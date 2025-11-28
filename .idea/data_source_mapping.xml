@@ -2,5 +2,6 @@
 <project version="4">
   <component name="DataSourcePerFileMappings">
     <file url="file://$APPLICATION_CONFIG_DIR$/consoles/db/e220508c-47b6-4957-8f1a-1090563d3c3a/console.sql" value="e220508c-47b6-4957-8f1a-1090563d3c3a" />
+    <file url="file://$PROJECT_DIR$/internal/domain/auth/repository/auth_repository.go" value="e220508c-47b6-4957-8f1a-1090563d3c3a" />
   </component>
 </project>

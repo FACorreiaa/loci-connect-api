@@ -22,10 +22,8 @@ const (
 	defaultSessionTTL = 30 * 24 * time.Hour
 )
 
-var (
-	// ErrAccountInactive is returned when a user has been disabled.
-	ErrAccountInactive = errors.New("account is deactivated")
-)
+// ErrAccountInactive is returned when a user has been disabled.
+var ErrAccountInactive = errors.New("account is deactivated")
 
 // SessionMetadata captures client information useful for audit trails.
 type SessionMetadata struct {
