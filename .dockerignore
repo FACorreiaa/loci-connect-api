@@ -1,0 +1,78 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker files
+Dockerfile
+docker-compose.yml
+postgres.Dockerfile
+.dockerignore
+
+# Development tools
+.air.toml
+Makefile
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build artifacts and caches
+tmp/
+vendor/
+main
+server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test files and coverage
+*_test.go
+testdata/
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+*.test
+
+# Profiling output
+*.prof
+cpu.prof
+heap.prof
+goroutine.prof
+trace.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/
+
+# Documentation
+README.md
+PROFILING.md
+docs/
+
+# Protobuf tools (buf binary not needed in container)
+buf.yaml
+buf.gen.yaml
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store

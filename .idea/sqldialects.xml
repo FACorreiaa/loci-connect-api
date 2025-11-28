@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SqlDialectMappings">
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0001_setup.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0002_create_users.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0003_create_point_of_interest.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0004_create_user_preferences.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0005_create_llm_interactions.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0006_create_reviews.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0007_create_lists.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0008_user_profile.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0009_user_tags.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0010_events.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0011_partner_integrations.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0012_analytics.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0013_itenerary.up.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0014_user_saved_iteneraries_markdown.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0015_user_favourites.up.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0016_add_user_profile_fields.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0017_add_vector_indexes_and_user_preference_embeddings.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0018_enhanced_user_preferences.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0019_add_chat_sessions_fields.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0020_fix_llm_interactions_session_id_type.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0022_add_llm_suggested_pois_unique_constraint.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0022_add_llm_suggested_pois_unique_constraint.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0027_fix_user_favorite_llm_pois_foreign_key.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0027_fix_user_favorite_llm_pois_foreign_key.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0028_add_session_id_to_user_saved_itineraries.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0028_add_session_id_to_user_saved_itineraries.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0029_add_itineraries_unique_constraint.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0029_add_itineraries_unique_constraint.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0030_update_list_items_generic_content.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0030_update_list_items_generic_content.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0031_fix_itinerary_validation.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0031_fix_itinerary_validation.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0032_fix_restaurant_validation.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0032_fix_restaurant_validation.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0033_make_poi_id_nullable.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0033_make_poi_id_nullable.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0034_enable_pg_trgm.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0034_enable_pg_trgm.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0035_create_discover_searches.down.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0035_create_discover_searches.up.sql" dialect="TSQL" />
+  </component>
+</project>

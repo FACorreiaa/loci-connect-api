@@ -1,0 +1,54 @@
+version: "2"
+linters:
+  enable:
+    - tagliatelle
+    - govet
+    - staticcheck
+    - revive
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - tools/cmd/stringer.go
+      - third_party$
+      - builtin$
+      - examples$
+
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -QF1008
+
+    gosec:
+      excludes:
+        - G505
+        - G501
+        - G401
+
+    tagliatelle:
+      case:
+        rules:
+          json: camel
+          path: camel
+          query: camel
+          db: snake
+          env: upperSnake
+
+formatters:
+  settings:
+    gofumpt:
+      extra-rules: true
+      module-path: ...
+  enable:
+    - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

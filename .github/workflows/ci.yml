@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  proto:
+    runs-on: ubuntu-latest
+    env:
+      GO_VERSION: "1.25.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install Buf CLI
+        uses: bufbuild/buf-setup-action@v1
+
+      - name: Generate protobuf stubs
+        env:
+          BUF_TOKEN: ${{ secrets.BUF_TOKEN }}
+        run: make generate
+
+      - name: Ensure proto outputs are committed
+        run: |
+          if [ -n "$(git status --short)" ]; then
+            echo "Protobuf output is not up to date. Run 'make generate' and commit the changes."
+            git status --short
+            exit 1
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: proto
+    env:
+      GO_VERSION: "1.25.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Check formatting
+        run: |
+          set -euo pipefail
+          gofiles=$(git ls-files '*.go' | grep -v '^vendor/' | grep -v '^gen/' || true)
+          if [ -n "$gofiles" ]; then
+            formatted=$(gofmt -l -s $gofiles)
+            if [ -n "$formatted" ]; then
+              echo "The following files need gofmt:"
+              echo "$formatted"
+              exit 1
+            fi
+          fi
+
+
+  test:
+    runs-on: ubuntu-latest
+    needs:
+      - proto
+      - lint
+    env:
+      GO_VERSION: "1.25.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run unit tests with coverage
+        run: go test -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
+  race:
+    runs-on: ubuntu-latest
+    needs:
+      - proto
+      - test
+    env:
+      GO_VERSION: "1.25.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run race detector
+        run: go test -race ./...
