@@ -88,12 +88,19 @@ func startPprofServer(cfg *config.Config, logger *slog.Logger) {
 func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) error {
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+
+	// Enable HTTP/2 support (h2c - HTTP/2 without TLS)
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	protocols.SetUnencryptedHTTP2(true)
+
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		Protocols:    protocols,
 	}
 
 	// Start server in goroutine

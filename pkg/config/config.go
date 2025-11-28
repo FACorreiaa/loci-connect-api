@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	_ "github.com/joho/godotenv"
 	"os"
 	"strconv"
+
+	_ "github.com/joho/godotenv"
 )
 
 // Config holds all application configuration
@@ -57,7 +58,7 @@ func Load() (*Config, error) {
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnvAsInt("DB_PORT", 5438),
+			Port:     getEnvAsInt("DB_PORT", 5439),
 			User:     getEnv("DB_USER", "postgres"),
 			Password: getEnv("DB_PASSWORD", "postgres"),
 			Database: getEnv("DB_NAME", "loci"),

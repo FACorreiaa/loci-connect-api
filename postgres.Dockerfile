@@ -5,7 +5,12 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     postgresql-server-dev-17 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    gnupg \
+    lsb-release
+
+# Install TimescaleDB for PostgreSQL 17
+RUN curl -s https://packagecloud.io/install/repositories/timescale/timescaledb/script.deb.sh | bash \
+    && apt-get install -y timescaledb-2-postgresql-17
 
 # Download and extract pgvector
 RUN curl -L https://github.com/pgvector/pgvector/archive/refs/tags/v0.8.0.tar.gz | tar xz -C /tmp
@@ -14,4 +19,4 @@ RUN curl -L https://github.com/pgvector/pgvector/archive/refs/tags/v0.8.0.tar.gz
 RUN cd /tmp/pgvector-0.8.0 && make && make install
 
 # Clean up temporary files
-RUN rm -rf /tmp/pgvector-0.8.0
+RUN rm -rf /tmp/pgvector-0.8.0 && rm -rf /var/lib/apt/lists/*

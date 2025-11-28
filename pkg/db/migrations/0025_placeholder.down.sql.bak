@@ -1,0 +1,3 @@
+-- +goose Down
+-- Placeholder migration to maintain sequential versioning
+SELECT 1;

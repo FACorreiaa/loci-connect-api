@@ -1,0 +1,9 @@
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE IF EXISTS user_tokens;
+DROP TABLE IF EXISTS user_sessions;
+
+ALTER TABLE users
+    DROP COLUMN IF EXISTS avatar_url,
+    DROP COLUMN IF EXISTS hashed_password;
+-- +goose StatementEnd

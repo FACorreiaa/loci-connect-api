@@ -1,0 +1,100 @@
+package main
+
+// Example: Running Connect-Go with HTTP/2 over TLS (HTTPS)
+// This is for PRODUCTION use
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"golang.org/x/crypto/acme/autocert"
+)
+
+// Option 1: With Let's Encrypt (Automatic Certificates)
+func runServerWithAutoTLS(addr string, handler http.Handler, logger *slog.Logger) error {
+	// Automatic certificate management with Let's Encrypt
+	certManager := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("yourdomain.com", "www.yourdomain.com"),
+		Cache:      autocert.DirCache("/var/www/.cache"), // Store certificates
+	}
+
+	srv := &http.Server{
+		Addr:         ":443", // HTTPS port
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		TLSConfig:    certManager.TLSConfig(),
+	}
+
+	// Start HTTP->HTTPS redirect server
+	go http.ListenAndServe(":80", certManager.HTTPHandler(nil))
+
+	logger.Info("HTTPS server started with auto-TLS", "addr", srv.Addr)
+	return srv.ListenAndServeTLS("", "") // Certificates managed by autocert
+}
+
+// Option 2: With Manual Certificates
+func runServerWithManualTLS(addr string, handler http.Handler, logger *slog.Logger) error {
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Graceful shutdown
+	serverErrors := make(chan error, 1)
+	go func() {
+		logger.Info("HTTPS server started", "addr", addr)
+		// Provide your certificate files
+		serverErrors <- srv.ListenAndServeTLS(
+			"/path/to/cert.pem",
+			"/path/to/key.pem",
+		)
+	}()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-serverErrors:
+		return fmt.Errorf("server error: %w", err)
+	case sig := <-shutdown:
+		logger.Info("shutdown signal received", "signal", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := srv.Shutdown(ctx); err != nil {
+			srv.Close()
+			return fmt.Errorf("graceful shutdown failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Option 3: Development with self-signed certificates
+// Generate self-signed cert:
+//   openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
+func runServerWithSelfSignedTLS(addr string, handler http.Handler, logger *slog.Logger) error {
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	logger.Info("HTTPS server with self-signed cert", "addr", addr)
+	return srv.ListenAndServeTLS("cert.pem", "key.pem")
+}
