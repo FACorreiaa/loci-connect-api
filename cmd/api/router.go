@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/validate"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/cors"
 	"go.opentelemetry.io/otel"
 	"golang.org/x/time/rate"
 
@@ -63,7 +64,33 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	// Register health and metrics routes
 	registerUtilityRoutes(mux, deps)
 
-	return mux
+	// Enable CORS for browser clients (Buf Studio, local frontend)
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins: []string{
+			"https://buf.build",
+			"https://studio.buf.build",
+			"http://localhost:3000",
+		},
+		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedHeaders: []string{
+			"Accept-Encoding",
+			"Content-Encoding",
+			"Content-Type",
+			"Connect-Protocol-Version",
+			"Connect-Timeout-Ms",
+			"Grpc-Timeout",
+			"X-Grpc-Web",
+			"X-User-Agent",
+		},
+		ExposedHeaders: []string{
+			"Grpc-Status",
+			"Grpc-Message",
+			"Grpc-Status-Details-Bin",
+		},
+		AllowCredentials: true,
+	})
+
+	return corsHandler.Handler(mux)
 }
 
 // registerConnectRoutes registers all Connect RPC service service
