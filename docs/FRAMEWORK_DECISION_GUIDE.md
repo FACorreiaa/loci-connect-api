@@ -4,7 +4,7 @@ Based on real performance testing of both implementations.
 
 ## Test Results Summary
 
-### Connect-Go (loci-connect-server)
+### Connect-Go (loci-connect-api)
 - **Login**: 225ms, 36 bytes request → 738 bytes response
 - **Register**: 238-381ms, 42-56 bytes request → 54 bytes response
 - **Protocol**: HTTP/2, Protocol Buffers
@@ -188,7 +188,7 @@ Phase 3: Add REST gateway for browsers if needed
 
 ### Your Current Setup:
 - ✅ You have BOTH implementations
-- ✅ loci-connect-server (Connect-Go)
+- ✅ loci-connect-api (Connect-Go)
 - ✅ go-ai-poi-server (Gin/REST)
 
 ### My Recommendation:

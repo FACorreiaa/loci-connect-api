@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"connectrpc.com/connect"
+	c "connectrpc.com/cors"
+
 	"connectrpc.com/validate"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -64,31 +66,40 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	// Register health and metrics routes
 	registerUtilityRoutes(mux, deps)
 
-	// Enable CORS for browser clients (Buf Studio, local frontend)
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins: []string{
-			"https://buf.build",
-			"https://studio.buf.build",
-			"http://localhost:3000",
-		},
-		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
-		AllowedHeaders: []string{
-			"Accept-Encoding",
-			"Content-Encoding",
-			"Content-Type",
-			"Connect-Protocol-Version",
-			"Connect-Timeout-Ms",
-			"Grpc-Timeout",
-			"X-Grpc-Web",
-			"X-User-Agent",
-		},
-		ExposedHeaders: []string{
-			"Grpc-Status",
-			"Grpc-Message",
-			"Grpc-Status-Details-Bin",
-		},
+		AllowedOrigins:   []string{"*"},                               // For testing ONLY—narrow to specifics like "http://localhost:3000" once working. Avoid in prod.
+		AllowedMethods:   c.AllowedMethods(),                          // ["GET", "POST", "OPTIONS"]
+		AllowedHeaders:   append(c.AllowedHeaders(), "Authorization"), // Adds "Authorization" for safety; full list: ["Accept-Encoding", "Content-Encoding", "Content-Type", "Connect-Protocol-Version", "Connect-Timeout-Ms", "Grpc-Timeout", "X-Grpc-Web", "X-User-Agent", "Authorization"]
+		ExposedHeaders:   c.ExposedHeaders(),                          // ["Grpc-Status", "Grpc-Message", "Grpc-Status-Details-Bin"]
 		AllowCredentials: true,
+		MaxAge:           7200, // Cache preflights for 2 hours
 	})
+
+	// Enable CORS for browser clients (Buf Studio, local frontend)
+	//corsHandler := cors.New(cors.Options{
+	//	AllowedOrigins: []string{
+	//		"https://buf.build",
+	//		"https://studio.buf.build",
+	//		"http://localhost:3000",
+	//	},
+	//	AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+	//	AllowedHeaders: []string{
+	//		"Accept-Encoding",
+	//		"Content-Encoding",
+	//		"Content-Type",
+	//		"Connect-Protocol-Version",
+	//		"Connect-Timeout-Ms",
+	//		"Grpc-Timeout",
+	//		"X-Grpc-Web",
+	//		"X-User-Agent",
+	//	},
+	//	ExposedHeaders: []string{
+	//		"Grpc-Status",
+	//		"Grpc-Message",
+	//		"Grpc-Status-Details-Bin",
+	//	},
+	//	AllowCredentials: true,
+	//})
 
 	return corsHandler.Handler(mux)
 }

@@ -1,0 +1,54 @@
+package user
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/google/generative-ai-go/genai"
+	"github.com/jackc/pgx/v5"
+	"github.com/pgvector/pgvector-go"
+	"google.golang.org/api/option"
+)
+
+// POI represents a place of interest.
+// Ensure your struct fields are exported and match DB columns (case-insensitive)
+// or use `db` tags if names differ significantly.
+type POI struct {
+	ID          int    `db:"id"`
+	Name        string `db:"name"`
+	Description string `db:"description"`
+}
+
+func SemanticSearch(ctx context.Context, db *pgx.Conn, geminiClient *genai.Client, userQuery string) ([]POI, error) {
+	// ... (Embedding generation logic remains the same) ...
+	em := geminiClient.EmbeddingModel("text-embedding-004")
+	res, err := em.EmbedContent(ctx, genai.Text(userQuery))
+	if err != nil {
+		return nil, fmt.Errorf("failed to embed: %w", err)
+	}
+	queryVector := pgvector.NewVector(res.Embedding.Values)
+
+	sql := `
+		SELECT id, name, description
+		FROM pois
+		ORDER BY embedding <-> $1
+		LIMIT 5;
+	`
+
+	// --- THE MODERN WAY (pgx v5) ---
+
+	// 1. Send the query
+	rows, _ := db.Query(ctx, sql, queryVector)
+
+	// 2. Use CollectRows to automatically scan into a slice of structs
+	// RowToStructByName maps DB column "name" -> Struct field "Name"
+	results, err := pgx.CollectRows(rows, pgx.RowToStructByName[POI])
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect rows: %w", err)
+	}
+
+	return results, nil
+}
