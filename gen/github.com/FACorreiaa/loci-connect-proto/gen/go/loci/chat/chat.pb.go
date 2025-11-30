@@ -2386,7 +2386,7 @@ var File_proto_chat_proto protoreflect.FileDescriptor
 
 const file_proto_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/chat.proto\x12\tloci.chat\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\x1a\x10proto/city.proto\x1a\x0fproto/poi.proto\x1a\x13proto/profile.proto\"\x8e\a\n" +
+	"\x10proto/chat.proto\x12\tloci.chat\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\x1a\x10proto/city.proto\x1a\x0fproto/poi.proto\x1a\x13proto/profile.proto\"\x97\a\n" +
 	"\x0eLlmInteraction\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12)\n" +
 	"\n" +
@@ -2398,11 +2398,11 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\tcity_name\x18\x05 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12\"\n" +
 	"\x06prompt\x18\x06 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\x06prompt\x120\n" +
-	"\x0frequest_payload\x18\a \x01(\fB\a\xbaH\x04z\x02\x10\x01R\x0erequestPayload\x12/\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\x06prompt\x124\n" +
+	"\x0frequest_payload\x18\a \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80@R\x0erequestPayload\x12/\n" +
 	"\rresponse_text\x18\b \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80}R\fresponseText\x122\n" +
-	"\x10response_payload\x18\t \x01(\fB\a\xbaH\x04z\x02\x10\x01R\x0fresponsePayload\x12(\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80}R\fresponseText\x127\n" +
+	"\x10response_payload\x18\t \x01(\fB\f\xbaH\tz\a\x10\x01\x18\x80\x80\x80\x01R\x0fresponsePayload\x12(\n" +
 	"\n" +
 	"model_used\x18\n" +
 	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tmodelUsed\x12,\n" +
@@ -2441,15 +2441,17 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xe8\aR\vdescription\x12@\n" +
 	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\ttimestamp\x12\x18\n" +
-	"\aapplied\x18\x04 \x01(\bR\aapplied\"\xcb\x03\n" +
+	"\aapplied\x18\x04 \x01(\bR\aapplied\"\xcf\x03\n" +
 	"\x0eSessionContext\x12'\n" +
 	"\tcity_name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcityName\x12+\n" +
 	"\flast_city_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\n" +
 	"lastCityId\x12S\n" +
-	"\x10user_preferences\x18\x03 \x01(\v2#.loci.profile.UserPreferenceProfileH\x00R\x0fuserPreferences\x88\x01\x01\x129\n" +
-	"\x10active_interests\x18\x04 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x0factiveInterests\x12/\n" +
-	"\vactive_tags\x18\x05 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\n" +
+	"\x10user_preferences\x18\x03 \x01(\v2#.loci.profile.UserPreferenceProfileH\x00R\x0fuserPreferences\x88\x01\x01\x12;\n" +
+	"\x10active_interests\x18\x04 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x102\"\x06r\x04\x10\x01\x18dR\x0factiveInterests\x121\n" +
+	"\vactive_tags\x18\x05 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x1e\"\x06r\x04\x10\x01\x18dR\n" +
 	"activeTags\x12;\n" +
 	"\x14conversation_summary\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x13conversationSummary\x12P\n" +
 	"\x14modification_history\x18\a \x03(\v2\x1d.loci.chat.ModificationRecordR\x13modificationHistoryB\x13\n" +
@@ -2468,24 +2470,27 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\x12itinerary_response\x18\x03 \x01(\v2\x1e.loci.chat.AIItineraryResponseR\x11itineraryResponse\x12)\n" +
 	"\n" +
 	"session_id\x18\x04 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\"\xb9\x02\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\"\xcb\x02\n" +
 	"\x19SessionPerformanceMetrics\x128\n" +
 	"\x14avg_response_time_ms\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x11avgResponseTimeMs\x12*\n" +
 	"\ftotal_tokens\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vtotalTokens\x12,\n" +
 	"\rprompt_tokens\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fpromptTokens\x124\n" +
-	"\x11completion_tokens\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x10completionTokens\x12\x1f\n" +
-	"\vmodels_used\x18\x05 \x03(\tR\n" +
+	"\x11completion_tokens\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x10completionTokens\x121\n" +
+	"\vmodels_used\x18\x05 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\n" +
+	"\"\x06r\x04\x10\x01\x18dR\n" +
 	"modelsUsed\x121\n" +
-	"\x10total_latency_ms\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0etotalLatencyMs\"\xf4\x02\n" +
+	"\x10total_latency_ms\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0etotalLatencyMs\"\xf8\x02\n" +
 	"\x15SessionContentMetrics\x12&\n" +
 	"\n" +
 	"total_pois\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\ttotalPois\x12*\n" +
 	"\ftotal_hotels\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vtotalHotels\x124\n" +
-	"\x11total_restaurants\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x10totalRestaurants\x126\n" +
-	"\x0ecities_covered\x18\x04 \x03(\tB\x0f\xbaH\f\x92\x01\t\"\ar\x05\x10\x01\x18\xc8\x01R\rcitiesCovered\x12#\n" +
+	"\x11total_restaurants\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x10totalRestaurants\x128\n" +
+	"\x0ecities_covered\x18\x04 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\x14\"\ar\x05\x10\x01\x18\xc8\x01R\rcitiesCovered\x12#\n" +
 	"\rhas_itinerary\x18\x05 \x01(\bR\fhasItinerary\x122\n" +
-	"\x10complexity_score\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0fcomplexityScore\x12@\n" +
-	"\x13dominant_categories\x18\a \x03(\tB\x0f\xbaH\f\x92\x01\t\"\ar\x05\x10\x01\x18\xc8\x01R\x12dominantCategories\"\xe0\x03\n" +
+	"\x10complexity_score\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0fcomplexityScore\x12B\n" +
+	"\x13dominant_categories\x18\a \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\n" +
+	"\"\ar\x05\x10\x01\x18\xc8\x01R\x12dominantCategories\"\xe0\x03\n" +
 	"\x18SessionEngagementMetrics\x12,\n" +
 	"\rmessage_count\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fmessageCount\x12K\n" +
 	"\x1dconversation_duration_seconds\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x1bconversationDurationSeconds\x125\n" +
@@ -2528,7 +2533,7 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\bcityName\x88\x01\x01B\r\n" +
 	"\v_session_idB\f\n" +
 	"\n" +
-	"_city_name\"\xdd\x02\n" +
+	"_city_name\"\xdf\x02\n" +
 	"\fChatResponse\x12)\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
@@ -2537,14 +2542,15 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12K\n" +
 	"\x11updated_itinerary\x18\x03 \x01(\v2\x19.loci.chat.AiCityResponseH\x00R\x10updatedItinerary\x88\x01\x01\x12$\n" +
 	"\x0eis_new_session\x18\x04 \x01(\bR\fisNewSession\x125\n" +
-	"\x16requires_clarification\x18\x05 \x01(\bR\x15requiresClarification\x12<\n" +
-	"\x11suggested_actions\x18\x06 \x03(\tB\x0f\xbaH\f\x92\x01\t\"\ar\x05\x10\x01\x18\xc8\x01R\x10suggestedActionsB\x14\n" +
-	"\x12_updated_itinerary\"\xea\x02\n" +
+	"\x16requires_clarification\x18\x05 \x01(\bR\x15requiresClarification\x12>\n" +
+	"\x11suggested_actions\x18\x06 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\n" +
+	"\"\ar\x05\x10\x01\x18\xc8\x01R\x10suggestedActionsB\x14\n" +
+	"\x12_updated_itinerary\"\xf5\x02\n" +
 	"\vStreamEvent\x12\x1d\n" +
 	"\x04type\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x04type\x12$\n" +
 	"\amessage\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12\x12\n" +
-	"\x04data\x18\x03 \x01(\fR\x04data\x12%\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12\x1d\n" +
+	"\x04data\x18\x03 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80@R\x04data\x12%\n" +
 	"\x05error\x18\x04 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xf4\x03H\x00R\x05error\x88\x01\x01\x12@\n" +
 	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\ttimestamp\x12%\n" +
@@ -2555,10 +2561,10 @@ const file_proto_chat_proto_rawDesc = "" +
 	"navigation\x18\b \x01(\v2\x19.loci.chat.NavigationDataH\x01R\n" +
 	"navigation\x88\x01\x01B\b\n" +
 	"\x06_errorB\r\n" +
-	"\v_navigation\"\xfb\x01\n" +
-	"\x0eNavigationData\x12\x1c\n" +
-	"\x03url\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\x03url\x12(\n" +
+	"\v_navigation\"\xfe\x01\n" +
+	"\x0eNavigationData\x12\x1f\n" +
+	"\x03url\x18\x01 \x01(\tB\r\xbaH\n" +
+	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x03url\x12(\n" +
 	"\n" +
 	"route_type\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\trouteType\x12a\n" +
 	"\fquery_params\x18\x03 \x03(\v2*.loci.chat.NavigationData.QueryParamsEntryB\x12\xbaH\x0f\x9a\x01\f\"\x04r\x02\x10\x01*\x04r\x02\x10\x01R\vqueryParams\x1a>\n" +
@@ -2623,7 +2629,7 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\vrestaurants\x18\f \x03(\v2 .loci.poi.RestaurantDetailedInfoR\vrestaurantsB\n" +
 	"\n" +
 	"\b_city_idB\x10\n" +
-	"\x0e_response_text\"\xf6\x03\n" +
+	"\x0e_response_text\"\x89\x04\n" +
 	"\x10CityInteractions\x12'\n" +
 	"\tcity_name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcityName\x12)\n" +
@@ -2632,8 +2638,8 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\x12@\n" +
 	"\finteractions\x18\x03 \x03(\v2\x1c.loci.chat.RecentInteractionR\finteractions\x12$\n" +
 	"\tpoi_count\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\bpoiCount\x12G\n" +
-	"\rlast_activity\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\flastActivity\x12\x1f\n" +
-	"\vsession_ids\x18\x06 \x03(\tR\n" +
+	"\rlast_activity\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\flastActivity\x122\n" +
+	"\vsession_ids\x18\x06 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x102\"\ar\x05\x10\x01\x18\xc8\x01R\n" +
 	"sessionIds\x12 \n" +
 	"\x05title\x18\a \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x05title\x125\n" +

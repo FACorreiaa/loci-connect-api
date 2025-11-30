@@ -400,13 +400,11 @@ var File_proto_common_proto protoreflect.FileDescriptor
 
 const file_proto_common_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/common.proto\x12\vloci.common\x1a\x1bbuf/validate/validate.proto\"\x8c\x01\n" +
+	"\x12proto/common.proto\x12\vloci.common\x1a\x1bbuf/validate/validate.proto\"\x88\x01\n" +
 	"\bResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12)\n" +
-	"\amessage\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03H\x00R\amessage\x88\x01\x01\x12%\n" +
-	"\x05error\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03H\x01R\x05error\x88\x01\x01B\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12'\n" +
+	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aH\x00R\amessage\x88\x01\x01\x12#\n" +
+	"\x05error\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aH\x01R\x05error\x88\x01\x01B\n" +
 	"\n" +
 	"\b_messageB\b\n" +
 	"\x06_error\"\xe7\x01\n" +

@@ -1461,18 +1461,24 @@ var File_proto_profile_proto protoreflect.FileDescriptor
 
 const file_proto_profile_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\x1a\x14proto/interest.proto\"\xb4\x06\n" +
+	"\x13proto/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\x1a\x14proto/interest.proto\"\xbc\x06\n" +
 	"\x18AccommodationPreferences\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12=\n" +
-	"\x12accommodation_type\x18\x03 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x11accommodationType\x12>\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12?\n" +
+	"\x12accommodation_type\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\n" +
+	"\"\x06r\x04\x10\x01\x18dR\x11accommodationType\x12>\n" +
 	"\vstar_rating\x18\x04 \x01(\v2\x18.loci.common.RangeFilterH\x00R\n" +
 	"starRating\x88\x01\x01\x12P\n" +
-	"\x15price_range_per_night\x18\x05 \x01(\v2\x18.loci.common.RangeFilterH\x01R\x12priceRangePerNight\x88\x01\x01\x12,\n" +
-	"\tamenities\x18\x06 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\tamenities\x12+\n" +
-	"\troom_type\x18\a \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\broomType\x129\n" +
-	"\x10chain_preference\x18\b \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\x0fchainPreference\x88\x01\x01\x12?\n" +
-	"\x13cancellation_policy\x18\t \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x12cancellationPolicy\x12?\n" +
+	"\x15price_range_per_night\x18\x05 \x01(\v2\x18.loci.common.RangeFilterH\x01R\x12priceRangePerNight\x88\x01\x01\x12.\n" +
+	"\tamenities\x18\x06 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x1e\"\x06r\x04\x10\x01\x18dR\tamenities\x12-\n" +
+	"\troom_type\x18\a \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\n" +
+	"\"\x06r\x04\x10\x01\x18dR\broomType\x129\n" +
+	"\x10chain_preference\x18\b \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\x0fchainPreference\x88\x01\x01\x12A\n" +
+	"\x13cancellation_policy\x18\t \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x05\"\x06r\x04\x10\x01\x18dR\x12cancellationPolicy\x12?\n" +
 	"\x13booking_flexibility\x18\n" +
 	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\x12bookingFlexibility\x88\x01\x01\x12A\n" +
 	"\n" +
@@ -1482,17 +1488,24 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\f_star_ratingB\x18\n" +
 	"\x16_price_range_per_nightB\x13\n" +
 	"\x11_chain_preferenceB\x16\n" +
-	"\x14_booking_flexibility\"\xef\x06\n" +
+	"\x14_booking_flexibility\"\xf9\x06\n" +
 	"\x11DiningPreferences\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x123\n" +
-	"\rcuisine_types\x18\x03 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fcuisineTypes\x12-\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x125\n" +
+	"\rcuisine_types\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fcuisineTypes\x12/\n" +
 	"\n" +
-	"meal_types\x18\x04 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\tmealTypes\x123\n" +
-	"\rservice_style\x18\x05 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fserviceStyle\x12R\n" +
-	"\x16price_range_per_person\x18\x06 \x01(\v2\x18.loci.common.RangeFilterH\x00R\x13priceRangePerPerson\x88\x01\x01\x123\n" +
-	"\rdietary_needs\x18\a \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x123\n" +
-	"\rallergen_free\x18\b \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fallergenFree\x12%\n" +
+	"meal_types\x18\x04 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\n" +
+	"\"\x06r\x04\x10\x01\x18dR\tmealTypes\x125\n" +
+	"\rservice_style\x18\x05 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\n" +
+	"\"\x06r\x04\x10\x01\x18dR\fserviceStyle\x12R\n" +
+	"\x16price_range_per_person\x18\x06 \x01(\v2\x18.loci.common.RangeFilterH\x00R\x13priceRangePerPerson\x88\x01\x01\x125\n" +
+	"\rdietary_needs\x18\a \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x125\n" +
+	"\rallergen_free\x18\b \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fallergenFree\x12%\n" +
 	"\x0emichelin_rated\x18\t \x01(\bR\rmichelinRated\x123\n" +
 	"\x15local_recommendations\x18\n" +
 	" \x01(\bR\x14localRecommendations\x124\n" +
@@ -1504,21 +1517,24 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x19\n" +
 	"\x17_price_range_per_personB\x11\n" +
-	"\x0f_chain_vs_local\"\xf0\a\n" +
+	"\x0f_chain_vs_local\"\xf6\a\n" +
 	"\x13ActivityPreferences\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12?\n" +
-	"\x13activity_categories\x18\x03 \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x12activityCategories\x12F\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12A\n" +
+	"\x13activity_categories\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x12activityCategories\x12F\n" +
 	"\x17physical_activity_level\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x15physicalActivityLevel\x88\x01\x01\x12J\n" +
 	"\x19indoor_outdoor_preference\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\x17indoorOutdoorPreference\x88\x01\x01\x12H\n" +
 	"\x18cultural_immersion_level\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\x16culturalImmersionLevel\x88\x01\x01\x12D\n" +
 	"\x17must_see_vs_hidden_gems\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\x13mustSeeVsHiddenGems\x88\x01\x01\x125\n" +
 	"\x16educational_preference\x18\b \x01(\bR\x15educationalPreference\x12;\n" +
-	"\x19photography_opportunities\x18\t \x01(\bR\x18photographyOpportunities\x12L\n" +
+	"\x19photography_opportunities\x18\t \x01(\bR\x18photographyOpportunities\x12N\n" +
 	"\x1aseason_specific_activities\x18\n" +
-	" \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x18seasonSpecificActivities\x12!\n" +
-	"\favoid_crowds\x18\v \x01(\bR\vavoidCrowds\x12B\n" +
-	"\x15local_events_interest\x18\f \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x13localEventsInterest\x12A\n" +
+	" \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x18seasonSpecificActivities\x12!\n" +
+	"\favoid_crowds\x18\v \x01(\bR\vavoidCrowds\x12D\n" +
+	"\x15local_events_interest\x18\f \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x13localEventsInterest\x12A\n" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
@@ -1526,7 +1542,7 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x18_physical_activity_levelB\x1c\n" +
 	"\x1a_indoor_outdoor_preferenceB\x1b\n" +
 	"\x19_cultural_immersion_levelB\x1a\n" +
-	"\x18_must_see_vs_hidden_gems\"\xac\a\n" +
+	"\x18_must_see_vs_hidden_gems\"\xae\a\n" +
 	"\x14ItineraryPreferences\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
 	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x125\n" +
@@ -1534,8 +1550,9 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x0epreferred_pace\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\rpreferredPace\x88\x01\x01\x129\n" +
 	"\x10time_flexibility\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\x0ftimeFlexibility\x88\x01\x01\x12<\n" +
 	"\x12morning_vs_evening\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\x10morningVsEvening\x88\x01\x01\x12<\n" +
-	"\x12weekend_vs_weekday\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x04R\x10weekendVsWeekday\x88\x01\x01\x12;\n" +
-	"\x11preferred_seasons\x18\b \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x182R\x10preferredSeasons\x12*\n" +
+	"\x12weekend_vs_weekday\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x04R\x10weekendVsWeekday\x88\x01\x01\x12=\n" +
+	"\x11preferred_seasons\x18\b \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x04\"\x06r\x04\x10\x01\x182R\x10preferredSeasons\x12*\n" +
 	"\x11avoid_peak_season\x18\t \x01(\bR\x0favoidPeakSeason\x12F\n" +
 	"\x17adventure_vs_relaxation\x18\n" +
 	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x05R\x15adventureVsRelaxation\x88\x01\x01\x12D\n" +
@@ -1550,7 +1567,7 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x13_morning_vs_eveningB\x15\n" +
 	"\x13_weekend_vs_weekdayB\x1a\n" +
 	"\x18_adventure_vs_relaxationB\x19\n" +
-	"\x17_spontaneous_vs_planned\"\xf6\f\n" +
+	"\x17_spontaneous_vs_planned\"\xfa\f\n" +
 	"\x15UserPreferenceProfile\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12-\n" +
@@ -1566,10 +1583,12 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x16prefer_accessible_pois\x18\t \x01(\bR\x14preferAccessiblePois\x124\n" +
 	"\x16prefer_outdoor_seating\x18\n" +
 	" \x01(\bR\x14preferOutdoorSeating\x12.\n" +
-	"\x13prefer_dog_friendly\x18\v \x01(\bR\x11preferDogFriendly\x127\n" +
-	"\x0fpreferred_vibes\x18\f \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12\\\n" +
-	"\x13preferred_transport\x18\r \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01R\x12preferredTransport\x123\n" +
-	"\rdietary_needs\x18\x0e \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x125\n" +
+	"\x13prefer_dog_friendly\x18\v \x01(\bR\x11preferDogFriendly\x129\n" +
+	"\x0fpreferred_vibes\x18\f \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12\\\n" +
+	"\x13preferred_transport\x18\r \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01R\x12preferredTransport\x125\n" +
+	"\rdietary_needs\x18\x0e \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x125\n" +
 	"\tinterests\x18\x0f \x03(\v2\x17.loci.interest.InterestR\tinterests\x12'\n" +
 	"\x04tags\x18\x10 \x03(\v2\x13.loci.interest.TagsR\x04tags\x12A\n" +
 	"\ruser_latitude\x18\x11 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x00R\fuserLatitude\x88\x01\x01\x12C\n" +
@@ -1587,7 +1606,7 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x1a_accommodation_preferencesB\x15\n" +
 	"\x13_dining_preferencesB\x17\n" +
 	"\x15_activity_preferencesB\x18\n" +
-	"\x16_itinerary_preferences\"\x85\f\n" +
+	"\x16_itinerary_preferences\"\x8d\f\n" +
 	"\"CreateUserPreferenceProfileRequest\x12-\n" +
 	"\fprofile_name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\vprofileName\x12\"\n" +
@@ -1600,13 +1619,17 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x0epreferred_pace\x18\x06 \x01(\x0e2\x18.loci.profile.SearchPaceB\b\xbaH\x05\x82\x01\x02\x10\x01H\x04R\rpreferredPace\x88\x01\x01\x129\n" +
 	"\x16prefer_accessible_pois\x18\a \x01(\bH\x05R\x14preferAccessiblePois\x88\x01\x01\x129\n" +
 	"\x16prefer_outdoor_seating\x18\b \x01(\bH\x06R\x14preferOutdoorSeating\x88\x01\x01\x123\n" +
-	"\x13prefer_dog_friendly\x18\t \x01(\bH\aR\x11preferDogFriendly\x88\x01\x01\x127\n" +
+	"\x13prefer_dog_friendly\x18\t \x01(\bH\aR\x11preferDogFriendly\x88\x01\x01\x129\n" +
 	"\x0fpreferred_vibes\x18\n" +
-	" \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12a\n" +
-	"\x13preferred_transport\x18\v \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01H\bR\x12preferredTransport\x88\x01\x01\x123\n" +
-	"\rdietary_needs\x18\f \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x12'\n" +
-	"\atag_ids\x18\r \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x06tagIds\x121\n" +
-	"\finterest_ids\x18\x0e \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\vinterestIds\x12h\n" +
+	" \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12a\n" +
+	"\x13preferred_transport\x18\v \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01H\bR\x12preferredTransport\x88\x01\x01\x125\n" +
+	"\rdietary_needs\x18\f \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x12)\n" +
+	"\atag_ids\x18\r \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x1e\"\x06r\x04\x10\x01\x18dR\x06tagIds\x123\n" +
+	"\finterest_ids\x18\x0e \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x102\"\x06r\x04\x10\x01\x18dR\vinterestIds\x12h\n" +
 	"\x19accommodation_preferences\x18\x0f \x01(\v2&.loci.profile.AccommodationPreferencesH\tR\x18accommodationPreferences\x88\x01\x01\x12S\n" +
 	"\x12dining_preferences\x18\x10 \x01(\v2\x1f.loci.profile.DiningPreferencesH\n" +
 	"R\x11diningPreferences\x88\x01\x01\x12Y\n" +
@@ -1624,7 +1647,7 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x1a_accommodation_preferencesB\x15\n" +
 	"\x13_dining_preferencesB\x17\n" +
 	"\x15_activity_preferencesB\x18\n" +
-	"\x16_itinerary_preferences\"\xc5\f\n" +
+	"\x16_itinerary_preferences\"\xcd\f\n" +
 	"\"UpdateUserPreferenceProfileRequest\x12(\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\x122\n" +
@@ -1640,12 +1663,16 @@ const file_proto_profile_proto_rawDesc = "" +
 	"\x16prefer_accessible_pois\x18\b \x01(\bH\x06R\x14preferAccessiblePois\x88\x01\x01\x129\n" +
 	"\x16prefer_outdoor_seating\x18\t \x01(\bH\aR\x14preferOutdoorSeating\x88\x01\x01\x123\n" +
 	"\x13prefer_dog_friendly\x18\n" +
-	" \x01(\bH\bR\x11preferDogFriendly\x88\x01\x01\x127\n" +
-	"\x0fpreferred_vibes\x18\v \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12a\n" +
-	"\x13preferred_transport\x18\f \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01H\tR\x12preferredTransport\x88\x01\x01\x123\n" +
-	"\rdietary_needs\x18\r \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x12'\n" +
-	"\atag_ids\x18\x0e \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\x06tagIds\x121\n" +
-	"\finterest_ids\x18\x0f \x03(\tB\x0e\xbaH\v\x92\x01\b\"\x06r\x04\x10\x01\x18dR\vinterestIds\x12h\n" +
+	" \x01(\bH\bR\x11preferDogFriendly\x88\x01\x01\x129\n" +
+	"\x0fpreferred_vibes\x18\v \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x0epreferredVibes\x12a\n" +
+	"\x13preferred_transport\x18\f \x01(\x0e2!.loci.profile.TransportPreferenceB\b\xbaH\x05\x82\x01\x02\x10\x01H\tR\x12preferredTransport\x88\x01\x01\x125\n" +
+	"\rdietary_needs\x18\r \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fdietaryNeeds\x12)\n" +
+	"\atag_ids\x18\x0e \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x1e\"\x06r\x04\x10\x01\x18dR\x06tagIds\x123\n" +
+	"\finterest_ids\x18\x0f \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x102\"\x06r\x04\x10\x01\x18dR\vinterestIds\x12h\n" +
 	"\x19accommodation_preferences\x18\x10 \x01(\v2&.loci.profile.AccommodationPreferencesH\n" +
 	"R\x18accommodationPreferences\x88\x01\x01\x12S\n" +
 	"\x12dining_preferences\x18\x11 \x01(\v2\x1f.loci.profile.DiningPreferencesH\vR\x11diningPreferences\x88\x01\x01\x12Y\n" +

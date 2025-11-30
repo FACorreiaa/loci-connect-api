@@ -33,6 +33,9 @@ func LoginResponse(result *service.LoginResult) *auth.LoginResponse {
 	return &auth.LoginResponse{
 		AccessToken:  result.Tokens.AccessToken,
 		RefreshToken: result.Tokens.RefreshToken,
+		Username:     result.User.Username,
+		UserId:       result.User.ID.String(),
+		Email:        result.User.Email,
 		Message:      "Login successful",
 	}
 }

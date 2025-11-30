@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 
 	"connectrpc.com/connect"
@@ -32,14 +33,14 @@ func (h *AuthHandler) Register(
 	ctx context.Context,
 	req *connect.Request[auth.RegisterRequest],
 ) (*connect.Response[commonpb.Response], error) {
-	if req.Msg.Email == "" || req.Msg.Password == "" || req.Msg.Username == "" {
+	if req.Msg.Email == "" || string(req.Msg.Password) == "" || req.Msg.Username == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("email, username, and password are required"))
 	}
 
 	result, err := h.service.RegisterUser(ctx, service.RegisterParams{
 		Email:       req.Msg.Email,
 		Username:    req.Msg.Username,
-		Password:    req.Msg.Password,
+		Password:    string(req.Msg.Password),
 		DisplayName: req.Msg.Username,
 		Metadata:    metadataFromRequest(req),
 	})
@@ -52,13 +53,15 @@ func (h *AuthHandler) Register(
 
 // Login authenticates a user.
 func (h *AuthHandler) Login(ctx context.Context, req *connect.Request[auth.LoginRequest]) (*connect.Response[auth.LoginResponse], error) {
-	if req.Msg.Email == "" || req.Msg.Password == "" {
+	if req.Msg.Email == "" || string(req.Msg.Password) == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("email and password are required"))
 	}
 
+	encodedPassword := base64.StdEncoding.EncodeToString([]byte(req.Msg.Password))
+
 	result, err := h.service.Login(ctx, service.LoginParams{
 		Email:    req.Msg.Email,
-		Password: req.Msg.Password,
+		Password: encodedPassword,
 		Metadata: metadataFromRequest(req),
 	})
 	if err != nil {
@@ -100,7 +103,7 @@ func (h *AuthHandler) ValidateSession(ctx context.Context, req *connect.Request[
 }
 
 // ChangePassword is not yet implemented.
-func (h *AuthHandler) ChangePassword(ctx context.Context, _ *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[commonpb.Response], error) {
+func (h *AuthHandler) ChangePassword(_ context.Context, _ *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[commonpb.Response], error) {
 	return nil, connect.NewError(
 		connect.CodeUnimplemented,
 		errors.New("change password is not implemented"),
@@ -108,7 +111,7 @@ func (h *AuthHandler) ChangePassword(ctx context.Context, _ *connect.Request[aut
 }
 
 // ChangeEmail is not yet implemented.
-func (h *AuthHandler) ChangeEmail(ctx context.Context, _ *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[commonpb.Response], error) {
+func (h *AuthHandler) ChangeEmail(_ context.Context, _ *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[commonpb.Response], error) {
 	return nil, connect.NewError(
 		connect.CodeUnimplemented,
 		errors.New("change email is not implemented"),

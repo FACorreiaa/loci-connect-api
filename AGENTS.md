@@ -8,9 +8,9 @@ Now I want to migrate a new the chat feature. But before we do that there is one
 
 We first need:
 
-1. run make generate
-2. fix all missing types on every folder (they are on the type folder now)
-3. migrate the chat feature to Connect-Go using the same pattern as the Auth folder
+1. read the chat proto gen inside the gen folder
+2. understand how the chat feature is working with the old REST API (chat_handler.go.old)
+3. migrate the chat feature to Connect-Go using the same pattern as the Auth folder (folder structure, service organisation)
 4. make sure everything is working by running the tests on the chat folder
 5. organise the chat folder and delete the import cycle
 6. based on chat_handler.go.old, create the equivalent chat_handler.go using Connect-Go

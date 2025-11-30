@@ -168,6 +168,9 @@ type LoginResponse struct {
 	AccessToken   string                 `protobuf:"bytes,1,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`
 	RefreshToken  string                 `protobuf:"bytes,2,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	UserId        string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Username      string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
+	Email         string                 `protobuf:"bytes,6,opt,name=email,proto3" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -219,6 +222,27 @@ func (x *LoginResponse) GetRefreshToken() string {
 func (x *LoginResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetEmail() string {
+	if x != nil {
+		return x.Email
 	}
 	return ""
 }
@@ -829,10 +853,10 @@ var File_proto_auth_proto protoreflect.FileDescriptor
 
 const file_proto_auth_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/auth.proto\x12\tloci.auth\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\"\x90\x02\n" +
+	"\x10proto/auth.proto\x12\tloci.auth\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\"\xa2\x02\n" +
 	"\bUserAuth\x12\x19\n" +
-	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12%\n" +
-	"\busername\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\busername\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
+	"\busername\x18\x02 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
 	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12\x1d\n" +
 	"\x04role\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x04role\x12A\n" +
 	"\n" +
@@ -842,14 +866,17 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\fLoginRequest\x12\x1d\n" +
 	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12&\n" +
 	"\bpassword\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\"\x8f\x01\n" +
+	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\"\x8b\x02\n" +
 	"\rLoginResponse\x12*\n" +
 	"\faccess_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\vaccessToken\x12,\n" +
 	"\rrefresh_token\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\x12$\n" +
 	"\amessage\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\amessage\"\xac\x01\n" +
-	"\x0fRegisterRequest\x12%\n" +
-	"\busername\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x03\x18dR\busername\x12\x1d\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\amessage\x12\"\n" +
+	"\auser_id\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x127\n" +
+	"\busername\x18\x05 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
+	"\x05email\x18\x06 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\xbe\x01\n" +
+	"\x0fRegisterRequest\x127\n" +
+	"\busername\x18\x01 \x01(\tB\x1b\xbaH\x18r\x16\x10\x03\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
 	"\x05email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12&\n" +
 	"\bpassword\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\x12\"\n" +
@@ -863,11 +890,11 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\x16ValidateSessionRequest\x12)\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\"\xcb\x01\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\"\xdd\x01\n" +
 	"\x17ValidateSessionResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12'\n" +
-	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01\x12*\n" +
-	"\busername\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\busername\x88\x01\x01\x12\"\n" +
+	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01\x12<\n" +
+	"\busername\x18\x03 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x01R\busername\x88\x01\x01\x12\"\n" +
 	"\x05email\x18\x04 \x01(\tB\a\xbaH\x04r\x02`\x01H\x02R\x05email\x88\x01\x01B\n" +
 	"\n" +
 	"\b_user_idB\v\n" +
@@ -883,15 +910,15 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\x12$\n" +
 	"\tnew_email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\bnewEmail\"=\n" +
 	"\rLogoutRequest\x12,\n" +
-	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"k\n" +
+	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"}\n" +
 	"\aSession\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x02id\x12%\n" +
-	"\busername\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\busername\x12\x1d\n" +
-	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\xbc\x03\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x02id\x127\n" +
+	"\busername\x18\x02 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
+	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"\xce\x03\n" +
 	"\x06Claims\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12%\n" +
-	"\busername\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\busername\x12\x1d\n" +
+	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x127\n" +
+	"\busername\x18\x02 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
 	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12\x1d\n" +
 	"\x04role\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x04role\x12;\n" +
 	"\x11subscription_plan\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x10subscriptionPlan\x88\x01\x01\x12?\n" +
