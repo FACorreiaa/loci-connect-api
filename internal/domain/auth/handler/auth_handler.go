@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 
 	"connectrpc.com/connect"
@@ -57,11 +56,9 @@ func (h *AuthHandler) Login(ctx context.Context, req *connect.Request[auth.Login
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("email and password are required"))
 	}
 
-	encodedPassword := base64.StdEncoding.EncodeToString([]byte(req.Msg.Password))
-
 	result, err := h.service.Login(ctx, service.LoginParams{
 		Email:    req.Msg.Email,
-		Password: encodedPassword,
+		Password: req.Msg.Password,
 		Metadata: metadataFromRequest(req),
 	})
 	if err != nil {

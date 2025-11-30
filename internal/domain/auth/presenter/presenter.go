@@ -9,7 +9,7 @@ import (
 
 // RegisterResponse converts a register result into a generic response.
 func RegisterResponse(result *service.RegisterResult) *commonpb.Response {
-	if result == nil {
+	if result == nil || result.User == nil || result.Tokens == nil {
 		return &commonpb.Response{}
 	}
 
@@ -26,7 +26,7 @@ func RegisterResponse(result *service.RegisterResult) *commonpb.Response {
 
 // LoginResponse converts a login result into its RPC response.
 func LoginResponse(result *service.LoginResult) *auth.LoginResponse {
-	if result == nil {
+	if result == nil || result.User == nil || result.Tokens == nil {
 		return &auth.LoginResponse{}
 	}
 
