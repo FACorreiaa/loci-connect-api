@@ -18,7 +18,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/patrickmn/go-cache"
-	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -2284,7 +2283,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 		jsonData, err := json.MarshalIndent(completeData, "", "  ")
 		if err != nil {
-			logger.Log.Error("Failed to marshal completeData to JSON", zap.Error(err))
+			l.logger.Error("Failed to marshal completeData to JSON", err)
 		} else {
 			filename := "complete_itinerary.json" // Or fmt.Sprintf("complete_itinerary_%s.json", sessionID)
 			if writeErr := os.WriteFile(filename, jsonData, 0644); writeErr != nil {
