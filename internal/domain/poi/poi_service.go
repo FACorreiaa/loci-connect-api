@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -67,7 +69,7 @@ type ServiceImpl struct {
 	logger           *slog.Logger
 	poiRepository    Repository
 	embeddingService *generativeAI.EmbeddingService
-	aiClient         *generativeAI.chatClient
+	aiClient         *generativeAI.LLMChatClient
 	cityRepo         city.Repository
 	discoverRepo     interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
@@ -79,11 +81,11 @@ func NewServiceImpl(poiRepository Repository,
 	embeddingService *generativeAI.EmbeddingService,
 	cityRepo city.Repository,
 	discoverRepo interface {
-	TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
-},
+		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
+	},
 	logger *slog.Logger) *ServiceImpl {
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := generativeAI.NewchatClient(context.Background(), apiKey)
+	aiClient, err := generativeAI.NewLLMChatClient(context.Background(), apiKey)
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
 		// For now, set to nil and handle gracefully in methods
@@ -544,12 +546,12 @@ Generate 5-10 relevant results.`, query, cityName)
 	}
 
 	// Clean the LLM response (remove markdown, trim, fix JSON issues)
-	responseStr := utils.CleanLLMResponse(txt)
+	responseStr := cleanLLMResponse(txt)
 
 	l.DebugContext(ctx, "LLM response received",
 		slog.Int64("latency_ms", latencyMs),
 		slog.Int("response_length", len(responseStr)),
-		slog.String("response_preview", responseStr[:min(200, len(responseStr))]))
+		slog.String("response_preview", responseStr[:minInt(200, len(responseStr))]))
 
 	// Parse JSON response
 	var searchResponse struct {
@@ -984,7 +986,7 @@ func (s *ServiceImpl) getGeneralPOIByDistance(wg *sync.WaitGroup,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := utils.CleanJSONResponse(txt)
+	cleanTxt := cleanJSONResponse(txt)
 	var poiData struct {
 		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -1437,7 +1439,7 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(wg *sync.WaitGroup,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := utils.CleanJSONResponse(txt)
+	cleanTxt := cleanJSONResponse(txt)
 	var poiData struct {
 		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -1537,7 +1539,7 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(wg *sync.WaitGroup,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := utils.CleanJSONResponse(txt)
+	cleanTxt := cleanJSONResponse(txt)
 	var poiData struct {
 		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -1637,7 +1639,7 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(wg *sync.WaitGroup,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := utils.CleanJSONResponse(txt)
+	cleanTxt := cleanJSONResponse(txt)
 	var poiData struct {
 		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -1737,7 +1739,7 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(wg *sync.WaitGroup,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := utils.CleanJSONResponse(txt)
+	cleanTxt := cleanJSONResponse(txt)
 	var poiData struct {
 		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -1758,4 +1760,79 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(wg *sync.WaitGroup,
 		Prompt:     prompt,
 		Response:   cleanTxt,
 	}
+}
+
+func cleanLLMResponse(responseText string) string {
+	cleaned := strings.TrimSpace(responseText)
+
+	if strings.HasPrefix(cleaned, "```json") {
+		cleaned = strings.TrimPrefix(cleaned, "```json")
+		cleaned = strings.TrimSuffix(cleaned, "```")
+		cleaned = strings.TrimSpace(cleaned)
+	} else if strings.HasPrefix(cleaned, "```") {
+		cleaned = strings.TrimPrefix(cleaned, "```")
+		cleaned = strings.TrimSuffix(cleaned, "```")
+		cleaned = strings.TrimSpace(cleaned)
+	}
+
+	cleaned = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(cleaned, "$1")
+	return cleaned
+}
+
+func cleanJSONResponse(response string) string {
+	response = strings.TrimSpace(response)
+
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+	} else if strings.HasPrefix(response, "```") {
+		response = strings.TrimPrefix(response, "```")
+	}
+
+	response = strings.TrimSuffix(response, "```")
+	response = strings.TrimSpace(response)
+
+	firstBrace := strings.Index(response, "{")
+	if firstBrace == -1 {
+		return response
+	}
+
+	braceCount := 0
+	lastValidBrace := -1
+	for i := firstBrace; i < len(response); i++ {
+		switch response[i] {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+			if braceCount == 0 {
+				lastValidBrace = i
+				break
+			}
+		}
+	}
+
+	if braceCount != 0 {
+		lastBrace := strings.LastIndex(response, "}")
+		if lastBrace == -1 || lastBrace <= firstBrace {
+			return response
+		}
+		lastValidBrace = lastBrace
+	}
+
+	if lastValidBrace == -1 {
+		return response
+	}
+
+	jsonPortion := response[firstBrace : lastValidBrace+1]
+	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
+	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
+
+	return strings.TrimSpace(jsonPortion)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

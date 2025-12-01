@@ -1948,3 +1948,61 @@ func uniqueStringSlice(slice []string) []string {
 
 	return result
 }
+
+func CleanJSONResponse(response string) string {
+	response = strings.TrimSpace(response)
+
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+	} else if strings.HasPrefix(response, "```") {
+		response = strings.TrimPrefix(response, "```")
+	}
+
+	response = strings.TrimSuffix(response, "```")
+	response = strings.TrimSpace(response)
+
+	firstBrace := strings.Index(response, "{")
+	if firstBrace == -1 {
+		return response
+	}
+
+	braceCount := 0
+	lastValidBrace := -1
+	for i := firstBrace; i < len(response); i++ {
+		switch response[i] {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+			if braceCount == 0 {
+				lastValidBrace = i
+				break
+			}
+		}
+	}
+
+	if braceCount != 0 {
+		lastBrace := strings.LastIndex(response, "}")
+		if lastBrace == -1 || lastBrace <= firstBrace {
+			return response
+		}
+		lastValidBrace = lastBrace
+	}
+
+	if lastValidBrace == -1 {
+		return response
+	}
+
+	jsonPortion := response[firstBrace : lastValidBrace+1]
+	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
+	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
+
+	return strings.TrimSpace(jsonPortion)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

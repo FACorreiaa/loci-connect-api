@@ -27,7 +27,10 @@ import (
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
@@ -53,6 +56,8 @@ var _ LlmInteractiontService = (*ServiceImpl)(nil)
 
 // LlmInteractiontService defines the business logic contract for user operations.
 type LlmInteractiontService interface {
+	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error)
+	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error)
 	SaveItenerary(ctx context.Context, userID uuid.UUID, req types.BookmarkRequest) (uuid.UUID, error)
 	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error)
 	RemoveItenerary(ctx context.Context, userID, itineraryID uuid.UUID) error
@@ -71,6 +76,9 @@ type LlmInteractiontService interface {
 
 	// Chat session management
 	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error)
+	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error)
+	EndSession(ctx context.Context, userID, sessionID uuid.UUID) error
+	GetRecentInteractions(ctx context.Context, userID uuid.UUID, pagination *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error)
 }
 
 type IntentClassifier interface {
@@ -140,6 +148,13 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	return service
 }
 
+// processDeadLetterQueue drains any stream events that could not be delivered and logs them.
+func (l *ServiceImpl) processDeadLetterQueue() {
+	for event := range l.deadLetterCh {
+		l.logger.Warn("stream event routed to dead letter queue", slog.String("event_id", event.EventID), slog.String("type", event.Type), slog.String("error", event.Error))
+	}
+}
+
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context
 func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []string, cityName, tagsPromptPart, userPrefs string, semanticPOIs []types.POIDetailedInfo) string {
 	prompt := fmt.Sprintf(`
@@ -199,13 +214,26 @@ func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []stri
 }
 
 func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.UUID) (interests []*types.Interest, searchProfile *types.UserPreferenceProfileResponse, tags []*types.Tags, err error) {
+	// If no profile ID is provided, fall back to the user's default search profile.
+	if profileID == uuid.Nil {
+		searchProfile, err = l.searchProfileRepo.GetDefaultSearchProfile(ctx, userID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch default search profile: %w", err)
+		}
+		if searchProfile != nil {
+			profileID = searchProfile.ID
+		}
+	}
+
 	interests, err = l.interestRepo.GetInterestsForProfile(ctx, profileID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch user interests: %w", err)
 	}
-	searchProfile, err = l.searchProfileRepo.GetSearchProfile(ctx, userID, profileID)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch search profile: %w", err)
+	if searchProfile == nil {
+		searchProfile, err = l.searchProfileRepo.GetSearchProfile(ctx, userID, profileID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch search profile: %w", err)
+		}
 	}
 	tags, err = l.tagsRepo.GetTagsForProfile(ctx, profileID)
 	if err != nil {
@@ -741,6 +769,38 @@ func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID,
 	)
 	span.SetStatus(codes.Ok, "Chat sessions retrieved successfully")
 	return response, nil
+}
+
+// GetChatSession returns a specific session if the user owns it.
+func (l *ServiceImpl) GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error) {
+	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", common.ErrSessionNotFound, err)
+	}
+	if session.UserID != userID {
+		return nil, common.ErrUnauthorized
+	}
+	return session, nil
+}
+
+// EndSession marks a chat session as closed.
+func (l *ServiceImpl) EndSession(ctx context.Context, userID, sessionID uuid.UUID) error {
+	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", common.ErrSessionNotFound, err)
+	}
+	if session.UserID != userID {
+		return common.ErrUnauthorized
+	}
+	session.Status = types.StatusClosed
+	session.UpdatedAt = time.Now()
+	return l.llmInteractionRepo.UpdateSession(ctx, *session)
+}
+
+// GetRecentInteractions currently returns an empty response placeholder.
+func (l *ServiceImpl) GetRecentInteractions(ctx context.Context, _ uuid.UUID, _ *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error) {
+	// TODO: hook into repository once implemented.
+	return &chatv1.GetRecentInteractionsResponse{}, nil
 }
 
 // getPOIDetailedInfos returns a formatted string with POI details.
@@ -1362,11 +1422,69 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- types.StreamEvent
 	return false
 }
 
-func (l *ServiceImpl) processDeadLetterQueue() {
-	for event := range l.deadLetterCh {
-		l.logger.ErrorContext(context.Background(), "Unprocessed event sent to dead letter queue", slog.Any("event", event))
-		// TODO Save events to DB
+func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error) {
+	eventCh := make(chan types.StreamEvent)
+	go func() {
+		defer close(eventCh)
+		err := l.ProcessUnifiedChatMessageStream(ctx, userID, profileID, cityName, message, userLocation, eventCh)
+		if err != nil {
+			l.logger.Error("error processing stream", "error", err)
+		}
+	}()
+
+	var lastItinerary types.AiCityResponse
+	var lastMessage string
+	var sessionID uuid.UUID
+
+	for event := range eventCh {
+		if event.Type == types.EventTypeItinerary {
+			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+				lastItinerary = itinerary
+				sessionID = itinerary.SessionID
+			}
+		}
+		if event.Message != "" {
+			lastMessage = event.Message
+		}
 	}
+
+	return &types.ChatResponse{
+		SessionID:        sessionID,
+		Message:          lastMessage,
+		UpdatedItinerary: &lastItinerary,
+	}, nil
+}
+
+// ContinueChat is a unary wrapper around the streaming continuation flow.
+func (l *ServiceImpl) ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error) {
+	eventCh := make(chan types.StreamEvent)
+	go func() {
+		defer close(eventCh)
+		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
+		if err != nil {
+			l.logger.Error("error processing continue stream", "error", err)
+		}
+	}()
+
+	var lastItinerary types.AiCityResponse
+	var lastMessage string
+
+	for event := range eventCh {
+		if event.Type == types.EventTypeItinerary {
+			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+				lastItinerary = itinerary
+			}
+		}
+		if event.Message != "" {
+			lastMessage = event.Message
+		}
+	}
+
+	return &types.ChatResponse{
+		SessionID:        sessionID,
+		Message:          lastMessage,
+		UpdatedItinerary: &lastItinerary,
+	}, nil
 }
 
 // getPersonalizedPOI generates a prompt for personalized POIs
@@ -2283,7 +2401,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 		jsonData, err := json.MarshalIndent(completeData, "", "  ")
 		if err != nil {
-			l.logger.Error("Failed to marshal completeData to JSON", err)
+			l.logger.Error("Failed to marshal completeData to JSON", slog.Any("error", err))
 		} else {
 			filename := "complete_itinerary.json" // Or fmt.Sprintf("complete_itinerary_%s.json", sessionID)
 			if writeErr := os.WriteFile(filename, jsonData, 0644); writeErr != nil {

@@ -1,0 +1,5 @@
+./chat_helpers.go
+./chat_prompt.go
+./chat_service.go
+./chat_workers.go
+./test_helpers.go

@@ -1,0 +1,6 @@
+./checked.go
+./enum.go
+./equal.go
+./file.go
+./pb.go
+./type.go

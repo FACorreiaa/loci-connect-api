@@ -1,0 +1,16 @@
+./auth.go
+./chat.go
+./chat_session.go
+./city.go
+./discover.go
+./errors.go
+./hotels.go
+./interests.go
+./itinerary_list.go
+./poi.go
+./profiles.go
+./settings.go
+./statistics.go
+./subscriptions.go
+./tags.go
+./user.go

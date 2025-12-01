@@ -199,3 +199,285 @@ func (svc *Service) ContinueChatStream(ctx context.Context, req *connect.Request
 // ... (FreeChatStream, GetChatSessions, etc. would follow similar patterns; convertStreamEventToChatEvent remains unchanged)
 ```
 Should follow the proto conventions from the gen folder, the current interceptors, etc.
+
+___
+
+After completing this, analyse the readme, the scope, the routes and the framework decision guide to make sure everything is aligned with Connect-Go and there are no references to the old REST API where not needed.
+To migrate your gRPC service to use Connect-Go (from `connectrpc.com/connect`),
+
+you'll need to make the following key changes for the streaming methods like `StartChatStream` and `ContinueChatStream`:
+- Import `connect "connectrpc.com/connect"`.
+- Update the method signatures to use Connect's types: `ctx context.Context`, `*connect
+- Request[RequestType]`, and `*connect.ServerStream[ResponseType]`.
+- Access the request message via `req.Msg` (e.g., `req.Msg.InitialMessage
+- `).
+- In the streaming loop, use `stream.Send(pbEvent)` instead of `stream.SendMsg(pbEvent)`.
+- For errors, return `connect.NewError(connect.CodeInvalidArgument, fmt.Errorf(...))` or similar, instead of `status.Errorf`. Connect handles errors by encoding them in HTTP trailers (responses are always HTTP 200 OK for streaming).
+- Remove `pb.UnsafeChatServiceServer` from the `Service` struct, as Connect doesn't require embedding a generated server interface—your struct just implements the handler methods directly.
+- Update the `handleStream` function to take `*connect.ServerStream[pb.ChatEvent]` instead of `grpc.ServerStream`.
+- The `context.WithCancel(stream.Context())` remains valid, as Connect's `ServerStream` provides a `Context()` method.
+  - No changes needed for internal functions like `startStreamProcessing` or non-streaming methods (though unary methods like `GetChatSessions` would change to return `*connect.Response[ResponseType]`).
+  - Here's how the relevant parts of your code would look after migration. I've focused on `StartChatStream`, `ContinueChatStream`, and the supporting `handleStream` function, as those are the streaming endpoints you asked about. (The rest of the file remains largely the same, but you'd apply similar patterns to other methods.)
+
+
+___
+### Aux example for the chat handler:
+Here is how your implementation transforms when moving to **Connect-Go**. Just as an example
+Always follow the best practices from the Auth folder migration and Connect Go
+
+The architecture shifts from **Manual HTTP/SSE management** to **Typed RPC Streaming**.
+
+### 1. The Protobuf Definition (`chat.proto`)
+First, you must define the data contract. Since your current logic relies on dynamic `map[string]interface{}` (especially for the chunks), we will map that into the Protobuf message using a JSON string or specific fields.
+
+```protobuf
+syntax = "proto3";
+
+package chat.v1;
+
+import "google/protobuf/struct.proto";
+
+service ChatService {
+  rpc StreamChat(StreamChatRequest) returns (stream StreamChatResponse);
+}
+
+message StreamChatRequest {
+  string profile_id = 1;
+  string message = 2;
+  UserLocation user_location = 3;
+}
+
+message UserLocation {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+message StreamChatResponse {
+  // Mirroing your types.StreamEvent.Type
+  string event_type = 1;
+
+  // Connect allows strict typing, but since your service yields
+  // dynamic JSON chunks, we can pass the data as a string
+  // or a Struct for non-chunk events.
+  oneof payload {
+    // For "chunk" events containing partial strings
+    StreamChunk chunk_data = 2;
+    // For "start", "complete", "error" events
+    google.protobuf.Struct generic_data = 3;
+    // For the final itinerary object
+    string itinerary_json = 4;
+  }
+
+  // Specific error field
+  string error_message = 5;
+
+  // Navigation data for the final redirect
+  NavigationData navigation = 6;
+}
+
+message StreamChunk {
+  string part_type = 1; // e.g., "city_data", "itinerary"
+  string content = 2;   // The text fragment
+}
+
+message NavigationData {
+  string url = 1;
+  string route_type = 2;
+  map<string, string> query_params = 3;
+}
+```
+
+---
+
+### 2. The Go Handler (Connect Implementation)
+
+You no longer manage `w.Header()`, `flusher.Flush()`, or manual JSON marshaling. The Connect handler purely focuses on bridging your Service channel to the gRPC stream.
+
+```go
+package chat
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"connectrpc.com/connect"
+	chatv1 "your-module/gen/chat/v1" // The generated code
+	"your-module/internal/auth"
+	"your-module/types"
+    "google.golang.org/protobuf/types/known/structpb"
+)
+
+// ChatServer implements the generated ChatServiceHandler interface
+type ChatServer struct {
+	logger  *slog.Logger
+	service LlmInteractionService
+}
+
+func (s *ChatServer) StreamChat(
+	ctx context.Context,
+	req *connect.Request[chatv1.StreamChatRequest],
+	stream *connect.ServerStream[chatv1.StreamChatResponse],
+) error {
+	// 1. Auth & Validation (Same as before)
+	userIDStr, ok := auth.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, _ := uuid.Parse(userIDStr)
+
+	profileID, err := uuid.Parse(req.Msg.ProfileId)
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, errors.New("invalid profile ID"))
+	}
+
+	// Map Proto UserLocation to Internal UserLocation
+	var userLoc *types.UserLocation
+	if req.Msg.UserLocation != nil {
+		userLoc = &types.UserLocation{
+			UserLat: req.Msg.UserLocation.Latitude,
+			UserLon: req.Msg.UserLocation.Longitude,
+		}
+	}
+
+	// 2. Create the channel (Same pattern)
+	eventCh := make(chan types.StreamEvent, 100)
+
+	// 3. Launch Service Logic (Exactly the same service call)
+	go func() {
+		// Note: We use ctx from the request. If client disconnects, ctx is canceled automatically.
+		err := s.service.ProcessUnifiedChatMessageStream(
+			ctx,
+			userID,
+			profileID,
+			"",
+			req.Msg.Message,
+			userLoc,
+			eventCh,
+		)
+
+		// Handle service startup errors that happen before the stream starts
+		if err != nil {
+			select {
+			case eventCh <- types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}:
+			case <-ctx.Done():
+			}
+		}
+	}()
+
+	// 4. Stream Loop (Much cleaner than HTTP/SSE)
+	for {
+		select {
+		case event, ok := <-eventCh:
+			if !ok {
+				return nil // Stream finished successfully
+			}
+
+			// Convert internal types.StreamEvent to Proto Message
+			resp, err := mapEventToProto(event)
+			if err != nil {
+				s.logger.Error("Failed to map event", "error", err)
+				continue
+			}
+
+			// Send to client (Handles framing and flushing automatically)
+			if err := stream.Send(resp); err != nil {
+				// If send fails (e.g., client disconnected), return error to stop handler
+				return err
+			}
+
+			// Stop if we see a completion or error type
+			if event.Type == types.EventTypeComplete || event.Type == types.EventTypeError {
+				return nil
+			}
+
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+```
+
+### 3. The Mapper Helper
+Since your Service yields `interface{}`/`any` in the `Data` field, we need a helper to safely put that into the strict Protobuf message.
+
+```go
+func mapEventToProto(event types.StreamEvent) (*chatv1.StreamChatResponse, error) {
+	resp := &chatv1.StreamChatResponse{
+		EventType: string(event.Type),
+	}
+
+	if event.Error != "" {
+		resp.ErrorMessage = event.Error
+	}
+
+	if event.Navigation != nil {
+		resp.Navigation = &chatv1.NavigationData{
+			Url:         event.Navigation.URL,
+			RouteType:   event.Navigation.RouteType,
+			QueryParams: event.Navigation.QueryParams,
+		}
+	}
+
+	// Handle the payload based on type
+	switch event.Type {
+	case types.EventTypeChunk:
+		// Expecting Data to be map[string]interface{} with "part" and "chunk"
+		if dataMap, ok := event.Data.(map[string]interface{}); ok {
+			part, _ := dataMap["part"].(string)
+			chunk, _ := dataMap["chunk"].(string)
+			resp.Payload = &chatv1.StreamChatResponse_ChunkData{
+				ChunkData: &chatv1.StreamChunk{
+					PartType: part,
+					Content:  chunk,
+				},
+			}
+		}
+
+	case types.EventTypeItinerary:
+		// Itinerary is complex, serialize to JSON string for safety
+		// or define a full Proto message for Itineraries if you want strict typing
+		jsonBytes, _ := json.Marshal(event.Data)
+		resp.Payload = &chatv1.StreamChatResponse_ItineraryJson{
+			ItineraryJson: string(jsonBytes),
+		}
+
+	default:
+		// For other events (Start, Progress), try to use Struct
+		// Use structpb to convert map[string]interface{} to google.protobuf.Struct
+		if event.Data != nil {
+			if dataMap, ok := event.Data.(map[string]interface{}); ok {
+				s, err := structpb.NewStruct(dataMap)
+				if err == nil {
+					resp.Payload = &chatv1.StreamChatResponse_GenericData{
+						GenericData: s,
+					}
+				}
+			}
+		}
+	}
+
+	return resp, nil
+}
+```
+
+### Key Differences & Improvements
+
+1.  **Request Parsing:**
+  *   **Old:** Manually parsing URL params (`chi.URLParam`) and decoding JSON Body.
+  *   **New:** `req.Msg` contains `ProfileId`, `Message`, and `UserLocation` already typed and parsed.
+2.  **Stream Management:**
+  *   **Old:** Manually writing `data: ...\n\n` strings and calling `flusher.Flush()`.
+  *   **New:** Calling `stream.Send(msg)`. Connect handles the HTTP/2 framing and buffer flushing.
+3.  **Type Safety:**
+  *   The frontend (if generated via Buf) will know that if `event_type` is "chunk", they should check `payload.chunk_data`. In your old code, the frontend had to blindly trust that `data` contained specific fields.
+4.  **Service Layer Unchanged:**
+  *   Notice that `ProcessUnifiedChatMessageStream` **did not change**. We simply wrapped the output channel in the Handler layer to convert the generic events into Protobuf messages.
+___
+### Tests
+Create tests for chat and profile handlers if there are none.\
+___
+# Save changes
+Save the changes under docs/CONNECT_MIGRATION_CHAT.md so I can instruct the frontend later on how to connect to the new chat service using Connect-Go.
+Analyse the readme, the scope, the routes and the framework decision guide and the proto gen and check of its worth to build two separate native mobile clients.
+Would people pay for an app like this one?

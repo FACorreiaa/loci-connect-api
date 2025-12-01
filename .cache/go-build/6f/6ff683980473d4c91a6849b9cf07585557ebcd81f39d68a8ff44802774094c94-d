@@ -1,0 +1,5 @@
+./camel.go
+./doc.go
+./helper.go
+./kebab.go
+./snake.go

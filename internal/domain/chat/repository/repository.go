@@ -2,280 +2,49 @@ package repository
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+	"github.com/google/uuid"
 	a "github.com/petar-dambovaliev/aho-corasick"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-
-	"google.golang.org/genai"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
-	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
+	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-type LlmInteraction struct {
-	ID                 uuid.UUID       `json:"id"`
-	SessionID          uuid.UUID       `json:"session_id"`
-	UserID             uuid.UUID       `json:"user_id"`
-	ProfileID          uuid.UUID       `json:"profile_id"`
-	CityName           string          `json:"city_name,omitempty"` // The city context for this interaction
-	Prompt             string          `json:"prompt"`
-	RequestPayload     json.RawMessage `json:"request_payload"`
-	ResponseText       string          `json:"response"`
-	ResponsePayload    json.RawMessage `json:"response_payload"`
-	ModelUsed          string          `json:"model_name"`
-	PromptTokens       int             `json:"prompt_tokens"`
-	CompletionTokens   int             `json:"completion_tokens"`
-	TotalTokens        int             `json:"total_tokens"`
-	LatencyMs          int             `json:"latency_ms"`
-	Timestamp          time.Time       `json:"timestamp"`
-	ModelName          string          `json:"model"`
-	Response           string          `json:"response_content"`
-	Latitude           *float64        `json:"latitude"`
-	Longitude          *float64        `json:"longitude"`
-	Distance           *float64        `json:"distance"`
-	PromptTokenCount   int             `json:"prompt_token_count"`
-	ResponseTokenCount int             `json:"response_token_count"`
-}
-
-type AIItineraryResponse struct {
-	ItineraryName      string                `json:"itinerary_name"`
-	OverallDescription string                `json:"overall_description"`
-	PointsOfInterest   []poi.POIDetailedInfo `json:"points_of_interest"`
-	Restaurants        []poi.POIDetailedInfo `json:"restaurants,omitempty"`
-	Bars               []poi.POIDetailedInfo `json:"bars,omitempty"`
-}
-
-type GeneralCityData struct {
-	City            string  `json:"city"`
-	Country         string  `json:"country"`
-	StateProvince   string  `json:"state_province,omitempty"`
-	Description     string  `json:"description"`
-	CenterLatitude  float64 `json:"center_latitude,omitempty"`
-	CenterLongitude float64 `json:"center_longitude,omitempty"`
-	Population      string  `json:"population"`
-	Area            string  `json:"area"`
-	Timezone        string  `json:"timezone"`
-	Language        string  `json:"language"`
-	Weather         string  `json:"weather"`
-	Attractions     string  `json:"attractions"`
-	History         string  `json:"history"`
-}
-
-type AiCityResponse struct {
-	GeneralCityData     GeneralCityData       `json:"general_city_data"`
-	PointsOfInterest    []poi.POIDetailedInfo `json:"points_of_interest"`
-	AIItineraryResponse AIItineraryResponse   `json:"itinerary_response"`
-	SessionID           uuid.UUID             `json:"session_id"`
-}
-
-type GenAIResponse struct {
-	SessionID            string                `json:"session_id"`
-	LlmInteractionID     uuid.UUID             `json:"llm_interaction_id"`
-	City                 string                `json:"city,omitempty"`
-	Country              string                `json:"country,omitempty"`
-	StateProvince        string                `json:"state_province,omitempty"` // New
-	CityDescription      string                `json:"city_description,omitempty"`
-	Latitude             float64               `json:"latitude,omitempty"`  // New: for city center
-	Longitude            float64               `json:"longitude,omitempty"` // New: for city center
-	ItineraryName        string                `json:"itinerary_name,omitempty"`
-	ItineraryDescription string                `json:"itinerary_description,omitempty"`
-	GeneralPOI           []poi.POIDetailedInfo `json:"general_poi,omitempty"`
-	PersonalisedPOI      []poi.POIDetailedInfo `json:"personalised_poi,omitempty"` // Consider changing to []PersonalizedPOIDetail
-	POIDetailedInfo      []poi.POIDetailedInfo `json:"poi_detailed_info,omitempty"`
-	Err                  error                 `json:"-"`
-	ModelName            string                `json:"model_name"`
-	Prompt               string                `json:"prompt"`
-	Response             string                `json:"response"`
-}
-
-type AIRequestPayloadForLog struct {
-	ModelName        string                       `json:"model_name"`
-	GenerationConfig *genai.GenerateContentConfig `json:"generation_config,omitempty"`
-	Content          *genai.Content               `json:"content"` // The actual content sent (prompt)
-	// You could add other things like "tools" if you use function calling
-}
-
-type ChatTurn struct { // You might not need this explicit struct if directly using []*genai.Content
-	Role  string       `json:"role"` // "user" or "model"
-	Parts []genai.Part `json:"parts"`
-}
-
-type UserLocation struct {
-	UserLat        float64 `json:"user_lat"`
-	UserLon        float64 `json:"user_lon"`
-	SearchRadiusKm float64 // Radius in kilometers for searching nearby POIs
-}
-
-type UserSavedItinerary struct {
-	ID                     uuid.UUID      `json:"id"`
-	UserID                 uuid.UUID      `json:"user_id"`
-	SourceLlmInteractionID pgtype.UUID    `json:"source_llm_interaction_id,omitempty"` // Nullable UUID for the source LLM interaction
-	SessionID              pgtype.UUID    `json:"session_id,omitempty"`                // Nullable UUID for the chat session
-	PrimaryCityID          pgtype.UUID    `json:"primary_city_id,omitempty"`           // Nullable UUID for the primary city
-	Title                  string         `json:"title"`
-	Description            sql.NullString `json:"description"`             // Use sql.NullString for nullable text fields
-	MarkdownContent        string         `json:"markdown_content"`        // Markdown content for the itinerary
-	Tags                   []string       `json:"tags"`                    // Tags for the itinerary
-	EstimatedDurationDays  sql.NullInt32  `json:"estimated_duration_days"` // Nullable int32 for estimated duration in days
-	EstimatedCostLevel     sql.NullInt32  `json:"estimated_cost_level"`    // Nullable int32 for estimated cost level
-	IsPublic               bool           `json:"is_public"`               // Indicates if the itinerary is public
-	CreatedAt              time.Time      `json:"created_at"`
-	UpdatedAt              time.Time      `json:"updated_at"`
-}
-
-type UpdateItineraryRequest struct {
-	Title                 *string  `json:"title,omitempty"`
-	Description           *string  `json:"description,omitempty"` // If nil, means no change. If empty string, means clear description.
-	Tags                  []string `json:"tags,omitempty"`        // If nil, no change. If empty slice, clear tags.
-	EstimatedDurationDays *int32   `json:"estimated_duration_days,omitempty"`
-	EstimatedCostLevel    *int32   `json:"estimated_cost_level,omitempty"`
-	IsPublic              *bool    `json:"is_public,omitempty"`
-	MarkdownContent       *string  `json:"markdown_content,omitempty"`
-}
-
-type PaginatedUserItinerariesResponse struct {
-	Itineraries  []UserSavedItinerary `json:"itineraries"`
-	TotalRecords int                  `json:"total_records"`
-	Page         int                  `json:"page"`
-	PageSize     int                  `json:"page_size"`
-}
-
-type BookmarkRequest struct {
-	LlmInteractionID *uuid.UUID `json:"llm_interaction_id,omitempty"` // Optional - if provided, use this specific interaction
-	SessionID        *uuid.UUID `json:"session_id,omitempty"`         // Optional - if provided, use latest interaction from this session
-	PrimaryCityID    *uuid.UUID `json:"primary_city_id,omitempty"`    // Optional - if provided, use this
-	PrimaryCityName  string     `json:"primary_city_name"`            // City name to look up if PrimaryCityID not provided
-	Title            string     `json:"title"`
-	Description      *string    `json:"description"` // Optional
-	Tags             []string   `json:"tags"`        // Optional
-	IsPublic         *bool      `json:"is_public"`   // Optional
-}
-
-type ChatMessage struct {
-	ID        uuid.UUID
-	UserID    uuid.UUID
-	Timestamp time.Time
-	Role      string
-	Content   string
-}
-
-type POIDetailrequest struct {
-	CityName  string  `json:"city_name"` // e.g., "New York"
-	Latitude  float64 `json:"latitude"`  // e.g., 40.7128
-	Longitude float64 `json:"longitude"` // e.g., -74.0060
-}
-
-type POIFilter struct {
-	Location GeoPoint `json:"location"` // e.g., "restaurant", "hotel", "bar"
-	Radius   float64  `json:"radius"`   // Radius in kilometers for filtering POIs
-	Category string   `json:"category"` // e.g., "restaurant", "hotel", "bar"
-}
-
-type GeoPoint struct {
-	Latitude  float64 `json:"latitude"`  // Latitude of the point
-	Longitude float64 `json:"longitude"` // Longitude of the point
-}
-type SearchPOIRequest struct {
-	Query      string   `json:"query"` // The search query text
-	CityName   string   `json:"city"`
-	Latitude   float64  `json:"lat"`
-	Longitude  float64  `json:"lon"`
-	RadiusKm   float64  `json:"radius_km"`   // Optional, for filtering POIs within a certain radius
-	SearchText string   `json:"search_text"` // Optional, for searching by name or description
-	SearchTags []string `json:"search_tags"` // Optional, for filtering by tags
-	SearchType string   `json:"search_type"` // Optional, e.g., "restaurant", "hotel", "bar"
-	SortBy     string   `json:"sort_by"`     // Optional, e.g., "rating", "distance"
-	SortOrder  string   `json:"sort_order"`  // Optional, e.g., "asc", "desc"
-	MinRating  float64  `json:"min_rating"`  // Optional, for filtering by minimum rating
-	MinPrice   string   `json:"min_price"`   // Optional, for filtering by minimum price range
-	MinGuests  int32    `json:"min_guests"`  // Optional, for filtering by minimum number of guests (for restaurants)
-}
-
-type HotelUserPreferences struct {
-	NumberOfGuests      int32     `json:"number_of_guests"`
-	PreferredCategories string    `json:"preferred_category"`    // e.g., "budget", "luxury"
-	PreferredTags       []string  `json:"preferredTags"`         // e.g., ["pet-friendly", "free wifi"]
-	MaxPriceRange       string    `json:"preferred_price_range"` // e.g., "$", "$$"
-	MinRating           float64   `json:"preferred_rating"`      // e.g., 4.0
-	NumberOfNights      int64     `json:"number_of_nights"`
-	NumberOfRooms       int32     `json:"number_of_rooms"`
-	PreferredCheckIn    time.Time `json:"preferred_check_in"`
-	PreferredCheckOut   time.Time `json:"preferred_check_out"`
-	SearchRadiusKm      float64   `json:"search_radius_km"` // Optional, for filtering hotels within a certain radius
-}
-
-type HotelDetailedInfo struct {
-	ID               uuid.UUID `json:"id"`
-	City             string    `json:"city"`
-	Name             string    `json:"name"`
-	Latitude         float64   `json:"latitude"`
-	Longitude        float64   `json:"longitude"`
-	Category         string    `json:"category"` // e.g., "Hotel", "Hostel"
-	Description      string    `json:"description"`
-	Address          string    `json:"address"`
-	PhoneNumber      *string   `json:"phone_number"`
-	Website          *string   `json:"website"`
-	OpeningHours     *string   `json:"opening_hours"`
-	PriceRange       *string   `json:"price_range"`
-	Rating           float64   `json:"rating"`
-	Tags             []string  `json:"tags"`
-	Images           []string  `json:"images"`
-	LlmInteractionID uuid.UUID `json:"llm_interaction_id"`
-	Err              error     `json:"-"` // Not serialized
-}
-
-type HotelPreferenceRequest struct {
-	City        string               `json:"city"`
-	Lat         float64              `json:"lat"`
-	Lon         float64              `json:"lon"`
-	Preferences HotelUserPreferences `json:"preferences"`
-	Distance    float64              `json:"distance"` // Optional, for filtering hotels within a certain radius
-}
-
-type RestaurantUserPreferences struct {
-	PreferredCuisine    string
-	PreferredPriceRange string
-	DietaryRestrictions string
-	Ambiance            string
-	SpecialFeatures     string
-}
-
-type RestaurantDetailedInfo struct {
-	ID               uuid.UUID `json:"id"`
-	City             string    `json:"city"`
-	Name             string    `json:"name"`
-	Latitude         float64   `json:"latitude"`
-	Longitude        float64   `json:"longitude"`
-	Category         string    `json:"category"`
-	Description      string    `json:"description"`
-	Address          *string   `json:"address"`
-	Website          *string   `json:"website"`
-	PhoneNumber      *string   `json:"phone_number"`
-	OpeningHours     *string   `json:"opening_hours"`
-	PriceLevel       *string   `json:"price_level"`  // Changed to *string
-	CuisineType      *string   `json:"cuisine_type"` // Changed to *string
-	Tags             []string  `json:"tags"`
-	Images           []string  `json:"images"`
-	Rating           float64   `json:"rating"`
-	LlmInteractionID uuid.UUID `json:"llm_interaction_id"`
-	Err              error     `json:"-"`
-}
-
-// Context-aware chat types
-type ChatContextType string
+type (
+	LlmInteraction                   = types.LlmInteraction
+	AIItineraryResponse              = types.AIItineraryResponse
+	GeneralCityData                  = types.GeneralCityData
+	AiCityResponse                   = types.AiCityResponse
+	GenAIResponse                    = types.GenAIResponse
+	AIRequestPayloadForLog           = types.AIRequestPayloadForLog
+	ChatTurn                         = types.ChatTurn
+	UserLocation                     = types.UserLocation
+	UserSavedItinerary               = types.UserSavedItinerary
+	UpdateItineraryRequest           = types.UpdateItineraryRequest
+	PaginatedUserItinerariesResponse = types.PaginatedUserItinerariesResponse
+	BookmarkRequest                  = types.BookmarkRequest
+	ChatMessage                      = types.ChatMessage
+	POIDetailrequest                 = types.POIDetailrequest
+	POIFilter                        = types.POIFilter
+	GeoPoint                         = types.GeoPoint
+	SearchPOIRequest                 = types.SearchPOIRequest
+	HotelUserPreferences             = types.HotelUserPreferences
+	HotelDetailedInfo                = types.HotelDetailedInfo
+	HotelPreferenceRequest           = types.HotelPreferenceRequest
+	RestaurantUserPreferences        = types.RestaurantUserPreferences
+	RestaurantDetailedInfo           = types.RestaurantDetailedInfo
+	ChatContextType                  = types.ChatContextType
+	DomainType                       = types.DomainType
+	DomainDetector                   = types.DomainDetector
+	UserPreferenceProfileResponse    = types.UserPreferenceProfileResponse
+)
 
 const (
-	ContextHotels      ChatContextType = "hotels"
-	ContextRestaurants ChatContextType = "restaurants"
-	ContextItineraries ChatContextType = "itineraries"
-	ContextGeneral     ChatContextType = "general"
+	ContextHotels      ChatContextType = types.ContextHotels
+	ContextRestaurants ChatContextType = types.ContextRestaurants
+	ContextItineraries ChatContextType = types.ContextItineraries
+	ContextGeneral     ChatContextType = types.ContextGeneral
 )
 
 type StartChatRequest struct {
@@ -336,44 +105,44 @@ var (
 	})
 
 	// Map keywords to their respective domains
-	keywordToDomain = map[string]profiles.DomainType{
+	keywordToDomain = map[string]types.DomainType{
 		// Accommodation
-		"hotel": profiles.DomainAccommodation, "hostel": profiles.DomainAccommodation,
-		"accommodation": profiles.DomainAccommodation, "stay": profiles.DomainAccommodation,
-		"sleep": profiles.DomainAccommodation, "room": profiles.DomainAccommodation,
-		"booking": profiles.DomainAccommodation, "airbnb": profiles.DomainAccommodation,
-		"lodge": profiles.DomainAccommodation, "resort": profiles.DomainAccommodation,
-		"guesthouse": profiles.DomainAccommodation,
+		"hotel": types.DomainAccommodation, "hostel": types.DomainAccommodation,
+		"accommodation": types.DomainAccommodation, "stay": types.DomainAccommodation,
+		"sleep": types.DomainAccommodation, "room": types.DomainAccommodation,
+		"booking": types.DomainAccommodation, "airbnb": types.DomainAccommodation,
+		"lodge": types.DomainAccommodation, "resort": types.DomainAccommodation,
+		"guesthouse": types.DomainAccommodation,
 		// Dining
-		"restaurant": profiles.DomainDining, "food": profiles.DomainDining,
-		"eat": profiles.DomainDining, "dine": profiles.DomainDining,
-		"meal": profiles.DomainDining, "cuisine": profiles.DomainDining,
-		"drink": profiles.DomainDining, "cafe": profiles.DomainDining,
-		"bar": profiles.DomainDining, "lunch": profiles.DomainDining,
-		"dinner": profiles.DomainDining, "breakfast": profiles.DomainDining,
-		"brunch": profiles.DomainDining,
+		"restaurant": types.DomainDining, "food": types.DomainDining,
+		"eat": types.DomainDining, "dine": types.DomainDining,
+		"meal": types.DomainDining, "cuisine": types.DomainDining,
+		"drink": types.DomainDining, "cafe": types.DomainDining,
+		"bar": types.DomainDining, "lunch": types.DomainDining,
+		"dinner": types.DomainDining, "breakfast": types.DomainDining,
+		"brunch": types.DomainDining,
 		// Activities
-		"activity": profiles.DomainActivities, "museum": profiles.DomainActivities,
-		"park": profiles.DomainActivities, "attraction": profiles.DomainActivities,
-		"tour": profiles.DomainActivities, "visit": profiles.DomainActivities,
-		"see": profiles.DomainActivities, "do": profiles.DomainActivities,
-		"experience": profiles.DomainActivities, "adventure": profiles.DomainActivities,
-		"shopping": profiles.DomainActivities, "nightlife": profiles.DomainActivities,
+		"activity": types.DomainActivities, "museum": types.DomainActivities,
+		"park": types.DomainActivities, "attraction": types.DomainActivities,
+		"tour": types.DomainActivities, "visit": types.DomainActivities,
+		"see": types.DomainActivities, "do": types.DomainActivities,
+		"experience": types.DomainActivities, "adventure": types.DomainActivities,
+		"shopping": types.DomainActivities, "nightlife": types.DomainActivities,
 		// Itinerary
-		"itinerary": profiles.DomainItinerary, "plan": profiles.DomainItinerary,
-		"schedule": profiles.DomainItinerary, "trip": profiles.DomainItinerary,
-		"day": profiles.DomainItinerary, "week": profiles.DomainItinerary,
-		"journey": profiles.DomainItinerary, "route": profiles.DomainItinerary,
-		"organize": profiles.DomainItinerary, "arrange": profiles.DomainItinerary,
+		"itinerary": types.DomainItinerary, "plan": types.DomainItinerary,
+		"schedule": types.DomainItinerary, "trip": types.DomainItinerary,
+		"day": types.DomainItinerary, "week": types.DomainItinerary,
+		"journey": types.DomainItinerary, "route": types.DomainItinerary,
+		"organize": types.DomainItinerary, "arrange": types.DomainItinerary,
 	}
 
 	// Priority order for domain selection when multiple domains match
-	domainPriority = map[profiles.DomainType]int{
-		profiles.DomainItinerary:     1, // Highest priority
-		profiles.DomainAccommodation: 2,
-		profiles.DomainDining:        3,
-		profiles.DomainActivities:    4,
-		profiles.DomainGeneral:       5, // Lowest priority
+	domainPriority = map[types.DomainType]int{
+		types.DomainItinerary:     1, // Highest priority
+		types.DomainAccommodation: 2,
+		types.DomainDining:        3,
+		types.DomainActivities:    4,
+		types.DomainGeneral:       5, // Lowest priority
 	}
 )
 
@@ -403,44 +172,6 @@ func (c *SimpleIntentClassifier) Classify(_ context.Context, message string) (In
 	return IntentModifyItinerary, nil // Default intent
 }
 
-// DomainDetector detects the primary domain from user queries
-type DomainDetector struct{}
-
-func (d *DomainDetector) DetectDomain(_ context.Context, message string) profiles.DomainType {
-	message = strings.ToLower(message)
-
-	// Scan the message ONCE with the single matcher
-	matches := domainMatcher.FindAll(message)
-
-	if len(matches) == 0 {
-		return profiles.DomainGeneral
-	}
-
-	// If multiple matches found, select the highest priority domain
-	bestDomain := profiles.DomainGeneral
-	bestPriority := 999
-
-	seen := make(map[profiles.DomainType]bool)
-	for _, match := range matches {
-		matchedWord := message[match.Start():match.End()]
-		domain := keywordToDomain[matchedWord]
-
-		// Skip if we've already processed this domain
-		if seen[domain] {
-			continue
-		}
-		seen[domain] = true
-
-		priority := domainPriority[domain]
-		if priority < bestPriority {
-			bestPriority = priority
-			bestDomain = domain
-		}
-	}
-
-	return bestDomain
-}
-
 // RecentInteraction represents a recent user interaction with cities and POIs
 type RecentInteraction struct {
 	ID           uuid.UUID                `json:"id"`
@@ -452,7 +183,7 @@ type RecentInteraction struct {
 	ModelUsed    string                   `json:"model_name"`
 	LatencyMs    int                      `json:"latency_ms"`
 	CreatedAt    time.Time                `json:"created_at"`
-	POIs         []poi.POIDetailedInfo    `json:"pois,omitempty"`
+	POIs         []types.POIDetailedInfo  `json:"pois,omitempty"`
 	Hotels       []HotelDetailedInfo      `json:"hotels,omitempty"`
 	Restaurants  []RestaurantDetailedInfo `json:"restaurants,omitempty"`
 }
@@ -547,13 +278,13 @@ type MessageMetadata struct {
 }
 
 type SessionContext struct {
-	CityName            string                                  `json:"city_name"` // e.g., "Barcelona"
-	LastCityID          uuid.UUID                               `json:"last_city_id"`
-	UserPreferences     *profiles.UserPreferenceProfileResponse `json:"user_preferences"`
-	ActiveInterests     []string                                `json:"active_interests"`
-	ActiveTags          []string                                `json:"active_tags"`
-	ConversationSummary string                                  `json:"conversation_summary"`
-	ModificationHistory []ModificationRecord                    `json:"modification_history"`
+	CityName            string                               `json:"city_name"` // e.g., "Barcelona"
+	LastCityID          uuid.UUID                            `json:"last_city_id"`
+	UserPreferences     *types.UserPreferenceProfileResponse `json:"user_preferences"`
+	ActiveInterests     []string                             `json:"active_interests"`
+	ActiveTags          []string                             `json:"active_tags"`
+	ConversationSummary string                               `json:"conversation_summary"`
+	ModificationHistory []ModificationRecord                 `json:"modification_history"`
 }
 
 type ModificationRecord struct {
@@ -607,17 +338,17 @@ type ChatService interface {
 }
 
 type StreamingChatEvent struct {
-	Timestamp        time.Time             `json:"timestamp"`  // Time of the event
-	EventID          string                `json:"event_id"`   // Unique identifier for the event
-	EventType        string                `json:"event_type"` // e.g., "session_started", "city_info", "general_pois", "personalized_poi_chunk", "final_itinerary", "error"
-	SessionID        uuid.UUID             `json:"session_id,omitempty"`
-	Message          string                `json:"message,omitempty"` // For general messages or errors
-	CityData         *GeneralCityData      `json:"city_data,omitempty"`
-	GeneralPOIs      []poi.POIDetailedInfo `json:"general_pois,omitempty"`
-	PersonalizedPOIs []poi.POIDetailedInfo `json:"personalized_pois,omitempty"` // Could send chunks or final list
-	Itinerary        *AiCityResponse       `json:"itinerary,omitempty"`         // Could be a partial or final one
-	Error            string                `json:"error_message,omitempty"`
-	IsFinal          bool                  `json:"is_final,omitempty"` // Indicates the end of a sequence or the whole stream
+	Timestamp        time.Time               `json:"timestamp"`  // Time of the event
+	EventID          string                  `json:"event_id"`   // Unique identifier for the event
+	EventType        string                  `json:"event_type"` // e.g., "session_started", "city_info", "general_pois", "personalized_poi_chunk", "final_itinerary", "error"
+	SessionID        uuid.UUID               `json:"session_id,omitempty"`
+	Message          string                  `json:"message,omitempty"` // For general messages or errors
+	CityData         *GeneralCityData        `json:"city_data,omitempty"`
+	GeneralPOIs      []types.POIDetailedInfo `json:"general_pois,omitempty"`
+	PersonalizedPOIs []types.POIDetailedInfo `json:"personalized_pois,omitempty"` // Could send chunks or final list
+	Itinerary        *AiCityResponse         `json:"itinerary,omitempty"`         // Could be a partial or final one
+	Error            string                  `json:"error_message,omitempty"`
+	IsFinal          bool                    `json:"is_final,omitempty"` // Indicates the end of a sequence or the whole stream
 	// Add any other relevant data for different event types
 }
 
