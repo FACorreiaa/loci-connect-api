@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -56,7 +55,7 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponse(
 	responses map[string]*strings.Builder,
 	userID, profileID, cityID uuid.UUID,
 	llmInteractionID uuid.UUID,
-	userLocation *user.UserLocation,
+	userLocation *types.UserLocation,
 ) {
 	l.logger.InfoContext(ctx, "Processing unified response for POI extraction",
 		slog.String("city_id", cityID.String()),

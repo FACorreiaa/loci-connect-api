@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 

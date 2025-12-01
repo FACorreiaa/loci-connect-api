@@ -9,6 +9,16 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
+	chathandler "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/handler"
+	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
+	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
+	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
+	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
+	profilerepo "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
+	profilesvc "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
+	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
+	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 )
@@ -22,14 +32,24 @@ type Dependencies struct {
 	sqlDB *sql.DB
 
 	// Repositories
-	AuthRepo repository.AuthRepository
+	AuthRepo     repository.AuthRepository
+	InterestRepo interestrepo.Repository
+	TagRepo      tagrepo.Repository
+	ProfileRepo  profilerepo.Repository
+	POIRepo      poirepo.Repository
+	CityRepo     cityrepo.Repository
+	ChatRepo     chatrepo.Repository
 
 	// Services
 	TokenManager service.TokenManager
 	AuthService  *service.AuthService
+	ChatService  chatservice.LlmInteractiontService
+	ProfileSvc   profilesvc.Service
 
 	// Handlers
-	AuthHandler *handler.AuthHandler
+	AuthHandler    *handler.AuthHandler
+	ChatHandler    *chathandler.ChatHandler
+	ProfileHandler *profilehandler.ProfileHandler
 }
 
 // InitDependencies initializes all application dependencies
@@ -100,6 +120,12 @@ func (d *Dependencies) initRepositories() error {
 
 	d.sqlDB = sqlDB
 	d.AuthRepo = repository.NewPostgresAuthRepository(sqlDB)
+	d.InterestRepo = interestrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
+	d.TagRepo = tagrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
+	d.ProfileRepo = profilerepo.NewPostgresUserRepo(d.DB.Pool, d.Logger)
+	d.POIRepo = poirepo.NewRepository(d.DB.Pool, d.Logger)
+	d.CityRepo = cityrepo.NewCityRepository(d.DB.Pool, d.Logger)
+	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -125,6 +151,18 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
+	d.ProfileSvc = profilesvc.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
+	d.ChatService = chatservice.NewLlmInteractiontService(
+		d.InterestRepo,
+		d.ProfileRepo,
+		d.ProfileSvc,
+		d.TagRepo,
+		d.ChatRepo,
+		d.CityRepo,
+		d.POIRepo,
+		d.Logger,
+	)
+
 	d.Logger.Info("services initialized")
 	return nil
 }
@@ -132,6 +170,8 @@ func (d *Dependencies) initServices() error {
 // initHandlers initializes all handler dependencies
 func (d *Dependencies) initHandlers() error {
 	d.AuthHandler = handler.NewAuthHandler(d.AuthService)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger)
+	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

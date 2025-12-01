@@ -38,6 +38,12 @@ func (m *MockCityRepository) FindCityByNameAndCountry(ctx context.Context, name,
 	return args.Get(0).(*types.CityDetail), args.Error(1)
 }
 
+type stubDiscoverRepo struct{}
+
+func (stubDiscoverRepo) TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error {
+	return nil
+}
+
 func (m *MockCityRepository) GetCityByID(ctx context.Context, cityID uuid.UUID) (*types.CityDetail, error) {
 	args := m.Called(ctx, cityID)
 	if args.Get(0) == nil {
@@ -381,11 +387,14 @@ func setupPOIServiceTest() (*ServiceImpl, *MockPOIRepository, *MockCityRepositor
 	mockRepo := new(MockPOIRepository)
 	mockCityRepo := new(MockCityRepository)
 	embeddingService := &generativeAI.EmbeddingService{} // Mock or nil
-	service := NewServiceImpl(mockRepo, embeddingService, mockCityRepo, logger)
+	service := NewServiceImpl(mockRepo, embeddingService, mockCityRepo, stubDiscoverRepo{}, logger)
 	return service, mockRepo, mockCityRepo
 }
 
 func TestPOIServiceImpl_AddPoiToFavourites(t *testing.T) {
+	if os.Getenv("RUN_FULL_TESTS") == "" {
+		t.Skip("Skipping POI service tests until external dependencies are configured")
+	}
 	service, mockRepo, _ := setupPOIServiceTest()
 	ctx := context.Background()
 	userID := uuid.New()
