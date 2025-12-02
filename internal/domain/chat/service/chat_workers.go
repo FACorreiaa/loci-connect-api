@@ -21,7 +21,8 @@ func (l *ServiceImpl) GenerateCityDataWorker(wg *sync.WaitGroup,
 	ctx context.Context,
 	cityName string,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	go func() {
 		ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateCityDataWorker", trace.WithAttributes(
 			attribute.String("city.name", cityName),
@@ -102,7 +103,8 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(wg *sync.WaitGroup,
 	ctx context.Context,
 	cityName string,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
 	))
@@ -159,7 +161,8 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(wg *sync.WaitGroup,
 func (l *ServiceImpl) GeneratePersonalisedPOIWorker(wg *sync.WaitGroup, ctx context.Context,
 	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
 	interestNames []string, tagsPromptPart string, userPrefs string,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
 		attribute.String("user.id", userID.String()),
@@ -255,7 +258,8 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(wg *sync.WaitGroup, ctx cont
 func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(wg *sync.WaitGroup, ctx context.Context,
 	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
 	interestNames []string, tagsPromptPart string, userPrefs string, semanticPOIs []types.POIDetailedInfo,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorkerWithSemantics", trace.WithAttributes(
 		attribute.String("city.name", cityName),
 		attribute.String("user.id", userID.String()),

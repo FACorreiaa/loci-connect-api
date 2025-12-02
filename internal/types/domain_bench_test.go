@@ -93,7 +93,7 @@ var (
 		"drink": DomainDining, "cafe": DomainDining,
 		"bar": DomainDining, "lunch": DomainDining,
 		"dinner": DomainDining, "breakfast": DomainDining,
-		"brunch": DomainDining,
+		"brunch":   DomainDining,
 		"activity": DomainActivities, "museum": DomainActivities,
 		"park": DomainActivities, "attraction": DomainActivities,
 		"tour": DomainActivities, "visit": DomainActivities,
@@ -123,10 +123,10 @@ func detectDomainSingleMatcher(message string) DomainType {
 
 // Benchmark test cases
 var testMessages = []string{
-	"I need a hotel near the Eiffel Tower",                           // Accommodation (early match)
-	"What are some good restaurants in Tokyo?",                        // Dining (early match)
-	"I want to visit museums and parks tomorrow",                      // Activities (early match)
-	"Help me plan my itinerary for next week",                         // Itinerary (early match)
+	"I need a hotel near the Eiffel Tower",                          // Accommodation (early match)
+	"What are some good restaurants in Tokyo?",                      // Dining (early match)
+	"I want to visit museums and parks tomorrow",                    // Activities (early match)
+	"Help me plan my itinerary for next week",                       // Itinerary (early match)
 	"This is a long message about my travel plans and I'm not sure", // General (no match, worst case)
 }
 

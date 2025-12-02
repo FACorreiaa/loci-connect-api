@@ -22,7 +22,7 @@ var _ Service = (*ServiceImpl)(nil)
 
 // profilessService defines the business logic contract for user operations.
 type Service interface {
-	//GetSearchProfiles User  Profiles
+	// GetSearchProfiles User  Profiles
 	GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error)
 	GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error)
 	GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error)

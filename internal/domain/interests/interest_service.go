@@ -19,7 +19,7 @@ var _ interestsService = (*interestsServiceImpl)(nil)
 
 // interestsService defines the business logic contract for user operations.
 type interestsService interface {
-	//Removeinterests remove interests
+	// Removeinterests remove interests
 	Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error
 	GetAllInterests(ctx context.Context) ([]*types.Interest, error)
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error)

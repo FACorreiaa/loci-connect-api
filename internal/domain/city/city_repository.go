@@ -77,7 +77,6 @@ func (r *RepositoryImpl) SaveCity(ctx context.Context, city types.CityDetail) (u
 		NewNullFloat64(city.CenterLongitude),
 		NewNullFloat64(city.CenterLatitude),
 	).Scan(&id)
-
 	if err != nil {
 		// No need to check for pgx.ErrNoRows on INSERT RETURNING, an error means failure.
 		return uuid.Nil, fmt.Errorf("failed to insert city: %w", err)

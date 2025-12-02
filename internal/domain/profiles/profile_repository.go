@@ -55,16 +55,16 @@ func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *Repository
 	}
 }
 
-//SELECT upp.profile_name, upp.is_default, upp.search_radius_km,
-//upp.preferred_time, upp.budget_level, upp.preferred_pace,
-//upp.prefer_accessible_pois, prefer_outdoor_seating,
-//upp.prefer_dog_friendly, upp.preferred_vibes,
-//upp.preferred_transport, upp.dietary_needs,
-//ucc.name, ucc.description ,ucc.active
-//FROM user_preference_profiles upp
-//JOIN user_custom_interests ucc ON ucc.user_id = upp.user_id
-//WHERE upp.user_id = 'f835199b-7d87-4450-841c-b94fcf9706b0'
-//ORDER BY upp.profile_name
+// SELECT upp.profile_name, upp.is_default, upp.search_radius_km,
+// upp.preferred_time, upp.budget_level, upp.preferred_pace,
+// upp.prefer_accessible_pois, prefer_outdoor_seating,
+// upp.prefer_dog_friendly, upp.preferred_vibes,
+// upp.preferred_transport, upp.dietary_needs,
+// ucc.name, ucc.description ,ucc.active
+// FROM user_preference_profiles upp
+// JOIN user_custom_interests ucc ON ucc.user_id = upp.user_id
+// WHERE upp.user_id = 'f835199b-7d87-4450-841c-b94fcf9706b0'
+// ORDER BY upp.profile_name
 
 // GetProfiles implements user.UserRepo.
 func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error) {

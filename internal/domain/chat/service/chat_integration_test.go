@@ -26,9 +26,11 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 )
 
-var testChatDB *pgxpool.Pool
-var testChatService LlmInteractiontService
-var testChatRepo repository.Repository
+var (
+	testChatDB      *pgxpool.Pool
+	testChatService LlmInteractiontService
+	testChatRepo    repository.Repository
+)
 
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("../../../.env.test"); err != nil {

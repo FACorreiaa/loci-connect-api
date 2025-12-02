@@ -296,7 +296,6 @@ func TestReviewConstraints_Integration(t *testing.T) {
 		_, err = testReviewDB.Exec(ctx, query,
 			invalidReview.ID, invalidReview.UserID, invalidReview.POIID, invalidReview.Rating, invalidReview.Title, invalidReview.Content,
 			invalidReview.Helpful, invalidReview.Unhelpful, invalidReview.IsVerified, invalidReview.IsPublished, invalidReview.CreatedAt, invalidReview.UpdatedAt)
-
 		// This should succeed if no constraints, or fail if there are rating constraints
 		// Adjust assertion based on your database schema constraints
 		if err != nil {

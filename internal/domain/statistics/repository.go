@@ -177,7 +177,6 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 		&stats.TotalItinerariesSaved,
 		&stats.TotalUniquePOIs,
 	)
-
 	if err != nil {
 		r.logger.ErrorContext(ctx, "failed to get main page statistics", slog.Any("error", err))
 		return nil, err
@@ -218,7 +217,6 @@ func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uu
 		&stats.Restaurants,
 		&stats.TotalPOIs,
 	)
-
 	if err != nil {
 		r.logger.ErrorContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
 		return nil, err
@@ -253,7 +251,6 @@ func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.
 		&stats.CitiesExplored,
 		&stats.Discoveries,
 	)
-
 	if err != nil {
 		r.logger.ErrorContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
 		return nil, err

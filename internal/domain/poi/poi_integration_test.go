@@ -20,8 +20,10 @@ import (
 	// Your database migration tool/library if you use one programmatically
 )
 
-var testDB *pgxpool.Pool
-var testService POIService // Use the interface
+var (
+	testDB      *pgxpool.Pool
+	testService POIService // Use the interface
+)
 
 func TestMain(m *testing.M) {
 	// Load .env.test or similar for test database credentials
@@ -84,6 +86,7 @@ func clearFavouritesTable(t *testing.T) {
 	_, err := testDB.Exec(context.Background(), "DELETE FROM user_favourite_pois") // Adjust table name
 	require.NoError(t, err, "Failed to clear user_favourite_pois table")
 }
+
 func clearPoisTable(t *testing.T) {
 	t.Helper()
 	// Be careful with cascading deletes or foreign key constraints
@@ -99,12 +102,14 @@ func insertTestUser(t *testing.T, id uuid.UUID, username string) {
 		id, username, username+"@example.com", "somehash")
 	require.NoError(t, err)
 }
+
 func insertTestCity(t *testing.T, id uuid.UUID, name string) {
 	t.Helper()
 	_, err := testDB.Exec(context.Background(), "INSERT INTO cities (id, name, country) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
 		id, name, "Testland")
 	require.NoError(t, err)
 }
+
 func insertTestPOI(t *testing.T, id uuid.UUID, name string, cityID uuid.UUID) types.POIDetail {
 	t.Helper()
 	poi := types.POIDetail{ID: id, Name: name, CityID: cityID, Latitude: 1.0, Longitude: 1.0, Category: "Test"} // Add other required fields

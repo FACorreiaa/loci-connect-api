@@ -50,7 +50,27 @@ func (h *ChatHandler) StartChat(
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 
-	resp, err := h.service.StartChat(ctx, userID, uuid.Nil, req.Msg.GetCityName(), req.Msg.GetInitialMessage(), nil)
+	// Extract profileID if provided
+	var profileID uuid.UUID
+	if req.Msg.GetProfileId() != "" {
+		if pid, err := uuid.Parse(req.Msg.GetProfileId()); err == nil {
+			profileID = pid
+		}
+	}
+
+	// Extract cityName from request
+	cityName := req.Msg.GetCityName()
+
+	// Extract userLocation if provided
+	var userLoc *types.UserLocation
+	if loc := req.Msg.GetUserLocation(); loc != nil {
+		userLoc = &types.UserLocation{
+			UserLat: loc.GetLatitude(),
+			UserLon: loc.GetLongitude(),
+		}
+	}
+
+	resp, err := h.service.StartChat(ctx, userID, profileID, cityName, req.Msg.GetInitialMessage(), userLoc)
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -73,6 +93,26 @@ func (h *ChatHandler) StreamChat(
 		return connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 
+	// Extract profileID if provided
+	var profileID uuid.UUID
+	if req.Msg.GetProfileId() != "" {
+		if pid, err := uuid.Parse(req.Msg.GetProfileId()); err == nil {
+			profileID = pid
+		}
+	}
+
+	// Extract cityName from request
+	cityName := req.Msg.GetCityName()
+
+	// Extract userLocation if provided
+	var userLoc *types.UserLocation
+	if loc := req.Msg.GetUserLocation(); loc != nil {
+		userLoc = &types.UserLocation{
+			UserLat: loc.GetLatitude(),
+			UserLon: loc.GetLongitude(),
+		}
+	}
+
 	eventCh := make(chan types.StreamEvent, 100)
 
 	go func() {
@@ -80,10 +120,10 @@ func (h *ChatHandler) StreamChat(
 		err := h.service.ProcessUnifiedChatMessageStream(
 			ctx,
 			userID,
-			uuid.Nil,
-			req.Msg.GetCityName(),
+			profileID,
+			cityName,
 			req.Msg.Message,
-			nil,
+			userLoc,
 			eventCh,
 		)
 		if err != nil {

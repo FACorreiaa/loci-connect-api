@@ -30,11 +30,11 @@ var _ Repository = (*RepositoryImpl)(nil)
 type Repository interface {
 	SavePoi(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
 	FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*types.POIDetailedInfo, error)
-	//GetPOIsByNamesAndCitySortedByDistance(ctx context.Context, names []string, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
+	// GetPOIsByNamesAndCitySortedByDistance(ctx context.Context, names []string, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
 	GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
 	GetPOIsByLocationAndDistance(ctx context.Context, lat, lon, radiusMeters float64) ([]types.POIDetailedInfo, error)
 	GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]types.POIDetailedInfo, error)
-	//GetPOIsByLocationAndDistanceWithFilters(ctx context.Context, lat, lon, radiusMeters float64, filters map[string]string) ([]types.POIDetailedInfo, error)
+	// GetPOIsByLocationAndDistanceWithFilters(ctx context.Context, lat, lon, radiusMeters float64, filters map[string]string) ([]types.POIDetailedInfo, error)
 	AddPoiToFavourites(ctx context.Context, userID, poiID uuid.UUID) (uuid.UUID, error)
 	AddLLMPoiToFavourite(ctx context.Context, userID uuid.UUID, llmPoiID uuid.UUID) (uuid.UUID, error)
 	RemovePoiFromFavourites(ctx context.Context, userID, poiID uuid.UUID) error
@@ -74,7 +74,7 @@ type Repository interface {
 	// GetPOIsByCityIDAndNameSortedByDistance(ctx context.Context, cityID uuid.UUID, name string, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
 	// GetPOIsByCityIDAndNamesSortedByDistance(ctx context.Context, cityID uuid.UUID, names []string, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
 
-	//AddPersonalizedPOItoFavourites(ctx context.Context, poiID uuid.UUID, userID uuid.UUID) (uuid.UUID, error)
+	// AddPersonalizedPOItoFavourites(ctx context.Context, poiID uuid.UUID, userID uuid.UUID) (uuid.UUID, error)
 
 	GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*types.UserSavedItinerary, error)
 	GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]types.UserSavedItinerary, int, error)
@@ -671,7 +671,6 @@ func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, l
 func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "SavePOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.id", func() string {
-
 			return "null"
 		}()),
 		attribute.String("poi.name", poi.Name),
@@ -706,7 +705,6 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetail
 			slog.String("poi_name", poi.Name),
 			slog.String("existing_id", existingID.String()),
 			slog.String("city_id", func() string {
-
 				return "null"
 			}()))
 		span.SetAttributes(attribute.String("poi.existing_id", existingID.String()))
@@ -756,7 +754,6 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetail
 			slog.String("poi_name", poi.Name),
 			slog.String("poi_id", poiID.String()),
 			slog.String("city_id", func() string {
-
 				return "null"
 			}()))
 		span.RecordError(err)
@@ -821,7 +818,6 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetail
 			slog.String("poi_name", poi.Name),
 			slog.String("poi_id", poiID.String()),
 			slog.String("city_id", func() string {
-
 				return "null"
 			}()))
 		span.RecordError(err)
@@ -845,7 +841,6 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetail
 		slog.String("poi_name", poi.Name),
 		slog.String("poi_id", poiID.String()),
 		slog.String("city_id", func() string {
-
 			return "null"
 		}()),
 		slog.Float64("latitude", poi.Latitude),
@@ -1151,7 +1146,6 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant t
 		restaurant.Rating,           // $18: rating (DOUBLE PRECISION)
 		restaurant.LlmInteractionID, // $19: llm_interaction_id (UUID)
 	).Scan(&id)
-
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to save restaurant details",
 			slog.Any("error", err),
@@ -1541,7 +1535,6 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID uuid.UUID, 
 		&updatedItinerary.CreatedAt,
 		&updatedItinerary.UpdatedAt,
 	)
-
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			notFoundErr := fmt.Errorf("itinerary with ID %s not found for user %s or does not exist", itineraryID, userID)
@@ -1658,7 +1651,6 @@ func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid
 		[]string{"itinerary_id", "poi_id", "order_index", "ai_description"},
 		source,
 	)
-
 	if err != nil {
 		span.RecordError(err)
 		return fmt.Errorf("failed to save itinerary POIs: %w", err)
