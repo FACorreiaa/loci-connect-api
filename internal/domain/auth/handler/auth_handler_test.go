@@ -48,7 +48,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	if _, err := repo.GetUserByEmail(ctx, "rpc-register@example.com"); err != nil {
 		t.Fatalf("user not stored: %v", err)
 	}
-	servicetest.WaitFor(t, func() bool { return emails.VerificationSent })
+	servicetest.WaitFor(t, func() bool { return emails.VerificationSent() })
 	if len(repo.Sessions) != 1 {
 		t.Fatalf("expected one session, got %d", len(repo.Sessions))
 	}

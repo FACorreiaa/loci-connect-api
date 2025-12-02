@@ -54,7 +54,7 @@ func TestAuthService_RegisterUser_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("user persisted not found: %v", err)
 	}
-	servicetest.WaitFor(t, func() bool { return email.VerificationSent })
+	servicetest.WaitFor(t, func() bool { return email.VerificationSent() })
 	if user.HashedPassword == "" {
 		t.Fatalf("expected hashed password to be stored")
 	}
@@ -279,7 +279,7 @@ func TestAuthService_VerifyEmail_Success(t *testing.T) {
 	if _, ok := repo.Tokens[hash]; ok {
 		t.Fatalf("token should be deleted")
 	}
-	servicetest.WaitFor(t, func() bool { return email.WelcomeSent })
+	servicetest.WaitFor(t, func() bool { return email.WelcomeSent() })
 }
 
 func TestAuthService_ResendVerificationEmail(t *testing.T) {
@@ -294,14 +294,14 @@ func TestAuthService_ResendVerificationEmail(t *testing.T) {
 	if result == nil || result.AlreadyVerified {
 		t.Fatalf("expected resend to proceed")
 	}
-	servicetest.WaitFor(t, func() bool { return email.VerificationSent })
+	servicetest.WaitFor(t, func() bool { return email.VerificationSent() })
 	if len(repo.Tokens) == 0 {
 		t.Fatalf("verification token not stored")
 	}
 
 	now := time.Now()
 	user.EmailVerifiedAt = &now
-	email.VerificationSent = false
+	email.ResetFlags()
 	result, err = svc.ResendVerificationEmail(ctx, user.Email)
 	if err != nil {
 		t.Fatalf("ResendVerificationEmail verified: %v", err)
@@ -309,7 +309,7 @@ func TestAuthService_ResendVerificationEmail(t *testing.T) {
 	if !result.AlreadyVerified {
 		t.Fatalf("expected AlreadyVerified flag")
 	}
-	if email.VerificationSent {
+	if email.VerificationSent() {
 		t.Fatalf("should not send email for verified user")
 	}
 }
@@ -380,7 +380,7 @@ func TestAuthService_RequestPasswordReset(t *testing.T) {
 	if err := svc.RequestPasswordReset(ctx, "jane@example.com"); err != nil {
 		t.Fatalf("RequestPasswordReset: %v", err)
 	}
-	servicetest.WaitFor(t, func() bool { return email.ResetSent })
+	servicetest.WaitFor(t, func() bool { return email.ResetSent() })
 	if len(repo.Tokens) == 0 {
 		t.Fatalf("expected token to be stored")
 	}

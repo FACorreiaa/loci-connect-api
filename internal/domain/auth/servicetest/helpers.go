@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,24 +45,42 @@ func (m *MockTokenManager) ValidateRefreshToken(tokenString string) (*service.Cl
 
 // MockEmailSender captures sent emails for assertions.
 type MockEmailSender struct {
-	VerificationSent bool
-	ResetSent        bool
-	WelcomeSent      bool
+	verificationSent atomic.Bool
+	resetSent        atomic.Bool
+	welcomeSent      atomic.Bool
 }
 
 func (m *MockEmailSender) SendVerificationEmail(_, _, _ string) error {
-	m.VerificationSent = true
+	m.verificationSent.Store(true)
 	return nil
 }
 
 func (m *MockEmailSender) SendPasswordResetEmail(_, _, _ string) error {
-	m.ResetSent = true
+	m.resetSent.Store(true)
 	return nil
 }
 
 func (m *MockEmailSender) SendWelcomeEmail(_, _ string) error {
-	m.WelcomeSent = true
+	m.welcomeSent.Store(true)
 	return nil
+}
+
+func (m *MockEmailSender) VerificationSent() bool {
+	return m.verificationSent.Load()
+}
+
+func (m *MockEmailSender) ResetSent() bool {
+	return m.resetSent.Load()
+}
+
+func (m *MockEmailSender) WelcomeSent() bool {
+	return m.welcomeSent.Load()
+}
+
+func (m *MockEmailSender) ResetFlags() {
+	m.verificationSent.Store(false)
+	m.resetSent.Store(false)
+	m.welcomeSent.Store(false)
 }
 
 // MockAuthRepo is an in-memory AuthRepository.
