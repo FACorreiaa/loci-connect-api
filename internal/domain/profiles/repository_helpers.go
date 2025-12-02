@@ -12,7 +12,7 @@ import (
 
 // Transaction helper methods for updating domain preferences
 
-func (r *RepositoryImpl) updateAccommodationPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *types.AccommodationPreferences) error {
+func (r *RepositoryImpl) updateAccommodationPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *locitypes.AccommodationPreferences) error {
 	// Convert preferences to JSONB
 	filters := map[string]interface{}{
 		"accommodation_type":    prefs.AccommodationType,
@@ -38,7 +38,7 @@ func (r *RepositoryImpl) updateAccommodationPreferencesInTx(ctx context.Context,
 	return err
 }
 
-func (r *RepositoryImpl) updateDiningPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *types.DiningPreferences) error {
+func (r *RepositoryImpl) updateDiningPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *locitypes.DiningPreferences) error {
 	// Convert preferences to JSONB
 	filters := map[string]interface{}{
 		"cuisine_types":             prefs.CuisineTypes,
@@ -67,7 +67,7 @@ func (r *RepositoryImpl) updateDiningPreferencesInTx(ctx context.Context, tx pgx
 	return err
 }
 
-func (r *RepositoryImpl) updateActivityPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *types.ActivityPreferences) error {
+func (r *RepositoryImpl) updateActivityPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *locitypes.ActivityPreferences) error {
 	// Convert preferences to JSONB
 	filters := map[string]interface{}{
 		"activity_categories":        prefs.ActivityCategories,
@@ -95,7 +95,7 @@ func (r *RepositoryImpl) updateActivityPreferencesInTx(ctx context.Context, tx p
 	return err
 }
 
-func (r *RepositoryImpl) updateItineraryPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *types.ItineraryPreferences) error {
+func (r *RepositoryImpl) updateItineraryPreferencesInTx(ctx context.Context, tx pgx.Tx, profileID uuid.UUID, prefs *locitypes.ItineraryPreferences) error {
 	// Convert preferences to JSONB
 	filters := map[string]interface{}{
 		"planning_style":          prefs.PlanningStyle,

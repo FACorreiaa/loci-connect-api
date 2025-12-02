@@ -244,7 +244,7 @@ func TestCacheDifferentPreferencesSameCity(t *testing.T) {
 	userID := uuid.New()
 	profileID := uuid.New()
 	city := "Paris"
-	domain := string(types.DomainItinerary)
+	domain := string(locitypes.DomainItinerary)
 
 	pref1 := "Art & Museums"
 	pref2 := "Food & Nightlife"
@@ -300,13 +300,13 @@ func TestAllEndpointCacheKeys(t *testing.T) {
 	profileID := uuid.New()
 
 	endpoints := []struct {
-		domain types.DomainType
+		domain locitypes.DomainType
 		suffix string
 	}{
-		{types.DomainItinerary, "_itinerary"},
-		{types.DomainAccommodation, "_hotels"},
-		{types.DomainDining, "_restaurants"},
-		{types.DomainActivities, "_activities"},
+		{locitypes.DomainItinerary, "_itinerary"},
+		{locitypes.DomainAccommodation, "_hotels"},
+		{locitypes.DomainDining, "_restaurants"},
+		{locitypes.DomainActivities, "_activities"},
 	}
 
 	cacheKeys := make(map[string]string)

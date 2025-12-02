@@ -110,9 +110,9 @@ func insertTestCity(t *testing.T, id uuid.UUID, name string) {
 	require.NoError(t, err)
 }
 
-func insertTestPOI(t *testing.T, id uuid.UUID, name string, cityID uuid.UUID) types.POIDetail {
+func insertTestPOI(t *testing.T, id uuid.UUID, name string, cityID uuid.UUID) locitypes.POIDetail {
 	t.Helper()
-	poi := types.POIDetail{ID: id, Name: name, CityID: cityID, Latitude: 1.0, Longitude: 1.0, Category: "Test"} // Add other required fields
+	poi := locitypes.POIDetail{ID: id, Name: name, CityID: cityID, Latitude: 1.0, Longitude: 1.0, Category: "Test"} // Add other required fields
 	_, err := testDB.Exec(context.Background(),
 		"INSERT INTO pois (id, city_id, name, description_poi, latitude, longitude, location, category) VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326), $9) ON CONFLICT (id) DO NOTHING",
 		poi.ID, poi.CityID, poi.Name, sql.NullString{String: "Desc", Valid: true}, poi.Latitude, poi.Longitude, poi.Longitude, poi.Latitude, poi.Category)
@@ -215,16 +215,16 @@ func TestPOIServiceImpl_SearchPOIs_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Seed specific POIs for searching
-	poiMuseum := types.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "Grand Museum", Category: "Museum", Latitude: 10.0, Longitude: 10.0, DescriptionPOI: sql.NullString{String: "Ancient artifacts", Valid: true}}
-	poiPark := types.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "City Park", Category: "Park", Latitude: 10.1, Longitude: 10.1, DescriptionPOI: sql.NullString{String: "Green space", Valid: true}}
-	poiCafe := types.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "Art Cafe", Category: "Cafe", Latitude: 10.05, Longitude: 10.05, DescriptionPOI: sql.NullString{String: "Coffee and art", Valid: true}, Tags: []string{"art", "coffee"}}
+	poiMuseum := locitypes.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "Grand Museum", Category: "Museum", Latitude: 10.0, Longitude: 10.0, DescriptionPOI: sql.NullString{String: "Ancient artifacts", Valid: true}}
+	poiPark := locitypes.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "City Park", Category: "Park", Latitude: 10.1, Longitude: 10.1, DescriptionPOI: sql.NullString{String: "Green space", Valid: true}}
+	poiCafe := locitypes.POIDetail{ID: uuid.New(), CityID: searchCityID, Name: "Art Cafe", Category: "Cafe", Latitude: 10.05, Longitude: 10.05, DescriptionPOI: sql.NullString{String: "Coffee and art", Valid: true}, Tags: []string{"art", "coffee"}}
 
 	insertPOIForIntegration(t, poiMuseum)
 	insertPOIForIntegration(t, poiPark)
 	insertPOIForIntegration(t, poiCafe)
 
 	t.Run("Search by category", func(t *testing.T) {
-		filter := types.POIFilter{CityID: searchCityID, Category: "Museum"}
+		filter := locitypes.POIFilter{CityID: searchCityID, Category: "Museum"}
 		pois, err := testService.SearchPOIs(ctx, filter)
 		require.NoError(t, err)
 		require.Len(t, pois, 1)
@@ -232,7 +232,7 @@ func TestPOIServiceImpl_SearchPOIs_Integration(t *testing.T) {
 	})
 
 	t.Run("Search by tag", func(t *testing.T) {
-		filter := types.POIFilter{CityID: searchCityID, Tags: []string{"art"}}
+		filter := locitypes.POIFilter{CityID: searchCityID, Tags: []string{"art"}}
 		pois, err := testService.SearchPOIs(ctx, filter)
 		require.NoError(t, err)
 		require.Len(t, pois, 1) // Only Art Cafe has "art" tag in this setup
@@ -240,7 +240,7 @@ func TestPOIServiceImpl_SearchPOIs_Integration(t *testing.T) {
 	})
 
 	t.Run("Search by name substring", func(t *testing.T) {
-		filter := types.POIFilter{CityID: searchCityID, Name: "grand"} // Case-insensitive search usually
+		filter := locitypes.POIFilter{CityID: searchCityID, Name: "grand"} // Case-insensitive search usually
 		pois, err := testService.SearchPOIs(ctx, filter)
 		require.NoError(t, err)
 		require.Len(t, pois, 1)
@@ -248,7 +248,7 @@ func TestPOIServiceImpl_SearchPOIs_Integration(t *testing.T) {
 	})
 
 	t.Run("Search with no results", func(t *testing.T) {
-		filter := types.POIFilter{CityID: searchCityID, Category: "Zoo"}
+		filter := locitypes.POIFilter{CityID: searchCityID, Category: "Zoo"}
 		pois, err := testService.SearchPOIs(ctx, filter)
 		require.NoError(t, err)
 		assert.Empty(t, pois)
@@ -256,7 +256,7 @@ func TestPOIServiceImpl_SearchPOIs_Integration(t *testing.T) {
 }
 
 // Helper for SearchPOIs_Integration
-func insertPOIForIntegration(t *testing.T, poi types.POIDetail) {
+func insertPOIForIntegration(t *testing.T, poi locitypes.POIDetail) {
 	t.Helper()
 	_, err := testDB.Exec(context.Background(),
 		"INSERT INTO pois (id, city_id, name, description_poi, latitude, longitude, location, category, tags) VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326), $9, $10) ON CONFLICT (id) DO NOTHING",

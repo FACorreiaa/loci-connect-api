@@ -18,34 +18,34 @@ import (
 var _ Service = (*ServiceImpl)(nil)
 
 type Service interface {
-	CreateTopLevelList(ctx context.Context, userID uuid.UUID, name, description string, cityID *uuid.UUID, isItinerary, isPublic bool) (*types.List, error)
-	CreateItineraryForList(ctx context.Context, userID, parentListID uuid.UUID, name, description string, isPublic bool) (*types.List, error)
-	GetListDetails(ctx context.Context, listID, userID uuid.UUID) (*types.ListWithItems, error)
-	UpdateListDetails(ctx context.Context, listID, userID uuid.UUID, params types.UpdateListRequest) (*types.List, error)
+	CreateTopLevelList(ctx context.Context, userID uuid.UUID, name, description string, cityID *uuid.UUID, isItinerary, isPublic bool) (*locitypes.List, error)
+	CreateItineraryForList(ctx context.Context, userID, parentListID uuid.UUID, name, description string, isPublic bool) (*locitypes.List, error)
+	GetListDetails(ctx context.Context, listID, userID uuid.UUID) (*locitypes.ListWithItems, error)
+	UpdateListDetails(ctx context.Context, listID, userID uuid.UUID, params locitypes.UpdateListRequest) (*locitypes.List, error)
 	DeleteUserList(ctx context.Context, listID, userID uuid.UUID) error
 
 	// Generic list item methods (support all content types)
-	AddListItem(ctx context.Context, userID, listID uuid.UUID, params types.AddListItemRequest) (*types.ListItem, error)
-	UpdateListItem(ctx context.Context, userID, listID, itemID uuid.UUID, params types.UpdateListItemRequest) (*types.ListItem, error)
+	AddListItem(ctx context.Context, userID, listID uuid.UUID, params locitypes.AddListItemRequest) (*locitypes.ListItem, error)
+	UpdateListItem(ctx context.Context, userID, listID, itemID uuid.UUID, params locitypes.UpdateListItemRequest) (*locitypes.ListItem, error)
 	RemoveListItem(ctx context.Context, userID, listID, itemID uuid.UUID) error
 
 	// Saved Lists functionality
 	SaveList(ctx context.Context, userID, listID uuid.UUID) error
 	UnsaveList(ctx context.Context, userID, listID uuid.UUID) error
-	GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*types.List, error)
+	GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error)
 
 	// Content type specific methods
-	GetListItemsByContentType(ctx context.Context, userID, listID uuid.UUID, contentType types.ContentType) ([]*types.ListItem, error)
+	GetListItemsByContentType(ctx context.Context, userID, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error)
 
 	// Search and filtering
-	SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*types.List, error)
+	SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error)
 
 	// Legacy POI-specific methods (for backward compatibility)
-	AddPOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params types.AddListItemRequest) (*types.ListItem, error)
-	UpdatePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params types.UpdateListItemRequest) (*types.ListItem, error)
+	AddPOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params locitypes.AddListItemRequest) (*locitypes.ListItem, error)
+	UpdatePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params locitypes.UpdateListItemRequest) (*locitypes.ListItem, error)
 	RemovePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID) error
 
-	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*types.List, error)
+	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error)
 }
 
 type ServiceImpl struct {
@@ -62,7 +62,7 @@ func NewServiceImpl(repo Repository, logger *slog.Logger) *ServiceImpl {
 }
 
 // CreateTopLevelList creates a new top-level list
-func (s *ServiceImpl) CreateTopLevelList(ctx context.Context, userID uuid.UUID, name, description string, cityID *uuid.UUID, isItinerary, isPublic bool) (*types.List, error) {
+func (s *ServiceImpl) CreateTopLevelList(ctx context.Context, userID uuid.UUID, name, description string, cityID *uuid.UUID, isItinerary, isPublic bool) (*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "CreateTopLevelList", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("list.name", name),
@@ -73,7 +73,7 @@ func (s *ServiceImpl) CreateTopLevelList(ctx context.Context, userID uuid.UUID, 
 	l := s.logger.With(slog.String("method", "CreateTopLevelList"), slog.String("userID", userID.String()))
 	l.DebugContext(ctx, "Creating top-level list")
 
-	list := types.List{
+	list := locitypes.List{
 		ID:          uuid.New(),
 		UserID:      userID,
 		Name:        name,
@@ -103,7 +103,7 @@ func (s *ServiceImpl) CreateTopLevelList(ctx context.Context, userID uuid.UUID, 
 }
 
 // CreateItineraryForList creates a new itinerary within a parent list
-func (s *ServiceImpl) CreateItineraryForList(ctx context.Context, userID, parentListID uuid.UUID, name, description string, isPublic bool) (*types.List, error) {
+func (s *ServiceImpl) CreateItineraryForList(ctx context.Context, userID, parentListID uuid.UUID, name, description string, isPublic bool) (*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "CreateItineraryForList", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("parent_list.id", parentListID.String()),
@@ -134,7 +134,7 @@ func (s *ServiceImpl) CreateItineraryForList(ctx context.Context, userID, parent
 	}
 
 	// Create the itinerary
-	itinerary := types.List{
+	itinerary := locitypes.List{
 		ID:           uuid.New(),
 		UserID:       userID,
 		Name:         name,
@@ -161,7 +161,7 @@ func (s *ServiceImpl) CreateItineraryForList(ctx context.Context, userID, parent
 }
 
 // GetListDetails retrieves a list with all its items
-func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UUID) (*types.ListWithItems, error) {
+func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UUID) (*locitypes.ListWithItems, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "GetListDetails", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -191,7 +191,7 @@ func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UU
 	}
 
 	// Fetch list items if it's an itinerary
-	var items []*types.ListItem
+	var items []*locitypes.ListItem
 	if list.IsItinerary {
 		items, err = s.listRepository.GetListItems(ctx, listID)
 		if err != nil {
@@ -202,7 +202,7 @@ func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UU
 		}
 	}
 
-	result := &types.ListWithItems{
+	result := &locitypes.ListWithItems{
 		List:  list,
 		Items: items,
 	}
@@ -214,7 +214,7 @@ func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UU
 }
 
 // UpdateListDetails updates a list's details
-func (s *ServiceImpl) UpdateListDetails(ctx context.Context, listID, userID uuid.UUID, params types.UpdateListRequest) (*types.List, error) {
+func (s *ServiceImpl) UpdateListDetails(ctx context.Context, listID, userID uuid.UUID, params locitypes.UpdateListRequest) (*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "UpdateListDetails", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -323,7 +323,7 @@ func (s *ServiceImpl) DeleteUserList(ctx context.Context, listID, userID uuid.UU
 // Generic list item methods (support all content types)
 
 // AddListItem adds any type of content to a list
-func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID, params types.AddListItemRequest) (*types.ListItem, error) {
+func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID, params locitypes.AddListItemRequest) (*locitypes.ListItem, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "AddListItem", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -357,7 +357,7 @@ func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID,
 	}
 
 	// Create the list item with the new structure
-	item := types.ListItem{
+	item := locitypes.ListItem{
 		ListID:                 listID,
 		ItemID:                 params.ItemID,
 		ContentType:            params.ContentType,
@@ -387,7 +387,7 @@ func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID,
 }
 
 // UpdateListItem updates any type of content in a list
-func (s *ServiceImpl) UpdateListItem(ctx context.Context, userID, listID, itemID uuid.UUID, params types.UpdateListItemRequest) (*types.ListItem, error) {
+func (s *ServiceImpl) UpdateListItem(ctx context.Context, userID, listID, itemID uuid.UUID, params locitypes.UpdateListItemRequest) (*locitypes.ListItem, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "UpdateListItem", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -520,7 +520,7 @@ func (s *ServiceImpl) RemoveListItem(ctx context.Context, userID, listID, itemID
 // Legacy POI-specific methods (for backward compatibility)
 
 // AddPOIListItem adds a POI to a list
-func (s *ServiceImpl) AddPOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params types.AddListItemRequest) (*types.ListItem, error) {
+func (s *ServiceImpl) AddPOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params locitypes.AddListItemRequest) (*locitypes.ListItem, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "AddPOIListItem", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -559,7 +559,7 @@ func (s *ServiceImpl) AddPOIListItem(ctx context.Context, userID, listID, poiID 
 	}
 
 	// Create the list item
-	item := types.ListItem{
+	item := locitypes.ListItem{
 		ListID:    listID,
 		ItemID:    poiID,
 		Position:  params.Position,
@@ -586,7 +586,7 @@ func (s *ServiceImpl) AddPOIListItem(ctx context.Context, userID, listID, poiID 
 }
 
 // UpdatePOIListItem updates a POI in a list
-func (s *ServiceImpl) UpdatePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params types.UpdateListItemRequest) (*types.ListItem, error) {
+func (s *ServiceImpl) UpdatePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID, params locitypes.UpdateListItemRequest) (*locitypes.ListItem, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "UpdatePOIListItem", trace.WithAttributes(
 		attribute.String("list.id", listID.String()),
 		attribute.String("user.id", userID.String()),
@@ -707,7 +707,7 @@ func (s *ServiceImpl) RemovePOIListItem(ctx context.Context, userID, listID, poi
 }
 
 // GetUserLists retrieves all lists for a user
-func (s *ServiceImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*types.List, error) {
+func (s *ServiceImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "GetUserLists", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.Bool("is_itinerary", isItinerary),
@@ -808,7 +808,7 @@ func (s *ServiceImpl) UnsaveList(ctx context.Context, userID, listID uuid.UUID) 
 	return nil
 }
 
-func (s *ServiceImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*types.List, error) {
+func (s *ServiceImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "GetUserSavedLists", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -832,7 +832,7 @@ func (s *ServiceImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) (
 	return lists, nil
 }
 
-func (s *ServiceImpl) GetListItemsByContentType(ctx context.Context, userID, listID uuid.UUID, contentType types.ContentType) ([]*types.ListItem, error) {
+func (s *ServiceImpl) GetListItemsByContentType(ctx context.Context, userID, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "GetListItemsByContentType", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("list.id", listID.String()),
@@ -877,7 +877,7 @@ func (s *ServiceImpl) GetListItemsByContentType(ctx context.Context, userID, lis
 	return items, nil
 }
 
-func (s *ServiceImpl) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*types.List, error) {
+func (s *ServiceImpl) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error) {
 	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "SearchLists", trace.WithAttributes(
 		attribute.String("search.term", searchTerm),
 		attribute.String("category", category),
@@ -913,27 +913,27 @@ func (s *ServiceImpl) SearchLists(ctx context.Context, searchTerm, category, con
 }
 
 // todo
-// func (r *RepositoryImpl) SaveItinerary(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, name, description string, isPublic bool, parentListID *uuid.UUID) (types.List, error) {
+// func (r *RepositoryImpl) SaveItinerary(ctx context.Context, sessionID uuid.UUID, userID uuid.UUID, name, description string, isPublic bool, parentListID *uuid.UUID) (locitypes.List, error) {
 // 	// Fetch session from chat_sessions
 // 	session, err := r.GetSession(ctx, sessionID) // Assume GetSession is available
 // 	if err != nil {
-// 		return types.List{}, fmt.Errorf("failed to get session: %w", err)
+// 		return locitypes.List{}, fmt.Errorf("failed to get session: %w", err)
 // 	}
 // 	if session.UserID != userID {
-// 		return types.List{}, fmt.Errorf("user does not own session")
+// 		return locitypes.List{}, fmt.Errorf("user does not own session")
 // 	}
 // 	if session.CurrentItinerary == nil {
-// 		return types.List{}, fmt.Errorf("session has no itinerary")
+// 		return locitypes.List{}, fmt.Errorf("session has no itinerary")
 // 	}
 
 // 	// Get city_id from general_city_data
 // 	city, err := r.cityRepo.FindCityByNameAndCountry(ctx, session.CurrentItinerary.GeneralCityData.City, session.CurrentItinerary.GeneralCityData.Country)
 // 	if err != nil {
-// 		return types.List{}, fmt.Errorf("failed to find city: %w", err)
+// 		return locitypes.List{}, fmt.Errorf("failed to find city: %w", err)
 // 	}
 
 // 	// Create list
-// 	list := types.List{
+// 	list := locitypes.List{
 // 		ID:           uuid.New(),
 // 		UserID:       userID,
 // 		Name:         name,
@@ -946,16 +946,16 @@ func (s *ServiceImpl) SearchLists(ctx context.Context, searchTerm, category, con
 // 		UpdatedAt:    time.Now(),
 // 	}
 // 	if err := r.CreateList(ctx, list); err != nil {
-// 		return types.List{}, fmt.Errorf("failed to create itinerary list: %w", err)
+// 		return locitypes.List{}, fmt.Errorf("failed to create itinerary list: %w", err)
 // 	}
 
 // 	// Save POIs
 // 	for i, poi := range session.CurrentItinerary.AIItineraryResponse.PointsOfInterest {
 // 		poiID, err := r.SaveSinglePOI(ctx, poi, userID, city.ID, poi.LlmInteractionID)
 // 		if err != nil {
-// 			return types.List{}, fmt.Errorf("failed to save POI %s: %w", poi.Name, err)
+// 			return locitypes.List{}, fmt.Errorf("failed to save POI %s: %w", poi.Name, err)
 // 		}
-// 		listItem := types.ListItem{
+// 		listItem := locitypes.ListItem{
 // 			ListID:    list.ID,
 // 			PoiID:     poiID,
 // 			Position:  i + 1,
@@ -964,7 +964,7 @@ func (s *ServiceImpl) SearchLists(ctx context.Context, searchTerm, category, con
 // 			UpdatedAt: time.Now(),
 // 		}
 // 		if err := r.AddListItem(ctx, listItem); err != nil {
-// 			return types.List{}, fmt.Errorf("failed to add POI to itinerary: %w", err)
+// 			return locitypes.List{}, fmt.Errorf("failed to add POI to itinerary: %w", err)
 // 		}
 // 	}
 

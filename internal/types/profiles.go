@@ -1,4 +1,4 @@
-package types
+package locitypes
 
 import (
 	"database/sql/driver"

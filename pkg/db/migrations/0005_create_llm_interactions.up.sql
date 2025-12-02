@@ -55,7 +55,7 @@ CREATE TABLE llm_suggested_pois (
     --FOREIGN KEY (search_profile_id) REFERENCES user_preference_profiles(id) ON DELETE SET NULL,
     FOREIGN KEY (llm_interaction_id) REFERENCES llm_interactions(id) ON DELETE CASCADE,
     FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE CASCADE,
-    -- You can add other fields from types.POIDetail if the LLM commonly provides them
+    -- You can add other fields from locitypes.POIDetail if the LLM commonly provides them
 
 -- Foreign key constraints (if not defined inline above)
 -- CONSTRAINT fk_llm_suggested_pois_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE, -- Assuming you have a users table

@@ -55,7 +55,7 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponse(
 	responses map[string]*strings.Builder,
 	userID, profileID, cityID uuid.UUID,
 	llmInteractionID uuid.UUID,
-	userLocation *types.UserLocation,
+	userLocation *locitypes.UserLocation,
 ) {
 	l.logger.InfoContext(ctx, "Processing unified response for POI extraction",
 		slog.String("city_id", cityID.String()),
@@ -102,7 +102,7 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponseFree(
 	responses map[string]*strings.Builder,
 	cityID uuid.UUID,
 	llmInteractionID uuid.UUID,
-	userLocation *types.UserLocation,
+	userLocation *locitypes.UserLocation,
 ) {
 	l.logger.InfoContext(ctx, "Processing unified response for POI extraction",
 		slog.String("city_id", cityID.String()),
@@ -146,7 +146,7 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponseFree(
 
 func (l *ServiceImpl) handleGeneralPoisFromResponse(ctx context.Context, content string, cityID uuid.UUID) {
 	var poiData struct {
-		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
+		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &poiData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse general POIs from unified response", slog.Any("error", err))
@@ -161,12 +161,12 @@ func (l *ServiceImpl) handleItineraryFromResponse(
 	content string,
 	userID, profileID, cityID uuid.UUID,
 	llmInteractionID uuid.UUID,
-	userLocation *types.UserLocation,
+	userLocation *locitypes.UserLocation,
 ) {
 	var itineraryData struct {
-		ItineraryName      string                  `json:"itinerary_name"`
-		OverallDescription string                  `json:"overall_description"`
-		PointsOfInterest   []types.POIDetailedInfo `json:"points_of_interest"`
+		ItineraryName      string                      `json:"itinerary_name"`
+		OverallDescription string                      `json:"overall_description"`
+		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &itineraryData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse itinerary from unified response", slog.Any("error", err))
@@ -182,7 +182,7 @@ func (l *ServiceImpl) handleItineraryFromResponse(
 
 func (l *ServiceImpl) handleHotelsFromResponse(ctx context.Context, content string, cityID, _, llmInteractionID uuid.UUID) {
 	var hotelData struct {
-		Hotels []types.HotelDetailedInfo `json:"hotels"`
+		Hotels []locitypes.HotelDetailedInfo `json:"hotels"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &hotelData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse hotels from unified response", slog.Any("error", err))
@@ -203,7 +203,7 @@ func (l *ServiceImpl) handleHotelsFromResponse(ctx context.Context, content stri
 
 func (l *ServiceImpl) handleRestaurantsFromResponse(ctx context.Context, content string, cityID, _, llmInteractionID uuid.UUID) {
 	var restaurantData struct {
-		Restaurants []types.RestaurantDetailedInfo `json:"restaurants"`
+		Restaurants []locitypes.RestaurantDetailedInfo `json:"restaurants"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &restaurantData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err))

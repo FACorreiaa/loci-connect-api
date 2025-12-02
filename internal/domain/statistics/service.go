@@ -11,9 +11,9 @@ import (
 var _ Service = (*ServiceImpl)(nil)
 
 type Service interface {
-	GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*types.MainPageStatistics, error)
-	GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*types.DetailedPOIStatistics, error)
-	GetLandingPageStatistics(ctx context.Context, userID uuid.UUID) (*types.LandingPageUserStats, error)
+	GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error)
+	GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.DetailedPOIStatistics, error)
+	GetLandingPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.LandingPageUserStats, error)
 }
 
 type ServiceImpl struct {
@@ -28,7 +28,7 @@ func NewService(repo Repository, logger *slog.Logger) *ServiceImpl {
 	}
 }
 
-func (s *ServiceImpl) GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*types.MainPageStatistics, error) {
+func (s *ServiceImpl) GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error) {
 	l := s.logger.With(slog.String("method", "GetMainPageStatistics"))
 	stats, err := s.repo.GetMainPageStatistics(ctx, userID)
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *ServiceImpl) GetMainPageStatistics(ctx context.Context, userID uuid.UUI
 	return stats, nil
 }
 
-func (s *ServiceImpl) GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*types.DetailedPOIStatistics, error) {
+func (s *ServiceImpl) GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.DetailedPOIStatistics, error) {
 	l := s.logger.With(slog.String("method", "GetDetailedPOIStatistics"))
 	stats, err := s.repo.GetDetailedPOIStatistics(ctx, userID)
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *ServiceImpl) GetDetailedPOIStatistics(ctx context.Context, userID uuid.
 	return stats, nil
 }
 
-func (s *ServiceImpl) GetLandingPageStatistics(ctx context.Context, userID uuid.UUID) (*types.LandingPageUserStats, error) {
+func (s *ServiceImpl) GetLandingPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.LandingPageUserStats, error) {
 	l := s.logger.With(slog.String("method", "GetLandingPageStatistics"))
 	stats, err := s.repo.LandingPageStatistics(ctx, userID)
 	if err != nil {

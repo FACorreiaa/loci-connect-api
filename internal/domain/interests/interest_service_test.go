@@ -26,12 +26,12 @@ type MockinterestsRepo struct {
 	mock.Mock
 }
 
-func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error) {
+func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
 	args := m.Called(ctx, name, description, isActive, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Interest), args.Error(1)
+	return args.Get(0).(*locitypes.Interest), args.Error(1)
 }
 
 func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
@@ -39,25 +39,25 @@ func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interes
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*types.Interest, error) {
+func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Interest), args.Error(1)
+	return args.Get(0).([]*locitypes.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
 	args := m.Called(ctx, userID, interestID, params)
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUID) (*types.Interest, error) {
+func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUID) (*locitypes.Interest, error) {
 	args := m.Called(ctx, interestID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Interest), args.Error(1)
+	return args.Get(0).(*locitypes.Interest), args.Error(1)
 }
 
 func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID, interestID uuid.UUID) error {
@@ -65,12 +65,12 @@ func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID,
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Interest, error) {
+func (m *MockinterestsRepo) GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Interest, error) {
 	args := m.Called(ctx, profileID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Interest), args.Error(1)
+	return args.Get(0).([]*locitypes.Interest), args.Error(1)
 }
 
 func TestCreateInterest(t *testing.T) {
@@ -87,7 +87,7 @@ func TestCreateInterest(t *testing.T) {
 	isActive := true
 	userID := "user123"
 	active := isActive
-	expectedInterest := &types.Interest{
+	expectedInterest := &locitypes.Interest{
 		ID:          uuid.New(),
 		Name:        name,
 		Description: &description,
@@ -210,7 +210,7 @@ func TestGetAllInterests(t *testing.T) {
 	active1 := true
 	active2 := true
 	now := time.Now()
-	expectedInterests := []*types.Interest{
+	expectedInterests := []*locitypes.Interest{
 		{
 			ID:        uuid.New(),
 			Name:      "Interest 1",
@@ -287,7 +287,7 @@ func TestUpdateinterests(t *testing.T) {
 	name := "Updated Interest"
 	description := "Updated Description"
 	active := true
-	params := types.UpdateinterestsParams{
+	params := locitypes.UpdateinterestsParams{
 		Name:        &name,
 		Description: &description,
 		Active:      &active,

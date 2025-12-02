@@ -67,7 +67,7 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 	clearCityTables(t)
 
 	t.Run("Save city with coordinates", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCity1",
 			Country:         "TestCountry",
 			StateProvince:   "TestState",
@@ -97,7 +97,7 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 	})
 
 	t.Run("Save city without coordinates", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:          "TestCity2",
 			Country:       "TestCountry",
 			StateProvince: "TestState",
@@ -122,7 +122,7 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 	})
 
 	t.Run("Save city with invalid coordinates", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCity3",
 			Country:         "TestCountry",
 			AiSummary:       "City with invalid coordinates",
@@ -145,7 +145,7 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 	})
 
 	t.Run("Save city with empty state province", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCity4",
 			Country:         "TestCountry",
 			StateProvince:   "", // Empty state province
@@ -176,7 +176,7 @@ func TestCityRepository_FindCityByNameAndCountry_Integration(t *testing.T) {
 	clearCityTables(t)
 
 	// Setup test cities
-	testCities := []types.CityDetail{
+	testCities := []locitypes.CityDetail{
 		{
 			Name:            "TestCityFind1",
 			Country:         "Portugal",
@@ -261,7 +261,7 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 	clearCityTables(t)
 
 	t.Run("Save city with special characters", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCity-São_Paulo",
 			Country:         "Brasil",
 			StateProvince:   "São Paulo",
@@ -289,7 +289,7 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 			"weather, transportation, demographics, economy, and much more detailed information that " +
 			"an AI might generate when describing a city in great detail for travel planning purposes."
 
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCityLong",
 			Country:         "TestCountry",
 			AiSummary:       longSummary,
@@ -310,7 +310,7 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 	})
 
 	t.Run("Coordinate precision test", func(t *testing.T) {
-		city := types.CityDetail{
+		city := locitypes.CityDetail{
 			Name:            "TestCityPrecision",
 			Country:         "TestCountry",
 			AiSummary:       "City for testing coordinate precision",

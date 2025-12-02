@@ -92,16 +92,16 @@ func (s *ChatServer) StreamChat(
 	}
 
     // Convert Proto UserLocation back to your internal domain type if needed
-    var userLoc *types.UserLocation
+    var userLoc *locitypes.UserLocation
     if req.Msg.UserLocation != nil {
-        userLoc = &types.UserLocation{
+        userLoc = &locitypes.UserLocation{
             UserLat: req.Msg.UserLocation.UserLat,
             UserLon: req.Msg.UserLocation.UserLon,
         }
     }
 
 	// 2. Create the channel (Same as before)
-	eventCh := make(chan types.StreamEvent, 100)
+	eventCh := make(chan locitypes.StreamEvent, 100)
 
 	// 3. Start the Service logic in a Goroutine (Same as before)
 	go func() {
@@ -123,8 +123,8 @@ func (s *ChatServer) StreamChat(
 		if err != nil {
             // Send error to channel so the loop below catches it
 			select {
-			case eventCh <- types.StreamEvent{
-				Type: types.EventTypeError,
+			case eventCh <- locitypes.StreamEvent{
+				Type: locitypes.EventTypeError,
                 Error: err.Error(),
             }:
 			case <-ctx.Done():
@@ -152,7 +152,7 @@ func (s *ChatServer) StreamChat(
 				return err // Client disconnected or network error
 			}
 
-			if event.Type == types.EventTypeComplete || event.Type == types.EventTypeError {
+			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
 				return nil
 			}
 
@@ -163,7 +163,7 @@ func (s *ChatServer) StreamChat(
 }
 
 // Helper to convert your dynamic internal map to a Proto Struct
-func convertEventToProto(event types.StreamEvent) (*chatv1.StreamChatResponse, error) {
+func convertEventToProto(event locitypes.StreamEvent) (*chatv1.StreamChatResponse, error) {
     // Handle the dynamic data map
     var dataStruct *structpb.Struct
 

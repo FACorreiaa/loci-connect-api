@@ -16,8 +16,8 @@ func ParseUUID(id string) (uuid.UUID, error) {
 	return uuid.Parse(id)
 }
 
-func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (types.CreateUserPreferenceProfileParams, error) {
-	params := types.CreateUserPreferenceProfileParams{
+func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (locitypes.CreateUserPreferenceProfileParams, error) {
+	params := locitypes.CreateUserPreferenceProfileParams{
 		ProfileName: req.GetProfileName(),
 		PreferredVibes: func() []string {
 			if req.PreferredVibes != nil {
@@ -62,14 +62,14 @@ func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (types.C
 	if len(req.TagIds) > 0 {
 		tagIDs, err := parseUUIDList(req.TagIds)
 		if err != nil {
-			return types.CreateUserPreferenceProfileParams{}, err
+			return locitypes.CreateUserPreferenceProfileParams{}, err
 		}
 		params.Tags = tagIDs
 	}
 	if len(req.InterestIds) > 0 {
 		interestIDs, err := parseUUIDList(req.InterestIds)
 		if err != nil {
-			return types.CreateUserPreferenceProfileParams{}, err
+			return locitypes.CreateUserPreferenceProfileParams{}, err
 		}
 		params.Interests = interestIDs
 	}
@@ -77,8 +77,8 @@ func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (types.C
 	return params, nil
 }
 
-func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (types.UpdateSearchProfileParams, error) {
-	params := types.UpdateSearchProfileParams{}
+func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (locitypes.UpdateSearchProfileParams, error) {
+	params := locitypes.UpdateSearchProfileParams{}
 	if req.ProfileName != nil {
 		params.ProfileName = req.GetProfileName()
 	}
@@ -117,7 +117,7 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (types.U
 	if len(req.TagIds) > 0 {
 		tagIDs, err := parseUUIDList(req.TagIds)
 		if err != nil {
-			return types.UpdateSearchProfileParams{}, err
+			return locitypes.UpdateSearchProfileParams{}, err
 		}
 		for _, id := range tagIDs {
 			v := id.String()
@@ -127,7 +127,7 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (types.U
 	if len(req.InterestIds) > 0 {
 		interestIDs, err := parseUUIDList(req.InterestIds)
 		if err != nil {
-			return types.UpdateSearchProfileParams{}, err
+			return locitypes.UpdateSearchProfileParams{}, err
 		}
 		for _, id := range interestIDs {
 			v := id.String()
@@ -138,7 +138,7 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (types.U
 	return params, nil
 }
 
-func ToProtoProfiles(list []types.UserPreferenceProfileResponse) []*profilev1.UserPreferenceProfile {
+func ToProtoProfiles(list []locitypes.UserPreferenceProfileResponse) []*profilev1.UserPreferenceProfile {
 	out := make([]*profilev1.UserPreferenceProfile, 0, len(list))
 	for _, p := range list {
 		out = append(out, ToProtoProfile(p))
@@ -146,7 +146,7 @@ func ToProtoProfiles(list []types.UserPreferenceProfileResponse) []*profilev1.Us
 	return out
 }
 
-func ToProtoProfile(p types.UserPreferenceProfileResponse) *profilev1.UserPreferenceProfile {
+func ToProtoProfile(p locitypes.UserPreferenceProfileResponse) *profilev1.UserPreferenceProfile {
 	resp := &profilev1.UserPreferenceProfile{
 		Id:                   p.ID.String(),
 		UserId:               p.UserID.String(),
@@ -186,74 +186,74 @@ func parseUUIDList(ids []string) ([]uuid.UUID, error) {
 	return result, nil
 }
 
-func toDayPreference(val profilev1.DayPreference) types.DayPreference {
+func toDayPreference(val profilev1.DayPreference) locitypes.DayPreference {
 	switch val {
 	case profilev1.DayPreference_DAY_PREFERENCE_DAY:
-		return types.DayPreferenceDay
+		return locitypes.DayPreferenceDay
 	case profilev1.DayPreference_DAY_PREFERENCE_NIGHT:
-		return types.DayPreferenceNight
+		return locitypes.DayPreferenceNight
 	default:
-		return types.DayPreferenceAny
+		return locitypes.DayPreferenceAny
 	}
 }
 
-func fromDayPreference(val types.DayPreference) profilev1.DayPreference {
+func fromDayPreference(val locitypes.DayPreference) profilev1.DayPreference {
 	switch val {
-	case types.DayPreferenceDay:
+	case locitypes.DayPreferenceDay:
 		return profilev1.DayPreference_DAY_PREFERENCE_DAY
-	case types.DayPreferenceNight:
+	case locitypes.DayPreferenceNight:
 		return profilev1.DayPreference_DAY_PREFERENCE_NIGHT
 	default:
 		return profilev1.DayPreference_DAY_PREFERENCE_ANY
 	}
 }
 
-func toSearchPace(val profilev1.SearchPace) types.SearchPace {
+func toSearchPace(val profilev1.SearchPace) locitypes.SearchPace {
 	switch val {
 	case profilev1.SearchPace_SEARCH_PACE_RELAXED:
-		return types.SearchPaceRelaxed
+		return locitypes.SearchPaceRelaxed
 	case profilev1.SearchPace_SEARCH_PACE_MODERATE:
-		return types.SearchPaceModerate
+		return locitypes.SearchPaceModerate
 	case profilev1.SearchPace_SEARCH_PACE_FAST:
-		return types.SearchPaceFast
+		return locitypes.SearchPaceFast
 	default:
-		return types.SearchPaceAny
+		return locitypes.SearchPaceAny
 	}
 }
 
-func fromSearchPace(val types.SearchPace) profilev1.SearchPace {
+func fromSearchPace(val locitypes.SearchPace) profilev1.SearchPace {
 	switch val {
-	case types.SearchPaceRelaxed:
+	case locitypes.SearchPaceRelaxed:
 		return profilev1.SearchPace_SEARCH_PACE_RELAXED
-	case types.SearchPaceModerate:
+	case locitypes.SearchPaceModerate:
 		return profilev1.SearchPace_SEARCH_PACE_MODERATE
-	case types.SearchPaceFast:
+	case locitypes.SearchPaceFast:
 		return profilev1.SearchPace_SEARCH_PACE_FAST
 	default:
 		return profilev1.SearchPace_SEARCH_PACE_ANY
 	}
 }
 
-func toTransportPreference(val profilev1.TransportPreference) types.TransportPreference {
+func toTransportPreference(val profilev1.TransportPreference) locitypes.TransportPreference {
 	switch val {
 	case profilev1.TransportPreference_TRANSPORT_PREFERENCE_WALK:
-		return types.TransportPreferenceWalk
+		return locitypes.TransportPreferenceWalk
 	case profilev1.TransportPreference_TRANSPORT_PREFERENCE_PUBLIC:
-		return types.TransportPreferencePublic
+		return locitypes.TransportPreferencePublic
 	case profilev1.TransportPreference_TRANSPORT_PREFERENCE_CAR:
-		return types.TransportPreferenceCar
+		return locitypes.TransportPreferenceCar
 	default:
-		return types.TransportPreferenceAny
+		return locitypes.TransportPreferenceAny
 	}
 }
 
-func fromTransportPreference(val types.TransportPreference) profilev1.TransportPreference {
+func fromTransportPreference(val locitypes.TransportPreference) profilev1.TransportPreference {
 	switch val {
-	case types.TransportPreferenceWalk:
+	case locitypes.TransportPreferenceWalk:
 		return profilev1.TransportPreference_TRANSPORT_PREFERENCE_WALK
-	case types.TransportPreferencePublic:
+	case locitypes.TransportPreferencePublic:
 		return profilev1.TransportPreference_TRANSPORT_PREFERENCE_PUBLIC
-	case types.TransportPreferenceCar:
+	case locitypes.TransportPreferenceCar:
 		return profilev1.TransportPreference_TRANSPORT_PREFERENCE_CAR
 	default:
 		return profilev1.TransportPreference_TRANSPORT_PREFERENCE_ANY

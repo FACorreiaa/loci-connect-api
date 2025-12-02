@@ -27,39 +27,39 @@ type MockprofilessRepo struct {
 }
 
 // Implement profilessRepo methods
-func (m *MockprofilessRepo) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error) {
+func (m *MockprofilessRepo) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]types.UserPreferenceProfileResponse), args.Error(1)
+	return args.Get(0).([]locitypes.UserPreferenceProfileResponse), args.Error(1)
 }
 
-func (m *MockprofilessRepo) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (m *MockprofilessRepo) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	args := m.Called(ctx, userID, profileID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.UserPreferenceProfileResponse), args.Error(1)
+	return args.Get(0).(*locitypes.UserPreferenceProfileResponse), args.Error(1)
 }
 
-func (m *MockprofilessRepo) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (m *MockprofilessRepo) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.UserPreferenceProfileResponse), args.Error(1)
+	return args.Get(0).(*locitypes.UserPreferenceProfileResponse), args.Error(1)
 }
 
-func (m *MockprofilessRepo) CreateSearchProfile(ctx context.Context, userID uuid.UUID, params types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error) {
+func (m *MockprofilessRepo) CreateSearchProfile(ctx context.Context, userID uuid.UUID, params locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error) {
 	args := m.Called(ctx, userID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.UserPreferenceProfileResponse), args.Error(1)
+	return args.Get(0).(*locitypes.UserPreferenceProfileResponse), args.Error(1)
 }
 
-func (m *MockprofilessRepo) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params types.UpdateSearchProfileParams) error {
+func (m *MockprofilessRepo) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params locitypes.UpdateSearchProfileParams) error {
 	args := m.Called(ctx, userID, profileID, params)
 	return args.Error(0)
 }
@@ -92,36 +92,36 @@ func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID,
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Interest, error) {
+func (m *MockinterestsRepo) GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Interest, error) {
 	args := m.Called(ctx, profileID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Interest), args.Error(1)
+	return args.Get(0).([]*locitypes.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUID) (*types.Interest, error) {
+func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUID) (*locitypes.Interest, error) {
 	args := m.Called(ctx, interestID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Interest), args.Error(1)
+	return args.Get(0).(*locitypes.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*types.Interest, error) { // Added for CreateSearchProfileCC
+func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) { // Added for CreateSearchProfileCC
 	args := m.Called(ctx)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Interest), args.Error(1)
+	return args.Get(0).([]*locitypes.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error) {
+func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
 	args := m.Called(ctx, name, description, isActive, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Interest), args.Error(1)
+	return args.Get(0).(*locitypes.Interest), args.Error(1)
 }
 
 func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
@@ -129,7 +129,7 @@ func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interes
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
 	args := m.Called(ctx, userID, interestID, params)
 	return args.Error(0)
 }
@@ -145,36 +145,36 @@ func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, pro
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Tags, error) {
+func (m *MocktagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Tags, error) {
 	args := m.Called(ctx, profileID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Tags), args.Error(1)
+	return args.Get(0).([]*locitypes.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) Get(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error) {
+func (m *MocktagsRepo) Get(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error) {
 	args := m.Called(ctx, userID, tagID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Tags), args.Error(1)
+	return args.Get(0).(*locitypes.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error) { // Added for CreateSearchProfileCC
+func (m *MocktagsRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error) { // Added for CreateSearchProfileCC
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Tags), args.Error(1)
+	return args.Get(0).([]*locitypes.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error) {
+func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error) {
 	args := m.Called(ctx, userID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.PersonalTag), args.Error(1)
+	return args.Get(0).(*locitypes.PersonalTag), args.Error(1)
 }
 
 func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
@@ -182,17 +182,17 @@ func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) erro
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) Update(ctx context.Context, userID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (m *MocktagsRepo) Update(ctx context.Context, userID, tagsID uuid.UUID, params locitypes.UpdatePersonalTagParams) error {
 	args := m.Called(ctx, userID, tagsID, params)
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) GetTagByName(ctx context.Context, name string) (*types.Tags, error) {
+func (m *MocktagsRepo) GetTagByName(ctx context.Context, name string) (*locitypes.Tags, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Tags), args.Error(1)
+	return args.Get(0).(*locitypes.Tags), args.Error(1)
 }
 
 // Helper
@@ -212,7 +212,7 @@ func TestProfilesServiceImpl_GetSearchProfile(t *testing.T) {
 	profileID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		expectedProfile := &types.UserPreferenceProfileResponse{ID: profileID, UserID: userID, ProfileName: "Test Profile"}
+		expectedProfile := &locitypes.UserPreferenceProfileResponse{ID: profileID, UserID: userID, ProfileName: "Test Profile"}
 		mockPrefRepo.On("GetSearchProfile", mock.Anything, userID, profileID).Return(expectedProfile, nil).Once()
 
 		profile, err := service.GetSearchProfile(ctx, userID, profileID)
@@ -240,7 +240,7 @@ func TestProfilesServiceImpl_GetSearchProfiles(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		expectedProfiles := []types.UserPreferenceProfileResponse{
+		expectedProfiles := []locitypes.UserPreferenceProfileResponse{
 			{ID: uuid.New(), UserID: userID, ProfileName: "Profile 1"},
 			{ID: uuid.New(), UserID: userID, ProfileName: "Profile 2"},
 		}
@@ -271,7 +271,7 @@ func TestProfilesServiceImpl_GetDefaultSearchProfile(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		expectedProfile := &types.UserPreferenceProfileResponse{ID: uuid.New(), UserID: userID, ProfileName: "Default Profile", IsDefault: true}
+		expectedProfile := &locitypes.UserPreferenceProfileResponse{ID: uuid.New(), UserID: userID, ProfileName: "Default Profile", IsDefault: true}
 		mockPrefRepo.On("GetDefaultSearchProfile", mock.Anything, userID).Return(expectedProfile, nil).Once()
 
 		profile, err := service.GetDefaultSearchProfile(ctx, userID)
@@ -300,7 +300,7 @@ func TestProfilesServiceImpl_UpdateSearchProfile(t *testing.T) {
 	profileID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		params := types.UpdateSearchProfileParams{
+		params := locitypes.UpdateSearchProfileParams{
 			ProfileName: "Updated Profile",
 		}
 		mockPrefRepo.On("UpdateSearchProfile", mock.Anything, userID, profileID, params).Return(nil).Once()
@@ -311,7 +311,7 @@ func TestProfilesServiceImpl_UpdateSearchProfile(t *testing.T) {
 	})
 
 	t.Run("repository error", func(t *testing.T) {
-		params := types.UpdateSearchProfileParams{
+		params := locitypes.UpdateSearchProfileParams{
 			ProfileName: "Updated Profile",
 		}
 		repoErr := errors.New("db error updating profile")
@@ -390,13 +390,13 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 	interestID1 := uuid.New()
 	tagID1 := uuid.New()
 
-	params := types.CreateUserPreferenceProfileParams{
+	params := locitypes.CreateUserPreferenceProfileParams{
 		ProfileName: profileName,
 		Interests:   []uuid.UUID{interestID1},
 		Tags:        []uuid.UUID{tagID1},
 		// ... other params
 	}
-	createdCoreProfile := &types.UserPreferenceProfileResponse{
+	createdCoreProfile := &locitypes.UserPreferenceProfileResponse{
 		ID:          uuid.New(),
 		UserID:      userID,
 		ProfileName: profileName,
@@ -405,15 +405,15 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 
 	t.Run("success - simple create with associations", func(t *testing.T) {
 		service, mockPrefRepo, mockIntRepo, mockTagRepo := setupprofilessServiceTest()
-		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]types.UserPreferenceProfileResponse{}, nil).Maybe()
+		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]locitypes.UserPreferenceProfileResponse{}, nil).Maybe()
 		// Mock transaction behavior for PostgresprofilessRepo.pgpool.Begin
 		// This is tricky if the service directly accesses pgpool. It's better if the repo handles transactions.
 		// For now, assuming CreateSearchProfile in repo doesn't start its own transaction.
 		// And the service's transaction logic is what we are testing.
 
 		// Mock validation calls
-		mockIntRepo.On("GetInterest", mock.Anything, interestID1).Return(&types.Interest{ID: interestID1, Name: "Hiking"}, nil).Once()
-		mockTagRepo.On("Get", mock.Anything, userID, tagID1).Return(&types.Tags{ID: tagID1, Name: "Mountains"}, nil).Once()
+		mockIntRepo.On("GetInterest", mock.Anything, interestID1).Return(&locitypes.Interest{ID: interestID1, Name: "Hiking"}, nil).Once()
+		mockTagRepo.On("Get", mock.Anything, userID, tagID1).Return(&locitypes.Tags{ID: tagID1, Name: "Mountains"}, nil).Once()
 
 		// Mock repo.CreateSearchProfile
 		mockPrefRepo.On("CreateSearchProfile", mock.Anything, userID, params).Return(createdCoreProfile, nil).Once()
@@ -431,8 +431,8 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 		mockTagRepo.On("LinkPersonalTagToProfile", mock.Anything, userID, createdCoreProfile.ID, tagID1).Return(nil).Once()
 
 		// Mock fetching associated data for the response
-		mockIntRepo.On("GetInterestsForProfile", mock.Anything, createdCoreProfile.ID).Return([]*types.Interest{{ID: interestID1, Name: "Hiking"}}, nil).Once()
-		mockTagRepo.On("GetTagsForProfile", mock.Anything, createdCoreProfile.ID).Return([]*types.Tags{{ID: tagID1, Name: "Mountains"}}, nil).Once()
+		mockIntRepo.On("GetInterestsForProfile", mock.Anything, createdCoreProfile.ID).Return([]*locitypes.Interest{{ID: interestID1, Name: "Hiking"}}, nil).Once()
+		mockTagRepo.On("GetTagsForProfile", mock.Anything, createdCoreProfile.ID).Return([]*locitypes.Tags{{ID: tagID1, Name: "Mountains"}}, nil).Once()
 
 		// Mock transaction parts - this is where it gets hard if service has `s.prefRepo.(*PostgresprofilessRepo).pgpool.Begin(ctx)`
 		// If we are testing `CreateSearchProfile` (not `CreateSearchProfileCC` which has explicit Tx):
@@ -463,22 +463,22 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 
 	t.Run("CreateSearchProfile - empty profile name", func(t *testing.T) {
 		service, mockPrefRepo, mockIntRepo, mockTagRepo := setupprofilessServiceTest()
-		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]types.UserPreferenceProfileResponse{}, nil).Maybe()
+		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]locitypes.UserPreferenceProfileResponse{}, nil).Maybe()
 		_ = mockIntRepo
 		_ = mockTagRepo
-		emptyNameParams := types.CreateUserPreferenceProfileParams{ProfileName: ""}
+		emptyNameParams := locitypes.CreateUserPreferenceProfileParams{ProfileName: ""}
 		_, err := service.CreateSearchProfile(ctx, userID, emptyNameParams)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, types.ErrBadRequest))
+		assert.True(t, errors.Is(err, locitypes.ErrBadRequest))
 		assert.Contains(t, err.Error(), "profile name cannot be empty")
 	})
 
 	t.Run("CreateSearchProfile - invalid interest ID", func(t *testing.T) {
 		service, mockPrefRepo, mockIntRepo, mockTagRepo := setupprofilessServiceTest()
-		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]types.UserPreferenceProfileResponse{}, nil).Maybe()
+		mockPrefRepo.On("GetSearchProfiles", mock.Anything, userID).Return([]locitypes.UserPreferenceProfileResponse{}, nil).Maybe()
 		_ = mockTagRepo
 		invalidInterestID := uuid.New()
-		paramsWithInvalidInterest := types.CreateUserPreferenceProfileParams{
+		paramsWithInvalidInterest := locitypes.CreateUserPreferenceProfileParams{
 			ProfileName: "TestInvalidInterest",
 			Interests:   []uuid.UUID{invalidInterestID},
 		}
@@ -487,7 +487,7 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 
 		_, err := service.CreateSearchProfile(ctx, userID, paramsWithInvalidInterest)
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, types.ErrNotFound))
+		assert.True(t, errors.Is(err, locitypes.ErrNotFound))
 		assert.Contains(t, err.Error(), fmt.Sprintf("invalid interest %s", invalidInterestID))
 		mockIntRepo.AssertExpectations(t) // Ensure GetInterest was called
 		// mockPrefRepo.AssertNotCalled(t, "CreateSearchProfile") // Base profile shouldn't be created

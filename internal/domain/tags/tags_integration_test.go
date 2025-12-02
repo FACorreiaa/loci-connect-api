@@ -107,7 +107,7 @@ func TesttagsServiceImpl_Integration(t *testing.T) {
 	var createdTagID2 uuid.UUID
 
 	t.Run("CreateTag for user1", func(t *testing.T) {
-		params := types.CreatePersonalTagParams{
+		params := locitypes.CreatePersonalTagParams{
 			Name:        "Vegan Options",
 			Description: stringPtr("Places with good vegan food"),
 		}
@@ -120,14 +120,14 @@ func TesttagsServiceImpl_Integration(t *testing.T) {
 		assert.Equal(t, userID1, tag.UserID) // Assuming PersonalTag struct has UserID
 
 		// Create another tag for the same user
-		params2 := types.CreatePersonalTagParams{Name: "Quiet Study"}
+		params2 := locitypes.CreatePersonalTagParams{Name: "Quiet Study"}
 		tag2, err := testtagsService.CreateTag(ctx, userID1, params2)
 		require.NoError(t, err)
 		createdTagID2 = tag2.ID
 	})
 
 	t.Run("CreateTag for user2", func(t *testing.T) {
-		params := types.CreatePersonalTagParams{
+		params := locitypes.CreatePersonalTagParams{
 			Name:        "Dog Friendly",
 			Description: stringPtr("Allows dogs inside or has patio"),
 		}
@@ -173,14 +173,14 @@ func TesttagsServiceImpl_Integration(t *testing.T) {
 
 		_, err := testtagsService.GetTag(ctx, userID1, user2TagID)
 		require.Error(t, err) // Expect an error (not found for this user, or access denied)
-		// Assert specific error if your repo/service returns one (e.g., types.ErrNotFound)
+		// Assert specific error if your repo/service returns one (e.g., locitypes.ErrNotFound)
 		assert.Contains(t, err.Error(), "error fetching user avoid tags")
 	})
 
 	t.Run("Update tag for user1", func(t *testing.T) {
 		newName := "Excellent Vegan Food"
 		newDesc := "Top-tier vegan dishes"
-		updateParams := types.UpdatePersonalTagParams{
+		updateParams := locitypes.UpdatePersonalTagParams{
 			Name:        &newName,
 			Description: &newDesc,
 		}
@@ -198,7 +198,7 @@ func TesttagsServiceImpl_Integration(t *testing.T) {
 		require.NotEmpty(t, user2Tags)
 		user2TagID := user2Tags[0].ID
 		newName := "Attempted Update"
-		updateParams := types.UpdatePersonalTagParams{Name: &newName}
+		updateParams := locitypes.UpdatePersonalTagParams{Name: &newName}
 
 		err := testtagsService.Update(ctx, userID1, user2TagID, updateParams)
 		require.Error(t, err) // Should fail as userID1 doesn't own user2TagID

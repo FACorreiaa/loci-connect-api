@@ -23,34 +23,34 @@ type RepositoryImpl struct {
 
 // Repository defines the interface for list and list item operations
 type Repository interface {
-	CreateList(ctx context.Context, list types.List) error
-	GetList(ctx context.Context, listID uuid.UUID) (types.List, error)
-	UpdateList(ctx context.Context, list types.List) error
-	GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*types.List, error)
-	GetListItems(ctx context.Context, listID uuid.UUID) ([]*types.ListItem, error)
+	CreateList(ctx context.Context, list locitypes.List) error
+	GetList(ctx context.Context, listID uuid.UUID) (locitypes.List, error)
+	UpdateList(ctx context.Context, list locitypes.List) error
+	GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*locitypes.List, error)
+	GetListItems(ctx context.Context, listID uuid.UUID) ([]*locitypes.ListItem, error)
 
 	// Generic list item methods (support all content types)
-	GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (types.ListItem, error)
+	GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (locitypes.ListItem, error)
 	DeleteListItemByID(ctx context.Context, listID, itemID uuid.UUID) error
 
 	// Saved Lists functionality
 	SaveList(ctx context.Context, userID, listID uuid.UUID) error
 	UnsaveList(ctx context.Context, userID, listID uuid.UUID) error
-	GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*types.List, error)
+	GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error)
 
 	// Content type specific methods
-	GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType types.ContentType) ([]*types.ListItem, error)
+	GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error)
 
 	// Search and filtering
-	SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*types.List, error)
+	SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error)
 
 	// Legacy POI-specific methods (for backward compatibility)
-	GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (types.ListItem, error)
-	AddListItem(ctx context.Context, item types.ListItem) error
-	UpdateListItem(ctx context.Context, item types.ListItem) error
+	GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (locitypes.ListItem, error)
+	AddListItem(ctx context.Context, item locitypes.ListItem) error
+	UpdateListItem(ctx context.Context, item locitypes.ListItem) error
 	DeleteListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) error
 	DeleteList(ctx context.Context, listID uuid.UUID) error
-	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*types.List, error)
+	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error)
 }
 
 func NewRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
@@ -61,7 +61,7 @@ func NewRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
 }
 
 // CreateList inserts a new list into the lists table
-func (r *RepositoryImpl) CreateList(ctx context.Context, list types.List) error {
+func (r *RepositoryImpl) CreateList(ctx context.Context, list locitypes.List) error {
 	query := `
         INSERT INTO lists (
             id, user_id, name, description, image_url, is_public, is_itinerary,
@@ -82,7 +82,7 @@ func (r *RepositoryImpl) CreateList(ctx context.Context, list types.List) error 
 }
 
 // GetList retrieves a list by its ID from the lists table
-func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (types.List, error) {
+func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locitypes.List, error) {
 	query := `
         SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
                parent_list_id, city_id, view_count, save_count, created_at, updated_at
@@ -90,23 +90,23 @@ func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (types.L
         WHERE id = $1
     `
 	row := r.pgpool.QueryRow(ctx, query, listID)
-	var list types.List
+	var list locitypes.List
 	err := row.Scan(
 		&list.ID, &list.UserID, &list.Name, &list.Description, &list.ImageURL, &list.IsPublic, &list.IsItinerary,
 		&list.ParentListID, &list.CityID, &list.ViewCount, &list.SaveCount, &list.CreatedAt, &list.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return types.List{}, fmt.Errorf("list not found: %w", err)
+			return locitypes.List{}, fmt.Errorf("list not found: %w", err)
 		}
 		r.logger.ErrorContext(ctx, "Failed to get list", slog.Any("error", err))
-		return types.List{}, fmt.Errorf("failed to get list: %w", err)
+		return locitypes.List{}, fmt.Errorf("failed to get list: %w", err)
 	}
 	return list, nil
 }
 
 // GetSubLists retrieves all sub-lists with a given parent_list_id
-func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*types.List, error) {
+func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*locitypes.List, error) {
 	query := `
         SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
                parent_list_id, city_id, view_count, save_count, created_at, updated_at
@@ -120,9 +120,9 @@ func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID
 	}
 	defer rows.Close()
 
-	var subLists []*types.List
+	var subLists []*locitypes.List
 	for rows.Next() {
-		var list types.List
+		var list locitypes.List
 		err := rows.Scan(
 			&list.ID, &list.UserID, &list.Name, &list.Description, &list.ImageURL, &list.IsPublic, &list.IsItinerary,
 			&list.ParentListID, &list.CityID, &list.ViewCount, &list.SaveCount, &list.CreatedAt, &list.UpdatedAt,
@@ -141,7 +141,7 @@ func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID
 }
 
 // GetListItems retrieves all items associated with a specific list, ordered by position
-func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]*types.ListItem, error) {
+func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]*locitypes.ListItem, error) {
 	query := `
         SELECT list_id, item_id, content_type, position, notes, day_number, time_slot, duration,
                source_llm_interaction_id, item_ai_description, created_at, updated_at
@@ -156,9 +156,9 @@ func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]
 	}
 	defer rows.Close()
 
-	var items []*types.ListItem
+	var items []*locitypes.ListItem
 	for rows.Next() {
-		var item types.ListItem
+		var item locitypes.ListItem
 		var dayNumber sql.NullInt32
 		var timeSlot sql.NullTime
 		var duration sql.NullInt32
@@ -203,10 +203,10 @@ func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]
 }
 
 // AddListItem inserts a new item into the list_items table
-func (r *RepositoryImpl) AddListItem(ctx context.Context, item types.ListItem) error {
+func (r *RepositoryImpl) AddListItem(ctx context.Context, item locitypes.ListItem) error {
 	var poiID *uuid.UUID
 	// Only set poi_id for POI content type to avoid foreign key constraint violations
-	if item.ContentType == types.ContentTypePOI {
+	if item.ContentType == locitypes.ContentTypePOI {
 		poiID = &item.ItemID
 	}
 
@@ -256,7 +256,7 @@ func (r *RepositoryImpl) DeleteList(ctx context.Context, listID uuid.UUID) error
 }
 
 // UpdateList updates a list in the lists table
-func (r *RepositoryImpl) UpdateList(ctx context.Context, list types.List) error {
+func (r *RepositoryImpl) UpdateList(ctx context.Context, list locitypes.List) error {
 	query := `
         UPDATE lists
         SET name = $1, description = $2, image_url = $3, is_public = $4,
@@ -278,7 +278,7 @@ func (r *RepositoryImpl) UpdateList(ctx context.Context, list types.List) error 
 }
 
 // GetListItem retrieves a specific item from the list_items table using list_id, item_id, and content_type
-func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (types.ListItem, error) {
+func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (locitypes.ListItem, error) {
 	query := `
         SELECT list_id, item_id, content_type, position, notes, day_number, time_slot, duration,
                source_llm_interaction_id, item_ai_description, created_at, updated_at
@@ -286,7 +286,7 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
         WHERE list_id = $1 AND item_id = $2 AND content_type = $3
     `
 	row := r.pgpool.QueryRow(ctx, query, listID, itemID, contentType)
-	var item types.ListItem
+	var item locitypes.ListItem
 	var dayNumber sql.NullInt32
 	var timeSlot sql.NullTime
 	var duration sql.NullInt32
@@ -299,10 +299,10 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return types.ListItem{}, fmt.Errorf("list item not found: %w", err)
+			return locitypes.ListItem{}, fmt.Errorf("list item not found: %w", err)
 		}
 		r.logger.ErrorContext(ctx, "Failed to get list item", slog.Any("error", err))
-		return types.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
+		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 	if dayNumber.Valid {
 		dn := int(dayNumber.Int32)
@@ -328,7 +328,7 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
 }
 
 // UpdateListItem updates an item in the list_items table (supports new generic structure)
-func (r *RepositoryImpl) UpdateListItem(ctx context.Context, item types.ListItem) error {
+func (r *RepositoryImpl) UpdateListItem(ctx context.Context, item locitypes.ListItem) error {
 	query := `
         UPDATE list_items
         SET item_id = $1, content_type = $2, position = $3, notes = $4, day_number = $5,
@@ -352,7 +352,7 @@ func (r *RepositoryImpl) UpdateListItem(ctx context.Context, item types.ListItem
 }
 
 // GetUserLists retrieves all lists for a user, optionally filtered by isItinerary
-func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*types.List, error) {
+func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error) {
 	query := `
         SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
                parent_list_id, city_id, view_count, save_count, created_at, updated_at
@@ -367,9 +367,9 @@ func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isI
 	}
 	defer rows.Close()
 
-	var lists []*types.List
+	var lists []*locitypes.List
 	for rows.Next() {
-		var list types.List
+		var list locitypes.List
 		err := rows.Scan(
 			&list.ID, &list.UserID, &list.Name, &list.Description, &list.ImageURL, &list.IsPublic, &list.IsItinerary,
 			&list.ParentListID, &list.CityID, &list.ViewCount, &list.SaveCount, &list.CreatedAt, &list.UpdatedAt,
@@ -390,7 +390,7 @@ func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isI
 // Generic list item methods (support all content types)
 
 // GetListItemByID retrieves a specific item from a list using generic item_id
-func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (types.ListItem, error) {
+func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (locitypes.ListItem, error) {
 	query := `
         SELECT list_id, item_id, content_type, position, notes, day_number,
                time_slot, duration, source_llm_interaction_id, item_ai_description,
@@ -398,7 +398,7 @@ func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uui
         FROM list_items
         WHERE list_id = $1 AND item_id = $2
     `
-	var item types.ListItem
+	var item locitypes.ListItem
 	err := r.pgpool.QueryRow(ctx, query, listID, itemID).Scan(
 		&item.ListID, &item.ItemID, &item.ContentType, &item.Position, &item.Notes,
 		&item.DayNumber, &item.TimeSlot, &item.Duration, &item.SourceLlmInteractionID,
@@ -406,10 +406,10 @@ func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uui
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return types.ListItem{}, fmt.Errorf("no list item found for list_id %s and item_id %s", listID, itemID)
+			return locitypes.ListItem{}, fmt.Errorf("no list item found for list_id %s and item_id %s", listID, itemID)
 		}
 		r.logger.ErrorContext(ctx, "Failed to get list item by ID", slog.Any("error", err))
-		return types.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
+		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 	return item, nil
 }
@@ -458,7 +458,7 @@ func (r *RepositoryImpl) UnsaveList(ctx context.Context, userID, listID uuid.UUI
 }
 
 // GetUserSavedLists retrieves all lists saved by a user
-func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*types.List, error) {
+func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
 	query := `
 		SELECT l.id, l.user_id, l.name, l.description, l.image_url, l.is_public, l.is_itinerary,
 		       l.parent_list_id, l.city_id, l.view_count, l.save_count, l.created_at, l.updated_at
@@ -474,9 +474,9 @@ func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID
 	}
 	defer rows.Close()
 
-	var lists []*types.List
+	var lists []*locitypes.List
 	for rows.Next() {
-		var list types.List
+		var list locitypes.List
 		err := rows.Scan(
 			&list.ID, &list.UserID, &list.Name, &list.Description, &list.ImageURL, &list.IsPublic, &list.IsItinerary,
 			&list.ParentListID, &list.CityID, &list.ViewCount, &list.SaveCount, &list.CreatedAt, &list.UpdatedAt,
@@ -495,7 +495,7 @@ func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID
 }
 
 // GetListItemsByContentType retrieves all items of a specific content type from a list
-func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType types.ContentType) ([]*types.ListItem, error) {
+func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error) {
 	query := `
 		SELECT list_id, item_id, content_type, position, notes, day_number,
 		       time_slot, duration, source_llm_interaction_id, item_ai_description,
@@ -511,9 +511,9 @@ func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID u
 	}
 	defer rows.Close()
 
-	var items []*types.ListItem
+	var items []*locitypes.ListItem
 	for rows.Next() {
-		var item types.ListItem
+		var item locitypes.ListItem
 		err := rows.Scan(
 			&item.ListID, &item.ItemID, &item.ContentType, &item.Position, &item.Notes,
 			&item.DayNumber, &item.TimeSlot, &item.Duration, &item.SourceLlmInteractionID,
@@ -533,7 +533,7 @@ func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID u
 }
 
 // SearchLists searches for lists based on various criteria
-func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*types.List, error) {
+func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error) {
 	query := `
 		SELECT DISTINCT l.id, l.user_id, l.name, l.description, l.image_url, l.is_public, l.is_itinerary,
 		       l.parent_list_id, l.city_id, l.view_count, l.save_count, l.created_at, l.updated_at
@@ -573,9 +573,9 @@ func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, 
 	}
 	defer rows.Close()
 
-	var lists []*types.List
+	var lists []*locitypes.List
 	for rows.Next() {
-		var list types.List
+		var list locitypes.List
 		err := rows.Scan(
 			&list.ID, &list.UserID, &list.Name, &list.Description, &list.ImageURL, &list.IsPublic, &list.IsItinerary,
 			&list.ParentListID, &list.CityID, &list.ViewCount, &list.SaveCount, &list.CreatedAt, &list.UpdatedAt,

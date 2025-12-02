@@ -28,15 +28,15 @@ var _ Repository = (*RepositoryImpl)(nil)
 type Repository interface {
 	// GetSearchProfiles --- User Preference Profiles ---
 	// GetSearchProfiles retrieves all preference profiles for a user
-	GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error)
+	GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error)
 	// GetSearchProfile retrieves a specific preference profile by ID
-	GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error)
+	GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error)
 	// GetDefaultSearchProfile retrieves the default preference profile for a user
-	GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error)
+	GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error)
 	// CreateSearchProfile creates a new preference profile for a user
-	CreateSearchProfile(ctx context.Context, userID uuid.UUID, params types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error)
+	CreateSearchProfile(ctx context.Context, userID uuid.UUID, params locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error)
 	// UpdateSearchProfile updates a preference profile
-	UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params types.UpdateSearchProfileParams) error
+	UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params locitypes.UpdateSearchProfileParams) error
 	// DeleteSearchProfile deletes a preference profile
 	DeleteSearchProfile(ctx context.Context, userID, profileID uuid.UUID) error
 	// SetDefaultSearchProfile sets a profile as the default for a user
@@ -67,7 +67,7 @@ func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *Repository
 // ORDER BY upp.profile_name
 
 // GetProfiles implements user.UserRepo.
-func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error) {
+func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetUserPreferenceProfiles", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "user_preference_profiles"),
@@ -96,9 +96,9 @@ func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID
 	}
 	defer rows.Close()
 
-	var profiles []types.UserPreferenceProfileResponse
+	var profiles []locitypes.UserPreferenceProfileResponse
 	for rows.Next() {
-		var p types.UserPreferenceProfileResponse
+		var p locitypes.UserPreferenceProfileResponse
 		err := rows.Scan(
 			&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
 			&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
@@ -125,7 +125,7 @@ func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID
 }
 
 // GetProfile implements user.UserRepo.
-func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetUserPreferenceProfile", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "user_preference_profiles"),
@@ -144,7 +144,7 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
         FROM user_preference_profiles
         WHERE id = $1 AND user_id = $2`
 
-	var p types.UserPreferenceProfileResponse
+	var p locitypes.UserPreferenceProfileResponse
 	err := r.pgpool.QueryRow(ctx, query, profileID, userID).Scan(
 		&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
 		&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
@@ -155,7 +155,7 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
 		l.ErrorContext(ctx, "Failed to query user preference profile", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB query failed")
-		return nil, fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+		return nil, fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 	}
 
 	l.DebugContext(ctx, "Fetched user preference profile successfully")
@@ -164,7 +164,7 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
 }
 
 // GetDefaultProfile implements user.UserRepo.
-func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetDefaultUserPreferenceProfile", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "user_preference_profiles"),
@@ -183,7 +183,7 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
         FROM user_preference_profiles
         WHERE user_id = $1 AND is_default = TRUE`
 
-	var p types.UserPreferenceProfileResponse
+	var p locitypes.UserPreferenceProfileResponse
 	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
 		&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
 		&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
@@ -194,7 +194,7 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
 		l.ErrorContext(ctx, "Failed to query default user preference profile", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB query failed")
-		return nil, fmt.Errorf("default preference profile not found: %w", types.ErrNotFound)
+		return nil, fmt.Errorf("default preference profile not found: %w", locitypes.ErrNotFound)
 	}
 
 	l.DebugContext(ctx, "Fetched default user preference profile successfully")
@@ -203,7 +203,7 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
 }
 
 // CreateProfile implements user.UserRepo.
-func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UUID, params types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error) {
+func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UUID, params locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "CreateUserPreferenceProfile", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "INSERT"),
@@ -229,7 +229,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	if params.SearchRadiusKm != nil {
 		searchRadiusKm = *params.SearchRadiusKm
 	}
-	preferredTime := types.DayPreferenceAny
+	preferredTime := locitypes.DayPreferenceAny
 	if params.PreferredTime != nil {
 		preferredTime = *params.PreferredTime
 	}
@@ -237,7 +237,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	if params.BudgetLevel != nil {
 		budgetLevel = *params.BudgetLevel
 	}
-	preferredPace := types.SearchPaceAny
+	preferredPace := locitypes.SearchPaceAny
 	if params.PreferredPace != nil {
 		preferredPace = *params.PreferredPace
 	}
@@ -257,7 +257,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	if preferredVibes == nil {
 		preferredVibes = []string{}
 	}
-	preferredTransport := types.TransportPreferenceAny
+	preferredTransport := locitypes.TransportPreferenceAny
 	if params.PreferredTransport != nil {
 		preferredTransport = *params.PreferredTransport
 	}
@@ -282,7 +282,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	}
 
 	// Insert base profile
-	var p types.UserPreferenceProfileResponse
+	var p locitypes.UserPreferenceProfileResponse
 	query := `
         INSERT INTO user_preference_profiles (
             user_id, profile_name, is_default, search_radius_km, preferred_time,
@@ -314,7 +314,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 			l.WarnContext(ctx, "Profile name already exists for this user", slog.Any("error", err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Profile name conflict")
-			return nil, fmt.Errorf("profile name already exists: %w", types.ErrConflict)
+			return nil, fmt.Errorf("profile name already exists: %w", locitypes.ErrConflict)
 		}
 		l.ErrorContext(ctx, "Failed to create user preference profile", slog.Any("error", err))
 		span.RecordError(err)
@@ -422,7 +422,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 }
 
 // UpdateProfile implements user.UserRepo.
-func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params types.UpdateSearchProfileParams) error {
+func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params locitypes.UpdateSearchProfileParams) error {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "UpdateUserPreferenceProfile", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),
@@ -517,7 +517,7 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 				l.WarnContext(ctx, "Profile name already exists for this user", slog.Any("error", err))
 				span.RecordError(err)
 				span.SetStatus(codes.Error, "Profile name conflict")
-				return fmt.Errorf("profile name already exists: %w", types.ErrConflict)
+				return fmt.Errorf("profile name already exists: %w", locitypes.ErrConflict)
 			}
 			l.ErrorContext(ctx, "Failed to update user preference profile", slog.Any("error", err))
 			span.RecordError(err)
@@ -529,7 +529,7 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("rollback_error", rollbackErr))
 			}
-			err := fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+			err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 			l.WarnContext(ctx, "Attempted to update non-existent preference profile")
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Profile not found")
@@ -606,7 +606,7 @@ func (r *RepositoryImpl) DeleteSearchProfile(ctx context.Context, userID, profil
 	err := r.pgpool.QueryRow(ctx, "SELECT is_default FROM user_preference_profiles WHERE id = $1 AND user_id = $2", profileID, userID).Scan(&isDefault)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			err := fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+			err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 			l.WarnContext(ctx, "Attempted to delete non-existent preference profile")
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Profile not found")
@@ -637,7 +637,7 @@ func (r *RepositoryImpl) DeleteSearchProfile(ctx context.Context, userID, profil
 
 	if tag.RowsAffected() == 0 {
 		// This should not happen since we already checked if the profile exists
-		err := fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+		err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 		l.WarnContext(ctx, "Attempted to delete non-existent preference profile")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Profile not found")
@@ -666,7 +666,7 @@ func (r *RepositoryImpl) SetDefaultSearchProfile(ctx context.Context, userID, pr
 	err := r.pgpool.QueryRow(ctx, "SELECT user_id FROM user_preference_profiles WHERE user_id = $1", userID).Scan(&userID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			err := fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+			err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 			l.WarnContext(ctx, "Attempted to set non-existent profile as default")
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Profile not found")
@@ -716,7 +716,7 @@ func (r *RepositoryImpl) SetDefaultSearchProfile(ctx context.Context, userID, pr
 			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("rollback_error", rollbackErr))
 		}
 		// This should not happen since we already checked if the profile exists
-		err := fmt.Errorf("preference profile not found: %w", types.ErrNotFound)
+		err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 		l.WarnContext(ctx, "Attempted to set non-existent profile as default")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Profile not found")

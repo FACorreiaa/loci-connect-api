@@ -12,19 +12,19 @@ import (
 
 type Service interface {
 	// Get all discover page data (trending, featured, recent)
-	GetDiscoverPageData(ctx context.Context, userID uuid.UUID, limit int) (*types.DiscoverPageData, error)
+	GetDiscoverPageData(ctx context.Context, userID uuid.UUID, limit int) (*locitypes.DiscoverPageData, error)
 
 	// Get trending discoveries
-	GetTrendingDiscoveries(ctx context.Context, limit int) ([]types.TrendingDiscovery, error)
+	GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error)
 
 	// Get featured collections
-	GetFeaturedCollections(ctx context.Context, limit int) ([]types.FeaturedCollection, error)
+	GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error)
 
 	// Get user's recent discoveries
-	GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]types.ChatSession, error)
+	GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
 
 	// Get category results
-	GetCategoryResults(ctx context.Context, category string) ([]types.DiscoverResult, error)
+	GetCategoryResults(ctx context.Context, category string) ([]locitypes.DiscoverResult, error)
 }
 
 type ServiceImpl struct {
@@ -40,18 +40,18 @@ func NewServiceImpl(repo Repository, logger *slog.Logger) *ServiceImpl {
 }
 
 // GetDiscoverPageData retrieves all data needed for the discover page
-func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID, limit int) (*types.DiscoverPageData, error) {
+func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID, limit int) (*locitypes.DiscoverPageData, error) {
 	l := s.logger.With(slog.String("service", "GetDiscoverPageData"))
 	l.DebugContext(ctx, "Getting discover page data", slog.Int("limit", limit))
 
-	pageData := &types.DiscoverPageData{}
+	pageData := &locitypes.DiscoverPageData{}
 
 	// Get trending discoveries
 	trending, err := s.repo.GetTrendingDiscoveries(ctx, limit)
 	if err != nil {
 		l.WarnContext(ctx, "Failed to get trending discoveries", slog.Any("error", err))
 		// Don't fail the entire request, just set empty array
-		trending = []types.TrendingDiscovery{}
+		trending = []locitypes.TrendingDiscovery{}
 	}
 	pageData.Trending = trending
 
@@ -60,7 +60,7 @@ func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		l.WarnContext(ctx, "Failed to get featured collections", slog.Any("error", err))
 		// Don't fail the entire request, just set empty array
-		featured = []types.FeaturedCollection{}
+		featured = []locitypes.FeaturedCollection{}
 	}
 	pageData.Featured = featured
 
@@ -69,7 +69,7 @@ func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 	if err != nil {
 		l.WarnContext(ctx, "Failed to get trending searches", slog.Any("error", err))
 		// Don't fail the entire request, just set empty array
-		trendingSearches = []types.TrendingSearch{}
+		trendingSearches = []locitypes.TrendingSearch{}
 	}
 	pageData.TrendingSearches = trendingSearches
 
@@ -79,11 +79,11 @@ func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 		if err != nil {
 			l.WarnContext(ctx, "Failed to get recent discoveries", slog.Any("error", err))
 			// Don't fail the entire request, just set empty array
-			recent = []types.ChatSession{}
+			recent = []locitypes.ChatSession{}
 		}
 		pageData.RecentDiscoveries = recent
 	} else {
-		pageData.RecentDiscoveries = []types.ChatSession{}
+		pageData.RecentDiscoveries = []locitypes.ChatSession{}
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved discover page data",
@@ -97,7 +97,7 @@ func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 }
 
 // GetTrendingDiscoveries retrieves currently trending discoveries
-func (s *ServiceImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]types.TrendingDiscovery, error) {
+func (s *ServiceImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
 	l := s.logger.With(slog.String("service", "GetTrendingDiscoveries"))
 	l.DebugContext(ctx, "Getting trending discoveries", slog.Int("limit", limit))
 
@@ -112,7 +112,7 @@ func (s *ServiceImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]
 }
 
 // GetFeaturedCollections retrieves featured collections
-func (s *ServiceImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]types.FeaturedCollection, error) {
+func (s *ServiceImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
 	l := s.logger.With(slog.String("service", "GetFeaturedCollections"))
 	l.DebugContext(ctx, "Getting featured collections", slog.Int("limit", limit))
 
@@ -127,7 +127,7 @@ func (s *ServiceImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]
 }
 
 // GetRecentDiscoveries retrieves user's recent discoveries
-func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]types.ChatSession, error) {
+func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
 	l := s.logger.With(slog.String("service", "GetRecentDiscoveries"))
 	l.DebugContext(ctx, "Getting recent discoveries",
 		slog.String("user_id", userID.String()),
@@ -146,7 +146,7 @@ func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID
 }
 
 // GetCategoryResults retrieves results for a specific category
-func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category string) ([]types.DiscoverResult, error) {
+func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category string) ([]locitypes.DiscoverResult, error) {
 	l := s.logger.With(slog.String("service", "GetCategoryResults"))
 	l.DebugContext(ctx, "Getting category results", slog.String("category", category))
 

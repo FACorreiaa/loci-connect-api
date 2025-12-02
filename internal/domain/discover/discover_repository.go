@@ -15,19 +15,19 @@ import (
 
 type Repository interface {
 	// Get trending discoveries
-	GetTrendingDiscoveries(ctx context.Context, limit int) ([]types.TrendingDiscovery, error)
+	GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error)
 
 	// Get featured collections
-	GetFeaturedCollections(ctx context.Context, limit int) ([]types.FeaturedCollection, error)
+	GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error)
 
 	// Get user's recent discoveries
-	GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]types.ChatSession, error)
+	GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
 
 	// Get POIs by category
-	GetPOIsByCategory(ctx context.Context, category string) ([]types.DiscoverResult, error)
+	GetPOIsByCategory(ctx context.Context, category string) ([]locitypes.DiscoverResult, error)
 
 	// Get trending searches today
-	GetTrendingSearchesToday(ctx context.Context, limit int) ([]types.TrendingSearch, error)
+	GetTrendingSearchesToday(ctx context.Context, limit int) ([]locitypes.TrendingSearch, error)
 
 	// Track a discover search
 	TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
@@ -46,7 +46,7 @@ func NewRepositoryImpl(db *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
 }
 
 // GetTrendingDiscoveries retrieves trending discoveries based on recent search activity
-func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]types.TrendingDiscovery, error) {
+func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
 	l := r.logger.With(slog.String("repository", "GetTrendingDiscoveries"))
 	l.DebugContext(ctx, "Fetching trending discoveries", slog.Int("limit", limit))
 
@@ -72,9 +72,9 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 	}
 	defer rows.Close()
 
-	var trending []types.TrendingDiscovery
+	var trending []locitypes.TrendingDiscovery
 	for rows.Next() {
-		var t types.TrendingDiscovery
+		var t locitypes.TrendingDiscovery
 		var lastSearch time.Time
 		err := rows.Scan(&t.CityName, &t.SearchCount, &lastSearch)
 		if err != nil {
@@ -95,7 +95,7 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 }
 
 // GetFeaturedCollections retrieves featured collections
-func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]types.FeaturedCollection, error) {
+func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
 	l := r.logger.With(slog.String("repository", "GetFeaturedCollections"))
 	l.DebugContext(ctx, "Fetching featured collections", slog.Int("limit", limit))
 
@@ -121,9 +121,9 @@ func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) 
 	}
 	defer rows.Close()
 
-	var featured []types.FeaturedCollection
+	var featured []locitypes.FeaturedCollection
 	for rows.Next() {
-		var f types.FeaturedCollection
+		var f locitypes.FeaturedCollection
 		var lastUpdated time.Time
 		err := rows.Scan(&f.Category, &f.ItemCount, &lastUpdated)
 		if err != nil {
@@ -145,7 +145,7 @@ func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) 
 }
 
 // GetRecentDiscoveriesByUserID retrieves user's recent discover searches
-func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]types.ChatSession, error) {
+func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
 	l := r.logger.With(slog.String("repository", "GetRecentDiscoveriesByUserID"))
 	l.DebugContext(ctx, "Fetching recent discoveries",
 		slog.String("user_id", userID.String()),
@@ -177,9 +177,9 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 	}
 	defer rows.Close()
 
-	var sessions []types.ChatSession
+	var sessions []locitypes.ChatSession
 	for rows.Next() {
-		var session types.ChatSession
+		var session locitypes.ChatSession
 		var conversationHistory []byte
 		var sessionContext []byte
 		var profileID sql.NullString
@@ -211,13 +211,13 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 		if len(conversationHistory) > 0 {
 			// You may need to implement JSON parsing here based on your types
 			// For now, we'll leave it empty
-			session.ConversationHistory = []types.ConversationMessage{}
+			session.ConversationHistory = []locitypes.ConversationMessage{}
 		}
 
 		// Parse session context JSON
 		if len(sessionContext) > 0 {
 			// You may need to implement JSON parsing here based on your types
-			session.SessionContext = types.SessionContext{}
+			session.SessionContext = locitypes.SessionContext{}
 		}
 
 		sessions = append(sessions, session)
@@ -235,7 +235,7 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 }
 
 // GetPOIsByCategory retrieves POIs by category
-func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category string) ([]types.DiscoverResult, error) {
+func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category string) ([]locitypes.DiscoverResult, error) {
 	l := r.logger.With(slog.String("repository", "GetPOIsByCategory"))
 	l.DebugContext(ctx, "Fetching POIs by category", slog.String("category", category))
 
@@ -268,9 +268,9 @@ func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category string)
 	}
 	defer rows.Close()
 
-	var results []types.DiscoverResult
+	var results []locitypes.DiscoverResult
 	for rows.Next() {
-		var result types.DiscoverResult
+		var result locitypes.DiscoverResult
 		var website sql.NullString
 		var phoneNumber sql.NullString
 		var tags []string
@@ -390,7 +390,7 @@ func getCategoryEmoji(category string) string {
 }
 
 // GetTrendingSearchesToday retrieves the most searched queries today
-func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int) ([]types.TrendingSearch, error) {
+func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int) ([]locitypes.TrendingSearch, error) {
 	l := r.logger.With(slog.String("repository", "GetTrendingSearchesToday"))
 	l.DebugContext(ctx, "Fetching trending searches today", slog.Int("limit", limit))
 
@@ -419,9 +419,9 @@ func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int
 	}
 	defer rows.Close()
 
-	var searches []types.TrendingSearch
+	var searches []locitypes.TrendingSearch
 	for rows.Next() {
-		var search types.TrendingSearch
+		var search locitypes.TrendingSearch
 		var lastSearched time.Time
 
 		err := rows.Scan(

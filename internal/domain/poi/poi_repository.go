@@ -28,13 +28,13 @@ import (
 var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
-	SavePoi(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
-	FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*types.POIDetailedInfo, error)
-	// GetPOIsByNamesAndCitySortedByDistance(ctx context.Context, names []string, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	GetPOIsByLocationAndDistance(ctx context.Context, lat, lon, radiusMeters float64) ([]types.POIDetailedInfo, error)
-	GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]types.POIDetailedInfo, error)
-	// GetPOIsByLocationAndDistanceWithFilters(ctx context.Context, lat, lon, radiusMeters float64, filters map[string]string) ([]types.POIDetailedInfo, error)
+	SavePoi(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error)
+	// GetPOIsByNamesAndCitySortedByDistance(ctx context.Context, names []string, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	GetPOIsByLocationAndDistance(ctx context.Context, lat, lon, radiusMeters float64) ([]locitypes.POIDetailedInfo, error)
+	GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByLocationAndDistanceWithFilters(ctx context.Context, lat, lon, radiusMeters float64, filters map[string]string) ([]locitypes.POIDetailedInfo, error)
 	AddPoiToFavourites(ctx context.Context, userID, poiID uuid.UUID) (uuid.UUID, error)
 	AddLLMPoiToFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) (uuid.UUID, error)
 	RemovePoiFromFavourites(ctx context.Context, userID, poiID uuid.UUID) error
@@ -43,51 +43,51 @@ type Repository interface {
 	CheckPoiExists(ctx context.Context, poiID uuid.UUID) (bool, error)
 	FindLLMPOIByNameAndCity(ctx context.Context, name, city string) (uuid.UUID, error)
 	FindLLMPOIByName(ctx context.Context, name string) (uuid.UUID, error)
-	GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]types.POIDetailedInfo, error)
-	GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]types.POIDetailedInfo, int, error)
-	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]types.POIDetailedInfo, error)
+	GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
+	GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.POIDetailedInfo, int, error)
+	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 
 	// POI details
-	FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error)
-	SavePOIDetails(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
-	SearchPOIs(ctx context.Context, filter types.POIFilter) ([]types.POIDetailedInfo, error)
+	FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*locitypes.POIDetailedInfo, error)
+	SavePOIDetails(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error)
 
 	// Vector similarity search methods
-	FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]types.POIDetailedInfo, error)
-	FindSimilarPOIsByCity(ctx context.Context, queryEmbedding []float32, cityID uuid.UUID, limit int) ([]types.POIDetailedInfo, error)
-	SearchPOIsHybrid(ctx context.Context, filter types.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]types.POIDetailedInfo, error)
+	FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.POIDetailedInfo, error)
+	FindSimilarPOIsByCity(ctx context.Context, queryEmbedding []float32, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error)
+	SearchPOIsHybrid(ctx context.Context, filter locitypes.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]locitypes.POIDetailedInfo, error)
 	UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID, embedding []float32) error
-	GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]types.POIDetailedInfo, error)
+	GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.POIDetailedInfo, error)
 
 	// Hotels
-	FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]types.HotelDetailedInfo, error)
-	SaveHotelDetails(ctx context.Context, hotel types.HotelDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
-	GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*types.HotelDetailedInfo, error)
+	FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error)
+	SaveHotelDetails(ctx context.Context, hotel locitypes.HotelDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*locitypes.HotelDetailedInfo, error)
 	// Restaurants
-	FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *types.RestaurantUserPreferences) ([]types.RestaurantDetailedInfo, error)
-	SaveRestaurantDetails(ctx context.Context, restaurant types.RestaurantDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
-	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*types.RestaurantDetailedInfo, error)
-	// GetPOIsByCityIDAndCategory(ctx context.Context, cityID uuid.UUID, category string) ([]types.POIDetailedInfo, error)
-	// GetPOIsByCityIDAndCategories(ctx context.Context, cityID uuid.UUID, categories []string) ([]types.POIDetailedInfo, error)
-	// GetPOIsByCityIDAndName(ctx context.Context, cityID uuid.UUID, name string) ([]types.POIDetailedInfo, error)
-	// GetPOIsByCityIDAndNames(ctx context.Context, cityID uuid.UUID, names []string) ([]types.POIDetailedInfo, error)
-	// GetPOIsByCityIDAndNameSortedByDistance(ctx context.Context, cityID uuid.UUID, name string, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	// GetPOIsByCityIDAndNamesSortedByDistance(ctx context.Context, cityID uuid.UUID, names []string, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
+	FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *locitypes.RestaurantUserPreferences) ([]locitypes.RestaurantDetailedInfo, error)
+	SaveRestaurantDetails(ctx context.Context, restaurant locitypes.RestaurantDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*locitypes.RestaurantDetailedInfo, error)
+	// GetPOIsByCityIDAndCategory(ctx context.Context, cityID uuid.UUID, category string) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByCityIDAndCategories(ctx context.Context, cityID uuid.UUID, categories []string) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByCityIDAndName(ctx context.Context, cityID uuid.UUID, name string) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByCityIDAndNames(ctx context.Context, cityID uuid.UUID, names []string) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByCityIDAndNameSortedByDistance(ctx context.Context, cityID uuid.UUID, name string, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	// GetPOIsByCityIDAndNamesSortedByDistance(ctx context.Context, cityID uuid.UUID, names []string, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
 
 	// AddPersonalizedPOItoFavourites(ctx context.Context, poiID uuid.UUID, userID uuid.UUID) (uuid.UUID, error)
 
-	GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*types.UserSavedItinerary, error)
-	GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]types.UserSavedItinerary, int, error)
-	UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error)
+	GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*locitypes.UserSavedItinerary, error)
+	GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]locitypes.UserSavedItinerary, int, error)
+	UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates locitypes.UpdateItineraryRequest) (*locitypes.UserSavedItinerary, error)
 	SaveItinerary(ctx context.Context, userID, cityID uuid.UUID) (uuid.UUID, error)
-	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error
-	SavePOItoPointsOfInterest(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []locitypes.POIDetailedInfo) error
+	SavePOItoPointsOfInterest(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
 	CityExists(ctx context.Context, cityID uuid.UUID) (bool, error)
 
 	// Distance
 	CalculateDistancePostGIS(ctx context.Context, userLat, userLon, poiLat, poiLon float64) (float64, error)
-	SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []types.POIDetailedInfo, genAIResponse *types.GenAIResponse, llmInteractionID uuid.UUID) error
-	SaveLlmInteraction(ctx context.Context, interaction *types.LlmInteraction) (uuid.UUID, error)
+	SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []locitypes.POIDetailedInfo, genAIResponse *locitypes.GenAIResponse, llmInteractionID uuid.UUID) error
+	SaveLlmInteraction(ctx context.Context, interaction *locitypes.LlmInteraction) (uuid.UUID, error)
 }
 
 type RepositoryImpl struct {
@@ -102,7 +102,7 @@ func NewRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
 	}
 }
 
-func (r *RepositoryImpl) SavePoi(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to start transaction: %w", err)
@@ -148,13 +148,13 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi types.POIDetailedInfo,
 	return id, nil
 }
 
-func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
 	query := `
         SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, poi_type
         FROM points_of_interest
         WHERE name = $1 AND city_id = $2
     `
-	var poi types.POIDetailedInfo
+	var poi locitypes.POIDetailedInfo
 	if err := r.pgpool.QueryRow(ctx, query, name, cityID).Scan(
 		&poi.Name, &poi.DescriptionPOI, &poi.Latitude, &poi.Longitude, &poi.Category,
 	); err != nil {
@@ -173,7 +173,7 @@ func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, 
 	return &poi, nil
 }
 
-func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
 	userPoint := fmt.Sprintf("SRID=4326;POINT(%f %f)", userLocation.UserLon, userLocation.UserLat)
 	query := `
         SELECT
@@ -193,9 +193,9 @@ func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uu
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		err := rows.Scan(&poi.ID, &poi.Name, &poi.Longitude,
 			&poi.Latitude, &poi.Category, &poi.DescriptionPOI, &poi.Distance)
 		if err != nil {
@@ -286,7 +286,7 @@ func (r *RepositoryImpl) RemoveLLMPoiFromFavourite(ctx context.Context, userID, 
 	return nil
 }
 
-func (r *RepositoryImpl) GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	query := `
 		SELECT
     favorite_id,
@@ -359,9 +359,9 @@ ORDER BY added_at DESC;
 		return nil, fmt.Errorf("failed to query favourite POIs: %w", err)
 	}
 	defer rows.Close()
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var favoriteID uuid.UUID
 		var notes *string
 		var addedAt time.Time
@@ -422,7 +422,7 @@ ORDER BY added_at DESC;
 	return pois, nil
 }
 
-func (r *RepositoryImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]types.POIDetailedInfo, int, error) {
+func (r *RepositoryImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.POIDetailedInfo, int, error) {
 	// First get the total count
 	countQuery := `
 		SELECT COUNT(*) FROM (
@@ -520,9 +520,9 @@ LIMIT $2 OFFSET $3;
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var favoriteID uuid.UUID
 		var notes *string
 		var addedAt time.Time
@@ -590,7 +590,7 @@ LIMIT $2 OFFSET $3;
 	return pois, totalCount, nil
 }
 
-func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	query := `
 		SELECT id, name, description, ST_X(location) AS longitude, ST_Y(location) AS latitude, poi_type
 		FROM points_of_interest
@@ -602,9 +602,9 @@ func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) 
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		err := rows.Scan(&poi.ID, &poi.Name, &poi.DescriptionPOI, &poi.Longitude, &poi.Latitude, &poi.Category)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan POI row: %w", err)
@@ -620,7 +620,7 @@ func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) 
 	return pois, nil
 }
 
-func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "FindPOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
 		attribute.Float64("latitude", lat),
@@ -643,7 +643,7 @@ func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, l
     `
 	row := r.pgpool.QueryRow(ctx, query, cityID, lon, lat, tolerance)
 
-	var poi types.POIDetailedInfo
+	var poi locitypes.POIDetailedInfo
 	var llmInteractionID uuid.NullUUID
 	err := row.Scan(
 		&poi.ID, &poi.Name, &poi.Description, &poi.Latitude, &poi.Longitude,
@@ -668,7 +668,7 @@ func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, l
 	return &poi, nil
 }
 
-func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "SavePOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.id", func() string {
 			return "null"
@@ -851,7 +851,7 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi types.POIDetail
 	return poiID, nil
 }
 
-func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]types.HotelDetailedInfo, error) {
+func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error) {
 	ctx, span := otel.Tracer("HotelRepository").Start(ctx, "FindHotelDetails", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
 		attribute.Float64("latitude", lat),
@@ -879,9 +879,9 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 	}
 	defer rows.Close()
 
-	var hotels []types.HotelDetailedInfo
+	var hotels []locitypes.HotelDetailedInfo
 	for rows.Next() {
-		var hotel types.HotelDetailedInfo
+		var hotel locitypes.HotelDetailedInfo
 		var llmInteractionID uuid.NullUUID
 		var website, phoneNumber, openingHours, priceRange *string
 		err := rows.Scan(
@@ -913,7 +913,7 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 	return hotels, nil
 }
 
-func (r *RepositoryImpl) SaveHotelDetails(ctx context.Context, hotel types.HotelDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveHotelDetails(ctx context.Context, hotel locitypes.HotelDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("HotelRepository").Start(ctx, "SaveHotelDetails", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
 		attribute.String("hotel.name", hotel.Name),
@@ -962,7 +962,7 @@ func (r *RepositoryImpl) SaveHotelDetails(ctx context.Context, hotel types.Hotel
 	return id, nil
 }
 
-func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*types.HotelDetailedInfo, error) {
+func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*locitypes.HotelDetailedInfo, error) {
 	ctx, span := otel.Tracer("HotelRepository").Start(ctx, "GetHotelByID", trace.WithAttributes(
 		attribute.String("hotel.id", hotelID.String()),
 	))
@@ -977,7 +977,7 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 	`
 	row := r.pgpool.QueryRow(ctx, query, hotelID)
 
-	var hotel types.HotelDetailedInfo
+	var hotel locitypes.HotelDetailedInfo
 	var llmInteractionID uuid.NullUUID
 	err := row.Scan(
 		&hotel.ID, &hotel.Name, &hotel.Description, &hotel.Latitude, &hotel.Longitude,
@@ -1002,7 +1002,7 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 	return &hotel, nil
 }
 
-func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *types.RestaurantUserPreferences) ([]types.RestaurantDetailedInfo, error) {
+func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *locitypes.RestaurantUserPreferences) ([]locitypes.RestaurantDetailedInfo, error) {
 	ctx, span := otel.Tracer("RestaurantRepository").Start(ctx, "FindRestaurantDetails")
 	defer span.End()
 
@@ -1038,9 +1038,9 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
 	}
 	defer rows.Close()
 
-	var restaurants []types.RestaurantDetailedInfo
+	var restaurants []locitypes.RestaurantDetailedInfo
 	for rows.Next() {
-		var r types.RestaurantDetailedInfo
+		var r locitypes.RestaurantDetailedInfo
 		var llmID uuid.NullUUID
 		err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Latitude, &r.Longitude, &r.Address,
 			&r.Website, &r.PhoneNumber, &r.OpeningHours, &r.PriceLevel, &r.Category,
@@ -1058,7 +1058,7 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
 	return restaurants, nil
 }
 
-func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant types.RestaurantDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant locitypes.RestaurantDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("RestaurantRepository").Start(ctx, "SaveRestaurantDetails", trace.WithAttributes(
 		attribute.String("restaurant.name", restaurant.Name),
 		attribute.String("city.id", cityID.String()),
@@ -1166,7 +1166,7 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant t
 	return id, nil
 }
 
-func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*types.RestaurantDetailedInfo, error) {
+func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*locitypes.RestaurantDetailedInfo, error) {
 	ctx, span := otel.Tracer("RestaurantRepository").Start(ctx, "GetRestaurantByID")
 	defer span.End()
 
@@ -1177,7 +1177,7 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
         FROM restaurant_details
         WHERE id = $1
     `
-	var restaurant types.RestaurantDetailedInfo
+	var restaurant locitypes.RestaurantDetailedInfo
 	var llmID uuid.NullUUID
 	err := r.pgpool.QueryRow(ctx, query, restaurantID).Scan(&restaurant.ID, &restaurant.Name,
 		&restaurant.Description, &restaurant.Latitude,
@@ -1202,7 +1202,7 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
 	return &restaurant, nil
 }
 
-func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter types.POIFilter) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "SearchPOIs", trace.WithAttributes(
 		attribute.Float64("location.latitude", filter.Location.Latitude),
 		attribute.Float64("location.longitude", filter.Location.Longitude),
@@ -1261,9 +1261,9 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter types.POIFilter)
 	defer rows.Close()
 
 	// Collect results
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var distanceMeters float64
 		var description sql.NullString // Handle NULL description
 
@@ -1312,7 +1312,7 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter types.POIFilter)
 	return pois, nil
 }
 
-func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*types.UserSavedItinerary, error) {
+func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*locitypes.UserSavedItinerary, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetItinerary", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -1331,7 +1331,7 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 	`
 	row := r.pgpool.QueryRow(ctx, query, itineraryID, userID)
 
-	var itinerary types.UserSavedItinerary
+	var itinerary locitypes.UserSavedItinerary
 	if err := row.Scan(
 		&itinerary.ID,
 		&itinerary.UserID,
@@ -1358,7 +1358,7 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 	return &itinerary, nil
 }
 
-func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]types.UserSavedItinerary, int, error) {
+func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]locitypes.UserSavedItinerary, int, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetItineraries", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -1385,9 +1385,9 @@ func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, p
 	}
 	defer rows.Close()
 
-	var itineraries []types.UserSavedItinerary
+	var itineraries []locitypes.UserSavedItinerary
 	for rows.Next() {
-		var itinerary types.UserSavedItinerary
+		var itinerary locitypes.UserSavedItinerary
 		if err := rows.Scan(
 			&itinerary.ID,
 			&itinerary.UserID,
@@ -1430,7 +1430,7 @@ func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, p
 	return itineraries, totalRecords, nil
 }
 
-func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
+func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates locitypes.UpdateItineraryRequest) (*locitypes.UserSavedItinerary, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "UpdateItinerary", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),
@@ -1519,7 +1519,7 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 
 	r.logger.DebugContext(ctx, "Executing UpdateItinerary query", slog.String("query", query), slog.Any("args_count", len(args)))
 
-	var updatedItinerary types.UserSavedItinerary
+	var updatedItinerary locitypes.UserSavedItinerary
 	err := r.pgpool.QueryRow(ctx, query, args...).Scan(
 		&updatedItinerary.ID,
 		&updatedItinerary.UserID,
@@ -1571,7 +1571,7 @@ func (r *RepositoryImpl) SaveItinerary(ctx context.Context, userID, cityID uuid.
 	return itineraryID, nil
 }
 
-func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SavePOItoPointsOfInterest")
 	defer span.End()
 
@@ -1607,7 +1607,7 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi type
 }
 
 type ItineraryPOISource struct {
-	pois        []types.POIDetailedInfo
+	pois        []locitypes.POIDetailedInfo
 	itineraryID uuid.UUID
 	idx         int
 }
@@ -1626,7 +1626,7 @@ func (ips *ItineraryPOISource) Err() error {
 	return nil
 }
 
-func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error {
+func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []locitypes.POIDetailedInfo) error {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveItineraryPOIs")
 	defer span.End()
 
@@ -1671,7 +1671,7 @@ func (r *RepositoryImpl) CityExists(ctx context.Context, cityID uuid.UUID) (bool
 }
 
 // FindSimilarPOIs finds POIs similar to the provided query embedding using cosine similarity
-func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "FindSimilarPOIs", trace.WithAttributes(
 		attribute.Int("embedding.dimension", len(queryEmbedding)),
 		attribute.Int("limit", limit),
@@ -1718,9 +1718,9 @@ func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []f
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var similarityScore float64
 		var description sql.NullString
 
@@ -1763,7 +1763,7 @@ func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []f
 }
 
 // FindSimilarPOIsByCity finds POIs similar to the provided query embedding within a specific city
-func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbedding []float32, cityID uuid.UUID, limit int) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbedding []float32, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "FindSimilarPOIsByCity", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
 		attribute.Int("embedding.dimension", len(queryEmbedding)),
@@ -1811,9 +1811,9 @@ func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbeddi
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var similarityScore float64
 		var description sql.NullString
 
@@ -1861,7 +1861,7 @@ func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbeddi
 }
 
 // SearchPOIsHybrid combines spatial filtering with semantic similarity search
-func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter types.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "SearchPOIsHybrid", trace.WithAttributes(
 		attribute.Float64("location.latitude", filter.Location.Latitude),
 		attribute.Float64("location.longitude", filter.Location.Longitude),
@@ -1951,9 +1951,9 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter types.POIF
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var distanceMeters, similarityScore, hybridScore float64
 		var description sql.NullString
 
@@ -2058,7 +2058,7 @@ func (r *RepositoryImpl) UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID
 }
 
 // GetPOIsWithoutEmbeddings retrieves POIs that don't have embeddings generated yet
-func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "GetPOIsWithoutEmbeddings", trace.WithAttributes(
 		attribute.Int("limit", limit),
 	))
@@ -2090,9 +2090,9 @@ func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var description sql.NullString
 
 		err := rows.Scan(
@@ -2131,7 +2131,7 @@ func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int
 }
 
 // GetPOIsByLocationAndDistance retrieves POIs within a specified radius from a given location using PostGIS
-func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, lon, radiusMeters float64) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, lon, radiusMeters float64) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("POIRepository").Start(ctx, "GetPOIsByLocationAndDistance", trace.WithAttributes(
 		attribute.Float64("location.lat", lat),
 		attribute.Float64("location.lon", lon),
@@ -2210,9 +2210,9 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, 
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var description, address, website, phoneNumber, poiType sql.NullString
 		var openingHours sql.NullString // JSONB can be scanned as string
 		var priceLevel sql.NullInt32
@@ -2335,7 +2335,7 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, 
 }
 
 // GetPOIsByLocationAndDistanceWithCategory retrieves POIs within a specified radius from a given location filtered by category
-func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("POIRepository").Start(ctx, "GetPOIsByLocationAndDistanceWithCategory", trace.WithAttributes(
 		attribute.Float64("location.lat", lat),
 		attribute.Float64("location.lon", lon),
@@ -2417,9 +2417,9 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Co
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var description, address, website, phoneNumber, poiType sql.NullString
 		var openingHours sql.NullString // JSONB can be scanned as string
 		var priceLevel sql.NullInt32
@@ -2519,7 +2519,7 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Co
 	return pois, nil
 }
 
-func (r *RepositoryImpl) SaveLlmInteraction(ctx context.Context, interaction *types.LlmInteraction) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveLlmInteraction(ctx context.Context, interaction *locitypes.LlmInteraction) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("POIRepository").Start(ctx, "SaveLlmInteraction")
 	defer span.End()
 
@@ -2544,7 +2544,7 @@ func (r *RepositoryImpl) SaveLlmInteraction(ctx context.Context, interaction *ty
 	return id, nil
 }
 
-func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []types.POIDetailedInfo, _ *types.GenAIResponse, llmInteractionID uuid.UUID) error {
+func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []locitypes.POIDetailedInfo, _ *locitypes.GenAIResponse, llmInteractionID uuid.UUID) error {
 	ctx, span := otel.Tracer("POIRepository").Start(ctx, "SaveLlmPoisToDatabase", trace.WithAttributes(
 		attribute.Int("poi.count", len(pois)),
 	))

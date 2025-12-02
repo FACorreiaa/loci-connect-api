@@ -98,7 +98,7 @@ func TestReviewModels_Integration(t *testing.T) {
 	poiID := createTestPOIForReview(t)
 
 	t.Run("Create and save review", func(t *testing.T) {
-		review := types.NewReview(userID, poiID, 5, "Amazing place!", "This is a fantastic location to visit.")
+		review := locitypes.NewReview(userID, poiID, 5, "Amazing place!", "This is a fantastic location to visit.")
 		visitDate := time.Now().AddDate(0, 0, -7) // 7 days ago
 		review.VisitDate = &visitDate
 		review.ImageURLs = []string{"https://example.com/image1.jpg", "https://example.com/image2.jpg"}
@@ -128,7 +128,7 @@ func TestReviewModels_Integration(t *testing.T) {
 
 	t.Run("Create and save review helpful", func(t *testing.T) {
 		// Create a review first
-		review := types.NewReview(userID, poiID, 4, "Good place", "Nice location")
+		review := locitypes.NewReview(userID, poiID, 4, "Good place", "Nice location")
 		query := `
 			INSERT INTO reviews (id, user_id, poi_id, rating, title, content, helpful, unhelpful, is_verified, is_published, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -141,7 +141,7 @@ func TestReviewModels_Integration(t *testing.T) {
 		// Create another user to mark the review as helpful
 		otherUserID := createTestUserForReview(t)
 
-		reviewHelpful := types.NewReviewHelpful(otherUserID, review.ID, true)
+		reviewHelpful := locitypes.NewReviewHelpful(otherUserID, review.ID, true)
 
 		// Insert review helpful record
 		helpfulQuery := `
@@ -163,7 +163,7 @@ func TestReviewModels_Integration(t *testing.T) {
 
 	t.Run("Create and save review reply", func(t *testing.T) {
 		// Create a review first
-		review := types.NewReview(userID, poiID, 3, "Average place", "It was okay")
+		review := locitypes.NewReview(userID, poiID, 3, "Average place", "It was okay")
 		query := `
 			INSERT INTO reviews (id, user_id, poi_id, rating, title, content, helpful, unhelpful, is_verified, is_published, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -175,7 +175,7 @@ func TestReviewModels_Integration(t *testing.T) {
 
 		// Create a reply to the review
 		replyUserID := createTestUserForReview(t)
-		reviewReply := types.NewReviewReply(review.ID, replyUserID, "Thanks for your feedback!", false)
+		reviewReply := locitypes.NewReviewReply(review.ID, replyUserID, "Thanks for your feedback!", false)
 
 		// Insert review reply
 		replyQuery := `
@@ -207,10 +207,10 @@ func TestReviewQueries_Integration(t *testing.T) {
 	poiID := createTestPOIForReview(t)
 
 	// Create multiple reviews for testing
-	reviews := []*types.Review{
-		types.NewReview(userID, poiID, 5, "Excellent!", "Perfect place"),
-		types.NewReview(userID, poiID, 4, "Very good", "Really enjoyed it"),
-		types.NewReview(userID, poiID, 3, "Average", "It was okay"),
+	reviews := []*locitypes.Review{
+		locitypes.NewReview(userID, poiID, 5, "Excellent!", "Perfect place"),
+		locitypes.NewReview(userID, poiID, 4, "Very good", "Really enjoyed it"),
+		locitypes.NewReview(userID, poiID, 3, "Average", "It was okay"),
 	}
 
 	// Insert reviews
@@ -280,7 +280,7 @@ func TestReviewConstraints_Integration(t *testing.T) {
 
 	t.Run("Rating constraints", func(t *testing.T) {
 		// Test valid rating (should succeed)
-		review := types.NewReview(userID, poiID, 5, "Valid rating", "Content")
+		review := locitypes.NewReview(userID, poiID, 5, "Valid rating", "Content")
 		query := `
 			INSERT INTO reviews (id, user_id, poi_id, rating, title, content, helpful, unhelpful, is_verified, is_published, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -291,8 +291,8 @@ func TestReviewConstraints_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test invalid rating (if constraints exist in DB schema)
-		invalidReview := types.NewReview(userID, poiID, 10, "Invalid rating", "Content") // Assuming rating should be 1-5
-		invalidReview.ID = uuid.New()                                                    // Different ID
+		invalidReview := locitypes.NewReview(userID, poiID, 10, "Invalid rating", "Content") // Assuming rating should be 1-5
+		invalidReview.ID = uuid.New()                                                        // Different ID
 		_, err = testReviewDB.Exec(ctx, query,
 			invalidReview.ID, invalidReview.UserID, invalidReview.POIID, invalidReview.Rating, invalidReview.Title, invalidReview.Content,
 			invalidReview.Helpful, invalidReview.Unhelpful, invalidReview.IsVerified, invalidReview.IsPublished, invalidReview.CreatedAt, invalidReview.UpdatedAt)

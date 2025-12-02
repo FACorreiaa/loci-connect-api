@@ -14,11 +14,11 @@ var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
 	// GetMainPageStatistics retrieves the main page statistics.
-	GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*types.MainPageStatistics, error)
+	GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error)
 	// GetDetailedPOIStatistics retrieves detailed POI statistics by type.
-	GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*types.DetailedPOIStatistics, error)
+	GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.DetailedPOIStatistics, error)
 	// LandingPageStatistics retrieves user-specific landing page statistics.
-	LandingPageStatistics(ctx context.Context, userID uuid.UUID) (*types.LandingPageUserStats, error)
+	LandingPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.LandingPageUserStats, error)
 }
 
 type RepositoryImpl struct {
@@ -33,7 +33,7 @@ func NewRepository(logger *slog.Logger, pgpool *pgxpool.Pool) *RepositoryImpl {
 	}
 }
 
-func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*types.MainPageStatistics, error) {
+func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error) {
 	r.logger.InfoContext(ctx, "Getting main page statistics for user")
 
 	// Check if this is a request for aggregate statistics (system user)
@@ -170,7 +170,7 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 		args = append(args, userID)
 	}
 
-	var stats types.MainPageStatistics
+	var stats locitypes.MainPageStatistics
 
 	err := r.pgpool.QueryRow(ctx, query, args...).Scan(
 		&stats.TotalUsersCount,
@@ -190,7 +190,7 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 	return &stats, nil
 }
 
-func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*types.DetailedPOIStatistics, error) {
+func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.DetailedPOIStatistics, error) {
 	r.logger.InfoContext(ctx, "Getting detailed POI statistics for user")
 
 	query := `
@@ -208,7 +208,7 @@ func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uu
 		WHERE li.user_id = $1
 	`
 
-	var stats types.DetailedPOIStatistics
+	var stats locitypes.DetailedPOIStatistics
 
 	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
 		&stats.GeneralPOIs,
@@ -232,7 +232,7 @@ func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uu
 	return &stats, nil
 }
 
-func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.UUID) (*types.LandingPageUserStats, error) {
+func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.LandingPageUserStats, error) {
 	r.logger.InfoContext(ctx, "Getting LandingPageStatistics")
 
 	query := `
@@ -243,7 +243,7 @@ func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.
     (SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1) AS discoveries;
 	`
 
-	var stats types.LandingPageUserStats
+	var stats locitypes.LandingPageUserStats
 
 	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
 		&stats.SavedPlaces,

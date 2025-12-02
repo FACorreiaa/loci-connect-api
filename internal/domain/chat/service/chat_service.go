@@ -26,7 +26,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/genai"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 
@@ -37,6 +36,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
+	"github.com/FACorreiaa/loci-connect-api/internal/llm"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -56,33 +56,33 @@ var _ LlmInteractiontService = (*ServiceImpl)(nil)
 
 // LlmInteractiontService defines the business logic contract for user operations.
 type LlmInteractiontService interface {
-	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error)
-	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error)
-	SaveItenerary(ctx context.Context, userID uuid.UUID, req types.BookmarkRequest) (uuid.UUID, error)
-	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error)
+	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error)
+	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*locitypes.ChatResponse, error)
+	SaveItenerary(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error)
+	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error)
 	RemoveItenerary(ctx context.Context, userID, itineraryID uuid.UUID) error
-	GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*types.POIDetailedInfo, error)
+	GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*locitypes.POIDetailedInfo, error)
 
 	ContinueSessionStreamed(
 		ctx context.Context,
 		sessionID uuid.UUID,
 		message string,
-		userLocation *types.UserLocation, // For distance sorting context
-		eventCh chan<- types.StreamEvent, // Channel to send events back
+		userLocation *locitypes.UserLocation, // For distance sorting context
+		eventCh chan<- locitypes.StreamEvent, // Channel to send events back
 	) error
 
-	ProcessUnifiedChatMessageStream(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation, eventCh chan<- types.StreamEvent) error
-	ProcessUnifiedChatMessageStreamFree(ctx context.Context, cityName, message string, userLocation *types.UserLocation, eventCh chan<- types.StreamEvent) error
+	ProcessUnifiedChatMessageStream(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation, eventCh chan<- locitypes.StreamEvent) error
+	ProcessUnifiedChatMessageStreamFree(ctx context.Context, cityName, message string, userLocation *locitypes.UserLocation, eventCh chan<- locitypes.StreamEvent) error
 
 	// Chat session management
-	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error)
-	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error)
+	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error)
+	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*locitypes.ChatSession, error)
 	EndSession(ctx context.Context, userID, sessionID uuid.UUID) error
 	GetRecentInteractions(ctx context.Context, userID uuid.UUID, pagination *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error)
 }
 
 type IntentClassifier interface {
-	Classify(ctx context.Context, message string) (types.IntentType, error) // e.g., "start_trip", "modify_itinerary"
+	Classify(ctx context.Context, message string) (locitypes.IntentType, error) // e.g., "start_trip", "modify_itinerary"
 }
 
 // ServiceImpl provides the implementation for LlmInteractiontService.
@@ -94,15 +94,15 @@ type ServiceImpl struct {
 	searchProfileRepo  profiles.Repository
 	searchProfileSvc   profiles.Service // Add service for enhanced methods
 	tagsRepo           tags.Repository
-	aiClient           *generativeAI.LLMChatClient
-	embeddingService   *generativeAI.EmbeddingService
+	aiClient           llm.ChatClient
+	embeddingService   llm.EmbeddingClient
 	llmInteractionRepo repository.Repository
 	cityRepo           city.Repository
 	poiRepo            poi.Repository
 	cache              *cache.Cache
 
 	// events
-	deadLetterCh     chan types.StreamEvent
+	deadLetterCh     chan locitypes.StreamEvent
 	intentClassifier IntentClassifier
 }
 
@@ -118,13 +118,13 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := generativeAI.NewLLMChatClient(ctx, apiKey)
+	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey)
 	if err != nil {
 		panic(err)
 	}
 
 	// Initialize embedding service
-	embeddingService, err := generativeAI.NewEmbeddingService(ctx, logger)
+	embeddingService, err := llm.NewGeminiEmbeddingClient(ctx, logger)
 	if err != nil {
 		log.Fatalf("Failed to create embedding service: %v", err) // Terminate if initialization fails
 	}
@@ -144,8 +144,8 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		cityRepo:           cityRepo,
 		poiRepo:            poiRepo,
 		cache:              c,
-		deadLetterCh:       make(chan types.StreamEvent, 100),
-		intentClassifier:   &types.SimpleIntentClassifier{},
+		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
+		intentClassifier:   &locitypes.SimpleIntentClassifier{},
 	}
 	go service.processDeadLetterQueue()
 	return service
@@ -159,7 +159,7 @@ func (l *ServiceImpl) processDeadLetterQueue() {
 }
 
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context
-func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []string, cityName, tagsPromptPart, userPrefs string, semanticPOIs []types.POIDetailedInfo) string {
+func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []string, cityName, tagsPromptPart, userPrefs string, semanticPOIs []locitypes.POIDetailedInfo) string {
 	prompt := fmt.Sprintf(`
         Generate a personalized trip itinerary for %s, tailored to user interests [%s].
 
@@ -216,7 +216,7 @@ func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []stri
 	return prompt
 }
 
-func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.UUID) (interests []*types.Interest, searchProfile *types.UserPreferenceProfileResponse, tags []*types.Tags, err error) {
+func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.UUID) (interests []*locitypes.Interest, searchProfile *locitypes.UserPreferenceProfileResponse, tags []*locitypes.Tags, err error) {
 	// If no profile ID is provided, fall back to the user's default search profile.
 	if profileID == uuid.Nil {
 		searchProfile, err = l.searchProfileRepo.GetDefaultSearchProfile(ctx, userID)
@@ -245,7 +245,7 @@ func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.
 	return interests, searchProfile, tags, nil
 }
 
-func (l *ServiceImpl) PreparePromptData(interests []*types.Interest, tags []*types.Tags, searchProfile *types.UserPreferenceProfileResponse) (interestNames []string, tagsPromptPart, userPrefs string) {
+func (l *ServiceImpl) PreparePromptData(interests []*locitypes.Interest, tags []*locitypes.Tags, searchProfile *locitypes.UserPreferenceProfileResponse) (interestNames []string, tagsPromptPart, userPrefs string) {
 	if len(interests) == 0 {
 		interestNames = []string{"general sightseeing", "local experiences"}
 	} else {
@@ -272,7 +272,7 @@ func (l *ServiceImpl) PreparePromptData(interests []*types.Interest, tags []*typ
 	return interestNames, tagsPromptPart, userPrefs
 }
 
-func (l *ServiceImpl) CollectResults(resultCh <-chan types.GenAIResponse) (itinerary types.AiCityResponse, llmInteractionID uuid.UUID, rawPersonalisedPOIs []types.POIDetailedInfo, errors []error) {
+func (l *ServiceImpl) CollectResults(resultCh <-chan locitypes.GenAIResponse) (itinerary locitypes.AiCityResponse, llmInteractionID uuid.UUID, rawPersonalisedPOIs []locitypes.POIDetailedInfo, errors []error) {
 	for res := range resultCh {
 		if res.Err != nil {
 			errors = append(errors, res.Err)
@@ -302,13 +302,13 @@ func (l *ServiceImpl) CollectResults(resultCh <-chan types.GenAIResponse) (itine
 	return itinerary, llmInteractionID, rawPersonalisedPOIs, errors
 }
 
-func (l *ServiceImpl) HandleCityData(ctx context.Context, cityData types.GeneralCityData) (cityID uuid.UUID, err error) {
+func (l *ServiceImpl) HandleCityData(ctx context.Context, cityData locitypes.GeneralCityData) (cityID uuid.UUID, err error) {
 	c, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityData.City, cityData.Country)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to check city existence: %w", err)
 	}
 	if c == nil {
-		cityDetail := types.CityDetail{
+		cityDetail := locitypes.CityDetail{
 			Name:            cityData.City,
 			Country:         cityData.Country,
 			StateProvince:   cityData.StateProvince,
@@ -326,7 +326,7 @@ func (l *ServiceImpl) HandleCityData(ctx context.Context, cityData types.General
 	return cityID, nil
 }
 
-func (l *ServiceImpl) HandleGeneralPOIs(ctx context.Context, pois []types.POIDetailedInfo, cityID uuid.UUID) {
+func (l *ServiceImpl) HandleGeneralPOIs(ctx context.Context, pois []locitypes.POIDetailedInfo, cityID uuid.UUID) {
 	for _, p := range pois {
 		existingPoi, err := l.poiRepo.FindPoiByNameAndCity(ctx, p.Name, cityID)
 		if err != nil {
@@ -342,7 +342,7 @@ func (l *ServiceImpl) HandleGeneralPOIs(ctx context.Context, pois []types.POIDet
 	}
 }
 
-func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.POIDetailedInfo, cityID uuid.UUID, userLocation *types.UserLocation, llmInteractionID, userID, profileID uuid.UUID) ([]types.POIDetailedInfo, error) {
+func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []locitypes.POIDetailedInfo, cityID uuid.UUID, userLocation *locitypes.UserLocation, llmInteractionID, userID, profileID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	if userLocation == nil || len(pois) == 0 {
 		return pois, nil // No sorting possible
 	}
@@ -383,8 +383,8 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.P
 
 // GenerateEnhancedPersonalisedPOIWorker generates personalized POIs with domain-aware filtering
 func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context, wg *sync.WaitGroup,
-	cityName string, userID, profileID uuid.UUID, resultCh chan<- types.GenAIResponse,
-	enhancedPromptData string, domain types.DomainType, config *genai.GenerateContentConfig,
+	cityName string, userID, profileID uuid.UUID, resultCh chan<- locitypes.GenAIResponse,
+	enhancedPromptData string, domain locitypes.DomainType, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateEnhancedPersonalisedPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -405,7 +405,7 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "AI generation failed")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to generate enhanced personalized POIs: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to generate enhanced personalized POIs: %w", err)}
 		return
 	}
 
@@ -423,23 +423,23 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 		err := fmt.Errorf("no valid enhanced personalized POI content from AI")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Empty response from AI")
-		resultCh <- types.GenAIResponse{Err: err}
+		resultCh <- locitypes.GenAIResponse{Err: err}
 		return
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
 	cleanTxt := CleanJSONResponse(txt)
-	var itineraryData types.AIItineraryResponse
+	var itineraryData locitypes.AIItineraryResponse
 	if err := json.Unmarshal([]byte(cleanTxt), &itineraryData); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to parse enhanced personalized POI JSON")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to parse enhanced personalized POI JSON: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to parse enhanced personalized POI JSON: %w", err)}
 		return
 	}
 
 	span.SetAttributes(attribute.Int("pois.count", len(itineraryData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "Enhanced personalized POIs generated successfully")
-	resultCh <- types.GenAIResponse{
+	resultCh <- locitypes.GenAIResponse{
 		ItineraryName:        itineraryData.ItineraryName,
 		ItineraryDescription: itineraryData.OverallDescription,
 		PersonalisedPOI:      itineraryData.PointsOfInterest,
@@ -448,16 +448,16 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 }
 
 // getEnhancedPersonalizedPOIPrompt creates a domain-aware prompt for personalized POI generation
-func (l *ServiceImpl) getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData string, domain types.DomainType) string {
+func (l *ServiceImpl) getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData string, domain locitypes.DomainType) string {
 	domainFocus := ""
 	switch domain {
-	case types.DomainAccommodation:
+	case locitypes.DomainAccommodation:
 		domainFocus = "Focus particularly on accommodation recommendations and nearby attractions that complement the user's accommodation preferences."
-	case types.DomainDining:
+	case locitypes.DomainDining:
 		domainFocus = "Focus particularly on restaurant, food, and dining experiences that align with the user's culinary preferences."
-	case types.DomainActivities:
+	case locitypes.DomainActivities:
 		domainFocus = "Focus particularly on activities, attractions, and experiences that match the user's activity preferences and physical capabilities."
-	case types.DomainItinerary:
+	case locitypes.DomainItinerary:
 		domainFocus = "Focus particularly on creating a well-structured itinerary that respects the user's planning style and pace preferences."
 	default:
 		domainFocus = "Provide a balanced mix of attractions, dining, and activities based on all user preferences."
@@ -505,7 +505,7 @@ func getBasePersonalizedPromptInstructions() string {
 - Maximum 8-10 POIs to maintain quality over quantity`
 }
 
-func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req types.BookmarkRequest) (uuid.UUID, error) {
+func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
 	var llmInteractionIDStr string
 	if req.LlmInteractionID != nil {
 		llmInteractionIDStr = req.LlmInteractionID.String()
@@ -578,7 +578,7 @@ func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req t
 
 		if city == nil {
 			// City doesn't exist, create it
-			cityDetail := types.CityDetail{
+			cityDetail := locitypes.CityDetail{
 				Name:      req.PrimaryCityName,
 				Country:   "Unknown", // Could be extracted from LLM interaction context
 				AiSummary: "",
@@ -606,7 +606,7 @@ func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req t
 	}
 
 	// Fetch original interaction only if LlmInteractionID is provided
-	var originalInteraction *types.LlmInteraction
+	var originalInteraction *locitypes.LlmInteraction
 	var err error
 	if req.LlmInteractionID != nil {
 		originalInteraction, err = l.llmInteractionRepo.GetInteractionByID(ctx, *req.LlmInteractionID)
@@ -650,7 +650,7 @@ func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req t
 		sessionID = pgtype.UUID{Valid: false}
 	}
 
-	newBookmark := &types.UserSavedItinerary{
+	newBookmark := &locitypes.UserSavedItinerary{
 		UserID:                 userID,
 		SourceLlmInteractionID: sourceInteractionID, // Will be nil if not provided
 		SessionID:              sessionID,           // Store the session ID separately
@@ -680,7 +680,7 @@ func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req t
 	return savedID, nil
 }
 
-func (l *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error) {
+func (l *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GetBookmarkedItineraries", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.Int("page", page),
@@ -737,7 +737,7 @@ func (l *ServiceImpl) RemoveItenerary(ctx context.Context, userID, itineraryID u
 }
 
 // GetUserChatSessions retrieves paginated chat sessions for a user
-func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error) {
+func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GetUserChatSessions", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.Int("page", page),
@@ -775,7 +775,7 @@ func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID,
 }
 
 // GetChatSession returns a specific session if the user owns it.
-func (l *ServiceImpl) GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error) {
+func (l *ServiceImpl) GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*locitypes.ChatSession, error) {
 	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", common.ErrSessionNotFound, err)
@@ -795,7 +795,7 @@ func (l *ServiceImpl) EndSession(ctx context.Context, userID, sessionID uuid.UUI
 	if session.UserID != userID {
 		return common.ErrUnauthorized
 	}
-	session.Status = types.StatusClosed
+	session.Status = locitypes.StatusClosed
 	session.UpdatedAt = time.Now()
 	return l.llmInteractionRepo.UpdateSession(ctx, *session)
 }
@@ -809,7 +809,7 @@ func (l *ServiceImpl) GetRecentInteractions(_ context.Context, _ uuid.UUID, _ *c
 // getPOIDetailedInfos returns a formatted string with POI details.
 func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGroup,
 	city string, lat, lon float64, userID uuid.UUID,
-	resultCh chan<- types.POIDetailedInfo, config *genai.GenerateContentConfig,
+	resultCh chan<- locitypes.POIDetailedInfo, config *genai.GenerateContentConfig,
 ) {
 	defer wg.Done()
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "getPOIDetailedInfos", trace.WithAttributes(
@@ -831,7 +831,7 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGrou
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate POI details")
-		resultCh <- types.POIDetailedInfo{Err: fmt.Errorf("failed to generate POI details: %w", err)}
+		resultCh <- locitypes.POIDetailedInfo{Err: fmt.Errorf("failed to generate POI details: %w", err)}
 		return
 	}
 
@@ -846,23 +846,23 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGrou
 		err := fmt.Errorf("no valid POI details content from AI")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Empty response from AI")
-		resultCh <- types.POIDetailedInfo{Err: err}
+		resultCh <- locitypes.POIDetailedInfo{Err: err}
 		return
 	}
 
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 	cleanTxt := CleanJSONResponse(txt)
-	var detailedInfo types.POIDetailedInfo
+	var detailedInfo locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanTxt), &detailedInfo); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to parse POI details JSON")
-		resultCh <- types.POIDetailedInfo{Err: fmt.Errorf("failed to parse POI details JSON: %w", err)}
+		resultCh <- locitypes.POIDetailedInfo{Err: fmt.Errorf("failed to parse POI details JSON: %w", err)}
 		return
 	}
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 	span.SetStatus(codes.Ok, "POI details generated successfully")
-	interaction := types.LlmInteraction{
+	interaction := locitypes.LlmInteraction{
 		UserID:       userID,
 		Prompt:       prompt,
 		ResponseText: txt,
@@ -880,10 +880,10 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGrou
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to save LLM interaction for POI details")
-		resultCh <- types.POIDetailedInfo{Err: fmt.Errorf("failed to save LLM interaction for POI details: %w", err)}
+		resultCh <- locitypes.POIDetailedInfo{Err: fmt.Errorf("failed to save LLM interaction for POI details: %w", err)}
 		return
 	}
-	resultCh <- types.POIDetailedInfo{
+	resultCh <- locitypes.POIDetailedInfo{
 		City:         city,
 		Name:         detailedInfo.Name,
 		Latitude:     detailedInfo.Latitude,
@@ -906,7 +906,7 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGrou
 	span.SetStatus(codes.Ok, "POI details generated and saved successfully")
 }
 
-func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*types.POIDetailedInfo, error) {
+func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GetPOIDetailedInfosResponse", trace.WithAttributes(
 		attribute.String("city.name", city),
 		attribute.Float64("latitude", lat),
@@ -924,7 +924,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 
 	// Check cache
 	if cached, found := l.cache.Get(cacheKey); found {
-		if p, ok := cached.(*types.POIDetailedInfo); ok {
+		if p, ok := cached.(*locitypes.POIDetailedInfo); ok {
 			l.logger.InfoContext(ctx, "Cache hit for POI details", slog.String("cache_key", cacheKey))
 			span.AddEvent("Cache hit")
 			span.SetStatus(codes.Ok, "POI details served from cache")
@@ -965,7 +965,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	l.logger.DebugContext(ctx, "Cache and database miss, fetching POI details from AI", slog.String("cache_key", cacheKey))
 	span.AddEvent("Cache and database miss")
 
-	resultCh := make(chan types.POIDetailedInfo, 1)
+	resultCh := make(chan locitypes.POIDetailedInfo, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
 
@@ -1010,7 +1010,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 }
 
 // generatePOIData queries the LLM for POI details and calculates distance using PostGIS
-func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName string, userLocation *types.UserLocation, userID, cityID uuid.UUID) (types.POIDetailedInfo, error) {
+func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName string, userLocation *locitypes.UserLocation, userID, cityID uuid.UUID) (locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePOIData", trace.WithAttributes(
 		attribute.String("p.name", poiName),
 		attribute.String("city.name", cityName),
@@ -1024,10 +1024,10 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 	response, err := l.aiClient.GenerateContent(ctx, prompt, "", nil)
 	if err != nil {
 		span.RecordError(err)
-		return types.POIDetailedInfo{}, fmt.Errorf("failed to generate POI data: %w", err)
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to generate POI data: %w", err)
 	}
 
-	interaction := types.LlmInteraction{
+	interaction := locitypes.LlmInteraction{
 		UserID:       userID,
 		Prompt:       prompt,
 		ResponseText: response,
@@ -1038,19 +1038,19 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 	if err != nil {
 		l.logger.ErrorContext(ctx, "Failed to save LLM interaction in generatePOIData", slog.Any("error", err))
 		// Decide if this is fatal for POI generation. It might be if FK is NOT NULL.
-		return types.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
 	}
 	span.SetAttributes(attribute.String("llm.interaction_id.for_poi_data", savedLlmInteractionID.String()))
 
 	cleanResponse := CleanJSONResponse(response)
-	var poiData types.POIDetailedInfo
+	var poiData locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanResponse), &poiData); err != nil || poiData.Name == "" {
 		l.logger.WarnContext(ctx, "LLM returned invalid or empty POI data",
 			slog.String("poiName", poiName),
 			slog.String("llmResponse", response),
 			slog.Any("unmarshalError", err))
 		span.AddEvent("Invalid LLM response")
-		poiData = types.POIDetailedInfo{
+		poiData = locitypes.POIDetailedInfo{
 			ID:             uuid.New(),
 			Name:           poiName,
 			Latitude:       0,
@@ -1109,7 +1109,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 }
 
 // enhancePOIRecommendationsWithSemantics uses embeddings to find similar POIs and enrich recommendations
-//func (l *ServiceImpl) enhancePOIRecommendationsWithSemantics(ctx context.Context, userMessage string, cityID uuid.UUID, userPreferences []string, limit int) ([]types.POIDetailedInfo, error) {
+//func (l *ServiceImpl) enhancePOIRecommendationsWithSemantics(ctx context.Context, userMessage string, cityID uuid.UUID, userPreferences []string, limit int) ([]locitypes.POIDetailedInfo, error) {
 //	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "enhancePOIRecommendationsWithSemantics", trace.WithAttributes(
 //		attribute.String("user.message", userMessage),
 //		attribute.String("city.id", cityID.String()),
@@ -1124,7 +1124,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //	if l.embeddingService == nil {
 //		l.logger.WarnContext(ctx, "Embedding service not available, falling back to traditional search")
 //		span.AddEvent("Embedding service not available")
-//		return []types.POIDetailedInfo{}, nil
+//		return []locitypes.POIDetailedInfo{}, nil
 //	}
 //
 //	// Generate embedding for user message combined with preferences
@@ -1140,7 +1140,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //			slog.String("query", searchQuery))
 //		span.RecordError(err)
 //		span.SetStatus(codes.Error, "Failed to generate query embedding")
-//		return []types.POIDetailedInfo{}, fmt.Errorf("failed to generate query embedding: %w", err)
+//		return []locitypes.POIDetailedInfo{}, fmt.Errorf("failed to generate query embedding: %w", err)
 //	}
 //
 //	// Search for similar POIs in the city
@@ -1149,7 +1149,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //		l.logger.ErrorContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
 //		span.RecordError(err)
 //		span.SetStatus(codes.Error, "Failed to find similar POIs")
-//		return []types.POIDetailedInfo{}, fmt.Errorf("failed to find similar POIs: %w", err)
+//		return []locitypes.POIDetailedInfo{}, fmt.Errorf("failed to find similar POIs: %w", err)
 //	}
 //
 //	l.logger.InfoContext(ctx, "Found semantically similar POIs",
@@ -1165,7 +1165,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //}
 
 // generateSemanticPOIRecommendations generates POI recommendations using semantic search
-func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID, userID uuid.UUID, userLocation *types.UserLocation, semanticWeight float64) ([]types.POIDetailedInfo, error) {
+func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID, userID uuid.UUID, userLocation *locitypes.UserLocation, semanticWeight float64) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "generateSemanticPOIRecommendations", trace.WithAttributes(
 		attribute.String("user.message", userMessage),
 		attribute.String("city.id", cityID.String()),
@@ -1196,12 +1196,12 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 
 	// If user location is available, use hybrid search (spatial + semantic)
 	if userLocation != nil && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
-		filter := types.POIFilter{
-			Location: types.GeoPoint{
+		filter := locitypes.POIFilter{
+			Location: locitypes.GeoPoint{
 				Latitude:  userLocation.UserLat,
 				Longitude: userLocation.UserLon,
 			},
@@ -1276,7 +1276,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 }
 
 // handleSemanticRemovePOI handles removing POIs with semantic understanding
-func (l *ServiceImpl) handleSemanticRemovePOI(ctx context.Context, message string, session *types.ChatSession) string {
+func (l *ServiceImpl) handleSemanticRemovePOI(ctx context.Context, message string, session *locitypes.ChatSession) string {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "handleSemanticRemovePOI")
 	defer span.End()
 
@@ -1391,7 +1391,7 @@ If no city is mentioned, use empty string for city.
 //     // Save to a persistent store
 // }
 
-func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- types.StreamEvent, event types.StreamEvent, retries int) bool {
+func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamEvent, event locitypes.StreamEvent, retries int) bool {
 	for i := 0; i < retries; i++ {
 		if event.EventID == "" {
 			event.EventID = uuid.New().String()
@@ -1424,8 +1424,8 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- types.StreamEvent
 	return false
 }
 
-func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error) {
-	eventCh := make(chan types.StreamEvent)
+func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error) {
+	eventCh := make(chan locitypes.StreamEvent)
 	go func() {
 		// Note: eventCh is closed by ProcessUnifiedChatMessageStream via closeOnce
 		err := l.ProcessUnifiedChatMessageStream(ctx, userID, profileID, cityName, message, userLocation, eventCh)
@@ -1434,13 +1434,13 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		}
 	}()
 
-	var lastItinerary types.AiCityResponse
+	var lastItinerary locitypes.AiCityResponse
 	var lastMessage string
 	var sessionID uuid.UUID
 
 	for event := range eventCh {
-		if event.Type == types.EventTypeItinerary {
-			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+		if event.Type == locitypes.EventTypeItinerary {
+			if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
 				lastItinerary = itinerary
 				sessionID = itinerary.SessionID
 			}
@@ -1450,7 +1450,7 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		}
 	}
 
-	return &types.ChatResponse{
+	return &locitypes.ChatResponse{
 		SessionID:        sessionID,
 		Message:          lastMessage,
 		UpdatedItinerary: &lastItinerary,
@@ -1458,8 +1458,8 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 }
 
 // ContinueChat is a unary wrapper around the streaming continuation flow.
-func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*types.ChatResponse, error) {
-	eventCh := make(chan types.StreamEvent)
+func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
+	eventCh := make(chan locitypes.StreamEvent)
 	go func() {
 		// Note: eventCh is closed by ContinueSessionStreamed via closeOnce
 		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
@@ -1468,12 +1468,12 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		}
 	}()
 
-	var lastItinerary types.AiCityResponse
+	var lastItinerary locitypes.AiCityResponse
 	var lastMessage string
 
 	for event := range eventCh {
-		if event.Type == types.EventTypeItinerary {
-			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+		if event.Type == locitypes.EventTypeItinerary {
+			if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
 				lastItinerary = itinerary
 			}
 		}
@@ -1482,7 +1482,7 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		}
 	}
 
-	return &types.ChatResponse{
+	return &locitypes.ChatResponse{
 		SessionID:        sessionID,
 		Message:          lastMessage,
 		UpdatedItinerary: &lastItinerary,
@@ -1526,8 +1526,8 @@ func getPersonalizedPOI(interestNames []string, cityName, tagsPromptPart, userPr
 // ContinueSessionStreamed handles subsequent messages in an existing session and streams responses/updates.
 func (l *ServiceImpl) ContinueSessionStreamed(
 	ctx context.Context, sessionID uuid.UUID,
-	message string, userLocation *types.UserLocation,
-	eventCh chan<- types.StreamEvent, // Output channel for events
+	message string, userLocation *locitypes.UserLocation,
+	eventCh chan<- locitypes.StreamEvent, // Output channel for events
 ) error { // Only returns error for critical setup failures
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "ContinueSessionStreamed", trace.WithAttributes(
 		attribute.String("session.id", sessionID.String()),
@@ -1541,15 +1541,15 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
 	if err != nil {
 		err = fmt.Errorf("failed to get session %s: %w", sessionID, err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
 		return err
 	}
-	if session.Status != types.StatusActive {
+	if session.Status != locitypes.StatusActive {
 		err = fmt.Errorf("session %s is not active (status: %s) %w", sessionID, session.Status, err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
 		return err
 	}
-	l.sendEvent(ctx, eventCh, types.StreamEvent{Type: "session_validated", Data: map[string]string{"status": "active"}}, 3)
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: "session_validated", Data: map[string]string{"status": "active"}}, 3)
 
 	// --- 2. Fetch City ID ---
 	cityData, err := l.cityRepo.FindCityByNameAndCountry(ctx, session.SessionContext.CityName, "")
@@ -1562,16 +1562,16 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 			} else {
 				err = fmt.Errorf("failed to find city '%s' for session %s: %w", session.SessionContext.CityName, sessionID, err)
 			}
-			l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
 			return err
 		}
 	}
 	cityID := cityData.ID
-	l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: map[string]interface{}{"status": "context_loaded", "city_id": cityID.String()}}, 3)
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: map[string]interface{}{"status": "context_loaded", "city_id": cityID.String()}}, 3)
 
 	// --- 3. Add User Message to History ---
-	userMessage := types.ConversationMessage{
-		ID: uuid.New(), Role: types.RoleUser, Content: message, Timestamp: time.Now(), MessageType: types.TypeModificationRequest,
+	userMessage := locitypes.ConversationMessage{
+		ID: uuid.New(), Role: locitypes.RoleUser, Content: message, Timestamp: time.Now(), MessageType: locitypes.TypeModificationRequest,
 	}
 	if err := l.llmInteractionRepo.AddMessageToSession(ctx, sessionID, userMessage); err != nil {
 		l.logger.WarnContext(ctx, "Failed to persist user message, continuing with in-memory history", slog.Any("error", err))
@@ -1583,29 +1583,29 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	intent, err := l.intentClassifier.Classify(ctx, message)
 	if err != nil {
 		err = fmt.Errorf("failed to classify intent for message '%s': %w", message, err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
 		return err
 	}
 	l.logger.InfoContext(ctx, "Intent classified", slog.String("intent", string(intent)))
-	l.sendEvent(ctx, eventCh, types.StreamEvent{Type: "intent_classified", Data: map[string]string{"intent": string(intent)}}, 3)
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: "intent_classified", Data: map[string]string{"intent": string(intent)}}, 3)
 
 	// --- 5. Enhance with Semantic POI Recommendations ---
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type: types.EventTypeProgress,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeProgress,
 		Data: map[string]interface{}{"status": "generating_semantic_context", "progress": 20},
 	}, 3)
 
 	semanticPOIs, err := l.generateSemanticPOIRecommendations(ctx, message, cityID, session.UserID, userLocation, 0.6)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to generate semantic POI recommendations for streaming session", slog.Any("error", err))
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type: types.EventTypeProgress,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeProgress,
 			Data: map[string]interface{}{"status": "semantic_context_failed", "progress": 22},
 		}, 3)
 	} else {
 		l.logger.InfoContext(ctx, "Generated semantic POI recommendations for streaming session",
 			slog.Int("semantic_recommendations", len(semanticPOIs)))
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: "semantic_context_generated",
 			Data: map[string]interface{}{
 				"status":                         "semantic_context_ready",
@@ -1617,34 +1617,34 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 
 	// --- 5. Handle Intent and Generate Response ---
 	var finalResponseMessage string
-	assistantMessageType := types.TypeResponse
+	assistantMessageType := locitypes.TypeResponse
 	itineraryModifiedByThisTurn := false
 
 	switch intent { // Align with ContinueSession's string-based intents
-	case types.IntentAddPOI:
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Processing: Adding Point of Interest with semantic enhancement..."}, 3)
+	case locitypes.IntentAddPOI:
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Adding Point of Interest with semantic enhancement..."}, 3)
 		var genErr error
 		finalResponseMessage, genErr = l.handleSemanticAddPOIStreamed(ctx, message, session, semanticPOIs, userLocation, cityID, eventCh)
 		if genErr != nil {
 			finalResponseMessage = "I had trouble understanding your request. Could you please specify which POI you'd like to add?"
-			assistantMessageType = types.TypeError
+			assistantMessageType = locitypes.TypeError
 		} else {
 			itineraryModifiedByThisTurn = true
 		}
 
-	case types.IntentRemovePOI:
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Processing: Removing Point of Interest with semantic understanding..."}, 3)
+	case locitypes.IntentRemovePOI:
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Removing Point of Interest with semantic understanding..."}, 3)
 		finalResponseMessage = l.handleSemanticRemovePOI(ctx, message, session)
 		if strings.Contains(finalResponseMessage, "I've removed") {
 			itineraryModifiedByThisTurn = true
 		}
 
-	case types.IntentAskQuestion:
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Processing: Answering your question with semantic context..."}, 3)
+	case locitypes.IntentAskQuestion:
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Answering your question with semantic context..."}, 3)
 		finalResponseMessage = "I’m here to help! For now, I’ll assume you’re asking about your trip. What specifically would you like to know?"
 
 	case "replace_poi":
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Processing: Replacing Point of Interest..."}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Replacing Point of Interest..."}, 3)
 		if matches := regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`).FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
 			oldPOI := matches[1]
 			newPOIName := matches[2]
@@ -1653,7 +1653,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 					newPOI, err := l.generatePOIDataStream(ctx, newPOIName, session.SessionContext.CityName, userLocation, session.UserID, cityID, eventCh)
 					if err != nil {
 						finalResponseMessage = fmt.Sprintf("Could not replace %s with %s due to an error: %v", oldPOI, newPOIName, err)
-						assistantMessageType = types.TypeError
+						assistantMessageType = locitypes.TypeError
 					} else {
 						session.CurrentItinerary.AIItineraryResponse.PointsOfInterest[i] = newPOI
 						finalResponseMessage = fmt.Sprintf("I've replaced %s with %s in your itinerary.", oldPOI, newPOIName)
@@ -1667,11 +1667,11 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 			}
 		} else {
 			finalResponseMessage = "Please specify the replacement clearly (e.g., 'replace X with Y')."
-			assistantMessageType = types.TypeClarification
+			assistantMessageType = locitypes.TypeClarification
 		}
 
 	default: // modify_itinerary
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Processing: Updating itinerary..."}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Updating itinerary..."}, 3)
 		if matches := regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`).FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
 			oldPOI := matches[1]
 			newPOIName := matches[2]
@@ -1699,7 +1699,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 
 	// --- 6. Post-Modification Processing (Sorting, Saving Session) ---
 	if itineraryModifiedByThisTurn && userLocation != nil && userLocation.UserLat != 0 && userLocation.UserLon != 0 && session.CurrentItinerary != nil {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeProgress, Data: "Sorting updated POIs by distance..."}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Sorting updated POIs by distance..."}, 3)
 		// Save new POIs to DB to ensure they have valid IDs
 		for i, p := range session.CurrentItinerary.AIItineraryResponse.PointsOfInterest {
 			if p.ID == uuid.Nil {
@@ -1712,7 +1712,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 			}
 		}
 
-		if (intent == types.IntentAddPOI || intent == types.IntentModifyItinerary) && userLocation != nil && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
+		if (intent == locitypes.IntentAddPOI || intent == locitypes.IntentModifyItinerary) && userLocation != nil && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
 			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, sessionID, cityID, *userLocation)
 			if err != nil {
 				l.logger.WarnContext(ctx, "Failed to sort POIs by distance", slog.Any("error", err))
@@ -1727,8 +1727,8 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	}
 
 	// Add assistant's final response to history
-	assistantMessage := types.ConversationMessage{
-		ID: uuid.New(), Role: types.RoleAssistant, Content: finalResponseMessage, Timestamp: time.Now(), MessageType: assistantMessageType,
+	assistantMessage := locitypes.ConversationMessage{
+		ID: uuid.New(), Role: locitypes.RoleAssistant, Content: finalResponseMessage, Timestamp: time.Now(), MessageType: assistantMessageType,
 	}
 	if err := l.llmInteractionRepo.AddMessageToSession(ctx, sessionID, assistantMessage); err != nil {
 		l.logger.WarnContext(ctx, "Failed to save assistant message", slog.Any("error", err))
@@ -1740,22 +1740,22 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	session.ExpiresAt = time.Now().Add(24 * time.Hour)
 	if err := l.llmInteractionRepo.UpdateSession(ctx, *session); err != nil {
 		err = fmt.Errorf("failed to update session %s: %w", sessionID, err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
 		return err
 	}
 
 	// --- 7. Send Final Itinerary and Completion Event ---
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type:      types.EventTypeItinerary,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type:      locitypes.EventTypeItinerary,
 		Data:      session.CurrentItinerary,
 		Message:   finalResponseMessage,
 		Timestamp: time.Now(),
 	}, 3)
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type:    types.EventTypeComplete,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type:    locitypes.EventTypeComplete,
 		Data:    "Turn completed.",
 		IsFinal: true,
-		Navigation: &types.NavigationData{
+		Navigation: &locitypes.NavigationData{
 			URL:       fmt.Sprintf("/itinerary?sessionId=%s&cityName=%s&domain=itinerary", sessionID.String(), url.QueryEscape(session.CityName)),
 			RouteType: "itinerary",
 			QueryParams: map[string]string{
@@ -1773,9 +1773,9 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 // generatePOIDataStream queries the LLM for POI details and streams updates
 func (l *ServiceImpl) generatePOIDataStream(
 	ctx context.Context, poiName, cityName string,
-	userLocation *types.UserLocation, userID, cityID uuid.UUID,
-	eventCh chan<- types.StreamEvent,
-) (types.POIDetailedInfo, error) {
+	userLocation *locitypes.UserLocation, userID, cityID uuid.UUID,
+	eventCh chan<- locitypes.StreamEvent,
+) (locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "generatePOIDataStream",
 		trace.WithAttributes(attribute.String("p.name", poiName), attribute.String("city.name", cityName)))
 	defer span.End()
@@ -1787,17 +1787,17 @@ func (l *ServiceImpl) generatePOIDataStream(
 	var responseTextBuilder strings.Builder
 	iter, err := l.aiClient.GenerateContentStream(ctx, prompt, config)
 	if err != nil {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type:      types.EventTypeError,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
 			Error:     fmt.Sprintf("Failed to generate POI data for '%s': %v", poiName, err),
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		}, 3)
-		return types.POIDetailedInfo{}, fmt.Errorf("AI stream init failed for POI '%s': %w", poiName, err)
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("AI stream init failed for POI '%s': %w", poiName, err)
 	}
 
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type:      types.EventTypeProgress,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type:      locitypes.EventTypeProgress,
 		Data:      map[string]string{"status": fmt.Sprintf("Getting details for %s...", poiName)},
 		Timestamp: time.Now(),
 		EventID:   uuid.New().String(),
@@ -1805,20 +1805,20 @@ func (l *ServiceImpl) generatePOIDataStream(
 
 	for resp, err := range iter {
 		if err != nil {
-			l.sendEvent(ctx, eventCh, types.StreamEvent{
-				Type:      types.EventTypeError,
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+				Type:      locitypes.EventTypeError,
 				Error:     fmt.Sprintf("Streaming failed for POI '%s': %v", poiName, err),
 				Timestamp: time.Now(),
 				EventID:   uuid.New().String(),
 			}, 3)
-			return types.POIDetailedInfo{}, fmt.Errorf("streaming POI details for '%s' failed: %w", poiName, err)
+			return locitypes.POIDetailedInfo{}, fmt.Errorf("streaming POI details for '%s' failed: %w", poiName, err)
 		}
 		for _, cand := range resp.Candidates {
 			if cand.Content != nil {
 				for _, part := range cand.Content.Parts {
 					if part.Text != "" {
 						responseTextBuilder.WriteString(string(part.Text))
-						l.sendEvent(ctx, eventCh, types.StreamEvent{
+						l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 							Type:      "poi_detail_chunk",
 							Data:      map[string]string{"poi_name": poiName, "chunk": string(part.Text)},
 							Timestamp: time.Now(),
@@ -1831,28 +1831,28 @@ func (l *ServiceImpl) generatePOIDataStream(
 	}
 
 	if ctx.Err() != nil {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type:      types.EventTypeError,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
 			Error:     ctx.Err().Error(),
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		}, 3)
-		return types.POIDetailedInfo{}, fmt.Errorf("context cancelled during POI detail generation: %w", ctx.Err())
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("context cancelled during POI detail generation: %w", ctx.Err())
 	}
 
 	fullText := responseTextBuilder.String()
 	if fullText == "" {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type:      types.EventTypeError,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
 			Error:     fmt.Sprintf("Empty response for POI '%s'", poiName),
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		}, 3)
-		return types.POIDetailedInfo{Name: poiName, DescriptionPOI: "Details not found."}, fmt.Errorf("empty response for POI details '%s'", poiName)
+		return locitypes.POIDetailedInfo{Name: poiName, DescriptionPOI: "Details not found."}, fmt.Errorf("empty response for POI details '%s'", poiName)
 	}
 
 	// Save LLM interaction
-	interaction := types.LlmInteraction{
+	interaction := locitypes.LlmInteraction{
 		UserID:       userID,
 		Prompt:       prompt,
 		ResponseText: fullText,
@@ -1861,21 +1861,21 @@ func (l *ServiceImpl) generatePOIDataStream(
 	}
 	llmInteractionID, err := l.saveCityInteraction(ctx, interaction)
 	if err != nil {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type:      types.EventTypeError,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
 			Error:     fmt.Sprintf("Failed to save LLM interaction for POI '%s': %v", poiName, err),
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		}, 3)
-		return types.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
 	}
 
 	// Parse response
 	cleanJSON := CleanJSONResponse(fullText)
-	var poiData types.POIDetailedInfo
+	var poiData locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanJSON), &poiData); err != nil || poiData.Name == "" {
 		l.logger.WarnContext(ctx, "Invalid POI data from LLM", slog.String("response", fullText), slog.Any("error", err))
-		poiData = types.POIDetailedInfo{
+		poiData = locitypes.POIDetailedInfo{
 			ID:             uuid.New(),
 			Name:           poiName,
 			Category:       "Attraction",
@@ -1893,13 +1893,13 @@ func (l *ServiceImpl) generatePOIDataStream(
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to save POI to database", slog.Any("error", err))
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type:      types.EventTypeError,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
 			Error:     fmt.Sprintf("Failed to save POI '%s' to database: %v", poiName, err),
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		}, 3)
-		return types.POIDetailedInfo{}, fmt.Errorf("failed to save POI to database: %w", err)
+		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to save POI to database: %w", err)
 	}
 	poiData.ID = dbPoiID
 
@@ -1914,7 +1914,7 @@ func (l *ServiceImpl) generatePOIDataStream(
 		}
 	}
 
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type:      "poi_detail_complete",
 		Data:      poiData,
 		Timestamp: time.Now(),
@@ -1923,7 +1923,7 @@ func (l *ServiceImpl) generatePOIDataStream(
 	return poiData, nil
 }
 
-func (l *ServiceImpl) saveCityInteraction(ctx context.Context, interaction types.LlmInteraction) (uuid.UUID, error) {
+func (l *ServiceImpl) saveCityInteraction(ctx context.Context, interaction locitypes.LlmInteraction) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "saveCityInteraction")
 	defer span.End()
 
@@ -1947,7 +1947,7 @@ func (l *ServiceImpl) saveCityInteraction(ctx context.Context, interaction types
 }
 
 // handleSemanticAddPOIStreamed handles adding POIs with semantic search enhancement and streaming updates
-func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message string, session *types.ChatSession, semanticPOIs []types.POIDetailedInfo, userLocation *types.UserLocation, cityID uuid.UUID, eventCh chan<- types.StreamEvent) (string, error) {
+func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message string, session *locitypes.ChatSession, semanticPOIs []locitypes.POIDetailedInfo, userLocation *locitypes.UserLocation, cityID uuid.UUID, eventCh chan<- locitypes.StreamEvent) (string, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "handleSemanticAddPOIStreamed")
 	defer span.End()
 
@@ -1956,8 +1956,8 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 
 	// Try semantic matching first - look for POIs semantically similar to the user's request
 	if len(semanticPOIs) > 0 {
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
-			Type: types.EventTypeProgress,
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeProgress,
 			Data: map[string]interface{}{
 				"status":           "analyzing_semantic_matches",
 				"semantic_options": len(semanticPOIs),
@@ -1974,7 +1974,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 			}
 
 			if !alreadyExists {
-				l.sendEvent(ctx, eventCh, types.StreamEvent{
+				l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 					Type: "semantic_poi_added",
 					Data: map[string]interface{}{
 						"poi_name":       semanticPOI.Name,
@@ -1999,7 +1999,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 		}
 
 		// If semantic POIs exist but all are already in itinerary
-		l.sendEvent(ctx, eventCh, types.StreamEvent{
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: "semantic_alternatives_suggested",
 			Data: map[string]interface{}{
 				"message": "All semantic matches already in itinerary",
@@ -2030,8 +2030,8 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	}
 
 	// Fallback to traditional POI name extraction and generation
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type: types.EventTypeProgress,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeProgress,
 		Data: map[string]interface{}{"status": "extracting_poi_name"},
 	}, 3)
 
@@ -2048,8 +2048,8 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	}
 
 	// Generate new POI data with streaming updates
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type: types.EventTypeProgress,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeProgress,
 		Data: map[string]interface{}{
 			"status":   "generating_poi_data",
 			"poi_name": poiName,
@@ -2066,7 +2066,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	session.CurrentItinerary.AIItineraryResponse.PointsOfInterest = append(
 		session.CurrentItinerary.AIItineraryResponse.PointsOfInterest, newPOI)
 
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: "poi_added_successfully",
 		Data: map[string]interface{}{
 			"poi_name":       newPOI.Name,
@@ -2079,7 +2079,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 }
 
 // ProcessUnifiedChatMessageStream handles unified chat with optimized streaming based on Google GenAI patterns
-func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation, eventCh chan<- types.StreamEvent) error {
+func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation, eventCh chan<- locitypes.StreamEvent) error {
 	startTime := time.Now() // Track when processing starts
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "ProcessUnifiedChatMessageStream", trace.WithAttributes(
 		attribute.String("message", message),
@@ -2090,7 +2090,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	extractedCity, cleanedMessage, err := l.extractCityFromMessage(ctx, message)
 	if err != nil {
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return fmt.Errorf("failed to parse message: %w", err)
 	}
 	if extractedCity != "" {
@@ -2099,7 +2099,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	span.SetAttributes(attribute.String("extracted.city", cityName), attribute.String("cleaned.message", cleanedMessage))
 
 	// Detect domain
-	domainDetector := &types.DomainDetector{}
+	domainDetector := &locitypes.DomainDetector{}
 	domain := domainDetector.DetectDomain(ctx, cleanedMessage)
 	span.SetAttributes(attribute.String("detected.domain", string(domain)))
 
@@ -2107,7 +2107,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	_, searchProfile, _, err := l.FetchUserData(ctx, userID, profileID)
 	if err != nil {
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return fmt.Errorf("failed to fetch user data: %w", err)
 	}
 	basePreferences := getUserPreferencesPrompt(searchProfile)
@@ -2115,7 +2115,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	// Use default location if not provided
 	var lat, lon float64
 	if userLocation == nil && searchProfile.UserLatitude != nil && searchProfile.UserLongitude != nil {
-		userLocation = &types.UserLocation{
+		userLocation = &locitypes.UserLocation{
 			UserLat: *searchProfile.UserLatitude,
 			UserLon: *searchProfile.UserLongitude,
 		}
@@ -2128,15 +2128,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	sessionID := uuid.New()
 
 	// Initialize session
-	session := types.ChatSession{
+	session := locitypes.ChatSession{
 		ID:        sessionID,
 		UserID:    userID,
 		ProfileID: profileID,
 		CityName:  cityName,
-		ConversationHistory: []types.ConversationMessage{
+		ConversationHistory: []locitypes.ConversationMessage{
 			{Role: "user", Content: message, Timestamp: time.Now()},
 		},
-		SessionContext: types.SessionContext{
+		SessionContext: locitypes.SessionContext{
 			CityName:            cityName,
 			ConversationSummary: fmt.Sprintf("Trip plan for %s", cityName),
 		},
@@ -2147,7 +2147,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	}
 	if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -2173,8 +2173,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	var wg sync.WaitGroup
 	var closeOnce sync.Once
 
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type: types.EventTypeStart,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeStart,
 		Data: map[string]interface{}{
 			"domain":     string(domain),
 			"city":       cityName,
@@ -2188,8 +2188,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	responsesMutex := sync.Mutex{}
 
 	// Modified sendEventWithResponse to capture responses
-	sendEventWithResponse := func(event types.StreamEvent) {
-		if event.Type == types.EventTypeChunk {
+	sendEventWithResponse := func(event locitypes.StreamEvent) {
+		if event.Type == locitypes.EventTypeChunk {
 			responsesMutex.Lock()
 			if data, ok := event.Data.(map[string]interface{}); ok {
 				if partType, exists := data["part"].(string); exists {
@@ -2208,7 +2208,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 	// Step 6: Spawn streaming workers based on domain with cache support
 	switch domain {
-	case types.DomainItinerary, types.DomainGeneral:
+	case locitypes.DomainItinerary, locitypes.DomainGeneral:
 		wg.Add(3)
 
 		// Worker 1: Stream City Data with cache
@@ -2235,7 +2235,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainAccommodation:
+	case locitypes.DomainAccommodation:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2244,7 +2244,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainDining:
+	case locitypes.DomainDining:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2253,7 +2253,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainActivities:
+	case locitypes.DomainActivities:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2263,7 +2263,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		}()
 
 	default:
-		sendEventWithResponse(types.StreamEvent{Type: types.EventTypeError, Error: fmt.Sprintf("unhandled domain: %s", domain)})
+		sendEventWithResponse(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: fmt.Sprintf("unhandled domain: %s", domain)})
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
@@ -2343,7 +2343,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			if fullResponse == "" {
 				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
 			}
-			interaction := types.LlmInteraction{
+			interaction := locitypes.LlmInteraction{
 				ID:           uuid.New(),
 				SessionID:    sessionID,
 				UserID:       userID,
@@ -2364,7 +2364,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			}
 
 			// Build AiCityResponse struct with database IDs
-			itineraryData := types.AiCityResponse{
+			itineraryData := locitypes.AiCityResponse{
 				SessionID: sessionID,
 			}
 
@@ -2409,8 +2409,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			}
 
 			// Send EventTypeItinerary with proper IDs
-			l.sendEvent(ctx, eventCh, types.StreamEvent{
-				Type: types.EventTypeItinerary,
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+				Type: locitypes.EventTypeItinerary,
 				Data: itineraryData,
 			}, 3)
 
@@ -2418,13 +2418,13 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			var routeType string
 			var baseURL string
 			switch domain {
-			case types.DomainAccommodation:
+			case locitypes.DomainAccommodation:
 				routeType = "hotels"
 				baseURL = "/hotels"
-			case types.DomainDining:
+			case locitypes.DomainDining:
 				routeType = "restaurants"
 				baseURL = "/restaurants"
-			case types.DomainActivities:
+			case locitypes.DomainActivities:
 				routeType = "activities"
 				baseURL = "/activities"
 			default:
@@ -2432,10 +2432,10 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				baseURL = "/itinerary"
 			}
 
-			l.sendEvent(ctx, eventCh, types.StreamEvent{
-				Type: types.EventTypeComplete,
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+				Type: locitypes.EventTypeComplete,
 				Data: map[string]interface{}{"session_id": sessionID.String()},
-				Navigation: &types.NavigationData{
+				Navigation: &locitypes.NavigationData{
 					URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
 					RouteType: routeType,
 					QueryParams: map[string]string{
@@ -2558,7 +2558,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		}
 
 		// Create and save interaction first to get proper llmInteractionID
-		interaction := types.LlmInteraction{
+		interaction := locitypes.LlmInteraction{
 			ID:           uuid.New(),
 			SessionID:    sessionID,
 			UserID:       session.UserID,
@@ -2589,7 +2589,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	return nil
 }
 
-func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, cityName, message string, userLocation *types.UserLocation, eventCh chan<- types.StreamEvent) error {
+func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, cityName, message string, userLocation *locitypes.UserLocation, eventCh chan<- locitypes.StreamEvent) error {
 	startTime := time.Now() // Track when processing starts
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "ProcessUnifiedChatMessageStream", trace.WithAttributes(
 		attribute.String("message", message),
@@ -2600,7 +2600,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	extractedCity, cleanedMessage, err := l.extractCityFromMessage(ctx, message)
 	if err != nil {
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return fmt.Errorf("failed to parse message: %w", err)
 	}
 	if extractedCity != "" {
@@ -2609,7 +2609,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	span.SetAttributes(attribute.String("extracted.city", cityName), attribute.String("cleaned.message", cleanedMessage))
 
 	// Detect domain
-	domainDetector := &types.DomainDetector{}
+	domainDetector := &locitypes.DomainDetector{}
 	domain := domainDetector.DetectDomain(ctx, cleanedMessage)
 	span.SetAttributes(attribute.String("detected.domain", string(domain)))
 
@@ -2617,13 +2617,13 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	sessionID := uuid.New()
 
 	// Initialize session
-	session := types.ChatSession{
+	session := locitypes.ChatSession{
 		ID:       sessionID,
 		CityName: cityName,
-		ConversationHistory: []types.ConversationMessage{
+		ConversationHistory: []locitypes.ConversationMessage{
 			{Role: "user", Content: message, Timestamp: time.Now()},
 		},
-		SessionContext: types.SessionContext{
+		SessionContext: locitypes.SessionContext{
 			CityName:            cityName,
 			ConversationSummary: fmt.Sprintf("Trip plan for %s", cityName),
 		},
@@ -2634,7 +2634,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	}
 	if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
 		span.RecordError(err)
-		l.sendEvent(ctx, eventCh, types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}, 3)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
@@ -2657,8 +2657,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	var wg sync.WaitGroup
 	var closeOnce sync.Once
 
-	l.sendEvent(ctx, eventCh, types.StreamEvent{
-		Type: types.EventTypeStart,
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeStart,
 		Data: map[string]interface{}{
 			"domain":     string(domain),
 			"city":       cityName,
@@ -2672,8 +2672,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 	responsesMutex := sync.Mutex{}
 
 	// Modified sendEventWithResponse to capture responses
-	sendEventWithResponse := func(event types.StreamEvent) {
-		if event.Type == types.EventTypeChunk {
+	sendEventWithResponse := func(event locitypes.StreamEvent) {
+		if event.Type == locitypes.EventTypeChunk {
 			responsesMutex.Lock()
 			if data, ok := event.Data.(map[string]interface{}); ok {
 				if partType, exists := data["part"].(string); exists {
@@ -2692,7 +2692,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 	// Step 6: Spawn streaming workers based on domain with cache support
 	switch domain {
-	case types.DomainItinerary, types.DomainGeneral:
+	case locitypes.DomainItinerary, locitypes.DomainGeneral:
 		wg.Add(3)
 
 		// Worker 1: Stream City Data with cache
@@ -2719,7 +2719,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainAccommodation:
+	case locitypes.DomainAccommodation:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2728,7 +2728,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainDining:
+	case locitypes.DomainDining:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2737,7 +2737,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, domain, partCacheKey)
 		}()
 
-	case types.DomainActivities:
+	case locitypes.DomainActivities:
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -2747,7 +2747,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 		}()
 
 	default:
-		sendEventWithResponse(types.StreamEvent{Type: types.EventTypeError, Error: fmt.Sprintf("unhandled domain: %s", domain)})
+		sendEventWithResponse(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: fmt.Sprintf("unhandled domain: %s", domain)})
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
@@ -2827,7 +2827,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			if fullResponse == "" {
 				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
 			}
-			interaction := types.LlmInteraction{
+			interaction := locitypes.LlmInteraction{
 				ID:           uuid.New(),
 				SessionID:    sessionID,
 				UserID:       uuid.Nil, // Free version has no authenticated user
@@ -2848,7 +2848,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			}
 
 			// Build AiCityResponse struct with database IDs
-			itineraryData := types.AiCityResponse{
+			itineraryData := locitypes.AiCityResponse{
 				SessionID: sessionID,
 			}
 
@@ -2893,8 +2893,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			}
 
 			// Send EventTypeItinerary with proper IDs
-			l.sendEvent(ctx, eventCh, types.StreamEvent{
-				Type: types.EventTypeItinerary,
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+				Type: locitypes.EventTypeItinerary,
 				Data: itineraryData,
 			}, 3)
 
@@ -2902,13 +2902,13 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			var routeType string
 			var baseURL string
 			switch domain {
-			case types.DomainAccommodation:
+			case locitypes.DomainAccommodation:
 				routeType = "hotels"
 				baseURL = "/hotels"
-			case types.DomainDining:
+			case locitypes.DomainDining:
 				routeType = "restaurants"
 				baseURL = "/restaurants"
-			case types.DomainActivities:
+			case locitypes.DomainActivities:
 				routeType = "activities"
 				baseURL = "/activities"
 			default:
@@ -2916,10 +2916,10 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 				baseURL = "/itinerary"
 			}
 
-			l.sendEvent(ctx, eventCh, types.StreamEvent{
-				Type: types.EventTypeComplete,
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+				Type: locitypes.EventTypeComplete,
 				Data: map[string]interface{}{"session_id": sessionID.String()},
-				Navigation: &types.NavigationData{
+				Navigation: &locitypes.NavigationData{
 					URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
 					RouteType: routeType,
 					QueryParams: map[string]string{
@@ -2994,7 +2994,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 		}
 
 		// Create and save interaction first to get proper llmInteractionID
-		interaction := types.LlmInteraction{
+		interaction := locitypes.LlmInteraction{
 			ID:           uuid.New(),
 			SessionID:    sessionID,
 			CityName:     cityName,
@@ -3024,23 +3024,23 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 }
 
 // ensureItineraryExists initializes the session's CurrentItinerary if it's nil
-func (l *ServiceImpl) ensureItineraryExists(session *types.ChatSession) {
+func (l *ServiceImpl) ensureItineraryExists(session *locitypes.ChatSession) {
 	if session.CurrentItinerary == nil {
-		session.CurrentItinerary = &types.AiCityResponse{
-			AIItineraryResponse: types.AIItineraryResponse{
+		session.CurrentItinerary = &locitypes.AiCityResponse{
+			AIItineraryResponse: locitypes.AIItineraryResponse{
 				ItineraryName:      fmt.Sprintf("Trip to %s", session.SessionContext.CityName),
 				OverallDescription: fmt.Sprintf("Exploring %s", session.SessionContext.CityName),
-				PointsOfInterest:   []types.POIDetailedInfo{},
+				PointsOfInterest:   []locitypes.POIDetailedInfo{},
 			},
 		}
 	}
 	if session.CurrentItinerary.AIItineraryResponse.PointsOfInterest == nil {
-		session.CurrentItinerary.AIItineraryResponse.PointsOfInterest = []types.POIDetailedInfo{}
+		session.CurrentItinerary.AIItineraryResponse.PointsOfInterest = []locitypes.POIDetailedInfo{}
 	}
 }
 
 // parseCityDataFromResponse extracts and parses city data from streamed response content
-func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseContent string) (*types.GeneralCityData, error) {
+func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseContent string) (*locitypes.GeneralCityData, error) {
 	// Clean the response by extracting JSON content between ```json and ```
 	cleanedResponse := responseContent
 
@@ -3062,7 +3062,7 @@ func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseConte
 	}
 
 	// Try to parse as GeneralCityData
-	var generalCity types.GeneralCityData
+	var generalCity locitypes.GeneralCityData
 	if err := json.Unmarshal([]byte(cleanedResponse), &generalCity); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal city data: %w", err)
 	}
@@ -3076,7 +3076,7 @@ func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseConte
 }
 
 // streamWorkerWithResponseAndCache handles streaming for a single worker with response capture and cache support
-func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(types.StreamEvent), domain types.DomainType, cacheKey string) {
+func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) {
 	// Step 1: Check cache first if cacheKey is provided
 	if cacheKey != "" {
 		if cached, found := l.cache.Get(cacheKey); found {
@@ -3098,8 +3098,8 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					}
 					chunk := cachedText[i:end]
 
-					sendEvent(types.StreamEvent{
-						Type: types.EventTypeChunk,
+					sendEvent(locitypes.StreamEvent{
+						Type: locitypes.EventTypeChunk,
 						Data: map[string]interface{}{
 							"part":       partType,
 							"chunk":      chunk,
@@ -3125,8 +3125,8 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 	iter, err := l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
 	if err != nil {
 		if ctx.Err() == nil {
-			sendEvent(types.StreamEvent{
-				Type:  types.EventTypeError,
+			sendEvent(locitypes.StreamEvent{
+				Type:  locitypes.EventTypeError,
 				Error: fmt.Sprintf("%s worker failed: %v", partType, err),
 			})
 		}
@@ -3141,8 +3141,8 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 		}
 		if err != nil {
 			if ctx.Err() == nil {
-				sendEvent(types.StreamEvent{
-					Type:  types.EventTypeError,
+				sendEvent(locitypes.StreamEvent{
+					Type:  locitypes.EventTypeError,
 					Error: fmt.Sprintf("%s streaming error: %v", partType, err),
 				})
 			}
@@ -3154,8 +3154,8 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					if part.Text != "" {
 						chunk := string(part.Text)
 						fullResponse.WriteString(chunk)
-						sendEvent(types.StreamEvent{
-							Type: types.EventTypeChunk,
+						sendEvent(locitypes.StreamEvent{
+							Type: locitypes.EventTypeChunk,
 							Data: map[string]interface{}{
 								"part":       partType,
 								"chunk":      chunk,

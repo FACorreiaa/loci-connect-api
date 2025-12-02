@@ -25,7 +25,7 @@ type BenchmarkConfig struct {
 	AuthToken        string
 	UserID           uuid.UUID
 	ProfileID        uuid.UUID
-	TestUserLocation *types.UserLocation
+	TestUserLocation *locitypes.UserLocation
 	Timeout          time.Duration
 }
 
@@ -71,7 +71,7 @@ func NewBenchmarkConfig() *BenchmarkConfig {
 		BaseURL:   "http://localhost:8080/api/v1",
 		UserID:    uuid.New(),
 		ProfileID: uuid.New(),
-		TestUserLocation: &types.UserLocation{
+		TestUserLocation: &locitypes.UserLocation{
 			UserLat: 41.4901, // Esposende coordinates
 			UserLon: -8.7853,
 		},

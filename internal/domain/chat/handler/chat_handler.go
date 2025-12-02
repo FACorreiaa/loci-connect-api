@@ -62,9 +62,9 @@ func (h *ChatHandler) StartChat(
 	cityName := req.Msg.GetCityName()
 
 	// Extract userLocation if provided
-	var userLoc *types.UserLocation
+	var userLoc *locitypes.UserLocation
 	if loc := req.Msg.GetUserLocation(); loc != nil {
-		userLoc = &types.UserLocation{
+		userLoc = &locitypes.UserLocation{
 			UserLat: loc.GetLatitude(),
 			UserLon: loc.GetLongitude(),
 		}
@@ -105,15 +105,15 @@ func (h *ChatHandler) StreamChat(
 	cityName := req.Msg.GetCityName()
 
 	// Extract userLocation if provided
-	var userLoc *types.UserLocation
+	var userLoc *locitypes.UserLocation
 	if loc := req.Msg.GetUserLocation(); loc != nil {
-		userLoc = &types.UserLocation{
+		userLoc = &locitypes.UserLocation{
 			UserLat: loc.GetLatitude(),
 			UserLon: loc.GetLongitude(),
 		}
 	}
 
-	eventCh := make(chan types.StreamEvent, 100)
+	eventCh := make(chan locitypes.StreamEvent, 100)
 
 	go func() {
 		defer close(eventCh)
@@ -128,7 +128,7 @@ func (h *ChatHandler) StreamChat(
 		)
 		if err != nil {
 			select {
-			case eventCh <- types.StreamEvent{Type: types.EventTypeError, Error: err.Error()}:
+			case eventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}:
 			case <-ctx.Done():
 			}
 		}
@@ -151,7 +151,7 @@ func (h *ChatHandler) StreamChat(
 				return err
 			}
 
-			if event.Type == types.EventTypeComplete || event.Type == types.EventTypeError {
+			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
 				return nil
 			}
 
@@ -182,7 +182,7 @@ func (h *ChatHandler) toConnectError(err error) error {
 	}
 }
 
-func (h *ChatHandler) mapEventToProto(event types.StreamEvent) (*chatv1.StreamEvent, error) {
+func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.StreamEvent, error) {
 	resp := &chatv1.StreamEvent{
 		Type:      string(event.Type),
 		Message:   event.Message,

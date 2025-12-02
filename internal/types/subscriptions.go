@@ -1,5 +1,5 @@
 //revive:disable-next-line:var-naming
-package types
+package locitypes
 
 import "context"
 

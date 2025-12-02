@@ -20,12 +20,12 @@ import (
 var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
-	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *types.RecentInteractionsFilter) (*types.RecentInteractionsResponse, error)
-	GetCityPOIsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.POIDetailedInfo, error)
-	GetCityHotelsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.HotelDetailedInfo, error)
-	GetCityRestaurantsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.RestaurantDetailedInfo, error)
-	GetCityItinerariesByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.UserSavedItinerary, error)
-	GetCityFavorites(ctx context.Context, userID uuid.UUID, cityName string) ([]types.POIDetailedInfo, error)
+	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error)
+	GetCityPOIsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.POIDetailedInfo, error)
+	GetCityHotelsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.HotelDetailedInfo, error)
+	GetCityRestaurantsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.RestaurantDetailedInfo, error)
+	GetCityItinerariesByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.UserSavedItinerary, error)
+	GetCityFavorites(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.POIDetailedInfo, error)
 }
 
 type RepositoryImpl struct {
@@ -41,7 +41,7 @@ func NewRepository(pgpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
 }
 
 // GetUserRecentInteractions fetches recent interactions grouped by city
-func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *types.RecentInteractionsFilter) (*types.RecentInteractionsResponse, error) {
+func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetUserRecentInteractions", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.Int("page", page),
@@ -158,7 +158,7 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 	}
 	defer rows.Close()
 
-	var cities []types.CityInteractions
+	var cities []locitypes.CityInteractions
 	for rows.Next() {
 		var cityName string
 		var lastActivity time.Time
@@ -183,7 +183,7 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 
 		// POI count is now included in the main query
 
-		cities = append(cities, types.CityInteractions{
+		cities = append(cities, locitypes.CityInteractions{
 			CityName:     cityName,
 			Interactions: interactions,
 			SessionIDs:   []uuid.UUID{sessionID},
@@ -238,14 +238,14 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 	span.SetAttributes(attribute.Int("results.cities", total))
 	span.SetStatus(codes.Ok, "Recent interactions retrieved")
 
-	return &types.RecentInteractionsResponse{
+	return &locitypes.RecentInteractionsResponse{
 		Cities: cities,
 		Total:  total,
 	}, nil
 }
 
 // getCityInteractions gets recent interactions for a specific city
-func (r *RepositoryImpl) getCityInteractions(ctx context.Context, userID uuid.UUID, cityName string) ([]types.RecentInteraction, error) {
+func (r *RepositoryImpl) getCityInteractions(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.RecentInteraction, error) {
 	query := `
 		SELECT
 			id,
@@ -269,9 +269,9 @@ func (r *RepositoryImpl) getCityInteractions(ctx context.Context, userID uuid.UU
 	}
 	defer rows.Close()
 
-	var interactions []types.RecentInteraction
+	var interactions []locitypes.RecentInteraction
 	for rows.Next() {
-		var interaction types.RecentInteraction
+		var interaction locitypes.RecentInteraction
 		var cityID *uuid.UUID
 		var responseText *string
 
@@ -303,7 +303,7 @@ func (r *RepositoryImpl) getCityInteractions(ctx context.Context, userID uuid.UU
 }
 
 // GetCityPOIsByInteraction gets all POIs for a city from user's interactions
-func (r *RepositoryImpl) GetCityPOIsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetCityPOIsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetCityPOIsByInteraction", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -344,9 +344,9 @@ func (r *RepositoryImpl) GetCityPOIsByInteraction(ctx context.Context, userID uu
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var description, address, website, phoneNumber, openingHours, priceRange, category *string
 		var tags, images []string
 
@@ -417,7 +417,7 @@ func (r *RepositoryImpl) GetCityPOIsByInteraction(ctx context.Context, userID uu
 }
 
 // GetCityHotelsByInteraction gets all hotels for a city from user's interactions
-func (r *RepositoryImpl) GetCityHotelsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.HotelDetailedInfo, error) {
+func (r *RepositoryImpl) GetCityHotelsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.HotelDetailedInfo, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetCityHotelsByInteraction", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -457,9 +457,9 @@ func (r *RepositoryImpl) GetCityHotelsByInteraction(ctx context.Context, userID 
 	}
 	defer rows.Close()
 
-	var hotels []types.HotelDetailedInfo
+	var hotels []locitypes.HotelDetailedInfo
 	for rows.Next() {
-		var hotel types.HotelDetailedInfo
+		var hotel locitypes.HotelDetailedInfo
 		var category, description, address, website, phoneNumber, priceRange *string
 		var tags, images []string
 
@@ -527,7 +527,7 @@ func (r *RepositoryImpl) GetCityHotelsByInteraction(ctx context.Context, userID 
 }
 
 // GetCityRestaurantsByInteraction gets all restaurants for a city from user's interactions
-func (r *RepositoryImpl) GetCityRestaurantsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.RestaurantDetailedInfo, error) {
+func (r *RepositoryImpl) GetCityRestaurantsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.RestaurantDetailedInfo, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetCityRestaurantsByInteraction", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -568,9 +568,9 @@ func (r *RepositoryImpl) GetCityRestaurantsByInteraction(ctx context.Context, us
 	}
 	defer rows.Close()
 
-	var restaurants []types.RestaurantDetailedInfo
+	var restaurants []locitypes.RestaurantDetailedInfo
 	for rows.Next() {
-		var restaurant types.RestaurantDetailedInfo
+		var restaurant locitypes.RestaurantDetailedInfo
 		var category, description *string
 		var address, website, phoneNumber, priceLevel, cuisineType *string
 		var tags, images []string
@@ -633,7 +633,7 @@ func (r *RepositoryImpl) GetCityRestaurantsByInteraction(ctx context.Context, us
 }
 
 // GetCityItinerariesByInteraction gets all saved itineraries for a city from user's interactions
-func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]types.UserSavedItinerary, error) {
+func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.UserSavedItinerary, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetCityItinerariesByInteraction", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -675,9 +675,9 @@ func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, us
 	}
 	defer rows.Close()
 
-	var itineraries []types.UserSavedItinerary
+	var itineraries []locitypes.UserSavedItinerary
 	for rows.Next() {
-		var itinerary types.UserSavedItinerary
+		var itinerary locitypes.UserSavedItinerary
 
 		err := rows.Scan(
 			&itinerary.ID,
@@ -720,7 +720,7 @@ func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, us
 }
 
 // GetCityFavorites gets all favorite POIs for a city (both regular and LLM POIs)
-func (r *RepositoryImpl) GetCityFavorites(ctx context.Context, userID uuid.UUID, cityName string) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetCityFavorites(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetCityFavorites", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -789,9 +789,9 @@ func (r *RepositoryImpl) GetCityFavorites(ctx context.Context, userID uuid.UUID,
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var poi types.POIDetailedInfo
+		var poi locitypes.POIDetailedInfo
 		var description, address, website, phoneNumber, openingHours, priceRange, category *string
 		var tags, images []string
 

@@ -90,9 +90,9 @@ func createTestUserForInterestTests(t *testing.T, username string) uuid.UUID {
 }
 
 // Helper to create an interest directly (useful if CreateInterest service method has other logic)
-func createTestInterestDirectly(t *testing.T, name string, description *string, isActive bool, createdByUserID string) *types.Interest {
+func createTestInterestDirectly(t *testing.T, name string, description *string, isActive bool, createdByUserID string) *locitypes.Interest {
 	t.Helper()
-	interest := &types.Interest{
+	interest := &locitypes.Interest{
 		ID:              uuid.New(),
 		Name:            name,
 		IsActive:        isActive,
@@ -160,14 +160,14 @@ func TestinterestsServiceImpl_CreateInterest_Integration(t *testing.T) {
 
 	t.Run("Attempt to create duplicate interest name (if repo handles it)", func(t *testing.T) {
 		// This test depends on how your repo.CreateInterest handles unique constraints on 'name'.
-		// If it returns a specific error (e.g., types.ErrConflict), test for that.
+		// If it returns a specific error (e.g., locitypes.ErrConflict), test for that.
 		// If it's a raw DB error, the service will wrap it.
 		interestName := "Kayaking"
 		_, _ = testinterestsService.CreateInterest(ctx, interestName, nil, true, userID.String()) // Create first one
 
 		_, err := testinterestsService.CreateInterest(ctx, interestName, nil, true, userID.String()) // Attempt duplicate
 		require.Error(t, err)                                                                        // Expect an error
-		// Example: assert.True(t, errors.Is(err, types.ErrConflict)) or check for specific DB error code
+		// Example: assert.True(t, errors.Is(err, locitypes.ErrConflict)) or check for specific DB error code
 		assert.Contains(t, err.Error(), "error adding user interest") // Service wraps it
 	})
 }
@@ -207,7 +207,7 @@ func TestinterestsServiceImpl_UserFavouriteInterests_Integration(t *testing.T) {
 		// The interestsService is missing Addinterests, so we test Remove.
 		// The test relies on setup using testinterestsRepo.Addinterests
 
-		// Let's assume GetFavouritePOIsByUserID actually returns types.Interest linked to the user
+		// Let's assume GetFavouritePOIsByUserID actually returns locitypes.Interest linked to the user
 		// through the interests table. This means the POIRepository might need to be interestsRepository.
 		// For this example, I'll assume your testinterestsRepo has a Getinterestss method
 		// and testinterestsService would call that.
@@ -318,22 +318,22 @@ func TestinterestsServiceImpl_Updateinterests_Integration(t *testing.T) {
 	interestToUpdate := createTestInterestDirectly(t, "Updatable Interest", &desc, true, userID.String())
 
 	// Link user to interest for this test (assuming Updateinterests modifies the *link* or user-specific aspect)
-	// Your current Updateinterests params types.UpdateinterestsParams is empty.
+	// Your current Updateinterests params locitypes.UpdateinterestsParams is empty.
 	// This implies it might be updating the *global* interest, or a user-specific flag on the join table.
 	// Let's assume for now it's trying to update the global interest record,
 	// but the method signature `Updateinterests(ctx, userID, interestID, params)` suggests it's user-specific.
 
-	// If types.UpdateinterestsParams is meant to update fields on the 'interests' table itself:
+	// If locitypes.UpdateinterestsParams is meant to update fields on the 'interests' table itself:
 	// This test is more complex as it implies that a user can update a global interest.
-	// Let's assume types.UpdateinterestsParams is for the *global* interest,
+	// Let's assume locitypes.UpdateinterestsParams is for the *global* interest,
 	// and your repo.Updateinterests handles this (and potentially authorization if only creator can update).
 
-	// Scenario 1: types.UpdateinterestsParams is for the global interest record.
+	// Scenario 1: locitypes.UpdateinterestsParams is for the global interest record.
 	t.Run("Update global interest details", func(t *testing.T) {
 		newName := "Updated Interest Name"
 		newDesc := "This is an updated description."
 		newIsActive := false
-		updateParams := types.UpdateinterestsParams{ // This struct needs fields
+		updateParams := locitypes.UpdateinterestsParams{ // This struct needs fields
 			Name:        &newName,
 			Description: &newDesc,
 			IsActive:    &newIsActive,
@@ -363,7 +363,7 @@ func TestinterestsServiceImpl_Updateinterests_Integration(t *testing.T) {
 	t.Run("Update non-existent interest", func(t *testing.T) {
 		nonExistentID := uuid.New()
 		newName := "NonExistentUpdate"
-		updateParams := types.UpdateinterestsParams{Name: &newName}
+		updateParams := locitypes.UpdateinterestsParams{Name: &newName}
 		err := testinterestsService.Updateinterests(ctx, userID, nonExistentID, updateParams)
 		require.Error(t, err) // Expect error as interest doesn't exist to be updated
 		// Check for a specific "not found" type error if your repo returns one.

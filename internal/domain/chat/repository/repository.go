@@ -12,39 +12,39 @@ import (
 )
 
 type (
-	LlmInteraction                   = types.LlmInteraction
-	AIItineraryResponse              = types.AIItineraryResponse
-	GeneralCityData                  = types.GeneralCityData
-	AiCityResponse                   = types.AiCityResponse
-	GenAIResponse                    = types.GenAIResponse
-	AIRequestPayloadForLog           = types.AIRequestPayloadForLog
-	ChatTurn                         = types.ChatTurn
-	UserLocation                     = types.UserLocation
-	UserSavedItinerary               = types.UserSavedItinerary
-	UpdateItineraryRequest           = types.UpdateItineraryRequest
-	PaginatedUserItinerariesResponse = types.PaginatedUserItinerariesResponse
-	BookmarkRequest                  = types.BookmarkRequest
-	ChatMessage                      = types.ChatMessage
-	POIDetailrequest                 = types.POIDetailrequest
-	POIFilter                        = types.POIFilter
-	GeoPoint                         = types.GeoPoint
-	SearchPOIRequest                 = types.SearchPOIRequest
-	HotelUserPreferences             = types.HotelUserPreferences
-	HotelDetailedInfo                = types.HotelDetailedInfo
-	HotelPreferenceRequest           = types.HotelPreferenceRequest
-	RestaurantUserPreferences        = types.RestaurantUserPreferences
-	RestaurantDetailedInfo           = types.RestaurantDetailedInfo
-	ChatContextType                  = types.ChatContextType
-	DomainType                       = types.DomainType
-	DomainDetector                   = types.DomainDetector
-	UserPreferenceProfileResponse    = types.UserPreferenceProfileResponse
+	LlmInteraction                   = locitypes.LlmInteraction
+	AIItineraryResponse              = locitypes.AIItineraryResponse
+	GeneralCityData                  = locitypes.GeneralCityData
+	AiCityResponse                   = locitypes.AiCityResponse
+	GenAIResponse                    = locitypes.GenAIResponse
+	AIRequestPayloadForLog           = locitypes.AIRequestPayloadForLog
+	ChatTurn                         = locitypes.ChatTurn
+	UserLocation                     = locitypes.UserLocation
+	UserSavedItinerary               = locitypes.UserSavedItinerary
+	UpdateItineraryRequest           = locitypes.UpdateItineraryRequest
+	PaginatedUserItinerariesResponse = locitypes.PaginatedUserItinerariesResponse
+	BookmarkRequest                  = locitypes.BookmarkRequest
+	ChatMessage                      = locitypes.ChatMessage
+	POIDetailrequest                 = locitypes.POIDetailrequest
+	POIFilter                        = locitypes.POIFilter
+	GeoPoint                         = locitypes.GeoPoint
+	SearchPOIRequest                 = locitypes.SearchPOIRequest
+	HotelUserPreferences             = locitypes.HotelUserPreferences
+	HotelDetailedInfo                = locitypes.HotelDetailedInfo
+	HotelPreferenceRequest           = locitypes.HotelPreferenceRequest
+	RestaurantUserPreferences        = locitypes.RestaurantUserPreferences
+	RestaurantDetailedInfo           = locitypes.RestaurantDetailedInfo
+	ChatContextType                  = locitypes.ChatContextType
+	DomainType                       = locitypes.DomainType
+	DomainDetector                   = locitypes.DomainDetector
+	UserPreferenceProfileResponse    = locitypes.UserPreferenceProfileResponse
 )
 
 const (
-	ContextHotels      ChatContextType = types.ContextHotels
-	ContextRestaurants ChatContextType = types.ContextRestaurants
-	ContextItineraries ChatContextType = types.ContextItineraries
-	ContextGeneral     ChatContextType = types.ContextGeneral
+	ContextHotels      ChatContextType = locitypes.ContextHotels
+	ContextRestaurants ChatContextType = locitypes.ContextRestaurants
+	ContextItineraries ChatContextType = locitypes.ContextItineraries
+	ContextGeneral     ChatContextType = locitypes.ContextGeneral
 )
 
 type StartChatRequest struct {
@@ -110,18 +110,18 @@ func (c *SimpleIntentClassifier) Classify(_ context.Context, message string) (In
 
 // RecentInteraction represents a recent user interaction with cities and POIs
 type RecentInteraction struct {
-	ID           uuid.UUID                `json:"id"`
-	UserID       uuid.UUID                `json:"user_id"`
-	CityName     string                   `json:"city_name"`
-	CityID       *uuid.UUID               `json:"city_id,omitempty"`
-	Prompt       string                   `json:"prompt"`
-	ResponseText string                   `json:"response,omitempty"`
-	ModelUsed    string                   `json:"model_name"`
-	LatencyMs    int                      `json:"latency_ms"`
-	CreatedAt    time.Time                `json:"created_at"`
-	POIs         []types.POIDetailedInfo  `json:"pois,omitempty"`
-	Hotels       []HotelDetailedInfo      `json:"hotels,omitempty"`
-	Restaurants  []RestaurantDetailedInfo `json:"restaurants,omitempty"`
+	ID           uuid.UUID                   `json:"id"`
+	UserID       uuid.UUID                   `json:"user_id"`
+	CityName     string                      `json:"city_name"`
+	CityID       *uuid.UUID                  `json:"city_id,omitempty"`
+	Prompt       string                      `json:"prompt"`
+	ResponseText string                      `json:"response,omitempty"`
+	ModelUsed    string                      `json:"model_name"`
+	LatencyMs    int                         `json:"latency_ms"`
+	CreatedAt    time.Time                   `json:"created_at"`
+	POIs         []locitypes.POIDetailedInfo `json:"pois,omitempty"`
+	Hotels       []HotelDetailedInfo         `json:"hotels,omitempty"`
+	Restaurants  []RestaurantDetailedInfo    `json:"restaurants,omitempty"`
 }
 
 // RecentInteractionsResponse groups interactions by city
@@ -214,13 +214,13 @@ type MessageMetadata struct {
 }
 
 type SessionContext struct {
-	CityName            string                               `json:"city_name"` // e.g., "Barcelona"
-	LastCityID          uuid.UUID                            `json:"last_city_id"`
-	UserPreferences     *types.UserPreferenceProfileResponse `json:"user_preferences"`
-	ActiveInterests     []string                             `json:"active_interests"`
-	ActiveTags          []string                             `json:"active_tags"`
-	ConversationSummary string                               `json:"conversation_summary"`
-	ModificationHistory []ModificationRecord                 `json:"modification_history"`
+	CityName            string                                   `json:"city_name"` // e.g., "Barcelona"
+	LastCityID          uuid.UUID                                `json:"last_city_id"`
+	UserPreferences     *locitypes.UserPreferenceProfileResponse `json:"user_preferences"`
+	ActiveInterests     []string                                 `json:"active_interests"`
+	ActiveTags          []string                                 `json:"active_tags"`
+	ConversationSummary string                                   `json:"conversation_summary"`
+	ModificationHistory []ModificationRecord                     `json:"modification_history"`
 }
 
 type ModificationRecord struct {
@@ -274,17 +274,17 @@ type ChatService interface {
 }
 
 type StreamingChatEvent struct {
-	Timestamp        time.Time               `json:"timestamp"`  // Time of the event
-	EventID          string                  `json:"event_id"`   // Unique identifier for the event
-	EventType        string                  `json:"event_type"` // e.g., "session_started", "city_info", "general_pois", "personalized_poi_chunk", "final_itinerary", "error"
-	SessionID        uuid.UUID               `json:"session_id,omitempty"`
-	Message          string                  `json:"message,omitempty"` // For general messages or errors
-	CityData         *GeneralCityData        `json:"city_data,omitempty"`
-	GeneralPOIs      []types.POIDetailedInfo `json:"general_pois,omitempty"`
-	PersonalizedPOIs []types.POIDetailedInfo `json:"personalized_pois,omitempty"` // Could send chunks or final list
-	Itinerary        *AiCityResponse         `json:"itinerary,omitempty"`         // Could be a partial or final one
-	Error            string                  `json:"error_message,omitempty"`
-	IsFinal          bool                    `json:"is_final,omitempty"` // Indicates the end of a sequence or the whole stream
+	Timestamp        time.Time                   `json:"timestamp"`  // Time of the event
+	EventID          string                      `json:"event_id"`   // Unique identifier for the event
+	EventType        string                      `json:"event_type"` // e.g., "session_started", "city_info", "general_pois", "personalized_poi_chunk", "final_itinerary", "error"
+	SessionID        uuid.UUID                   `json:"session_id,omitempty"`
+	Message          string                      `json:"message,omitempty"` // For general messages or errors
+	CityData         *GeneralCityData            `json:"city_data,omitempty"`
+	GeneralPOIs      []locitypes.POIDetailedInfo `json:"general_pois,omitempty"`
+	PersonalizedPOIs []locitypes.POIDetailedInfo `json:"personalized_pois,omitempty"` // Could send chunks or final list
+	Itinerary        *AiCityResponse             `json:"itinerary,omitempty"`         // Could be a partial or final one
+	Error            string                      `json:"error_message,omitempty"`
+	IsFinal          bool                        `json:"is_final,omitempty"` // Indicates the end of a sequence or the whole stream
 	// Add any other relevant data for different event types
 }
 

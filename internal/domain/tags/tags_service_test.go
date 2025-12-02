@@ -19,28 +19,28 @@ type MocktagsRepo struct {
 	mock.Mock
 }
 
-func (m *MocktagsRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error) {
+func (m *MocktagsRepo) GetAll(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Tags), args.Error(1)
+	return args.Get(0).([]*locitypes.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) Get(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error) {
+func (m *MocktagsRepo) Get(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error) {
 	args := m.Called(ctx, userID, tagID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Tags), args.Error(1)
+	return args.Get(0).(*locitypes.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error) {
+func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error) {
 	args := m.Called(ctx, userID, params)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.PersonalTag), args.Error(1)
+	return args.Get(0).(*locitypes.PersonalTag), args.Error(1)
 }
 
 func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
@@ -48,17 +48,17 @@ func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) erro
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (m *MocktagsRepo) Update(ctx context.Context, userID, tagID uuid.UUID, params locitypes.UpdatePersonalTagParams) error {
 	args := m.Called(ctx, userID, tagID, params)
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) GetTagByName(ctx context.Context, name string) (*types.Tags, error) {
+func (m *MocktagsRepo) GetTagByName(ctx context.Context, name string) (*locitypes.Tags, error) {
 	args := m.Called(ctx, name)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*types.Tags), args.Error(1)
+	return args.Get(0).(*locitypes.Tags), args.Error(1)
 }
 
 func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error {
@@ -66,12 +66,12 @@ func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, pro
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Tags, error) {
+func (m *MocktagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Tags, error) {
 	args := m.Called(ctx, profileID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.Tags), args.Error(1)
+	return args.Get(0).([]*locitypes.Tags), args.Error(1)
 }
 
 // Helper to setup service with mock repository
@@ -88,7 +88,7 @@ func TestTagsServiceImpl_GetTags(t *testing.T) {
 	userID := uuid.New()
 
 	t.Run("success - tags found", func(t *testing.T) {
-		expectedTags := []*types.Tags{
+		expectedTags := []*locitypes.Tags{
 			{ID: uuid.New(), Name: "Outdoors", TagType: "preference"},
 			{ID: uuid.New(), Name: "Foodie", TagType: "preference"},
 		}
@@ -101,7 +101,7 @@ func TestTagsServiceImpl_GetTags(t *testing.T) {
 	})
 
 	t.Run("success - no tags found", func(t *testing.T) {
-		var expectedTags []*types.Tags
+		var expectedTags []*locitypes.Tags
 		mockRepo.On("GetAll", mock.Anything, userID).Return(expectedTags, nil).Once()
 
 		tags, err := service.GetTags(ctx, userID)
@@ -129,7 +129,7 @@ func TestTagsServiceImpl_GetTag(t *testing.T) {
 	tagID := uuid.New()
 
 	t.Run("success", func(t *testing.T) {
-		expectedTag := &types.Tags{ID: tagID, Name: "Specific Tag", TagType: "preference"}
+		expectedTag := &locitypes.Tags{ID: tagID, Name: "Specific Tag", TagType: "preference"}
 		mockRepo.On("Get", mock.Anything, userID, tagID).Return(expectedTag, nil).Once()
 
 		tag, err := service.GetTag(ctx, userID, tagID)
@@ -139,7 +139,7 @@ func TestTagsServiceImpl_GetTag(t *testing.T) {
 	})
 
 	t.Run("repository error - not found", func(t *testing.T) {
-		repoErr := errors.New("tag not found in repo") // Or types.ErrNotFound
+		repoErr := errors.New("tag not found in repo") // Or locitypes.ErrNotFound
 		mockRepo.On("Get", mock.Anything, userID, tagID).Return(nil, repoErr).Once()
 
 		_, err := service.GetTag(ctx, userID, tagID)
@@ -155,12 +155,12 @@ func TestTagsServiceImpl_CreateTag(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 	desc := "Loves spicy food"
-	params := types.CreatePersonalTagParams{
+	params := locitypes.CreatePersonalTagParams{
 		Name:        "SpicyLover",
 		Description: desc,
 		TagType:     "preference",
 	}
-	expectedPersonalTag := &types.PersonalTag{
+	expectedPersonalTag := &locitypes.PersonalTag{
 		ID:          uuid.New(),
 		UserID:      userID,
 		Name:        params.Name,
@@ -222,7 +222,7 @@ func TestTagsServiceImpl_Update(t *testing.T) {
 	tagID := uuid.New()
 	newName := "Updated Tag Name"
 	newDesc := "Updated description for tag"
-	params := types.UpdatePersonalTagParams{
+	params := locitypes.UpdatePersonalTagParams{
 		Name:        newName,
 		Description: newDesc,
 		TagType:     "preference",
@@ -248,7 +248,7 @@ func TestTagsServiceImpl_Update(t *testing.T) {
 	})
 
 	t.Run("no fields to update (service passes to repo)", func(t *testing.T) {
-		emptyParams := types.UpdatePersonalTagParams{}
+		emptyParams := locitypes.UpdatePersonalTagParams{}
 		mockRepo.On("Update", mock.Anything, userID, tagID, emptyParams).Return(nil).Once()
 
 		err := service.Update(ctx, userID, tagID, emptyParams)

@@ -7,7 +7,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func getUserPreferencesPrompt(searchProfile *types.UserPreferenceProfileResponse) string {
+func getUserPreferencesPrompt(searchProfile *locitypes.UserPreferenceProfileResponse) string {
 	// Base preferences
 	basePrefs := fmt.Sprintf(`
 BASIC PREFERENCES:

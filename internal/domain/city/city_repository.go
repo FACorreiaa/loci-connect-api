@@ -20,16 +20,16 @@ import (
 var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
-	SaveCity(ctx context.Context, city types.CityDetail) (uuid.UUID, error)
-	FindCityByNameAndCountry(ctx context.Context, city, country string) (*types.CityDetail, error)
-	FindCityByFuzzyName(ctx context.Context, cityName string) (*types.CityDetail, error)
+	SaveCity(ctx context.Context, city locitypes.CityDetail) (uuid.UUID, error)
+	FindCityByNameAndCountry(ctx context.Context, city, country string) (*locitypes.CityDetail, error)
+	FindCityByFuzzyName(ctx context.Context, cityName string) (*locitypes.CityDetail, error)
 	GetCityIDByName(ctx context.Context, cityName string) (uuid.UUID, error)
-	GetAllCities(ctx context.Context) ([]types.CityDetail, error)
+	GetAllCities(ctx context.Context) ([]locitypes.CityDetail, error)
 
 	// Vector similarity search methods
-	FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]types.CityDetail, error)
+	FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.CityDetail, error)
 	UpdateCityEmbedding(ctx context.Context, cityID uuid.UUID, embedding []float32) error
-	GetCitiesWithoutEmbeddings(ctx context.Context, limit int) ([]types.CityDetail, error)
+	GetCitiesWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.CityDetail, error)
 
 	GetCity(ctx context.Context, lat, lon float64) (uuid.UUID, string, error)
 }
@@ -46,7 +46,7 @@ func NewCityRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryIm
 	}
 }
 
-func (r *RepositoryImpl) SaveCity(ctx context.Context, city types.CityDetail) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveCity(ctx context.Context, city locitypes.CityDetail) (uuid.UUID, error) {
 	query := `
         INSERT INTO cities (
             name, country, state_province, ai_summary, center_location
@@ -54,7 +54,7 @@ func (r *RepositoryImpl) SaveCity(ctx context.Context, city types.CityDetail) (u
         ) VALUES (
             $1, $2, $3, $4,
             -- Check for 0.0 is a bit naive if 0,0 is a valid location.
-            -- It's better if types.CityDetail.CenterLongitude/Latitude are pointers (*float64)
+            -- It's better if locitypes.CityDetail.CenterLongitude/Latitude are pointers (*float64)
             -- Then you can check for nil. For now, assuming 0.0 implies "not set".
             CASE
                 WHEN ($5::DOUBLE PRECISION IS NOT NULL AND $6::DOUBLE PRECISION IS NOT NULL)
@@ -108,7 +108,7 @@ func NewNullFloat64(f float64) sql.NullFloat64 {
 }
 
 // FindCityByNameAndCountry You'll also need to update FindCityByNameAndCountry to retrieve these new fields.
-func (r *RepositoryImpl) FindCityByNameAndCountry(ctx context.Context, cityName, countryName string) (*types.CityDetail, error) {
+func (r *RepositoryImpl) FindCityByNameAndCountry(ctx context.Context, cityName, countryName string) (*locitypes.CityDetail, error) {
 	query := `
         SELECT
             id, name, country,
@@ -122,7 +122,7 @@ func (r *RepositoryImpl) FindCityByNameAndCountry(ctx context.Context, cityName,
         AND ($2 = '' OR country = $2)
     `
 
-	var cityDetail types.CityDetail
+	var cityDetail locitypes.CityDetail
 	var lat, lon sql.NullFloat64 // To handle potentially NULL location
 
 	err := r.pgpool.QueryRow(ctx, query, cityName, countryName).Scan(
@@ -152,7 +152,7 @@ func (r *RepositoryImpl) FindCityByNameAndCountry(ctx context.Context, cityName,
 }
 
 // FindCityByFuzzyName finds the city with the most similar name using trigram similarity.
-func (r *RepositoryImpl) FindCityByFuzzyName(ctx context.Context, cityName string) (*types.CityDetail, error) {
+func (r *RepositoryImpl) FindCityByFuzzyName(ctx context.Context, cityName string) (*locitypes.CityDetail, error) {
 	query := `
 		SELECT
 			id, name, country,
@@ -166,7 +166,7 @@ func (r *RepositoryImpl) FindCityByFuzzyName(ctx context.Context, cityName strin
 		LIMIT 1
 	`
 
-	var cityDetail types.CityDetail
+	var cityDetail locitypes.CityDetail
 	var lat, lon sql.NullFloat64 // To handle potentially NULL location
 
 	err := r.pgpool.QueryRow(ctx, query, cityName).Scan(
@@ -240,7 +240,7 @@ func (r *RepositoryImpl) GetCityIDByName(ctx context.Context, cityName string) (
 }
 
 // FindSimilarCities finds cities similar to the provided query embedding using cosine similarity
-func (r *RepositoryImpl) FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]types.CityDetail, error) {
+func (r *RepositoryImpl) FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.CityDetail, error) {
 	ctx, span := otel.Tracer("CityRepository").Start(ctx, "FindSimilarCities", trace.WithAttributes(
 		attribute.Int("embedding.dimension", len(queryEmbedding)),
 		attribute.Int("limit", limit),
@@ -288,9 +288,9 @@ func (r *RepositoryImpl) FindSimilarCities(ctx context.Context, queryEmbedding [
 	}
 	defer rows.Close()
 
-	var cities []types.CityDetail
+	var cities []locitypes.CityDetail
 	for rows.Next() {
-		var city types.CityDetail
+		var city locitypes.CityDetail
 		var similarityScore float64
 		var lat, lon sql.NullFloat64
 
@@ -389,7 +389,7 @@ func (r *RepositoryImpl) UpdateCityEmbedding(ctx context.Context, cityID uuid.UU
 }
 
 // GetCitiesWithoutEmbeddings retrieves cities that don't have embeddings generated yet
-func (r *RepositoryImpl) GetCitiesWithoutEmbeddings(ctx context.Context, limit int) ([]types.CityDetail, error) {
+func (r *RepositoryImpl) GetCitiesWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.CityDetail, error) {
 	ctx, span := otel.Tracer("CityRepository").Start(ctx, "GetCitiesWithoutEmbeddings", trace.WithAttributes(
 		attribute.Int("limit", limit),
 	))
@@ -421,9 +421,9 @@ func (r *RepositoryImpl) GetCitiesWithoutEmbeddings(ctx context.Context, limit i
 	}
 	defer rows.Close()
 
-	var cities []types.CityDetail
+	var cities []locitypes.CityDetail
 	for rows.Next() {
-		var city types.CityDetail
+		var city locitypes.CityDetail
 		var lat, lon sql.NullFloat64
 
 		err := rows.Scan(
@@ -465,7 +465,7 @@ func (r *RepositoryImpl) GetCitiesWithoutEmbeddings(ctx context.Context, limit i
 }
 
 // GetAllCities retrieves all cities from the database with their coordinates
-func (r *RepositoryImpl) GetAllCities(ctx context.Context) ([]types.CityDetail, error) {
+func (r *RepositoryImpl) GetAllCities(ctx context.Context) ([]locitypes.CityDetail, error) {
 	ctx, span := otel.Tracer("CityRepository").Start(ctx, "GetAllCities")
 	defer span.End()
 
@@ -493,9 +493,9 @@ func (r *RepositoryImpl) GetAllCities(ctx context.Context) ([]types.CityDetail, 
 	}
 	defer rows.Close()
 
-	var cities []types.CityDetail
+	var cities []locitypes.CityDetail
 	for rows.Next() {
-		var city types.CityDetail
+		var city locitypes.CityDetail
 		var lat, lon sql.NullFloat64
 
 		err := rows.Scan(

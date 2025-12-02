@@ -25,28 +25,28 @@ var _ Repository = (*RepositoryImpl)(nil)
 type Repository interface {
 	// GetAll --- Global Tags & User Avoid Tags ---
 	// GetAll retrieves all global tags
-	GetAll(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error)
+	GetAll(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error)
 
 	// Get retrieves all avoid tags for a user
-	Get(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error)
+	Get(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error)
 
 	// Create adds an avoid tag for a user
-	Create(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error)
+	Create(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error)
 
 	// Delete removes an avoid tag for a user
 	Delete(ctx context.Context, userID, tagID uuid.UUID) error
 
 	// Update updates on tag
-	Update(ctx context.Context, userID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error
+	Update(ctx context.Context, userID, tagsID uuid.UUID, params locitypes.UpdatePersonalTagParams) error
 
 	// GetTagByName retrieves a tag by name.
-	GetTagByName(ctx context.Context, name string) (*types.Tags, error)
+	GetTagByName(ctx context.Context, name string) (*locitypes.Tags, error)
 
 	// LinkPersonalTagToProfile links a tag to a profile.
 	LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error
 
 	// GetTagsForProfile retrieves all tags associated with a profile
-	GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Tags, error)
+	GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Tags, error)
 }
 
 type RepositoryImpl struct {
@@ -62,7 +62,7 @@ func NewRepositoryImpl(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryIm
 }
 
 // GetAll implements user.UserRepo.
-func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error) {
+func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetAllGlobalTags", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "global_tags"),
@@ -109,9 +109,9 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*types
 	}
 	defer rows.Close()
 
-	var tags []*types.Tags
+	var tags []*locitypes.Tags
 	for rows.Next() {
-		var t types.Tags
+		var t locitypes.Tags
 		err := rows.Scan(
 			&t.ID,
 			&t.Name,
@@ -141,8 +141,8 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*types
 }
 
 // Get implements user.UserRepo.
-func (r *RepositoryImpl) Get(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error) {
-	var tag types.Tags
+func (r *RepositoryImpl) Get(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error) {
+	var tag locitypes.Tags
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetUserAvoidTags", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "user_avoid_tags, global_tags"),
@@ -201,7 +201,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, userID, tagID uuid.UUID) (*typ
 }
 
 // Create creates a new personal tag for a specific user.
-func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error) {
+func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error) {
 	ctx, span := otel.Tracer("tagsRepo").Start(ctx, "CreatePersonalTag", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "INSERT"),
@@ -233,7 +233,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params ty
 	newTagID := uuid.New()
 	now := time.Now()
 
-	tag := &types.PersonalTag{
+	tag := &locitypes.PersonalTag{
 		ID:          newTagID,
 		UserID:      userID,
 		Name:        params.Name,
@@ -272,7 +272,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params ty
 }
 
 // Update updates the name and/or type of an existing personal tag for a specific user.
-func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, params locitypes.UpdatePersonalTagParams) error {
 	ctx, span := otel.Tracer("tagsRepo").Start(ctx, "UpdatePersonalTag", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),
@@ -320,7 +320,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, p
 		l.WarnContext(ctx, "Attempted to update non-existent or unauthorized personal tag")
 		span.SetStatus(codes.Error, "Tag not found or not owned by user")
 		// It didn't exist OR didn't belong to the user, return NotFound
-		return fmt.Errorf("personal tag not found or not owned by user: %w", types.ErrNotFound)
+		return fmt.Errorf("personal tag not found or not owned by user: %w", locitypes.ErrNotFound)
 	}
 
 	err = tx.Commit(ctx)
@@ -378,7 +378,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, userID, tagID uuid.UUID) er
 		l.WarnContext(ctx, "Attempted to delete non-existent or unauthorized personal tag")
 		span.SetStatus(codes.Error, "Tag not found or not owned by user")
 		// It didn't exist OR didn't belong to the user
-		return fmt.Errorf("personal tag not found or not owned by user: %w", types.ErrNotFound)
+		return fmt.Errorf("personal tag not found or not owned by user: %w", locitypes.ErrNotFound)
 	}
 
 	err = tx.Commit(ctx)
@@ -394,7 +394,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, userID, tagID uuid.UUID) er
 }
 
 // GetTagByName retrieves a tag by name.
-func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*types.Tags, error) {
+func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*locitypes.Tags, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetTagByName", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -411,7 +411,7 @@ func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*types.
         FROM global_tags
         WHERE name = $1 AND active = TRUE`
 
-	var tag types.Tags
+	var tag locitypes.Tags
 	err := r.pgpool.QueryRow(ctx, query, name).Scan(
 		&tag.ID,
 		&tag.Name,
@@ -423,7 +423,7 @@ func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*types.
 		if errors.Is(err, pgx.ErrNoRows) {
 			l.WarnContext(ctx, "Tag not found", slog.String("name", name))
 			span.SetStatus(codes.Error, "Tag not found")
-			return nil, types.ErrNotFound
+			return nil, locitypes.ErrNotFound
 		}
 		l.ErrorContext(ctx, "Failed to fetch tag by name", slog.Any("error", err))
 		span.RecordError(err)
@@ -462,7 +462,7 @@ func (r *RepositoryImpl) LinkPersonalTagToProfile(ctx context.Context, userID, p
 	}
 
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("personal tag %s not found for user %s: %w", tagID, userID, types.ErrNotFound)
+		return fmt.Errorf("personal tag %s not found for user %s: %w", tagID, userID, locitypes.ErrNotFound)
 	}
 
 	l.DebugContext(ctx, "Tag linked to profile successfully")
@@ -471,7 +471,7 @@ func (r *RepositoryImpl) LinkPersonalTagToProfile(ctx context.Context, userID, p
 }
 
 // GetTagsForProfile retrieves all tags associated with a profile
-func (r *RepositoryImpl) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Tags, error) {
+func (r *RepositoryImpl) GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*locitypes.Tags, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetTagsForProfile", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -498,9 +498,9 @@ func (r *RepositoryImpl) GetTagsForProfile(ctx context.Context, profileID uuid.U
 	}
 	defer rows.Close()
 
-	var tags []*types.Tags
+	var tags []*locitypes.Tags
 	for rows.Next() {
-		var tag types.Tags
+		var tag locitypes.Tags
 		err := rows.Scan(
 			&tag.ID,
 			&tag.Name,

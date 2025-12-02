@@ -12,7 +12,7 @@ import (
 )
 
 type Service interface {
-	GetAllCities(ctx context.Context) ([]types.CityDetail, error)
+	GetAllCities(ctx context.Context) ([]locitypes.CityDetail, error)
 }
 
 type ServiceImpl struct {
@@ -28,7 +28,7 @@ func NewCityService(repo Repository, logger *slog.Logger) *ServiceImpl {
 }
 
 // GetAllCities retrieves all cities from the database
-func (s *ServiceImpl) GetAllCities(ctx context.Context) ([]types.CityDetail, error) {
+func (s *ServiceImpl) GetAllCities(ctx context.Context) ([]locitypes.CityDetail, error) {
 	ctx, span := otel.Tracer("CityService").Start(ctx, "GetAllCities")
 	defer span.End()
 

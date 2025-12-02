@@ -18,7 +18,7 @@ import (
 )
 
 func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitGroup,
-	cityName string, resultCh chan<- types.GenAIResponse, config *genai.GenerateContentConfig,
+	cityName string, resultCh chan<- locitypes.GenAIResponse, config *genai.GenerateContentConfig,
 ) {
 	go func() {
 		ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateCityDataWorker", trace.WithAttributes(
@@ -34,7 +34,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to generate city data")
-			resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to generate city data: %w", err)}
+			resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to generate city data: %w", err)}
 			return
 		}
 
@@ -49,7 +49,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 			err := fmt.Errorf("no valid city data content from AI")
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Empty response from AI")
-			resultCh <- types.GenAIResponse{Err: err}
+			resultCh <- locitypes.GenAIResponse{Err: err}
 			return
 		}
 		span.SetAttributes(attribute.Int("response.length", len(txt)))
@@ -67,7 +67,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 		if err := json.Unmarshal([]byte(cleanTxt), &cityDataFromAI); err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to parse city data JSON")
-			resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to parse city data JSON: %w", err)}
+			resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to parse city data JSON: %w", err)}
 			return
 		}
 
@@ -84,7 +84,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 		)
 		span.SetStatus(codes.Ok, "City data generated successfully")
 
-		resultCh <- types.GenAIResponse{
+		resultCh <- locitypes.GenAIResponse{
 			City:            cityDataFromAI.CityName,
 			Country:         cityDataFromAI.Country,
 			StateProvince:   stateProvinceValue,
@@ -97,7 +97,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 }
 
 func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.WaitGroup,
-	cityName string, resultCh chan<- types.GenAIResponse, config *genai.GenerateContentConfig,
+	cityName string, resultCh chan<- locitypes.GenAIResponse, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -116,7 +116,7 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.Wai
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate general POIs")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to generate general POIs: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to generate general POIs: %w", err)}
 		return
 	}
 
@@ -131,29 +131,29 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.Wai
 		err := fmt.Errorf("no valid general POI content from AI")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Empty response from AI")
-		resultCh <- types.GenAIResponse{Err: err}
+		resultCh <- locitypes.GenAIResponse{Err: err}
 		return
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
 	cleanTxt := CleanJSONResponse(txt)
 	var poiData struct {
-		PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"`
+		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 	if err := json.Unmarshal([]byte(cleanTxt), &poiData); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to parse general POI JSON")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to parse general POI JSON: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to parse general POI JSON: %w", err)}
 		return
 	}
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
-	resultCh <- types.GenAIResponse{GeneralPOI: poiData.PointsOfInterest}
+	resultCh <- locitypes.GenAIResponse{GeneralPOI: poiData.PointsOfInterest}
 }
 
 func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *sync.WaitGroup,
-	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
+	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- locitypes.GenAIResponse,
 	interestNames []string, tagsPromptPart, userPrefs string, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorker", trace.WithAttributes(
@@ -174,7 +174,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate personalized itinerary")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to generate personalized itinerary: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to generate personalized itinerary: %w", err)}
 		return
 	}
 
@@ -189,22 +189,22 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 		err := fmt.Errorf("no valid personalized itinerary content from AI")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Empty response from AI")
-		resultCh <- types.GenAIResponse{Err: err}
+		resultCh <- locitypes.GenAIResponse{Err: err}
 		return
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
 	cleanTxt := CleanJSONResponse(txt)
 	var itineraryData struct {
-		ItineraryName      string                  `json:"itinerary_name"`
-		OverallDescription string                  `json:"overall_description"`
-		PointsOfInterest   []types.POIDetailedInfo `json:"points_of_interest"`
+		ItineraryName      string                      `json:"itinerary_name"`
+		OverallDescription string                      `json:"overall_description"`
+		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanTxt), &itineraryData); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to parse personalized itinerary JSON")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to parse personalized itinerary JSON: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to parse personalized itinerary JSON: %w", err)}
 		return
 	}
 	span.SetAttributes(
@@ -215,7 +215,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
-	interaction := types.LlmInteraction{
+	interaction := locitypes.LlmInteraction{
 		UserID:       userID,
 		SessionID:    sessionID,
 		Prompt:       prompt,
@@ -233,13 +233,13 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to save LLM interaction")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to save LLM interaction: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to save LLM interaction: %w", err)}
 		return
 	}
 	span.SetAttributes(attribute.String("llm_interaction.id", savedInteractionID.String()))
 	span.SetStatus(codes.Ok, "Personalized POIs generated successfully")
 
-	resultCh <- types.GenAIResponse{
+	resultCh <- locitypes.GenAIResponse{
 		ItineraryName:        itineraryData.ItineraryName,
 		ItineraryDescription: itineraryData.OverallDescription,
 		PersonalisedPOI:      itineraryData.PointsOfInterest,
@@ -249,8 +249,8 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 
 // GeneratePersonalisedPOIWorkerWithSemantics generates personalized POIs with semantic search enhancement
 func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Context, wg *sync.WaitGroup,
-	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
-	interestNames []string, tagsPromptPart, userPrefs string, semanticPOIs []types.POIDetailedInfo, config *genai.GenerateContentConfig,
+	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- locitypes.GenAIResponse,
+	interestNames []string, tagsPromptPart, userPrefs string, semanticPOIs []locitypes.POIDetailedInfo, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorkerWithSemantics", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -272,7 +272,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate semantic-enhanced personalized itinerary")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to generate semantic-enhanced personalized itinerary: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to generate semantic-enhanced personalized itinerary: %w", err)}
 		return
 	}
 
@@ -287,22 +287,22 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 		err := fmt.Errorf("no valid semantic-enhanced personalized itinerary content from AI")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Empty response from AI")
-		resultCh <- types.GenAIResponse{Err: err}
+		resultCh <- locitypes.GenAIResponse{Err: err}
 		return
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
 	cleanTxt := CleanJSONResponse(txt)
 	var itineraryData struct {
-		ItineraryName      string                  `json:"itinerary_name"`
-		OverallDescription string                  `json:"overall_description"`
-		PointsOfInterest   []types.POIDetailedInfo `json:"points_of_interest"`
+		ItineraryName      string                      `json:"itinerary_name"`
+		OverallDescription string                      `json:"overall_description"`
+		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 
 	if err := json.Unmarshal([]byte(cleanTxt), &itineraryData); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to parse semantic-enhanced personalized itinerary JSON")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to parse semantic-enhanced personalized itinerary JSON: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to parse semantic-enhanced personalized itinerary JSON: %w", err)}
 		return
 	}
 	span.SetAttributes(
@@ -313,7 +313,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
-	interaction := types.LlmInteraction{
+	interaction := locitypes.LlmInteraction{
 		UserID:       userID,
 		SessionID:    sessionID,
 		Prompt:       prompt,
@@ -326,13 +326,13 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to save semantic-enhanced LLM interaction")
-		resultCh <- types.GenAIResponse{Err: fmt.Errorf("failed to save semantic-enhanced LLM interaction: %w", err)}
+		resultCh <- locitypes.GenAIResponse{Err: fmt.Errorf("failed to save semantic-enhanced LLM interaction: %w", err)}
 		return
 	}
 	span.SetAttributes(attribute.String("llm_interaction.id", savedInteractionID.String()))
 	span.SetStatus(codes.Ok, "Semantic-enhanced personalized POIs generated successfully")
 
-	resultCh <- types.GenAIResponse{
+	resultCh <- locitypes.GenAIResponse{
 		ItineraryName:        itineraryData.ItineraryName,
 		ItineraryDescription: itineraryData.OverallDescription,
 		PersonalisedPOI:      itineraryData.PointsOfInterest,

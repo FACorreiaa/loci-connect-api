@@ -1,4 +1,4 @@
-package types
+package locitypes
 
 // DiscoverPageData contains all data needed for the discover page
 type DiscoverPageData struct {

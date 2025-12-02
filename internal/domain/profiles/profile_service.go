@@ -25,11 +25,11 @@ var _ Service = (*ServiceImpl)(nil)
 // profilessService defines the business logic contract for user operations.
 type Service interface {
 	// GetSearchProfiles User  Profiles
-	GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error)
-	GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error)
-	GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error)
-	CreateSearchProfile(ctx context.Context, userID uuid.UUID, params types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error)
-	UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params types.UpdateSearchProfileParams) error
+	GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error)
+	GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error)
+	GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error)
+	CreateSearchProfile(ctx context.Context, userID uuid.UUID, params locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error)
+	UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params locitypes.UpdateSearchProfileParams) error
 	DeleteSearchProfile(ctx context.Context, userID, profileID uuid.UUID) error
 	SetDefaultSearchProfile(ctx context.Context, userID, profileID uuid.UUID) error
 
@@ -54,7 +54,7 @@ func NewUserProfilesService(prefRepo Repository, intRepo interests.Repository, t
 }
 
 // GetSearchProfiles retrieves all preference profiles for a user.
-func (s *ServiceImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]types.UserPreferenceProfileResponse, error) {
+func (s *ServiceImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "GetSearchProfiles", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -77,7 +77,7 @@ func (s *ServiceImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) (
 }
 
 // GetSearchProfile retrieves a specific preference profile by ID.
-func (s *ServiceImpl) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (s *ServiceImpl) GetSearchProfile(ctx context.Context, userID, profileID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "GetSearchProfile", trace.WithAttributes(
 		attribute.String("profile.id", profileID.String()),
 	))
@@ -100,7 +100,7 @@ func (s *ServiceImpl) GetSearchProfile(ctx context.Context, userID, profileID uu
 }
 
 // GetDefaultSearchProfile retrieves the default preference profile for a user.
-func (s *ServiceImpl) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*types.UserPreferenceProfileResponse, error) {
+func (s *ServiceImpl) GetDefaultSearchProfile(ctx context.Context, userID uuid.UUID) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "GetDefaultSearchProfile", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -123,7 +123,7 @@ func (s *ServiceImpl) GetDefaultSearchProfile(ctx context.Context, userID uuid.U
 }
 
 // CreateSearchProfileCC TODO fix Create profile interests and tags
-func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUID, params types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error) { // Return the richer response type
+func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUID, params locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error) { // Return the richer response type
 
 	ctx, span := otel.Tracer("PreferenceService").Start(ctx, "CreateSearchProfile")
 	defer span.End()
@@ -133,7 +133,7 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 
 	// --- 1. Validate input further if needed (e.g., check if profile name is empty) ---
 	if params.ProfileName == "" {
-		return nil, fmt.Errorf("%w: profile name cannot be empty", types.ErrBadRequest)
+		return nil, fmt.Errorf("%w: profile name cannot be empty", locitypes.ErrBadRequest)
 	}
 
 	tx, err := s.prefRepo.(*RepositoryImpl).pgpool.Begin(ctx)
@@ -215,8 +215,8 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 	// After successful creation and linking, fetch the linked data to return the full response object.
 	// Can also run these concurrently.
 	gResp, respCtx := errgroup.WithContext(ctx)
-	var fetchedInterests []*types.Interest
-	var fetchedTags []*types.Tags
+	var fetchedInterests []*locitypes.Interest
+	var fetchedTags []*locitypes.Tags
 
 	gResp.Go(func() error {
 		var fetchErr error
@@ -245,7 +245,7 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 	}
 
 	// --- 5. Assemble Final Response ---
-	fullResponse := &types.UserPreferenceProfileResponse{
+	fullResponse := &locitypes.UserPreferenceProfileResponse{
 		// Copy fields from createdProfileCore
 		ID:                   createdProfileCore.ID,
 		UserID:               createdProfileCore.UserID,
@@ -273,7 +273,7 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 }
 
 // CreateSearchProfile userProfiles/service.go
-func (s *ServiceImpl) CreateSearchProfile(ctx context.Context, userID uuid.UUID, p types.CreateUserPreferenceProfileParams) (*types.UserPreferenceProfileResponse, error) {
+func (s *ServiceImpl) CreateSearchProfile(ctx context.Context, userID uuid.UUID, p locitypes.CreateUserPreferenceProfileParams) (*locitypes.UserPreferenceProfileResponse, error) {
 	ctx, span := otel.Tracer("ProfilesService").Start(ctx, "CreateSearchProfile")
 	defer span.End()
 
@@ -337,7 +337,7 @@ func (s *ServiceImpl) SetDefaultSearchProfile(ctx context.Context, userID, profi
 }
 
 // UpdateSearchProfile implements profilessService.
-func (s *ServiceImpl) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params types.UpdateSearchProfileParams) error {
+func (s *ServiceImpl) UpdateSearchProfile(ctx context.Context, userID, profileID uuid.UUID, params locitypes.UpdateSearchProfileParams) error {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "UpdateSearchProfile", trace.WithAttributes(
 		attribute.String("profile.id", profileID.String()),
 	))

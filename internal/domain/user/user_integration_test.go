@@ -75,7 +75,7 @@ func clearUsersTable(t *testing.T) {
 }
 
 // Helper to create a user directly for testing setup
-func createTestUserDirectly(t *testing.T, user types.User) uuid.UUID {
+func createTestUserDirectly(t *testing.T, user locitypes.User) uuid.UUID {
 	t.Helper()
 	// This function would use testUserRepo or direct db exec to insert a user for setup
 	// It depends on whether your UserRepo has a CreateUser method.
@@ -97,7 +97,7 @@ func TestServiceUserImpl_UserProfile_Integration(t *testing.T) {
 	ctx := context.Background()
 	clearUsersTable(t) // Ensure a clean state
 
-	testUser := types.User{ // Assuming types.User is the struct for your DB table
+	testUser := locitypes.User{ // Assuming locitypes.User is the struct for your DB table
 		Username:     "integ_test_user",
 		Email:        "integ@example.com",
 		PasswordHash: "hashedpassword", // In real tests, you'd hash a test password
@@ -127,7 +127,7 @@ func TestServiceUserImpl_UserProfile_Integration(t *testing.T) {
 
 	t.Run("Update user profile", func(t *testing.T) {
 		dob := "1990-01-01"
-		updateParams := types.UpdateProfileParams{
+		updateParams := locitypes.UpdateProfileParams{
 			Username:    "integ_test_user_updated",
 			FirstName:   "IntegrationUpdated",
 			LastName:    "TestUpdated",
@@ -158,7 +158,7 @@ func TestServiceUserImpl_UserStatus_Integration(t *testing.T) {
 	ctx := context.Background()
 	clearUsersTable(t)
 
-	testUser := types.User{Username: "status_user", Email: "status@example.com", PasswordHash: "hash"}
+	testUser := locitypes.User{Username: "status_user", Email: "status@example.com", PasswordHash: "hash"}
 	userID := createTestUserDirectly(t, testUser)
 
 	t.Run("Update Last Login", func(t *testing.T) {

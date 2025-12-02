@@ -18,8 +18,8 @@ import (
 var _ Service = (*ServiceImpl)(nil)
 
 type Service interface {
-	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *types.RecentInteractionsFilter) (*types.RecentInteractionsResponse, error)
-	GetCityDetailsForUser(ctx context.Context, userID uuid.UUID, cityName string) (*types.CityInteractions, error)
+	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error)
+	GetCityDetailsForUser(ctx context.Context, userID uuid.UUID, cityName string) (*locitypes.CityInteractions, error)
 }
 
 type ServiceImpl struct {
@@ -35,7 +35,7 @@ func NewService(repo Repository, logger *slog.Logger) *ServiceImpl {
 }
 
 // GetUserRecentInteractions retrieves recent interactions for a user
-func (s *ServiceImpl) GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *types.RecentInteractionsFilter) (*types.RecentInteractionsResponse, error) {
+func (s *ServiceImpl) GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error) {
 	ctx, span := otel.Tracer("RecentsService").Start(ctx, "GetUserRecentInteractions", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.Int("page", page),
@@ -83,7 +83,7 @@ func (s *ServiceImpl) GetUserRecentInteractions(ctx context.Context, userID uuid
 }
 
 // GetCityDetailsForUser retrieves detailed information for a specific city
-func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUID, cityName string) (*types.CityInteractions, error) {
+func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUID, cityName string) (*locitypes.CityInteractions, error) {
 	ctx, span := otel.Tracer("RecentsService").Start(ctx, "GetCityDetailsForUser", trace.WithAttributes(
 		attribute.String("user_id", userID.String()),
 		attribute.String("city_name", cityName),
@@ -105,7 +105,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		slog.String("city_name", cityName))
 
 	// Get recent interactions to find the city data
-	defaultFilter := &types.RecentInteractionsFilter{
+	defaultFilter := &locitypes.RecentInteractionsFilter{
 		SortBy:    "last_activity",
 		SortOrder: "desc",
 	}
@@ -118,7 +118,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 	}
 
 	// Find the city in recent interactions
-	var cityInteractions *types.CityInteractions
+	var cityInteractions *locitypes.CityInteractions
 	for _, city := range recentResponse.Cities {
 		if city.CityName == cityName {
 			cityInteractions = &city
@@ -142,7 +142,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		l.WarnContext(ctx, "Failed to get POIs for city",
 			slog.String("city_name", cityName),
 			slog.Any("error", err))
-		pois = []types.POIDetailedInfo{} // Set to empty slice if we can't get POIs
+		pois = []locitypes.POIDetailedInfo{} // Set to empty slice if we can't get POIs
 	}
 
 	// Get hotels for the city
@@ -151,7 +151,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		l.WarnContext(ctx, "Failed to get hotels for city",
 			slog.String("city_name", cityName),
 			slog.Any("error", err))
-		hotels = []types.HotelDetailedInfo{} // Set to empty slice if we can't get hotels
+		hotels = []locitypes.HotelDetailedInfo{} // Set to empty slice if we can't get hotels
 	}
 
 	// Get restaurants for the city
@@ -160,7 +160,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		l.WarnContext(ctx, "Failed to get restaurants for city",
 			slog.String("city_name", cityName),
 			slog.Any("error", err))
-		restaurants = []types.RestaurantDetailedInfo{} // Set to empty slice if we can't get restaurants
+		restaurants = []locitypes.RestaurantDetailedInfo{} // Set to empty slice if we can't get restaurants
 	}
 
 	// Get saved itineraries for the city
@@ -169,7 +169,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		l.WarnContext(ctx, "Failed to get itineraries for city",
 			slog.String("city_name", cityName),
 			slog.Any("error", err))
-		itineraries = []types.UserSavedItinerary{} // Set to empty slice if we can't get itineraries
+		itineraries = []locitypes.UserSavedItinerary{} // Set to empty slice if we can't get itineraries
 	}
 
 	// Get favorite POIs for the city
@@ -178,7 +178,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		l.WarnContext(ctx, "Failed to get favorites for city",
 			slog.String("city_name", cityName),
 			slog.Any("error", err))
-		favorites = []types.POIDetailedInfo{} // Set to empty slice if we can't get favorites
+		favorites = []locitypes.POIDetailedInfo{} // Set to empty slice if we can't get favorites
 	}
 
 	// Enrich interactions with POI/hotel/restaurant data
@@ -194,7 +194,7 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		lastActivity = interactions[0].CreatedAt // Interactions are ordered by created_at DESC
 	}
 
-	cityDetails := &types.CityInteractions{
+	cityDetails := &locitypes.CityInteractions{
 		CityName:     cityName,
 		Interactions: interactions,
 		POICount:     poiCount,
@@ -230,10 +230,10 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 }
 
 // Helper function to convert POIDetailedInfo to POIDetail for consistency with existing types
-func convertPOIsToDetail(detailedPOIs []types.POIDetailedInfo) []types.POIDetailedInfo {
-	var pois []types.POIDetailedInfo
+func convertPOIsToDetail(detailedPOIs []locitypes.POIDetailedInfo) []locitypes.POIDetailedInfo {
+	var pois []locitypes.POIDetailedInfo
 	for _, poi := range detailedPOIs {
-		detail := types.POIDetailedInfo{
+		detail := locitypes.POIDetailedInfo{
 			ID:               poi.ID,
 			LlmInteractionID: poi.LlmInteractionID,
 			City:             poi.City,

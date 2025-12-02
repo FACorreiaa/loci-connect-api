@@ -6,7 +6,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func getRestaurantsNearbyPrompt(userLocation types.UserLocation) string {
+func getRestaurantsNearbyPrompt(userLocation locitypes.UserLocation) string {
 	if userLocation.SearchRadiusKm == 0 {
 		userLocation.SearchRadiusKm = 5.0
 	}
@@ -28,7 +28,7 @@ func getRestaurantsNearbyPrompt(userLocation types.UserLocation) string {
     `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
 }
 
-func getHotelsNeabyPrompt(userLocation types.UserLocation) string {
+func getHotelsNeabyPrompt(userLocation locitypes.UserLocation) string {
 	return fmt.Sprintf(`
         Generate a list of maximum 10 hotels nearby the coordinates %0.2f , %0.2f.
         the hotels can be around %0.2f km radius from the user's location or if nothing provided, use the default radius of 5km.
@@ -48,7 +48,7 @@ func getHotelsNeabyPrompt(userLocation types.UserLocation) string {
     `, userLocation.UserLat, userLocation.UserLon, userLocation.SearchRadiusKm)
 }
 
-func getActivitiesNearbyPrompt(userLocation types.UserLocation) string {
+func getActivitiesNearbyPrompt(userLocation locitypes.UserLocation) string {
 	if userLocation.SearchRadiusKm == 0 {
 		userLocation.SearchRadiusKm = 5.0
 	}
@@ -70,7 +70,7 @@ func getActivitiesNearbyPrompt(userLocation types.UserLocation) string {
     `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
 }
 
-func getAttractionsNeabyPrompt(userLocation types.UserLocation) string {
+func getAttractionsNeabyPrompt(userLocation locitypes.UserLocation) string {
 	if userLocation.SearchRadiusKm == 0 {
 		userLocation.SearchRadiusKm = 5.0
 	}

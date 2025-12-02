@@ -118,7 +118,7 @@ func createTestUserForProfileTests(t *testing.T, usernameSuffix string) uuid.UUI
 	return id
 }
 
-func createTestInterestForProfileTests(t *testing.T, name string, userID uuid.UUID) *types.Interest {
+func createTestInterestForProfileTests(t *testing.T, name string, userID uuid.UUID) *locitypes.Interest {
 	t.Helper()
 	// Use the actual interest service/repo to create it if possible, or direct insert
 	// For consistency, using the repo methods (which interestsService wraps)
@@ -129,7 +129,7 @@ func createTestInterestForProfileTests(t *testing.T, name string, userID uuid.UU
 	return interest
 }
 
-func createTestTagForProfileTests(t *testing.T, name string, userID uuid.UUID) *types.Tags {
+func createTestTagForProfileTests(t *testing.T, name string, userID uuid.UUID) *locitypes.Tags {
 	t.Helper()
 	desc := "Integration test tag"
 	tag, err := testUserTagRepoForProfile.CreateTag(context.Background(), name, &desc, userID.String()) // Assuming CreateTag in repo
@@ -157,7 +157,7 @@ func TestprofilessServiceImpl_Integration(t *testing.T) {
 	var createdProfileID2 uuid.UUID
 
 	t.Run("CreateSearchProfile", func(t *testing.T) {
-		params1 := types.CreateUserPreferenceProfileParams{
+		params1 := locitypes.CreateUserPreferenceProfileParams{
 			ProfileName:    "Weekend Getaway",
 			IsDefault:      true,
 			SearchRadiusKm: 10.0,
@@ -175,7 +175,7 @@ func TestprofilessServiceImpl_Integration(t *testing.T) {
 		assert.Len(t, profile1.Interests, 2) // Assuming CreateSearchProfile fetches them back
 		assert.Len(t, profile1.Tags, 1)
 
-		params2 := types.CreateUserPreferenceProfileParams{
+		params2 := locitypes.CreateUserPreferenceProfileParams{
 			ProfileName: "Quick Bites",
 			IsDefault:   false,
 			Interests:   []uuid.UUID{interest2.ID},
@@ -215,7 +215,7 @@ func TestprofilessServiceImpl_Integration(t *testing.T) {
 	t.Run("UpdateSearchProfile", func(t *testing.T) {
 		newName := "Updated Weekend Adventure"
 		newRadius := 15.5
-		updateParams := types.UpdateSearchProfileParams{
+		updateParams := locitypes.UpdateSearchProfileParams{
 			ProfileName:    &newName,
 			SearchRadiusKm: &newRadius,
 			// To test interest/tag updates, UpdateSearchProfileParams needs fields for them

@@ -21,20 +21,20 @@ type MockListRepository struct {
 	mock.Mock
 }
 
-func (m *MockListRepository) CreateList(ctx context.Context, list types.List) error {
+func (m *MockListRepository) CreateList(ctx context.Context, list locitypes.List) error {
 	args := m.Called(ctx, list)
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetList(ctx context.Context, listID uuid.UUID) (types.List, error) {
+func (m *MockListRepository) GetList(ctx context.Context, listID uuid.UUID) (locitypes.List, error) {
 	args := m.Called(ctx, listID)
 	if args.Get(0) == nil {
-		return types.List{}, args.Error(1)
+		return locitypes.List{}, args.Error(1)
 	}
-	return args.Get(0).(types.List), args.Error(1)
+	return args.Get(0).(locitypes.List), args.Error(1)
 }
 
-func (m *MockListRepository) UpdateList(ctx context.Context, list types.List) error {
+func (m *MockListRepository) UpdateList(ctx context.Context, list locitypes.List) error {
 	args := m.Called(ctx, list)
 	return args.Error(0)
 }
@@ -44,28 +44,28 @@ func (m *MockListRepository) DeleteList(ctx context.Context, listID uuid.UUID) e
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetListItems(ctx context.Context, listID uuid.UUID) ([]*types.ListItem, error) {
+func (m *MockListRepository) GetListItems(ctx context.Context, listID uuid.UUID) ([]*locitypes.ListItem, error) {
 	args := m.Called(ctx, listID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.ListItem), args.Error(1)
+	return args.Get(0).([]*locitypes.ListItem), args.Error(1)
 }
 
-func (m *MockListRepository) AddListItem(ctx context.Context, item types.ListItem) error {
+func (m *MockListRepository) AddListItem(ctx context.Context, item locitypes.ListItem) error {
 	args := m.Called(ctx, item)
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (types.ListItem, error) {
+func (m *MockListRepository) GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (locitypes.ListItem, error) {
 	args := m.Called(ctx, listID, itemID, contentType)
 	if args.Get(0) == nil {
-		return types.ListItem{}, args.Error(1)
+		return locitypes.ListItem{}, args.Error(1)
 	}
-	return args.Get(0).(types.ListItem), args.Error(1)
+	return args.Get(0).(locitypes.ListItem), args.Error(1)
 }
 
-func (m *MockListRepository) UpdateListItem(ctx context.Context, item types.ListItem) error {
+func (m *MockListRepository) UpdateListItem(ctx context.Context, item locitypes.ListItem) error {
 	args := m.Called(ctx, item)
 	return args.Error(0)
 }
@@ -75,20 +75,20 @@ func (m *MockListRepository) DeleteListItem(ctx context.Context, listID, itemID 
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*types.List, error) {
+func (m *MockListRepository) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error) {
 	args := m.Called(ctx, userID, isItinerary)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.List), args.Error(1)
+	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
-func (m *MockListRepository) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (types.ListItem, error) {
+func (m *MockListRepository) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (locitypes.ListItem, error) {
 	args := m.Called(ctx, listID, itemID)
 	if args.Get(0) == nil {
-		return types.ListItem{}, args.Error(1)
+		return locitypes.ListItem{}, args.Error(1)
 	}
-	return args.Get(0).(types.ListItem), args.Error(1)
+	return args.Get(0).(locitypes.ListItem), args.Error(1)
 }
 
 func (m *MockListRepository) DeleteListItemByID(ctx context.Context, listID, itemID uuid.UUID) error {
@@ -96,12 +96,12 @@ func (m *MockListRepository) DeleteListItemByID(ctx context.Context, listID, ite
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*types.List, error) {
+func (m *MockListRepository) GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*locitypes.List, error) {
 	args := m.Called(ctx, parentListID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.List), args.Error(1)
+	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
 // Saved Lists functionality
@@ -115,30 +115,30 @@ func (m *MockListRepository) UnsaveList(ctx context.Context, userID, listID uuid
 	return args.Error(0)
 }
 
-func (m *MockListRepository) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*types.List, error) {
+func (m *MockListRepository) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
 	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.List), args.Error(1)
+	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
 // Content type specific methods
-func (m *MockListRepository) GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType types.ContentType) ([]*types.ListItem, error) {
+func (m *MockListRepository) GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error) {
 	args := m.Called(ctx, listID, contentType)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.ListItem), args.Error(1)
+	return args.Get(0).([]*locitypes.ListItem), args.Error(1)
 }
 
 // Search and filtering
-func (m *MockListRepository) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*types.List, error) {
+func (m *MockListRepository) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error) {
 	args := m.Called(ctx, searchTerm, category, contentType, theme, cityID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*types.List), args.Error(1)
+	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
 // Helper to setup service with mock repository
@@ -159,7 +159,7 @@ func TestServiceImpl_CreateTopLevelList(t *testing.T) {
 	cityID := uuid.New()
 
 	t.Run("success - with city", func(t *testing.T) {
-		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("types.List")).Return(nil).Once()
+		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("locitypes.List")).Return(nil).Once()
 
 		result, err := service.CreateTopLevelList(ctx, userID, "Test List", "Test Description", &cityID, false, true)
 
@@ -174,7 +174,7 @@ func TestServiceImpl_CreateTopLevelList(t *testing.T) {
 	})
 
 	t.Run("success - without city", func(t *testing.T) {
-		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("types.List")).Return(nil).Once()
+		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("locitypes.List")).Return(nil).Once()
 
 		result, err := service.CreateTopLevelList(ctx, userID, "Test List", "Test Description", nil, true, false)
 
@@ -187,7 +187,7 @@ func TestServiceImpl_CreateTopLevelList(t *testing.T) {
 
 	t.Run("repository error", func(t *testing.T) {
 		repoErr := errors.New("db error")
-		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("types.List")).Return(repoErr).Once()
+		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("locitypes.List")).Return(repoErr).Once()
 
 		_, err := service.CreateTopLevelList(ctx, userID, "Test List", "Test Description", nil, false, false)
 
@@ -207,7 +207,7 @@ func TestServiceImpl_CreateItineraryForList(t *testing.T) {
 	parentListID := uuid.New()
 	cityID := uuid.New()
 
-	parentList := types.List{
+	parentList := locitypes.List{
 		ID:          parentListID,
 		UserID:      userID,
 		Name:        "Parent List",
@@ -218,7 +218,7 @@ func TestServiceImpl_CreateItineraryForList(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		mockRepo.On("GetList", mock.Anything, parentListID).Return(parentList, nil).Once()
-		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("types.List")).Return(nil).Once()
+		mockRepo.On("CreateList", mock.Anything, mock.AnythingOfType("locitypes.List")).Return(nil).Once()
 
 		result, err := service.CreateItineraryForList(ctx, userID, parentListID, "Test Itinerary", "Test Description", false)
 
@@ -243,7 +243,7 @@ func TestServiceImpl_CreateItineraryForList(t *testing.T) {
 	})
 
 	t.Run("user does not own parent list", func(t *testing.T) {
-		otherUserList := types.List{
+		otherUserList := locitypes.List{
 			ID:          parentListID,
 			UserID:      uuid.New(), // Different user
 			Name:        "Parent List",
@@ -270,7 +270,7 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 	userID := uuid.New()
 	listID := uuid.New()
 
-	list := types.List{
+	list := locitypes.List{
 		ID:          listID,
 		UserID:      userID,
 		Name:        "Test List",
@@ -278,18 +278,18 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 		IsPublic:    false,
 	}
 
-	items := []*types.ListItem{
+	items := []*locitypes.ListItem{
 		{
 			ListID:      listID,
 			ItemID:      uuid.New(),
-			ContentType: types.ContentTypePOI,
+			ContentType: locitypes.ContentTypePOI,
 			Position:    1,
 			Notes:       "First POI",
 		},
 		{
 			ListID:      listID,
 			ItemID:      uuid.New(),
-			ContentType: types.ContentTypePOI,
+			ContentType: locitypes.ContentTypePOI,
 			Position:    2,
 			Notes:       "Second POI",
 		},
@@ -312,7 +312,7 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 
 	t.Run("success - public list access", func(t *testing.T) {
 		service, mockRepo := setupListServiceTest()
-		publicList := types.List{
+		publicList := locitypes.List{
 			ID:          listID,
 			UserID:      uuid.New(), // Different user
 			Name:        "Public Test List",
@@ -332,7 +332,7 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 
 	t.Run("access denied - private list", func(t *testing.T) {
 		service, mockRepo := setupListServiceTest()
-		privateList := types.List{
+		privateList := locitypes.List{
 			ID:          listID,
 			UserID:      uuid.New(), // Different user
 			Name:        "Private Test List",
@@ -371,7 +371,7 @@ func TestServiceImpl_UpdateListDetails(t *testing.T) {
 	userID := uuid.New()
 	listID := uuid.New()
 
-	list := types.List{
+	list := locitypes.List{
 		ID:          listID,
 		UserID:      userID,
 		Name:        "Old Name",
@@ -384,14 +384,14 @@ func TestServiceImpl_UpdateListDetails(t *testing.T) {
 		newDescription := "New Description"
 		isPublic := true
 
-		params := types.UpdateListRequest{
+		params := locitypes.UpdateListRequest{
 			Name:        &newName,
 			Description: &newDescription,
 			IsPublic:    &isPublic,
 		}
 
 		mockRepo.On("GetList", mock.Anything, listID).Return(list, nil).Once()
-		mockRepo.On("UpdateList", mock.Anything, mock.MatchedBy(func(updatedList *types.List) bool {
+		mockRepo.On("UpdateList", mock.Anything, mock.MatchedBy(func(updatedList *locitypes.List) bool {
 			return updatedList.Name == newName &&
 				updatedList.Description == newDescription &&
 				updatedList.IsPublic == isPublic
@@ -407,7 +407,7 @@ func TestServiceImpl_UpdateListDetails(t *testing.T) {
 	})
 
 	t.Run("user does not own list", func(t *testing.T) {
-		otherUserList := types.List{
+		otherUserList := locitypes.List{
 			ID:     listID,
 			UserID: uuid.New(), // Different user
 			Name:   "Test List",
@@ -415,7 +415,7 @@ func TestServiceImpl_UpdateListDetails(t *testing.T) {
 
 		mockRepo.On("GetList", mock.Anything, listID).Return(otherUserList, nil).Once()
 
-		_, err := service.UpdateListDetails(ctx, listID, userID, types.UpdateListRequest{})
+		_, err := service.UpdateListDetails(ctx, listID, userID, locitypes.UpdateListRequest{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "user does not own list")
@@ -433,7 +433,7 @@ func TestServiceImpl_AddPOIListItem(t *testing.T) {
 	listID := uuid.New()
 	poiID := uuid.New()
 
-	list := types.List{
+	list := locitypes.List{
 		ID:          listID,
 		UserID:      userID,
 		Name:        "Test Itinerary",
@@ -442,7 +442,7 @@ func TestServiceImpl_AddPOIListItem(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		morningTime := time.Date(2024, 1, 1, 9, 0, 0, 0, time.UTC)
-		params := types.AddListItemRequest{
+		params := locitypes.AddListItemRequest{
 			Position:        1,
 			Notes:           "Test POI",
 			DayNumber:       &[]int{1}[0],
@@ -451,7 +451,7 @@ func TestServiceImpl_AddPOIListItem(t *testing.T) {
 		}
 
 		mockRepo.On("GetList", mock.Anything, listID).Return(list, nil).Once()
-		mockRepo.On("AddListItem", mock.Anything, mock.MatchedBy(func(item types.ListItem) bool {
+		mockRepo.On("AddListItem", mock.Anything, mock.MatchedBy(func(item locitypes.ListItem) bool {
 			return item.ListID == listID && item.ItemID == poiID && item.Position == 1
 		})).Return(nil).Once()
 
@@ -465,7 +465,7 @@ func TestServiceImpl_AddPOIListItem(t *testing.T) {
 	})
 
 	t.Run("list is not an itinerary", func(t *testing.T) {
-		nonItineraryList := types.List{
+		nonItineraryList := locitypes.List{
 			ID:          listID,
 			UserID:      userID,
 			Name:        "Regular List",
@@ -474,7 +474,7 @@ func TestServiceImpl_AddPOIListItem(t *testing.T) {
 
 		mockRepo.On("GetList", mock.Anything, listID).Return(nonItineraryList, nil).Once()
 
-		_, err := service.AddPOIListItem(ctx, userID, listID, poiID, types.AddListItemRequest{})
+		_, err := service.AddPOIListItem(ctx, userID, listID, poiID, locitypes.AddListItemRequest{})
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "list is not an itinerary")
@@ -490,7 +490,7 @@ func TestServiceImpl_GetUserLists(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
-	expectedLists := []*types.List{
+	expectedLists := []*locitypes.List{
 		{
 			ID:          uuid.New(),
 			UserID:      userID,
@@ -537,7 +537,7 @@ func TestServiceImpl_DeleteUserList(t *testing.T) {
 	userID := uuid.New()
 	listID := uuid.New()
 
-	list := types.List{
+	list := locitypes.List{
 		ID:     listID,
 		UserID: userID,
 		Name:   "Test List",
@@ -554,7 +554,7 @@ func TestServiceImpl_DeleteUserList(t *testing.T) {
 	})
 
 	t.Run("user does not own list", func(t *testing.T) {
-		otherUserList := types.List{
+		otherUserList := locitypes.List{
 			ID:     listID,
 			UserID: uuid.New(), // Different user
 			Name:   "Test List",

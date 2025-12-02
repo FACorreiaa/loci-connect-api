@@ -1,5 +1,5 @@
 //revive:disable-next-line:var-naming
-package types
+package locitypes
 
 type MainPageStatistics struct {
 	TotalUsersCount       int64 `json:"total_users_count"`

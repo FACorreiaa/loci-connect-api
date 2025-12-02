@@ -19,11 +19,11 @@ var _ tagsService = (*tagsServiceImpl)(nil)
 
 // tagsService defines the business logic contract for user operations.
 type tagsService interface {
-	GetTags(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error)
-	GetTag(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error)
-	CreateTag(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error)
+	GetTags(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error)
+	GetTag(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error)
+	CreateTag(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error)
 	DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error
-	Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error
+	Update(ctx context.Context, userID, tagID uuid.UUID, params locitypes.UpdatePersonalTagParams) error
 }
 
 // tagsServiceImpl provides the implementation for UserService.
@@ -43,7 +43,7 @@ func NewtagsService(repo Repository, logger *slog.Logger) *tagsServiceImpl {
 }
 
 // GetTags retrieves all global tags.
-func (s *tagsServiceImpl) GetTags(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error) {
+func (s *tagsServiceImpl) GetTags(ctx context.Context, userID uuid.UUID) ([]*locitypes.Tags, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "GetAllGlobalTags")
 	defer span.End()
 
@@ -64,7 +64,7 @@ func (s *tagsServiceImpl) GetTags(ctx context.Context, userID uuid.UUID) ([]*typ
 }
 
 // GetTag retrieves all avoid tags for a user.
-func (s *tagsServiceImpl) GetTag(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error) {
+func (s *tagsServiceImpl) GetTag(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "GetUserAvoidTags", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -87,7 +87,7 @@ func (s *tagsServiceImpl) GetTag(ctx context.Context, userID, tagID uuid.UUID) (
 }
 
 // CreateTag adds an avoid tag for a user.
-func (s *tagsServiceImpl) CreateTag(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error) {
+func (s *tagsServiceImpl) CreateTag(ctx context.Context, userID uuid.UUID, params locitypes.CreatePersonalTagParams) (*locitypes.PersonalTag, error) {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "AddUserTag", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -133,7 +133,7 @@ func (s *tagsServiceImpl) DeleteTag(ctx context.Context, userID, tagID uuid.UUID
 	return nil
 }
 
-func (s *tagsServiceImpl) Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (s *tagsServiceImpl) Update(ctx context.Context, userID, tagID uuid.UUID, params locitypes.UpdatePersonalTagParams) error {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "UpdateUserAvoidTag", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("tag.id", tagID.String()),

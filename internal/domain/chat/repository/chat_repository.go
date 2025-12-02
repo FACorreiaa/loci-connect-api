@@ -26,31 +26,31 @@ import (
 var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
-	SaveInteraction(ctx context.Context, interaction types.LlmInteraction) (uuid.UUID, error)
-	SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []types.POIDetailedInfo, userID, searchProfileID, llmInteractionID, cityID uuid.UUID) error
-	GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	AddChatToBookmark(ctx context.Context, itinerary *types.UserSavedItinerary) (uuid.UUID, error)
-	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error)
+	SaveInteraction(ctx context.Context, interaction locitypes.LlmInteraction) (uuid.UUID, error)
+	SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []locitypes.POIDetailedInfo, userID, searchProfileID, llmInteractionID, cityID uuid.UUID) error
+	GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	AddChatToBookmark(ctx context.Context, itinerary *locitypes.UserSavedItinerary) (uuid.UUID, error)
+	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error)
 	RemoveChatFromBookmark(ctx context.Context, userID, itineraryID uuid.UUID) error
-	GetInteractionByID(ctx context.Context, interactionID uuid.UUID) (*types.LlmInteraction, error)
-	GetLatestInteractionBySessionID(ctx context.Context, sessionID uuid.UUID) (*types.LlmInteraction, error)
+	GetInteractionByID(ctx context.Context, interactionID uuid.UUID) (*locitypes.LlmInteraction, error)
+	GetLatestInteractionBySessionID(ctx context.Context, sessionID uuid.UUID) (*locitypes.LlmInteraction, error)
 
 	// Session methods
-	CreateSession(ctx context.Context, session types.ChatSession) error
-	GetSession(ctx context.Context, sessionID uuid.UUID) (*types.ChatSession, error)
-	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error)
-	UpdateSession(ctx context.Context, session types.ChatSession) error
-	AddMessageToSession(ctx context.Context, sessionID uuid.UUID, message types.ConversationMessage) error
+	CreateSession(ctx context.Context, session locitypes.ChatSession) error
+	GetSession(ctx context.Context, sessionID uuid.UUID) (*locitypes.ChatSession, error)
+	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error)
+	UpdateSession(ctx context.Context, session locitypes.ChatSession) error
+	AddMessageToSession(ctx context.Context, sessionID uuid.UUID, message locitypes.ConversationMessage) error
 
 	//
-	SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error)
-	GetPOIsBySessionSortedByDistance(ctx context.Context, sessionID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID, sourceInteractionID uuid.UUID) (uuid.UUID, error)
-	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error
+	SaveSinglePOI(ctx context.Context, poi locitypes.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error)
+	GetPOIsBySessionSortedByDistance(ctx context.Context, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo locitypes.POIDetailedInfo, cityID, sourceInteractionID uuid.UUID) (uuid.UUID, error)
+	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []locitypes.POIDetailedInfo) error
 
 	// RAG
-	// SaveInteractionWithEmbedding(ctx context.Context, interaction types.LlmInteraction, embedding []float32) (uuid.UUID, error)
-	// FindSimilarInteractions(ctx context.Context, queryEmbedding []float32, limit int, threshold float32) ([]types.LlmInteraction, error)
+	// SaveInteractionWithEmbedding(ctx context.Context, interaction locitypes.LlmInteraction, embedding []float32) (uuid.UUID, error)
+	// FindSimilarInteractions(ctx context.Context, queryEmbedding []float32, limit int, threshold float32) ([]locitypes.LlmInteraction, error)
 }
 
 //revive:disable-next-line:exported
@@ -66,7 +66,7 @@ func NewRepositoryImpl(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryIm
 	}
 }
 
-func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction types.LlmInteraction) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locitypes.LlmInteraction) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveInteraction", trace.WithAttributes(
 		semconv.DBSystemKey.String(semconv.DBSystemPostgreSQL.Value.AsString()),
 		attribute.String("db.operation", "INSERT_COMPLEX"),
@@ -164,7 +164,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction types.
 	}
 
 	if itineraryID != uuid.Nil {
-		var pois []types.POIDetailedInfo
+		var pois []locitypes.POIDetailedInfo
 		// Only parse POIs for itinerary/general responses, skip for domain-specific responses
 		if strings.Contains(interaction.Prompt, "Unified Chat - Domain: dining") ||
 			strings.Contains(interaction.Prompt, "Unified Chat - Domain: accommodation") ||
@@ -200,7 +200,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction types.
 					span.SetStatus(codes.Error, "Failed to get or create POI")
 					return interactionID, fmt.Errorf("failed to get or create POI '%s': %w", POIDetailedInfoFromLlm.Name, err)
 				}
-				poiBatch.Queue(itineraryPoiInsertQuery, itineraryID, poiDBID, i, POIDetailedInfoFromLlm.DescriptionPOI) // Assumes types.POIDetailedInfo has DescriptionPOI
+				poiBatch.Queue(itineraryPoiInsertQuery, itineraryID, poiDBID, i, POIDetailedInfoFromLlm.DescriptionPOI) // Assumes locitypes.POIDetailedInfo has DescriptionPOI
 			}
 
 			if poiBatch.Len() > 0 {
@@ -247,7 +247,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction types.
 	return interactionID, nil
 }
 
-func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []types.POIDetailedInfo, userID, searchProfileID, llmInteractionID, cityID uuid.UUID) error {
+func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []locitypes.POIDetailedInfo, userID, searchProfileID, llmInteractionID, cityID uuid.UUID) error {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveLlmSuggestedPOIsBatch", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "INSERT"),
@@ -315,8 +315,8 @@ func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []t
 }
 
 func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
-	ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation types.UserLocation,
-) ([]types.POIDetailedInfo, error) {
+	ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation locitypes.UserLocation,
+) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetLlmSuggestedPOIsByInteractionSortedByDistance", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -363,9 +363,9 @@ func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
 	}
 	defer rows.Close()
 
-	var resultPois []types.POIDetailedInfo
+	var resultPois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var p types.POIDetailedInfo
+		var p locitypes.POIDetailedInfo
 		var descr sql.NullString // Handle nullable fields from DB
 		// var cat sql.NullString
 		// var addr sql.NullString
@@ -375,7 +375,7 @@ func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
 		err := rows.Scan(
 			&p.ID, &p.Name, &descr,
 			&p.Longitude, &p.Latitude,
-			&p.Distance, // Ensure your types.POIDetailedInfo has Distance field
+			&p.Distance, // Ensure your locitypes.POIDetailedInfo has Distance field
 		)
 		if err != nil {
 			span.RecordError(err)
@@ -399,7 +399,7 @@ func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
 	return resultPois, nil
 }
 
-func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *types.UserSavedItinerary) (uuid.UUID, error) {
+func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locitypes.UserSavedItinerary) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "AddChatToBookmark", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "INSERT"),
@@ -476,7 +476,7 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *types
 	return savedItineraryID, nil
 }
 
-func (r *RepositoryImpl) GetInteractionByID(ctx context.Context, interactionID uuid.UUID) (*types.LlmInteraction, error) {
+func (r *RepositoryImpl) GetInteractionByID(ctx context.Context, interactionID uuid.UUID) (*locitypes.LlmInteraction, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetInteractionByID", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -495,7 +495,7 @@ func (r *RepositoryImpl) GetInteractionByID(ctx context.Context, interactionID u
 	`
 	row := r.pgpool.QueryRow(ctx, query, interactionID)
 
-	var interaction types.LlmInteraction
+	var interaction locitypes.LlmInteraction
 
 	nullPromptTokens := sql.NullInt64{}
 	nullCompletionTokens := sql.NullInt64{}
@@ -534,7 +534,7 @@ func (r *RepositoryImpl) GetInteractionByID(ctx context.Context, interactionID u
 	return &interaction, nil
 }
 
-func (r *RepositoryImpl) GetLatestInteractionBySessionID(ctx context.Context, sessionID uuid.UUID) (*types.LlmInteraction, error) {
+func (r *RepositoryImpl) GetLatestInteractionBySessionID(ctx context.Context, sessionID uuid.UUID) (*locitypes.LlmInteraction, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetLatestInteractionBySessionID", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -555,7 +555,7 @@ func (r *RepositoryImpl) GetLatestInteractionBySessionID(ctx context.Context, se
 	`
 	row := r.pgpool.QueryRow(ctx, query, sessionID)
 
-	var interaction types.LlmInteraction
+	var interaction locitypes.LlmInteraction
 
 	nullPromptTokens := sql.NullInt64{}
 	nullCompletionTokens := sql.NullInt64{}
@@ -736,7 +736,7 @@ func (r *RepositoryImpl) RemoveChatFromBookmark(ctx context.Context, userID, iti
 	return nil
 }
 
-func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error) {
+func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetBookmarkedItineraries", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "SELECT"),
@@ -780,9 +780,9 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 	}
 	defer rows.Close()
 
-	var itineraries []types.UserSavedItinerary
+	var itineraries []locitypes.UserSavedItinerary
 	for rows.Next() {
-		var itinerary types.UserSavedItinerary
+		var itinerary locitypes.UserSavedItinerary
 		var tags []string
 
 		err := rows.Scan(
@@ -817,7 +817,7 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 		return nil, fmt.Errorf("row iteration error: %w", err)
 	}
 
-	response := &types.PaginatedUserItinerariesResponse{
+	response := &locitypes.PaginatedUserItinerariesResponse{
 		Itineraries:  itineraries,
 		TotalRecords: totalCount,
 		Page:         page,
@@ -829,7 +829,7 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 }
 
 // sessions
-func (r *RepositoryImpl) CreateSession(ctx context.Context, session types.ChatSession) error {
+func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.ChatSession) error {
 	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to begin transaction for session creation", slog.Any("error", err))
@@ -879,7 +879,7 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session types.ChatSe
 }
 
 // GetSession retrieves a session by ID
-func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*types.ChatSession, error) {
+func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*locitypes.ChatSession, error) {
 	query := `
         SELECT id, user_id, profile_id, city_name, current_itinerary, conversation_history, session_context,
                created_at, updated_at, expires_at, status
@@ -887,7 +887,7 @@ func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*
     `
 	row := r.pgpool.QueryRow(ctx, query, sessionID)
 
-	var session types.ChatSession
+	var session locitypes.ChatSession
 	var itineraryJSON, historyJSON, contextJSON []byte
 	err := row.Scan(&session.ID, &session.UserID, &session.ProfileID, &session.CityName,
 		&itineraryJSON, &historyJSON, &contextJSON, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt, &session.Status)
@@ -915,7 +915,7 @@ func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*
 }
 
 // GetUserChatSessions retrieves paginated chat history from LLM interactions grouped by session/city, ordered by most recent first
-func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error) {
+func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetUserChatSessions", trace.WithAttributes(
 		semconv.DBSystemKey.String(semconv.DBSystemPostgreSQL.Value.AsString()),
 		attribute.String("db.operation", "SELECT"),
@@ -1023,7 +1023,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	}
 	defer rows.Close()
 
-	var sessions []types.ChatSession
+	var sessions []locitypes.ChatSession
 	for rows.Next() {
 		var sessionKey, cityName string
 		var userIDFromDB uuid.UUID
@@ -1051,7 +1051,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			continue
 		}
 
-		var conversationHistory []types.ConversationMessage
+		var conversationHistory []locitypes.ConversationMessage
 		var totalPOIs, totalHotels, totalRestaurants int
 		var citiesCovered []string
 		var hasItinerary bool
@@ -1059,7 +1059,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 		for _, interaction := range interactions {
 			if prompt, ok := interaction["prompt"].(string); ok && prompt != "" {
-				conversationHistory = append(conversationHistory, types.ConversationMessage{
+				conversationHistory = append(conversationHistory, locitypes.ConversationMessage{
 					Role:      "user",
 					Content:   prompt,
 					Timestamp: parseTimeFromInterface(interaction["created_at"]),
@@ -1082,7 +1082,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 					// Convert JSON response to human-readable format
 					response = formatResponseForDisplay(response, cityName)
 				}
-				conversationHistory = append(conversationHistory, types.ConversationMessage{
+				conversationHistory = append(conversationHistory, locitypes.ConversationMessage{
 					Role:      "assistant",
 					Content:   response,
 					Timestamp: parseTimeFromInterface(interaction["created_at"]),
@@ -1091,7 +1091,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		}
 
 		// Calculate enriched metrics
-		performanceMetrics := types.SessionPerformanceMetrics{
+		performanceMetrics := locitypes.SessionPerformanceMetrics{
 			AvgResponseTimeMs: int(avgLatencyMs.Int64),
 			TotalTokens:       int(totalTokens.Int64),
 			PromptTokens:      int(totalPromptTokens.Int64),
@@ -1114,7 +1114,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		// Calculate complexity score (1-10)
 		complexityScore := calculateComplexityScore(totalPOIs, totalHotels, totalRestaurants, len(conversationHistory), hasItinerary)
 
-		contentMetrics := types.SessionContentMetrics{
+		contentMetrics := locitypes.SessionContentMetrics{
 			TotalPOIs:          totalPOIs,
 			TotalHotels:        totalHotels,
 			TotalRestaurants:   totalRestaurants,
@@ -1130,7 +1130,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		avgMsgLength := calculateAverageMessageLength(conversationHistory)
 		engagementLevel := calculateEngagementLevel(len(conversationHistory), conversationDuration, complexityScore)
 
-		engagementMetrics := types.SessionEngagementMetrics{
+		engagementMetrics := locitypes.SessionEngagementMetrics{
 			MessageCount:          len(conversationHistory),
 			ConversationDuration:  conversationDuration,
 			UserMessageCount:      userMsgCount,
@@ -1140,7 +1140,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		}
 
 		sessionID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(sessionKey))
-		session := types.ChatSession{
+		session := locitypes.ChatSession{
 			ID:                  sessionID,
 			UserID:              userIDFromDB,
 			CityName:            cityName,
@@ -1165,7 +1165,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	// Calculate hasMore
 	hasMore := (page * limit) < total
 
-	response := &types.ChatSessionsResponse{
+	response := &locitypes.ChatSessionsResponse{
 		Sessions: sessions,
 		Total:    total,
 		Page:     page,
@@ -1238,13 +1238,13 @@ func formatResponseForDisplay(response, cityName string) string {
 	}
 
 	// Try to parse as GeneralCityData first (for [city_data] responses)
-	var generalCity types.GeneralCityData
+	var generalCity locitypes.GeneralCityData
 	if err := json.Unmarshal([]byte(cleanedResponse), &generalCity); err == nil && generalCity.City != "" {
 		return formatCityDataResponse(generalCity)
 	}
 
 	// Try to parse as AiCityResponse (most common format)
-	var cityResponse types.AiCityResponse
+	var cityResponse locitypes.AiCityResponse
 	if err := json.Unmarshal([]byte(cleanedResponse), &cityResponse); err == nil {
 		// Check if it's a valid itinerary response (either has POIs or itinerary data)
 		if len(cityResponse.PointsOfInterest) > 0 || cityResponse.AIItineraryResponse.ItineraryName != "" || len(cityResponse.AIItineraryResponse.PointsOfInterest) > 0 {
@@ -1253,19 +1253,19 @@ func formatResponseForDisplay(response, cityName string) string {
 	}
 
 	// Try to parse as hotel array
-	var hotels []types.HotelDetailedInfo
+	var hotels []locitypes.HotelDetailedInfo
 	if err := json.Unmarshal([]byte(cleanedResponse), &hotels); err == nil && len(hotels) > 0 {
 		return formatHotelResponse(hotels, cityName)
 	}
 
 	// Try to parse as restaurant array
-	var restaurants []types.RestaurantDetailedInfo
+	var restaurants []locitypes.RestaurantDetailedInfo
 	if err := json.Unmarshal([]byte(cleanedResponse), &restaurants); err == nil && len(restaurants) > 0 {
 		return formatRestaurantResponse(restaurants, cityName)
 	}
 
 	// Try to parse as POI array
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanedResponse), &pois); err == nil && len(pois) > 0 {
 		return formatPOIResponse(pois, cityName)
 	}
@@ -1300,7 +1300,7 @@ func formatResponseForDisplay(response, cityName string) string {
 }
 
 // Format itinerary response to readable text
-func formatItineraryResponse(response types.AiCityResponse, cityName string) string {
+func formatItineraryResponse(response locitypes.AiCityResponse, cityName string) string {
 	// Determine which POI list to use and total count
 	var totalPOIs int
 	var firstPOIName string
@@ -1344,7 +1344,7 @@ func formatItineraryResponse(response types.AiCityResponse, cityName string) str
 }
 
 // Format hotel response to readable text
-func formatHotelResponse(hotels []types.HotelDetailedInfo, cityName string) string {
+func formatHotelResponse(hotels []locitypes.HotelDetailedInfo, cityName string) string {
 	if len(hotels) == 0 {
 		return fmt.Sprintf("I searched for hotels in %s for you.", cityName)
 	}
@@ -1357,7 +1357,7 @@ func formatHotelResponse(hotels []types.HotelDetailedInfo, cityName string) stri
 }
 
 // Format restaurant response to readable text
-func formatRestaurantResponse(restaurants []types.RestaurantDetailedInfo, cityName string) string {
+func formatRestaurantResponse(restaurants []locitypes.RestaurantDetailedInfo, cityName string) string {
 	if len(restaurants) == 0 {
 		return fmt.Sprintf("I searched for restaurants in %s for you.", cityName)
 	}
@@ -1370,7 +1370,7 @@ func formatRestaurantResponse(restaurants []types.RestaurantDetailedInfo, cityNa
 }
 
 // Format POI response to readable text
-func formatPOIResponse(pois []types.POIDetailedInfo, cityName string) string {
+func formatPOIResponse(pois []locitypes.POIDetailedInfo, cityName string) string {
 	if len(pois) == 0 {
 		return fmt.Sprintf("I searched for activities in %s for you.", cityName)
 	}
@@ -1383,7 +1383,7 @@ func formatPOIResponse(pois []types.POIDetailedInfo, cityName string) string {
 }
 
 // Format city data response to readable text
-func formatCityDataResponse(cityData types.GeneralCityData) string {
+func formatCityDataResponse(cityData locitypes.GeneralCityData) string {
 	result := fmt.Sprintf("Let me tell you about %s, %s! ", cityData.City, cityData.Country)
 
 	if cityData.Description != "" {
@@ -1421,7 +1421,7 @@ func formatCityDataResponse(cityData types.GeneralCityData) string {
 }
 
 // Helper functions
-func getFirstPOIName(pois []types.POIDetailedInfo) string {
+func getFirstPOIName(pois []locitypes.POIDetailedInfo) string {
 	if len(pois) > 0 {
 		return pois[0].Name
 	}
@@ -1436,7 +1436,7 @@ func pluralize(count int) string {
 }
 
 // UpdateSession updates an existing session
-func (r *RepositoryImpl) UpdateSession(ctx context.Context, session types.ChatSession) error {
+func (r *RepositoryImpl) UpdateSession(ctx context.Context, session locitypes.ChatSession) error {
 	query := `
         UPDATE chat_sessions SET current_itinerary = $2, conversation_history = $3, session_context = $4,
                                  updated_at = $5, expires_at = $6, status = $7
@@ -1468,7 +1468,7 @@ func (r *RepositoryImpl) UpdateSession(ctx context.Context, session types.ChatSe
 }
 
 // AddMessageToSession appends a message to the session's conversation history
-func (r *RepositoryImpl) AddMessageToSession(ctx context.Context, sessionID uuid.UUID, message types.ConversationMessage) error {
+func (r *RepositoryImpl) AddMessageToSession(ctx context.Context, sessionID uuid.UUID, message locitypes.ConversationMessage) error {
 	session, err := r.GetSession(ctx, sessionID)
 	if err != nil {
 		return err
@@ -1478,7 +1478,7 @@ func (r *RepositoryImpl) AddMessageToSession(ctx context.Context, sessionID uuid
 	return r.UpdateSession(ctx, *session)
 }
 
-func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveSinglePOI", trace.WithAttributes(
 		attribute.String("poi.name", poi.Name), /* ... */
 	))
@@ -1549,7 +1549,7 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi types.POIDetaile
 	return returnedID, nil
 }
 
-func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
 	query := `
         SELECT id, name, latitude, longitude, category, description_poi,
                ST_Distance(
@@ -1567,9 +1567,9 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 	}
 	defer rows.Close()
 
-	var pois []types.POIDetailedInfo
+	var pois []locitypes.POIDetailedInfo
 	for rows.Next() {
-		var p types.POIDetailedInfo
+		var p locitypes.POIDetailedInfo
 		var lat, lon, dist sql.NullFloat64 // Use nullable types
 		var cat, desc sql.NullString
 
@@ -1625,12 +1625,12 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 // 		// History          string  `json:"history,omitempty"`
 // 	} `json:"general_city_data"`
 
-// 	PointsOfInterest []types.POIDetailedInfo `json:"points_of_interest"` // <--- ADD THIS FIELD for general POIs
+// 	PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"` // <--- ADD THIS FIELD for general POIs
 
 // 	ItineraryResponse struct {
 // 		ItineraryName      string            `json:"itinerary_name"`
 // 		OverallDescription string            `json:"overall_description"`
-// 		PointsOfInterest   []types.POIDetailedInfo `json:"points_of_interest"` // This is for itinerary_response.points_of_interest
+// 		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"` // This is for itinerary_response.points_of_interest
 // 	} `json:"itinerary_response"`
 // }
 
@@ -1642,7 +1642,7 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 // 	// SessionIDInsideData string `json:"session_id,omitempty"`
 // }
 
-func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.POIDetailedInfo, error) {
+func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
 	cleanedResponse := CleanJSONResponse(responseText)
 
 	// Debug logging to see the actual cleaned response
@@ -1661,17 +1661,17 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.PO
 	// Check if this looks like an itinerary response instead of a POI response
 	if strings.Contains(cleanedResponse, "itinerary_name") {
 		logger.Debug("parsePOIsFromResponse: Response appears to be an itinerary, not POI data")
-		return []types.POIDetailedInfo{}, nil
+		return []locitypes.POIDetailedInfo{}, nil
 	}
 
 	// First try to parse as unified chat response format with "data" wrapper
 	var unifiedResponse struct {
-		Data types.AiCityResponse `json:"data"`
+		Data locitypes.AiCityResponse `json:"data"`
 	}
 	err := json.Unmarshal([]byte(cleanedResponse), &unifiedResponse)
 	if err == nil {
 		// Collect POIs from both general points_of_interest and itinerary points_of_interest
-		var allPOIs []types.POIDetailedInfo
+		var allPOIs []locitypes.POIDetailedInfo
 		if unifiedResponse.Data.PointsOfInterest != nil {
 			allPOIs = append(allPOIs, unifiedResponse.Data.PointsOfInterest...)
 		}
@@ -1687,7 +1687,7 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.PO
 	}
 
 	// Second, try to parse as a full AiCityResponse (for legacy responses)
-	var parsedResponse types.AiCityResponse
+	var parsedResponse locitypes.AiCityResponse
 	err = json.Unmarshal([]byte(cleanedResponse), &parsedResponse)
 	if err == nil && parsedResponse.PointsOfInterest != nil {
 		logger.Debug("parsePOIsFromResponse: Parsed as AiCityResponse", "poiCount", len(parsedResponse.PointsOfInterest))
@@ -1697,11 +1697,11 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.PO
 	}
 
 	// Third, try to parse as a single POI (for individual POI additions)
-	var singlePOI types.POIDetailedInfo
+	var singlePOI locitypes.POIDetailedInfo
 	err = json.Unmarshal([]byte(cleanedResponse), &singlePOI)
 	if err == nil && singlePOI.Name != "" {
 		logger.Debug("parsePOIsFromResponse: Parsed as single POI", "poiName", singlePOI.Name)
-		return []types.POIDetailedInfo{singlePOI}, nil
+		return []locitypes.POIDetailedInfo{singlePOI}, nil
 	}
 
 	// If all fail, log the error and return empty
@@ -1709,10 +1709,10 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.PO
 		"error", err,
 		"cleanedResponseLength", len(cleanedResponse),
 		"responsePreview", cleanedResponse[:min(200, len(cleanedResponse))])
-	return []types.POIDetailedInfo{}, nil
+	return []locitypes.POIDetailedInfo{}, nil
 }
 
-func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID, _ uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo locitypes.POIDetailedInfo, cityID, _ uuid.UUID) (uuid.UUID, error) {
 	var poiDBID uuid.UUID
 	findPoiQuery := `SELECT id FROM points_of_interest WHERE name = $1 AND city_id = $2 LIMIT 1`
 	err := tx.QueryRow(ctx, findPoiQuery, POIDetailedInfo.Name, cityID).Scan(&poiDBID)
@@ -1727,7 +1727,7 @@ func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetai
 			POIDetailedInfo.Latitude,
 			POIDetailedInfo.Longitude,
 			POIDetailedInfo.Category,
-			POIDetailedInfo.DescriptionPOI, // Assumes types.POIDetailedInfo has DescriptionPOI from JSON
+			POIDetailedInfo.DescriptionPOI, // Assumes locitypes.POIDetailedInfo has DescriptionPOI from JSON
 		).Scan(&poiDBID)
 		if err != nil {
 			r.logger.ErrorContext(ctx, "GetOrCreatePOI: Failed to insert new POI", "error", err, "poi_name", POIDetailedInfo.Name)
@@ -1740,7 +1740,7 @@ func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetai
 	return poiDBID, nil
 }
 
-func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error {
+func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []locitypes.POIDetailedInfo) error {
 	batch := &pgx.Batch{}
 	for i, poi := range pois {
 		query := `
@@ -1884,7 +1884,7 @@ func calculateComplexityScore(pois, hotels, restaurants, messageCount int, hasIt
 }
 
 // countMessagesByRole counts messages by user and assistant roles
-func countMessagesByRole(messages []types.ConversationMessage) (userCount, assistantCount int) {
+func countMessagesByRole(messages []locitypes.ConversationMessage) (userCount, assistantCount int) {
 	for _, msg := range messages {
 		switch msg.Role {
 		case "user":
@@ -1897,7 +1897,7 @@ func countMessagesByRole(messages []types.ConversationMessage) (userCount, assis
 }
 
 // calculateAverageMessageLength calculates the average length of all messages
-func calculateAverageMessageLength(messages []types.ConversationMessage) int {
+func calculateAverageMessageLength(messages []locitypes.ConversationMessage) int {
 	if len(messages) == 0 {
 		return 0
 	}

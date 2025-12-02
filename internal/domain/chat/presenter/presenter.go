@@ -12,7 +12,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func ToChatResponse(resp *types.ChatResponse) *chatv1.ChatResponse {
+func ToChatResponse(resp *locitypes.ChatResponse) *chatv1.ChatResponse {
 	if resp == nil {
 		return nil
 	}
@@ -26,7 +26,7 @@ func ToChatResponse(resp *types.ChatResponse) *chatv1.ChatResponse {
 	}
 }
 
-func ToAiCityResponse(resp *types.AiCityResponse) *chatv1.AiCityResponse {
+func ToAiCityResponse(resp *locitypes.AiCityResponse) *chatv1.AiCityResponse {
 	if resp == nil {
 		return nil
 	}
@@ -38,7 +38,7 @@ func ToAiCityResponse(resp *types.AiCityResponse) *chatv1.AiCityResponse {
 	}
 }
 
-func ToGeneralCityData(data types.GeneralCityData) *cityv1.GeneralCityData {
+func ToGeneralCityData(data locitypes.GeneralCityData) *cityv1.GeneralCityData {
 	resp := &cityv1.GeneralCityData{
 		City:        data.City,
 		Country:     data.Country,
@@ -65,7 +65,7 @@ func ToGeneralCityData(data types.GeneralCityData) *cityv1.GeneralCityData {
 	return resp
 }
 
-func ToPOIDetailedInfoSlice(pois []types.POIDetailedInfo) []*poiv1.POIDetailedInfo {
+func ToPOIDetailedInfoSlice(pois []locitypes.POIDetailedInfo) []*poiv1.POIDetailedInfo {
 	if pois == nil {
 		return nil
 	}
@@ -76,7 +76,7 @@ func ToPOIDetailedInfoSlice(pois []types.POIDetailedInfo) []*poiv1.POIDetailedIn
 	return result
 }
 
-func ToPOIDetailedInfo(poi types.POIDetailedInfo) *poiv1.POIDetailedInfo {
+func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	resp := &poiv1.POIDetailedInfo{
 		Id:               poi.ID.String(),
 		City:             poi.City,
@@ -128,7 +128,7 @@ func ToPOIDetailedInfo(poi types.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	return resp
 }
 
-func ToAIItineraryResponse(resp types.AIItineraryResponse) *chatv1.AIItineraryResponse {
+func ToAIItineraryResponse(resp locitypes.AIItineraryResponse) *chatv1.AIItineraryResponse {
 	return &chatv1.AIItineraryResponse{
 		ItineraryName:      resp.ItineraryName,
 		OverallDescription: resp.OverallDescription,
@@ -138,28 +138,28 @@ func ToAIItineraryResponse(resp types.AIItineraryResponse) *chatv1.AIItineraryRe
 	}
 }
 
-func ToConversationMessage(msg types.ConversationMessage) *chatv1.ConversationMessage {
+func ToConversationMessage(msg locitypes.ConversationMessage) *chatv1.ConversationMessage {
 	role := chatv1.MessageRole_MESSAGE_ROLE_UNSPECIFIED
 	switch msg.Role {
-	case types.RoleUser:
+	case locitypes.RoleUser:
 		role = chatv1.MessageRole_MESSAGE_ROLE_USER
-	case types.RoleAssistant:
+	case locitypes.RoleAssistant:
 		role = chatv1.MessageRole_MESSAGE_ROLE_ASSISTANT
-	case types.RoleSystem:
+	case locitypes.RoleSystem:
 		role = chatv1.MessageRole_MESSAGE_ROLE_SYSTEM
 	}
 
 	msgType := chatv1.MessageType_MESSAGE_TYPE_RESPONSE
 	switch msg.MessageType {
-	case types.TypeInitialRequest:
+	case locitypes.TypeInitialRequest:
 		msgType = chatv1.MessageType_MESSAGE_TYPE_INITIAL_REQUEST
-	case types.TypeModificationRequest:
+	case locitypes.TypeModificationRequest:
 		msgType = chatv1.MessageType_MESSAGE_TYPE_MODIFICATION_REQUEST
-	case types.TypeClarification:
+	case locitypes.TypeClarification:
 		msgType = chatv1.MessageType_MESSAGE_TYPE_CLARIFICATION
-	case types.TypeItineraryResponse:
+	case locitypes.TypeItineraryResponse:
 		msgType = chatv1.MessageType_MESSAGE_TYPE_ITINERARY_RESPONSE
-	case types.TypeError:
+	case locitypes.TypeError:
 		msgType = chatv1.MessageType_MESSAGE_TYPE_ERROR
 	}
 
@@ -172,7 +172,7 @@ func ToConversationMessage(msg types.ConversationMessage) *chatv1.ConversationMe
 	}
 }
 
-func ToConversationMessages(msgs []types.ConversationMessage) []*chatv1.ConversationMessage {
+func ToConversationMessages(msgs []locitypes.ConversationMessage) []*chatv1.ConversationMessage {
 	out := make([]*chatv1.ConversationMessage, 0, len(msgs))
 	for _, m := range msgs {
 		out = append(out, ToConversationMessage(m))
@@ -180,7 +180,7 @@ func ToConversationMessages(msgs []types.ConversationMessage) []*chatv1.Conversa
 	return out
 }
 
-func ToChatSession(session *types.ChatSession) *chatv1.ChatSession {
+func ToChatSession(session *locitypes.ChatSession) *chatv1.ChatSession {
 	if session == nil {
 		return nil
 	}
@@ -191,11 +191,11 @@ func ToChatSession(session *types.ChatSession) *chatv1.ChatSession {
 
 	status := chatv1.SessionStatus_SESSION_STATUS_UNSPECIFIED
 	switch session.Status {
-	case types.StatusActive:
+	case locitypes.StatusActive:
 		status = chatv1.SessionStatus_SESSION_STATUS_ACTIVE
-	case types.StatusExpired:
+	case locitypes.StatusExpired:
 		status = chatv1.SessionStatus_SESSION_STATUS_EXPIRED
-	case types.StatusClosed:
+	case locitypes.StatusClosed:
 		status = chatv1.SessionStatus_SESSION_STATUS_CLOSED
 	}
 
@@ -213,7 +213,7 @@ func ToChatSession(session *types.ChatSession) *chatv1.ChatSession {
 	}
 }
 
-func ToGetChatSessionsResponse(resp *types.ChatSessionsResponse) *chatv1.GetChatSessionsResponse {
+func ToGetChatSessionsResponse(resp *locitypes.ChatSessionsResponse) *chatv1.GetChatSessionsResponse {
 	if resp == nil {
 		return &chatv1.GetChatSessionsResponse{}
 	}

@@ -21,9 +21,9 @@ var _ interestsService = (*interestsServiceImpl)(nil)
 type interestsService interface {
 	// Removeinterests remove interests
 	Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error
-	GetAllInterests(ctx context.Context) ([]*types.Interest, error)
-	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error)
-	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error
+	GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error)
+	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error)
+	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error
 }
 
 // interestsServiceImpl provides the implementation for interestsService.
@@ -43,7 +43,7 @@ func NewinterestsService(repo Repository, logger *slog.Logger) *interestsService
 }
 
 // CreateInterest create user interest
-func (s *interestsServiceImpl) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error) {
+func (s *interestsServiceImpl) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Createinterests", trace.WithAttributes(
 		attribute.String("name", name),
 		attribute.String("description", *description),
@@ -92,7 +92,7 @@ func (s *interestsServiceImpl) Removeinterests(ctx context.Context, userID, inte
 }
 
 // GetAllInterests retrieves all available interests.
-func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*types.Interest, error) {
+func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "GetAllInterests")
 	defer span.End()
 
@@ -112,7 +112,7 @@ func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*types.In
 	return interests, nil
 }
 
-func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Updateinterests", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("interest.id", interestID.String()),
@@ -133,7 +133,7 @@ func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID, inte
 }
 
 // GetUserEnhancedInterests retrieves a user's enhanced interests.
-//func (s *interestsServiceImpl) GetUserEnhancedInterests(ctx context.Context, userID uuid.UUID) ([]types.EnhancedInterest, error) {
+//func (s *interestsServiceImpl) GetUserEnhancedInterests(ctx context.Context, userID uuid.UUID) ([]locitypes.EnhancedInterest, error) {
 //	ctx, span := otel.Tracer("interestsService").Start(ctx, "GetUserEnhancedInterests", trace.WithAttributes(
 //		attribute.String("user.id", userID.String()),
 //	))

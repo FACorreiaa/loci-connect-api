@@ -139,7 +139,7 @@ func TestServiceImpl_SaveItenerary_Integration(t *testing.T) {
 	cityID := createTestCityForChat(t)
 
 	t.Run("Save itinerary successfully", func(t *testing.T) {
-		req := types.BookmarkRequest{
+		req := locitypes.BookmarkRequest{
 			Title:       "My Lisbon Trip",
 			Description: "A wonderful trip to Lisbon",
 			CityID:      cityID,
@@ -169,7 +169,7 @@ func TestServiceImpl_RemoveItenerary_Integration(t *testing.T) {
 	cityID := createTestCityForChat(t)
 
 	// Create test itinerary
-	req := types.BookmarkRequest{
+	req := locitypes.BookmarkRequest{
 		Title:       "Trip to Remove",
 		Description: "This will be removed",
 		CityID:      cityID,
@@ -212,7 +212,7 @@ func TestServiceImpl_StartNewSession_Integration(t *testing.T) {
 	t.Run("Start new chat session", func(t *testing.T) {
 		cityName := "Lisbon"
 		message := "I want to explore Lisbon for 2 days"
-		userLocation := &types.UserLocation{
+		userLocation := &locitypes.UserLocation{
 			Latitude:  38.7223,
 			Longitude: -9.1393,
 		}
@@ -253,7 +253,7 @@ func TestServiceImpl_ContinueSession_Integration(t *testing.T) {
 	// Start a session first
 	cityName := "Lisbon"
 	initialMessage := "I want to explore Lisbon"
-	userLocation := &types.UserLocation{
+	userLocation := &locitypes.UserLocation{
 		Latitude:  38.7223,
 		Longitude: -9.1393,
 	}
@@ -292,7 +292,7 @@ func TestServiceImpl_GetIteneraryResponse_Integration(t *testing.T) {
 
 	t.Run("Get itinerary response", func(t *testing.T) {
 		cityName := "Lisbon"
-		userLocation := &types.UserLocation{
+		userLocation := &locitypes.UserLocation{
 			Latitude:  38.7223,
 			Longitude: -9.1393,
 		}
@@ -336,15 +336,15 @@ func TestSimpleIntentClassifier_Integration(t *testing.T) {
 
 	testCases := []struct {
 		message      string
-		expectedType types.IntentType
+		expectedType locitypes.IntentType
 	}{
-		{"I want to add a museum to my trip", types.IntentAddPOI},
-		{"Please include the cathedral", types.IntentAddPOI},
-		{"Remove the restaurant from my list", types.IntentRemovePOI},
-		{"Delete this attraction", types.IntentRemovePOI},
-		{"What time does the museum open?", types.IntentAskQuestion},
-		{"Where is the best place to eat?", types.IntentAskQuestion},
-		{"Change my itinerary to focus on art", types.IntentModifyItinerary},
+		{"I want to add a museum to my trip", locitypes.IntentAddPOI},
+		{"Please include the cathedral", locitypes.IntentAddPOI},
+		{"Remove the restaurant from my list", locitypes.IntentRemovePOI},
+		{"Delete this attraction", locitypes.IntentRemovePOI},
+		{"What time does the museum open?", locitypes.IntentAskQuestion},
+		{"Where is the best place to eat?", locitypes.IntentAskQuestion},
+		{"Change my itinerary to focus on art", locitypes.IntentModifyItinerary},
 	}
 
 	for _, tc := range testCases {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"iter"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/llm"
 	"google.golang.org/genai"
 )
 
@@ -14,7 +14,7 @@ type TestLLMClient struct {
 	GenerateContentStreamFn          func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error)
 	GenerateResponseFn               func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
 	GenerateContentFn                func(ctx context.Context, prompt, apiKey string, config *genai.GenerateContentConfig) (string, error)
-	StartChatSessionFn               func(ctx context.Context, config *genai.GenerateContentConfig) (*generativeAI.ChatSession, error)
+	ModelFn                          func() string
 }
 
 func (t *TestLLMClient) GenerateContentStreamWithCache(
@@ -54,9 +54,11 @@ func (t *TestLLMClient) GenerateContent(ctx context.Context, prompt, apiKey stri
 	return "", nil
 }
 
-func (t *TestLLMClient) StartChatSession(ctx context.Context, config *genai.GenerateContentConfig) (*generativeAI.ChatSession, error) {
-	if t.StartChatSessionFn != nil {
-		return t.StartChatSessionFn(ctx, config)
+func (t *TestLLMClient) Model() string {
+	if t.ModelFn != nil {
+		return t.ModelFn()
 	}
-	return nil, nil
+	return ""
 }
+
+var _ llm.ChatClient = (*TestLLMClient)(nil)
