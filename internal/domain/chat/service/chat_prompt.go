@@ -306,21 +306,23 @@ func getPOIDetailsPrompt(city string, lat, lon float64) string {
 
 func generatedContinuedConversationPrompt(poi, city string) string {
 	return fmt.Sprintf(
-		`Provide detailed information about "%s" in %s.
-        If user writes "Restaurant" add "cuisine_type" to final response and hide "description_poi"
-        If user writes "Hotel" add "star_rating" to final response and hide "description_poi"
-		Analise this POI (The user can insert a POI name, a Restaurant name or an Hotel/Hostel name) and return the following JSON structure:
-    {
-        "name": "string (the POI name)",
-        "latitude": number (approximate latitude as float),
-        "longitude": number (approximate longitude as float),
-        "category": "string (e.g., Museum, Park, Historical Site)",
-        "description_poi": "string (50-100 words description)"
-        "cuisine_type": "string (for Restaurant)",
-        "star_rating": "number (for Hotel/Hostel)"
-    }
+		`Return ONLY a valid JSON object for "%s" in %s. Do not include any explanations, markdown formatting, or additional text.
 
-    If the POI is not found, return: {"name": "", "latitude": 0, "longitude": 0, "category": "", "description_poi": ""}`,
+Rules:
+- If this is a Restaurant: include "cuisine_type" and omit "description_poi"
+- If this is a Hotel: include "star_rating" and omit "description_poi"
+- For other POIs: include "description_poi" (50-100 words)
+
+Required JSON structure (return ONLY this, nothing else):
+{
+    "name": "string",
+    "latitude": number,
+    "longitude": number,
+    "category": "string",
+    "description_poi": "string"
+}
+
+If the POI is not found, return: {"name": "", "latitude": 0, "longitude": 0, "category": "", "description_poi": ""}`,
 		poi, city)
 }
 

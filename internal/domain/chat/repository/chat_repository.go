@@ -1518,7 +1518,8 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDet
             $6, $7, ST_SetSRID(ST_MakePoint($7, $6), 4326),
             $8, $9
         )
-        ON CONFLICT (name, latitude, longitude) DO NOTHING
+        ON CONFLICT (name, latitude, longitude) DO UPDATE SET
+            name = EXCLUDED.name
         RETURNING id
     `
 
@@ -1966,35 +1967,70 @@ func uniqueStringSlice(slice []string) []string {
 func CleanJSONResponse(response string) string {
 	response = strings.TrimSpace(response)
 
-	if strings.HasPrefix(response, "```json") {
-		response = strings.TrimPrefix(response, "```json")
-	} else if strings.HasPrefix(response, "```") {
-		response = strings.TrimPrefix(response, "```")
+	// Remove markdown code blocks (```json or ```)
+	// Use regex to remove everything before and after code blocks
+	codeBlockPattern := regexp.MustCompile("(?s)```(?:json)?\\s*([\\s\\S]*?)```")
+	if matches := codeBlockPattern.FindStringSubmatch(response); len(matches) > 1 {
+		response = matches[1]
+		response = strings.TrimSpace(response)
+	} else {
+		// Fallback to prefix/suffix removal
+		if strings.HasPrefix(response, "```json") {
+			response = strings.TrimPrefix(response, "```json")
+		} else if strings.HasPrefix(response, "```") {
+			response = strings.TrimPrefix(response, "```")
+		}
+		response = strings.TrimSuffix(response, "```")
+		response = strings.TrimSpace(response)
 	}
 
-	response = strings.TrimSuffix(response, "```")
-	response = strings.TrimSpace(response)
-
+	// Find the first { and last balanced }
 	firstBrace := strings.Index(response, "{")
 	if firstBrace == -1 {
 		return response
 	}
 
+	// Count braces to find the matching closing brace
 	braceCount := 0
 	lastValidBrace := -1
+	inString := false
+	escapeNext := false
+
 	for i := firstBrace; i < len(response); i++ {
-		switch response[i] {
-		case '{':
-			braceCount++
-		case '}':
-			braceCount--
-			if braceCount == 0 {
-				lastValidBrace = i
-				break
+		char := response[i]
+
+		// Handle string escaping
+		if escapeNext {
+			escapeNext = false
+			continue
+		}
+		if char == '\\' {
+			escapeNext = true
+			continue
+		}
+
+		// Track if we're inside a string
+		if char == '"' {
+			inString = !inString
+			continue
+		}
+
+		// Only count braces outside of strings
+		if !inString {
+			switch char {
+			case '{':
+				braceCount++
+			case '}':
+				braceCount--
+				if braceCount == 0 {
+					lastValidBrace = i
+					break
+				}
 			}
 		}
 	}
 
+	// If braces are unbalanced, try to find the last }
 	if braceCount != 0 {
 		lastBrace := strings.LastIndex(response, "}")
 		if lastBrace == -1 || lastBrace <= firstBrace {
@@ -2007,8 +2043,13 @@ func CleanJSONResponse(response string) string {
 		return response
 	}
 
+	// Extract just the JSON portion
 	jsonPortion := response[firstBrace : lastValidBrace+1]
+
+	// Remove any remaining backticks
 	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
+
+	// Remove trailing commas before closing braces/brackets
 	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
 
 	return strings.TrimSpace(jsonPortion)

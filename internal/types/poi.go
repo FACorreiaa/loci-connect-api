@@ -90,6 +90,7 @@ func (p *POIDetailedInfo) UnmarshalJSON(data []byte) error {
 	type Alias POIDetailedInfo
 	aux := &struct {
 		OpeningHours json.RawMessage `json:"opening_hours"`
+		StarRating   json.RawMessage `json:"star_rating"`
 		*Alias
 	}{
 		Alias: (*Alias)(p),
@@ -110,6 +111,19 @@ func (p *POIDetailedInfo) UnmarshalJSON(data []byte) error {
 			var hoursString string
 			if err := json.Unmarshal(aux.OpeningHours, &hoursString); err == nil {
 				p.OpeningHours = map[string]string{"general": hoursString}
+			}
+		}
+	}
+
+	// Handle star_rating that may come as number or string
+	if len(aux.StarRating) > 0 {
+		var asString string
+		if err := json.Unmarshal(aux.StarRating, &asString); err == nil {
+			p.StarRating = asString
+		} else {
+			var asNumber json.Number
+			if err := json.Unmarshal(aux.StarRating, &asNumber); err == nil {
+				p.StarRating = asNumber.String()
 			}
 		}
 	}

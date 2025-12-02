@@ -1459,9 +1459,9 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 
 // ContinueChat is a unary wrapper around the streaming continuation flow.
 func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
-	eventCh := make(chan locitypes.StreamEvent)
+	eventCh := make(chan locitypes.StreamEvent, 100) // Buffered channel to prevent blocking
 	go func() {
-		// Note: eventCh is closed by ContinueSessionStreamed via closeOnce
+		defer close(eventCh) // Ensure channel is closed when goroutine exits
 		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
 		if err != nil {
 			l.logger.Error("error processing continue stream", "error", err)
@@ -1473,8 +1473,16 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 
 	for event := range eventCh {
 		if event.Type == locitypes.EventTypeItinerary {
-			if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
+			// Try type assertion for pointer first
+			if itinerary, ok := event.Data.(*locitypes.AiCityResponse); ok {
+				lastItinerary = *itinerary
+				l.logger.Debug("Captured itinerary from event (pointer)", "poi_count", len(itinerary.AIItineraryResponse.PointsOfInterest))
+			} else if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
+				// Try value type
 				lastItinerary = itinerary
+				l.logger.Debug("Captured itinerary from event (value)", "poi_count", len(itinerary.AIItineraryResponse.PointsOfInterest))
+			} else {
+				l.logger.Warn("Failed to cast event data to AiCityResponse", "event_type", event.Type, "data_type", fmt.Sprintf("%T", event.Data))
 			}
 		}
 		if event.Message != "" {
