@@ -21,7 +21,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	svc, repo, tokens, emails := servicetest.NewTestAuthService()
 	handler := NewAuthHandler(svc)
 
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "access-token",
 			RefreshToken: "refresh-token",
@@ -81,7 +81,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 
 	hashed := servicetest.MustHash(t, "Str0ng!Pass")
 	user := servicetest.AddUser(repo, t, "rpc-login@example.com", true, hashed)
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "login-access",
 			RefreshToken: "login-refresh",
@@ -150,7 +150,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 		}
 		return &service.Claims{UserID: user.ID.String()}, nil
 	}
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "new-access",
 			RefreshToken: "new-refresh",

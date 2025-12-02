@@ -17,11 +17,8 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func (l *ServiceImpl) GenerateCityDataWorker(wg *sync.WaitGroup,
-	ctx context.Context,
-	cityName string,
-	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig,
+func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitGroup,
+	cityName string, resultCh chan<- types.GenAIResponse, config *genai.GenerateContentConfig,
 ) {
 	go func() {
 		ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateCityDataWorker", trace.WithAttributes(
@@ -99,11 +96,8 @@ func (l *ServiceImpl) GenerateCityDataWorker(wg *sync.WaitGroup,
 	}()
 }
 
-func (l *ServiceImpl) GenerateGeneralPOIWorker(wg *sync.WaitGroup,
-	ctx context.Context,
-	cityName string,
-	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig,
+func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.WaitGroup,
+	cityName string, resultCh chan<- types.GenAIResponse, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -158,10 +152,9 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(wg *sync.WaitGroup,
 	resultCh <- types.GenAIResponse{GeneralPOI: poiData.PointsOfInterest}
 }
 
-func (l *ServiceImpl) GeneratePersonalisedPOIWorker(wg *sync.WaitGroup, ctx context.Context,
+func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *sync.WaitGroup,
 	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
-	interestNames []string, tagsPromptPart string, userPrefs string,
-	config *genai.GenerateContentConfig,
+	interestNames []string, tagsPromptPart, userPrefs string, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -255,10 +248,9 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(wg *sync.WaitGroup, ctx cont
 }
 
 // GeneratePersonalisedPOIWorkerWithSemantics generates personalized POIs with semantic search enhancement
-func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(wg *sync.WaitGroup, ctx context.Context,
+func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Context, wg *sync.WaitGroup,
 	cityName string, userID, profileID, sessionID uuid.UUID, resultCh chan<- types.GenAIResponse,
-	interestNames []string, tagsPromptPart string, userPrefs string, semanticPOIs []types.POIDetailedInfo,
-	config *genai.GenerateContentConfig,
+	interestNames []string, tagsPromptPart, userPrefs string, semanticPOIs []types.POIDetailedInfo, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GeneratePersonalisedPOIWorkerWithSemantics", trace.WithAttributes(
 		attribute.String("city.name", cityName),

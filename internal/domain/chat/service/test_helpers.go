@@ -60,25 +60,3 @@ func (t *TestLLMClient) StartChatSession(ctx context.Context, config *genai.Gene
 	}
 	return nil, nil
 }
-
-// Helper function to create a mock iterator with test data
-func createMockIterator(responses []string) iter.Seq2[*genai.GenerateContentResponse, error] {
-	return func(yield func(*genai.GenerateContentResponse, error) bool) {
-		for _, resp := range responses {
-			response := &genai.GenerateContentResponse{
-				Candidates: []*genai.Candidate{
-					{
-						Content: &genai.Content{
-							Parts: []*genai.Part{
-								{Text: resp},
-							},
-						},
-					},
-				},
-			}
-			if !yield(response, nil) {
-				return
-			}
-		}
-	}
-}

@@ -34,7 +34,7 @@ func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, des
 	return args.Get(0).(*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error {
+func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	args := m.Called(ctx, userID, interestID)
 	return args.Error(0)
 }
@@ -47,7 +47,7 @@ func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*types.Inter
 	return args.Get(0).([]*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
 	args := m.Called(ctx, userID, interestID, params)
 	return args.Error(0)
 }
@@ -60,7 +60,7 @@ func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUI
 	return args.Get(0).(*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID uuid.UUID, interestID uuid.UUID) error {
+func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID, interestID uuid.UUID) error {
 	args := m.Called(ctx, profileID, interestID)
 	return args.Error(0)
 }

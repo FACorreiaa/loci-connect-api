@@ -31,7 +31,7 @@ func TestAuthService_RegisterUser_Success(t *testing.T) {
 		ExpiresAt:    time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return expectedPair, nil
 	}
 
@@ -99,7 +99,7 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "access",
 			RefreshToken: "refresh",
@@ -135,7 +135,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 		t.Fatalf("RegisterUser: %v", err)
 	}
 
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "login-access",
 			RefreshToken: "login-refresh",
@@ -185,7 +185,7 @@ func TestAuthService_RefreshTokens_InvalidSession(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, tokens, _ := servicetest.NewTestAuthService()
 	user := servicetest.AddUser(repo, t, "refresh@example.com", true, "Hashed!Pass1")
-	tokens.RefreshFunc = func(token string) (*service.Claims, error) {
+	tokens.RefreshFunc = func(_ string) (*service.Claims, error) {
 		return &service.Claims{UserID: user.ID.String()}, nil
 	}
 
@@ -339,7 +339,7 @@ func TestAuthService_RefreshTokens_Success(t *testing.T) {
 		}
 		return &service.Claims{UserID: user.ID.String()}, nil
 	}
-	tokens.GenerateFunc = func(userID, email, username, role string) (*service.TokenPair, error) {
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
 			AccessToken:  "access-new",
 			RefreshToken: "refresh-new",

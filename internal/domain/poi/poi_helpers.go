@@ -9,7 +9,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func (l *ServiceImpl) enrichAndFilterLLMResponse(rawPOIs []types.POIDetailedInfo, userLat, userLon, searchRadius float64) []types.POIDetailedInfo {
+func (s *ServiceImpl) enrichAndFilterLLMResponse(rawPOIs []types.POIDetailedInfo, userLat, userLon, searchRadius float64) []types.POIDetailedInfo {
 	var processedPOIs []types.POIDetailedInfo
 	for _, p := range rawPOIs {
 		distanceKm := calculateDistance(userLat, userLon, p.Latitude, p.Longitude)

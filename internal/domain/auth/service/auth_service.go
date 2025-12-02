@@ -262,7 +262,11 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	}
 
 	if s.emailService != nil {
-		go s.emailService.SendPasswordResetEmail(user.Email, user.DisplayName, resetToken)
+		go func(ctx context.Context, email, name, token string) {
+			if err := s.emailService.SendPasswordResetEmail(email, name, token); err != nil {
+				s.logger.WarnContext(ctx, "failed to send password reset email", slog.Any("error", err))
+			}
+		}(ctx, user.Email, user.DisplayName, resetToken)
 	}
 
 	return nil
@@ -296,7 +300,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, resetToken, newPassword
 }
 
 // ChangePassword changes the password for an authenticated user.
-func (s *AuthService) ChangePassword(ctx context.Context, userID string, currentPassword, newPassword string) error {
+func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
 	if userID == "" {
 		return fmt.Errorf("user id required")
 	}
@@ -352,7 +356,11 @@ func (s *AuthService) VerifyEmail(ctx context.Context, verificationToken string)
 
 	if s.emailService != nil {
 		if user, err := s.repo.GetUserByID(ctx, userToken.UserID); err == nil {
-			go s.emailService.SendWelcomeEmail(user.Email, user.DisplayName)
+			go func(ctx context.Context, email, name string) {
+				if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
+					s.logger.WarnContext(ctx, "failed to send welcome email", slog.Any("error", err))
+				}
+			}(ctx, user.Email, user.DisplayName)
 		}
 	}
 
@@ -409,7 +417,11 @@ func (s *AuthService) sendEmailVerification(ctx context.Context, user *repositor
 	}
 
 	if s.emailService != nil {
-		go s.emailService.SendVerificationEmail(user.Email, user.DisplayName, token)
+		go func(ctx context.Context, email, name, verificationToken string) {
+			if err := s.emailService.SendVerificationEmail(email, name, verificationToken); err != nil {
+				s.logger.WarnContext(ctx, "failed to send verification email", slog.Any("error", err))
+			}
+		}(ctx, user.Email, user.DisplayName, token)
 	}
 	return nil
 }

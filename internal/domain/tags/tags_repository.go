@@ -34,7 +34,7 @@ type Repository interface {
 	Create(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error)
 
 	// Delete removes an avoid tag for a user
-	Delete(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error
+	Delete(ctx context.Context, userID, tagID uuid.UUID) error
 
 	// Update updates on tag
 	Update(ctx context.Context, userID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error
@@ -43,7 +43,7 @@ type Repository interface {
 	GetTagByName(ctx context.Context, name string) (*types.Tags, error)
 
 	// LinkPersonalTagToProfile links a tag to a profile.
-	LinkPersonalTagToProfile(ctx context.Context, userID, profileID uuid.UUID, tagID uuid.UUID) error
+	LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error
 
 	// GetTagsForProfile retrieves all tags associated with a profile
 	GetTagsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Tags, error)
@@ -336,7 +336,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, p
 }
 
 // Delete deletes a specific personal tag belonging to a user.
-func (r *RepositoryImpl) Delete(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error {
+func (r *RepositoryImpl) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
 	ctx, span := otel.Tracer("tagsRepo").Start(ctx, "DeletePersonalTag", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "DELETE"),

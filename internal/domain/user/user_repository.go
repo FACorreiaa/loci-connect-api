@@ -24,6 +24,8 @@ import (
 var _ UserRepo = (*PostgresUserRepo)(nil)
 
 // UserRepo defines the contract for user data persistence.
+//
+//revive:disable-next-line:exported
 type UserRepo interface {
 	// GetUserByID retrieves a user's full profile by their unique ID.
 	// Returns types.ErrNotFound if the user doesn't exist or is inactive.

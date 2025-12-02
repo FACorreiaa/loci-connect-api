@@ -15,8 +15,7 @@ import (
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
-	profilerepo "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
-	profilesvc "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
+	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
@@ -35,7 +34,7 @@ type Dependencies struct {
 	AuthRepo     repository.AuthRepository
 	InterestRepo interestrepo.Repository
 	TagRepo      tagrepo.Repository
-	ProfileRepo  profilerepo.Repository
+	ProfileRepo  profiles.Repository
 	POIRepo      poirepo.Repository
 	CityRepo     cityrepo.Repository
 	ChatRepo     chatrepo.Repository
@@ -44,7 +43,7 @@ type Dependencies struct {
 	TokenManager service.TokenManager
 	AuthService  *service.AuthService
 	ChatService  chatservice.LlmInteractiontService
-	ProfileSvc   profilesvc.Service
+	ProfileSvc   profiles.Service
 
 	// Handlers
 	AuthHandler    *handler.AuthHandler
@@ -122,7 +121,7 @@ func (d *Dependencies) initRepositories() error {
 	d.AuthRepo = repository.NewPostgresAuthRepository(sqlDB)
 	d.InterestRepo = interestrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.TagRepo = tagrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
-	d.ProfileRepo = profilerepo.NewPostgresUserRepo(d.DB.Pool, d.Logger)
+	d.ProfileRepo = profiles.NewPostgresUserRepo(d.DB.Pool, d.Logger)
 	d.POIRepo = poirepo.NewRepository(d.DB.Pool, d.Logger)
 	d.CityRepo = cityrepo.NewCityRepository(d.DB.Pool, d.Logger)
 	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
@@ -151,7 +150,7 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
-	d.ProfileSvc = profilesvc.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
+	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	d.ChatService = chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,

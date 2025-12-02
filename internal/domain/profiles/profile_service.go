@@ -2,10 +2,12 @@ package profiles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -141,7 +143,11 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 		span.SetStatus(codes.Error, "Transaction begin failed")
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			l.WarnContext(ctx, "failed to rollback profile transaction", slog.Any("error", rollbackErr))
+		}
+	}()
 
 	// --- 2. Create the base profile ---
 	// NOTE: The repo method CreateSearchProfile should ONLY insert into user_preference_profiles

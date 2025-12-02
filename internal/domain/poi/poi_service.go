@@ -42,7 +42,7 @@ type Service interface {
 	// SearchPOIsSemantic Semantic search methods
 	SearchPOIsSemantic(ctx context.Context, query string, limit int) ([]types.POIDetailedInfo, error)
 	SearchPOIsSemanticByCity(ctx context.Context, query string, cityID uuid.UUID, limit int) ([]types.POIDetailedInfo, error)
-	SearchPOIsByQueryAndCity(ctx context.Context, query string, cityName string) ([]types.POIDetailedInfo, error)
+	SearchPOIsByQueryAndCity(ctx context.Context, query, cityName string) ([]types.POIDetailedInfo, error)
 	SearchPOIsHybrid(ctx context.Context, filter types.POIFilter, query string, semanticWeight float64) ([]types.POIDetailedInfo, error)
 	GenerateEmbeddingForPOI(ctx context.Context, poiID uuid.UUID) error
 	GenerateEmbeddingsForAllPOIs(ctx context.Context, batchSize int) error
@@ -363,7 +363,7 @@ func (s *ServiceImpl) SearchPOIsSemanticByCity(ctx context.Context, query string
 
 // SearchPOIsByQueryAndCity performs a semantic search for POIs using a query string and city name
 // If no results are found in the database, it falls back to LLM generation
-func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query string, cityName string) ([]types.POIDetailedInfo, error) {
+func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query, cityName string) ([]types.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("POIService").Start(ctx, "SearchPOIsByQueryAndCity", trace.WithAttributes(
 		attribute.String("query", query),
 		attribute.String("city.name", cityName),
@@ -438,7 +438,11 @@ func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query string
 
 		// Track search (async, don't fail on error)
 		if s.discoverRepo != nil {
-			go s.discoverRepo.TrackSearch(context.Background(), uuid.Nil, query, cityName, "llm", len(llmPOIs))
+			go func(ctx context.Context) {
+				if err := s.discoverRepo.TrackSearch(ctx, uuid.Nil, query, cityName, "llm", len(llmPOIs)); err != nil {
+					s.logger.WarnContext(ctx, "failed to track LLM search", slog.Any("error", err))
+				}
+			}(context.Background())
 		}
 
 		return llmPOIs, nil
@@ -456,14 +460,18 @@ func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query string
 
 	// Track search (async, don't fail on error)
 	if s.discoverRepo != nil {
-		go s.discoverRepo.TrackSearch(context.Background(), uuid.Nil, query, cityName, "database", len(pois))
+		go func(ctx context.Context) {
+			if err := s.discoverRepo.TrackSearch(ctx, uuid.Nil, query, cityName, "database", len(pois)); err != nil {
+				s.logger.WarnContext(ctx, "failed to track database search", slog.Any("error", err))
+			}
+		}(context.Background())
 	}
 
 	return pois, nil
 }
 
 // generatePOIsWithLLM generates POIs using LLM when database search returns no results
-func (s *ServiceImpl) generatePOIsWithLLM(ctx context.Context, query string, cityName string) ([]types.POIDetailedInfo, error) {
+func (s *ServiceImpl) generatePOIsWithLLM(ctx context.Context, query, cityName string) ([]types.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("POIService").Start(ctx, "generatePOIsWithLLM", trace.WithAttributes(
 		attribute.String("query", query),
 		attribute.String("city", cityName),
@@ -921,7 +929,7 @@ func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID,
 	resultCh := make(chan types.GenAIResponse, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go s.getGeneralPOIByDistance(&wg, ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+	go s.getGeneralPOIByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -935,8 +943,7 @@ func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID,
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralPOIByDistance(wg *sync.WaitGroup,
-	ctx context.Context,
+func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context, wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
@@ -1370,7 +1377,7 @@ func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uui
 	resultCh := make(chan types.GenAIResponse, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go s.getGeneralRestaurantByDistance(&wg, ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+	go s.getGeneralRestaurantByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -1384,8 +1391,7 @@ func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uui
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralRestaurantByDistance(wg *sync.WaitGroup,
-	ctx context.Context,
+func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context, wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
@@ -1471,7 +1477,7 @@ func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid
 	resultCh := make(chan types.GenAIResponse, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go s.getGeneralActivitiesByDistance(&wg, ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+	go s.getGeneralActivitiesByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -1485,8 +1491,7 @@ func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralActivitiesByDistance(wg *sync.WaitGroup,
-	ctx context.Context,
+func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context, wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
@@ -1572,7 +1577,7 @@ func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUI
 	resultCh := make(chan types.GenAIResponse, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go s.getGeneralHotelsByDistance(&wg, ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+	go s.getGeneralHotelsByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -1586,8 +1591,7 @@ func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUI
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralHotelsByDistance(wg *sync.WaitGroup,
-	ctx context.Context,
+func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context, wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
@@ -1673,7 +1677,7 @@ func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uui
 	resultCh := make(chan types.GenAIResponse, 1)
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go s.getGeneralAttractionsByDistance(&wg, ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+	go s.getGeneralAttractionsByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -1687,8 +1691,7 @@ func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uui
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralAttractionsByDistance(wg *sync.WaitGroup,
-	ctx context.Context,
+func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context, wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,

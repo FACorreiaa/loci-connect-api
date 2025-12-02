@@ -15,6 +15,7 @@ func detectDomainRegex(message string) DomainType {
 }
 
 // Your 4-matcher approach
+// revive:disable-next-line:var-naming
 var (
 	accommBuilder = a.NewAhoCorasickBuilder(a.Opts{
 		AsciiCaseInsensitive: true,

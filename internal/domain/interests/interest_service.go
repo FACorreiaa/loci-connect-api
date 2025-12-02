@@ -20,10 +20,10 @@ var _ interestsService = (*interestsServiceImpl)(nil)
 // interestsService defines the business logic contract for user operations.
 type interestsService interface {
 	// Removeinterests remove interests
-	Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error
+	Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error
 	GetAllInterests(ctx context.Context) ([]*types.Interest, error)
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error)
-	Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error
+	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error
 }
 
 // interestsServiceImpl provides the implementation for interestsService.
@@ -33,6 +33,8 @@ type interestsServiceImpl struct {
 }
 
 // NewinterestsService creates a new user service instance.
+//
+//revive:disable-next-line:unexported-return
 func NewinterestsService(repo Repository, logger *slog.Logger) *interestsServiceImpl {
 	return &interestsServiceImpl{
 		logger: logger,
@@ -66,7 +68,7 @@ func (s *interestsServiceImpl) CreateInterest(ctx context.Context, name string, 
 }
 
 // Removeinterests removes an interest from a user's preferences.
-func (s *interestsServiceImpl) Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error {
+func (s *interestsServiceImpl) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Removeinterests", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("interest.id", interestID.String()),
@@ -110,7 +112,7 @@ func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*types.In
 	return interests, nil
 }
 
-func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Updateinterests", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("interest.id", interestID.String()),

@@ -22,8 +22,8 @@ type tagsService interface {
 	GetTags(ctx context.Context, userID uuid.UUID) ([]*types.Tags, error)
 	GetTag(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error)
 	CreateTag(ctx context.Context, userID uuid.UUID, params types.CreatePersonalTagParams) (*types.PersonalTag, error)
-	DeleteTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error
-	Update(ctx context.Context, userID uuid.UUID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error
+	DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error
+	Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error
 }
 
 // tagsServiceImpl provides the implementation for UserService.
@@ -33,6 +33,8 @@ type tagsServiceImpl struct {
 }
 
 // NewtagsService creates a new user service instance.
+//
+//revive:disable-next-line:unexported-return
 func NewtagsService(repo Repository, logger *slog.Logger) *tagsServiceImpl {
 	return &tagsServiceImpl{
 		logger: logger,
@@ -108,7 +110,7 @@ func (s *tagsServiceImpl) CreateTag(ctx context.Context, userID uuid.UUID, param
 }
 
 // DeleteTag removes an avoid tag for a user.
-func (s *tagsServiceImpl) DeleteTag(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error {
+func (s *tagsServiceImpl) DeleteTag(ctx context.Context, userID, tagID uuid.UUID) error {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "RemoveUserAvoidTag", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("tag.id", tagID.String()),
@@ -131,7 +133,7 @@ func (s *tagsServiceImpl) DeleteTag(ctx context.Context, userID uuid.UUID, tagID
 	return nil
 }
 
-func (s *tagsServiceImpl) Update(ctx context.Context, userID uuid.UUID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (s *tagsServiceImpl) Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
 	ctx, span := otel.Tracer("UserService").Start(ctx, "UpdateUserAvoidTag", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("tag.id", tagID.String()),

@@ -87,7 +87,7 @@ type MockinterestsRepo struct {
 }
 
 // Implement methods from interests.interestsRepo used by profilessServiceImpl
-func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID uuid.UUID, interestID uuid.UUID) error {
+func (m *MockinterestsRepo) AddInterestToProfile(ctx context.Context, profileID, interestID uuid.UUID) error {
 	args := m.Called(ctx, profileID, interestID)
 	return args.Error(0)
 }
@@ -124,12 +124,12 @@ func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, des
 	return args.Get(0).(*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error {
+func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	args := m.Called(ctx, userID, interestID)
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
 	args := m.Called(ctx, userID, interestID, params)
 	return args.Error(0)
 }
@@ -140,7 +140,7 @@ type MocktagsRepo struct {
 }
 
 // Implement methods from tags.tagsRepo used
-func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID uuid.UUID, profileID uuid.UUID, tagID uuid.UUID) error {
+func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, profileID, tagID)
 	return args.Error(0)
 }
@@ -153,7 +153,7 @@ func (m *MocktagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUI
 	return args.Get(0).([]*types.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) Get(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) (*types.Tags, error) {
+func (m *MocktagsRepo) Get(ctx context.Context, userID, tagID uuid.UUID) (*types.Tags, error) {
 	args := m.Called(ctx, userID, tagID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -177,12 +177,12 @@ func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params type
 	return args.Get(0).(*types.PersonalTag), args.Error(1)
 }
 
-func (m *MocktagsRepo) Delete(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error {
+func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, tagID)
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) Update(ctx context.Context, userID uuid.UUID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (m *MocktagsRepo) Update(ctx context.Context, userID, tagsID uuid.UUID, params types.UpdatePersonalTagParams) error {
 	args := m.Called(ctx, userID, tagsID, params)
 	return args.Error(0)
 }

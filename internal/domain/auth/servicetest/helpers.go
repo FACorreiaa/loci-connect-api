@@ -49,17 +49,17 @@ type MockEmailSender struct {
 	WelcomeSent      bool
 }
 
-func (m *MockEmailSender) SendVerificationEmail(toEmail, toName, token string) error {
+func (m *MockEmailSender) SendVerificationEmail(_, _, _ string) error {
 	m.VerificationSent = true
 	return nil
 }
 
-func (m *MockEmailSender) SendPasswordResetEmail(toEmail, toName, token string) error {
+func (m *MockEmailSender) SendPasswordResetEmail(_, _, _ string) error {
 	m.ResetSent = true
 	return nil
 }
 
-func (m *MockEmailSender) SendWelcomeEmail(toEmail, toName string) error {
+func (m *MockEmailSender) SendWelcomeEmail(_, _ string) error {
 	m.WelcomeSent = true
 	return nil
 }
@@ -79,7 +79,7 @@ func NewMockAuthRepo() *MockAuthRepo {
 	}
 }
 
-func (m *MockAuthRepo) CreateUser(ctx context.Context, email, username, hashedPassword, displayName string) (*repository.User, error) {
+func (m *MockAuthRepo) CreateUser(_ context.Context, email, username, hashedPassword, displayName string) (*repository.User, error) {
 	if _, exists := m.Users[email]; exists {
 		return nil, common.ErrUserAlreadyExists
 	}
@@ -98,7 +98,7 @@ func (m *MockAuthRepo) CreateUser(ctx context.Context, email, username, hashedPa
 	return CloneUser(user), nil
 }
 
-func (m *MockAuthRepo) GetUserByEmail(ctx context.Context, email string) (*repository.User, error) {
+func (m *MockAuthRepo) GetUserByEmail(_ context.Context, email string) (*repository.User, error) {
 	user, ok := m.Users[email]
 	if !ok {
 		return nil, common.ErrUserNotFound
@@ -106,7 +106,7 @@ func (m *MockAuthRepo) GetUserByEmail(ctx context.Context, email string) (*repos
 	return CloneUser(user), nil
 }
 
-func (m *MockAuthRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*repository.User, error) {
+func (m *MockAuthRepo) GetUserByID(_ context.Context, userID uuid.UUID) (*repository.User, error) {
 	for _, user := range m.Users {
 		if user.ID == userID {
 			return CloneUser(user), nil
@@ -115,7 +115,7 @@ func (m *MockAuthRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*repo
 	return nil, common.ErrUserNotFound
 }
 
-func (m *MockAuthRepo) UpdateLastLogin(ctx context.Context, userID uuid.UUID) error {
+func (m *MockAuthRepo) UpdateLastLogin(_ context.Context, userID uuid.UUID) error {
 	for _, user := range m.Users {
 		if user.ID == userID {
 			now := time.Now()
@@ -126,7 +126,7 @@ func (m *MockAuthRepo) UpdateLastLogin(ctx context.Context, userID uuid.UUID) er
 	return common.ErrUserNotFound
 }
 
-func (m *MockAuthRepo) CreateUserSession(ctx context.Context, userID uuid.UUID, hashedRefreshToken, userAgent, clientIP string, expiresAt time.Time) (*repository.UserSession, error) {
+func (m *MockAuthRepo) CreateUserSession(_ context.Context, userID uuid.UUID, hashedRefreshToken, userAgent, clientIP string, expiresAt time.Time) (*repository.UserSession, error) {
 	session := &repository.UserSession{
 		ID:                 uuid.New(),
 		UserID:             userID,
@@ -140,7 +140,7 @@ func (m *MockAuthRepo) CreateUserSession(ctx context.Context, userID uuid.UUID, 
 	return session, nil
 }
 
-func (m *MockAuthRepo) GetUserSessionByToken(ctx context.Context, hashedToken string) (*repository.UserSession, error) {
+func (m *MockAuthRepo) GetUserSessionByToken(_ context.Context, hashedToken string) (*repository.UserSession, error) {
 	session, ok := m.Sessions[hashedToken]
 	if !ok || session.ExpiresAt.Before(time.Now()) {
 		return nil, common.ErrSessionNotFound
@@ -148,12 +148,12 @@ func (m *MockAuthRepo) GetUserSessionByToken(ctx context.Context, hashedToken st
 	return session, nil
 }
 
-func (m *MockAuthRepo) DeleteUserSession(ctx context.Context, hashedToken string) error {
+func (m *MockAuthRepo) DeleteUserSession(_ context.Context, hashedToken string) error {
 	delete(m.Sessions, hashedToken)
 	return nil
 }
 
-func (m *MockAuthRepo) DeleteAllUserSessions(ctx context.Context, userID uuid.UUID) error {
+func (m *MockAuthRepo) DeleteAllUserSessions(_ context.Context, userID uuid.UUID) error {
 	for token, session := range m.Sessions {
 		if session.UserID == userID {
 			delete(m.Sessions, token)
@@ -162,7 +162,7 @@ func (m *MockAuthRepo) DeleteAllUserSessions(ctx context.Context, userID uuid.UU
 	return nil
 }
 
-func (m *MockAuthRepo) CreateUserToken(ctx context.Context, userID uuid.UUID, tokenHash, tokenType string, expiresAt time.Time) error {
+func (m *MockAuthRepo) CreateUserToken(_ context.Context, userID uuid.UUID, tokenHash, tokenType string, expiresAt time.Time) error {
 	m.Tokens[tokenHash] = &repository.UserToken{
 		TokenHash: tokenHash,
 		UserID:    userID,
@@ -173,7 +173,7 @@ func (m *MockAuthRepo) CreateUserToken(ctx context.Context, userID uuid.UUID, to
 	return nil
 }
 
-func (m *MockAuthRepo) GetUserTokenByHash(ctx context.Context, tokenHash, tokenType string) (*repository.UserToken, error) {
+func (m *MockAuthRepo) GetUserTokenByHash(_ context.Context, tokenHash, tokenType string) (*repository.UserToken, error) {
 	token, ok := m.Tokens[tokenHash]
 	if !ok || token.Type != tokenType || token.ExpiresAt.Before(time.Now()) {
 		return nil, common.ErrInvalidToken
@@ -181,12 +181,12 @@ func (m *MockAuthRepo) GetUserTokenByHash(ctx context.Context, tokenHash, tokenT
 	return token, nil
 }
 
-func (m *MockAuthRepo) DeleteUserToken(ctx context.Context, tokenHash string) error {
+func (m *MockAuthRepo) DeleteUserToken(_ context.Context, tokenHash string) error {
 	delete(m.Tokens, tokenHash)
 	return nil
 }
 
-func (m *MockAuthRepo) VerifyEmail(ctx context.Context, userID uuid.UUID) error {
+func (m *MockAuthRepo) VerifyEmail(_ context.Context, userID uuid.UUID) error {
 	for _, user := range m.Users {
 		if user.ID == userID {
 			now := time.Now()
@@ -197,7 +197,7 @@ func (m *MockAuthRepo) VerifyEmail(ctx context.Context, userID uuid.UUID) error 
 	return common.ErrUserNotFound
 }
 
-func (m *MockAuthRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error {
+func (m *MockAuthRepo) UpdatePassword(_ context.Context, userID uuid.UUID, hashedPassword string) error {
 	for _, user := range m.Users {
 		if user.ID == userID {
 			user.HashedPassword = hashedPassword
@@ -207,11 +207,11 @@ func (m *MockAuthRepo) UpdatePassword(ctx context.Context, userID uuid.UUID, has
 	return common.ErrUserNotFound
 }
 
-func (m *MockAuthRepo) CreateOrUpdateOAuthIdentity(ctx context.Context, providerName, providerUserID string, userID uuid.UUID, accessToken, refreshToken *string) error {
+func (m *MockAuthRepo) CreateOrUpdateOAuthIdentity(_ context.Context, _, _ string, _ uuid.UUID, _, _ *string) error {
 	return nil
 }
 
-func (m *MockAuthRepo) GetUserByOAuthIdentity(ctx context.Context, providerName, providerUserID string) (*repository.User, error) {
+func (m *MockAuthRepo) GetUserByOAuthIdentity(_ context.Context, _, _ string) (*repository.User, error) {
 	return nil, common.ErrUserNotFound
 }
 

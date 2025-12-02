@@ -1,7 +1,6 @@
 version: "2"
 linters:
   enable:
-    - tagliatelle
     - govet
     - staticcheck
     - revive
@@ -29,15 +28,6 @@ linters:
         - G505
         - G501
         - G401
-
-    tagliatelle:
-      case:
-        rules:
-          json: camel
-          path: camel
-          query: camel
-          db: snake
-          env: upperSnake
 
 formatters:
   settings:

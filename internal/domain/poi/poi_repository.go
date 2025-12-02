@@ -36,7 +36,7 @@ type Repository interface {
 	GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]types.POIDetailedInfo, error)
 	// GetPOIsByLocationAndDistanceWithFilters(ctx context.Context, lat, lon, radiusMeters float64, filters map[string]string) ([]types.POIDetailedInfo, error)
 	AddPoiToFavourites(ctx context.Context, userID, poiID uuid.UUID) (uuid.UUID, error)
-	AddLLMPoiToFavourite(ctx context.Context, userID uuid.UUID, llmPoiID uuid.UUID) (uuid.UUID, error)
+	AddLLMPoiToFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) (uuid.UUID, error)
 	RemovePoiFromFavourites(ctx context.Context, userID, poiID uuid.UUID) error
 
 	RemoveLLMPoiFromFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) error
@@ -48,7 +48,7 @@ type Repository interface {
 	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]types.POIDetailedInfo, error)
 
 	// POI details
-	FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon float64, tolerance float64) (*types.POIDetailedInfo, error)
+	FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error)
 	SavePOIDetails(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
 	SearchPOIs(ctx context.Context, filter types.POIFilter) ([]types.POIDetailedInfo, error)
 
@@ -78,7 +78,7 @@ type Repository interface {
 
 	GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*types.UserSavedItinerary, error)
 	GetItineraries(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]types.UserSavedItinerary, int, error)
-	UpdateItinerary(ctx context.Context, userID uuid.UUID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error)
+	UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error)
 	SaveItinerary(ctx context.Context, userID, cityID uuid.UUID) (uuid.UUID, error)
 	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error
 	SavePOItoPointsOfInterest(ctx context.Context, poi types.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
@@ -236,7 +236,7 @@ func (r *RepositoryImpl) AddPoiToFavourites(ctx context.Context, userID, poiID u
 	return id, nil
 }
 
-func (r *RepositoryImpl) AddLLMPoiToFavourite(ctx context.Context, userID uuid.UUID, llmPoiID uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) AddLLMPoiToFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) (uuid.UUID, error) {
 	query := `
         INSERT INTO user_favorite_llm_pois (user_id, llm_poi_id)
         VALUES ($1, $2)
@@ -620,7 +620,7 @@ func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) 
 	return pois, nil
 }
 
-func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon float64, tolerance float64) (*types.POIDetailedInfo, error) {
+func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "FindPOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
 		attribute.Float64("latitude", lat),
@@ -1430,7 +1430,7 @@ func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, p
 	return itineraries, totalRecords, nil
 }
 
-func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID uuid.UUID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
+func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "UpdateItinerary", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),

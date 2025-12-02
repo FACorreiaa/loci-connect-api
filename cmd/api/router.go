@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 
@@ -135,19 +136,23 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 // registerUtilityRoutes registers health check, metrics, and other utility routes
 func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 	// Health check endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		if err := deps.DB.Health(); err != nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("database unhealthy"))
+			if _, writeErr := w.Write([]byte("database unhealthy")); writeErr != nil {
+				deps.Logger.Error("failed to write health response", slog.Any("error", writeErr))
+			}
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			deps.Logger.Error("failed to write health response", slog.Any("error", err))
+		}
 	})
 	deps.Logger.Info("registered health check", "path", "/health")
 
 	// Extended health with details on dependencies/env
-	mux.HandleFunc("/health/details", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health/details", func(w http.ResponseWriter, _ *http.Request) {
 		type status struct {
 			Status string `json:"status"`
 			Detail string `json:"detail,omitempty"`
@@ -170,20 +175,26 @@ func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 		for _, v := range result {
 			if v.Status == "fail" {
 				w.WriteHeader(http.StatusServiceUnavailable)
-				json.NewEncoder(w).Encode(result)
+				if err := json.NewEncoder(w).Encode(result); err != nil {
+					deps.Logger.Error("failed to encode health details", slog.Any("error", err))
+				}
 				return
 			}
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(result)
+		if err := json.NewEncoder(w).Encode(result); err != nil {
+			deps.Logger.Error("failed to encode health details", slog.Any("error", err))
+		}
 	})
 	deps.Logger.Info("registered health details", "path", "/health/details")
 
 	// Readiness check endpoint
-	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ready"))
+		if _, err := w.Write([]byte("ready")); err != nil {
+			deps.Logger.Error("failed to write readiness response", slog.Any("error", err))
+		}
 	})
 	deps.Logger.Info("registered readiness check", "path", "/ready")
 

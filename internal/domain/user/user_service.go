@@ -14,6 +14,8 @@ import (
 var _ UserService = (*ServiceUserImpl)(nil)
 
 // UserService defines the business logic contract for user operations.
+//
+//revive:disable-next-line:exported
 type UserService interface {
 	// GetUserProfile Profile Management
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (*types.UserProfile, error)

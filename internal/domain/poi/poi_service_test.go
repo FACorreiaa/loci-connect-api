@@ -40,7 +40,7 @@ func (m *MockCityRepository) FindCityByNameAndCountry(ctx context.Context, name,
 
 type stubDiscoverRepo struct{}
 
-func (stubDiscoverRepo) TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error {
+func (stubDiscoverRepo) TrackSearch(_ context.Context, _ uuid.UUID, _, _, _ string, _ int) error {
 	return nil
 }
 
@@ -99,7 +99,7 @@ type MockPOIRepository struct {
 	mock.Mock
 }
 
-func (m *MockPOIRepository) GetPOIsByLocationAndDistanceWithCategory(ctx context.Context, lat, lon, radiusMeters float64, category string) ([]types.POIDetailedInfo, error) {
+func (m *MockPOIRepository) GetPOIsByLocationAndDistanceWithCategory(_ context.Context, _, _, _ float64, _ string) ([]types.POIDetailedInfo, error) {
 	panic("implement me")
 }
 
@@ -145,7 +145,7 @@ func (m *MockPOIRepository) AddPoiToFavourites(ctx context.Context, userID, poiI
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockPOIRepository) AddLLMPoiToFavourite(ctx context.Context, userID uuid.UUID, llmPoiID uuid.UUID) (uuid.UUID, error) {
+func (m *MockPOIRepository) AddLLMPoiToFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) (uuid.UUID, error) {
 	args := m.Called(ctx, userID, llmPoiID)
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
@@ -194,7 +194,7 @@ func (m *MockPOIRepository) GetPOIsByCityID(ctx context.Context, cityID uuid.UUI
 	return args.Get(0).([]types.POIDetailedInfo), args.Error(1)
 }
 
-func (m *MockPOIRepository) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon float64, tolerance float64) (*types.POIDetailedInfo, error) {
+func (m *MockPOIRepository) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error) {
 	args := m.Called(ctx, cityID, lat, lon, tolerance)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -318,7 +318,7 @@ func (m *MockPOIRepository) GetItineraryByUserIDAndCityID(ctx context.Context, u
 	return args.Get(0).(*types.UserSavedItinerary), args.Error(1)
 }
 
-func (m *MockPOIRepository) UpdateItinerary(ctx context.Context, userID uuid.UUID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
+func (m *MockPOIRepository) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
 	args := m.Called(ctx, userID, itineraryID, updates)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

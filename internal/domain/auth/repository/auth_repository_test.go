@@ -314,7 +314,7 @@ func startMockDB(t *testing.T, script *pgmock.Script) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("ParseConfig: %v", err)
 	}
-	cfg.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+	cfg.DialFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
 		return clientConn, nil
 	}
 	cfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol

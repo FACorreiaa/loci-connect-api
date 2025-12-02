@@ -86,6 +86,8 @@ type IntentClassifier interface {
 }
 
 // ServiceImpl provides the implementation for LlmInteractiontService.
+//
+//revive:disable-next-line:exported
 type ServiceImpl struct {
 	logger             *slog.Logger
 	interestRepo       interests.Repository
@@ -243,7 +245,7 @@ func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.
 	return interests, searchProfile, tags, nil
 }
 
-func (l *ServiceImpl) PreparePromptData(interests []*types.Interest, tags []*types.Tags, searchProfile *types.UserPreferenceProfileResponse) (interestNames []string, tagsPromptPart string, userPrefs string) {
+func (l *ServiceImpl) PreparePromptData(interests []*types.Interest, tags []*types.Tags, searchProfile *types.UserPreferenceProfileResponse) (interestNames []string, tagsPromptPart, userPrefs string) {
 	if len(interests) == 0 {
 		interestNames = []string{"general sightseeing", "local experiences"}
 	} else {
@@ -340,7 +342,7 @@ func (l *ServiceImpl) HandleGeneralPOIs(ctx context.Context, pois []types.POIDet
 	}
 }
 
-func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.POIDetailedInfo, cityID uuid.UUID, userLocation *types.UserLocation, llmInteractionID uuid.UUID, userID, profileID uuid.UUID) ([]types.POIDetailedInfo, error) {
+func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.POIDetailedInfo, cityID uuid.UUID, userLocation *types.UserLocation, llmInteractionID, userID, profileID uuid.UUID) ([]types.POIDetailedInfo, error) {
 	if userLocation == nil || len(pois) == 0 {
 		return pois, nil // No sorting possible
 	}
@@ -380,10 +382,9 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.P
 }
 
 // GenerateEnhancedPersonalisedPOIWorker generates personalized POIs with domain-aware filtering
-func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(wg *sync.WaitGroup, ctx context.Context,
+func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context, wg *sync.WaitGroup,
 	cityName string, userID, profileID uuid.UUID, resultCh chan<- types.GenAIResponse,
-	enhancedPromptData string, domain types.DomainType,
-	config *genai.GenerateContentConfig,
+	enhancedPromptData string, domain types.DomainType, config *genai.GenerateContentConfig,
 ) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateEnhancedPersonalisedPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
@@ -800,14 +801,14 @@ func (l *ServiceImpl) EndSession(ctx context.Context, userID, sessionID uuid.UUI
 }
 
 // GetRecentInteractions currently returns an empty response placeholder.
-func (l *ServiceImpl) GetRecentInteractions(ctx context.Context, _ uuid.UUID, _ *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error) {
+func (l *ServiceImpl) GetRecentInteractions(_ context.Context, _ uuid.UUID, _ *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error) {
 	// TODO: hook into repository once implemented.
 	return &chatv1.GetRecentInteractionsResponse{}, nil
 }
 
 // getPOIDetailedInfos returns a formatted string with POI details.
-func (l *ServiceImpl) getPOIDetailedInfos(wg *sync.WaitGroup, ctx context.Context,
-	city string, lat float64, lon float64, userID uuid.UUID,
+func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGroup,
+	city string, lat, lon float64, userID uuid.UUID,
 	resultCh chan<- types.POIDetailedInfo, config *genai.GenerateContentConfig,
 ) {
 	defer wg.Done()
@@ -968,30 +969,28 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	go l.getPOIDetailedInfos(&wg, ctx, city, lat, lon, userID, resultCh, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
+	go l.getPOIDetailedInfos(ctx, &wg, city, lat, lon, userID, resultCh, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
 
 	go func() {
 		wg.Wait()
 		close(resultCh)
 	}()
 
-	var poiResult *types.POIDetailedInfo
-	for res := range resultCh {
-		if res.Err != nil {
-			l.logger.ErrorContext(ctx, "Error generating POI details", slog.Any("error", res.Err))
-			span.RecordError(res.Err)
-			span.SetStatus(codes.Error, "Failed to generate POI details")
-			return nil, res.Err
-		}
-		poiResult = &res
-		break
-	}
-
-	if poiResult == nil {
+	res, ok := <-resultCh
+	if !ok {
 		l.logger.WarnContext(ctx, "No response received for POI details")
 		span.SetStatus(codes.Error, "No response received")
 		return nil, fmt.Errorf("no response received for POI details")
 	}
+
+	if res.Err != nil {
+		l.logger.ErrorContext(ctx, "Error generating POI details", slog.Any("error", res.Err))
+		span.RecordError(res.Err)
+		span.SetStatus(codes.Error, "Failed to generate POI details")
+		return nil, res.Err
+	}
+
+	poiResult := &res
 
 	// Save to database
 	_, err = l.poiRepo.SavePoi(ctx, *poiResult, cityID)
@@ -1166,7 +1165,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //}
 
 // generateSemanticPOIRecommendations generates POI recommendations using semantic search
-func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID uuid.UUID, userID uuid.UUID, userLocation *types.UserLocation, semanticWeight float64) ([]types.POIDetailedInfo, error) {
+func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID, userID uuid.UUID, userLocation *types.UserLocation, semanticWeight float64) ([]types.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "generateSemanticPOIRecommendations", trace.WithAttributes(
 		attribute.String("user.message", userMessage),
 		attribute.String("city.id", cityID.String()),
@@ -1316,7 +1315,7 @@ func (l *ServiceImpl) handleSemanticRemovePOI(ctx context.Context, message strin
 }
 
 // min helper function
-func min(a, b int) int {
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
@@ -1459,7 +1458,7 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 }
 
 // ContinueChat is a unary wrapper around the streaming continuation flow.
-func (l *ServiceImpl) ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error) {
+func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*types.ChatResponse, error) {
 	eventCh := make(chan types.StreamEvent)
 	go func() {
 		// Note: eventCh is closed by ContinueSessionStreamed via closeOnce
@@ -1965,7 +1964,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 			},
 		}, 3)
 
-		for _, semanticPOI := range semanticPOIs[:min(3, len(semanticPOIs))] {
+		for _, semanticPOI := range semanticPOIs[:minInt(3, len(semanticPOIs))] {
 			alreadyExists := false
 			for _, existingPOI := range session.CurrentItinerary.AIItineraryResponse.PointsOfInterest {
 				if strings.EqualFold(existingPOI.Name, existingPOI.Name) {
@@ -2006,7 +2005,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 				"message": "All semantic matches already in itinerary",
 				"alternatives": func() []string {
 					var names []string
-					for i, p := range semanticPOIs[:min(3, len(semanticPOIs))] {
+					for i, p := range semanticPOIs[:minInt(3, len(semanticPOIs))] {
 						names = append(names, p.Name)
 						if i >= 2 {
 							break
@@ -2020,7 +2019,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 		return fmt.Sprintf("I found some great options matching your request, but they're already in your itinerary. Here are some suggestions: %s",
 			strings.Join(func() []string {
 				var names []string
-				for i, p := range semanticPOIs[:min(3, len(semanticPOIs))] {
+				for i, p := range semanticPOIs[:minInt(3, len(semanticPOIs))] {
 					names = append(names, p.Name)
 					if i >= 2 {
 						break
@@ -2374,21 +2373,27 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
 					// Try to unmarshal into GeneralCityData struct
 					if jsonBytes, err := json.Marshal(cityData); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
+						}
 					}
 				}
 			}
 			if pois, ok := completeData["points_of_interest"]; ok {
 				if poisArr, parseOk := pois.([]interface{}); parseOk {
 					if jsonBytes, err := json.Marshal(poisArr); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
+						}
 					}
 				}
 			}
 			if itinResp, ok := completeData["itinerary_response"]; ok {
 				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
 					if jsonBytes, err := json.Marshal(itinData); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+						}
 					}
 				}
 			}
@@ -2852,21 +2857,27 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
 					// Try to unmarshal into GeneralCityData struct
 					if jsonBytes, err := json.Marshal(cityData); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
+						}
 					}
 				}
 			}
 			if pois, ok := completeData["points_of_interest"]; ok {
 				if poisArr, parseOk := pois.([]interface{}); parseOk {
 					if jsonBytes, err := json.Marshal(poisArr); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
+						}
 					}
 				}
 			}
 			if itinResp, ok := completeData["itinerary_response"]; ok {
 				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
 					if jsonBytes, err := json.Marshal(itinData); err == nil {
-						json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse)
+						if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+						}
 					}
 				}
 			}

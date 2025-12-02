@@ -544,6 +544,8 @@ func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, 
 
 	var args []interface{}
 	argIndex := 1
+	_ = category
+	_ = theme
 
 	if searchTerm != "" {
 		query += fmt.Sprintf(" AND (l.name ILIKE $%d OR l.description ILIKE $%d)", argIndex, argIndex+1)
@@ -560,7 +562,6 @@ func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, 
 	if contentType != "" {
 		query += fmt.Sprintf(" AND li.content_type = $%d", argIndex)
 		args = append(args, contentType)
-		argIndex++
 	}
 
 	query += " ORDER BY l.save_count DESC, l.created_at DESC"

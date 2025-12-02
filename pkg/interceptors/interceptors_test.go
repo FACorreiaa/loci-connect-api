@@ -11,7 +11,7 @@ import (
 
 func TestRequestIDInterceptor_GeneratesID(t *testing.T) {
 	interceptor := NewRequestIDInterceptor("X-Request-ID")
-	handler := interceptor.WrapUnary(func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+	handler := interceptor.WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		id, ok := RequestIDFromContext(ctx)
 		if !ok || id == "" {
 			t.Fatalf("expected request id in context")
@@ -28,7 +28,7 @@ func TestRequestIDInterceptor_GeneratesID(t *testing.T) {
 func TestRateLimitInterceptor_ExceedsLimit(t *testing.T) {
 	limiter := rate.NewLimiter(0, 0)
 	interceptor := NewRateLimitInterceptor(limiter)
-	handler := interceptor.WrapUnary(func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+	handler := interceptor.WrapUnary(func(_ context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		return connect.NewResponse(&emptypb.Empty{}), nil
 	})
 	req := connect.NewRequest(&emptypb.Empty{})

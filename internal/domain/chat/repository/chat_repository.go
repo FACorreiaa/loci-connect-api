@@ -28,7 +28,7 @@ var _ Repository = (*RepositoryImpl)(nil)
 type Repository interface {
 	SaveInteraction(ctx context.Context, interaction types.LlmInteraction) (uuid.UUID, error)
 	SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []types.POIDetailedInfo, userID, searchProfileID, llmInteractionID, cityID uuid.UUID) error
-	GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID uuid.UUID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
+	GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
 	AddChatToBookmark(ctx context.Context, itinerary *types.UserSavedItinerary) (uuid.UUID, error)
 	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error)
 	RemoveChatFromBookmark(ctx context.Context, userID, itineraryID uuid.UUID) error
@@ -43,9 +43,9 @@ type Repository interface {
 	AddMessageToSession(ctx context.Context, sessionID uuid.UUID, message types.ConversationMessage) error
 
 	//
-	SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID uuid.UUID, llmInteractionID uuid.UUID) (uuid.UUID, error)
+	SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error)
 	GetPOIsBySessionSortedByDistance(ctx context.Context, sessionID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error)
-	GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID uuid.UUID, sourceInteractionID uuid.UUID) (uuid.UUID, error)
+	GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID, sourceInteractionID uuid.UUID) (uuid.UUID, error)
 	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error
 
 	// RAG
@@ -53,6 +53,7 @@ type Repository interface {
 	// FindSimilarInteractions(ctx context.Context, queryEmbedding []float32, limit int, threshold float32) ([]types.LlmInteraction, error)
 }
 
+//revive:disable-next-line:exported
 type RepositoryImpl struct {
 	logger *slog.Logger
 	pgpool *pgxpool.Pool
@@ -314,7 +315,7 @@ func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []t
 }
 
 func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
-	ctx context.Context, llmInteractionID uuid.UUID, cityID uuid.UUID, userLocation types.UserLocation,
+	ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation types.UserLocation,
 ) ([]types.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "GetLlmSuggestedPOIsByInteractionSortedByDistance", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
@@ -414,7 +415,11 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *types
 		span.SetStatus(codes.Error, "Failed to start transaction")
 		return uuid.Nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+	}()
 
 	query := `
 		INSERT INTO user_saved_itineraries (
@@ -628,7 +633,11 @@ func (r *RepositoryImpl) RemoveChatFromBookmark(ctx context.Context, userID, iti
 		span.SetStatus(codes.Error, "Failed to start transaction")
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+	}()
 
 	query := `
 		DELETE FROM user_saved_itineraries
@@ -826,7 +835,11 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session types.ChatSe
 		r.logger.ErrorContext(ctx, "Failed to begin transaction for session creation", slog.Any("error", err))
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+	}()
 
 	query := `
         INSERT INTO chat_sessions (
@@ -1313,11 +1326,10 @@ func formatItineraryResponse(response types.AiCityResponse, cityName string) str
 				cityName,
 				totalPOIs,
 				firstPOIName)
-		} else {
-			return fmt.Sprintf("I created a personalized itinerary called '%s' for %s with great recommendations!",
-				response.AIItineraryResponse.ItineraryName,
-				cityName)
 		}
+		return fmt.Sprintf("I created a personalized itinerary called '%s' for %s with great recommendations!",
+			response.AIItineraryResponse.ItineraryName,
+			cityName)
 	}
 
 	// Fallback to generic response
@@ -1484,7 +1496,11 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi types.POIDetaile
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+	}()
 
 	// If poi.ID is already set (e.g., from LLM or previous step), use it. Otherwise, generate new.
 	recordID := poi.ID
@@ -1696,7 +1712,7 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]types.PO
 	return []types.POIDetailedInfo{}, nil
 }
 
-func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID uuid.UUID, _ uuid.UUID) (uuid.UUID, error) {
+func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID, _ uuid.UUID) (uuid.UUID, error) {
 	var poiDBID uuid.UUID
 	findPoiQuery := `SELECT id FROM points_of_interest WHERE name = $1 AND city_id = $2 LIMIT 1`
 	err := tx.QueryRow(ctx, findPoiQuery, POIDetailedInfo.Name, cityID).Scan(&poiDBID)
@@ -1827,7 +1843,7 @@ func calculateComplexityScore(pois, hotels, restaurants, messageCount int, hasIt
 	} else if totalContent > 10 {
 		score += 2
 	} else if totalContent > 5 {
-		score += 1
+		score++
 	}
 
 	// Bonus for having itinerary
@@ -1839,7 +1855,7 @@ func calculateComplexityScore(pois, hotels, restaurants, messageCount int, hasIt
 	if messageCount > 20 {
 		score += 2
 	} else if messageCount > 10 {
-		score += 1
+		score++
 	}
 
 	// Bonus for content diversity
@@ -1856,7 +1872,7 @@ func calculateComplexityScore(pois, hotels, restaurants, messageCount int, hasIt
 	if contentTypes >= 3 {
 		score += 2
 	} else if contentTypes >= 2 {
-		score += 1
+		score++
 	}
 
 	// Cap at 10
@@ -1877,7 +1893,7 @@ func countMessagesByRole(messages []types.ConversationMessage) (userCount, assis
 			assistantCount++
 		}
 	}
-	return
+	return userCount, assistantCount
 }
 
 // calculateAverageMessageLength calculates the average length of all messages
@@ -1904,7 +1920,7 @@ func calculateEngagementLevel(messageCount int, duration time.Duration, complexi
 	} else if messageCount > 8 {
 		score += 2
 	} else if messageCount > 3 {
-		score += 1
+		score++
 	}
 
 	// Duration factor (more than 10 minutes indicates engagement)
@@ -1913,14 +1929,14 @@ func calculateEngagementLevel(messageCount int, duration time.Duration, complexi
 	} else if duration > 10*time.Minute {
 		score += 2
 	} else if duration > 2*time.Minute {
-		score += 1
+		score++
 	}
 
 	// Complexity factor
 	if complexityScore >= 8 {
 		score += 2
 	} else if complexityScore >= 5 {
-		score += 1
+		score++
 	}
 
 	// Determine level
@@ -1996,11 +2012,4 @@ func CleanJSONResponse(response string) string {
 	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
 
 	return strings.TrimSpace(jsonPortion)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

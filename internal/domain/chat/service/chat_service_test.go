@@ -81,7 +81,7 @@ func (m *MockPOIRepository) AddPoiToFavourites(ctx context.Context, userID, poiI
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockPOIRepository) RemovePoiFromFavourites(ctx context.Context, poiID uuid.UUID, userID uuid.UUID) error {
+func (m *MockPOIRepository) RemovePoiFromFavourites(ctx context.Context, poiID, userID uuid.UUID) error {
 	args := m.Called(ctx, poiID, userID)
 	return args.Error(0)
 }
@@ -110,7 +110,7 @@ func (m *MockPOIRepository) GetPOIsByCityID(ctx context.Context, cityID uuid.UUI
 	return args.Get(0).([]types.POIDetailedInfo), args.Error(1)
 }
 
-func (m *MockPOIRepository) FindPOIDetailedInfos(ctx context.Context, cityID uuid.UUID, lat, lon float64, tolerance float64) (*types.POIDetailedInfo, error) {
+func (m *MockPOIRepository) FindPOIDetailedInfos(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*types.POIDetailedInfo, error) {
 	args := m.Called(ctx, cityID, lat, lon, tolerance)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -226,7 +226,7 @@ func (m *MockPOIRepository) GetItineraries(ctx context.Context, userID uuid.UUID
 	return args.Get(0).([]types.UserSavedItinerary), args.Get(1).(int), args.Error(2)
 }
 
-func (m *MockPOIRepository) UpdateItinerary(ctx context.Context, userID uuid.UUID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
+func (m *MockPOIRepository) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates types.UpdateItineraryRequest) (*types.UserSavedItinerary, error) {
 	args := m.Called(ctx, userID, itineraryID, updates)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -325,7 +325,7 @@ func (m *MockLLMInteractionRepository) SaveLlmSuggestedPOIsBatch(ctx context.Con
 	return args.Error(0)
 }
 
-func (m *MockLLMInteractionRepository) GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID uuid.UUID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error) {
+func (m *MockLLMInteractionRepository) GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx context.Context, llmInteractionID, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error) {
 	args := m.Called(ctx, llmInteractionID, cityID, userLocation)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -385,7 +385,7 @@ func (m *MockLLMInteractionRepository) AddMessageToSession(ctx context.Context, 
 	return args.Error(0)
 }
 
-func (m *MockLLMInteractionRepository) SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID uuid.UUID, llmInteractionID uuid.UUID) (uuid.UUID, error) {
+func (m *MockLLMInteractionRepository) SaveSinglePOI(ctx context.Context, poi types.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error) {
 	args := m.Called(ctx, poi, userID, cityID, llmInteractionID)
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
@@ -403,7 +403,7 @@ func (m *MockLLMInteractionRepository) CalculateDistancePostGIS(ctx context.Cont
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockLLMInteractionRepository) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID uuid.UUID, sourceInteractionID uuid.UUID) (uuid.UUID, error) {
+func (m *MockLLMInteractionRepository) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo types.POIDetailedInfo, cityID, sourceInteractionID uuid.UUID) (uuid.UUID, error) {
 	args := m.Called(ctx, tx, POIDetailedInfo, cityID, sourceInteractionID)
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
@@ -418,7 +418,7 @@ func (m *MockinterestsRepo) CreateInterest(ctx context.Context, name string, des
 	return args.Get(0).(*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error {
+func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	args := m.Called(ctx, userID, interestID)
 	return args.Error(0)
 }
@@ -439,7 +439,7 @@ func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUI
 	return args.Get(0).(*types.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (m *MockinterestsRepo) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
 	args := m.Called(ctx, userID, interestID, params)
 	return args.Error(0)
 }
@@ -532,7 +532,7 @@ func (m *MockTagsRepo) Create(ctx context.Context, userID uuid.UUID, params type
 	return args.Get(0).(*types.PersonalTag), args.Error(1)
 }
 
-func (m *MockTagsRepo) Delete(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error {
+func (m *MockTagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, tagID)
 	return args.Error(0)
 }
@@ -550,7 +550,7 @@ func (m *MockTagsRepo) GetTagByName(ctx context.Context, name string) (*types.Ta
 	return args.Get(0).(*types.Tags), args.Error(1)
 }
 
-func (m *MockTagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID uuid.UUID, tagID uuid.UUID) error {
+func (m *MockTagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, profileID, tagID)
 	return args.Error(0)
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 
+	// Load environment variables from .env files when present.
 	_ "github.com/joho/godotenv"
 )
 

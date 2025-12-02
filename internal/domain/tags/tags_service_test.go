@@ -43,12 +43,12 @@ func (m *MocktagsRepo) Create(ctx context.Context, userID uuid.UUID, params type
 	return args.Get(0).(*types.PersonalTag), args.Error(1)
 }
 
-func (m *MocktagsRepo) Delete(ctx context.Context, userID uuid.UUID, tagID uuid.UUID) error {
+func (m *MocktagsRepo) Delete(ctx context.Context, userID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, tagID)
 	return args.Error(0)
 }
 
-func (m *MocktagsRepo) Update(ctx context.Context, userID uuid.UUID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
+func (m *MocktagsRepo) Update(ctx context.Context, userID, tagID uuid.UUID, params types.UpdatePersonalTagParams) error {
 	args := m.Called(ctx, userID, tagID, params)
 	return args.Error(0)
 }
@@ -61,7 +61,7 @@ func (m *MocktagsRepo) GetTagByName(ctx context.Context, name string) (*types.Ta
 	return args.Get(0).(*types.Tags), args.Error(1)
 }
 
-func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID uuid.UUID, tagID uuid.UUID) error {
+func (m *MocktagsRepo) LinkPersonalTagToProfile(ctx context.Context, userID, profileID, tagID uuid.UUID) error {
 	args := m.Called(ctx, userID, profileID, tagID)
 	return args.Error(0)
 }

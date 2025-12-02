@@ -26,10 +26,10 @@ var _ Repository = (*RepositoryImpl)(nil)
 type Repository interface {
 	// CreateInterest ---  / Interests ---
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*types.Interest, error)
-	Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error
+	Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error
 	GetAllInterests(ctx context.Context) ([]*types.Interest, error)
 	GetInterest(ctx context.Context, interestID uuid.UUID) (*types.Interest, error)
-	Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error
+	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error
 	AddInterestToProfile(ctx context.Context, profileID, interestID uuid.UUID) error
 	// GetInterestsForProfile retrieves all interests associated with a profile
 	GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Interest, error)
@@ -108,7 +108,7 @@ func (r *RepositoryImpl) CreateInterest(ctx context.Context, name string, descri
 }
 
 // Removeinterests implements user.UserRepo.
-func (r *RepositoryImpl) Removeinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID) error {
+func (r *RepositoryImpl) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "Removeinterests", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "DELETE"),
@@ -251,7 +251,7 @@ func (r *RepositoryImpl) GetAllInterests(ctx context.Context) ([]*types.Interest
 //	return interests, nil
 //}
 
-func (r *RepositoryImpl) Updateinterests(ctx context.Context, userID uuid.UUID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
+func (r *RepositoryImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params types.UpdateinterestsParams) error {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "UpdateUserCustomInterest", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),

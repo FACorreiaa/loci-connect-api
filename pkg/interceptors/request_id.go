@@ -41,12 +41,6 @@ func (i *RequestIDInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFu
 		requestID, ctxWithID := i.ensureRequestID(ctx, req.Header())
 		resp, err := next(ctxWithID, req)
 		if resp != nil && requestID != "" {
-			defer func() {
-				if r := recover(); r != nil {
-					// Silently ignore panic when trying to set response header
-					// This can happen when the response is in an error state
-				}
-			}()
 			if header := resp.Header(); header != nil {
 				header.Set(i.headerName, requestID)
 			}

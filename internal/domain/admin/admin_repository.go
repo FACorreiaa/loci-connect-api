@@ -8,6 +8,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
+//revive:disable-next-line:exported
 type AdminRepo interface {
 	// GetUserByID retrieves a user's full profile by their unique ID.
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*types.UserProfile, error)
