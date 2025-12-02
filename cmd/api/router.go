@@ -1,13 +1,17 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
+	"os"
 
 	"connectrpc.com/connect"
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
+	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/otel"
@@ -113,6 +117,18 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	mux.Handle(authServicePath, authServiceHandler)
 	deps.Logger.Info("registered Connect RPC service", "path", authServicePath)
 
+	if deps.ChatHandler != nil {
+		chatPath, chatHandler := chatconnect.NewChatServiceHandler(deps.ChatHandler, opts)
+		mux.Handle(chatPath, chatHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", chatPath)
+	}
+
+	if deps.ProfileHandler != nil {
+		profilePath, profileHandler := profileconnect.NewProfileServiceHandler(deps.ProfileHandler, opts)
+		mux.Handle(profilePath, profileHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", profilePath)
+	}
+
 	deps.Logger.Info("Connect RPC routes configured")
 }
 
@@ -129,6 +145,40 @@ func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 		w.Write([]byte("ok"))
 	})
 	deps.Logger.Info("registered health check", "path", "/health")
+
+	// Extended health with details on dependencies/env
+	mux.HandleFunc("/health/details", func(w http.ResponseWriter, r *http.Request) {
+		type status struct {
+			Status string `json:"status"`
+			Detail string `json:"detail,omitempty"`
+		}
+		result := map[string]status{
+			"db":    {Status: "ok"},
+			"env":   {Status: "ok"},
+			"ready": {Status: "ok"},
+		}
+
+		if err := deps.DB.Health(); err != nil {
+			result["db"] = status{Status: "fail", Detail: err.Error()}
+			result["ready"] = status{Status: "fail", Detail: "db unavailable"}
+		}
+
+		if os.Getenv("GEMINI_API_KEY") == "" {
+			result["env"] = status{Status: "warn", Detail: "GEMINI_API_KEY missing"}
+		}
+
+		for _, v := range result {
+			if v.Status == "fail" {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				json.NewEncoder(w).Encode(result)
+				return
+			}
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(result)
+	})
+	deps.Logger.Info("registered health details", "path", "/health/details")
 
 	// Readiness check endpoint
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {

@@ -23,10 +23,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testUserProfileDB *pgxpool.Pool
-var testUserProfileService profilessService             // Use the interface
-var testinterestsRepoForProfile interests.interestsRepo // Actual repo for setup
-var testUserTagRepoForProfile tags.tagsRepo             // Actual repo for setup
+var (
+	testUserProfileDB           *pgxpool.Pool
+	testUserProfileService      profilessService        // Use the interface
+	testinterestsRepoForProfile interests.interestsRepo // Actual repo for setup
+	testUserTagRepoForProfile   tags.tagsRepo           // Actual repo for setup
+)
+
 // var testUserProfileRepo profilessRepo // Not strictly needed if testing through service, but can be useful for direct verification
 
 func TestMain(m *testing.M) {
@@ -78,16 +81,19 @@ func clearUserPreferenceProfilesTable(t *testing.T) {
 	_, err = testUserProfileDB.Exec(context.Background(), "DELETE FROM user_preference_profiles")
 	require.NoError(t, err)
 }
+
 func clearUserProfileTestUsers(t *testing.T) { // Separate user cleanup if needed
 	t.Helper()
 	// Assuming user_preference_profiles FK to users is ON DELETE CASCADE or handled
 	// Or delete users that are only test users. For simplicity, this might not be needed if users are few.
 }
+
 func clearUserProfileTestInterests(t *testing.T) {
 	t.Helper()
 	_, err := testUserProfileDB.Exec(context.Background(), "DELETE FROM interests WHERE name LIKE 'IntegTestInterest%'")
 	require.NoError(t, err)
 }
+
 func clearUserProfileTestTags(t *testing.T) {
 	t.Helper()
 	_, err := testUserProfileDB.Exec(context.Background(), "DELETE FROM tags WHERE name LIKE 'IntegTestTag%'")
@@ -102,7 +108,7 @@ func createTestUserForProfileTests(t *testing.T, usernameSuffix string) uuid.UUI
 	_, err := testUserProfileDB.Exec(context.Background(),
 		"INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING RETURNING id", // Assuming username is unique
 		id, username, fmt.Sprintf("%s@example.com", username), "test_hash").Scan(&id) // Scan back ID in case of conflict
-	if err != nil && err != pgx.ErrNoRows {                                           // ErrNoRows if ON CONFLICT DO NOTHING and it did nothing
+	if err != nil && err != pgx.ErrNoRows { // ErrNoRows if ON CONFLICT DO NOTHING and it did nothing
 		// if it did nothing, we need to fetch the existing one
 		errFetch := testUserProfileDB.QueryRow(context.Background(), "SELECT id FROM users WHERE username = $1", username).Scan(&id)
 		require.NoError(t, errFetch, "Failed to fetch existing test user after conflict")

@@ -1,0 +1,6 @@
+{
+  "city_data_raw": "{\n    \"city\": \"Lisbon\",\n    \"country\": \"Portugal\",\n    \"state_province\": \"N/A\",\n    \"descrip",
+  "general_pois_raw": "{\n    \"points_of_interest\": [\n        {\n            \"name\": \"Jerónimos Monastery\",",
+  "itinerary_raw": "{\n    \"itinerary_name\": \"Lisbon's Historical Charm \u0026 Modern Flavors\",\n    \"overall_descripti",
+  "session_id": "a2f20157-e1f0-41b4-9bdb-bb5feba5072b"
+}

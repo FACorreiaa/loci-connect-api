@@ -27,7 +27,10 @@ import (
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
@@ -53,6 +56,8 @@ var _ LlmInteractiontService = (*ServiceImpl)(nil)
 
 // LlmInteractiontService defines the business logic contract for user operations.
 type LlmInteractiontService interface {
+	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error)
+	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error)
 	SaveItenerary(ctx context.Context, userID uuid.UUID, req types.BookmarkRequest) (uuid.UUID, error)
 	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*types.PaginatedUserItinerariesResponse, error)
 	RemoveItenerary(ctx context.Context, userID, itineraryID uuid.UUID) error
@@ -71,6 +76,9 @@ type LlmInteractiontService interface {
 
 	// Chat session management
 	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*types.ChatSessionsResponse, error)
+	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error)
+	EndSession(ctx context.Context, userID, sessionID uuid.UUID) error
+	GetRecentInteractions(ctx context.Context, userID uuid.UUID, pagination *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error)
 }
 
 type IntentClassifier interface {
@@ -104,7 +112,8 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	llmInteractionRepo repository.Repository,
 	cityRepo city.Repository,
 	poiRepo poi.Repository,
-	logger *slog.Logger) *ServiceImpl {
+	logger *slog.Logger,
+) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	aiClient, err := generativeAI.NewLLMChatClient(ctx, apiKey)
@@ -138,6 +147,13 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	}
 	go service.processDeadLetterQueue()
 	return service
+}
+
+// processDeadLetterQueue drains any stream events that could not be delivered and logs them.
+func (l *ServiceImpl) processDeadLetterQueue() {
+	for event := range l.deadLetterCh {
+		l.logger.Warn("stream event routed to dead letter queue", slog.String("event_id", event.EventID), slog.String("type", event.Type), slog.String("error", event.Error))
+	}
 }
 
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context
@@ -199,13 +215,26 @@ func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []stri
 }
 
 func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.UUID) (interests []*types.Interest, searchProfile *types.UserPreferenceProfileResponse, tags []*types.Tags, err error) {
+	// If no profile ID is provided, fall back to the user's default search profile.
+	if profileID == uuid.Nil {
+		searchProfile, err = l.searchProfileRepo.GetDefaultSearchProfile(ctx, userID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch default search profile: %w", err)
+		}
+		if searchProfile != nil {
+			profileID = searchProfile.ID
+		}
+	}
+
 	interests, err = l.interestRepo.GetInterestsForProfile(ctx, profileID)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch user interests: %w", err)
 	}
-	searchProfile, err = l.searchProfileRepo.GetSearchProfile(ctx, userID, profileID)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch search profile: %w", err)
+	if searchProfile == nil {
+		searchProfile, err = l.searchProfileRepo.GetSearchProfile(ctx, userID, profileID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to fetch search profile: %w", err)
+		}
 	}
 	tags, err = l.tagsRepo.GetTagsForProfile(ctx, profileID)
 	if err != nil {
@@ -354,7 +383,8 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []types.P
 func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(wg *sync.WaitGroup, ctx context.Context,
 	cityName string, userID, profileID uuid.UUID, resultCh chan<- types.GenAIResponse,
 	enhancedPromptData string, domain types.DomainType,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateEnhancedPersonalisedPOIWorker", trace.WithAttributes(
 		attribute.String("city.name", cityName),
 		attribute.String("user.id", userID.String()),
@@ -743,10 +773,43 @@ func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID,
 	return response, nil
 }
 
+// GetChatSession returns a specific session if the user owns it.
+func (l *ServiceImpl) GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*types.ChatSession, error) {
+	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", common.ErrSessionNotFound, err)
+	}
+	if session.UserID != userID {
+		return nil, common.ErrUnauthorized
+	}
+	return session, nil
+}
+
+// EndSession marks a chat session as closed.
+func (l *ServiceImpl) EndSession(ctx context.Context, userID, sessionID uuid.UUID) error {
+	session, err := l.llmInteractionRepo.GetSession(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", common.ErrSessionNotFound, err)
+	}
+	if session.UserID != userID {
+		return common.ErrUnauthorized
+	}
+	session.Status = types.StatusClosed
+	session.UpdatedAt = time.Now()
+	return l.llmInteractionRepo.UpdateSession(ctx, *session)
+}
+
+// GetRecentInteractions currently returns an empty response placeholder.
+func (l *ServiceImpl) GetRecentInteractions(ctx context.Context, _ uuid.UUID, _ *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error) {
+	// TODO: hook into repository once implemented.
+	return &chatv1.GetRecentInteractionsResponse{}, nil
+}
+
 // getPOIDetailedInfos returns a formatted string with POI details.
 func (l *ServiceImpl) getPOIDetailedInfos(wg *sync.WaitGroup, ctx context.Context,
 	city string, lat float64, lon float64, userID uuid.UUID,
-	resultCh chan<- types.POIDetailedInfo, config *genai.GenerateContentConfig) {
+	resultCh chan<- types.POIDetailedInfo, config *genai.GenerateContentConfig,
+) {
 	defer wg.Done()
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "getPOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.name", city),
@@ -1362,11 +1425,69 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- types.StreamEvent
 	return false
 }
 
-func (l *ServiceImpl) processDeadLetterQueue() {
-	for event := range l.deadLetterCh {
-		l.logger.ErrorContext(context.Background(), "Unprocessed event sent to dead letter queue", slog.Any("event", event))
-		// TODO Save events to DB
+func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *types.UserLocation) (*types.ChatResponse, error) {
+	eventCh := make(chan types.StreamEvent)
+	go func() {
+		// Note: eventCh is closed by ProcessUnifiedChatMessageStream via closeOnce
+		err := l.ProcessUnifiedChatMessageStream(ctx, userID, profileID, cityName, message, userLocation, eventCh)
+		if err != nil {
+			l.logger.Error("error processing stream", "error", err)
+		}
+	}()
+
+	var lastItinerary types.AiCityResponse
+	var lastMessage string
+	var sessionID uuid.UUID
+
+	for event := range eventCh {
+		if event.Type == types.EventTypeItinerary {
+			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+				lastItinerary = itinerary
+				sessionID = itinerary.SessionID
+			}
+		}
+		if event.Message != "" {
+			lastMessage = event.Message
+		}
 	}
+
+	return &types.ChatResponse{
+		SessionID:        sessionID,
+		Message:          lastMessage,
+		UpdatedItinerary: &lastItinerary,
+	}, nil
+}
+
+// ContinueChat is a unary wrapper around the streaming continuation flow.
+func (l *ServiceImpl) ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*types.ChatResponse, error) {
+	eventCh := make(chan types.StreamEvent)
+	go func() {
+		// Note: eventCh is closed by ContinueSessionStreamed via closeOnce
+		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
+		if err != nil {
+			l.logger.Error("error processing continue stream", "error", err)
+		}
+	}()
+
+	var lastItinerary types.AiCityResponse
+	var lastMessage string
+
+	for event := range eventCh {
+		if event.Type == types.EventTypeItinerary {
+			if itinerary, ok := event.Data.(types.AiCityResponse); ok {
+				lastItinerary = itinerary
+			}
+		}
+		if event.Message != "" {
+			lastMessage = event.Message
+		}
+	}
+
+	return &types.ChatResponse{
+		SessionID:        sessionID,
+		Message:          lastMessage,
+		UpdatedItinerary: &lastItinerary,
+	}, nil
 }
 
 // getPersonalizedPOI generates a prompt for personalized POIs
@@ -2147,10 +2268,147 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
-	// Step 7: Completion goroutine with sync.Once for channel closure
+	// Step 7: Completion goroutine - save IDs before sending events
 	go func() {
 		wg.Wait()             // Wait for all workers to complete
 		if ctx.Err() == nil { // Only send completion event if context is still active
+			// Build complete data from collected responses
+			responsesMutex.Lock()
+			completeData := map[string]interface{}{
+				"session_id": sessionID.String(),
+			}
+			cityDataContent := ""
+			var fullResponseBuilder strings.Builder
+
+			// Parse and add each response part as structured JSON
+			for partType, builder := range responses {
+				if builder != nil && builder.Len() > 0 {
+					content := builder.String()
+					fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
+
+					if partType == "city_data" {
+						cityDataContent = content
+					}
+
+					// Extract JSON from markdown code blocks if present
+					content = extractJSONFromMarkdown(content)
+
+					// Try to parse as JSON
+					var parsedJSON interface{}
+					if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
+						switch partType {
+						case "city_data":
+							completeData["general_city_data"] = parsedJSON
+						case "general_pois":
+							completeData["points_of_interest"] = parsedJSON
+						case "itinerary":
+							completeData["itinerary_response"] = parsedJSON
+						case "hotels":
+							completeData["accommodation_response"] = parsedJSON
+						case "restaurants":
+							completeData["dining_response"] = parsedJSON
+						case "activities":
+							completeData["activities_response"] = parsedJSON
+						default:
+							completeData[partType] = parsedJSON
+						}
+					} else {
+						// If parsing fails, store as string
+						l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
+							slog.String("part_type", partType), slog.Any("error", err))
+						completeData[partType+"_raw"] = content
+					}
+				}
+			}
+			responsesMutex.Unlock()
+
+			// Save city data and get cityID BEFORE sending itinerary event
+			var cityID uuid.UUID
+			if cityDataContent != "" {
+				if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
+					if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
+						cityID = savedCityID
+						l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
+					}
+				}
+			}
+			// Fallback: try to get existing city from database
+			if cityID == uuid.Nil {
+				if existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, ""); err == nil && existingCity != nil {
+					cityID = existingCity.ID
+				}
+			}
+
+			// Save interaction and get llmInteractionID BEFORE sending itinerary event
+			fullResponse := fullResponseBuilder.String()
+			if fullResponse == "" {
+				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
+			}
+			interaction := types.LlmInteraction{
+				ID:           uuid.New(),
+				SessionID:    sessionID,
+				UserID:       userID,
+				ProfileID:    profileID,
+				CityName:     cityName,
+				Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
+				ResponseText: fullResponse,
+				ModelUsed:    model,
+				LatencyMs:    int(time.Since(startTime).Milliseconds()),
+				Timestamp:    startTime,
+			}
+			savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
+			if saveErr != nil {
+				l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
+				savedInteractionID = uuid.Nil
+			} else {
+				l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+			}
+
+			// Build AiCityResponse struct with database IDs
+			itineraryData := types.AiCityResponse{
+				SessionID: sessionID,
+			}
+
+			// Populate structured data if available
+			if generalCityData, ok := completeData["general_city_data"]; ok {
+				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
+					// Try to unmarshal into GeneralCityData struct
+					if jsonBytes, err := json.Marshal(cityData); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData)
+					}
+				}
+			}
+			if pois, ok := completeData["points_of_interest"]; ok {
+				if poisArr, parseOk := pois.([]interface{}); parseOk {
+					if jsonBytes, err := json.Marshal(poisArr); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest)
+					}
+				}
+			}
+			if itinResp, ok := completeData["itinerary_response"]; ok {
+				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
+					if jsonBytes, err := json.Marshal(itinData); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse)
+					}
+				}
+			}
+
+			// Set cityID and llmInteractionID on POIs
+			if cityID != uuid.Nil {
+				for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
+					itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
+					if savedInteractionID != uuid.Nil {
+						itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+					}
+				}
+			}
+
+			// Send EventTypeItinerary with proper IDs
+			l.sendEvent(ctx, eventCh, types.StreamEvent{
+				Type: types.EventTypeItinerary,
+				Data: itineraryData,
+			}, 3)
+
 			// Determine route type based on domain
 			var routeType string
 			var baseURL string
@@ -2190,7 +2448,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	}()
 
 	go func() {
-		//wg.Wait() // Wait for all workers to complete
+		// wg.Wait() // Wait for all workers to complete
 		asyncCtx := context.Background()
 
 		var fullResponseBuilder strings.Builder
@@ -2283,10 +2541,10 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 		jsonData, err := json.MarshalIndent(completeData, "", "  ")
 		if err != nil {
-			l.logger.Error("Failed to marshal completeData to JSON", err)
+			l.logger.Error("Failed to marshal completeData to JSON", slog.Any("error", err))
 		} else {
 			filename := "complete_itinerary.json" // Or fmt.Sprintf("complete_itinerary_%s.json", sessionID)
-			if writeErr := os.WriteFile(filename, jsonData, 0644); writeErr != nil {
+			if writeErr := os.WriteFile(filename, jsonData, 0o644); writeErr != nil {
 				l.logger.ErrorContext(ctx, "Failed to write completeData to file", slog.String("file", filename), slog.Any("error", writeErr))
 			} else {
 				l.logger.InfoContext(ctx, "Complete itinerary data written to file", slog.String("file", filename))
@@ -2298,8 +2556,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		interaction := types.LlmInteraction{
 			ID:           uuid.New(),
 			SessionID:    sessionID,
-			UserID:       userID,
-			ProfileID:    profileID,
+			UserID:       session.UserID,
+			ProfileID:    session.ProfileID,
 			CityName:     cityName,
 			Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
 			ResponseText: fullResponse,
@@ -2488,10 +2746,147 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
-	// Step 7: Completion goroutine with sync.Once for channel closure
+	// Step 7: Completion goroutine - save IDs before sending events
 	go func() {
 		wg.Wait()             // Wait for all workers to complete
 		if ctx.Err() == nil { // Only send completion event if context is still active
+			// Build complete data from collected responses
+			responsesMutex.Lock()
+			completeData := map[string]interface{}{
+				"session_id": sessionID.String(),
+			}
+			cityDataContent := ""
+			var fullResponseBuilder strings.Builder
+
+			// Parse and add each response part as structured JSON
+			for partType, builder := range responses {
+				if builder != nil && builder.Len() > 0 {
+					content := builder.String()
+					fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
+
+					if partType == "city_data" {
+						cityDataContent = content
+					}
+
+					// Extract JSON from markdown code blocks if present
+					content = extractJSONFromMarkdown(content)
+
+					// Try to parse as JSON
+					var parsedJSON interface{}
+					if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
+						switch partType {
+						case "city_data":
+							completeData["general_city_data"] = parsedJSON
+						case "general_pois":
+							completeData["points_of_interest"] = parsedJSON
+						case "itinerary":
+							completeData["itinerary_response"] = parsedJSON
+						case "hotels":
+							completeData["accommodation_response"] = parsedJSON
+						case "restaurants":
+							completeData["dining_response"] = parsedJSON
+						case "activities":
+							completeData["activities_response"] = parsedJSON
+						default:
+							completeData[partType] = parsedJSON
+						}
+					} else {
+						// If parsing fails, store as string
+						l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
+							slog.String("part_type", partType), slog.Any("error", err))
+						completeData[partType+"_raw"] = content
+					}
+				}
+			}
+			responsesMutex.Unlock()
+
+			// Save city data and get cityID BEFORE sending itinerary event
+			var cityID uuid.UUID
+			if cityDataContent != "" {
+				if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
+					if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
+						cityID = savedCityID
+						l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
+					}
+				}
+			}
+			// Fallback: try to get existing city from database
+			if cityID == uuid.Nil {
+				if existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, ""); err == nil && existingCity != nil {
+					cityID = existingCity.ID
+				}
+			}
+
+			// Save interaction and get llmInteractionID BEFORE sending itinerary event
+			fullResponse := fullResponseBuilder.String()
+			if fullResponse == "" {
+				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
+			}
+			interaction := types.LlmInteraction{
+				ID:           uuid.New(),
+				SessionID:    sessionID,
+				UserID:       uuid.Nil, // Free version has no authenticated user
+				ProfileID:    uuid.Nil, // Free version has no profile
+				CityName:     cityName,
+				Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
+				ResponseText: fullResponse,
+				ModelUsed:    model,
+				LatencyMs:    int(time.Since(startTime).Milliseconds()),
+				Timestamp:    startTime,
+			}
+			savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
+			if saveErr != nil {
+				l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
+				savedInteractionID = uuid.Nil
+			} else {
+				l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+			}
+
+			// Build AiCityResponse struct with database IDs
+			itineraryData := types.AiCityResponse{
+				SessionID: sessionID,
+			}
+
+			// Populate structured data if available
+			if generalCityData, ok := completeData["general_city_data"]; ok {
+				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
+					// Try to unmarshal into GeneralCityData struct
+					if jsonBytes, err := json.Marshal(cityData); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData)
+					}
+				}
+			}
+			if pois, ok := completeData["points_of_interest"]; ok {
+				if poisArr, parseOk := pois.([]interface{}); parseOk {
+					if jsonBytes, err := json.Marshal(poisArr); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest)
+					}
+				}
+			}
+			if itinResp, ok := completeData["itinerary_response"]; ok {
+				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
+					if jsonBytes, err := json.Marshal(itinData); err == nil {
+						json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse)
+					}
+				}
+			}
+
+			// Set cityID and llmInteractionID on POIs
+			if cityID != uuid.Nil {
+				for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
+					itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
+					if savedInteractionID != uuid.Nil {
+						itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+					}
+				}
+			}
+
+			// Send EventTypeItinerary with proper IDs
+			l.sendEvent(ctx, eventCh, types.StreamEvent{
+				Type: types.EventTypeItinerary,
+				Data: itineraryData,
+			}, 3)
+
 			// Determine route type based on domain
 			var routeType string
 			var baseURL string

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -458,6 +459,9 @@ func TestChatStreamingRoutes(t *testing.T) {
 	// Skip if integration tests are not enabled
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
+	}
+	if os.Getenv("RUN_CHAT_INTEGRATION") == "" {
+		t.Skip("Skipping chat streaming integration tests; set RUN_CHAT_INTEGRATION=1 to run")
 	}
 
 	config := NewBenchmarkConfig()

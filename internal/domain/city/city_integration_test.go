@@ -17,8 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testCityDB *pgxpool.Pool
-var testCityRepo Repository
+var (
+	testCityDB   *pgxpool.Pool
+	testCityRepo Repository
+)
 
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("../../../.env.test"); err != nil {

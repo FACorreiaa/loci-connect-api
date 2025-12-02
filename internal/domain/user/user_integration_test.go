@@ -18,9 +18,11 @@ import (
 	// Your database migration tool/library if you use one programmatically
 )
 
-var testUserDB *pgxpool.Pool
-var testUserService UserService // Use the interface
-var testUserRepo UserRepo       // Actual repository implementation for setup/cleanup
+var (
+	testUserDB      *pgxpool.Pool
+	testUserService UserService // Use the interface
+	testUserRepo    UserRepo    // Actual repository implementation for setup/cleanup
+)
 
 func TestMain(m *testing.M) {
 	// Load .env.test or similar for test database credentials

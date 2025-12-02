@@ -34,7 +34,7 @@ type Repository interface {
 	// GetInterestsForProfile retrieves all interests associated with a profile
 	GetInterestsForProfile(ctx context.Context, profileID uuid.UUID) ([]*types.Interest, error)
 	// GetUserEnhancedInterests retrieves all interests for a user with their preference levels
-	//GetUserEnhancedInterests(ctx context.Context, userID uuid.UUID) ([]types.EnhancedInterest, error)
+	// GetUserEnhancedInterests(ctx context.Context, userID uuid.UUID) ([]types.EnhancedInterest, error)
 }
 
 type RepositoryImpl struct {
@@ -84,9 +84,7 @@ func (r *RepositoryImpl) CreateInterest(ctx context.Context, name string, descri
 		&interest.CreatedAt,
 		&interest.UpdatedAt, // Scan the updated_at timestamp set by the query
 	)
-
 	// TODO also add to user_custom_interests
-
 	if err != nil {
 		// Check for unique constraint violation (name already exists)
 		var pgErr *pgconn.PgError
@@ -396,7 +394,6 @@ func (r *RepositoryImpl) GetInterest(ctx context.Context, interestID uuid.UUID) 
 		&interest.UpdatedAt,
 		&interest.Source,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("database error fetching interest: %w", err)
 	}

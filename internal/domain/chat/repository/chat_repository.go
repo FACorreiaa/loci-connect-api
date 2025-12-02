@@ -49,8 +49,8 @@ type Repository interface {
 	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []types.POIDetailedInfo) error
 
 	// RAG
-	//SaveInteractionWithEmbedding(ctx context.Context, interaction types.LlmInteraction, embedding []float32) (uuid.UUID, error)
-	//FindSimilarInteractions(ctx context.Context, queryEmbedding []float32, limit int, threshold float32) ([]types.LlmInteraction, error)
+	// SaveInteractionWithEmbedding(ctx context.Context, interaction types.LlmInteraction, embedding []float32) (uuid.UUID, error)
+	// FindSimilarInteractions(ctx context.Context, queryEmbedding []float32, limit int, threshold float32) ([]types.LlmInteraction, error)
 }
 
 type RepositoryImpl struct {
@@ -382,7 +382,7 @@ func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
 			return nil, fmt.Errorf("failed to scan llm_suggested_poi row: %w", err)
 		}
 		p.DescriptionPOI = descr.String
-		//p.Category = cat.String
+		// p.Category = cat.String
 
 		resultPois = append(resultPois, p)
 	}
@@ -1518,7 +1518,6 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi types.POIDetaile
 		poi.Category,       // $8: category
 		poi.DescriptionPOI, // $9: description_poi
 	).Scan(&returnedID)
-
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to insert llm_suggested_poi", slog.Any("error", err), slog.String("query", query), slog.String("name", poi.Name))
 		span.RecordError(err)
@@ -1535,7 +1534,6 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi types.POIDetaile
 }
 
 func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _, cityID uuid.UUID, userLocation types.UserLocation) ([]types.POIDetailedInfo, error) {
-
 	query := `
         SELECT id, name, latitude, longitude, category, description_poi,
                ST_Distance(
@@ -1947,4 +1945,62 @@ func uniqueStringSlice(slice []string) []string {
 	}
 
 	return result
+}
+
+func CleanJSONResponse(response string) string {
+	response = strings.TrimSpace(response)
+
+	if strings.HasPrefix(response, "```json") {
+		response = strings.TrimPrefix(response, "```json")
+	} else if strings.HasPrefix(response, "```") {
+		response = strings.TrimPrefix(response, "```")
+	}
+
+	response = strings.TrimSuffix(response, "```")
+	response = strings.TrimSpace(response)
+
+	firstBrace := strings.Index(response, "{")
+	if firstBrace == -1 {
+		return response
+	}
+
+	braceCount := 0
+	lastValidBrace := -1
+	for i := firstBrace; i < len(response); i++ {
+		switch response[i] {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+			if braceCount == 0 {
+				lastValidBrace = i
+				break
+			}
+		}
+	}
+
+	if braceCount != 0 {
+		lastBrace := strings.LastIndex(response, "}")
+		if lastBrace == -1 || lastBrace <= firstBrace {
+			return response
+		}
+		lastValidBrace = lastBrace
+	}
+
+	if lastValidBrace == -1 {
+		return response
+	}
+
+	jsonPortion := response[firstBrace : lastValidBrace+1]
+	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
+	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
+
+	return strings.TrimSpace(jsonPortion)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
