@@ -2556,8 +2556,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		interaction := types.LlmInteraction{
 			ID:           uuid.New(),
 			SessionID:    sessionID,
-			UserID:       userID,
-			ProfileID:    profileID,
+			UserID:       session.UserID,
+			ProfileID:    session.ProfileID,
 			CityName:     cityName,
 			Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
 			ResponseText: fullResponse,
@@ -2825,8 +2825,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			interaction := types.LlmInteraction{
 				ID:           uuid.New(),
 				SessionID:    sessionID,
-				UserID:       userID,
-				ProfileID:    profileID,
+				UserID:       uuid.Nil, // Free version has no authenticated user
+				ProfileID:    uuid.Nil, // Free version has no profile
 				CityName:     cityName,
 				Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
 				ResponseText: fullResponse,
