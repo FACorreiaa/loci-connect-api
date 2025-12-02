@@ -17,9 +17,9 @@ type TrendingDiscovery struct {
 
 // TrendingSearch represents a trending search query
 type TrendingSearch struct {
-	Query       string `json:"query"`
-	CityName    string `json:"city_name"`
-	SearchCount int    `json:"search_count"`
+	Query        string `json:"query"`
+	CityName     string `json:"city_name"`
+	SearchCount  int    `json:"search_count"`
 	LastSearched string `json:"last_searched"` // Human-readable time (e.g., "2 hours ago")
 }
 

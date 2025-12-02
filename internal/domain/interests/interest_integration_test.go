@@ -19,9 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testinterestsDB *pgxpool.Pool
-var testinterestsService interestsService // Use the interface
-var testinterestsRepo interestsRepo       // Actual repository implementation for setup/cleanup
+var (
+	testinterestsDB      *pgxpool.Pool
+	testinterestsService interestsService // Use the interface
+	testinterestsRepo    interestsRepo    // Actual repository implementation for setup/cleanup
+)
 
 func TestMain(m *testing.M) {
 	if err := godotenv.Load("../../../.env.test"); err != nil { // Adjust path

@@ -18,8 +18,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testtagsDB *pgxpool.Pool
-var testtagsService tagsService // Use the interface
+var (
+	testtagsDB      *pgxpool.Pool
+	testtagsService tagsService // Use the interface
+)
+
 // var testtagsRepo tagsRepo    // Actual repository for direct interaction if needed for setup
 
 func TestMain(m *testing.M) {
@@ -66,6 +69,7 @@ func clearUserPersonalTagsTable(t *testing.T) {
 	_, err := testtagsDB.Exec(context.Background(), "DELETE FROM personal_tags")
 	require.NoError(t, err, "Failed to clear personal_tags table")
 }
+
 func clearTagsTable(t *testing.T) { // If you have a global tags table
 	t.Helper()
 	// If personal_tags FK to tags, delete personal_tags first or handle cascades

@@ -1406,6 +1406,8 @@ type ChatRequest struct {
 	SessionId     *string                `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3,oneof" json:"session_id,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	CityName      *string                `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3,oneof" json:"city_name,omitempty"`
+	UserLocation  *UserLocation          `protobuf:"bytes,4,opt,name=user_location,json=userLocation,proto3,oneof" json:"user_location,omitempty"`
+	ProfileId     *string                `protobuf:"bytes,5,opt,name=profile_id,json=profileId,proto3,oneof" json:"profile_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1457,6 +1459,20 @@ func (x *ChatRequest) GetMessage() string {
 func (x *ChatRequest) GetCityName() string {
 	if x != nil && x.CityName != nil {
 		return *x.CityName
+	}
+	return ""
+}
+
+func (x *ChatRequest) GetUserLocation() *UserLocation {
+	if x != nil {
+		return x.UserLocation
+	}
+	return nil
+}
+
+func (x *ChatRequest) GetProfileId() string {
+	if x != nil && x.ProfileId != nil {
+		return *x.ProfileId
 	}
 	return ""
 }
@@ -1708,19 +1724,73 @@ func (x *NavigationData) GetQueryParams() map[string]string {
 	return nil
 }
 
+type UserLocation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Latitude      *float64               `protobuf:"fixed64,1,opt,name=latitude,proto3,oneof" json:"latitude,omitempty"`
+	Longitude     *float64               `protobuf:"fixed64,2,opt,name=longitude,proto3,oneof" json:"longitude,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserLocation) Reset() {
+	*x = UserLocation{}
+	mi := &file_proto_chat_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserLocation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserLocation) ProtoMessage() {}
+
+func (x *UserLocation) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_chat_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserLocation.ProtoReflect.Descriptor instead.
+func (*UserLocation) Descriptor() ([]byte, []int) {
+	return file_proto_chat_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *UserLocation) GetLatitude() float64 {
+	if x != nil && x.Latitude != nil {
+		return *x.Latitude
+	}
+	return 0
+}
+
+func (x *UserLocation) GetLongitude() float64 {
+	if x != nil && x.Longitude != nil {
+		return *x.Longitude
+	}
+	return 0
+}
+
 // StartChatRequest for starting a new chat session
 type StartChatRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CityName       string                 `protobuf:"bytes,1,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
-	ContextType    DomainType             `protobuf:"varint,2,opt,name=context_type,json=contextType,proto3,enum=loci.chat.DomainType" json:"context_type,omitempty"`
-	InitialMessage *string                `protobuf:"bytes,3,opt,name=initial_message,json=initialMessage,proto3,oneof" json:"initial_message,omitempty"`
+	CityName       *string                `protobuf:"bytes,1,opt,name=city_name,json=cityName,proto3,oneof" json:"city_name,omitempty"`
+	ContextType    *DomainType            `protobuf:"varint,2,opt,name=context_type,json=contextType,proto3,enum=loci.chat.DomainType,oneof" json:"context_type,omitempty"`
+	InitialMessage string                 `protobuf:"bytes,3,opt,name=initial_message,json=initialMessage,proto3" json:"initial_message,omitempty"`
+	UserLocation   *UserLocation          `protobuf:"bytes,4,opt,name=user_location,json=userLocation,proto3,oneof" json:"user_location,omitempty"`
+	ProfileId      *string                `protobuf:"bytes,5,opt,name=profile_id,json=profileId,proto3,oneof" json:"profile_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *StartChatRequest) Reset() {
 	*x = StartChatRequest{}
-	mi := &file_proto_chat_proto_msgTypes[15]
+	mi := &file_proto_chat_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1732,7 +1802,7 @@ func (x *StartChatRequest) String() string {
 func (*StartChatRequest) ProtoMessage() {}
 
 func (x *StartChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[15]
+	mi := &file_proto_chat_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1745,26 +1815,40 @@ func (x *StartChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartChatRequest.ProtoReflect.Descriptor instead.
 func (*StartChatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{15}
+	return file_proto_chat_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartChatRequest) GetCityName() string {
-	if x != nil {
-		return x.CityName
+	if x != nil && x.CityName != nil {
+		return *x.CityName
 	}
 	return ""
 }
 
 func (x *StartChatRequest) GetContextType() DomainType {
-	if x != nil {
-		return x.ContextType
+	if x != nil && x.ContextType != nil {
+		return *x.ContextType
 	}
 	return DomainType_DOMAIN_TYPE_UNSPECIFIED
 }
 
 func (x *StartChatRequest) GetInitialMessage() string {
-	if x != nil && x.InitialMessage != nil {
-		return *x.InitialMessage
+	if x != nil {
+		return x.InitialMessage
+	}
+	return ""
+}
+
+func (x *StartChatRequest) GetUserLocation() *UserLocation {
+	if x != nil {
+		return x.UserLocation
+	}
+	return nil
+}
+
+func (x *StartChatRequest) GetProfileId() string {
+	if x != nil && x.ProfileId != nil {
+		return *x.ProfileId
 	}
 	return ""
 }
@@ -1782,7 +1866,7 @@ type ContinueChatRequest struct {
 
 func (x *ContinueChatRequest) Reset() {
 	*x = ContinueChatRequest{}
-	mi := &file_proto_chat_proto_msgTypes[16]
+	mi := &file_proto_chat_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1794,7 +1878,7 @@ func (x *ContinueChatRequest) String() string {
 func (*ContinueChatRequest) ProtoMessage() {}
 
 func (x *ContinueChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[16]
+	mi := &file_proto_chat_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1807,7 +1891,7 @@ func (x *ContinueChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContinueChatRequest.ProtoReflect.Descriptor instead.
 func (*ContinueChatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{16}
+	return file_proto_chat_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ContinueChatRequest) GetSessionId() string {
@@ -1848,7 +1932,7 @@ type GetChatSessionRequest struct {
 
 func (x *GetChatSessionRequest) Reset() {
 	*x = GetChatSessionRequest{}
-	mi := &file_proto_chat_proto_msgTypes[17]
+	mi := &file_proto_chat_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1860,7 +1944,7 @@ func (x *GetChatSessionRequest) String() string {
 func (*GetChatSessionRequest) ProtoMessage() {}
 
 func (x *GetChatSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[17]
+	mi := &file_proto_chat_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1873,7 +1957,7 @@ func (x *GetChatSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetChatSessionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{17}
+	return file_proto_chat_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetChatSessionRequest) GetSessionId() string {
@@ -1893,7 +1977,7 @@ type GetChatSessionResponse struct {
 
 func (x *GetChatSessionResponse) Reset() {
 	*x = GetChatSessionResponse{}
-	mi := &file_proto_chat_proto_msgTypes[18]
+	mi := &file_proto_chat_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1905,7 +1989,7 @@ func (x *GetChatSessionResponse) String() string {
 func (*GetChatSessionResponse) ProtoMessage() {}
 
 func (x *GetChatSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[18]
+	mi := &file_proto_chat_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1918,7 +2002,7 @@ func (x *GetChatSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetChatSessionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{18}
+	return file_proto_chat_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetChatSessionResponse) GetSession() *ChatSession {
@@ -1939,7 +2023,7 @@ type GetChatSessionsRequest struct {
 
 func (x *GetChatSessionsRequest) Reset() {
 	*x = GetChatSessionsRequest{}
-	mi := &file_proto_chat_proto_msgTypes[19]
+	mi := &file_proto_chat_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1951,7 +2035,7 @@ func (x *GetChatSessionsRequest) String() string {
 func (*GetChatSessionsRequest) ProtoMessage() {}
 
 func (x *GetChatSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[19]
+	mi := &file_proto_chat_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1964,7 +2048,7 @@ func (x *GetChatSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionsRequest.ProtoReflect.Descriptor instead.
 func (*GetChatSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{19}
+	return file_proto_chat_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetChatSessionsRequest) GetUserId() string {
@@ -1992,7 +2076,7 @@ type GetChatSessionsResponse struct {
 
 func (x *GetChatSessionsResponse) Reset() {
 	*x = GetChatSessionsResponse{}
-	mi := &file_proto_chat_proto_msgTypes[20]
+	mi := &file_proto_chat_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2004,7 +2088,7 @@ func (x *GetChatSessionsResponse) String() string {
 func (*GetChatSessionsResponse) ProtoMessage() {}
 
 func (x *GetChatSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[20]
+	mi := &file_proto_chat_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2017,7 +2101,7 @@ func (x *GetChatSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionsResponse.ProtoReflect.Descriptor instead.
 func (*GetChatSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{20}
+	return file_proto_chat_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetChatSessionsResponse) GetSessions() []*ChatSession {
@@ -2055,7 +2139,7 @@ type RecentInteraction struct {
 
 func (x *RecentInteraction) Reset() {
 	*x = RecentInteraction{}
-	mi := &file_proto_chat_proto_msgTypes[21]
+	mi := &file_proto_chat_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2067,7 +2151,7 @@ func (x *RecentInteraction) String() string {
 func (*RecentInteraction) ProtoMessage() {}
 
 func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[21]
+	mi := &file_proto_chat_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2080,7 +2164,7 @@ func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentInteraction.ProtoReflect.Descriptor instead.
 func (*RecentInteraction) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{21}
+	return file_proto_chat_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RecentInteraction) GetId() string {
@@ -2185,7 +2269,7 @@ type CityInteractions struct {
 
 func (x *CityInteractions) Reset() {
 	*x = CityInteractions{}
-	mi := &file_proto_chat_proto_msgTypes[22]
+	mi := &file_proto_chat_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2197,7 +2281,7 @@ func (x *CityInteractions) String() string {
 func (*CityInteractions) ProtoMessage() {}
 
 func (x *CityInteractions) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[22]
+	mi := &file_proto_chat_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2210,7 +2294,7 @@ func (x *CityInteractions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInteractions.ProtoReflect.Descriptor instead.
 func (*CityInteractions) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{22}
+	return file_proto_chat_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CityInteractions) GetCityName() string {
@@ -2287,7 +2371,7 @@ type GetRecentInteractionsRequest struct {
 
 func (x *GetRecentInteractionsRequest) Reset() {
 	*x = GetRecentInteractionsRequest{}
-	mi := &file_proto_chat_proto_msgTypes[23]
+	mi := &file_proto_chat_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2299,7 +2383,7 @@ func (x *GetRecentInteractionsRequest) String() string {
 func (*GetRecentInteractionsRequest) ProtoMessage() {}
 
 func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[23]
+	mi := &file_proto_chat_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2312,7 +2396,7 @@ func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsRequest.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{23}
+	return file_proto_chat_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetRecentInteractionsRequest) GetUserId() string {
@@ -2340,7 +2424,7 @@ type GetRecentInteractionsResponse struct {
 
 func (x *GetRecentInteractionsResponse) Reset() {
 	*x = GetRecentInteractionsResponse{}
-	mi := &file_proto_chat_proto_msgTypes[24]
+	mi := &file_proto_chat_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2352,7 +2436,7 @@ func (x *GetRecentInteractionsResponse) String() string {
 func (*GetRecentInteractionsResponse) ProtoMessage() {}
 
 func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_chat_proto_msgTypes[24]
+	mi := &file_proto_chat_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2365,7 +2449,7 @@ func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsResponse.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_chat_proto_rawDescGZIP(), []int{24}
+	return file_proto_chat_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetRecentInteractionsResponse) GetCities() []*CityInteractions {
@@ -2522,7 +2606,7 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\x13performance_metrics\x18\f \x01(\v2$.loci.chat.SessionPerformanceMetricsR\x12performanceMetrics\x12I\n" +
 	"\x0fcontent_metrics\x18\r \x01(\v2 .loci.chat.SessionContentMetricsR\x0econtentMetrics\x12R\n" +
 	"\x12engagement_metrics\x18\x0e \x01(\v2#.loci.chat.SessionEngagementMetricsR\x11engagementMetricsB\x14\n" +
-	"\x12_current_itinerary\"\xae\x01\n" +
+	"\x12_current_itinerary\"\xc1\x02\n" +
 	"\vChatRequest\x12.\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
@@ -2530,10 +2614,15 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12,\n" +
 	"\tcity_name\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\bcityName\x88\x01\x01B\r\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\bcityName\x88\x01\x01\x12A\n" +
+	"\ruser_location\x18\x04 \x01(\v2\x17.loci.chat.UserLocationH\x02R\fuserLocation\x88\x01\x01\x12-\n" +
+	"\n" +
+	"profile_id\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\tprofileId\x88\x01\x01B\r\n" +
 	"\v_session_idB\f\n" +
 	"\n" +
-	"_city_name\"\xdf\x02\n" +
+	"_city_nameB\x10\n" +
+	"\x0e_user_locationB\r\n" +
+	"\v_profile_id\"\xdf\x02\n" +
 	"\fChatResponse\x12)\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
@@ -2570,14 +2659,27 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\fquery_params\x18\x03 \x03(\v2*.loci.chat.NavigationData.QueryParamsEntryB\x12\xbaH\x0f\x9a\x01\f\"\x04r\x02\x10\x01*\x04r\x02\x10\x01R\vqueryParams\x1a>\n" +
 	"\x10QueryParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xcd\x01\n" +
-	"\x10StartChatRequest\x12'\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9f\x01\n" +
+	"\fUserLocation\x128\n" +
+	"\blatitude\x18\x01 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x00R\blatitude\x88\x01\x01\x12:\n" +
+	"\tlongitude\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x01R\tlongitude\x88\x01\x01B\v\n" +
+	"\t_latitudeB\f\n" +
+	"\n" +
+	"_longitude\"\xf0\x02\n" +
+	"\x10StartChatRequest\x12,\n" +
 	"\tcity_name\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcityName\x12B\n" +
-	"\fcontext_type\x18\x02 \x01(\x0e2\x15.loci.chat.DomainTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontextType\x128\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12G\n" +
+	"\fcontext_type\x18\x02 \x01(\x0e2\x15.loci.chat.DomainTypeB\b\xbaH\x05\x82\x01\x02\x10\x01H\x01R\vcontextType\x88\x01\x01\x123\n" +
 	"\x0finitial_message\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fH\x00R\x0einitialMessage\x88\x01\x01B\x12\n" +
-	"\x10_initial_message\"\xe6\x01\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\x0einitialMessage\x12A\n" +
+	"\ruser_location\x18\x04 \x01(\v2\x17.loci.chat.UserLocationH\x02R\fuserLocation\x88\x01\x01\x12-\n" +
+	"\n" +
+	"profile_id\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\tprofileId\x88\x01\x01B\f\n" +
+	"\n" +
+	"_city_nameB\x0f\n" +
+	"\r_context_typeB\x10\n" +
+	"\x0e_user_locationB\r\n" +
+	"\v_profile_id\"\xe6\x01\n" +
 	"\x13ContinueChatRequest\x12)\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
@@ -2730,7 +2832,7 @@ func file_proto_chat_proto_rawDescGZIP() []byte {
 }
 
 var file_proto_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_proto_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_proto_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_proto_chat_proto_goTypes = []any{
 	(MessageRole)(0),                      // 0: loci.chat.MessageRole
 	(MessageType)(0),                      // 1: loci.chat.MessageType
@@ -2752,91 +2854,94 @@ var file_proto_chat_proto_goTypes = []any{
 	(*ChatResponse)(nil),                  // 17: loci.chat.ChatResponse
 	(*StreamEvent)(nil),                   // 18: loci.chat.StreamEvent
 	(*NavigationData)(nil),                // 19: loci.chat.NavigationData
-	(*StartChatRequest)(nil),              // 20: loci.chat.StartChatRequest
-	(*ContinueChatRequest)(nil),           // 21: loci.chat.ContinueChatRequest
-	(*GetChatSessionRequest)(nil),         // 22: loci.chat.GetChatSessionRequest
-	(*GetChatSessionResponse)(nil),        // 23: loci.chat.GetChatSessionResponse
-	(*GetChatSessionsRequest)(nil),        // 24: loci.chat.GetChatSessionsRequest
-	(*GetChatSessionsResponse)(nil),       // 25: loci.chat.GetChatSessionsResponse
-	(*RecentInteraction)(nil),             // 26: loci.chat.RecentInteraction
-	(*CityInteractions)(nil),              // 27: loci.chat.CityInteractions
-	(*GetRecentInteractionsRequest)(nil),  // 28: loci.chat.GetRecentInteractionsRequest
-	(*GetRecentInteractionsResponse)(nil), // 29: loci.chat.GetRecentInteractionsResponse
-	nil,                                   // 30: loci.chat.NavigationData.QueryParamsEntry
-	(*timestamppb.Timestamp)(nil),         // 31: google.protobuf.Timestamp
-	(*profile.UserPreferenceProfile)(nil), // 32: loci.profile.UserPreferenceProfile
-	(*poi.POIDetailedInfo)(nil),           // 33: loci.poi.POIDetailedInfo
-	(*city.GeneralCityData)(nil),          // 34: loci.city.GeneralCityData
-	(*common.PaginationRequest)(nil),      // 35: loci.common.PaginationRequest
-	(*common.PaginationMetadata)(nil),     // 36: loci.common.PaginationMetadata
-	(*poi.HotelDetailedInfo)(nil),         // 37: loci.poi.HotelDetailedInfo
-	(*poi.RestaurantDetailedInfo)(nil),    // 38: loci.poi.RestaurantDetailedInfo
-	(*common.Response)(nil),               // 39: loci.common.Response
+	(*UserLocation)(nil),                  // 20: loci.chat.UserLocation
+	(*StartChatRequest)(nil),              // 21: loci.chat.StartChatRequest
+	(*ContinueChatRequest)(nil),           // 22: loci.chat.ContinueChatRequest
+	(*GetChatSessionRequest)(nil),         // 23: loci.chat.GetChatSessionRequest
+	(*GetChatSessionResponse)(nil),        // 24: loci.chat.GetChatSessionResponse
+	(*GetChatSessionsRequest)(nil),        // 25: loci.chat.GetChatSessionsRequest
+	(*GetChatSessionsResponse)(nil),       // 26: loci.chat.GetChatSessionsResponse
+	(*RecentInteraction)(nil),             // 27: loci.chat.RecentInteraction
+	(*CityInteractions)(nil),              // 28: loci.chat.CityInteractions
+	(*GetRecentInteractionsRequest)(nil),  // 29: loci.chat.GetRecentInteractionsRequest
+	(*GetRecentInteractionsResponse)(nil), // 30: loci.chat.GetRecentInteractionsResponse
+	nil,                                   // 31: loci.chat.NavigationData.QueryParamsEntry
+	(*timestamppb.Timestamp)(nil),         // 32: google.protobuf.Timestamp
+	(*profile.UserPreferenceProfile)(nil), // 33: loci.profile.UserPreferenceProfile
+	(*poi.POIDetailedInfo)(nil),           // 34: loci.poi.POIDetailedInfo
+	(*city.GeneralCityData)(nil),          // 35: loci.city.GeneralCityData
+	(*common.PaginationRequest)(nil),      // 36: loci.common.PaginationRequest
+	(*common.PaginationMetadata)(nil),     // 37: loci.common.PaginationMetadata
+	(*poi.HotelDetailedInfo)(nil),         // 38: loci.poi.HotelDetailedInfo
+	(*poi.RestaurantDetailedInfo)(nil),    // 39: loci.poi.RestaurantDetailedInfo
+	(*common.Response)(nil),               // 40: loci.common.Response
 }
 var file_proto_chat_proto_depIdxs = []int32{
-	31, // 0: loci.chat.LlmInteraction.timestamp:type_name -> google.protobuf.Timestamp
+	32, // 0: loci.chat.LlmInteraction.timestamp:type_name -> google.protobuf.Timestamp
 	0,  // 1: loci.chat.ConversationMessage.role:type_name -> loci.chat.MessageRole
 	1,  // 2: loci.chat.ConversationMessage.message_type:type_name -> loci.chat.MessageType
-	31, // 3: loci.chat.ConversationMessage.timestamp:type_name -> google.protobuf.Timestamp
+	32, // 3: loci.chat.ConversationMessage.timestamp:type_name -> google.protobuf.Timestamp
 	7,  // 4: loci.chat.ConversationMessage.metadata:type_name -> loci.chat.MessageMetadata
-	31, // 5: loci.chat.ModificationRecord.timestamp:type_name -> google.protobuf.Timestamp
-	32, // 6: loci.chat.SessionContext.user_preferences:type_name -> loci.profile.UserPreferenceProfile
+	32, // 5: loci.chat.ModificationRecord.timestamp:type_name -> google.protobuf.Timestamp
+	33, // 6: loci.chat.SessionContext.user_preferences:type_name -> loci.profile.UserPreferenceProfile
 	8,  // 7: loci.chat.SessionContext.modification_history:type_name -> loci.chat.ModificationRecord
-	33, // 8: loci.chat.AIItineraryResponse.points_of_interest:type_name -> loci.poi.POIDetailedInfo
-	33, // 9: loci.chat.AIItineraryResponse.restaurants:type_name -> loci.poi.POIDetailedInfo
-	33, // 10: loci.chat.AIItineraryResponse.bars:type_name -> loci.poi.POIDetailedInfo
-	34, // 11: loci.chat.AiCityResponse.general_city_data:type_name -> loci.city.GeneralCityData
-	33, // 12: loci.chat.AiCityResponse.points_of_interest:type_name -> loci.poi.POIDetailedInfo
+	34, // 8: loci.chat.AIItineraryResponse.points_of_interest:type_name -> loci.poi.POIDetailedInfo
+	34, // 9: loci.chat.AIItineraryResponse.restaurants:type_name -> loci.poi.POIDetailedInfo
+	34, // 10: loci.chat.AIItineraryResponse.bars:type_name -> loci.poi.POIDetailedInfo
+	35, // 11: loci.chat.AiCityResponse.general_city_data:type_name -> loci.city.GeneralCityData
+	34, // 12: loci.chat.AiCityResponse.points_of_interest:type_name -> loci.poi.POIDetailedInfo
 	10, // 13: loci.chat.AiCityResponse.itinerary_response:type_name -> loci.chat.AIItineraryResponse
-	31, // 14: loci.chat.SessionEngagementMetrics.peak_activity_time:type_name -> google.protobuf.Timestamp
+	32, // 14: loci.chat.SessionEngagementMetrics.peak_activity_time:type_name -> google.protobuf.Timestamp
 	11, // 15: loci.chat.ChatSession.current_itinerary:type_name -> loci.chat.AiCityResponse
 	6,  // 16: loci.chat.ChatSession.conversation_history:type_name -> loci.chat.ConversationMessage
 	9,  // 17: loci.chat.ChatSession.session_context:type_name -> loci.chat.SessionContext
-	31, // 18: loci.chat.ChatSession.created_at:type_name -> google.protobuf.Timestamp
-	31, // 19: loci.chat.ChatSession.updated_at:type_name -> google.protobuf.Timestamp
-	31, // 20: loci.chat.ChatSession.expires_at:type_name -> google.protobuf.Timestamp
+	32, // 18: loci.chat.ChatSession.created_at:type_name -> google.protobuf.Timestamp
+	32, // 19: loci.chat.ChatSession.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 20: loci.chat.ChatSession.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 21: loci.chat.ChatSession.status:type_name -> loci.chat.SessionStatus
 	12, // 22: loci.chat.ChatSession.performance_metrics:type_name -> loci.chat.SessionPerformanceMetrics
 	13, // 23: loci.chat.ChatSession.content_metrics:type_name -> loci.chat.SessionContentMetrics
 	14, // 24: loci.chat.ChatSession.engagement_metrics:type_name -> loci.chat.SessionEngagementMetrics
-	11, // 25: loci.chat.ChatResponse.updated_itinerary:type_name -> loci.chat.AiCityResponse
-	31, // 26: loci.chat.StreamEvent.timestamp:type_name -> google.protobuf.Timestamp
-	19, // 27: loci.chat.StreamEvent.navigation:type_name -> loci.chat.NavigationData
-	30, // 28: loci.chat.NavigationData.query_params:type_name -> loci.chat.NavigationData.QueryParamsEntry
-	4,  // 29: loci.chat.StartChatRequest.context_type:type_name -> loci.chat.DomainType
-	4,  // 30: loci.chat.ContinueChatRequest.context_type:type_name -> loci.chat.DomainType
-	15, // 31: loci.chat.GetChatSessionResponse.session:type_name -> loci.chat.ChatSession
-	35, // 32: loci.chat.GetChatSessionsRequest.pagination:type_name -> loci.common.PaginationRequest
-	15, // 33: loci.chat.GetChatSessionsResponse.sessions:type_name -> loci.chat.ChatSession
-	36, // 34: loci.chat.GetChatSessionsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	31, // 35: loci.chat.RecentInteraction.created_at:type_name -> google.protobuf.Timestamp
-	33, // 36: loci.chat.RecentInteraction.pois:type_name -> loci.poi.POIDetailedInfo
-	37, // 37: loci.chat.RecentInteraction.hotels:type_name -> loci.poi.HotelDetailedInfo
-	38, // 38: loci.chat.RecentInteraction.restaurants:type_name -> loci.poi.RestaurantDetailedInfo
-	26, // 39: loci.chat.CityInteractions.interactions:type_name -> loci.chat.RecentInteraction
-	31, // 40: loci.chat.CityInteractions.last_activity:type_name -> google.protobuf.Timestamp
-	35, // 41: loci.chat.GetRecentInteractionsRequest.pagination:type_name -> loci.common.PaginationRequest
-	27, // 42: loci.chat.GetRecentInteractionsResponse.cities:type_name -> loci.chat.CityInteractions
-	36, // 43: loci.chat.GetRecentInteractionsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	20, // 44: loci.chat.ChatService.StartChat:input_type -> loci.chat.StartChatRequest
-	21, // 45: loci.chat.ChatService.ContinueChat:input_type -> loci.chat.ContinueChatRequest
-	22, // 46: loci.chat.ChatService.GetChatSession:input_type -> loci.chat.GetChatSessionRequest
-	24, // 47: loci.chat.ChatService.GetChatSessions:input_type -> loci.chat.GetChatSessionsRequest
-	28, // 48: loci.chat.ChatService.GetRecentInteractions:input_type -> loci.chat.GetRecentInteractionsRequest
-	22, // 49: loci.chat.ChatService.EndSession:input_type -> loci.chat.GetChatSessionRequest
-	16, // 50: loci.chat.ChatService.StreamChat:input_type -> loci.chat.ChatRequest
-	17, // 51: loci.chat.ChatService.StartChat:output_type -> loci.chat.ChatResponse
-	17, // 52: loci.chat.ChatService.ContinueChat:output_type -> loci.chat.ChatResponse
-	23, // 53: loci.chat.ChatService.GetChatSession:output_type -> loci.chat.GetChatSessionResponse
-	25, // 54: loci.chat.ChatService.GetChatSessions:output_type -> loci.chat.GetChatSessionsResponse
-	29, // 55: loci.chat.ChatService.GetRecentInteractions:output_type -> loci.chat.GetRecentInteractionsResponse
-	39, // 56: loci.chat.ChatService.EndSession:output_type -> loci.common.Response
-	18, // 57: loci.chat.ChatService.StreamChat:output_type -> loci.chat.StreamEvent
-	51, // [51:58] is the sub-list for method output_type
-	44, // [44:51] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	20, // 25: loci.chat.ChatRequest.user_location:type_name -> loci.chat.UserLocation
+	11, // 26: loci.chat.ChatResponse.updated_itinerary:type_name -> loci.chat.AiCityResponse
+	32, // 27: loci.chat.StreamEvent.timestamp:type_name -> google.protobuf.Timestamp
+	19, // 28: loci.chat.StreamEvent.navigation:type_name -> loci.chat.NavigationData
+	31, // 29: loci.chat.NavigationData.query_params:type_name -> loci.chat.NavigationData.QueryParamsEntry
+	4,  // 30: loci.chat.StartChatRequest.context_type:type_name -> loci.chat.DomainType
+	20, // 31: loci.chat.StartChatRequest.user_location:type_name -> loci.chat.UserLocation
+	4,  // 32: loci.chat.ContinueChatRequest.context_type:type_name -> loci.chat.DomainType
+	15, // 33: loci.chat.GetChatSessionResponse.session:type_name -> loci.chat.ChatSession
+	36, // 34: loci.chat.GetChatSessionsRequest.pagination:type_name -> loci.common.PaginationRequest
+	15, // 35: loci.chat.GetChatSessionsResponse.sessions:type_name -> loci.chat.ChatSession
+	37, // 36: loci.chat.GetChatSessionsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	32, // 37: loci.chat.RecentInteraction.created_at:type_name -> google.protobuf.Timestamp
+	34, // 38: loci.chat.RecentInteraction.pois:type_name -> loci.poi.POIDetailedInfo
+	38, // 39: loci.chat.RecentInteraction.hotels:type_name -> loci.poi.HotelDetailedInfo
+	39, // 40: loci.chat.RecentInteraction.restaurants:type_name -> loci.poi.RestaurantDetailedInfo
+	27, // 41: loci.chat.CityInteractions.interactions:type_name -> loci.chat.RecentInteraction
+	32, // 42: loci.chat.CityInteractions.last_activity:type_name -> google.protobuf.Timestamp
+	36, // 43: loci.chat.GetRecentInteractionsRequest.pagination:type_name -> loci.common.PaginationRequest
+	28, // 44: loci.chat.GetRecentInteractionsResponse.cities:type_name -> loci.chat.CityInteractions
+	37, // 45: loci.chat.GetRecentInteractionsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	21, // 46: loci.chat.ChatService.StartChat:input_type -> loci.chat.StartChatRequest
+	22, // 47: loci.chat.ChatService.ContinueChat:input_type -> loci.chat.ContinueChatRequest
+	23, // 48: loci.chat.ChatService.GetChatSession:input_type -> loci.chat.GetChatSessionRequest
+	25, // 49: loci.chat.ChatService.GetChatSessions:input_type -> loci.chat.GetChatSessionsRequest
+	29, // 50: loci.chat.ChatService.GetRecentInteractions:input_type -> loci.chat.GetRecentInteractionsRequest
+	23, // 51: loci.chat.ChatService.EndSession:input_type -> loci.chat.GetChatSessionRequest
+	16, // 52: loci.chat.ChatService.StreamChat:input_type -> loci.chat.ChatRequest
+	17, // 53: loci.chat.ChatService.StartChat:output_type -> loci.chat.ChatResponse
+	17, // 54: loci.chat.ChatService.ContinueChat:output_type -> loci.chat.ChatResponse
+	24, // 55: loci.chat.ChatService.GetChatSession:output_type -> loci.chat.GetChatSessionResponse
+	26, // 56: loci.chat.ChatService.GetChatSessions:output_type -> loci.chat.GetChatSessionsResponse
+	30, // 57: loci.chat.ChatService.GetRecentInteractions:output_type -> loci.chat.GetRecentInteractionsResponse
+	40, // 58: loci.chat.ChatService.EndSession:output_type -> loci.common.Response
+	18, // 59: loci.chat.ChatService.StreamChat:output_type -> loci.chat.StreamEvent
+	53, // [53:60] is the sub-list for method output_type
+	46, // [46:53] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_proto_chat_proto_init() }
@@ -2855,17 +2960,18 @@ func file_proto_chat_proto_init() {
 	file_proto_chat_proto_msgTypes[13].OneofWrappers = []any{}
 	file_proto_chat_proto_msgTypes[15].OneofWrappers = []any{}
 	file_proto_chat_proto_msgTypes[16].OneofWrappers = []any{}
-	file_proto_chat_proto_msgTypes[19].OneofWrappers = []any{}
-	file_proto_chat_proto_msgTypes[21].OneofWrappers = []any{}
+	file_proto_chat_proto_msgTypes[17].OneofWrappers = []any{}
+	file_proto_chat_proto_msgTypes[20].OneofWrappers = []any{}
 	file_proto_chat_proto_msgTypes[22].OneofWrappers = []any{}
 	file_proto_chat_proto_msgTypes[23].OneofWrappers = []any{}
+	file_proto_chat_proto_msgTypes[24].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_chat_proto_rawDesc), len(file_proto_chat_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   26,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

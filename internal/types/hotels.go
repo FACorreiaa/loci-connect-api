@@ -15,7 +15,6 @@ type HotelSearchParameters struct {
 	Page             int       `json:"page,omitempty"`         // For pagination
 	PageSize         int       `json:"page_size,omitempty"`    // For pagination
 	LlmInteractionID uuid.UUID `json:"llm_interaction_id"`     // For interaction id
-
 }
 
 // RestaurantSearchParameters defines the filters for searching restaurants
@@ -33,7 +32,6 @@ type RestaurantSearchParameters struct {
 	Page             int       `json:"page,omitempty"`
 	PageSize         int       `json:"page_size,omitempty"`
 	LlmInteractionID uuid.UUID `json:"llm_interaction_id"` // For interaction id
-
 }
 
 // PaginatedHotelResponse holds a list of hotels and pagination info

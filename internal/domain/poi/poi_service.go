@@ -83,7 +83,8 @@ func NewServiceImpl(poiRepository Repository,
 	discoverRepo interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
 	},
-	logger *slog.Logger) *ServiceImpl {
+	logger *slog.Logger,
+) *ServiceImpl {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	aiClient, err := generativeAI.NewLLMChatClient(context.Background(), apiKey)
 	if err != nil {
@@ -102,6 +103,7 @@ func NewServiceImpl(poiRepository Repository,
 		embeddingService: embeddingService,
 	}
 }
+
 func (s *ServiceImpl) AddPoiToFavourites(ctx context.Context, userID, poiID uuid.UUID, isLLMGenerated bool) (uuid.UUID, error) {
 	var id uuid.UUID
 	if !isLLMGenerated {
@@ -156,6 +158,7 @@ func (s *ServiceImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, use
 	}
 	return pois, total, nil
 }
+
 func (s *ServiceImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]types.POIDetailedInfo, error) {
 	pois, err := s.poiRepository.GetPOIsByCityID(ctx, cityID)
 	if err != nil {
@@ -937,7 +940,8 @@ func (s *ServiceImpl) getGeneralPOIByDistance(wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.Float64("latitude", lat),
 		attribute.Float64("longitude", lon),
@@ -1385,7 +1389,8 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.Float64("latitude", lat),
 		attribute.Float64("longitude", lon),
@@ -1485,7 +1490,8 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.Float64("latitude", lat),
 		attribute.Float64("longitude", lon),
@@ -1585,7 +1591,8 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.Float64("latitude", lat),
 		attribute.Float64("longitude", lon),
@@ -1685,7 +1692,8 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(wg *sync.WaitGroup,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- types.GenAIResponse,
-	config *genai.GenerateContentConfig) {
+	config *genai.GenerateContentConfig,
+) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GenerateGeneralPOIWorker", trace.WithAttributes(
 		attribute.Float64("latitude", lat),
 		attribute.Float64("longitude", lon),

@@ -199,11 +199,11 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 		Interactions: interactions,
 		POICount:     poiCount,
 		LastActivity: lastActivity,
-		//SavedItineraries:  itineraries,
-		//FavoritePOIs:      favorites,
-		//TotalInteractions: len(interactions),
-		//TotalFavorites:    len(favorites),
-		//TotalItineraries:  len(itineraries),
+		// SavedItineraries:  itineraries,
+		// FavoritePOIs:      favorites,
+		// TotalInteractions: len(interactions),
+		// TotalFavorites:    len(favorites),
+		// TotalItineraries:  len(itineraries),
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city details",
