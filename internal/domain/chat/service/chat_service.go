@@ -2193,6 +2193,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 	// Step 5: Collect responses for saving interaction
 	responses := make(map[string]*strings.Builder)
+	partCacheKeys := make(map[string]string)
 	responsesMutex := sync.Mutex{}
 
 	// Modified sendEventWithResponse to capture responses
@@ -2224,6 +2225,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getCityDataPrompt(cityName)
 			partCacheKey := cacheKey + "_city_data"
+			partCacheKeys["city_data"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2232,6 +2234,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getGeneralPOIPrompt(cityName)
 			partCacheKey := cacheKey + "_general_pois"
+			partCacheKeys["general_pois"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2240,6 +2243,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getPersonalizedItineraryPrompt(cityName, basePreferences)
 			partCacheKey := cacheKey + "_itinerary"
+			partCacheKeys["itinerary"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2249,6 +2253,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getAccommodationPrompt(cityName, lat, lon, basePreferences)
 			partCacheKey := cacheKey + "_hotels"
+			partCacheKeys["hotels"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2258,6 +2263,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getDiningPrompt(cityName, lat, lon, basePreferences)
 			partCacheKey := cacheKey + "_restaurants"
+			partCacheKeys["restaurants"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2267,6 +2273,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getActivitiesPrompt(cityName, lat, lon, basePreferences)
 			partCacheKey := cacheKey + "_activities"
+			partCacheKeys["activities"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2281,6 +2288,22 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		if ctx.Err() == nil { // Only send completion event if context is still active
 			// Build complete data from collected responses
 			responsesMutex.Lock()
+
+			// If any expected parts are missing, try to hydrate from cache
+			for part, key := range partCacheKeys {
+				if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
+					if cached, found := l.cache.Get(key); found {
+						if cachedText, ok := cached.(string); ok && cachedText != "" {
+							l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
+								slog.String("part_type", part), slog.String("cache_key", key))
+							b := &strings.Builder{}
+							b.WriteString(cachedText)
+							responses[part] = b
+						}
+					}
+				}
+			}
+
 			completeData := map[string]interface{}{
 				"session_id": sessionID.String(),
 			}
@@ -2405,13 +2428,56 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 					}
 				}
 			}
+			if hotelsResp, ok := completeData["accommodation_response"]; ok {
+				if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
+					if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
+						if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
+							if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
+							} else {
+								// Surface hotels through points_of_interest so they reach clients
+								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, convertHotelsToPOIs(itineraryData.Hotels)...)
+							}
+						}
+					}
+				}
+			}
+			if restaurantsResp, ok := completeData["dining_response"]; ok {
+				if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
+					if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
+						if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
+							if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
+							} else {
+								// Also populate itinerary restaurants so the gRPC response carries them
+								restaurantPOIs := convertRestaurantsToPOIs(itineraryData.Restaurants)
+								itineraryData.AIItineraryResponse.Restaurants = restaurantPOIs
+								// Expose restaurants through points_of_interest for clients that read the generic field
+								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, restaurantPOIs...)
+							}
+						}
+					}
+				}
+			}
 
 			// Set cityID and llmInteractionID on POIs
 			if cityID != uuid.Nil {
+				for i := range itineraryData.PointsOfInterest {
+					itineraryData.PointsOfInterest[i].CityID = cityID
+					if savedInteractionID != uuid.Nil {
+						itineraryData.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+					}
+				}
 				for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
 					itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
 					if savedInteractionID != uuid.Nil {
 						itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+					}
+				}
+				for i := range itineraryData.AIItineraryResponse.Restaurants {
+					itineraryData.AIItineraryResponse.Restaurants[i].CityID = cityID
+					if savedInteractionID != uuid.Nil {
+						itineraryData.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedInteractionID
 					}
 				}
 			}
@@ -2461,7 +2527,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	}()
 
 	go func() {
-		// wg.Wait() // Wait for all workers to complete
+		wg.Wait() // Wait for all workers to complete
 		asyncCtx := context.Background()
 
 		var fullResponseBuilder strings.Builder
@@ -2677,6 +2743,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 	// Step 5: Collect responses for saving interaction
 	responses := make(map[string]*strings.Builder)
+	partCacheKeys := make(map[string]string)
 	responsesMutex := sync.Mutex{}
 
 	// Modified sendEventWithResponse to capture responses
@@ -2708,6 +2775,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getCityDataPrompt(cityName)
 			partCacheKey := cacheKey + "_city_data"
+			partCacheKeys["city_data"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2716,6 +2784,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralPOIPrompt(cityName)
 			partCacheKey := cacheKey + "_general_pois"
+			partCacheKeys["general_pois"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2724,6 +2793,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralizedItineraryPrompt(cityName)
 			partCacheKey := cacheKey + "_itinerary"
+			partCacheKeys["itinerary"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2733,6 +2803,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralAccommodationPrompt(cityName)
 			partCacheKey := cacheKey + "_hotels"
+			partCacheKeys["hotels"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2742,6 +2813,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralDiningPrompt(cityName)
 			partCacheKey := cacheKey + "_restaurants"
+			partCacheKeys["restaurants"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2751,6 +2823,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralActivitiesPrompt(cityName)
 			partCacheKey := cacheKey + "_activities"
+			partCacheKeys["activities"] = partCacheKey
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2765,6 +2838,22 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 		if ctx.Err() == nil { // Only send completion event if context is still active
 			// Build complete data from collected responses
 			responsesMutex.Lock()
+
+			// If any expected parts are missing, try to hydrate from cache
+			for part, key := range partCacheKeys {
+				if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
+					if cached, found := l.cache.Get(key); found {
+						if cachedText, ok := cached.(string); ok && cachedText != "" {
+							l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
+								slog.String("part_type", part), slog.String("cache_key", key))
+							b := &strings.Builder{}
+							b.WriteString(cachedText)
+							responses[part] = b
+						}
+					}
+				}
+			}
+
 			completeData := map[string]interface{}{
 				"session_id": sessionID.String(),
 			}
@@ -2885,6 +2974,28 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 					if jsonBytes, err := json.Marshal(itinData); err == nil {
 						if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
 							l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+						}
+					}
+				}
+			}
+			if hotelsResp, ok := completeData["accommodation_response"]; ok {
+				if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
+					if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
+						if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
+							if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
+							}
+						}
+					}
+				}
+			}
+			if restaurantsResp, ok := completeData["dining_response"]; ok {
+				if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
+					if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
+						if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
+							if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
+							}
 						}
 					}
 				}
@@ -3186,6 +3297,80 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("cache_key", cacheKey),
 			slog.Int("response_length", fullResponse.Len()))
 	}
+}
+
+// convertRestaurantsToPOIs lifts restaurant-specific details into the generic POI shape
+// so they can be transported through itinerary responses that only expose POIs.
+func convertRestaurantsToPOIs(restaurants []locitypes.RestaurantDetailedInfo) []locitypes.POIDetailedInfo {
+	pois := make([]locitypes.POIDetailedInfo, 0, len(restaurants))
+	for _, r := range restaurants {
+		poi := locitypes.POIDetailedInfo{
+			City:             r.City,
+			Name:             r.Name,
+			Latitude:         r.Latitude,
+			Longitude:        r.Longitude,
+			Category:         r.Category,
+			Description:      r.Description,
+			Rating:           r.Rating,
+			Tags:             r.Tags,
+			Images:           r.Images,
+			LlmInteractionID: r.LlmInteractionID,
+		}
+		if r.Address != nil {
+			poi.Address = *r.Address
+		}
+		if r.PhoneNumber != nil {
+			poi.PhoneNumber = *r.PhoneNumber
+		}
+		if r.Website != nil {
+			poi.Website = *r.Website
+		}
+		if r.OpeningHours != nil && *r.OpeningHours != "" {
+			poi.OpeningHours = map[string]string{"general": *r.OpeningHours}
+		}
+		if r.PriceLevel != nil {
+			poi.PriceLevel = *r.PriceLevel
+		}
+		if r.CuisineType != nil {
+			poi.CuisineType = *r.CuisineType
+		}
+		pois = append(pois, poi)
+	}
+	return pois
+}
+
+// convertHotelsToPOIs adapts hotel details into POI entries for client responses.
+func convertHotelsToPOIs(hotels []locitypes.HotelDetailedInfo) []locitypes.POIDetailedInfo {
+	pois := make([]locitypes.POIDetailedInfo, 0, len(hotels))
+	for _, h := range hotels {
+		poi := locitypes.POIDetailedInfo{
+			City:             h.City,
+			Name:             h.Name,
+			Latitude:         h.Latitude,
+			Longitude:        h.Longitude,
+			Category:         h.Category,
+			Description:      h.Description,
+			Rating:           h.Rating,
+			Address:          h.Address,
+			Tags:             h.Tags,
+			Images:           h.Images,
+			LlmInteractionID: h.LlmInteractionID,
+		}
+		if h.PhoneNumber != nil {
+			poi.PhoneNumber = *h.PhoneNumber
+		}
+		if h.Website != nil {
+			poi.Website = *h.Website
+		}
+		if h.OpeningHours != nil && *h.OpeningHours != "" {
+			poi.OpeningHours = map[string]string{"general": *h.OpeningHours}
+		}
+		if h.PriceRange != nil {
+			poi.PriceRange = *h.PriceRange
+		}
+		pois = append(pois, poi)
+	}
+	return pois
 }
 
 // extractJSONFromMarkdown extracts JSON content from markdown code blocks

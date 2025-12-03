@@ -1,3 +1,236 @@
 {
-  "session_id": "fe5b4572-b663-4d14-a97f-c33a73e9ba59"
+  "dining_response": {
+    "restaurants": [
+      {
+        "address": "Av. Almirante Reis 1 H, 1150-007 Lisboa, Portugal",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Seafood",
+        "description": "Famous seafood restaurant known for its fresh catches and lively atmosphere. Expect queues, but it's worth the wait for the prawns, clams, and other delicacies.",
+        "distance": 1.5,
+        "images": [],
+        "latitude": 38.7214,
+        "longitude": -9.1377,
+        "name": "Cervejaria Ramiro",
+        "opening_hours": "Tue-Sun 12:00-00:30",
+        "phone_number": "+351 21 882 0020",
+        "price_level": "$$$",
+        "rating": 4.5,
+        "tags": [
+          "Seafood",
+          "Portuguese",
+          "Casual",
+          "Lively"
+        ],
+        "website": "https://www.cervejariaramiro.pt/"
+      },
+      {
+        "address": "Av. 24 de Julho 49, 1200-479 Lisboa, Portugal",
+        "category": "Food Market",
+        "city": "Lisbon",
+        "cuisine_type": "Multiple",
+        "description": "A vibrant food hall featuring stalls from some of Lisbon's best restaurants and chefs. Offers a wide variety of cuisines and dining experiences.",
+        "distance": 1.8,
+        "images": [],
+        "latitude": 38.7083,
+        "longitude": -9.145,
+        "name": "Time Out Market Lisboa",
+        "opening_hours": "Sun-Thu 10:00-00:00, Fri-Sat 10:00-01:00",
+        "phone_number": "+351 21 364 7411",
+        "price_level": "$$",
+        "rating": 4.3,
+        "tags": [
+          "Food Market",
+          "Variety",
+          "Casual",
+          "Central"
+        ],
+        "website": "https://www.timeoutmarket.com/lisboa/"
+      },
+      {
+        "address": "Rua Dom Pedro V, 129, Príncipe Real, Lisboa",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Peruvian",
+        "description": "Specializes in Peruvian ceviche, offering a fresh and flavorful dining experience. Known for its creative dishes and stylish atmosphere.",
+        "distance": 2.2,
+        "images": [],
+        "latitude": 38.7138,
+        "longitude": -9.1489,
+        "name": "A Cevicheria",
+        "opening_hours": "Mon-Sun 12:30-00:00",
+        "phone_number": "+351 21 346 0000",
+        "price_level": "$$$",
+        "rating": 4.6,
+        "tags": [
+          "Ceviche",
+          "Peruvian",
+          "Seafood",
+          "Stylish"
+        ],
+        "website": "https://www.acevicheria.pt/"
+      },
+      {
+        "address": "Rua Duques de Bragança, 7, Chiado, Lisboa",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Portuguese",
+        "description": "Chef José Avillez's more casual restaurant, offering a modern take on Portuguese cuisine. Features a diverse menu with options for everyone.",
+        "distance": 1.9,
+        "images": [],
+        "latitude": 38.7145,
+        "longitude": -9.1405,
+        "name": "Cantinho do Avillez",
+        "opening_hours": "Mon-Sun 12:30-15:00, 19:00-23:00",
+        "phone_number": "+351 21 195 0598",
+        "price_level": "$$$",
+        "rating": 4.4,
+        "tags": [
+          "Portuguese",
+          "Modern",
+          "Casual",
+          "Chef"
+        ],
+        "website": "https://cantinhodoavillez.pt/en/cantinho-do-avillez-lisboa/"
+      },
+      {
+        "address": "R. das Flores 103, 1200-194 Lisboa, Portugal",
+        "category": "Tapas Bar",
+        "city": "Lisbon",
+        "cuisine_type": "Portuguese",
+        "description": "Small and popular tapas bar serving traditional Portuguese petiscos (small dishes). Known for its cozy atmosphere and authentic flavors.",
+        "distance": 1.9,
+        "images": [],
+        "latitude": 38.7111,
+        "longitude": -9.1425,
+        "name": "Taberna da Rua das Flores",
+        "opening_hours": "Mon-Fri 12:00-23:00, Sat 19:00-23:00",
+        "phone_number": "+351 21 347 9418",
+        "price_level": "$$",
+        "rating": 4.7,
+        "tags": [
+          "Tapas",
+          "Portuguese",
+          "Petiscos",
+          "Cozy"
+        ],
+        "website": "https://www.facebook.com/Taberna-da-Rua-das-Flores-338875856125669/"
+      },
+      {
+        "address": "Rua das Portas de Santo Antão, 150, Lisboa",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Portuguese",
+        "description": "Traditional Portuguese restaurant known for its generous portions and classic dishes. A popular spot for locals and tourists alike.",
+        "distance": 1.8,
+        "images": [],
+        "latitude": 38.7156,
+        "longitude": -9.1375,
+        "name": "Solar dos Presuntos",
+        "opening_hours": "Mon-Sun 12:00-15:00, 19:00-23:00",
+        "phone_number": "+351 21 342 4253",
+        "price_level": "$$$",
+        "rating": 4.2,
+        "tags": [
+          "Portuguese",
+          "Traditional",
+          "Generous Portions"
+        ],
+        "website": "http://www.solardospresuntos.com/"
+      },
+      {
+        "address": "Largo Rafael Bordalo Pinheiro 30, Lisboa",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Asian",
+        "description": "Offers a pan-Asian dining experience with dishes from various countries like Thailand, Vietnam, and China. Known for its flavorful and well-presented food.",
+        "distance": 2,
+        "images": [],
+        "latitude": 38.7187,
+        "longitude": -9.1422,
+        "name": "Boa-Bao",
+        "opening_hours": "Mon-Sun 12:00-00:00",
+        "phone_number": "+351 21 342 2357",
+        "price_level": "$$$",
+        "rating": 4.5,
+        "tags": [
+          "Asian",
+          "Pan-Asian",
+          "Modern",
+          "Stylish"
+        ],
+        "website": "https://boabao.pt/"
+      },
+      {
+        "address": "R. de Belém 84-92, 1300-085 Lisboa, Portugal",
+        "category": "Cafe",
+        "city": "Lisbon",
+        "cuisine_type": "Pastries",
+        "description": "Home of the original Pastéis de Belém, a must-try custard tart. Expect a queue, but it moves quickly.",
+        "distance": 5.8,
+        "images": [],
+        "latitude": 38.6976,
+        "longitude": -9.2008,
+        "name": "Pastéis de Belém",
+        "opening_hours": "Mon-Sun 08:00-21:00",
+        "phone_number": "+351 21 363 7423",
+        "price_level": "$",
+        "rating": 4.6,
+        "tags": [
+          "Pastries",
+          "Portuguese",
+          "Iconic",
+          "Cafe"
+        ],
+        "website": "https://pasteisdebelem.pt/"
+      },
+      {
+        "address": "R. Rodrigues de Faria 103, 1300-501 Lisboa, Portugal",
+        "category": "Food Market",
+        "city": "Lisbon",
+        "cuisine_type": "Multiple",
+        "description": "A trendy industrial complex with various restaurants, cafes, and shops. Offers a unique and diverse dining experience.",
+        "distance": 4.6,
+        "images": [],
+        "latitude": 38.7014,
+        "longitude": -9.1843,
+        "name": "LX Factory",
+        "opening_hours": "Varies by establishment",
+        "phone_number": null,
+        "price_level": "$$",
+        "rating": 4.3,
+        "tags": [
+          "Food Market",
+          "Trendy",
+          "Industrial",
+          "Variety"
+        ],
+        "website": "https://lxfactory.com/"
+      },
+      {
+        "address": "Rua da Escola Politécnica, 26/28, Príncipe Real, Lisboa",
+        "category": "Casual Dining",
+        "city": "Lisbon",
+        "cuisine_type": "Italian",
+        "description": "Offers authentic Neapolitan pizza with high-quality ingredients. A popular spot for pizza lovers.",
+        "distance": 1.9,
+        "images": [],
+        "latitude": 38.7171,
+        "longitude": -9.1415,
+        "name": "ZeroZero Pizzeria",
+        "opening_hours": "Mon-Sun 12:00-15:00, 19:00-23:00",
+        "phone_number": "+351 21 347 0324",
+        "price_level": "$$",
+        "rating": 4.4,
+        "tags": [
+          "Pizza",
+          "Italian",
+          "Neapolitan",
+          "Casual"
+        ],
+        "website": "https://www.zerozero.pt/"
+      }
+    ]
+  },
+  "session_id": "e47c22de-175b-46c6-9b9a-579b8418a4a9"
 }

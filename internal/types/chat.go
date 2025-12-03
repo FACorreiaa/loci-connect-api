@@ -66,10 +66,12 @@ type GeneralCityData struct {
 }
 
 type AiCityResponse struct {
-	GeneralCityData     GeneralCityData     `json:"general_city_data"`
-	PointsOfInterest    []POIDetailedInfo   `json:"points_of_interest"`
-	AIItineraryResponse AIItineraryResponse `json:"itinerary_response"`
-	SessionID           uuid.UUID           `json:"session_id"`
+	GeneralCityData     GeneralCityData          `json:"general_city_data"`
+	PointsOfInterest    []POIDetailedInfo        `json:"points_of_interest"`
+	AIItineraryResponse AIItineraryResponse      `json:"itinerary_response"`
+	Hotels              []HotelDetailedInfo      `json:"hotels,omitempty"`
+	Restaurants         []RestaurantDetailedInfo `json:"restaurants,omitempty"`
+	SessionID           uuid.UUID                `json:"session_id"`
 }
 
 type GenAIResponse struct {
