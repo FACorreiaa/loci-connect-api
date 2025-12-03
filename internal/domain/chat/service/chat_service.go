@@ -2459,6 +2459,34 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 					}
 				}
 			}
+			if activitiesResp, ok := completeData["activities_response"]; ok {
+				if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
+					if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
+						if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
+							var activities []locitypes.POIDetailedInfo
+							if err := json.Unmarshal(jsonBytes, &activities); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
+							} else {
+								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
+							}
+						}
+					}
+				}
+			}
+			if activitiesResp, ok := completeData["activities_response"]; ok {
+				if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
+					if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
+						if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
+							var activities []locitypes.POIDetailedInfo
+							if err := json.Unmarshal(jsonBytes, &activities); err != nil {
+								l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
+							} else {
+								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
+							}
+						}
+					}
+				}
+			}
 
 			// Set cityID and llmInteractionID on POIs
 			if cityID != uuid.Nil {

@@ -1,94 +1,117 @@
 {
-  "accommodation_response": {
-    "hotels": [
+  "activities_response": {
+    "activities": [
       {
-        "address": "Rua Garrett 61, 1200-203 Lisboa, Portugal",
-        "category": "Hotel",
-        "city": "Lisbon",
-        "description": "Located in the heart of Lisbon's Chiado district, Hotel Borges Chiado offers comfortable rooms and a convenient location for exploring the city. It's within walking distance of many attractions, restaurants, and shops.",
-        "distance": 1.2,
-        "images": null,
-        "latitude": 38.7147,
-        "longitude": -9.1405,
-        "name": "Hotel Borges Chiado",
-        "opening_hours": null,
-        "phone_number": "+351 21 325 6000",
-        "price_range": "2",
-        "rating": 4,
-        "tags": [
-          "Central Location",
-          "Chiado",
-          "Comfortable Rooms"
-        ],
-        "website": "https://www.hotelborgeschiado.pt/"
-      },
-      {
-        "address": "Rossio Train Station, 2nd Floor, Largo do Duque de Cadaval, 1, 1200-160 Lisboa, Portugal",
-        "category": "Hostel",
-        "city": "Lisbon",
-        "description": "Lisbon Destination Hostel is situated in a historic building in the city center. It offers a social atmosphere, dorms and private rooms, and organized activities for guests.",
-        "distance": 1.5,
-        "images": null,
-        "latitude": 38.7137,
-        "longitude": -9.1362,
-        "name": "Lisbon Destination Hostel",
-        "opening_hours": null,
-        "phone_number": "+351 21 887 0021",
-        "price_range": "1",
+        "address": "Trafalgar Square, London WC2N 5DN, United Kingdom",
+        "category": "Outdoor Activity",
+        "city": "London",
+        "description": "A vibrant public square in the heart of London, known for Nelson's Column, fountains, and historical significance. A great place to people-watch and soak in the city's atmosphere.",
+        "distance": 0.8,
+        "images": [],
+        "latitude": 51.507351,
+        "longitude": -0.127758,
+        "name": "Trafalgar Square",
+        "opening_hours": "Open 24 hours",
+        "price_range": "Free",
         "rating": 4.5,
         "tags": [
-          "Hostel",
-          "Central Location",
-          "Social Atmosphere",
-          "Budget-Friendly"
+          "public square",
+          "landmark",
+          "historical site",
+          "free",
+          "central London"
         ],
-        "website": "https://lisbondestinationhostel.com/"
+        "website": "https://www.london.gov.uk/about-us/our-building-and-squares/trafalgar-square"
       },
       {
-        "address": "Rua do Alecrim 12, 1200-017 Lisboa, Portugal",
-        "category": "Hostel",
-        "city": "Lisbon",
-        "description": "Located in a former Swiss embassy, The Independente offers a mix of dorms and private suites with unique design. Features a rooftop bar and a restaurant.",
-        "distance": 1,
-        "images": null,
-        "latitude": 38.7159,
-        "longitude": -9.1432,
-        "name": "The Independente Hostel \u0026 Suites",
-        "opening_hours": null,
-        "phone_number": "+351 21 346 1381",
-        "price_range": "2",
-        "rating": 4.3,
+        "address": "Trafalgar Square, London WC2N 5DN, United Kingdom",
+        "category": "Museum",
+        "city": "London",
+        "description": "Home to one of the world’s greatest collections of Western European paintings. From Van Gogh’s Sunflowers to Monet’s Water Lilies, the National Gallery offers a rich and diverse artistic experience.",
+        "distance": 0.9,
+        "images": [],
+        "latitude": 51.5082,
+        "longitude": -0.128,
+        "name": "National Gallery",
+        "opening_hours": "Sat-Thu 10:00-18:00, Fri 10:00-21:00",
+        "price_range": "Free",
+        "rating": 4.7,
         "tags": [
-          "Hostel",
-          "Suites",
-          "Rooftop Bar",
-          "Design"
+          "art museum",
+          "paintings",
+          "free",
+          "cultural",
+          "historical"
         ],
-        "website": "https://theindependente.com/"
+        "website": "https://www.nationalgallery.org.uk/"
       },
       {
-        "address": "Praça Dom Pedro IV 59, 1100-200 Lisboa, Portugal",
-        "category": "Hotel",
-        "city": "Lisbon",
-        "description": "My Story Hotel Rossio is located in the heart of Lisbon, close to Rossio Square. It offers comfortable and modern rooms with a focus on local stories and culture.",
+        "address": "Leicester Square, London WC2H 7DE, United Kingdom",
+        "category": "Entertainment",
+        "city": "London",
+        "description": "A pedestrianised square in the West End, known for its cinemas, theatres, and street performers. A bustling hub of entertainment and nightlife.",
         "distance": 1.4,
-        "images": null,
-        "latitude": 38.7141,
-        "longitude": -9.1373,
-        "name": "My Story Hotel Rossio",
-        "opening_hours": null,
-        "phone_number": "+351 21 887 0020",
-        "price_range": "2",
+        "images": [],
+        "latitude": 51.5128,
+        "longitude": -0.127,
+        "name": "Leicester Square",
+        "opening_hours": "Open 24 hours",
+        "price_range": "$",
         "rating": 4.2,
         "tags": [
-          "Central Location",
-          "Rossio",
-          "Modern",
-          "Comfortable"
+          "entertainment",
+          "cinemas",
+          "theatre",
+          "nightlife",
+          "central London"
         ],
-        "website": "https://www.mystoryhotels.com/pt/hotel-rossio-lisboa/"
+        "website": "https://www.leicestersquare.london/"
+      },
+      {
+        "address": "Great Russell Street, London WC1B 3DG, United Kingdom",
+        "category": "Museum",
+        "city": "London",
+        "description": "One of the world's largest and most comprehensive museums, with a vast collection of art and artifacts from around the world, including the Rosetta Stone and Egyptian mummies.",
+        "distance": 2.1,
+        "images": [],
+        "latitude": 51.5189,
+        "longitude": -0.1269,
+        "name": "British Museum",
+        "opening_hours": "Sat-Thu 10:00-17:00, Fri 10:00-20:30",
+        "price_range": "Free",
+        "rating": 4.6,
+        "tags": [
+          "museum",
+          "history",
+          "archaeology",
+          "free",
+          "cultural"
+        ],
+        "website": "https://www.britishmuseum.org/"
+      },
+      {
+        "address": "London SW1A 2BJ, United Kingdom",
+        "category": "Outdoor Activity",
+        "city": "London",
+        "description": "A beautiful Royal Park in the heart of London, offering scenic views, walking paths, and a tranquil escape from the city bustle. Famous for its pelicans and diverse birdlife.",
+        "distance": 1.1,
+        "images": [],
+        "latitude": 51.5011,
+        "longitude": -0.133,
+        "name": "St. James's Park",
+        "opening_hours": "05:00-00:00",
+        "price_range": "Free",
+        "rating": 4.7,
+        "tags": [
+          "park",
+          "nature",
+          "walking",
+          "relaxing",
+          "free"
+        ],
+        "website": "https://www.royalparks.org.uk/parks/st-james-s-park"
       }
     ]
   },
-  "session_id": "dbdbf9da-fb23-4aee-a542-f1484c11cb94"
+  "session_id": "958db4ff-ddee-437a-a85f-593de63965d5"
 }
