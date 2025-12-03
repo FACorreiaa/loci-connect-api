@@ -1,236 +1,94 @@
 {
-  "dining_response": {
-    "restaurants": [
+  "accommodation_response": {
+    "hotels": [
       {
-        "address": "Av. Almirante Reis 1 H, 1150-007 Lisboa, Portugal",
-        "category": "Casual Dining",
+        "address": "Rua Garrett 61, 1200-203 Lisboa, Portugal",
+        "category": "Hotel",
         "city": "Lisbon",
-        "cuisine_type": "Seafood",
-        "description": "Famous seafood restaurant known for its fresh catches and lively atmosphere. Expect queues, but it's worth the wait for the prawns, clams, and other delicacies.",
+        "description": "Located in the heart of Lisbon's Chiado district, Hotel Borges Chiado offers comfortable rooms and a convenient location for exploring the city. It's within walking distance of many attractions, restaurants, and shops.",
+        "distance": 1.2,
+        "images": null,
+        "latitude": 38.7147,
+        "longitude": -9.1405,
+        "name": "Hotel Borges Chiado",
+        "opening_hours": null,
+        "phone_number": "+351 21 325 6000",
+        "price_range": "2",
+        "rating": 4,
+        "tags": [
+          "Central Location",
+          "Chiado",
+          "Comfortable Rooms"
+        ],
+        "website": "https://www.hotelborgeschiado.pt/"
+      },
+      {
+        "address": "Rossio Train Station, 2nd Floor, Largo do Duque de Cadaval, 1, 1200-160 Lisboa, Portugal",
+        "category": "Hostel",
+        "city": "Lisbon",
+        "description": "Lisbon Destination Hostel is situated in a historic building in the city center. It offers a social atmosphere, dorms and private rooms, and organized activities for guests.",
         "distance": 1.5,
-        "images": [],
-        "latitude": 38.7214,
-        "longitude": -9.1377,
-        "name": "Cervejaria Ramiro",
-        "opening_hours": "Tue-Sun 12:00-00:30",
-        "phone_number": "+351 21 882 0020",
-        "price_level": "$$$",
+        "images": null,
+        "latitude": 38.7137,
+        "longitude": -9.1362,
+        "name": "Lisbon Destination Hostel",
+        "opening_hours": null,
+        "phone_number": "+351 21 887 0021",
+        "price_range": "1",
         "rating": 4.5,
         "tags": [
-          "Seafood",
-          "Portuguese",
-          "Casual",
-          "Lively"
+          "Hostel",
+          "Central Location",
+          "Social Atmosphere",
+          "Budget-Friendly"
         ],
-        "website": "https://www.cervejariaramiro.pt/"
+        "website": "https://lisbondestinationhostel.com/"
       },
       {
-        "address": "Av. 24 de Julho 49, 1200-479 Lisboa, Portugal",
-        "category": "Food Market",
+        "address": "Rua do Alecrim 12, 1200-017 Lisboa, Portugal",
+        "category": "Hostel",
         "city": "Lisbon",
-        "cuisine_type": "Multiple",
-        "description": "A vibrant food hall featuring stalls from some of Lisbon's best restaurants and chefs. Offers a wide variety of cuisines and dining experiences.",
-        "distance": 1.8,
-        "images": [],
-        "latitude": 38.7083,
-        "longitude": -9.145,
-        "name": "Time Out Market Lisboa",
-        "opening_hours": "Sun-Thu 10:00-00:00, Fri-Sat 10:00-01:00",
-        "phone_number": "+351 21 364 7411",
-        "price_level": "$$",
+        "description": "Located in a former Swiss embassy, The Independente offers a mix of dorms and private suites with unique design. Features a rooftop bar and a restaurant.",
+        "distance": 1,
+        "images": null,
+        "latitude": 38.7159,
+        "longitude": -9.1432,
+        "name": "The Independente Hostel \u0026 Suites",
+        "opening_hours": null,
+        "phone_number": "+351 21 346 1381",
+        "price_range": "2",
         "rating": 4.3,
         "tags": [
-          "Food Market",
-          "Variety",
-          "Casual",
-          "Central"
+          "Hostel",
+          "Suites",
+          "Rooftop Bar",
+          "Design"
         ],
-        "website": "https://www.timeoutmarket.com/lisboa/"
+        "website": "https://theindependente.com/"
       },
       {
-        "address": "Rua Dom Pedro V, 129, Príncipe Real, Lisboa",
-        "category": "Casual Dining",
+        "address": "Praça Dom Pedro IV 59, 1100-200 Lisboa, Portugal",
+        "category": "Hotel",
         "city": "Lisbon",
-        "cuisine_type": "Peruvian",
-        "description": "Specializes in Peruvian ceviche, offering a fresh and flavorful dining experience. Known for its creative dishes and stylish atmosphere.",
-        "distance": 2.2,
-        "images": [],
-        "latitude": 38.7138,
-        "longitude": -9.1489,
-        "name": "A Cevicheria",
-        "opening_hours": "Mon-Sun 12:30-00:00",
-        "phone_number": "+351 21 346 0000",
-        "price_level": "$$$",
-        "rating": 4.6,
-        "tags": [
-          "Ceviche",
-          "Peruvian",
-          "Seafood",
-          "Stylish"
-        ],
-        "website": "https://www.acevicheria.pt/"
-      },
-      {
-        "address": "Rua Duques de Bragança, 7, Chiado, Lisboa",
-        "category": "Casual Dining",
-        "city": "Lisbon",
-        "cuisine_type": "Portuguese",
-        "description": "Chef José Avillez's more casual restaurant, offering a modern take on Portuguese cuisine. Features a diverse menu with options for everyone.",
-        "distance": 1.9,
-        "images": [],
-        "latitude": 38.7145,
-        "longitude": -9.1405,
-        "name": "Cantinho do Avillez",
-        "opening_hours": "Mon-Sun 12:30-15:00, 19:00-23:00",
-        "phone_number": "+351 21 195 0598",
-        "price_level": "$$$",
-        "rating": 4.4,
-        "tags": [
-          "Portuguese",
-          "Modern",
-          "Casual",
-          "Chef"
-        ],
-        "website": "https://cantinhodoavillez.pt/en/cantinho-do-avillez-lisboa/"
-      },
-      {
-        "address": "R. das Flores 103, 1200-194 Lisboa, Portugal",
-        "category": "Tapas Bar",
-        "city": "Lisbon",
-        "cuisine_type": "Portuguese",
-        "description": "Small and popular tapas bar serving traditional Portuguese petiscos (small dishes). Known for its cozy atmosphere and authentic flavors.",
-        "distance": 1.9,
-        "images": [],
-        "latitude": 38.7111,
-        "longitude": -9.1425,
-        "name": "Taberna da Rua das Flores",
-        "opening_hours": "Mon-Fri 12:00-23:00, Sat 19:00-23:00",
-        "phone_number": "+351 21 347 9418",
-        "price_level": "$$",
-        "rating": 4.7,
-        "tags": [
-          "Tapas",
-          "Portuguese",
-          "Petiscos",
-          "Cozy"
-        ],
-        "website": "https://www.facebook.com/Taberna-da-Rua-das-Flores-338875856125669/"
-      },
-      {
-        "address": "Rua das Portas de Santo Antão, 150, Lisboa",
-        "category": "Casual Dining",
-        "city": "Lisbon",
-        "cuisine_type": "Portuguese",
-        "description": "Traditional Portuguese restaurant known for its generous portions and classic dishes. A popular spot for locals and tourists alike.",
-        "distance": 1.8,
-        "images": [],
-        "latitude": 38.7156,
-        "longitude": -9.1375,
-        "name": "Solar dos Presuntos",
-        "opening_hours": "Mon-Sun 12:00-15:00, 19:00-23:00",
-        "phone_number": "+351 21 342 4253",
-        "price_level": "$$$",
+        "description": "My Story Hotel Rossio is located in the heart of Lisbon, close to Rossio Square. It offers comfortable and modern rooms with a focus on local stories and culture.",
+        "distance": 1.4,
+        "images": null,
+        "latitude": 38.7141,
+        "longitude": -9.1373,
+        "name": "My Story Hotel Rossio",
+        "opening_hours": null,
+        "phone_number": "+351 21 887 0020",
+        "price_range": "2",
         "rating": 4.2,
         "tags": [
-          "Portuguese",
-          "Traditional",
-          "Generous Portions"
-        ],
-        "website": "http://www.solardospresuntos.com/"
-      },
-      {
-        "address": "Largo Rafael Bordalo Pinheiro 30, Lisboa",
-        "category": "Casual Dining",
-        "city": "Lisbon",
-        "cuisine_type": "Asian",
-        "description": "Offers a pan-Asian dining experience with dishes from various countries like Thailand, Vietnam, and China. Known for its flavorful and well-presented food.",
-        "distance": 2,
-        "images": [],
-        "latitude": 38.7187,
-        "longitude": -9.1422,
-        "name": "Boa-Bao",
-        "opening_hours": "Mon-Sun 12:00-00:00",
-        "phone_number": "+351 21 342 2357",
-        "price_level": "$$$",
-        "rating": 4.5,
-        "tags": [
-          "Asian",
-          "Pan-Asian",
+          "Central Location",
+          "Rossio",
           "Modern",
-          "Stylish"
+          "Comfortable"
         ],
-        "website": "https://boabao.pt/"
-      },
-      {
-        "address": "R. de Belém 84-92, 1300-085 Lisboa, Portugal",
-        "category": "Cafe",
-        "city": "Lisbon",
-        "cuisine_type": "Pastries",
-        "description": "Home of the original Pastéis de Belém, a must-try custard tart. Expect a queue, but it moves quickly.",
-        "distance": 5.8,
-        "images": [],
-        "latitude": 38.6976,
-        "longitude": -9.2008,
-        "name": "Pastéis de Belém",
-        "opening_hours": "Mon-Sun 08:00-21:00",
-        "phone_number": "+351 21 363 7423",
-        "price_level": "$",
-        "rating": 4.6,
-        "tags": [
-          "Pastries",
-          "Portuguese",
-          "Iconic",
-          "Cafe"
-        ],
-        "website": "https://pasteisdebelem.pt/"
-      },
-      {
-        "address": "R. Rodrigues de Faria 103, 1300-501 Lisboa, Portugal",
-        "category": "Food Market",
-        "city": "Lisbon",
-        "cuisine_type": "Multiple",
-        "description": "A trendy industrial complex with various restaurants, cafes, and shops. Offers a unique and diverse dining experience.",
-        "distance": 4.6,
-        "images": [],
-        "latitude": 38.7014,
-        "longitude": -9.1843,
-        "name": "LX Factory",
-        "opening_hours": "Varies by establishment",
-        "phone_number": null,
-        "price_level": "$$",
-        "rating": 4.3,
-        "tags": [
-          "Food Market",
-          "Trendy",
-          "Industrial",
-          "Variety"
-        ],
-        "website": "https://lxfactory.com/"
-      },
-      {
-        "address": "Rua da Escola Politécnica, 26/28, Príncipe Real, Lisboa",
-        "category": "Casual Dining",
-        "city": "Lisbon",
-        "cuisine_type": "Italian",
-        "description": "Offers authentic Neapolitan pizza with high-quality ingredients. A popular spot for pizza lovers.",
-        "distance": 1.9,
-        "images": [],
-        "latitude": 38.7171,
-        "longitude": -9.1415,
-        "name": "ZeroZero Pizzeria",
-        "opening_hours": "Mon-Sun 12:00-15:00, 19:00-23:00",
-        "phone_number": "+351 21 347 0324",
-        "price_level": "$$",
-        "rating": 4.4,
-        "tags": [
-          "Pizza",
-          "Italian",
-          "Neapolitan",
-          "Casual"
-        ],
-        "website": "https://www.zerozero.pt/"
+        "website": "https://www.mystoryhotels.com/pt/hotel-rossio-lisboa/"
       }
     ]
   },
-  "session_id": "e47c22de-175b-46c6-9b9a-579b8418a4a9"
+  "session_id": "dbdbf9da-fb23-4aee-a542-f1484c11cb94"
 }

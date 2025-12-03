@@ -150,7 +150,7 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
 
 func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
 	query := `
-        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, poi_type
+        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '')
         FROM points_of_interest
         WHERE name = $1 AND city_id = $2
     `
@@ -1072,10 +1072,17 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
 			openingHoursJSON.String = *restaurant.OpeningHours
 			openingHoursJSON.Valid = true
 		} else {
-			r.logger.WarnContext(ctx, "Invalid JSON for opening_hours, setting to NULL",
-				slog.String("value", *restaurant.OpeningHours),
-				slog.String("restaurant_name", restaurant.Name))
-			// openingHoursJSON remains invalid, which inserts NULL
+			// Wrap plain string into a simple JSON object so we don't drop data
+			if marshalled, err := json.Marshal(map[string]string{"general": *restaurant.OpeningHours}); err == nil {
+				openingHoursJSON.String = string(marshalled)
+				openingHoursJSON.Valid = true
+			} else {
+				r.logger.WarnContext(ctx, "Invalid JSON for opening_hours, setting to NULL",
+					slog.String("value", *restaurant.OpeningHours),
+					slog.String("restaurant_name", restaurant.Name),
+					slog.Any("marshal_error", err))
+				// openingHoursJSON remains invalid, which inserts NULL
+			}
 		}
 	}
 

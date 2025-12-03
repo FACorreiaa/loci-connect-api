@@ -212,6 +212,9 @@ func (l *ServiceImpl) handleRestaurantsFromResponse(ctx context.Context, content
 
 	// Save restaurants to database
 	for _, restaurant := range restaurantData.Restaurants {
+		if restaurant.ID == uuid.Nil {
+			restaurant.ID = uuid.New()
+		}
 		restaurant.LlmInteractionID = llmInteractionID
 		if _, err := l.poiRepo.SaveRestaurantDetails(ctx, restaurant, cityID); err != nil {
 			l.logger.WarnContext(ctx, "Failed to save restaurant from unified response",

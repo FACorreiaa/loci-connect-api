@@ -1697,6 +1697,25 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitype
 		logger.Debug("parsePOIsFromResponse: Failed to parse as AiCityResponse", "error", err.Error())
 	}
 
+	// Third, try to parse loose collections of activities/hotels/restaurants/points_of_interest
+	var collectionResponse struct {
+		Activities       []locitypes.POIDetailedInfo `json:"activities"`
+		Hotels           []locitypes.POIDetailedInfo `json:"hotels"`
+		Restaurants      []locitypes.POIDetailedInfo `json:"restaurants"`
+		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
+	}
+	if err := json.Unmarshal([]byte(cleanedResponse), &collectionResponse); err == nil {
+		var allPOIs []locitypes.POIDetailedInfo
+		allPOIs = append(allPOIs, collectionResponse.PointsOfInterest...)
+		allPOIs = append(allPOIs, collectionResponse.Restaurants...)
+		allPOIs = append(allPOIs, collectionResponse.Hotels...)
+		allPOIs = append(allPOIs, collectionResponse.Activities...)
+		if len(allPOIs) > 0 {
+			logger.Debug("parsePOIsFromResponse: Parsed as loose collection", "poiCount", len(allPOIs))
+			return allPOIs, nil
+		}
+	}
+
 	// Third, try to parse as a single POI (for individual POI additions)
 	var singlePOI locitypes.POIDetailedInfo
 	err = json.Unmarshal([]byte(cleanedResponse), &singlePOI)
