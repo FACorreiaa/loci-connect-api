@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"unicode"
 
 	a "github.com/petar-dambovaliev/aho-corasick"
 )
@@ -21,30 +22,60 @@ var (
 		AsciiCaseInsensitive: true,
 		MatchOnlyWholeWords:  true,
 	})
-	accommMatcher = accommBuilder.Build([]string{"hotel", "hostel", "accommodation", "stay", "sleep", "room", "booking", "airbnb", "lodge", "resort", "guesthouse"})
+	accommMatcher = accommBuilder.Build([]string{"hotel", "hotels", "hostel", "hostels", "accommodation", "stay", "sleep", "room", "rooms", "booking", "bookings", "airbnb", "lodge", "resort", "resorts", "guesthouse", "guesthouses"})
 
 	diningBuilder = a.NewAhoCorasickBuilder(a.Opts{
 		AsciiCaseInsensitive: true,
 		MatchOnlyWholeWords:  true,
 	})
-	diningMatcher = diningBuilder.Build([]string{"restaurant", "food", "eat", "dine", "meal", "cuisine", "drink", "cafe", "bar", "lunch", "dinner", "breakfast", "brunch"})
+	diningMatcher = diningBuilder.Build([]string{"restaurant", "restaurants", "food", "eat", "dine", "meal", "meals", "cuisine", "drink", "drinks", "cafe", "cafes", "bar", "bars", "lunch", "dinner", "breakfast", "brunch"})
 
 	activBuilder = a.NewAhoCorasickBuilder(a.Opts{
 		AsciiCaseInsensitive: true,
 		MatchOnlyWholeWords:  true,
 	})
-	activMatcher = activBuilder.Build([]string{"activity", "museum", "park", "attraction", "tour", "visit", "see", "do", "experience", "adventure", "shopping", "nightlife"})
+	activMatcher = activBuilder.Build([]string{"activity", "activities", "museum", "museums", "park", "parks", "attraction", "attractions", "tour", "tours", "visit", "see", "do", "experience", "experiences", "adventure", "adventures", "shopping", "nightlife"})
 
 	itinBuilder = a.NewAhoCorasickBuilder(a.Opts{
 		AsciiCaseInsensitive: true,
 		MatchOnlyWholeWords:  true,
 	})
-	itinMatcher = itinBuilder.Build([]string{"itinerary", "plan", "schedule", "trip", "day", "week", "journey", "route", "organize", "arrange"})
+	itinMatcher = itinBuilder.Build([]string{"itinerary", "itineraries", "plan", "plans", "schedule", "trip", "trips", "day", "week", "journey", "journeys", "route", "routes", "organize", "arrange"})
 )
 
 func hasMatch(m a.AhoCorasick, s string) bool {
 	iter := m.Iter(s)
 	return iter.Next() != nil
+}
+
+func fallbackDomain(message string) DomainType {
+	bestDomain := DomainGeneral
+	bestPriority := 999
+	seen := make(map[DomainType]bool)
+
+	for _, token := range strings.FieldsFunc(message, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if token == "" {
+			continue
+		}
+		candidates := []string{token}
+		if strings.HasSuffix(token, "s") {
+			candidates = append(candidates, strings.TrimSuffix(token, "s"))
+		}
+		for _, c := range candidates {
+			if domain, ok := keywordMap[c]; ok {
+				if seen[domain] {
+					continue
+				}
+				seen[domain] = true
+				if priority := domainPriority[domain]; priority < bestPriority {
+					bestPriority = priority
+					bestDomain = domain
+				}
+			}
+		}
+	}
+
+	return bestDomain
 }
 
 func detectDomainFourMatchers(message string) DomainType {
@@ -60,7 +91,7 @@ func detectDomainFourMatchers(message string) DomainType {
 	case hasMatch(itinMatcher, message):
 		return DomainItinerary
 	default:
-		return DomainGeneral
+		return fallbackDomain(message)
 	}
 }
 
@@ -71,40 +102,40 @@ var (
 		MatchOnlyWholeWords:  true,
 	})
 	singleMatcher = singleMatcherBuilder.Build([]string{
-		"hotel", "hostel", "accommodation", "stay", "sleep", "room",
-		"booking", "airbnb", "lodge", "resort", "guesthouse",
-		"restaurant", "food", "eat", "dine", "meal", "cuisine",
-		"drink", "cafe", "bar", "lunch", "dinner", "breakfast", "brunch",
-		"activity", "museum", "park", "attraction", "tour", "visit",
-		"see", "do", "experience", "adventure", "shopping", "nightlife",
-		"itinerary", "plan", "schedule", "trip", "day", "week",
-		"journey", "route", "organize", "arrange",
+		"hotel", "hotels", "hostel", "hostels", "accommodation", "stay", "sleep", "room", "rooms",
+		"booking", "bookings", "airbnb", "lodge", "resort", "resorts", "guesthouse", "guesthouses",
+		"restaurant", "restaurants", "food", "eat", "dine", "meal", "meals", "cuisine",
+		"drink", "drinks", "cafe", "cafes", "bar", "bars", "lunch", "dinner", "breakfast", "brunch",
+		"activity", "activities", "museum", "museums", "park", "parks", "attraction", "attractions", "tour", "tours", "visit",
+		"see", "do", "experience", "experiences", "adventure", "adventures", "shopping", "nightlife",
+		"itinerary", "itineraries", "plan", "plans", "schedule", "trip", "trips", "day", "week",
+		"journey", "journeys", "route", "routes", "organize", "arrange",
 	})
 
 	keywordMap = map[string]DomainType{
-		"hotel": DomainAccommodation, "hostel": DomainAccommodation,
+		"hotel": DomainAccommodation, "hotels": DomainAccommodation, "hostel": DomainAccommodation, "hostels": DomainAccommodation,
 		"accommodation": DomainAccommodation, "stay": DomainAccommodation,
-		"sleep": DomainAccommodation, "room": DomainAccommodation,
-		"booking": DomainAccommodation, "airbnb": DomainAccommodation,
-		"lodge": DomainAccommodation, "resort": DomainAccommodation,
-		"guesthouse": DomainAccommodation,
-		"restaurant": DomainDining, "food": DomainDining,
+		"sleep": DomainAccommodation, "room": DomainAccommodation, "rooms": DomainAccommodation,
+		"booking": DomainAccommodation, "bookings": DomainAccommodation, "airbnb": DomainAccommodation,
+		"lodge": DomainAccommodation, "resort": DomainAccommodation, "resorts": DomainAccommodation,
+		"guesthouse": DomainAccommodation, "guesthouses": DomainAccommodation,
+		"restaurant": DomainDining, "restaurants": DomainDining, "food": DomainDining,
 		"eat": DomainDining, "dine": DomainDining,
-		"meal": DomainDining, "cuisine": DomainDining,
-		"drink": DomainDining, "cafe": DomainDining,
-		"bar": DomainDining, "lunch": DomainDining,
+		"meal": DomainDining, "meals": DomainDining, "cuisine": DomainDining,
+		"drink": DomainDining, "drinks": DomainDining, "cafe": DomainDining, "cafes": DomainDining,
+		"bar": DomainDining, "bars": DomainDining, "lunch": DomainDining,
 		"dinner": DomainDining, "breakfast": DomainDining,
 		"brunch":   DomainDining,
-		"activity": DomainActivities, "museum": DomainActivities,
-		"park": DomainActivities, "attraction": DomainActivities,
-		"tour": DomainActivities, "visit": DomainActivities,
+		"activity": DomainActivities, "activities": DomainActivities, "museum": DomainActivities, "museums": DomainActivities,
+		"park": DomainActivities, "parks": DomainActivities, "attraction": DomainActivities, "attractions": DomainActivities,
+		"tour": DomainActivities, "tours": DomainActivities, "visit": DomainActivities,
 		"see": DomainActivities, "do": DomainActivities,
-		"experience": DomainActivities, "adventure": DomainActivities,
+		"experience": DomainActivities, "experiences": DomainActivities, "adventure": DomainActivities, "adventures": DomainActivities,
 		"shopping": DomainActivities, "nightlife": DomainActivities,
-		"itinerary": DomainItinerary, "plan": DomainItinerary,
-		"schedule": DomainItinerary, "trip": DomainItinerary,
+		"itinerary": DomainItinerary, "itineraries": DomainItinerary, "plan": DomainItinerary, "plans": DomainItinerary,
+		"schedule": DomainItinerary, "trip": DomainItinerary, "trips": DomainItinerary,
 		"day": DomainItinerary, "week": DomainItinerary,
-		"journey": DomainItinerary, "route": DomainItinerary,
+		"journey": DomainItinerary, "journeys": DomainItinerary, "route": DomainItinerary, "routes": DomainItinerary,
 		"organize": DomainItinerary, "arrange": DomainItinerary,
 	}
 )
@@ -114,7 +145,7 @@ func detectDomainSingleMatcher(message string) DomainType {
 	matches := singleMatcher.FindAll(message)
 
 	if len(matches) == 0 {
-		return DomainGeneral
+		return fallbackDomain(message)
 	}
 
 	// Return first match's domain
@@ -162,6 +193,7 @@ func TestDomainDetectionCorrectness(t *testing.T) {
 		expected DomainType
 	}{
 		{"I need a hotel", DomainAccommodation},
+		{"Hotels in Rome", DomainAccommodation},
 		{"Where can I eat?", DomainDining},
 		{"What museums should I visit?", DomainActivities},
 		{"Help me plan my trip", DomainItinerary},

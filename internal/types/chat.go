@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"unicode"
 
 	a "github.com/petar-dambovaliev/aho-corasick"
 
@@ -318,48 +319,49 @@ var (
 
 	domainMatcher = domainMatcherBuilder.Build([]string{
 		// Accommodation keywords
-		"hotel", "hostel", "accommodation", "stay", "sleep", "room",
-		"booking", "airbnb", "lodge", "resort", "guesthouse",
+		"hotel", "hotels", "hostel", "hostels", "accommodation", "stay", "sleep", "room", "rooms",
+		"booking", "bookings", "airbnb", "lodge", "resort", "resorts", "guesthouse", "guesthouses",
 		// Dining keywords
-		"restaurant", "food", "eat", "dine", "meal", "cuisine",
-		"drink", "cafe", "bar", "lunch", "dinner", "breakfast", "brunch",
+		"restaurant", "restaurants", "food", "eat", "dine", "meal", "meals", "cuisine",
+		"drink", "drinks", "cafe", "cafes", "bar", "bars", "lunch", "dinner", "breakfast", "brunch",
 		// Activities keywords
-		"activity", "museum", "park", "attraction", "tour", "visit",
-		"see", "do", "experience", "adventure", "shopping", "nightlife",
+		"activity", "activities", "museum", "museums", "park", "parks", "attraction", "attractions", "tour", "tours", "visit",
+		"see", "do", "experience", "experiences", "adventure", "adventures", "shopping", "nightlife",
 		// Itinerary keywords
-		"itinerary", "plan", "schedule", "trip", "day", "week",
-		"journey", "route", "organize", "arrange",
+		"itinerary", "itineraries", "plan", "plans", "schedule", "trip", "trips", "day", "week",
+		"journey", "journeys", "route", "routes", "organize", "arrange",
 	})
 
 	// Map keywords to their respective domains
 	keywordToDomain = map[string]DomainType{
 		// Accommodation
-		"hotel": DomainAccommodation, "hostel": DomainAccommodation,
+		"hotel": DomainAccommodation, "hotels": DomainAccommodation,
+		"hostel": DomainAccommodation, "hostels": DomainAccommodation,
 		"accommodation": DomainAccommodation, "stay": DomainAccommodation,
-		"sleep": DomainAccommodation, "room": DomainAccommodation,
-		"booking": DomainAccommodation, "airbnb": DomainAccommodation,
-		"lodge": DomainAccommodation, "resort": DomainAccommodation,
-		"guesthouse": DomainAccommodation,
+		"sleep": DomainAccommodation, "room": DomainAccommodation, "rooms": DomainAccommodation,
+		"booking": DomainAccommodation, "bookings": DomainAccommodation, "airbnb": DomainAccommodation,
+		"lodge": DomainAccommodation, "resort": DomainAccommodation, "resorts": DomainAccommodation,
+		"guesthouse": DomainAccommodation, "guesthouses": DomainAccommodation,
 		// Dining
-		"restaurant": DomainDining, "food": DomainDining,
+		"restaurant": DomainDining, "restaurants": DomainDining, "food": DomainDining,
 		"eat": DomainDining, "dine": DomainDining,
-		"meal": DomainDining, "cuisine": DomainDining,
-		"drink": DomainDining, "cafe": DomainDining,
-		"bar": DomainDining, "lunch": DomainDining,
+		"meal": DomainDining, "meals": DomainDining, "cuisine": DomainDining,
+		"drink": DomainDining, "drinks": DomainDining, "cafe": DomainDining, "cafes": DomainDining,
+		"bar": DomainDining, "bars": DomainDining, "lunch": DomainDining,
 		"dinner": DomainDining, "breakfast": DomainDining,
 		"brunch": DomainDining,
 		// Activities
-		"activity": DomainActivities, "museum": DomainActivities,
-		"park": DomainActivities, "attraction": DomainActivities,
-		"tour": DomainActivities, "visit": DomainActivities,
+		"activity": DomainActivities, "activities": DomainActivities, "museum": DomainActivities, "museums": DomainActivities,
+		"park": DomainActivities, "parks": DomainActivities, "attraction": DomainActivities, "attractions": DomainActivities,
+		"tour": DomainActivities, "tours": DomainActivities, "visit": DomainActivities,
 		"see": DomainActivities, "do": DomainActivities,
-		"experience": DomainActivities, "adventure": DomainActivities,
+		"experience": DomainActivities, "experiences": DomainActivities, "adventure": DomainActivities, "adventures": DomainActivities,
 		"shopping": DomainActivities, "nightlife": DomainActivities,
 		// Itinerary
-		"itinerary": DomainItinerary, "plan": DomainItinerary,
-		"schedule": DomainItinerary, "trip": DomainItinerary,
+		"itinerary": DomainItinerary, "itineraries": DomainItinerary, "plan": DomainItinerary, "plans": DomainItinerary,
+		"schedule": DomainItinerary, "trip": DomainItinerary, "trips": DomainItinerary,
 		"day": DomainItinerary, "week": DomainItinerary,
-		"journey": DomainItinerary, "route": DomainItinerary,
+		"journey": DomainItinerary, "journeys": DomainItinerary, "route": DomainItinerary, "routes": DomainItinerary,
 		"organize": DomainItinerary, "arrange": DomainItinerary,
 	}
 
@@ -409,7 +411,33 @@ func (d *DomainDetector) DetectDomain(_ context.Context, message string) DomainT
 	matches := domainMatcher.FindAll(message)
 
 	if len(matches) == 0 {
-		return DomainGeneral
+		// Fallback: lightweight token scan with simple singularization to catch forms
+		bestDomain := DomainGeneral
+		bestPriority := 999
+		seen := make(map[DomainType]bool)
+		for _, token := range strings.FieldsFunc(message, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+			if token == "" {
+				continue
+			}
+			candidates := []string{token}
+			if strings.HasSuffix(token, "s") {
+				candidates = append(candidates, strings.TrimSuffix(token, "s"))
+			}
+			for _, c := range candidates {
+				if domain, ok := keywordToDomain[c]; ok {
+					if seen[domain] {
+						continue
+					}
+					seen[domain] = true
+					priority := domainPriority[domain]
+					if priority < bestPriority {
+						bestPriority = priority
+						bestDomain = domain
+					}
+				}
+			}
+		}
+		return bestDomain
 	}
 
 	// If multiple matches found, select the highest priority domain
