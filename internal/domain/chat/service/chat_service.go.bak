@@ -1753,48 +1753,9 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	}
 
 	// --- 7. Send Final Itinerary and Completion Event ---
-	// Create a consolidated response to avoid sending duplicates to the client
-	responseData := session.CurrentItinerary
-	if session.CurrentItinerary != nil {
-		// Make a copy to avoid modifying the session
-		responseCopy := *session.CurrentItinerary
-		responseData = &responseCopy
-
-		// Merge all POIs from top-level and nested locations
-		allPOIs := make([]locitypes.POIDetailedInfo, 0)
-		seenIDs := make(map[string]bool)
-
-		// Helper to add unique POIs
-		addUnique := func(pois []locitypes.POIDetailedInfo) {
-			for _, poi := range pois {
-				key := poi.ID.String()
-				if key == "00000000-0000-0000-0000-000000000000" {
-					key = poi.Name // Use name for placeholder IDs
-				}
-				if !seenIDs[key] {
-					seenIDs[key] = true
-					allPOIs = append(allPOIs, poi)
-				}
-			}
-		}
-
-		// Collect from all sources
-		addUnique(session.CurrentItinerary.PointsOfInterest)
-		addUnique(session.CurrentItinerary.AIItineraryResponse.PointsOfInterest)
-		addUnique(session.CurrentItinerary.AIItineraryResponse.Restaurants)
-
-		// Clear redundant fields in the response copy and put everything in one place
-		responseData.PointsOfInterest = nil
-		responseData.AIItineraryResponse.Restaurants = nil
-		responseData.AIItineraryResponse.PointsOfInterest = allPOIs
-
-		l.logger.InfoContext(ctx, "Consolidated POIs for response",
-			slog.Int("total_unique_pois", len(allPOIs)))
-	}
-
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type:      locitypes.EventTypeItinerary,
-		Data:      responseData,
+		Data:      session.CurrentItinerary,
 		Message:   finalResponseMessage,
 		Timestamp: time.Now(),
 	}, 3)
@@ -2554,16 +2515,6 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				Type: locitypes.EventTypeItinerary,
 				Data: itineraryData,
 			}, 3)
-
-		// Update session with the initial itinerary data so it persists for future ContinueChat calls
-		session.CurrentItinerary = &itineraryData
-		session.UpdatedAt = time.Now()
-		if updateErr := l.llmInteractionRepo.UpdateSession(ctx, session); updateErr != nil {
-			l.logger.WarnContext(ctx, "Failed to update session with initial itinerary", slog.Any("error", updateErr))
-		} else {
-			l.logger.InfoContext(ctx, "Successfully saved initial itinerary to session",
-				slog.Int("poi_count", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
-		}
 
 			// Determine route type based on domain
 			var routeType string

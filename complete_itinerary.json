@@ -1,227 +1,79 @@
 {
-  "dining_response": {
-    "restaurants": [
+  "accommodation_response": {
+    "hotels": [
       {
-        "address": "Praça dos Poveiros 130, 4000-393 Porto, Portugal",
-        "category": "Casual Dining",
+        "address": "Rua Dr. Alfredo Magalhães, 0, União de Freguesias do Centro, 4000-061 Porto, Portugal",
+        "category": "Hotel",
         "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "Famous for its pork sandwiches (sandes de pernil) and traditional Portuguese snacks. A local favorite with a lively atmosphere.",
-        "distance": 4.7,
-        "images": [],
+        "description": "Unconventional hotel offering a unique experience with box-like rooms. Central location, close to shops and restaurants. Good for budget-conscious travelers seeking something different.",
+        "distance": 5540,
+        "images": [
+          "https://example.com/zeroboxlodge_image1.jpg",
+          "https://example.com/zeroboxlodge_image2.jpg"
+        ],
         "latitude": 41.1496,
-        "longitude": -8.6099,
-        "name": "Casa Guedes",
-        "opening_hours": "Mon-Sat 09:00-23:00",
-        "phone_number": "+351 22 200 2874",
-        "price_level": "$",
-        "rating": 4.5,
+        "longitude": -8.6101,
+        "name": "Zero Box Lodge Porto",
+        "opening_hours": null,
+        "phone_number": "+351 22 040 7000",
+        "price_range": "€€",
+        "rating": 8.2,
         "tags": [
-          "Sandwiches",
-          "Local Cuisine",
-          "Quick Bite"
+          "Unique",
+          "Central",
+          "Budget-friendly"
         ],
-        "website": null
+        "website": "https://www.zeroboxlodge.com/porto/"
       },
       {
-        "address": "Rua Santa Catarina 112, 4000-442 Porto, Portugal",
-        "category": "Cafe",
+        "address": "Rua Guedes de Azevedo 179, União de Freguesias do Centro, 4000-243 Porto, Portugal",
+        "category": "Hotel",
         "city": "Porto",
-        "cuisine_type": "Cafe",
-        "description": "A historic and opulent café, known for its Belle Époque architecture and traditional Portuguese pastries and coffee.",
-        "distance": 4.6,
-        "images": [],
-        "latitude": 41.1473,
-        "longitude": -8.6084,
-        "name": "Majestic Café",
-        "opening_hours": "Mon-Sat 09:30-23:30",
-        "phone_number": "+351 22 200 3887",
-        "price_level": "$$",
-        "rating": 4.3,
-        "tags": [
-          "Coffee",
-          "Pastries",
-          "Historic",
-          "Tourist Attraction"
+        "description": "A modern hotel located in the heart of Porto, offering comfortable rooms and excellent city views. Close to many attractions and transportation options. Offers a good value for money.",
+        "distance": 5580,
+        "images": [
+          "https://example.com/domhenrique_image1.jpg",
+          "https://example.com/domhenrique_image2.jpg"
         ],
-        "website": "https://www.cafemajestic.com/"
-      },
-      {
-        "address": "Rua do Bonjardim 31, 4000-115 Porto, Portugal",
-        "category": "Casual Dining",
-        "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "Modern Portuguese cuisine with a focus on fresh, seasonal ingredients. Offers a creative menu and a relaxed atmosphere.",
-        "distance": 4.8,
-        "images": [],
-        "latitude": 41.1492,
-        "longitude": -8.6122,
-        "name": "Cantina 31",
-        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-23:00",
-        "phone_number": "+351 22 320 0382",
-        "price_level": "$$",
-        "rating": 4.4,
+        "latitude": 41.1516,
+        "longitude": -8.6077,
+        "name": "Hotel Dom Henrique - Downtown",
+        "opening_hours": null,
+        "phone_number": "+351 22 204 6600",
+        "price_range": "€€€",
+        "rating": 8.4,
         "tags": [
+          "Central",
           "Modern",
-          "Seasonal",
-          "Local Cuisine"
+          "City Views"
         ],
-        "website": null
+        "website": "https://www.hoteisdomhenrique.pt/"
       },
       {
-        "address": "Rua de Passos Manuel 226, 4000-382 Porto, Portugal",
-        "category": "Casual Dining",
+        "address": "Praça da Batalha 43/47, União de Freguesias do Centro, 4000-101 Porto, Portugal",
+        "category": "Hotel",
         "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "Home of the Francesinha, a traditional Porto sandwich with various meats, cheese, and a special sauce. A must-try for visitors.",
-        "distance": 4.7,
-        "images": [],
-        "latitude": 41.1498,
-        "longitude": -8.6086,
-        "name": "Santiago F.",
-        "opening_hours": "Mon-Sun 12:00-23:00",
-        "phone_number": "+351 22 205 5797",
-        "price_level": "$",
-        "rating": 4.6,
-        "tags": [
-          "Francesinha",
-          "Sandwiches",
-          "Local Cuisine"
+        "description": "A budget-friendly hotel in a central location. Clean and simple rooms. A great option for travelers looking for affordable accommodation without sacrificing location.",
+        "distance": 5480,
+        "images": [
+          "https://example.com/moovhotel_image1.jpg",
+          "https://example.com/moovhotel_image2.jpg"
         ],
-        "website": null
-      },
-      {
-        "address": "Rua de Ramalho Ortigão 28, 4000-364 Porto, Portugal",
-        "category": "Bar",
-        "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "A popular cervejaria (beer house) offering a wide selection of craft beers and traditional Portuguese snacks and dishes.",
-        "distance": 4.6,
-        "images": [],
-        "latitude": 41.1477,
-        "longitude": -8.6108,
-        "name": "Brasão Cervejaria Aliados",
-        "opening_hours": "Mon-Sun 12:00-00:00",
-        "phone_number": "+351 22 208 3232",
-        "price_level": "$$",
-        "rating": 4.5,
-        "tags": [
-          "Beer",
-          "Snacks",
-          "Local Cuisine"
-        ],
-        "website": "https://brasao.pt/"
-      },
-      {
-        "address": "Rua do Rosário 22, 4050-526 Porto, Portugal",
-        "category": "Cafe",
-        "city": "Porto",
-        "cuisine_type": "Brunch",
-        "description": "A brunch spot with healthy and delicious options, including pancakes, avocado toast, and smoothie bowls. Great for a casual meal.",
-        "distance": 4.8,
-        "images": [],
-        "latitude": 41.1501,
-        "longitude": -8.6128,
-        "name": "Época",
-        "opening_hours": "Wed-Sun 09:00-17:00",
-        "phone_number": "+351 910 088 425",
-        "price_level": "$$",
-        "rating": 4.4,
-        "tags": [
-          "Brunch",
-          "Healthy",
-          "Casual"
-        ],
-        "website": null
-      },
-      {
-        "address": "R. do Bonjardim 270, 4000-115 Porto, Portugal",
-        "category": "Casual Dining",
-        "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "Restaurant specializing in traditional portuguese cuisine. Good prices and good quality.",
-        "distance": 4.6,
-        "images": [],
-        "latitude": 41.1474,
-        "longitude": -8.6128,
-        "name": "Pedro Limão",
-        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-22:00",
-        "phone_number": "+351 22 208 4378",
-        "price_level": "$",
-        "rating": 4.3,
-        "tags": [
-          "Traditional",
-          "Local Cuisine"
-        ],
-        "website": null
-      },
-      {
-        "address": "R. de Santo Ildefonso 224, 4000-542 Porto, Portugal",
-        "category": "Casual Dining",
-        "city": "Porto",
-        "cuisine_type": "Portuguese",
-        "description": "Traditional Portuguese restaurant with a cozy atmosphere and a focus on fresh seafood and grilled meats.",
-        "distance": 4.6,
-        "images": [],
-        "latitude": 41.1469,
+        "latitude": 41.1476,
         "longitude": -8.6089,
-        "name": "Maria Rita",
-        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-22:30",
-        "phone_number": "+351 22 200 4527",
-        "price_level": "$$",
-        "rating": 4.2,
+        "name": "Moov Hotel Porto Centro",
+        "opening_hours": null,
+        "phone_number": "+351 22 374 4000",
+        "price_range": "€€",
+        "rating": 8,
         "tags": [
-          "Seafood",
-          "Grilled Meats",
-          "Local Cuisine"
+          "Budget",
+          "Central",
+          "Clean"
         ],
-        "website": null
-      },
-      {
-        "address": "Rua do Almada 226, 4050-036 Porto, Portugal",
-        "category": "Cafe",
-        "city": "Porto",
-        "cuisine_type": "Cafe",
-        "description": "A charming café serving delicious pastries, sandwiches, and coffee. A great spot for a quick breakfast or lunch.",
-        "distance": 4.7,
-        "images": [],
-        "latitude": 41.1505,
-        "longitude": -8.6103,
-        "name": "Antiga Leitaria",
-        "opening_hours": "Mon-Sat 08:00-19:00",
-        "phone_number": "+351 22 200 4112",
-        "price_level": "$",
-        "rating": 4.1,
-        "tags": [
-          "Pastries",
-          "Sandwiches",
-          "Coffee"
-        ],
-        "website": null
-      },
-      {
-        "address": "Rua da Madeira 221, 4000-330 Porto, Portugal",
-        "category": "Casual Dining",
-        "city": "Porto",
-        "cuisine_type": "Tapas",
-        "description": "Popular tapas restaurant with a modern twist on traditional Portuguese dishes. Known for its creative presentations and flavorful combinations.",
-        "distance": 4.5,
-        "images": [],
-        "latitude": 41.1451,
-        "longitude": -8.6111,
-        "name": "Tapabento",
-        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-23:00",
-        "phone_number": "+351 22 200 7290",
-        "price_level": "$$$",
-        "rating": 4.7,
-        "tags": [
-          "Tapas",
-          "Modern",
-          "Local Cuisine"
-        ],
-        "website": null
+        "website": "https://www.hotelmoov.com/pt/porto-centro/"
       }
     ]
   },
-  "session_id": "a5980787-db4c-472a-be14-cec42bcd92c0"
+  "session_id": "79adc7f0-f3fd-4a6e-b2ca-592d11d7f23b"
 }
