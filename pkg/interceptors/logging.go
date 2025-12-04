@@ -34,8 +34,11 @@ func NewLoggingInterceptor(logger *slog.Logger) connect.UnaryInterceptorFunc {
 			// Calculate response payload size
 			responseSize := 0
 			if resp != nil {
-				if msg, ok := resp.Any().(proto.Message); ok {
-					responseSize = proto.Size(msg)
+				// Safely access resp.Any() - it can be nil even if resp is not nil
+				if anyResp := resp.Any(); anyResp != nil {
+					if msg, ok := anyResp.(proto.Message); ok {
+						responseSize = proto.Size(msg)
+					}
 				}
 			}
 

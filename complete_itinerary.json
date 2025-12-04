@@ -1,81 +1,239 @@
 {
-  "accommodation_response": {
-    "hotels": [
+  "dining_response": {
+    "restaurants": [
       {
-        "address": "Avenida da República, 1, 8000-078 Faro, Portugal",
-        "category": "Hotel",
-        "city": "Faro",
-        "description": "Modern hotel located in the heart of Faro, offering comfortable rooms, a rooftop pool with panoramic views, and a restaurant serving local cuisine. Close to the marina and city center.",
-        "distance": 770.3,
-        "images": [
-          "https://example.com/ap_eva_senses_image1.jpg",
-          "https://example.com/ap_eva_senses_image2.jpg"
-        ],
-        "latitude": 37.0159,
-        "longitude": -7.9356,
-        "name": "AP Eva Senses",
-        "opening_hours": null,
-        "phone_number": "+351 289 001 000",
-        "price_range": "Moderate",
-        "rating": 8.4,
+        "address": "Rua Santa Catarina 112, 4000-442 Porto, Portugal",
+        "category": "Cafe",
+        "city": "Porto",
+        "cuisine_type": "Portuguese, Cafe",
+        "description": "Historical café known for its Belle Époque architecture, traditional Portuguese pastries, and coffee.",
+        "distance": 4577,
+        "images": [],
+        "latitude": 41.1496,
+        "longitude": -8.6098,
+        "name": "Majestic Café",
+        "opening_hours": "Mon-Sat 9:30-23:30, Sun Closed",
+        "phone_number": "+351 22 200 3887",
+        "price_level": "$$",
+        "rating": 4.5,
         "tags": [
-          "Pool",
-          "Restaurant",
-          "City Center",
-          "Marina"
+          "Historical",
+          "Coffee",
+          "Pastries",
+          "Breakfast",
+          "Lunch"
         ],
-        "website": "https://www.ap-hotelsresorts.com/ap-eva-senses/"
+        "website": "https://www.majesticcafe.pt/"
       },
       {
-        "address": "Praça D. Francisco Gomes, 2, 8000-150 Faro, Portugal",
-        "category": "Hotel",
-        "city": "Faro",
-        "description": "Stylish hotel with a contemporary design, featuring a rooftop terrace, a swimming pool, and a beach club on Faro Island. Offers stunning views of the Ria Formosa Natural Park.",
-        "distance": 763.9,
-        "images": [
-          "https://example.com/hotel_faro_image1.jpg",
-          "https://example.com/hotel_faro_image2.jpg"
-        ],
-        "latitude": 37.0153,
-        "longitude": -7.9351,
-        "name": "Hotel Faro \u0026 Beach Club",
-        "opening_hours": null,
-        "phone_number": "+351 289 830 830",
-        "price_range": "Moderate",
-        "rating": 8.6,
+        "address": "Rua do Bonjardim 31, 4000-115 Porto, Portugal",
+        "category": "Casual Dining",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Modern Portuguese cuisine with a focus on fresh, seasonal ingredients. Known for its creative dishes and relaxed atmosphere.",
+        "distance": 4567,
+        "images": [],
+        "latitude": 41.1455,
+        "longitude": -8.6109,
+        "name": "Cantina 31",
+        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-23:00, Sun Closed",
+        "phone_number": "+351 22 203 9069",
+        "price_level": "$$",
+        "rating": 4.3,
         "tags": [
-          "Pool",
-          "Beach Club",
-          "Ria Formosa",
-          "Rooftop Terrace"
+          "Modern",
+          "Seasonal",
+          "Lunch",
+          "Dinner"
         ],
-        "website": "https://www.hotelfaro.pt/"
+        "website": "https://www.cantina31.pt/"
       },
       {
-        "address": "Rua Vasco da Gama, 25, 8000-428 Faro, Portugal",
-        "category": "Hotel",
-        "city": "Faro",
-        "description": "Charming boutique hotel in the center of Faro, offering comfortable rooms with modern amenities and a personalized service. Close to the main attractions and restaurants.",
-        "distance": 754.7,
-        "images": [
-          "https://example.com/aqua_ria_image1.jpg",
-          "https://example.com/aqua_ria_image2.jpg"
-        ],
-        "latitude": 37.0145,
-        "longitude": -7.9343,
-        "name": "Aqua Ria Boutique Hotel",
-        "opening_hours": null,
-        "phone_number": "+351 289 823 019",
-        "price_range": "Moderate",
-        "rating": 8.8,
+        "address": "Praça dos Poveiros 130, 4000-393 Porto, Portugal",
+        "category": "Fast Food",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Famous for its 'sandes de pernil' (pork sandwiches). A local favorite for a quick and tasty meal.",
+        "distance": 4622,
+        "images": [],
+        "latitude": 41.1467,
+        "longitude": -8.6085,
+        "name": "Casa Guedes",
+        "opening_hours": "Mon-Sun 8:00-23:00",
+        "phone_number": "+351 22 200 2874",
+        "price_level": "$",
+        "rating": 4.4,
         "tags": [
-          "Boutique Hotel",
-          "City Center",
-          "Modern Amenities"
+          "Sandwiches",
+          "Pork",
+          "Casual",
+          "Local"
         ],
-        "website": "https://www.aquariaboutiquehotel.com/"
+        "website": "https://www.casaguedes.pt/"
+      },
+      {
+        "address": "Rua da Madeira 221, 4000-330 Porto, Portugal",
+        "category": "Casual Dining",
+        "city": "Porto",
+        "cuisine_type": "Tapas, Fusion",
+        "description": "Tapas restaurant offering a fusion of Portuguese and international flavors. Known for its creative dishes and lively atmosphere.",
+        "distance": 4687,
+        "images": [],
+        "latitude": 41.1459,
+        "longitude": -8.6125,
+        "name": "Tapabento",
+        "opening_hours": "Mon-Sat 12:30-15:00, 19:30-23:00, Sun Closed",
+        "phone_number": "+351 22 200 7290",
+        "price_level": "$$",
+        "rating": 4.6,
+        "tags": [
+          "Tapas",
+          "International",
+          "Lunch",
+          "Dinner"
+        ],
+        "website": "http://www.tapabento.com/"
+      },
+      {
+        "address": "Rua dos Mártires da Liberdade 98, 4000-322 Porto, Portugal",
+        "category": "Casual Dining",
+        "city": "Porto",
+        "cuisine_type": "Sandwiches",
+        "description": "Gourmet sandwich shop with a wide variety of fillings and bread options. Perfect for a quick and satisfying lunch.",
+        "distance": 4631,
+        "images": [],
+        "latitude": 41.1464,
+        "longitude": -8.6115,
+        "name": "A Sandeira",
+        "opening_hours": "Mon-Sat 12:00-23:00, Sun Closed",
+        "phone_number": "+351 22 208 2313",
+        "price_level": "$",
+        "rating": 4.2,
+        "tags": [
+          "Sandwiches",
+          "Gourmet",
+          "Lunch",
+          "Casual"
+        ],
+        "website": "https://www.asandeira.pt/"
+      },
+      {
+        "address": "Rua de Passos Manuel 226, 4000-382 Porto, Portugal",
+        "category": "Cafe",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Home of the Francesinha, a signature Porto sandwich. A must-try for any visitor.",
+        "distance": 4742,
+        "images": [],
+        "latitude": 41.1491,
+        "longitude": -8.6073,
+        "name": "Cafe Santiago",
+        "opening_hours": "Mon-Sat 11:00-23:00, Sun Closed",
+        "phone_number": "+351 22 205 8555",
+        "price_level": "$",
+        "rating": 4.3,
+        "tags": [
+          "Francesinha",
+          "Sandwiches",
+          "Local",
+          "Casual"
+        ],
+        "website": "https://cafesantiago.pt/"
+      },
+      {
+        "address": "Rua do Bonjardim 154, 4000-115 Porto, Portugal",
+        "category": "Casual Dining",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Restaurant serving traditional Portuguese dishes with a modern twist. Known for its fresh seafood and friendly service.",
+        "distance": 4650,
+        "images": [],
+        "latitude": 41.1448,
+        "longitude": -8.6128,
+        "name": "Pedro Limão",
+        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-23:00, Sun Closed",
+        "phone_number": "+351 22 208 2447",
+        "price_level": "$$",
+        "rating": 4.1,
+        "tags": [
+          "Seafood",
+          "Traditional",
+          "Lunch",
+          "Dinner"
+        ],
+        "website": "http://www.pedrolimao.com/"
+      },
+      {
+        "address": "Rua de Passos Manuel 203, 4000-382 Porto, Portugal",
+        "category": "Casual Dining",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Traditional Portuguese cuisine served in a cozy and intimate setting. Known for its generous portions and affordable prices.",
+        "distance": 4715,
+        "images": [],
+        "latitude": 41.1445,
+        "longitude": -8.6138,
+        "name": "O Afonso - Cabine Passajens",
+        "opening_hours": "Mon-Sat 12:00-15:00, 19:00-22:00, Sun Closed",
+        "phone_number": "+351 22 200 9335",
+        "price_level": "$",
+        "rating": 4,
+        "tags": [
+          "Traditional",
+          "Cozy",
+          "Lunch",
+          "Dinner"
+        ],
+        "website": "N/A"
+      },
+      {
+        "address": "Rua de José Falcão 138, 4050-315 Porto, Portugal",
+        "category": "Cafe",
+        "city": "Porto",
+        "cuisine_type": "Desserts",
+        "description": "Cafe specializing in Pavlova desserts, offering a variety of flavors and toppings. Perfect for a sweet treat.",
+        "distance": 4750,
+        "images": [],
+        "latitude": 41.1471,
+        "longitude": -8.6135,
+        "name": "Miss Pavlova",
+        "opening_hours": "Tue-Sun 11:00-19:00, Mon Closed",
+        "phone_number": "+351 912 833 455",
+        "price_level": "$",
+        "rating": 4.7,
+        "tags": [
+          "Pavlova",
+          "Desserts",
+          "Cafe",
+          "Sweet"
+        ],
+        "website": "https://www.misspavlova.com/"
+      },
+      {
+        "address": "Rua da Conceição 63, 4050-213 Porto, Portugal",
+        "category": "Bar",
+        "city": "Porto",
+        "cuisine_type": "Portuguese",
+        "description": "Stylish restaurant and bar offering a modern Portuguese menu and creative cocktails. Known for its vibrant atmosphere and live music.",
+        "distance": 4593,
+        "images": [],
+        "latitude": 41.1437,
+        "longitude": -8.6122,
+        "name": "FLOW Restaurant \u0026 Bar",
+        "opening_hours": "Mon-Sun 12:00-00:00",
+        "phone_number": "+351 22 208 2446",
+        "price_level": "$$",
+        "rating": 4.4,
+        "tags": [
+          "Modern",
+          "Cocktails",
+          "Live Music",
+          "Dinner",
+          "Bar"
+        ],
+        "website": "https://www.flowporto.pt/"
       }
     ]
   },
-  "session_id": "cd855fe7-b257-4a7e-a73a-4a09df20143a"
+  "session_id": "cb052aec-6b8d-4901-9ac5-46062c8cfa29"
 }

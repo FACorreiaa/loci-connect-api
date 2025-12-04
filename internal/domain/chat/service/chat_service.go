@@ -2401,10 +2401,33 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 					}
 				}
 			}
-			// Fallback: try to get existing city from database
-			if cityID == uuid.Nil {
-				if existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, ""); err == nil && existingCity != nil {
+			// Fallback: try to get existing city from database, or create it
+			if cityID == uuid.Nil && cityName != "" {
+				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "")
+				if err != nil || existingCity == nil {
+					// City doesn't exist, create a minimal entry to allow POI saving
+					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
+						slog.String("city_name", cityName))
+					cityDetail := locitypes.CityDetail{
+						Name:    cityName,
+						Country: "", // Will be populated by future city data requests
+					}
+					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
+					if err != nil {
+						l.logger.WarnContext(ctx, "Failed to create city entry",
+							slog.String("city", cityName),
+							slog.Any("error", err))
+						cityID = uuid.Nil
+					} else {
+						l.logger.InfoContext(ctx, "Successfully created city entry",
+							slog.String("city", cityName),
+							slog.String("city_id", cityID.String()))
+					}
+				} else {
 					cityID = existingCity.ID
+					l.logger.InfoContext(ctx, "Found existing city",
+						slog.String("city", cityName),
+						slog.String("city_id", cityID.String()))
 				}
 			}
 
@@ -2549,6 +2572,38 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				}
 			}
 
+			// Consolidate POIs: deduplicate and merge from all locations into AIItineraryResponse.PointsOfInterest
+			// This ensures both paths have the data for consistency without duplicates
+			allPOIs := make([]locitypes.POIDetailedInfo, 0)
+			seenIDs := make(map[string]bool)
+
+			// Helper to add unique POIs
+			addUniquePOI := func(pois []locitypes.POIDetailedInfo) {
+				for _, poi := range pois {
+					key := poi.ID.String()
+					if key == "00000000-0000-0000-0000-000000000000" {
+						key = poi.Name // Use name for placeholder IDs
+					}
+					if !seenIDs[key] {
+						seenIDs[key] = true
+						allPOIs = append(allPOIs, poi)
+					}
+				}
+			}
+
+			// Collect from all sources with deduplication
+			addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
+			addUniquePOI(itineraryData.PointsOfInterest)
+			addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
+
+			// Update the main POI list
+			itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
+
+			l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse",
+				slog.Int("total_unique_pois", len(allPOIs)),
+				slog.Int("from_top_level", len(itineraryData.PointsOfInterest)),
+				slog.Int("from_nested", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
+
 			// Send EventTypeItinerary with proper IDs
 			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 				Type: locitypes.EventTypeItinerary,
@@ -2562,7 +2617,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			l.logger.WarnContext(ctx, "Failed to update session with initial itinerary", slog.Any("error", updateErr))
 		} else {
 			l.logger.InfoContext(ctx, "Successfully saved initial itinerary to session",
-				slog.Int("poi_count", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
+				slog.Int("poi_count", len(itineraryData.AIItineraryResponse.PointsOfInterest)),
+				slog.Int("top_level_pois", len(itineraryData.PointsOfInterest)))
 		}
 
 			// Determine route type based on domain
@@ -2989,10 +3045,33 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 					}
 				}
 			}
-			// Fallback: try to get existing city from database
-			if cityID == uuid.Nil {
-				if existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, ""); err == nil && existingCity != nil {
+			// Fallback: try to get existing city from database, or create it
+			if cityID == uuid.Nil && cityName != "" {
+				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "")
+				if err != nil || existingCity == nil {
+					// City doesn't exist, create a minimal entry to allow POI saving
+					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
+						slog.String("city_name", cityName))
+					cityDetail := locitypes.CityDetail{
+						Name:    cityName,
+						Country: "", // Will be populated by future city data requests
+					}
+					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
+					if err != nil {
+						l.logger.WarnContext(ctx, "Failed to create city entry",
+							slog.String("city", cityName),
+							slog.Any("error", err))
+						cityID = uuid.Nil
+					} else {
+						l.logger.InfoContext(ctx, "Successfully created city entry",
+							slog.String("city", cityName),
+							slog.String("city_id", cityID.String()))
+					}
+				} else {
 					cityID = existingCity.ID
+					l.logger.InfoContext(ctx, "Found existing city",
+						slog.String("city", cityName),
+						slog.String("city_id", cityID.String()))
 				}
 			}
 
