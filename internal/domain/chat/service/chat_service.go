@@ -2701,14 +2701,35 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			}
 		}
 
-		// If we don't have a cityID from the response, try to get it from the database
-		if cityID == uuid.Nil {
-			if existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, ""); err == nil && existingCity != nil {
-				cityID = existingCity.ID
+		// If we don't have a cityID from the response, try to get it from the database or create it
+		if cityID == uuid.Nil && cityName != "" {
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "")
+			if err != nil || existingCity == nil {
+				// City doesn't exist, create a minimal entry to allow POI saving
+				l.logger.InfoContext(asyncCtx, "City not found in database, creating minimal entry",
+					slog.String("city_name", cityName))
+				cityDetail := locitypes.CityDetail{
+					Name:    cityName,
+					Country: "", // Will be populated by future city data requests
+				}
+				cityID, err = l.cityRepo.SaveCity(asyncCtx, cityDetail)
+				if err != nil {
+					l.logger.WarnContext(asyncCtx, "Failed to create city entry",
+						slog.String("city", cityName),
+						slog.Any("error", err))
+					l.logger.WarnContext(asyncCtx, "Could not find or save city data, skipping POI processing",
+						slog.String("city", cityName))
+					return
+				} else {
+					l.logger.InfoContext(asyncCtx, "Successfully created city entry",
+						slog.String("city", cityName),
+						slog.String("city_id", cityID.String()))
+				}
 			} else {
-				l.logger.WarnContext(asyncCtx, "Could not find or save city data, skipping POI processing",
-					slog.String("city", cityName))
-				return
+				cityID = existingCity.ID
+				l.logger.InfoContext(asyncCtx, "Found existing city",
+					slog.String("city", cityName),
+					slog.String("city_id", cityID.String()))
 			}
 		}
 		// Create structured completeData from individual response parts
@@ -3257,14 +3278,35 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			}
 		}
 
-		// If we don't have a cityID from the response, try to get it from the database
-		if cityID == uuid.Nil {
-			if existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, ""); err == nil && existingCity != nil {
-				cityID = existingCity.ID
+		// If we don't have a cityID from the response, try to get it from the database or create it
+		if cityID == uuid.Nil && cityName != "" {
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "")
+			if err != nil || existingCity == nil {
+				// City doesn't exist, create a minimal entry to allow POI saving
+				l.logger.InfoContext(asyncCtx, "City not found in database, creating minimal entry",
+					slog.String("city_name", cityName))
+				cityDetail := locitypes.CityDetail{
+					Name:    cityName,
+					Country: "", // Will be populated by future city data requests
+				}
+				cityID, err = l.cityRepo.SaveCity(asyncCtx, cityDetail)
+				if err != nil {
+					l.logger.WarnContext(asyncCtx, "Failed to create city entry",
+						slog.String("city", cityName),
+						slog.Any("error", err))
+					l.logger.WarnContext(asyncCtx, "Could not find or save city data, skipping POI processing",
+						slog.String("city", cityName))
+					return
+				} else {
+					l.logger.InfoContext(asyncCtx, "Successfully created city entry",
+						slog.String("city", cityName),
+						slog.String("city_id", cityID.String()))
+				}
 			} else {
-				l.logger.WarnContext(asyncCtx, "Could not find or save city data, skipping POI processing",
-					slog.String("city", cityName))
-				return
+				cityID = existingCity.ID
+				l.logger.InfoContext(asyncCtx, "Found existing city",
+					slog.String("city", cityName),
+					slog.String("city_id", cityID.String()))
 			}
 		}
 
