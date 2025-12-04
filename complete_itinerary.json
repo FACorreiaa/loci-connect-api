@@ -2,78 +2,80 @@
   "accommodation_response": {
     "hotels": [
       {
-        "address": "Rua Dr. Alfredo Magalhães, 0, União de Freguesias do Centro, 4000-061 Porto, Portugal",
+        "address": "Avenida da República, 1, 8000-078 Faro, Portugal",
         "category": "Hotel",
-        "city": "Porto",
-        "description": "Unconventional hotel offering a unique experience with box-like rooms. Central location, close to shops and restaurants. Good for budget-conscious travelers seeking something different.",
-        "distance": 5540,
+        "city": "Faro",
+        "description": "Modern hotel located in the heart of Faro, offering comfortable rooms, a rooftop pool with panoramic views, and a restaurant serving local cuisine. Close to the marina and city center.",
+        "distance": 770.3,
         "images": [
-          "https://example.com/zeroboxlodge_image1.jpg",
-          "https://example.com/zeroboxlodge_image2.jpg"
+          "https://example.com/ap_eva_senses_image1.jpg",
+          "https://example.com/ap_eva_senses_image2.jpg"
         ],
-        "latitude": 41.1496,
-        "longitude": -8.6101,
-        "name": "Zero Box Lodge Porto",
+        "latitude": 37.0159,
+        "longitude": -7.9356,
+        "name": "AP Eva Senses",
         "opening_hours": null,
-        "phone_number": "+351 22 040 7000",
-        "price_range": "€€",
-        "rating": 8.2,
-        "tags": [
-          "Unique",
-          "Central",
-          "Budget-friendly"
-        ],
-        "website": "https://www.zeroboxlodge.com/porto/"
-      },
-      {
-        "address": "Rua Guedes de Azevedo 179, União de Freguesias do Centro, 4000-243 Porto, Portugal",
-        "category": "Hotel",
-        "city": "Porto",
-        "description": "A modern hotel located in the heart of Porto, offering comfortable rooms and excellent city views. Close to many attractions and transportation options. Offers a good value for money.",
-        "distance": 5580,
-        "images": [
-          "https://example.com/domhenrique_image1.jpg",
-          "https://example.com/domhenrique_image2.jpg"
-        ],
-        "latitude": 41.1516,
-        "longitude": -8.6077,
-        "name": "Hotel Dom Henrique - Downtown",
-        "opening_hours": null,
-        "phone_number": "+351 22 204 6600",
-        "price_range": "€€€",
+        "phone_number": "+351 289 001 000",
+        "price_range": "Moderate",
         "rating": 8.4,
         "tags": [
-          "Central",
-          "Modern",
-          "City Views"
+          "Pool",
+          "Restaurant",
+          "City Center",
+          "Marina"
         ],
-        "website": "https://www.hoteisdomhenrique.pt/"
+        "website": "https://www.ap-hotelsresorts.com/ap-eva-senses/"
       },
       {
-        "address": "Praça da Batalha 43/47, União de Freguesias do Centro, 4000-101 Porto, Portugal",
+        "address": "Praça D. Francisco Gomes, 2, 8000-150 Faro, Portugal",
         "category": "Hotel",
-        "city": "Porto",
-        "description": "A budget-friendly hotel in a central location. Clean and simple rooms. A great option for travelers looking for affordable accommodation without sacrificing location.",
-        "distance": 5480,
+        "city": "Faro",
+        "description": "Stylish hotel with a contemporary design, featuring a rooftop terrace, a swimming pool, and a beach club on Faro Island. Offers stunning views of the Ria Formosa Natural Park.",
+        "distance": 763.9,
         "images": [
-          "https://example.com/moovhotel_image1.jpg",
-          "https://example.com/moovhotel_image2.jpg"
+          "https://example.com/hotel_faro_image1.jpg",
+          "https://example.com/hotel_faro_image2.jpg"
         ],
-        "latitude": 41.1476,
-        "longitude": -8.6089,
-        "name": "Moov Hotel Porto Centro",
+        "latitude": 37.0153,
+        "longitude": -7.9351,
+        "name": "Hotel Faro \u0026 Beach Club",
         "opening_hours": null,
-        "phone_number": "+351 22 374 4000",
-        "price_range": "€€",
-        "rating": 8,
+        "phone_number": "+351 289 830 830",
+        "price_range": "Moderate",
+        "rating": 8.6,
         "tags": [
-          "Budget",
-          "Central",
-          "Clean"
+          "Pool",
+          "Beach Club",
+          "Ria Formosa",
+          "Rooftop Terrace"
         ],
-        "website": "https://www.hotelmoov.com/pt/porto-centro/"
+        "website": "https://www.hotelfaro.pt/"
+      },
+      {
+        "address": "Rua Vasco da Gama, 25, 8000-428 Faro, Portugal",
+        "category": "Hotel",
+        "city": "Faro",
+        "description": "Charming boutique hotel in the center of Faro, offering comfortable rooms with modern amenities and a personalized service. Close to the main attractions and restaurants.",
+        "distance": 754.7,
+        "images": [
+          "https://example.com/aqua_ria_image1.jpg",
+          "https://example.com/aqua_ria_image2.jpg"
+        ],
+        "latitude": 37.0145,
+        "longitude": -7.9343,
+        "name": "Aqua Ria Boutique Hotel",
+        "opening_hours": null,
+        "phone_number": "+351 289 823 019",
+        "price_range": "Moderate",
+        "rating": 8.8,
+        "tags": [
+          "Boutique Hotel",
+          "City Center",
+          "Modern Amenities"
+        ],
+        "website": "https://www.aquariaboutiquehotel.com/"
       }
     ]
   },
-  "session_id": "79adc7f0-f3fd-4a6e-b2ca-592d11d7f23b"
+  "session_id": "cd855fe7-b257-4a7e-a73a-4a09df20143a"
 }
