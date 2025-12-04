@@ -2403,14 +2403,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			}
 			// Fallback: try to get existing city from database, or create it
 			if cityID == uuid.Nil && cityName != "" {
-				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "")
+				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
 				if err != nil || existingCity == nil {
 					// City doesn't exist, create a minimal entry to allow POI saving
 					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
 						slog.String("city_name", cityName))
 					cityDetail := locitypes.CityDetail{
-						Name:    cityName,
-						Country: "", // Will be populated by future city data requests
+						Name:          cityName,
+						Country:       "Unknown", // Use consistent default to avoid duplicates
+						StateProvince: "Unknown", // Use consistent default to avoid duplicates
 					}
 					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
 					if err != nil {
@@ -2703,14 +2704,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 		// If we don't have a cityID from the response, try to get it from the database or create it
 		if cityID == uuid.Nil && cityName != "" {
-			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "")
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "Unknown")
 			if err != nil || existingCity == nil {
 				// City doesn't exist, create a minimal entry to allow POI saving
 				l.logger.InfoContext(asyncCtx, "City not found in database, creating minimal entry",
 					slog.String("city_name", cityName))
 				cityDetail := locitypes.CityDetail{
-					Name:    cityName,
-					Country: "", // Will be populated by future city data requests
+					Name:          cityName,
+					Country:       "Unknown", // Use consistent default to avoid duplicates
+					StateProvince: "Unknown", // Use consistent default to avoid duplicates
 				}
 				cityID, err = l.cityRepo.SaveCity(asyncCtx, cityDetail)
 				if err != nil {
@@ -3068,14 +3070,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			}
 			// Fallback: try to get existing city from database, or create it
 			if cityID == uuid.Nil && cityName != "" {
-				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "")
+				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
 				if err != nil || existingCity == nil {
 					// City doesn't exist, create a minimal entry to allow POI saving
 					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
 						slog.String("city_name", cityName))
 					cityDetail := locitypes.CityDetail{
-						Name:    cityName,
-						Country: "", // Will be populated by future city data requests
+						Name:          cityName,
+						Country:       "Unknown", // Use consistent default to avoid duplicates
+						StateProvince: "Unknown", // Use consistent default to avoid duplicates
 					}
 					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
 					if err != nil {
@@ -3280,14 +3283,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 		// If we don't have a cityID from the response, try to get it from the database or create it
 		if cityID == uuid.Nil && cityName != "" {
-			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "")
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(asyncCtx, cityName, "Unknown")
 			if err != nil || existingCity == nil {
 				// City doesn't exist, create a minimal entry to allow POI saving
 				l.logger.InfoContext(asyncCtx, "City not found in database, creating minimal entry",
 					slog.String("city_name", cityName))
 				cityDetail := locitypes.CityDetail{
-					Name:    cityName,
-					Country: "", // Will be populated by future city data requests
+					Name:          cityName,
+					Country:       "Unknown", // Use consistent default to avoid duplicates
+					StateProvince: "Unknown", // Use consistent default to avoid duplicates
 				}
 				cityID, err = l.cityRepo.SaveCity(asyncCtx, cityDetail)
 				if err != nil {

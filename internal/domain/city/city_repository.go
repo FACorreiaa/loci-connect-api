@@ -47,38 +47,64 @@ func NewCityRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryIm
 }
 
 func (r *RepositoryImpl) SaveCity(ctx context.Context, city locitypes.CityDetail) (uuid.UUID, error) {
+	// First, try to find existing city to avoid race condition
+	// Normalize empty values to ensure consistent matching
+	normalizedCountry := city.Country
+	if normalizedCountry == "" {
+		normalizedCountry = "Unknown" // Use consistent default instead of empty string
+	}
+	normalizedState := city.StateProvince
+	if normalizedState == "" {
+		normalizedState = "Unknown" // Use consistent default instead of NULL
+	}
+
+	// Check if city already exists
+	existingCity, err := r.FindCityByNameAndCountry(ctx, city.Name, normalizedCountry)
+	if err == nil && existingCity != nil {
+		// City already exists, return its ID
+		return existingCity.ID, nil
+	}
+
 	query := `
         INSERT INTO cities (
             name, country, state_province, ai_summary, center_location
-            -- bounding_box will use its DEFAULT or be NULL if not specified
         ) VALUES (
             $1, $2, $3, $4,
-            -- Check for 0.0 is a bit naive if 0,0 is a valid location.
-            -- It's better if locitypes.CityDetail.CenterLongitude/Latitude are pointers (*float64)
-            -- Then you can check for nil. For now, assuming 0.0 implies "not set".
             CASE
                 WHEN ($5::DOUBLE PRECISION IS NOT NULL AND $6::DOUBLE PRECISION IS NOT NULL)
-                     AND ($5::DOUBLE PRECISION != 0.0 OR $6::DOUBLE PRECISION != 0.0) -- Example: only make point if not (0,0) AND both are provided
-                     AND ($5::DOUBLE PRECISION >= -180 AND $5::DOUBLE PRECISION <= 180) -- Longitude check
-                     AND ($6::DOUBLE PRECISION >= -90 AND $6::DOUBLE PRECISION <= 90)   -- Latitude check
+                     AND ($5::DOUBLE PRECISION != 0.0 OR $6::DOUBLE PRECISION != 0.0)
+                     AND ($5::DOUBLE PRECISION >= -180 AND $5::DOUBLE PRECISION <= 180)
+                     AND ($6::DOUBLE PRECISION >= -90 AND $6::DOUBLE PRECISION <= 90)
                 THEN ST_SetSRID(ST_MakePoint($5::DOUBLE PRECISION, $6::DOUBLE PRECISION), 4326)
                 ELSE NULL
             END
-        ) RETURNING id
+        )
+        ON CONFLICT (name, state_province, country)
+        DO UPDATE SET
+            ai_summary = COALESCE(EXCLUDED.ai_summary, cities.ai_summary),
+            center_location = COALESCE(EXCLUDED.center_location, cities.center_location),
+            updated_at = NOW()
+        RETURNING id
     `
 	var id uuid.UUID
 
-	// For ST_MakePoint, longitude is first, then latitude
-	err := r.pgpool.QueryRow(ctx, query,
+	// Use normalized values for the insert
+	err = r.pgpool.QueryRow(ctx, query,
 		city.Name,
-		city.Country,
-		NewNullString(city.StateProvince),
+		normalizedCountry,
+		normalizedState,
 		city.AiSummary,
 		NewNullFloat64(city.CenterLongitude),
 		NewNullFloat64(city.CenterLatitude),
 	).Scan(&id)
 	if err != nil {
-		// No need to check for pgx.ErrNoRows on INSERT RETURNING, an error means failure.
+		// If there's still a conflict (race condition), try to find and return existing city
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			existingCity, findErr := r.FindCityByNameAndCountry(ctx, city.Name, normalizedCountry)
+			if findErr == nil && existingCity != nil {
+				return existingCity.ID, nil
+			}
+		}
 		return uuid.Nil, fmt.Errorf("failed to insert city: %w", err)
 	}
 
