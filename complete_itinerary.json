@@ -1,173 +1,87 @@
 {
-  "general_city_data": {
-    "area": "100.05 km²",
-    "attractions": "São Jorge Castle, Jerónimos Monastery, Belém Tower, Alfama district, Tram 28, Oceanário de Lisboa, Praça do Comércio, Time Out Market Lisboa, Cristo Rei.",
-    "center_latitude": 38.7223,
-    "center_longitude": -9.1393,
-    "city": "Lisbon",
-    "country": "Portugal",
-    "description": "Lisbon, Portugal's vibrant capital, is a captivating city blending traditional heritage with modern innovation. Perched on the Tagus River estuary, it's renowned for its hilly terrain, offering stunning panoramic views from viewpoints like São Jorge Castle and the Alfama district. Cobblestone streets wind through historic neighborhoods, revealing charming cafes, Fado houses, and colorful buildings adorned with intricate tilework. Lisbon boasts a rich maritime history, evident in landmarks like Belém Tower and Jerónimos Monastery. The city's culinary scene is a delight, with fresh seafood, pastel de nata, and local wines tempting every palate. Lisbon is a city that effortlessly combines old-world charm with a contemporary spirit.",
-    "history": "Lisbon is one of the oldest cities in Western Europe, predating many other modern European capitals. It has been inhabited since Neolithic times and later settled by Phoenicians, Greeks, and Romans. In the 8th century, it was conquered by the Moors, who influenced its architecture and culture for centuries. In 1147, Afonso Henriques, the first King of Portugal, captured Lisbon, making it the capital of the Kingdom in 1255. During the Age of Discovery, Lisbon became a major trading center, accumulating wealth and power. The devastating earthquake of 1755 destroyed much of the city, leading to its reconstruction under the direction of the Marquis of Pombal. Today, Lisbon is a thriving metropolis and a major European tourist destination.",
-    "language": "Portuguese",
-    "population": "547,733 (2021)",
-    "state_province": null,
-    "timezone": "UTC+0 (WET) / UTC+1 (WEST) - Western European Time",
-    "weather": "Mediterranean climate with mild, wet winters and warm, dry summers. Average temperatures range from 8°C (46°F) in winter to 28°C (82°F) in summer."
-  },
-  "itinerary_response": {
-    "itinerary_name": "Lisbon Unveiled: A Flexible Exploration",
-    "overall_description": "This itinerary prioritizes flexibility, allowing you to explore Lisbon at your own pace. It focuses on experiencing the city's diverse offerings within a 5km radius of the city center, accommodating any budget and mode of transport. From historic landmarks to vibrant neighborhoods, this plan provides a framework for discovering Lisbon's unique charm. The suggested activities can be adapted to your interests, whether you prefer delving into history, enjoying panoramic views, or indulging in local cuisine. Remember to check opening hours and transport options before heading out, and feel free to substitute any suggested point of interest with something that better suits your preferences.",
-    "points_of_interest": [
+  "activities_response": {
+    "activities": [
       {
-        "address": "Praça do Comércio, 1100-148 Lisboa, Portugal",
-        "category": "Landmark",
-        "description_poi": "A grand, historic square on the Tagus River, perfect for a stroll and enjoying the views. Once the gateway to Lisbon, it's now a vibrant hub with cafes and shops.",
-        "distance": 0.5,
-        "latitude": 38.70775,
-        "longitude": -9.136591,
-        "name": "Praça do Comércio",
-        "opening_hours": "Open 24 hours",
-        "website": "https://www.visitlisboa.com/en/places/praca-do-comercio"
+        "address": "Marienplatz, 80331 München, Germany",
+        "category": "Cultural",
+        "city": "Munich",
+        "description": "Central square of Munich, known for the Glockenspiel show and historical buildings.",
+        "distance": 5340,
+        "images": [],
+        "latitude": 48.1374,
+        "longitude": 11.5755,
+        "name": "Marienplatz",
+        "opening_hours": "Always open",
+        "price_range": "Free",
+        "rating": 4.5,
+        "tags": [
+          "Historical Landmark",
+          "City Center",
+          "Shopping"
+        ],
+        "website": "https://www.muenchen.de/sehenswuerdigkeiten/marienplatz.html"
       },
       {
-        "address": "R. de Santa Cruz do Castelo, 1100-129 Lisboa, Portugal",
-        "category": "Historical Site",
-        "description_poi": "A Moorish castle offering stunning panoramic views of Lisbon. Explore its ramparts, towers, and archaeological site, learning about the city's history.",
-        "distance": 1.2,
-        "latitude": 38.713889,
-        "longitude": -9.132222,
-        "name": "Castelo de São Jorge",
-        "opening_hours": "Daily 9:00-21:00 (seasonal variations)",
-        "website": "https://castelodesaojorge.pt/en/"
+        "address": "Hofgartenstraße 1, 80538 München, Germany",
+        "category": "Outdoor Activity",
+        "city": "Munich",
+        "description": "A beautiful garden near the Residenz, perfect for a relaxing stroll.",
+        "distance": 5400,
+        "images": [],
+        "latitude": 48.1431,
+        "longitude": 11.5784,
+        "name": "Hofgarten",
+        "opening_hours": "Always open",
+        "price_range": "Free",
+        "rating": 4.6,
+        "tags": [
+          "Park",
+          "Garden",
+          "Relaxation"
+        ],
+        "website": "https://www.schloesser.bayern.de/englisch/garden/objects/hofgarte.htm"
       },
       {
-        "address": "Alfama, Lisboa, Portugal",
-        "category": "Neighborhood",
-        "description_poi": "Lisbon's oldest district, characterized by narrow, winding streets, traditional Fado houses, and historic churches. Get lost in its labyrinthine alleys and soak up the authentic atmosphere.",
-        "distance": 1,
-        "latitude": 38.711944,
-        "longitude": -9.128056,
-        "name": "Alfama District",
-        "opening_hours": "Open 24 hours",
-        "website": "https://www.visitlisboa.com/en/places/alfama"
-      },
-      {
-        "address": "Largo da Sé, 1100-585 Lisboa, Portugal",
-        "category": "Religious Site",
-        "description_poi": "Lisbon's oldest church, a Romanesque cathedral with Gothic and Baroque elements. Admire its architecture and explore its treasury and cloisters.",
-        "distance": 0.7,
-        "latitude": 38.711111,
-        "longitude": -9.133333,
-        "name": "Lisbon Cathedral (Sé de Lisboa)",
-        "opening_hours": "Daily 9:00-19:00 (seasonal variations)",
-        "website": "https://www.visitlisboa.com/en/places/se-lisbon-cathedral"
-      },
-      {
-        "address": "Av. 24 de Julho 49, 1200-479 Lisboa, Portugal",
-        "category": "Food Market",
-        "description_poi": "A vibrant food hall offering a wide variety of Portuguese cuisine from top chefs and restaurants. Sample local delicacies, enjoy a drink, and soak up the lively atmosphere.",
-        "distance": 0.8,
-        "latitude": 38.710278,
-        "longitude": -9.142778,
-        "name": "Time Out Market Lisboa",
-        "opening_hours": "Daily 10:00-0:00 (extended hours on weekends)",
-        "website": "https://www.timeoutmarket.com/lisboa/en/"
-      }
-    ]
-  },
-  "points_of_interest": {
-    "points_of_interest": [
-      {
-        "address": "Praça do Império, 1400-206 Lisboa",
-        "category": "Historical Site",
-        "description_poi": "A UNESCO World Heritage Site, this stunning monastery showcases Manueline architecture and is a symbol of Portugal's Age of Discoveries.",
-        "latitude": 38.6977,
-        "longitude": -9.2069,
-        "name": "Jerónimos Monastery",
-        "opening_hours": "Tue-Sun 10:00-17:30 (Oct-May), Tue-Sun 10:00-18:30 (May-Sep)",
-        "website": "http://www.mosteirojeronimos.gov.pt/"
-      },
-      {
-        "address": "Av. Brasília, 1400-038 Lisboa",
-        "category": "Historical Site",
-        "description_poi": "A fortified tower on the Tagus River, also a UNESCO World Heritage Site, that served as a point of embarkation and disembarkation for Portuguese explorers and as a ceremonial gateway to Lisbon.",
-        "latitude": 38.6926,
-        "longitude": -9.2159,
-        "name": "Belém Tower",
-        "opening_hours": "Tue-Sun 10:00-17:30 (Oct-May), Tue-Sun 10:00-18:30 (May-Sep)",
-        "website": "http://www.torrebelem.gov.pt/"
-      },
-      {
-        "address": "R. de Santa Cruz do Castelo, 1100-129 Lisboa",
-        "category": "Historical Site",
-        "description_poi": "A Moorish castle occupying a commanding hilltop overlooking Lisbon, offering panoramic views of the city and the Tagus River.",
-        "latitude": 38.7141,
-        "longitude": -9.1321,
-        "name": "São Jorge Castle",
-        "opening_hours": "Daily 09:00-21:00 (Mar-Oct), Daily 09:00-19:00 (Nov-Feb)",
-        "website": "https://castelodesaojorge.pt/en/"
-      },
-      {
-        "address": "Esplanada D. Carlos I s/nº, 1990-005 Lisboa",
-        "category": "Aquarium",
-        "description_poi": "One of the largest aquariums in Europe, featuring a vast array of marine life from around the world.",
-        "latitude": 38.7633,
-        "longitude": -9.0931,
-        "name": "Oceanário de Lisboa",
-        "opening_hours": "Daily 10:00-20:00",
-        "website": "https://www.oceanario.pt/en/"
-      },
-      {
-        "address": "Various stops throughout Lisbon",
-        "category": "Transportation/Sightseeing",
-        "description_poi": "A historic tram line that winds its way through the narrow streets of Lisbon's oldest districts, offering a unique and charming way to see the city.",
-        "latitude": 38.7137,
-        "longitude": -9.1394,
-        "name": "Tram 28",
-        "opening_hours": "Varies depending on the specific tram and time of day.",
-        "website": "https://www.carris.pt/"
-      },
-      {
-        "address": "Praça do Comércio, 1100-148 Lisboa",
-        "category": "Public Square",
-        "description_poi": "A grand square located on the Tagus River, historically the gateway to Lisbon and a center of commerce.",
-        "latitude": 38.7077,
-        "longitude": -9.1365,
-        "name": "Praça do Comércio",
-        "opening_hours": "Open 24/7",
-        "website": "N/A"
-      },
-      {
-        "address": "R. Rodrigues de Faria 103, 1300-501 Lisboa",
-        "category": "Shopping/Creative Hub",
-        "description_poi": "A former industrial complex transformed into a vibrant hub for creative businesses, shops, restaurants, and art installations.",
-        "latitude": 38.7024,
-        "longitude": -9.1857,
-        "name": "LX Factory",
-        "opening_hours": "Varies depending on the specific shop or restaurant.",
-        "website": "https://lxfactory.com/"
-      },
-      {
-        "address": "Av. 24 de Julho 49, 1200-479 Lisboa",
-        "category": "Food Market",
-        "description_poi": "A vibrant food hall showcasing the best of Lisbon's culinary scene, with stalls from renowned chefs and local vendors.",
-        "latitude": 38.7105,
-        "longitude": -9.1451,
-        "name": "Time Out Market Lisboa",
-        "opening_hours": "Daily 10:00-00:00",
-        "website": "https://www.timeoutmarket.com/lisboa/"
-      },
-      {
-        "address": "Alfama, Largo do Chafariz de Dentro, 1, 1100-139 Lisboa",
+        "address": "Museumsinsel 1, 80538 München, Germany",
         "category": "Museum",
-        "description_poi": "Dedicated to the traditional Portuguese music genre of Fado.",
-        "latitude": 38.7154,
-        "longitude": -9.1263,
-        "name": "Fado Museum",
-        "opening_hours": "Tue-Sun 10:00-18:00",
-        "website": "https://www.museudofado.pt/en/"
+        "city": "Munich",
+        "description": "One of the world's largest science and technology museums.",
+        "distance": 5900,
+        "images": [],
+        "latitude": 48.1303,
+        "longitude": 11.5842,
+        "name": "Deutsches Museum",
+        "opening_hours": "Daily 9:00-17:00",
+        "price_range": "$$",
+        "rating": 4.7,
+        "tags": [
+          "Science",
+          "Technology",
+          "History"
+        ],
+        "website": "https://www.deutsches-museum.de/en/"
+      },
+      {
+        "address": "Viktualienmarkt 3, 80331 München, Germany",
+        "category": "Cultural",
+        "city": "Munich",
+        "description": "A daily food market in the center of Munich. Great for trying local food and drinks.",
+        "distance": 5500,
+        "images": [],
+        "latitude": 48.1347,
+        "longitude": 11.5777,
+        "name": "Viktualienmarkt",
+        "opening_hours": "Mon-Sat 06:00-20:00 (varies by vendor)",
+        "price_range": "$",
+        "rating": 4.5,
+        "tags": [
+          "Food Market",
+          "Local Cuisine",
+          "Shopping"
+        ],
+        "website": "https://www.muenchen.de/viktualienmarkt"
       }
     ]
   },
-  "session_id": "67028069-9c8f-4983-abdd-f9ce3d52d3e4"
+  "session_id": "e265973d-a542-430e-b51a-e3dbf1a4ce02"
 }
