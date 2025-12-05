@@ -24,7 +24,7 @@ type Repository interface {
 	GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
 
 	// Get POIs by category
-	GetPOIsByCategory(ctx context.Context, category string) ([]locitypes.DiscoverResult, error)
+	GetPOIsByCategory(ctx context.Context, category, cityName string, limit, offset int) ([]locitypes.DiscoverResult, error)
 
 	// Get trending searches today
 	GetTrendingSearchesToday(ctx context.Context, limit int) ([]locitypes.TrendingSearch, error)
@@ -234,12 +234,12 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 	return sessions, nil
 }
 
-// GetPOIsByCategory retrieves POIs by category
-func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category string) ([]locitypes.DiscoverResult, error) {
+// GetPOIsByCategory retrieves POIs by category (optionally filtered by city) with pagination.
+func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category, cityName string, limit, offset int) ([]locitypes.DiscoverResult, error) {
 	l := r.logger.With(slog.String("repository", "GetPOIsByCategory"))
-	l.DebugContext(ctx, "Fetching POIs by category", slog.String("category", category))
+	l.DebugContext(ctx, "Fetching POIs by category", slog.String("category", category), slog.String("city_name", cityName), slog.Int("limit", limit), slog.Int("offset", offset))
 
-	query := `
+	baseQuery := `
 		SELECT
 			id,
 			name,
@@ -257,11 +257,25 @@ func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category string)
 		WHERE
 			LOWER(category) = LOWER($1)
 			AND rating >= 3.5
-		ORDER BY rating DESC, name ASC
-		LIMIT 20
 	`
 
-	rows, err := r.db.Query(ctx, query, category)
+	args := []any{category}
+	placeholder := 2
+	if cityName != "" {
+		baseQuery += `
+			AND LOWER(city_name) = LOWER($2)
+		`
+		args = append(args, cityName)
+		placeholder = 3
+	}
+
+	baseQuery += fmt.Sprintf(`
+		ORDER BY rating DESC, name ASC
+		LIMIT $%d OFFSET $%d
+	`, placeholder, placeholder+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.db.Query(ctx, baseQuery, args...)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query POIs by category", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query POIs by category: %w", err)

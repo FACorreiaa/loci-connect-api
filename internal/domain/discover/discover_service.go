@@ -24,7 +24,7 @@ type Service interface {
 	GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
 
 	// Get category results
-	GetCategoryResults(ctx context.Context, category string) ([]locitypes.DiscoverResult, error)
+	GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error)
 }
 
 type ServiceImpl struct {
@@ -146,7 +146,7 @@ func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID
 }
 
 // GetCategoryResults retrieves results for a specific category
-func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category string) ([]locitypes.DiscoverResult, error) {
+func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error) {
 	l := s.logger.With(slog.String("service", "GetCategoryResults"))
 	l.DebugContext(ctx, "Getting category results", slog.String("category", category))
 
@@ -173,7 +173,15 @@ func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category string) (
 		return nil, fmt.Errorf("invalid category: %s", category)
 	}
 
-	results, err := s.repo.GetPOIsByCategory(ctx, category)
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	results, err := s.repo.GetPOIsByCategory(ctx, category, cityName, limit, offset)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to get category results", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get category results: %w", err)
@@ -181,6 +189,7 @@ func (s *ServiceImpl) GetCategoryResults(ctx context.Context, category string) (
 
 	l.InfoContext(ctx, "Successfully retrieved category results",
 		slog.String("category", category),
+		slog.String("city_name", cityName),
 		slog.Int("count", len(results)))
 	return results, nil
 }

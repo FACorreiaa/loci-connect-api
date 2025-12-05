@@ -13,6 +13,7 @@ import (
 	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
@@ -38,17 +39,20 @@ type Dependencies struct {
 	POIRepo      poirepo.Repository
 	CityRepo     cityrepo.Repository
 	ChatRepo     chatrepo.Repository
+	DiscoverRepo discoverdomain.Repository
 
 	// Services
 	TokenManager service.TokenManager
 	AuthService  *service.AuthService
 	ChatService  chatservice.LlmInteractiontService
 	ProfileSvc   profiles.Service
+	DiscoverSvc  discoverdomain.Service
 
 	// Handlers
-	AuthHandler    *handler.AuthHandler
-	ChatHandler    *chathandler.ChatHandler
-	ProfileHandler *profilehandler.ProfileHandler
+	AuthHandler     *handler.AuthHandler
+	ChatHandler     *chathandler.ChatHandler
+	ProfileHandler  *profilehandler.ProfileHandler
+	DiscoverHandler *discoverdomain.Handler
 }
 
 // InitDependencies initializes all application dependencies
@@ -125,6 +129,7 @@ func (d *Dependencies) initRepositories() error {
 	d.POIRepo = poirepo.NewRepository(d.DB.Pool, d.Logger)
 	d.CityRepo = cityrepo.NewCityRepository(d.DB.Pool, d.Logger)
 	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
+	d.DiscoverRepo = discoverdomain.NewRepositoryImpl(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -161,6 +166,7 @@ func (d *Dependencies) initServices() error {
 		d.POIRepo,
 		d.Logger,
 	)
+	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 
 	d.Logger.Info("services initialized")
 	return nil
@@ -171,6 +177,7 @@ func (d *Dependencies) initHandlers() error {
 	d.AuthHandler = handler.NewAuthHandler(d.AuthService)
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
+	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

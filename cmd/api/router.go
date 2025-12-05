@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/validate"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -122,6 +123,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		chatPath, chatHandler := chatconnect.NewChatServiceHandler(deps.ChatHandler, opts)
 		mux.Handle(chatPath, chatHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", chatPath)
+	}
+
+	if deps.DiscoverHandler != nil {
+		discoverPath, discoverHandler := discoverconnect.NewDiscoverServiceHandler(deps.DiscoverHandler, opts)
+		mux.Handle(discoverPath, discoverHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", discoverPath)
 	}
 
 	if deps.ProfileHandler != nil {
