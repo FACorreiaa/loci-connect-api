@@ -1322,6 +1322,12 @@ func minInt(a, b int) int {
 	return b
 }
 
+func normalizeCacheComponent(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.Join(strings.Fields(s), " ")
+	return s
+}
+
 // extractCityFromMessage uses AI to extract city name and clean the message
 func (l *ServiceImpl) extractCityFromMessage(ctx context.Context, message string) (cityName, cleanedMessage string, err error) {
 	prompt := fmt.Sprintf(`
@@ -2219,8 +2225,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 	cacheKeyData := map[string]interface{}{
 		"user_id":     userID.String(),
 		"profile_id":  profileID.String(),
-		"city":        cityName,
-		"message":     cleanedMessage,
+		"city":        normalizeCacheComponent(cityName),
+		"message":     normalizeCacheComponent(cleanedMessage),
 		"domain":      string(domain),
 		"preferences": basePreferences,
 	}
@@ -2893,8 +2899,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 	// Generate cache key based on session parameters
 	cacheKeyData := map[string]interface{}{
-		"city":    cityName,
-		"message": cleanedMessage,
+		"city":    normalizeCacheComponent(cityName),
+		"message": normalizeCacheComponent(cleanedMessage),
 		"domain":  string(domain),
 	}
 	cacheKeyBytes, err := json.Marshal(cacheKeyData)

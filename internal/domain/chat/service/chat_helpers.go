@@ -184,7 +184,8 @@ func (l *ServiceImpl) handleHotelsFromResponse(ctx context.Context, content stri
 	var hotelData struct {
 		Hotels []locitypes.HotelDetailedInfo `json:"hotels"`
 	}
-	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &hotelData); err != nil {
+	clean := CleanJSONResponse(content)
+	if err := json.Unmarshal([]byte(clean), &hotelData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse hotels from unified response", slog.Any("error", err))
 		return
 	}
@@ -205,8 +206,9 @@ func (l *ServiceImpl) handleRestaurantsFromResponse(ctx context.Context, content
 	var restaurantData struct {
 		Restaurants []locitypes.RestaurantDetailedInfo `json:"restaurants"`
 	}
-	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &restaurantData); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err))
+	clean := CleanJSONResponse(content)
+	if err := json.Unmarshal([]byte(clean), &restaurantData); err != nil {
+		l.logger.ErrorContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err), slog.String("cleaned_response", clean))
 		return
 	}
 
