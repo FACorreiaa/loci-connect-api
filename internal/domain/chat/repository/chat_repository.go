@@ -19,7 +19,9 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -1070,7 +1072,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 					response = fmt.Sprintf("I provided recommendations for %s", cityName)
 				} else {
 					// Count content items from response for metrics
-					contentCounts := countContentFromResponse(response)
+					contentCounts := common.CountContentFromResponse(response)
 					totalPOIs += contentCounts.POIs
 					totalHotels += contentCounts.Hotels
 					totalRestaurants += contentCounts.Restaurants
@@ -1112,7 +1114,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		}
 
 		// Calculate complexity score (1-10)
-		complexityScore := calculateComplexityScore(totalPOIs, totalHotels, totalRestaurants, len(conversationHistory), hasItinerary)
+		complexityScore := common.CalculateComplexityScore(totalPOIs, totalHotels, totalRestaurants, len(conversationHistory), hasItinerary)
 
 		contentMetrics := locitypes.SessionContentMetrics{
 			TotalPOIs:          totalPOIs,
@@ -1121,14 +1123,14 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			CitiesCovered:      uniqueCities,
 			HasItinerary:       hasItinerary,
 			ComplexityScore:    complexityScore,
-			DominantCategories: uniqueStringSlice(dominantCategories),
+			DominantCategories: common.UniqueStringSlice(dominantCategories),
 		}
 
 		// Calculate engagement metrics
-		userMsgCount, assistantMsgCount := countMessagesByRole(conversationHistory)
+		userMsgCount, assistantMsgCount := common.CountMessagesByRole(conversationHistory)
 		conversationDuration := lastInteraction.Sub(firstInteraction)
-		avgMsgLength := calculateAverageMessageLength(conversationHistory)
-		engagementLevel := calculateEngagementLevel(len(conversationHistory), conversationDuration, complexityScore)
+		avgMsgLength := common.CalculateAverageMessageLength(conversationHistory)
+		engagementLevel := common.CalculateEngagementLevel(len(conversationHistory), conversationDuration, complexityScore)
 
 		engagementMetrics := locitypes.SessionEngagementMetrics{
 			MessageCount:          len(conversationHistory),
@@ -1644,7 +1646,7 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 // }
 
 func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
-	cleanedResponse := CleanJSONResponse(responseText)
+	cleanedResponse := common.CleanJSONResponse(responseText)
 
 	// Debug logging to see the actual cleaned response
 	logger.Debug("parsePOIsFromResponse: Cleaned response debug",
@@ -1787,289 +1789,201 @@ func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid
 	return nil
 }
 
-// ContentCounts represents counts of different content types found in responses
-type ContentCounts struct {
-	POIs         int
-	Hotels       int
-	Restaurants  int
-	HasItinerary bool
-	Categories   []string
-}
+// GetRecentChatSessions directly queries chat_sessions table for recent sessions
+func (r *RepositoryImpl) GetRecentChatSessions(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
+	query := `
+		SELECT id, user_id, profile_id, city_name, conversation_history, created_at, updated_at, COALESCE(search_type, 'itinerary') as search_type
+		FROM chat_sessions
+		WHERE user_id = $1 AND status = 'active'
+		ORDER BY created_at DESC
+		LIMIT $2
+	`
 
-// countContentFromResponse analyzes a response to count different content types
-func countContentFromResponse(response string) ContentCounts {
-	counts := ContentCounts{
-		Categories: make([]string, 0),
+	rows, err := r.pgpool.Query(ctx, query, userID, limit)
+	if err != nil {
+		r.logger.Error("Failed to query recent chat sessions", zap.Any("error", err))
+		return nil, fmt.Errorf("failed to query recent chat sessions: %w", err)
 	}
+	defer rows.Close()
 
-	// Try to parse as JSON first
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal([]byte(response), &jsonData); err == nil {
-		// Handle JSON response
-		if pois, ok := jsonData["points_of_interest"].([]interface{}); ok {
-			counts.POIs = len(pois)
-			counts.Categories = append(counts.Categories, "attractions")
-		}
-		if hotels, ok := jsonData["hotels"].([]interface{}); ok {
-			counts.Hotels = len(hotels)
-			counts.Categories = append(counts.Categories, "accommodation")
-		}
-		if restaurants, ok := jsonData["restaurants"].([]interface{}); ok {
-			counts.Restaurants = len(restaurants)
-			counts.Categories = append(counts.Categories, "dining")
-		}
-		if _, ok := jsonData["itinerary_response"]; ok {
-			counts.HasItinerary = true
-			counts.Categories = append(counts.Categories, "itinerary")
-		}
-		if _, ok := jsonData["itinerary_name"]; ok {
-			counts.HasItinerary = true
-			counts.Categories = append(counts.Categories, "itinerary")
-		}
-	} else {
-		// Handle text response with pattern matching
-		lowerResponse := strings.ToLower(response)
-
-		// Count mentions of different content types
-		if strings.Contains(lowerResponse, "hotel") || strings.Contains(lowerResponse, "accommodation") {
-			counts.Hotels = 1
-			counts.Categories = append(counts.Categories, "accommodation")
-		}
-		if strings.Contains(lowerResponse, "restaurant") || strings.Contains(lowerResponse, "dining") {
-			counts.Restaurants = 1
-			counts.Categories = append(counts.Categories, "dining")
-		}
-		if strings.Contains(lowerResponse, "attraction") || strings.Contains(lowerResponse, "visit") || strings.Contains(lowerResponse, "see") {
-			counts.POIs = 1
-			counts.Categories = append(counts.Categories, "attractions")
-		}
-		if strings.Contains(lowerResponse, "itinerary") || strings.Contains(lowerResponse, "plan") || strings.Contains(lowerResponse, "schedule") {
-			counts.HasItinerary = true
-			counts.Categories = append(counts.Categories, "itinerary")
-		}
-	}
-
-	return counts
-}
-
-// calculateComplexityScore calculates a complexity score from 1-10 based on session content
-func calculateComplexityScore(pois, hotels, restaurants, messageCount int, hasItinerary bool) int {
-	score := 1
-
-	// Base score from content count
-	totalContent := pois + hotels + restaurants
-	if totalContent > 20 {
-		score += 3
-	} else if totalContent > 10 {
-		score += 2
-	} else if totalContent > 5 {
-		score++
-	}
-
-	// Bonus for having itinerary
-	if hasItinerary {
-		score += 2
-	}
-
-	// Bonus for message count (engagement)
-	if messageCount > 20 {
-		score += 2
-	} else if messageCount > 10 {
-		score++
-	}
-
-	// Bonus for content diversity
-	contentTypes := 0
-	if pois > 0 {
-		contentTypes++
-	}
-	if hotels > 0 {
-		contentTypes++
-	}
-	if restaurants > 0 {
-		contentTypes++
-	}
-	if contentTypes >= 3 {
-		score += 2
-	} else if contentTypes >= 2 {
-		score++
-	}
-
-	// Cap at 10
-	if score > 10 {
-		score = 10
-	}
-
-	return score
-}
-
-// countMessagesByRole counts messages by user and assistant roles
-func countMessagesByRole(messages []locitypes.ConversationMessage) (userCount, assistantCount int) {
-	for _, msg := range messages {
-		switch msg.Role {
-		case "user":
-			userCount++
-		case "assistant":
-			assistantCount++
-		}
-	}
-	return userCount, assistantCount
-}
-
-// calculateAverageMessageLength calculates the average length of all messages
-func calculateAverageMessageLength(messages []locitypes.ConversationMessage) int {
-	if len(messages) == 0 {
-		return 0
-	}
-
-	totalLength := 0
-	for _, msg := range messages {
-		totalLength += len(msg.Content)
-	}
-
-	return totalLength / len(messages)
-}
-
-// calculateEngagementLevel determines engagement level based on metrics
-func calculateEngagementLevel(messageCount int, duration time.Duration, complexityScore int) string {
-	score := 0
-
-	// Message count factor
-	if messageCount > 15 {
-		score += 3
-	} else if messageCount > 8 {
-		score += 2
-	} else if messageCount > 3 {
-		score++
-	}
-
-	// Duration factor (more than 10 minutes indicates engagement)
-	if duration > 30*time.Minute {
-		score += 3
-	} else if duration > 10*time.Minute {
-		score += 2
-	} else if duration > 2*time.Minute {
-		score++
-	}
-
-	// Complexity factor
-	if complexityScore >= 8 {
-		score += 2
-	} else if complexityScore >= 5 {
-		score++
-	}
-
-	// Determine level
-	if score >= 6 {
-		return "high"
-	} else if score >= 3 {
-		return "medium"
-	}
-	return "low"
-}
-
-// uniqueStringSlice removes duplicates from a string slice
-func uniqueStringSlice(slice []string) []string {
-	unique := make(map[string]bool)
-	result := make([]string, 0)
-
-	for _, item := range slice {
-		if !unique[item] && item != "" {
-			unique[item] = true
-			result = append(result, item)
-		}
-	}
-
-	return result
-}
-
-func CleanJSONResponse(response string) string {
-	response = strings.TrimSpace(response)
-
-	// Remove markdown code blocks (```json or ```)
-	// Use regex to remove everything before and after code blocks
-	codeBlockPattern := regexp.MustCompile("(?s)```(?:json)?\\s*([\\s\\S]*?)```")
-	if matches := codeBlockPattern.FindStringSubmatch(response); len(matches) > 1 {
-		response = matches[1]
-		response = strings.TrimSpace(response)
-	} else {
-		// Fallback to prefix/suffix removal
-		if strings.HasPrefix(response, "```json") {
-			response = strings.TrimPrefix(response, "```json")
-		} else if strings.HasPrefix(response, "```") {
-			response = strings.TrimPrefix(response, "```")
-		}
-		response = strings.TrimSuffix(response, "```")
-		response = strings.TrimSpace(response)
-	}
-
-	// Find the first { and last balanced }
-	firstBrace := strings.Index(response, "{")
-	if firstBrace == -1 {
-		return response
-	}
-
-	// Count braces to find the matching closing brace
-	braceCount := 0
-	lastValidBrace := -1
-	inString := false
-	escapeNext := false
-
-	for i := firstBrace; i < len(response); i++ {
-		char := response[i]
-
-		// Handle string escaping
-		if escapeNext {
-			escapeNext = false
-			continue
-		}
-		if char == '\\' {
-			escapeNext = true
+	var sessions []locitypes.ChatSession
+	for rows.Next() {
+		var session locitypes.ChatSession
+		var historyJSON []byte
+		err := rows.Scan(&session.ID, &session.UserID, &session.ProfileID, &session.CityName,
+			&historyJSON, &session.CreatedAt, &session.UpdatedAt, &session.SearchType)
+		if err != nil {
+			r.logger.Warn("Failed to scan session row", zap.Any("error", err))
 			continue
 		}
 
-		// Track if we're inside a string
-		if char == '"' {
-			inString = !inString
-			continue
-		}
-
-		// Only count braces outside of strings
-		if !inString {
-			switch char {
-			case '{':
-				braceCount++
-			case '}':
-				braceCount--
-				if braceCount == 0 {
-					lastValidBrace = i
-					break
-				}
+		// Parse conversation history JSON
+		if len(historyJSON) > 0 {
+			if err := json.Unmarshal(historyJSON, &session.ConversationHistory); err != nil {
+				r.logger.Warn("Failed to parse conversation history", zap.Any("error", err))
+				session.ConversationHistory = []locitypes.ConversationMessage{}
 			}
 		}
+
+		sessions = append(sessions, session)
 	}
 
-	// If braces are unbalanced, try to find the last }
-	if braceCount != 0 {
-		lastBrace := strings.LastIndex(response, "}")
-		if lastBrace == -1 || lastBrace <= firstBrace {
-			return response
+	return sessions, nil
+}
+
+// GetRecentChatSessionsByType directly queries chat_sessions table for recent sessions filtered by search_type
+func (r *RepositoryImpl) GetRecentChatSessionsByType(ctx context.Context, userID uuid.UUID, searchType locitypes.SearchType, limit int) ([]locitypes.ChatSession, error) {
+	query := `
+		SELECT id, user_id, profile_id, city_name, conversation_history, created_at, updated_at, search_type
+		FROM chat_sessions
+		WHERE user_id = $1 AND status = 'active' AND search_type = $2
+		ORDER BY created_at DESC
+		LIMIT $3
+	`
+
+	rows, err := r.pgpool.Query(ctx, query, userID, searchType, limit)
+	if err != nil {
+		r.logger.Error("Failed to query recent chat sessions by type",
+			zap.Any("error", err),
+			zap.String("search_type", string(searchType)))
+		return nil, fmt.Errorf("failed to query recent chat sessions by type: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []locitypes.ChatSession
+	for rows.Next() {
+		var session locitypes.ChatSession
+		var historyJSON []byte
+		err := rows.Scan(&session.ID, &session.UserID, &session.ProfileID, &session.CityName,
+			&historyJSON, &session.CreatedAt, &session.UpdatedAt, &session.SearchType)
+		if err != nil {
+			r.logger.Warn("Failed to scan session row", zap.Any("error", err))
+			continue
 		}
-		lastValidBrace = lastBrace
+
+		// Parse conversation history JSON
+		if len(historyJSON) > 0 {
+			if err := json.Unmarshal(historyJSON, &session.ConversationHistory); err != nil {
+				r.logger.Warn("Failed to parse conversation history", zap.Any("error", err))
+				session.ConversationHistory = []locitypes.ConversationMessage{}
+			}
+		}
+
+		sessions = append(sessions, session)
 	}
 
-	if lastValidBrace == -1 {
-		return response
+	r.logger.Info("Retrieved chat sessions by type",
+		zap.String("user_id", userID.String()),
+		zap.String("search_type", string(searchType)),
+		zap.Int("count", len(sessions)))
+
+	return sessions, nil
+}
+
+// GetTrendingDiscoveries returns the most searched cities/queries today
+func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
+	query := `
+		SELECT
+			city_name,
+			COUNT(*) as search_count,
+			CASE
+				WHEN city_name ILIKE '%tokyo%' THEN '🍜'
+				WHEN city_name ILIKE '%paris%' THEN '☕'
+				WHEN city_name ILIKE '%new york%' OR city_name ILIKE '%nyc%' THEN '🏙️'
+				WHEN city_name ILIKE '%bali%' THEN '🏖️'
+				WHEN city_name ILIKE '%rome%' THEN '🍅'
+				WHEN city_name ILIKE '%london%' THEN '☂️'
+				WHEN city_name ILIKE '%barcelona%' THEN '🎨'
+				ELSE '🗺️'
+			END as emoji,
+			COALESCE(
+				(SELECT msg->>'content'
+				 FROM chat_sessions cs
+				 CROSS JOIN LATERAL jsonb_array_elements(cs.conversation_history) msg
+				 WHERE cs.city_name = chat_sessions.city_name
+				   AND msg->>'role' = 'user'
+				 LIMIT 1),
+				city_name
+			) as first_message
+		FROM chat_sessions
+		WHERE created_at >= CURRENT_DATE
+			AND status = 'active'
+			AND city_name IS NOT NULL
+			AND city_name != ''
+		GROUP BY city_name
+		ORDER BY search_count DESC, city_name ASC
+		LIMIT $1
+	`
+
+	rows, err := r.pgpool.Query(ctx, query, limit)
+	if err != nil {
+		r.logger.Error("Failed to query trending discoveries", zap.Any("error", err))
+		return nil, fmt.Errorf("failed to query trending discoveries: %w", err)
+	}
+	defer rows.Close()
+
+	var discoveries []locitypes.TrendingDiscovery
+	for rows.Next() {
+		var discovery locitypes.TrendingDiscovery
+		err := rows.Scan(&discovery.CityName, &discovery.SearchCount, &discovery.Emoji, &discovery.FirstMessage)
+		if err != nil {
+			r.logger.Warn("Failed to scan trending discovery row", zap.Any("error", err))
+			continue
+		}
+		discoveries = append(discoveries, discovery)
 	}
 
-	// Extract just the JSON portion
-	jsonPortion := response[firstBrace : lastValidBrace+1]
+	r.logger.Info("Retrieved trending discoveries", zap.Int("count", len(discoveries)))
+	return discoveries, nil
+}
 
-	// Remove any remaining backticks
-	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
+// GetFeaturedCollections returns curated featured collections
+func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
+	// For now, return hardcoded collections
+	// TODO: Move this to a database table when we have proper featured collections system
+	collections := []locitypes.FeaturedCollection{
+		{
+			ID:          uuid.New(),
+			Title:       "European Food Capitals",
+			Description: "Culinary adventures across Europe",
+			Emoji:       "🇪🇺",
+			ItemCount:   12,
+			Category:    "food",
+			CreatedAt:   time.Now(),
+		},
+		{
+			ID:          uuid.New(),
+			Title:       "Asian Night Markets",
+			Description: "Street food and night life",
+			Emoji:       "🏮",
+			ItemCount:   15,
+			Category:    "markets",
+			CreatedAt:   time.Now(),
+		},
+		{
+			ID:          uuid.New(),
+			Title:       "California Wineries",
+			Description: "Wine tasting tours",
+			Emoji:       "🍷",
+			ItemCount:   8,
+			Category:    "wine",
+			CreatedAt:   time.Now(),
+		},
+		{
+			ID:          uuid.New(),
+			Title:       "Art Museums Worldwide",
+			Description: "World-class art collections",
+			Emoji:       "🎨",
+			ItemCount:   20,
+			Category:    "culture",
+			CreatedAt:   time.Now(),
+		},
+	}
 
-	// Remove trailing commas before closing braces/brackets
-	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
+	if limit > 0 && limit < len(collections) {
+		collections = collections[:limit]
+	}
 
-	return strings.TrimSpace(jsonPortion)
+	r.logger.Info("Retrieved featured collections", zap.Int("count", len(collections)))
+	return collections, nil
 }

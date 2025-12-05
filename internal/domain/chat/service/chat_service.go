@@ -1406,17 +1406,34 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamE
 			l.deadLetterCh <- event // Send to dead letter queue
 			return false
 		default:
-			select {
-			case ch <- event:
-				return true
-			case <-ctx.Done():
-				l.logger.WarnContext(ctx, "Context cancelled while trying to send stream event", slog.String("eventType", event.Type))
-				l.deadLetterCh <- event // Send to dead letter queue
+			// Protect against panic from sending to closed channel
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						l.logger.WarnContext(ctx, "Recovered from panic sending to channel (likely closed)",
+							slog.String("eventType", event.Type),
+							slog.Any("panic", r))
+					}
+				}()
+
+				select {
+				case ch <- event:
+					// Successfully sent
+				case <-ctx.Done():
+					l.logger.WarnContext(ctx, "Context cancelled while trying to send stream event",
+						slog.String("eventType", event.Type),
+						slog.Any("context_err", ctx.Err()))
+					l.deadLetterCh <- event // Send to dead letter queue
+				case <-time.After(2 * time.Second): // Use a reasonable timeout
+					l.logger.WarnContext(ctx, "Dropped stream event due to slow consumer or blocked channel (timeout)",
+						slog.String("eventType", event.Type))
+					l.deadLetterCh <- event // Send to dead letter queue
+					// Continue to retry after backoff
+				}
+			}()
+
+			if ctx.Err() != nil {
 				return false
-			case <-time.After(2 * time.Second): // Use a reasonable timeout
-				l.logger.WarnContext(ctx, "Dropped stream event due to slow consumer or blocked channel (timeout)", slog.String("eventType", event.Type))
-				l.deadLetterCh <- event // Send to dead letter queue
-				// Continue to retry after backoff
 			}
 		}
 		time.Sleep(100 * time.Millisecond) // Backoff
@@ -2218,7 +2235,6 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 
 	// Step 5: Fan-in Fan-out Setup
 	var wg sync.WaitGroup
-	var closeOnce sync.Once
 
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
@@ -2264,7 +2280,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getCityDataPrompt(cityName)
 			partCacheKey := cacheKey + "_city_data"
+			responsesMutex.Lock()
 			partCacheKeys["city_data"] = partCacheKey
+			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2273,7 +2291,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getGeneralPOIPrompt(cityName)
 			partCacheKey := cacheKey + "_general_pois"
+			responsesMutex.Lock()
 			partCacheKeys["general_pois"] = partCacheKey
+			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2282,7 +2302,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 			defer wg.Done()
 			prompt := getPersonalizedItineraryPrompt(cityName, basePreferences)
 			partCacheKey := cacheKey + "_itinerary"
+			responsesMutex.Lock()
 			partCacheKeys["itinerary"] = partCacheKey
+			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2321,295 +2343,298 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
-	// Step 7: Completion goroutine - save IDs before sending events
-	go func() {
-		wg.Wait()             // Wait for all workers to complete
-		if ctx.Err() == nil { // Only send completion event if context is still active
-			// Build complete data from collected responses
-			responsesMutex.Lock()
+	// Step 7: Wait for all workers to complete synchronously
+	// IMPORTANT: This must block until workers finish so the RPC stream stays open
+	wg.Wait()
+	l.logger.InfoContext(ctx, "All streaming workers completed")
 
-			// If any expected parts are missing, try to hydrate from cache
-			for part, key := range partCacheKeys {
-				if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
-					if cached, found := l.cache.Get(key); found {
-						if cachedText, ok := cached.(string); ok && cachedText != "" {
-							l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
-								slog.String("part_type", part), slog.String("cache_key", key))
-							b := &strings.Builder{}
-							b.WriteString(cachedText)
-							responses[part] = b
-						}
+	// Only process completion if context is still active
+	if ctx.Err() == nil {
+		// Build complete data from collected responses
+		responsesMutex.Lock()
+
+		// If any expected parts are missing, try to hydrate from cache
+		for part, key := range partCacheKeys {
+			if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
+				if cached, found := l.cache.Get(key); found {
+					if cachedText, ok := cached.(string); ok && cachedText != "" {
+						l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
+							slog.String("part_type", part), slog.String("cache_key", key))
+						b := &strings.Builder{}
+						b.WriteString(cachedText)
+						responses[part] = b
 					}
 				}
 			}
+		}
 
-			completeData := map[string]interface{}{
-				"session_id": sessionID.String(),
-			}
-			cityDataContent := ""
-			var fullResponseBuilder strings.Builder
+		completeData := map[string]interface{}{
+			"session_id": sessionID.String(),
+		}
+		cityDataContent := ""
+		var fullResponseBuilder strings.Builder
 
-			// Parse and add each response part as structured JSON
-			for partType, builder := range responses {
-				if builder != nil && builder.Len() > 0 {
-					content := builder.String()
-					fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
+		// Parse and add each response part as structured JSON
+		for partType, builder := range responses {
+			if builder != nil && builder.Len() > 0 {
+				content := builder.String()
+				fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
 
-					if partType == "city_data" {
-						cityDataContent = content
-					}
-
-					// Extract JSON from markdown code blocks if present
-					content = extractJSONFromMarkdown(content)
-
-					// Try to parse as JSON
-					var parsedJSON interface{}
-					if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
-						switch partType {
-						case "city_data":
-							completeData["general_city_data"] = parsedJSON
-						case "general_pois":
-							completeData["points_of_interest"] = parsedJSON
-						case "itinerary":
-							completeData["itinerary_response"] = parsedJSON
-						case "hotels":
-							completeData["accommodation_response"] = parsedJSON
-						case "restaurants":
-							completeData["dining_response"] = parsedJSON
-						case "activities":
-							completeData["activities_response"] = parsedJSON
-						default:
-							completeData[partType] = parsedJSON
-						}
-					} else {
-						// If parsing fails, store as string
-						l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
-							slog.String("part_type", partType), slog.Any("error", err))
-						completeData[partType+"_raw"] = content
-					}
+				if partType == "city_data" {
+					cityDataContent = content
 				}
-			}
-			responsesMutex.Unlock()
 
-			// Save city data and get cityID BEFORE sending itinerary event
-			var cityID uuid.UUID
-			if cityDataContent != "" {
-				if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
-					if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
-						cityID = savedCityID
-						l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
-					}
-				}
-			}
-			// Fallback: try to get existing city from database, or create it
-			if cityID == uuid.Nil && cityName != "" {
-				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
-				if err != nil || existingCity == nil {
-					// City doesn't exist, create a minimal entry to allow POI saving
-					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
-						slog.String("city_name", cityName))
-					cityDetail := locitypes.CityDetail{
-						Name:          cityName,
-						Country:       "Unknown", // Use consistent default to avoid duplicates
-						StateProvince: "Unknown", // Use consistent default to avoid duplicates
-					}
-					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
-					if err != nil {
-						l.logger.WarnContext(ctx, "Failed to create city entry",
-							slog.String("city", cityName),
-							slog.Any("error", err))
-						cityID = uuid.Nil
-					} else {
-						l.logger.InfoContext(ctx, "Successfully created city entry",
-							slog.String("city", cityName),
-							slog.String("city_id", cityID.String()))
+				// Extract JSON from markdown code blocks if present
+				content = extractJSONFromMarkdown(content)
+
+				// Try to parse as JSON
+				var parsedJSON interface{}
+				if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
+					switch partType {
+					case "city_data":
+						completeData["general_city_data"] = parsedJSON
+					case "general_pois":
+						completeData["points_of_interest"] = parsedJSON
+					case "itinerary":
+						completeData["itinerary_response"] = parsedJSON
+					case "hotels":
+						completeData["accommodation_response"] = parsedJSON
+					case "restaurants":
+						completeData["dining_response"] = parsedJSON
+					case "activities":
+						completeData["activities_response"] = parsedJSON
+					default:
+						completeData[partType] = parsedJSON
 					}
 				} else {
-					cityID = existingCity.ID
-					l.logger.InfoContext(ctx, "Found existing city",
+					// If parsing fails, store as string
+					l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
+						slog.String("part_type", partType), slog.Any("error", err))
+					completeData[partType+"_raw"] = content
+				}
+			}
+		}
+		responsesMutex.Unlock()
+
+		// Save city data and get cityID BEFORE sending itinerary event
+		var cityID uuid.UUID
+		if cityDataContent != "" {
+			if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
+				if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
+					cityID = savedCityID
+					l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
+				}
+			}
+		}
+		// Fallback: try to get existing city from database, or create it
+		if cityID == uuid.Nil && cityName != "" {
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
+			if err != nil || existingCity == nil {
+				// City doesn't exist, create a minimal entry to allow POI saving
+				l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
+					slog.String("city_name", cityName))
+				cityDetail := locitypes.CityDetail{
+					Name:          cityName,
+					Country:       "Unknown", // Use consistent default to avoid duplicates
+					StateProvince: "Unknown", // Use consistent default to avoid duplicates
+				}
+				cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
+				if err != nil {
+					l.logger.WarnContext(ctx, "Failed to create city entry",
+						slog.String("city", cityName),
+						slog.Any("error", err))
+					cityID = uuid.Nil
+				} else {
+					l.logger.InfoContext(ctx, "Successfully created city entry",
 						slog.String("city", cityName),
 						slog.String("city_id", cityID.String()))
 				}
-			}
-
-			// Save interaction and get llmInteractionID BEFORE sending itinerary event
-			fullResponse := fullResponseBuilder.String()
-			if fullResponse == "" {
-				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
-			}
-			interaction := locitypes.LlmInteraction{
-				ID:           uuid.New(),
-				SessionID:    sessionID,
-				UserID:       userID,
-				ProfileID:    profileID,
-				CityName:     cityName,
-				Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
-				ResponseText: fullResponse,
-				ModelUsed:    model,
-				LatencyMs:    int(time.Since(startTime).Milliseconds()),
-				Timestamp:    startTime,
-			}
-			savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
-			if saveErr != nil {
-				l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
-				savedInteractionID = uuid.Nil
 			} else {
-				l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+				cityID = existingCity.ID
+				l.logger.InfoContext(ctx, "Found existing city",
+					slog.String("city", cityName),
+					slog.String("city_id", cityID.String()))
 			}
+		}
 
-			// Build AiCityResponse struct with database IDs
-			itineraryData := locitypes.AiCityResponse{
-				SessionID: sessionID,
+		// Save interaction and get llmInteractionID BEFORE sending itinerary event
+		fullResponse := fullResponseBuilder.String()
+		if fullResponse == "" {
+			fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
+		}
+		interaction := locitypes.LlmInteraction{
+			ID:           uuid.New(),
+			SessionID:    sessionID,
+			UserID:       userID,
+			ProfileID:    profileID,
+			CityName:     cityName,
+			Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
+			ResponseText: fullResponse,
+			ModelUsed:    model,
+			LatencyMs:    int(time.Since(startTime).Milliseconds()),
+			Timestamp:    startTime,
+		}
+		savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
+		if saveErr != nil {
+			l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
+			savedInteractionID = uuid.Nil
+		} else {
+			l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+		}
+
+		// Build AiCityResponse struct with database IDs
+		itineraryData := locitypes.AiCityResponse{
+			SessionID: sessionID,
+		}
+
+		// Populate structured data if available
+		if generalCityData, ok := completeData["general_city_data"]; ok {
+			if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
+				// Try to unmarshal into GeneralCityData struct
+				if jsonBytes, err := json.Marshal(cityData); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
+					}
+				}
 			}
-
-			// Populate structured data if available
-			if generalCityData, ok := completeData["general_city_data"]; ok {
-				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
-					// Try to unmarshal into GeneralCityData struct
-					if jsonBytes, err := json.Marshal(cityData); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
+		}
+		if pois, ok := completeData["points_of_interest"]; ok {
+			if poisArr, parseOk := pois.([]interface{}); parseOk {
+				if jsonBytes, err := json.Marshal(poisArr); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
+					}
+				}
+			}
+		}
+		if itinResp, ok := completeData["itinerary_response"]; ok {
+			if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
+				if jsonBytes, err := json.Marshal(itinData); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+					}
+				}
+			}
+		}
+		if hotelsResp, ok := completeData["accommodation_response"]; ok {
+			if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
+				if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
+					if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
+						if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
+						} else {
+							// Surface hotels through points_of_interest so they reach clients
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, convertHotelsToPOIs(itineraryData.Hotels)...)
 						}
 					}
 				}
 			}
-			if pois, ok := completeData["points_of_interest"]; ok {
-				if poisArr, parseOk := pois.([]interface{}); parseOk {
-					if jsonBytes, err := json.Marshal(poisArr); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
+		}
+		if restaurantsResp, ok := completeData["dining_response"]; ok {
+			if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
+				if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
+					if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
+						if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
+						} else {
+							// Also populate itinerary restaurants so the gRPC response carries them
+							restaurantPOIs := convertRestaurantsToPOIs(itineraryData.Restaurants)
+							itineraryData.AIItineraryResponse.Restaurants = restaurantPOIs
+							// Expose restaurants through points_of_interest for clients that read the generic field
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, restaurantPOIs...)
 						}
 					}
 				}
 			}
-			if itinResp, ok := completeData["itinerary_response"]; ok {
-				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
-					if jsonBytes, err := json.Marshal(itinData); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+		}
+		if activitiesResp, ok := completeData["activities_response"]; ok {
+			if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
+				if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
+					if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
+						var activities []locitypes.POIDetailedInfo
+						if err := json.Unmarshal(jsonBytes, &activities); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
+						} else {
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
 						}
 					}
 				}
 			}
-			if hotelsResp, ok := completeData["accommodation_response"]; ok {
-				if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
-					if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
-						if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
-							if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
-							} else {
-								// Surface hotels through points_of_interest so they reach clients
-								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, convertHotelsToPOIs(itineraryData.Hotels)...)
-							}
+		}
+		if activitiesResp, ok := completeData["activities_response"]; ok {
+			if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
+				if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
+					if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
+						var activities []locitypes.POIDetailedInfo
+						if err := json.Unmarshal(jsonBytes, &activities); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
+						} else {
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
 						}
 					}
 				}
 			}
-			if restaurantsResp, ok := completeData["dining_response"]; ok {
-				if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
-					if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
-						if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
-							if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
-							} else {
-								// Also populate itinerary restaurants so the gRPC response carries them
-								restaurantPOIs := convertRestaurantsToPOIs(itineraryData.Restaurants)
-								itineraryData.AIItineraryResponse.Restaurants = restaurantPOIs
-								// Expose restaurants through points_of_interest for clients that read the generic field
-								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, restaurantPOIs...)
-							}
-						}
-					}
+		}
+
+		// Set cityID and llmInteractionID on POIs
+		if cityID != uuid.Nil {
+			for i := range itineraryData.PointsOfInterest {
+				itineraryData.PointsOfInterest[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.PointsOfInterest[i].LlmInteractionID = savedInteractionID
 				}
 			}
-			if activitiesResp, ok := completeData["activities_response"]; ok {
-				if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
-					if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
-						if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
-							var activities []locitypes.POIDetailedInfo
-							if err := json.Unmarshal(jsonBytes, &activities); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
-							} else {
-								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
-							}
-						}
-					}
+			for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
+				itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
 				}
 			}
-			if activitiesResp, ok := completeData["activities_response"]; ok {
-				if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
-					if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
-						if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
-							var activities []locitypes.POIDetailedInfo
-							if err := json.Unmarshal(jsonBytes, &activities); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
-							} else {
-								itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
-							}
-						}
-					}
+			for i := range itineraryData.AIItineraryResponse.Restaurants {
+				itineraryData.AIItineraryResponse.Restaurants[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedInteractionID
 				}
 			}
+		}
 
-			// Set cityID and llmInteractionID on POIs
-			if cityID != uuid.Nil {
-				for i := range itineraryData.PointsOfInterest {
-					itineraryData.PointsOfInterest[i].CityID = cityID
-					if savedInteractionID != uuid.Nil {
-						itineraryData.PointsOfInterest[i].LlmInteractionID = savedInteractionID
-					}
+		// Consolidate POIs: deduplicate and merge from all locations into AIItineraryResponse.PointsOfInterest
+		// This ensures both paths have the data for consistency without duplicates
+		allPOIs := make([]locitypes.POIDetailedInfo, 0)
+		seenIDs := make(map[string]bool)
+
+		// Helper to add unique POIs
+		addUniquePOI := func(pois []locitypes.POIDetailedInfo) {
+			for _, poi := range pois {
+				key := poi.ID.String()
+				if key == "00000000-0000-0000-0000-000000000000" {
+					key = poi.Name // Use name for placeholder IDs
 				}
-				for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
-					itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
-					if savedInteractionID != uuid.Nil {
-						itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
-					}
-				}
-				for i := range itineraryData.AIItineraryResponse.Restaurants {
-					itineraryData.AIItineraryResponse.Restaurants[i].CityID = cityID
-					if savedInteractionID != uuid.Nil {
-						itineraryData.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedInteractionID
-					}
+				if !seenIDs[key] {
+					seenIDs[key] = true
+					allPOIs = append(allPOIs, poi)
 				}
 			}
+		}
 
-			// Consolidate POIs: deduplicate and merge from all locations into AIItineraryResponse.PointsOfInterest
-			// This ensures both paths have the data for consistency without duplicates
-			allPOIs := make([]locitypes.POIDetailedInfo, 0)
-			seenIDs := make(map[string]bool)
+		// Collect from all sources with deduplication
+		addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
+		addUniquePOI(itineraryData.PointsOfInterest)
+		addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
 
-			// Helper to add unique POIs
-			addUniquePOI := func(pois []locitypes.POIDetailedInfo) {
-				for _, poi := range pois {
-					key := poi.ID.String()
-					if key == "00000000-0000-0000-0000-000000000000" {
-						key = poi.Name // Use name for placeholder IDs
-					}
-					if !seenIDs[key] {
-						seenIDs[key] = true
-						allPOIs = append(allPOIs, poi)
-					}
-				}
-			}
+		// Update the main POI list
+		itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
 
-			// Collect from all sources with deduplication
-			addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
-			addUniquePOI(itineraryData.PointsOfInterest)
-			addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
+		l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse",
+			slog.Int("total_unique_pois", len(allPOIs)),
+			slog.Int("from_top_level", len(itineraryData.PointsOfInterest)),
+			slog.Int("from_nested", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
 
-			// Update the main POI list
-			itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
-
-			l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse",
-				slog.Int("total_unique_pois", len(allPOIs)),
-				slog.Int("from_top_level", len(itineraryData.PointsOfInterest)),
-				slog.Int("from_nested", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
-
-			// Send EventTypeItinerary with proper IDs
-			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
-				Type: locitypes.EventTypeItinerary,
-				Data: itineraryData,
-			}, 3)
+		// Send EventTypeItinerary with proper IDs
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeItinerary,
+			Data: itineraryData,
+		}, 3)
 
 		// Update session with the initial itinerary data so it persists for future ContinueChat calls
 		session.CurrentItinerary = &itineraryData
@@ -2622,46 +2647,44 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				slog.Int("top_level_pois", len(itineraryData.PointsOfInterest)))
 		}
 
-			// Determine route type based on domain
-			var routeType string
-			var baseURL string
-			switch domain {
-			case locitypes.DomainAccommodation:
-				routeType = "hotels"
-				baseURL = "/hotels"
-			case locitypes.DomainDining:
-				routeType = "restaurants"
-				baseURL = "/restaurants"
-			case locitypes.DomainActivities:
-				routeType = "activities"
-				baseURL = "/activities"
-			default:
-				routeType = "itinerary"
-				baseURL = "/itinerary"
-			}
-
-			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
-				Type: locitypes.EventTypeComplete,
-				Data: map[string]interface{}{"session_id": sessionID.String()},
-				Navigation: &locitypes.NavigationData{
-					URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
-					RouteType: routeType,
-					QueryParams: map[string]string{
-						"sessionId": sessionID.String(),
-						"cityName":  cityName,
-						"domain":    routeType,
-					},
-				},
-			}, 3)
+		// Determine route type based on domain
+		var routeType string
+		var baseURL string
+		switch domain {
+		case locitypes.DomainAccommodation:
+			routeType = "hotels"
+			baseURL = "/hotels"
+		case locitypes.DomainDining:
+			routeType = "restaurants"
+			baseURL = "/restaurants"
+		case locitypes.DomainActivities:
+			routeType = "activities"
+			baseURL = "/activities"
+		default:
+			routeType = "itinerary"
+			baseURL = "/itinerary"
 		}
-		closeOnce.Do(func() {
-			close(eventCh) // Close the channel only once
-			l.logger.InfoContext(ctx, "Event channel closed by completion goroutine")
-		})
-	}()
 
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeComplete,
+			Data: map[string]interface{}{"session_id": sessionID.String()},
+			Navigation: &locitypes.NavigationData{
+				URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
+				RouteType: routeType,
+				QueryParams: map[string]string{
+					"sessionId": sessionID.String(),
+					"cityName":  cityName,
+					"domain":    routeType,
+				},
+			},
+		}, 3)
+	}
+	// Note: Do NOT close eventCh here - the handler owns the channel and will close it via defer
+	l.logger.InfoContext(ctx, "Completion processing finished, event channel will be closed by handler")
+
+	// Async goroutine for database operations (can continue after RPC completes)
 	go func() {
-		wg.Wait() // Wait for all workers to complete
+		// Use a fresh context since the RPC context may be canceled after we return
 		asyncCtx := context.Background()
 
 		var fullResponseBuilder strings.Builder
@@ -2885,7 +2908,6 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 	// Step 5: Fan-in Fan-out Setup
 	var wg sync.WaitGroup
-	var closeOnce sync.Once
 
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
@@ -2931,7 +2953,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getCityDataPrompt(cityName)
 			partCacheKey := cacheKey + "_city_data"
+			responsesMutex.Lock()
 			partCacheKeys["city_data"] = partCacheKey
+			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2940,7 +2964,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 			defer wg.Done()
 			prompt := getGeneralPOIPrompt(cityName)
 			partCacheKey := cacheKey + "_general_pois"
+			responsesMutex.Lock()
 			partCacheKeys["general_pois"] = partCacheKey
+			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, domain, partCacheKey)
 		}()
 
@@ -2988,258 +3014,256 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 		return fmt.Errorf("unhandled domain type: %s", domain)
 	}
 
-	// Step 7: Completion goroutine - save IDs before sending events
-	go func() {
-		wg.Wait()             // Wait for all workers to complete
-		if ctx.Err() == nil { // Only send completion event if context is still active
-			// Build complete data from collected responses
-			responsesMutex.Lock()
+	// Step 7: Wait for all workers to complete synchronously
+	// IMPORTANT: This must block until workers finish so the RPC stream stays open
+	wg.Wait()
+	l.logger.InfoContext(ctx, "All streaming workers completed (free endpoint)")
 
-			// If any expected parts are missing, try to hydrate from cache
-			for part, key := range partCacheKeys {
-				if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
-					if cached, found := l.cache.Get(key); found {
-						if cachedText, ok := cached.(string); ok && cachedText != "" {
-							l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
-								slog.String("part_type", part), slog.String("cache_key", key))
-							b := &strings.Builder{}
-							b.WriteString(cachedText)
-							responses[part] = b
-						}
+	// Only process completion if context is still active
+	if ctx.Err() == nil {
+		// Build complete data from collected responses
+		responsesMutex.Lock()
+
+		// If any expected parts are missing, try to hydrate from cache
+		for part, key := range partCacheKeys {
+			if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
+				if cached, found := l.cache.Get(key); found {
+					if cachedText, ok := cached.(string); ok && cachedText != "" {
+						l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
+							slog.String("part_type", part), slog.String("cache_key", key))
+						b := &strings.Builder{}
+						b.WriteString(cachedText)
+						responses[part] = b
 					}
 				}
 			}
+		}
 
-			completeData := map[string]interface{}{
-				"session_id": sessionID.String(),
-			}
-			cityDataContent := ""
-			var fullResponseBuilder strings.Builder
+		completeData := map[string]interface{}{
+			"session_id": sessionID.String(),
+		}
+		cityDataContent := ""
+		var fullResponseBuilder strings.Builder
 
-			// Parse and add each response part as structured JSON
-			for partType, builder := range responses {
-				if builder != nil && builder.Len() > 0 {
-					content := builder.String()
-					fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
+		// Parse and add each response part as structured JSON
+		for partType, builder := range responses {
+			if builder != nil && builder.Len() > 0 {
+				content := builder.String()
+				fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
 
-					if partType == "city_data" {
-						cityDataContent = content
-					}
-
-					// Extract JSON from markdown code blocks if present
-					content = extractJSONFromMarkdown(content)
-
-					// Try to parse as JSON
-					var parsedJSON interface{}
-					if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
-						switch partType {
-						case "city_data":
-							completeData["general_city_data"] = parsedJSON
-						case "general_pois":
-							completeData["points_of_interest"] = parsedJSON
-						case "itinerary":
-							completeData["itinerary_response"] = parsedJSON
-						case "hotels":
-							completeData["accommodation_response"] = parsedJSON
-						case "restaurants":
-							completeData["dining_response"] = parsedJSON
-						case "activities":
-							completeData["activities_response"] = parsedJSON
-						default:
-							completeData[partType] = parsedJSON
-						}
-					} else {
-						// If parsing fails, store as string
-						l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
-							slog.String("part_type", partType), slog.Any("error", err))
-						completeData[partType+"_raw"] = content
-					}
+				if partType == "city_data" {
+					cityDataContent = content
 				}
-			}
-			responsesMutex.Unlock()
 
-			// Save city data and get cityID BEFORE sending itinerary event
-			var cityID uuid.UUID
-			if cityDataContent != "" {
-				if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
-					if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
-						cityID = savedCityID
-						l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
-					}
-				}
-			}
-			// Fallback: try to get existing city from database, or create it
-			if cityID == uuid.Nil && cityName != "" {
-				existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
-				if err != nil || existingCity == nil {
-					// City doesn't exist, create a minimal entry to allow POI saving
-					l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
-						slog.String("city_name", cityName))
-					cityDetail := locitypes.CityDetail{
-						Name:          cityName,
-						Country:       "Unknown", // Use consistent default to avoid duplicates
-						StateProvince: "Unknown", // Use consistent default to avoid duplicates
-					}
-					cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
-					if err != nil {
-						l.logger.WarnContext(ctx, "Failed to create city entry",
-							slog.String("city", cityName),
-							slog.Any("error", err))
-						cityID = uuid.Nil
-					} else {
-						l.logger.InfoContext(ctx, "Successfully created city entry",
-							slog.String("city", cityName),
-							slog.String("city_id", cityID.String()))
+				// Extract JSON from markdown code blocks if present
+				content = extractJSONFromMarkdown(content)
+
+				// Try to parse as JSON
+				var parsedJSON interface{}
+				if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
+					switch partType {
+					case "city_data":
+						completeData["general_city_data"] = parsedJSON
+					case "general_pois":
+						completeData["points_of_interest"] = parsedJSON
+					case "itinerary":
+						completeData["itinerary_response"] = parsedJSON
+					case "hotels":
+						completeData["accommodation_response"] = parsedJSON
+					case "restaurants":
+						completeData["dining_response"] = parsedJSON
+					case "activities":
+						completeData["activities_response"] = parsedJSON
+					default:
+						completeData[partType] = parsedJSON
 					}
 				} else {
-					cityID = existingCity.ID
-					l.logger.InfoContext(ctx, "Found existing city",
+					// If parsing fails, store as string
+					l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
+						slog.String("part_type", partType), slog.Any("error", err))
+					completeData[partType+"_raw"] = content
+				}
+			}
+		}
+		responsesMutex.Unlock()
+
+		// Save city data and get cityID BEFORE sending itinerary event
+		var cityID uuid.UUID
+		if cityDataContent != "" {
+			if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
+				if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
+					cityID = savedCityID
+					l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
+				}
+			}
+		}
+		// Fallback: try to get existing city from database, or create it
+		if cityID == uuid.Nil && cityName != "" {
+			existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cityName, "Unknown")
+			if err != nil || existingCity == nil {
+				// City doesn't exist, create a minimal entry to allow POI saving
+				l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
+					slog.String("city_name", cityName))
+				cityDetail := locitypes.CityDetail{
+					Name:          cityName,
+					Country:       "Unknown", // Use consistent default to avoid duplicates
+					StateProvince: "Unknown", // Use consistent default to avoid duplicates
+				}
+				cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
+				if err != nil {
+					l.logger.WarnContext(ctx, "Failed to create city entry",
+						slog.String("city", cityName),
+						slog.Any("error", err))
+					cityID = uuid.Nil
+				} else {
+					l.logger.InfoContext(ctx, "Successfully created city entry",
 						slog.String("city", cityName),
 						slog.String("city_id", cityID.String()))
 				}
-			}
-
-			// Save interaction and get llmInteractionID BEFORE sending itinerary event
-			fullResponse := fullResponseBuilder.String()
-			if fullResponse == "" {
-				fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
-			}
-			interaction := locitypes.LlmInteraction{
-				ID:           uuid.New(),
-				SessionID:    sessionID,
-				UserID:       uuid.Nil, // Free version has no authenticated user
-				ProfileID:    uuid.Nil, // Free version has no profile
-				CityName:     cityName,
-				Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
-				ResponseText: fullResponse,
-				ModelUsed:    model,
-				LatencyMs:    int(time.Since(startTime).Milliseconds()),
-				Timestamp:    startTime,
-			}
-			savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
-			if saveErr != nil {
-				l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
-				savedInteractionID = uuid.Nil
 			} else {
-				l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+				cityID = existingCity.ID
+				l.logger.InfoContext(ctx, "Found existing city",
+					slog.String("city", cityName),
+					slog.String("city_id", cityID.String()))
 			}
-
-			// Build AiCityResponse struct with database IDs
-			itineraryData := locitypes.AiCityResponse{
-				SessionID: sessionID,
-			}
-
-			// Populate structured data if available
-			if generalCityData, ok := completeData["general_city_data"]; ok {
-				if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
-					// Try to unmarshal into GeneralCityData struct
-					if jsonBytes, err := json.Marshal(cityData); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
-						}
-					}
-				}
-			}
-			if pois, ok := completeData["points_of_interest"]; ok {
-				if poisArr, parseOk := pois.([]interface{}); parseOk {
-					if jsonBytes, err := json.Marshal(poisArr); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
-						}
-					}
-				}
-			}
-			if itinResp, ok := completeData["itinerary_response"]; ok {
-				if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
-					if jsonBytes, err := json.Marshal(itinData); err == nil {
-						if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
-						}
-					}
-				}
-			}
-			if hotelsResp, ok := completeData["accommodation_response"]; ok {
-				if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
-					if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
-						if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
-							if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
-							}
-						}
-					}
-				}
-			}
-			if restaurantsResp, ok := completeData["dining_response"]; ok {
-				if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
-					if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
-						if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
-							if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
-								l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
-							}
-						}
-					}
-				}
-			}
-
-			// Set cityID and llmInteractionID on POIs
-			if cityID != uuid.Nil {
-				for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
-					itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
-					if savedInteractionID != uuid.Nil {
-						itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
-					}
-				}
-			}
-
-			// Send EventTypeItinerary with proper IDs
-			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
-				Type: locitypes.EventTypeItinerary,
-				Data: itineraryData,
-			}, 3)
-
-			// Determine route type based on domain
-			var routeType string
-			var baseURL string
-			switch domain {
-			case locitypes.DomainAccommodation:
-				routeType = "hotels"
-				baseURL = "/hotels"
-			case locitypes.DomainDining:
-				routeType = "restaurants"
-				baseURL = "/restaurants"
-			case locitypes.DomainActivities:
-				routeType = "activities"
-				baseURL = "/activities"
-			default:
-				routeType = "itinerary"
-				baseURL = "/itinerary"
-			}
-
-			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
-				Type: locitypes.EventTypeComplete,
-				Data: map[string]interface{}{"session_id": sessionID.String()},
-				Navigation: &locitypes.NavigationData{
-					URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
-					RouteType: routeType,
-					QueryParams: map[string]string{
-						"sessionId": sessionID.String(),
-						"cityName":  cityName,
-						"domain":    routeType,
-					},
-				},
-			}, 3)
 		}
-		closeOnce.Do(func() {
-			close(eventCh) // Close the channel only once
-			l.logger.InfoContext(ctx, "Event channel closed by completion goroutine")
-		})
-	}()
+
+		// Save interaction and get llmInteractionID BEFORE sending itinerary event
+		fullResponse := fullResponseBuilder.String()
+		if fullResponse == "" {
+			fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cityName)
+		}
+		interaction := locitypes.LlmInteraction{
+			ID:           uuid.New(),
+			SessionID:    sessionID,
+			UserID:       uuid.Nil, // Free version has no authenticated user
+			ProfileID:    uuid.Nil, // Free version has no profile
+			CityName:     cityName,
+			Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
+			ResponseText: fullResponse,
+			ModelUsed:    model,
+			LatencyMs:    int(time.Since(startTime).Milliseconds()),
+			Timestamp:    startTime,
+		}
+		savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
+		if saveErr != nil {
+			l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
+			savedInteractionID = uuid.Nil
+		} else {
+			l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
+		}
+
+		// Build AiCityResponse struct with database IDs
+		itineraryData := locitypes.AiCityResponse{
+			SessionID: sessionID,
+		}
+
+		// Populate structured data if available
+		if generalCityData, ok := completeData["general_city_data"]; ok {
+			if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
+				// Try to unmarshal into GeneralCityData struct
+				if jsonBytes, err := json.Marshal(cityData); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
+					}
+				}
+			}
+		}
+		if pois, ok := completeData["points_of_interest"]; ok {
+			if poisArr, parseOk := pois.([]interface{}); parseOk {
+				if jsonBytes, err := json.Marshal(poisArr); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
+					}
+				}
+			}
+		}
+		if itinResp, ok := completeData["itinerary_response"]; ok {
+			if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
+				if jsonBytes, err := json.Marshal(itinData); err == nil {
+					if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
+						l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
+					}
+				}
+			}
+		}
+		if hotelsResp, ok := completeData["accommodation_response"]; ok {
+			if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
+				if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
+					if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
+						if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
+						}
+					}
+				}
+			}
+		}
+		if restaurantsResp, ok := completeData["dining_response"]; ok {
+			if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
+				if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
+					if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
+						if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
+						}
+					}
+				}
+			}
+		}
+
+		// Set cityID and llmInteractionID on POIs
+		if cityID != uuid.Nil {
+			for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
+				itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+				}
+			}
+		}
+
+		// Send EventTypeItinerary with proper IDs
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeItinerary,
+			Data: itineraryData,
+		}, 3)
+
+		// Determine route type based on domain
+		var routeType string
+		var baseURL string
+		switch domain {
+		case locitypes.DomainAccommodation:
+			routeType = "hotels"
+			baseURL = "/hotels"
+		case locitypes.DomainDining:
+			routeType = "restaurants"
+			baseURL = "/restaurants"
+		case locitypes.DomainActivities:
+			routeType = "activities"
+			baseURL = "/activities"
+		default:
+			routeType = "itinerary"
+			baseURL = "/itinerary"
+		}
+
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeComplete,
+			Data: map[string]interface{}{"session_id": sessionID.String()},
+			Navigation: &locitypes.NavigationData{
+				URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cityName), routeType),
+				RouteType: routeType,
+				QueryParams: map[string]string{
+					"sessionId": sessionID.String(),
+					"cityName":  cityName,
+					"domain":    routeType,
+				},
+			},
+		}, 3)
+	}
+	// Note: Do NOT close eventCh here - the handler owns the channel and will close it via defer
+	l.logger.InfoContext(ctx, "Completion processing finished (free endpoint), event channel will be closed by handler")
 
 	// Step 8: Save interaction and process structured data asynchronously after completion
 	go func() {
-		wg.Wait() // Wait for all workers to complete
-
-		// Save interaction with complete response
+		// Use a fresh context since the RPC context may be canceled after we return
 		asyncCtx := context.Background()
 
 		// Combine all responses into a single response text
@@ -3443,8 +3467,16 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 	}
 
 	// Step 2: Cache miss or no cache key - call LLM
+	l.logger.InfoContext(ctx, "Calling LLM for streaming",
+		slog.String("part_type", partType),
+		slog.String("cache_key", cacheKey),
+		slog.Int("prompt_length", len(prompt)))
+
 	iter, err := l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
 	if err != nil {
+		l.logger.ErrorContext(ctx, "LLM call failed",
+			slog.String("part_type", partType),
+			slog.Any("error", err))
 		if ctx.Err() == nil {
 			sendEvent(locitypes.StreamEvent{
 				Type:  locitypes.EventTypeError,
@@ -3456,11 +3488,18 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 
 	// Step 3: Stream response and collect full text for caching
 	var fullResponse strings.Builder
+	chunkCount := 0
 	for resp, err := range iter {
 		if ctx.Err() != nil {
+			l.logger.WarnContext(ctx, "Context canceled during streaming",
+				slog.String("part_type", partType),
+				slog.Int("chunks_received", chunkCount))
 			return // Stop if context is canceled
 		}
 		if err != nil {
+			l.logger.ErrorContext(ctx, "Streaming error from LLM",
+				slog.String("part_type", partType),
+				slog.Any("error", err))
 			if ctx.Err() == nil {
 				sendEvent(locitypes.StreamEvent{
 					Type:  locitypes.EventTypeError,
@@ -3474,7 +3513,18 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				for _, part := range cand.Content.Parts {
 					if part.Text != "" {
 						chunk := string(part.Text)
+						chunkCount++
 						fullResponse.WriteString(chunk)
+
+						// Log first few chunks for debugging
+						if chunkCount <= 3 {
+							l.logger.InfoContext(ctx, "Received chunk from LLM",
+								slog.String("part_type", partType),
+								slog.Int("chunk_number", chunkCount),
+								slog.Int("chunk_length", len(chunk)),
+								slog.String("chunk_preview", chunk[:min(100, len(chunk))]))
+						}
+
 						sendEvent(locitypes.StreamEvent{
 							Type: locitypes.EventTypeChunk,
 							Data: map[string]interface{}{
@@ -3490,6 +3540,11 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			}
 		}
 	}
+
+	l.logger.InfoContext(ctx, "LLM streaming completed",
+		slog.String("part_type", partType),
+		slog.Int("total_chunks", chunkCount),
+		slog.Int("total_response_length", fullResponse.Len()))
 
 	// Step 4: Save full response to cache if cacheKey is provided
 	if cacheKey != "" && fullResponse.Len() > 0 {

@@ -239,7 +239,75 @@ func (a *AuthInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) 
 	return next
 }
 
-// WrapStreamingHandler implements connect.Interceptor (no streaming support yet).
+// WrapStreamingHandler implements connect.Interceptor with JWT authentication for streaming.
 func (a *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return next
+	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
+		// Skip authentication for client-side calls
+		if conn.Spec().IsClient {
+			return next(ctx, conn)
+		}
+
+		// Allow certain procedures to skip strict auth
+		_, optional := a.optionalProcedures[conn.Spec().Procedure]
+
+		// Extract token from Authorization header
+		authHeader := conn.RequestHeader().Get("Authorization")
+		if authHeader == "" {
+			if optional {
+				return next(ctx, conn)
+			}
+			return connect.NewError(
+				connect.CodeUnauthenticated,
+				errors.New("missing authorization header"),
+			)
+		}
+
+		// Expected format: "Bearer <token>"
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			return connect.NewError(
+				connect.CodeUnauthenticated,
+				errors.New("invalid authorization header format, expected 'Bearer <token>'"),
+			)
+		}
+
+		tokenString := parts[1]
+
+		// Parse and validate JWT
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			// Validate signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("unexpected signing method")
+			}
+			return a.jwtSecret, nil
+		})
+		if err != nil {
+			return connect.NewError(
+				connect.CodeUnauthenticated,
+				errors.New("invalid token: "+err.Error()),
+			)
+		}
+
+		if !token.Valid {
+			return connect.NewError(
+				connect.CodeUnauthenticated,
+				errors.New("token is not valid"),
+			)
+		}
+
+		// Check token expiration
+		if claims.ExpiresAt != nil && claims.ExpiresAt.Before(time.Now()) {
+			return connect.NewError(
+				connect.CodeUnauthenticated,
+				errors.New("token has expired"),
+			)
+		}
+
+		// Add claims to context
+		ctx = context.WithValue(ctx, claimsKey, claims)
+		ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+
+		return next(ctx, conn)
+	}
 }

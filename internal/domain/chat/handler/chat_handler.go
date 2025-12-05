@@ -138,6 +138,7 @@ func (h *ChatHandler) StreamChat(
 		select {
 		case event, ok := <-eventCh:
 			if !ok {
+				h.logger.Info("Event channel closed, stream finished successfully")
 				return nil // Stream finished successfully
 			}
 
@@ -148,14 +149,21 @@ func (h *ChatHandler) StreamChat(
 			}
 
 			if err := stream.Send(resp); err != nil {
+				h.logger.Warn("Failed to send event to client",
+					"error", err,
+					"event_type", event.Type)
 				return err
 			}
 
 			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
+				h.logger.Info("Stream completed", "event_type", event.Type)
 				return nil
 			}
 
 		case <-ctx.Done():
+			h.logger.Warn("RPC context canceled",
+				"error", ctx.Err(),
+				"reason", "client_disconnected_or_timeout")
 			return ctx.Err()
 		}
 	}

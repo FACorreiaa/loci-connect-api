@@ -2606,15 +2606,14 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\x13performance_metrics\x18\f \x01(\v2$.loci.chat.SessionPerformanceMetricsR\x12performanceMetrics\x12I\n" +
 	"\x0fcontent_metrics\x18\r \x01(\v2 .loci.chat.SessionContentMetricsR\x0econtentMetrics\x12R\n" +
 	"\x12engagement_metrics\x18\x0e \x01(\v2#.loci.chat.SessionEngagementMetricsR\x11engagementMetricsB\x14\n" +
-	"\x12_current_itinerary\"\xc1\x02\n" +
+	"\x12_current_itinerary\"\xbf\x02\n" +
 	"\vChatRequest\x12.\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x00R\tsessionId\x88\x01\x01\x12$\n" +
 	"\amessage\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12,\n" +
-	"\tcity_name\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\bcityName\x88\x01\x01\x12A\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12*\n" +
+	"\tcity_name\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01H\x01R\bcityName\x88\x01\x01\x12A\n" +
 	"\ruser_location\x18\x04 \x01(\v2\x17.loci.chat.UserLocationH\x02R\fuserLocation\x88\x01\x01\x12-\n" +
 	"\n" +
 	"profile_id\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\tprofileId\x88\x01\x01B\r\n" +
@@ -2665,10 +2664,9 @@ const file_proto_chat_proto_rawDesc = "" +
 	"\tlongitude\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x01R\tlongitude\x88\x01\x01B\v\n" +
 	"\t_latitudeB\f\n" +
 	"\n" +
-	"_longitude\"\xf0\x02\n" +
-	"\x10StartChatRequest\x12,\n" +
-	"\tcity_name\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12G\n" +
+	"_longitude\"\xee\x02\n" +
+	"\x10StartChatRequest\x12*\n" +
+	"\tcity_name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12G\n" +
 	"\fcontext_type\x18\x02 \x01(\x0e2\x15.loci.chat.DomainTypeB\b\xbaH\x05\x82\x01\x02\x10\x01H\x01R\vcontextType\x88\x01\x01\x123\n" +
 	"\x0finitial_message\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\x0einitialMessage\x12A\n" +
@@ -2679,15 +2677,14 @@ const file_proto_chat_proto_rawDesc = "" +
 	"_city_nameB\x0f\n" +
 	"\r_context_typeB\x10\n" +
 	"\x0e_user_locationB\r\n" +
-	"\v_profile_id\"\xe6\x01\n" +
+	"\v_profile_id\"\xe4\x01\n" +
 	"\x13ContinueChatRequest\x12)\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\tsessionId\x12$\n" +
 	"\amessage\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12,\n" +
-	"\tcity_name\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12B\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\amessage\x12*\n" +
+	"\tcity_name\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01H\x00R\bcityName\x88\x01\x01\x12B\n" +
 	"\fcontext_type\x18\x04 \x01(\x0e2\x15.loci.chat.DomainTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontextTypeB\f\n" +
 	"\n" +
 	"_city_name\"B\n" +

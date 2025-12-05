@@ -31,5 +31,13 @@
     <file url="file://$PROJECT_DIR$/pkg/db/migrations/0033_make_poi_id_nullable.up.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/pkg/db/migrations/0034_enable_pg_trgm.up.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/pkg/db/migrations/0035_create_discover_searches.up.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0038_create_poi_interactions.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0039_user_bookmarks.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0040_user_favorite_hotels.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0041_user_favorite_restaurants.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0042_add_search_type_to_chat_sessions.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0043_enhance_llm_interactions_logging.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0044_enable_timescaledb_llm_interactions.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/pkg/db/migrations/0045_create_location_history.sql" dialect="TSQL" />
   </component>
 </project>

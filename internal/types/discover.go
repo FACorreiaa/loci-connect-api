@@ -1,5 +1,11 @@
 package locitypes
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 // DiscoverPageData contains all data needed for the discover page
 type DiscoverPageData struct {
 	Trending          []TrendingDiscovery  `json:"trending"`
@@ -10,9 +16,11 @@ type DiscoverPageData struct {
 
 // TrendingDiscovery represents a trending discovery/search by city
 type TrendingDiscovery struct {
-	CityName    string `json:"city_name"`
-	SearchCount int    `json:"search_count"`
-	Emoji       string `json:"emoji"`
+	CityName     string `json:"city_name" db:"city_name"`
+	SearchCount  int    `json:"search_count" db:"search_count"`
+	Emoji        string `json:"emoji" db:"emoji"`
+	Category     string `json:"category" db:"category"`
+	FirstMessage string `json:"first_message" db:"first_message"`
 }
 
 // TrendingSearch represents a trending search query
@@ -25,10 +33,13 @@ type TrendingSearch struct {
 
 // FeaturedCollection represents a featured collection of POIs
 type FeaturedCollection struct {
-	Category  string `json:"category"`
-	Title     string `json:"title"`
-	ItemCount int    `json:"item_count"`
-	Emoji     string `json:"emoji"`
+	ID          uuid.UUID `json:"id" db:"id"`
+	Title       string    `json:"title" db:"title"`
+	Description string    `json:"description" db:"description"`
+	Emoji       string    `json:"emoji" db:"emoji"`
+	ItemCount   int       `json:"item_count" db:"item_count"`
+	Category    string    `json:"category" db:"category"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
 
 // DiscoverResult represents a single discovery result (POI)

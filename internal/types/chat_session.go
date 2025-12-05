@@ -13,6 +13,16 @@ const (
 	ContinueEventTimeout = 3 * time.Second
 )
 
+type SearchType string
+
+const (
+	SearchTypeDiscover   SearchType = "discover"
+	SearchTypeItinerary  SearchType = "itinerary"
+	SearchTypeRestaurant SearchType = "restaurant"
+	SearchTypeHotel      SearchType = "hotel"
+	SearchTypeActivity   SearchType = "activity"
+)
+
 type ChatSession struct {
 	ID                  uuid.UUID             `json:"id"`
 	UserID              uuid.UUID             `json:"user_id"`
@@ -25,7 +35,7 @@ type ChatSession struct {
 	UpdatedAt           time.Time             `json:"updated_at"`
 	ExpiresAt           time.Time             `json:"expires_at"`
 	Status              SessionStatus         `json:"status"` // "active", "expired", etc.
-
+	SearchType          SearchType            `json:"search_type"`
 	// Enriched fields for better chat history display
 	PerformanceMetrics SessionPerformanceMetrics `json:"performance_metrics"`
 	ContentMetrics     SessionContentMetrics     `json:"content_metrics"`
