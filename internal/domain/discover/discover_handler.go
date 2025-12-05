@@ -111,14 +111,14 @@ func (h *Handler) GetRecentDiscoveries(
 	}
 
 	page, pageSize := paginationParamsCommon(req.Msg.GetPagination())
-	recent, err := h.svc.GetRecentDiscoveries(ctx, userID, pageSize)
+	recent, total, err := h.svc.GetRecentDiscoveries(ctx, userID, page, pageSize)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	resp := &discoverv1.GetRecentDiscoveriesResponse{
 		Sessions:   presenter.ToChatSessions(recent),
-		Pagination: presenter.ToPaginationMetadata(len(recent), page, pageSize),
+		Pagination: presenter.ToPaginationMetadata(total, page, pageSize),
 	}
 
 	return connect.NewResponse(resp), nil

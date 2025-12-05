@@ -21,7 +21,7 @@ type Repository interface {
 	GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error)
 
 	// Get user's recent discoveries
-	GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
+	GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.ChatSession, int, error)
 
 	// Get POIs by category
 	GetPOIsByCategory(ctx context.Context, category, cityName string, limit, offset int) ([]locitypes.DiscoverResult, error)
@@ -37,6 +37,8 @@ type RepositoryImpl struct {
 	db     *pgxpool.Pool
 	logger *slog.Logger
 }
+
+const repoDefaultPageSize = 10
 
 func NewRepositoryImpl(db *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
@@ -144,12 +146,26 @@ func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) 
 	return featured, nil
 }
 
-// GetRecentDiscoveriesByUserID retrieves user's recent discover searches
-func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
+// GetRecentDiscoveriesByUserID retrieves user's recent discover searches with pagination
+func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.ChatSession, int, error) {
 	l := r.logger.With(slog.String("repository", "GetRecentDiscoveriesByUserID"))
 	l.DebugContext(ctx, "Fetching recent discoveries",
 		slog.String("user_id", userID.String()),
-		slog.Int("limit", limit))
+		slog.Int("limit", limit),
+		slog.Int("offset", offset))
+
+	if limit <= 0 {
+		limit = repoDefaultPageSize
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1`, userID).Scan(&total); err != nil {
+		l.ErrorContext(ctx, "Failed to count recent discoveries", slog.Any("error", err))
+		return nil, 0, fmt.Errorf("failed to count recent discoveries: %w", err)
+	}
 
 	query := `
 		SELECT
@@ -167,13 +183,13 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 		WHERE
 			user_id = $1
 		ORDER BY created_at DESC
-		LIMIT $2
+		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := r.db.Query(ctx, query, userID, limit)
+	rows, err := r.db.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query recent discoveries", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to query recent discoveries: %w", err)
+		return nil, 0, fmt.Errorf("failed to query recent discoveries: %w", err)
 	}
 	defer rows.Close()
 
@@ -225,13 +241,14 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 
 	if err := rows.Err(); err != nil {
 		l.ErrorContext(ctx, "Error iterating recent discoveries", slog.Any("error", err))
-		return nil, fmt.Errorf("error iterating recent discoveries: %w", err)
+		return nil, 0, fmt.Errorf("error iterating recent discoveries: %w", err)
 	}
 
 	l.InfoContext(ctx, "Successfully fetched recent discoveries",
 		slog.String("user_id", userID.String()),
-		slog.Int("count", len(sessions)))
-	return sessions, nil
+		slog.Int("count", len(sessions)),
+		slog.Int("total", total))
+	return sessions, total, nil
 }
 
 // GetPOIsByCategory retrieves POIs by category (optionally filtered by city) with pagination.
