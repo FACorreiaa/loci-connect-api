@@ -43,9 +43,9 @@ func (s *stubService) GetFeaturedCollections(ctx context.Context, limit int) ([]
 	s.lastCalls = append(s.lastCalls, "GetFeaturedCollections")
 	return s.featured, s.err
 }
-func (s *stubService) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
+func (s *stubService) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, page, limit int) ([]locitypes.ChatSession, int, error) {
 	s.lastCalls = append(s.lastCalls, "GetRecentDiscoveries")
-	return s.recent, s.err
+	return s.recent, len(s.recent), s.err
 }
 func (s *stubService) GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error) {
 	s.lastCalls = append(s.lastCalls, "GetCategoryResults")

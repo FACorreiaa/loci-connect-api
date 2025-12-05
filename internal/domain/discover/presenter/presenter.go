@@ -80,9 +80,23 @@ func ToChatSessions(items []locitypes.ChatSession) []*chatv1.ChatSession {
 }
 
 func ToPaginationMetadata(total, page, pageSize int) *commonv1.PaginationMetadata {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	totalPages := int32(0)
+	if total > 0 {
+		totalPages = int32((total + pageSize - 1) / pageSize)
+	}
+	hasMore := int32(total) > int32(page*pageSize)
+
 	return &commonv1.PaginationMetadata{
 		TotalRecords: int32(total),
 		Page:         int32(page),
 		PageSize:     int32(pageSize),
+		TotalPages:   totalPages,
+		HasMore:      hasMore,
 	}
 }

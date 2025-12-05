@@ -21,7 +21,7 @@ type Service interface {
 	GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error)
 
 	// Get user's recent discoveries
-	GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error)
+	GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, page, limit int) ([]locitypes.ChatSession, int, error)
 
 	// Get category results
 	GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error)
@@ -75,7 +75,7 @@ func (s *ServiceImpl) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 
 	// Get recent discoveries if user is authenticated
 	if userID != uuid.Nil {
-		recent, err := s.repo.GetRecentDiscoveriesByUserID(ctx, userID, limit)
+		recent, _, err := s.repo.GetRecentDiscoveriesByUserID(ctx, userID, limit, 0)
 		if err != nil {
 			l.WarnContext(ctx, "Failed to get recent discoveries", slog.Any("error", err))
 			// Don't fail the entire request, just set empty array
@@ -126,23 +126,33 @@ func (s *ServiceImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]
 	return featured, nil
 }
 
-// GetRecentDiscoveries retrieves user's recent discoveries
-func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, limit int) ([]locitypes.ChatSession, error) {
+// GetRecentDiscoveries retrieves user's recent discoveries with pagination
+func (s *ServiceImpl) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, page, limit int) ([]locitypes.ChatSession, int, error) {
 	l := s.logger.With(slog.String("service", "GetRecentDiscoveries"))
 	l.DebugContext(ctx, "Getting recent discoveries",
 		slog.String("user_id", userID.String()),
+		slog.Int("page", page),
 		slog.Int("limit", limit))
 
-	recent, err := s.repo.GetRecentDiscoveriesByUserID(ctx, userID, limit)
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = defaultPageSize
+	}
+	offset := (page - 1) * limit
+
+	recent, total, err := s.repo.GetRecentDiscoveriesByUserID(ctx, userID, limit, offset)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to get recent discoveries", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to get recent discoveries: %w", err)
+		return nil, 0, fmt.Errorf("failed to get recent discoveries: %w", err)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved recent discoveries",
 		slog.String("user_id", userID.String()),
-		slog.Int("count", len(recent)))
-	return recent, nil
+		slog.Int("count", len(recent)),
+		slog.Int("total", total))
+	return recent, total, nil
 }
 
 // GetCategoryResults retrieves results for a specific category
