@@ -1,142 +1,183 @@
 {
   "general_city_data": {
-    "area": "183.4 km²",
-    "attractions": "Bom Jesus do Monte, Braga Cathedral, Sanctuary of Sameiro, Arco da Porta Nova, Garden of Santa Bárbara, Biscainhos Museum, Roman Baths of Alto da Cividade.",
-    "center_latitude": 41.5475,
-    "center_longitude": -8.4292,
-    "city": "Braga",
-    "country": "Portugal",
-    "description": "Braga, one of Portugal's oldest cities, is a captivating blend of ancient history and youthful energy. Known as the \"Rome of Portugal\" due to its numerous churches and religious significance, Braga boasts a rich architectural heritage, from Roman ruins to stunning Baroque churches. Beyond its religious landmarks, Braga is a vibrant university town, filled with students, modern shops, and bustling cafes. Its well-preserved historic center offers a charming atmosphere, while its surrounding gardens and parks provide tranquil escapes. Braga is a city where tradition and modernity intertwine, offering a unique and engaging experience for visitors.",
-    "history": "Braga's history dates back to Roman times, when it was known as Bracara Augusta. It became an important religious center in the Middle Ages and served as the capital of Portugal for a brief period. The city has played a significant role in Portuguese history and culture, and its religious heritage continues to be a defining characteristic.",
-    "language": "Portuguese",
-    "population": "Approximately 193,000 (city)",
-    "state_province": "None",
-    "timezone": "UTC+0 (WET - Western European Time); UTC+1 (WEST - Western European Summer Time)",
-    "weather": "Mediterranean climate with warm, dry summers and mild, wet winters."
+    "area": "604.3 km² (city proper)",
+    "attractions": "Prado Museum, Reina Sofia Museum, Royal Palace of Madrid, Retiro Park, Puerta del Sol, Plaza Mayor, Temple of Debod, Gran Vía, Santiago Bernabéu Stadium.",
+    "center_latitude": 40.4168,
+    "center_longitude": -3.7038,
+    "city": "Madrid",
+    "country": "Spain",
+    "description": "Madrid, the vibrant capital of Spain, is a city that seamlessly blends historical grandeur with modern energy. Known for its stunning architecture, world-class art museums like the Prado and Reina Sofia, and lively atmosphere, Madrid offers a rich cultural experience. From the bustling Puerta del Sol to the serene Retiro Park, the city provides a diverse range of attractions. Indulge in delicious tapas, explore the Royal Palace, or catch a passionate flamenco performance. Madrid's warm and welcoming spirit makes it a truly unforgettable destination.",
+    "history": "Madrid's history dates back to the 9th century when it was a Moorish fortress. It became the capital of Spain in the 16th century under Philip II, marking the beginning of its golden age. The city has played a significant role in Spanish history, witnessing numerous political and social changes, including the Spanish Civil War. Today, Madrid stands as a modern metropolis with a rich historical heritage.",
+    "language": "Spanish (Castilian)",
+    "population": "Approximately 3.3 million (city proper), 6.7 million (metropolitan area)",
+    "state_province": "Madrid",
+    "timezone": "Central European Time (CET) / Central European Summer Time (CEST)",
+    "weather": "Madrid has a Mediterranean climate with hot, dry summers and cool, wet winters. Spring and autumn offer pleasant temperatures."
   },
   "itinerary_response": {
-    "itinerary_name": "Braga's Historical Heartbeat",
-    "overall_description": "This itinerary focuses on exploring the historical and religious significance of Braga, Portugal's oldest city. Prepare to be captivated by stunning architecture, serene gardens, and a palpable sense of history. This itinerary offers a flexible pace, allowing you to immerse yourself in the beauty and culture of Braga at your own speed. It includes key landmarks accessible by public transport or on foot, ensuring a convenient and enriching experience. Enjoy the journey through time as you uncover the hidden gems and iconic sights that define Braga's unique character.",
+    "itinerary_name": "Madrid Tapas \u0026 Treasures: A Flexible Exploration",
+    "overall_description": "This itinerary offers a flexible exploration of Madrid, focusing on experiencing authentic tapas culture and uncovering hidden gems. With no strict timing, you can adjust the pace to your liking. It balances iconic landmarks with local experiences, allowing for spontaneous discoveries within a 5km radius. This itinerary caters to all budgets, providing options for affordable tapas bars and free activities. Enjoy the vibrant atmosphere of Madrid at your own speed!",
     "points_of_interest": [
       {
-        "address": "Rua Dom Paio Mendes, 4700-424 Braga, Portugal",
-        "category": "Religious Site",
-        "description_poi": "The oldest cathedral in Portugal, a magnificent blend of Romanesque, Gothic, and Baroque styles. Explore its chapels, tombs, and treasury.",
-        "distance": 0.5,
-        "latitude": 41.5492,
-        "longitude": -8.4251,
-        "name": "Braga Cathedral (Sé de Braga)",
-        "opening_hours": "Mon-Sun 9:00-18:30",
-        "website": "https://www.diocese-braga.pt/"
-      },
-      {
-        "address": "Rua de Santa Margarida, Braga, Portugal",
-        "category": "Park/Garden",
-        "description_poi": "A beautiful public garden featuring meticulously manicured flower beds and a central fountain. A perfect place for a relaxing stroll.",
-        "distance": 0.2,
-        "latitude": 41.5482,
-        "longitude": -8.4264,
-        "name": "Jardim de Santa Bárbara",
-        "opening_hours": "Open 24 hours",
-        "website": "N/A"
-      },
-      {
-        "address": "Rua de São Marcos, Braga, Portugal",
+        "address": "Plaza Mayor, 28012 Madrid, Spain",
         "category": "Landmark",
-        "description_poi": "A monumental arch marking the entrance to the city. Admire its Baroque design and historical significance.",
-        "distance": 0.3,
-        "latitude": 41.5467,
-        "longitude": -8.4278,
-        "name": "Arco da Porta Nova",
+        "description_poi": "A grand, historic square in the heart of Madrid, surrounded by beautiful architecture and bustling with activity. Perfect for people-watching and soaking in the atmosphere.",
+        "distance": 0.5,
+        "latitude": 40.4156,
+        "longitude": -3.7072,
+        "name": "Plaza Mayor",
         "opening_hours": "Open 24 hours",
-        "website": "N/A"
+        "website": "https://www.esmadrid.com/en/tourist-information/plaza-mayor"
       },
       {
-        "address": "Estrada do Bom Jesus, Braga, Portugal",
-        "category": "Religious Site",
-        "description_poi": "A stunning sanctuary located on a hilltop, famous for its monumental Baroque staircase and panoramic views of Braga. Take a bus or funicular to reach the top.",
-        "distance": 4,
-        "latitude": 41.5647,
-        "longitude": -8.3769,
-        "name": "Santuário do Bom Jesus do Monte",
-        "opening_hours": "Mon-Sun 9:00-19:00",
-        "website": "http://www.bomjesus.pt/"
+        "address": "Plaza de San Miguel, s/n, 28005 Madrid, Spain",
+        "category": "Food Market",
+        "description_poi": "A vibrant and bustling food market offering a wide variety of Spanish tapas, wines, and other delicacies. A great place to sample local cuisine and experience the lively atmosphere.",
+        "distance": 0.7,
+        "latitude": 40.4154,
+        "longitude": -3.7091,
+        "name": "Mercado de San Miguel",
+        "opening_hours": "Sun-Thurs 10:00-00:00, Fri-Sat 10:00-01:00",
+        "website": "https://www.mercadodesanmiguel.es/en/"
+      },
+      {
+        "address": "Calle de Cuchilleros, 17, 28005 Madrid, Spain",
+        "category": "Restaurant",
+        "description_poi": "The oldest restaurant in the world, according to the Guinness World Records, serving traditional Castilian cuisine, especially roast suckling pig.",
+        "distance": 0.8,
+        "latitude": 40.4152,
+        "longitude": -3.7094,
+        "name": "Sobrino de Botín",
+        "opening_hours": "Mon-Sun 13:00-16:00, 20:00-23:00",
+        "website": "https://www.botin.es/en/"
+      },
+      {
+        "address": "Plaza de la Independencia, 7, 28001 Madrid, Spain",
+        "category": "Park",
+        "description_poi": "A beautiful and expansive park offering a peaceful escape from the city. Features a boating lake, rose garden, Crystal Palace, and numerous walking paths.",
+        "distance": 2.5,
+        "latitude": 40.4167,
+        "longitude": -3.6843,
+        "name": "Retiro Park",
+        "opening_hours": "Mon-Sun 06:00-00:00",
+        "website": "https://www.esmadrid.com/en/tourist-information/parque-del-retiro"
+      },
+      {
+        "address": "Puerta del Sol, 28013 Madrid, Spain",
+        "category": "Landmark",
+        "description_poi": "A bustling square and a central point in Madrid, marked by the Kilometre Zero plaque, from which all of Spain's radial roads are measured.",
+        "distance": 0.2,
+        "latitude": 40.4167,
+        "longitude": -3.7033,
+        "name": "Puerta del Sol",
+        "opening_hours": "Open 24 hours",
+        "website": "https://www.esmadrid.com/en/tourist-information/puerta-del-sol"
       }
     ]
   },
   "points_of_interest": {
     "points_of_interest": [
       {
-        "address": "Santuário do Bom Jesus, 4715-056 Braga, Portugal",
-        "category": "Religious Site, Historical Site",
-        "description_poi": "A prominent Portuguese sanctuary and pilgrimage site known for its monumental Baroque staircase. Offers stunning views of Braga.",
-        "latitude": 41.5555,
-        "longitude": -8.3761,
-        "name": "Bom Jesus do Monte",
-        "opening_hours": "Open daily, hours vary depending on the season. Check website for details.",
-        "website": "https://bomjesus.pt/en/"
+        "address": "Calle Ruiz de Alarcón, 23, 28014 Madrid",
+        "category": "Museum",
+        "description_poi": "One of the world's greatest art museums, housing masterpieces from Spanish, Italian, and Flemish masters.",
+        "latitude": 40.4138,
+        "longitude": -3.6922,
+        "name": "Prado Museum",
+        "opening_hours": "Mon-Sat 10:00-20:00, Sun \u0026 Holidays 10:00-19:00",
+        "website": "https://www.museodelprado.es/"
       },
       {
-        "address": "Rua Dom Paio Mendes, 4700-424 Braga, Portugal",
-        "category": "Religious Site, Historical Site",
-        "description_poi": "The oldest cathedral in Portugal, showcasing a mix of Romanesque, Gothic, and Baroque architectural styles. A significant religious and historical landmark.",
-        "latitude": 41.5475,
-        "longitude": -8.4255,
-        "name": "Braga Cathedral (Sé de Braga)",
-        "opening_hours": "Open daily, 9:00-18:30 (times may vary, check website)",
-        "website": "http://www.se-braga.pt/"
+        "address": "Calle de Santa Isabel, 52, 28012 Madrid",
+        "category": "Museum",
+        "description_poi": "Home to modern and contemporary art, including Picasso's Guernica.",
+        "latitude": 40.4077,
+        "longitude": -3.6907,
+        "name": "Reina Sofía Museum",
+        "opening_hours": "Mon \u0026 Wed-Sat 10:00-21:00, Sun 10:00-19:00, Tue Closed",
+        "website": "https://www.museoreinasofia.es/"
       },
       {
-        "address": "Santuário do Sameiro, 4715-652 Braga, Portugal",
-        "category": "Religious Site",
-        "description_poi": "One of the largest Marian shrines in Portugal, known for its impressive architecture and religious significance. Offers panoramic views.",
-        "latitude": 41.5675,
-        "longitude": -8.3966,
-        "name": "Santuário do Sameiro",
-        "opening_hours": "Open daily, hours vary depending on the season. Check website for details.",
-        "website": "http://www.sameiro.pt/"
+        "address": "Plaza de Oriente, s/n, 28071 Madrid",
+        "category": "Historical Site",
+        "description_poi": "The official residence of the Spanish Royal Family, though it is only used for state ceremonies.",
+        "latitude": 40.4186,
+        "longitude": -3.7143,
+        "name": "Royal Palace of Madrid",
+        "opening_hours": "Oct-Mar: Mon-Sun 10:00-18:00, Apr-Sep: Mon-Sun 10:00-19:00",
+        "website": "https://www.patrimonionacional.es/real-sitio/palacio-real-de-madrid"
       },
       {
-        "address": "Rua de Santa Margarida, 4700-312 Braga, Portugal",
-        "category": "Park, Garden",
-        "description_poi": "A beautiful public garden featuring colorful flowerbeds, geometric designs, and a medieval fountain. A peaceful oasis in the city center.",
-        "latitude": 41.5491,
-        "longitude": -8.4266,
-        "name": "Jardim de Santa Bárbara",
-        "opening_hours": "Open daily, 09:00-21:00 (summer), 09:00-18:00 (winter)",
-        "website": "N/A"
+        "address": "Plaza de la Independencia, 7, 28001 Madrid",
+        "category": "Park",
+        "description_poi": "A large and beautiful park in the heart of Madrid, perfect for relaxing, boating, or exploring.",
+        "latitude": 40.414,
+        "longitude": -3.6835,
+        "name": "Retiro Park",
+        "opening_hours": "Open 24 hours",
+        "website": "https://www.esmadrid.com/en/tourist-information/parque-del-retiro"
       },
       {
-        "address": "Rua de São Marcos, 4700-323 Braga, Portugal",
-        "category": "Historical Site, Landmark",
-        "description_poi": "A triumphal arch marking the western entrance to Braga. A notable example of Baroque architecture.",
-        "latitude": 41.5463,
-        "longitude": -8.4284,
-        "name": "Arco da Porta Nova",
-        "opening_hours": "Always open (exterior view)",
-        "website": "N/A"
+        "address": "Plaza Mayor, 28012 Madrid",
+        "category": "Historical Site",
+        "description_poi": "A grand square in the heart of Madrid, surrounded by historic buildings.",
+        "latitude": 40.4156,
+        "longitude": -3.7072,
+        "name": "Plaza Mayor",
+        "opening_hours": "Open 24 hours",
+        "website": "https://www.esmadrid.com/en/tourist-information/plaza-mayor"
       },
       {
-        "address": "Rua do Raio, 4700-331 Braga, Portugal",
-        "category": "Historical Site, Building",
-        "description_poi": "A stunning example of Baroque architecture, known for its blue-tiled facade. Houses the Interpretation Centre of Memórias da Misericórdia de Braga.",
-        "latitude": 41.5498,
-        "longitude": -8.4217,
-        "name": "Raio Palace (Palácio do Raio)",
-        "opening_hours": "Tue-Sun 10:00-13:00, 14:00-18:00 (check website for potential changes)",
-        "website": "https://www.misericordiabraga.pt/palacio-do-raio/"
+        "address": "Puerta del Sol, 28013 Madrid",
+        "category": "Historical Site",
+        "description_poi": "A bustling square and a central point in Madrid, known for its Kilómetro Cero marker.",
+        "latitude": 40.4167,
+        "longitude": -3.7033,
+        "name": "Puerta del Sol",
+        "opening_hours": "Open 24 hours",
+        "website": "https://www.esmadrid.com/en/tourist-information/puerta-del-sol"
       },
       {
-        "address": "Rua dos Biscainhos, 4700-041 Braga, Portugal",
-        "category": "Museum, Historical Site",
-        "description_poi": "A museum housed in a beautiful Baroque palace, showcasing 17th and 18th-century decorative arts and furniture. Features stunning gardens.",
-        "latitude": 41.5469,
-        "longitude": -8.4232,
-        "name": "Museu dos Biscainhos",
-        "opening_hours": "Tue-Sun 10:00-12:30, 14:00-17:30",
-        "website": "http://www.culturanorte.gov.pt/pt/museus-e-monumentos/museu-dos-biscainhos/"
+        "address": "Calle Ferraz, 1, 28008 Madrid",
+        "category": "Historical Site",
+        "description_poi": "An ancient Egyptian temple donated to Spain, offering stunning sunset views of the city.",
+        "latitude": 40.4241,
+        "longitude": -3.7184,
+        "name": "Temple of Debod",
+        "opening_hours": "Oct-Mar: Tue-Sun 10:00-14:00 \u0026 18:00-20:00, Apr-Sep: Tue-Sun 10:00-14:00 \u0026 18:00-22:00, Mon Closed",
+        "website": "https://www.esmadrid.com/en/tourist-information/templo-de-debod"
+      },
+      {
+        "address": "Av. de Concha Espina, 1, Chamartín, 28036 Madrid",
+        "category": "Sports Venue",
+        "description_poi": "The home stadium of Real Madrid Football Club.",
+        "latitude": 40.4531,
+        "longitude": -3.6882,
+        "name": "Santiago Bernabéu Stadium",
+        "opening_hours": "Varies depending on events and tours. Check website.",
+        "website": "https://www.realmadrid.com/en/santiago-bernabeu-stadium"
+      },
+      {
+        "address": "Gran Vía, Madrid",
+        "category": "Street",
+        "description_poi": "Madrid's most famous street, known for its theaters, shops, and architecture.",
+        "latitude": 40.4197,
+        "longitude": -3.7055,
+        "name": "Gran Vía",
+        "opening_hours": "Open 24 hours (shops and theaters have varying hours)",
+        "website": "https://www.esmadrid.com/en/tourist-information/gran-via"
+      },
+      {
+        "address": "Plaza de San Miguel, s/n, 28005 Madrid",
+        "category": "Market",
+        "description_poi": "A historic market offering a wide variety of Spanish tapas and drinks.",
+        "latitude": 40.4154,
+        "longitude": -3.7109,
+        "name": "Mercado de San Miguel",
+        "opening_hours": "Sun-Thu 10:00-00:00, Fri-Sat 10:00-01:00",
+        "website": "https://www.mercadodesanmiguel.es/"
       }
     ]
   },
-  "session_id": "d1d79ca8-2488-480c-a720-bad9190f9ab2"
+  "session_id": "248a1e36-7ac6-4fd1-a273-8e48000e5594"
 }
