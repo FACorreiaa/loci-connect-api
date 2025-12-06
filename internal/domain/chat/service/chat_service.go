@@ -2567,23 +2567,21 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 				}
 			}
 		}
-		if activitiesResp, ok := completeData["activities_response"]; ok {
-			if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
-				if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
-					if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
-						var activities []locitypes.POIDetailedInfo
-						if err := json.Unmarshal(jsonBytes, &activities); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
-						} else {
-							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
-						}
-					}
-				}
-			}
-		}
 
 		// Set cityID and llmInteractionID on POIs
 		if cityID != uuid.Nil {
+			for i := range itineraryData.Hotels {
+				itineraryData.Hotels[i].ID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.Hotels[i].LlmInteractionID = savedInteractionID
+				}
+			}
+			for i := range itineraryData.Restaurants {
+				itineraryData.Restaurants[i].ID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.Restaurants[i].LlmInteractionID = savedInteractionID
+				}
+			}
 			for i := range itineraryData.PointsOfInterest {
 				itineraryData.PointsOfInterest[i].CityID = cityID
 				if savedInteractionID != uuid.Nil {
@@ -2627,9 +2625,14 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(ctx context.Context, userI
 		addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
 		addUniquePOI(itineraryData.PointsOfInterest)
 		addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
+		// Also ensure hotels contribute to the unified list
+		addUniquePOI(convertHotelsToPOIs(itineraryData.Hotels))
 
 		// Update the main POI list
 		itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
+		// Also surface the unified POI list in the top-level field so clients relying
+		// on PointsOfInterest get the same data as the itinerary payload.
+		itineraryData.PointsOfInterest = allPOIs
 
 		l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse",
 			slog.Int("total_unique_pois", len(allPOIs)),
@@ -3199,6 +3202,9 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 					if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
 						if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
 							l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
+						} else {
+							// Surface hotels through points_of_interest so they reach clients
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, convertHotelsToPOIs(itineraryData.Hotels)...)
 						}
 					}
 				}
@@ -3210,6 +3216,25 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 					if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
 						if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
 							l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
+						} else {
+							restaurantPOIs := convertRestaurantsToPOIs(itineraryData.Restaurants)
+							// Expose restaurants through the itinerary payload and generic POIs
+							itineraryData.AIItineraryResponse.Restaurants = restaurantPOIs
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, restaurantPOIs...)
+						}
+					}
+				}
+			}
+		}
+		if activitiesResp, ok := completeData["activities_response"]; ok {
+			if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
+				if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
+					if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
+						var activities []locitypes.POIDetailedInfo
+						if err := json.Unmarshal(jsonBytes, &activities); err != nil {
+							l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
+						} else {
+							itineraryData.PointsOfInterest = append(itineraryData.PointsOfInterest, activities...)
 						}
 					}
 				}
@@ -3218,13 +3243,54 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStreamFree(ctx context.Context, c
 
 		// Set cityID and llmInteractionID on POIs
 		if cityID != uuid.Nil {
+			for i := range itineraryData.PointsOfInterest {
+				itineraryData.PointsOfInterest[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.PointsOfInterest[i].LlmInteractionID = savedInteractionID
+				}
+			}
 			for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
 				itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
 				if savedInteractionID != uuid.Nil {
 					itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
 				}
 			}
+			for i := range itineraryData.AIItineraryResponse.Restaurants {
+				itineraryData.AIItineraryResponse.Restaurants[i].CityID = cityID
+				if savedInteractionID != uuid.Nil {
+					itineraryData.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedInteractionID
+				}
+			}
 		}
+
+		// Consolidate POIs and surface them on both itinerary and top-level fields
+		allPOIs := make([]locitypes.POIDetailedInfo, 0)
+		seenIDs := make(map[string]bool)
+
+		addUniquePOI := func(pois []locitypes.POIDetailedInfo) {
+			for _, poi := range pois {
+				key := poi.ID.String()
+				if key == "00000000-0000-0000-0000-000000000000" {
+					key = poi.Name
+				}
+				if !seenIDs[key] {
+					seenIDs[key] = true
+					allPOIs = append(allPOIs, poi)
+				}
+			}
+		}
+
+		addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
+		addUniquePOI(itineraryData.PointsOfInterest)
+		addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
+
+		itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
+		itineraryData.PointsOfInterest = allPOIs
+
+		l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse (free endpoint)",
+			slog.Int("total_unique_pois", len(allPOIs)),
+			slog.Int("from_top_level", len(itineraryData.PointsOfInterest)),
+			slog.Int("from_nested", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
 
 		// Send EventTypeItinerary with proper IDs
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
