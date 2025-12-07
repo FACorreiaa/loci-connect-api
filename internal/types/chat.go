@@ -71,6 +71,7 @@ type AiCityResponse struct {
 	AIItineraryResponse AIItineraryResponse      `json:"itinerary_response"`
 	Hotels              []HotelDetailedInfo      `json:"hotels,omitempty"`
 	Restaurants         []RestaurantDetailedInfo `json:"restaurants,omitempty"`
+	Activities          []POIDetailedInfo        `json:"activities,omitempty"`
 	SessionID           uuid.UUID                `json:"session_id"`
 }
 

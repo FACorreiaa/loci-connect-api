@@ -2,11 +2,14 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -307,4 +310,23 @@ func CleanJSONResponse(response string) string {
 	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
 
 	return strings.TrimSpace(jsonPortion)
+}
+
+type ChatContext struct {
+	// Context for cancellation and timeouts
+	Ctx context.Context
+
+	// Input parameters
+	UserID       uuid.UUID
+	ProfileID    uuid.UUID
+	CityName     string
+	Message      string
+	UserLocation *locitypes.UserLocation
+	EventCh      chan<- locitypes.StreamEvent
+
+	// Derived/Generated fields populated during preparation
+	SessionID       uuid.UUID
+	Domain          locitypes.DomainType
+	CacheKey        string
+	BasePreferences string
 }

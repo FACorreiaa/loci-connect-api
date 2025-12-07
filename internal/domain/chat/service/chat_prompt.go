@@ -368,7 +368,7 @@ Respond with JSON:
 
 func getGeneralPOIPrompt(cityName string) string {
 	return fmt.Sprintf(`
-You are a travel assistant. List general points of interest in %s.
+List general points of interest in %s.
 Respond with JSON:
 {
     "points_of_interest": [
@@ -380,8 +380,7 @@ Respond with JSON:
             "description_poi": "",
             "address": "",
             "website": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-
+            "opening_hours": "e.g., 'Mon-Fri 9:00-17:00'"
         }
     ]
 }`, cityName)
@@ -495,7 +494,7 @@ Respond with JSON:
 
 func getDiningPrompt(cityName string, lat, lon float64, basePreferences string) string {
 	return fmt.Sprintf(`
-You are a restaurant recommendation assistant. Find 10 dining options in %s near coordinates %.4f, %.4f.
+Find 10 dining options in %s near coordinates %.4f, %.4f.
 USER PREFERENCES:
 %s
 Respond with JSON:
@@ -511,9 +510,8 @@ Respond with JSON:
             "address": "",
             "website": "",
             "phone_number": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-,
-            "price_level": "$|$$|$$$|$$$$",
+            "opening_hours": "e.g., 'Mon-Fri 9:00-17:00'",
+            "price_level": "$|$|$$|$$",
             "cuisine_type": "",
             "tags": [],
             "images": [],

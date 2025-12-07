@@ -52,7 +52,7 @@ func extractPOIName(message string) string {
 
 func (l *ServiceImpl) ProcessAndSaveUnifiedResponse(
 	ctx context.Context,
-	responses map[string]*strings.Builder,
+	responses map[string]string, // <--- CHANGED: Now accepts simple strings
 	userID, profileID, cityID uuid.UUID,
 	llmInteractionID uuid.UUID,
 	userLocation *locitypes.UserLocation,
@@ -62,38 +62,39 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponse(
 		slog.Int("response_parts", len(responses)))
 
 	// Process general POIs if available
-	if poisContent, ok := responses["general_pois"]; ok && poisContent.Len() > 0 {
+	// CHANGED: used len() instead of .Len() and removed .String()
+	if poisContent, ok := responses["general_pois"]; ok && len(poisContent) > 0 {
 		l.logger.InfoContext(ctx, "Processing general POIs from unified response",
-			slog.Int("content_length", poisContent.Len()))
-		l.handleGeneralPoisFromResponse(ctx, poisContent.String(), cityID)
+			slog.Int("content_length", len(poisContent)))
+		l.handleGeneralPoisFromResponse(ctx, poisContent, cityID)
 	}
 
 	// Process itinerary POIs if available
-	if itineraryContent, ok := responses["itinerary"]; ok && itineraryContent.Len() > 0 {
+	if itineraryContent, ok := responses["itinerary"]; ok && len(itineraryContent) > 0 {
 		l.logger.InfoContext(ctx, "Processing itinerary POIs from unified response",
-			slog.Int("content_length", itineraryContent.Len()))
-		l.handleItineraryFromResponse(ctx, itineraryContent.String(), userID, profileID, cityID, llmInteractionID, userLocation)
+			slog.Int("content_length", len(itineraryContent)))
+		l.handleItineraryFromResponse(ctx, itineraryContent, userID, profileID, cityID, llmInteractionID, userLocation)
 	}
 
-	// Process activities POIs if available (for DomainActivities)
-	if activitiesContent, ok := responses["activities"]; ok && activitiesContent.Len() > 0 {
+	// Process activities POIs if available
+	if activitiesContent, ok := responses["activities"]; ok && len(activitiesContent) > 0 {
 		l.logger.InfoContext(ctx, "Processing activities POIs from unified response",
-			slog.Int("content_length", activitiesContent.Len()))
-		l.handleGeneralPoisFromResponse(ctx, activitiesContent.String(), cityID)
+			slog.Int("content_length", len(activitiesContent)))
+		l.handleGeneralPoisFromResponse(ctx, activitiesContent, cityID)
 	}
 
-	// Process hotel POIs if available (for DomainAccommodation)
-	if hotelsContent, ok := responses["hotels"]; ok && hotelsContent.Len() > 0 {
+	// Process hotel POIs if available
+	if hotelsContent, ok := responses["hotels"]; ok && len(hotelsContent) > 0 {
 		l.logger.InfoContext(ctx, "Processing hotels from unified response",
-			slog.Int("content_length", hotelsContent.Len()))
-		l.handleHotelsFromResponse(ctx, hotelsContent.String(), cityID, userID, llmInteractionID)
+			slog.Int("content_length", len(hotelsContent)))
+		l.handleHotelsFromResponse(ctx, hotelsContent, cityID, userID, llmInteractionID)
 	}
 
-	// Process restaurant POIs if available (for DomainDining)
-	if restaurantsContent, ok := responses["restaurants"]; ok && restaurantsContent.Len() > 0 {
+	// Process restaurant POIs if available
+	if restaurantsContent, ok := responses["restaurants"]; ok && len(restaurantsContent) > 0 {
 		l.logger.InfoContext(ctx, "Processing restaurants from unified response",
-			slog.Int("content_length", restaurantsContent.Len()))
-		l.handleRestaurantsFromResponse(ctx, restaurantsContent.String(), cityID, userID, llmInteractionID)
+			slog.Int("content_length", len(restaurantsContent)))
+		l.handleRestaurantsFromResponse(ctx, restaurantsContent, cityID, userID, llmInteractionID)
 	}
 }
 
@@ -264,49 +265,17 @@ func CleanJSONResponse(response string) string {
 	} else if strings.HasPrefix(response, "```") {
 		response = strings.TrimPrefix(response, "```")
 	}
-
 	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)
 
-	firstBrace := strings.Index(response, "{")
-	if firstBrace == -1 {
-		return response // No JSON found, return as is
+	// Find the first '{' and the last '}'
+	start := strings.Index(response, "{")
+	end := strings.LastIndex(response, "}")
+
+	if start == -1 || end == -1 || end < start {
+		return "" // No JSON object found
 	}
 
-	// Find the matching closing brace by counting braces
-	braceCount := 0
-	var lastValidBrace int
-	for i := firstBrace; i < len(response); i++ {
-		switch response[i] {
-		case '{':
-			braceCount++
-		case '}':
-			braceCount--
-			if braceCount == 0 {
-				lastValidBrace = i
-				break
-			}
-		}
-	}
-
-	if braceCount != 0 {
-		// Fallback to last brace method if brace counting fails
-		lastBrace := strings.LastIndex(response, "}")
-		if lastBrace == -1 || lastBrace <= firstBrace {
-			return response // No valid JSON structure found
-		}
-		lastValidBrace = lastBrace
-	}
-
-	// Extract the JSON portion
-	jsonPortion := response[firstBrace : lastValidBrace+1]
-
-	// Remove any remaining backticks that might be within the JSON content
-	// This handles cases where the AI includes markdown formatting within JSON strings
-	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
-
-	// Remove trailing commas before closing braces/brackets (common LLM error)
-	jsonPortion = regexp.MustCompile(`,(\s*[}\]])`).ReplaceAllString(jsonPortion, "$1")
-
-	return strings.TrimSpace(jsonPortion)
+	// Extract the potential JSON object
+	return response[start : end+1]
 }

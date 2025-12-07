@@ -115,17 +115,19 @@ func (h *ChatHandler) StreamChat(
 
 	eventCh := make(chan locitypes.StreamEvent, 100)
 
+	cc := common.ChatContext{
+		Ctx:          ctx,
+		UserID:       userID,
+		ProfileID:    profileID,
+		CityName:     cityName,
+		Message:      req.Msg.GetMessage(),
+		UserLocation: userLoc,
+		EventCh:      eventCh,
+	}
+
 	go func() {
 		defer close(eventCh)
-		err := h.service.ProcessUnifiedChatMessageStream(
-			ctx,
-			userID,
-			profileID,
-			cityName,
-			req.Msg.Message,
-			userLoc,
-			eventCh,
-		)
+		err := h.service.ProcessUnifiedChatMessageStream(cc)
 		if err != nil {
 			select {
 			case eventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}:
