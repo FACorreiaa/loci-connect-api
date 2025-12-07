@@ -388,6 +388,7 @@ func (l *ServiceImpl) persistResults(
 		CityName:     cc.CityName,
 		Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", cc.Domain, cc.Message),
 		ResponseText: fullResponse,
+		ModelUsed:    model,
 		LatencyMs:    int(time.Since(startTime).Milliseconds()),
 		Timestamp:    startTime,
 	}
