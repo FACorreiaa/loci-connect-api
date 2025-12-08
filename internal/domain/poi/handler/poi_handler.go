@@ -41,7 +41,8 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 	var pois []locitypes.POIDetailedInfo
 	var err error
 
-	if searchType == "semantic" {
+	switch searchType {
+	case "semantic":
 		if cityName != "" {
 			// Need city UUID if using SearchPOIsSemanticByCity...
 			// Service method SearchPOIsSemanticByCity requires UUID.
@@ -51,7 +52,7 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 			limit := 20 // Default
 			pois, err = h.service.SearchPOIsSemantic(ctx, query, limit)
 		}
-	} else if searchType == "hybrid" {
+	case "hybrid":
 		// Needs filter + query
 		filter.Location.Latitude = req.Msg.Latitude
 		filter.Location.Longitude = req.Msg.Longitude
@@ -59,7 +60,7 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 			filter.Radius = *req.Msg.RadiusKm
 		}
 		pois, err = h.service.SearchPOIsHybrid(ctx, filter, query, 0.5) // Default weight
-	} else {
+	default:
 		// Default to text search or semantic?
 		// Using SearchPOIsByQueryAndCity as generic entry point if query/city provided
 		pois, err = h.service.SearchPOIsByQueryAndCity(ctx, query, cityName)
