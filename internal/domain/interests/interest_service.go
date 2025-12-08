@@ -11,39 +11,39 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // Ensure implementation satisfies the interface
-var _ interestsService = (*interestsServiceImpl)(nil)
+var _ Service = (*ServiceImpl)(nil)
 
-// interestsService defines the business logic contract for user operations.
-type interestsService interface {
-	// Removeinterests remove interests
-	Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error
+// Service defines the business logic contract for user operations.
+type Service interface {
+	// RemoveInterests remove interests
+	RemoveInterests(ctx context.Context, userID, interestID uuid.UUID) error
 	GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error)
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error)
-	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error
+	UpdateInterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error
 }
 
-// interestsServiceImpl provides the implementation for interestsService.
-type interestsServiceImpl struct {
+// ServiceImpl provides the implementation for Service.
+type ServiceImpl struct {
 	logger *slog.Logger
 	repo   Repository
 }
 
-// NewinterestsService creates a new user service instance.
+// NewService creates a new user service instance.
 //
 //revive:disable-next-line:unexported-return
-func NewinterestsService(repo Repository, logger *slog.Logger) *interestsServiceImpl {
-	return &interestsServiceImpl{
+func NewService(repo Repository, logger *slog.Logger) *ServiceImpl {
+	return &ServiceImpl{
 		logger: logger,
 		repo:   repo,
 	}
 }
 
 // CreateInterest create user interest
-func (s *interestsServiceImpl) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
+func (s *ServiceImpl) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Createinterests", trace.WithAttributes(
 		attribute.String("name", name),
 		attribute.String("description", *description),
@@ -67,8 +67,8 @@ func (s *interestsServiceImpl) CreateInterest(ctx context.Context, name string, 
 	return interest, nil
 }
 
-// Removeinterests removes an interest from a user's preferences.
-func (s *interestsServiceImpl) Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error {
+// RemoveInterests removes an interest from a user's preferences.
+func (s *ServiceImpl) RemoveInterests(ctx context.Context, userID, interestID uuid.UUID) error {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Removeinterests", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("interest.id", interestID.String()),
@@ -92,7 +92,7 @@ func (s *interestsServiceImpl) Removeinterests(ctx context.Context, userID, inte
 }
 
 // GetAllInterests retrieves all available interests.
-func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
+func (s *ServiceImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "GetAllInterests")
 	defer span.End()
 
@@ -112,7 +112,7 @@ func (s *interestsServiceImpl) GetAllInterests(ctx context.Context) ([]*locitype
 	return interests, nil
 }
 
-func (s *interestsServiceImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
+func (s *ServiceImpl) UpdateInterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Updateinterests", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("interest.id", interestID.String()),

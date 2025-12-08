@@ -12,11 +12,10 @@ import (
 	"testing"
 	"time"
 
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // BenchmarkConfig holds configuration for the benchmark tests
@@ -540,26 +539,24 @@ func BenchmarkConcurrentChatRequests(b *testing.B) {
 
 		// Start concurrent StartChat requests
 		for _, msg := range startMessages {
-			wg.Add(1)
-			go func(message string) {
-				defer wg.Done()
-				result := benchmarkStartChat(config, message)
+			msg := msg // capture loop variable
+			wg.Go(func() {
+				result := benchmarkStartChat(config, msg)
 				if !result.Success {
 					b.Errorf("Concurrent StartChat failed: %s", result.Error)
 				}
-			}(msg)
+			})
 		}
 
 		// Start concurrent ContinueChat requests
 		for _, msg := range continueMessages {
-			wg.Add(1)
-			go func(message string) {
-				defer wg.Done()
-				result := benchmarkContinueChat(config, sessionID, message)
+			msg := msg // capture loop variable
+			wg.Go(func() {
+				result := benchmarkContinueChat(config, sessionID, msg)
 				if !result.Success {
 					b.Errorf("Concurrent ContinueChat failed: %s", result.Error)
 				}
-			}(msg)
+			})
 		}
 
 		wg.Wait()

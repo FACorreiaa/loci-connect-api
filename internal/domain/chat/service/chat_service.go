@@ -35,11 +35,11 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/llm"
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 const (
-	model              = "gemini-2.0-flash"
+	model              = "gemini-1.5-flash"
 	defaultTemperature = 0.5
 )
 
@@ -56,9 +56,9 @@ var _ LlmInteractiontService = (*ServiceImpl)(nil)
 type LlmInteractiontService interface {
 	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error)
 	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*locitypes.ChatResponse, error)
-	SaveItenerary(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error)
+	SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error)
 	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error)
-	RemoveItenerary(ctx context.Context, userID, itineraryID uuid.UUID) error
+	RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error
 	GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*locitypes.POIDetailedInfo, error)
 
 	ContinueSessionStreamed(
@@ -115,7 +115,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey)
+	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
 		panic(err)
 	}
@@ -379,7 +379,7 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []locityp
 }
 
 // GenerateEnhancedPersonalisedPOIWorker generates personalized POIs with domain-aware filtering
-func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context, wg *sync.WaitGroup,
+func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	cityName string, userID, profileID uuid.UUID, resultCh chan<- locitypes.GenAIResponse,
 	enhancedPromptData string, domain locitypes.DomainType, config *genai.GenerateContentConfig,
 ) {
@@ -390,7 +390,6 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 		attribute.String("domain", string(domain)),
 	))
 	defer span.End()
-	defer wg.Done()
 
 	startTime := time.Now()
 
@@ -502,7 +501,7 @@ func getBasePersonalizedPromptInstructions() string {
 - Maximum 8-10 POIs to maintain quality over quantity`
 }
 
-func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
+func (l *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
 	var llmInteractionIDStr string
 	if req.LlmInteractionID != nil {
 		llmInteractionIDStr = req.LlmInteractionID.String()
@@ -510,7 +509,7 @@ func (l *ServiceImpl) SaveItenerary(ctx context.Context, userID uuid.UUID, req l
 		llmInteractionIDStr = "nil"
 	}
 
-	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "SaveItenerary", trace.WithAttributes(
+	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "SaveItineraryFromInteraction", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("llm_interaction.id", llmInteractionIDStr),
 		attribute.String("title", req.Title),
@@ -711,8 +710,8 @@ func (l *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.
 	return response, nil
 }
 
-func (l *ServiceImpl) RemoveItenerary(ctx context.Context, userID, itineraryID uuid.UUID) error {
-	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "RemoveItenerary", trace.WithAttributes(
+func (l *ServiceImpl) RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error {
+	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "RemoveItinerary", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.String("itinerary.id", itineraryID.String()),
 	))
@@ -804,11 +803,10 @@ func (l *ServiceImpl) GetRecentInteractions(_ context.Context, _ uuid.UUID, _ *c
 }
 
 // getPOIDetailedInfos returns a formatted string with POI details.
-func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context, wg *sync.WaitGroup,
+func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context,
 	city string, lat, lon float64, userID uuid.UUID,
 	resultCh chan<- locitypes.POIDetailedInfo, config *genai.GenerateContentConfig,
 ) {
-	defer wg.Done()
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "getPOIDetailedInfos", trace.WithAttributes(
 		attribute.String("city.name", city),
 		attribute.Float64("latitude", lat),
@@ -964,9 +962,10 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 
 	resultCh := make(chan locitypes.POIDetailedInfo, 1)
 	var wg sync.WaitGroup
-	wg.Add(1)
 
-	go l.getPOIDetailedInfos(ctx, &wg, city, lat, lon, userID, resultCh, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
+	wg.Go(func() {
+		l.getPOIDetailedInfos(ctx, city, lat, lon, userID, resultCh, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
+	})
 
 	go func() {
 		wg.Wait()
@@ -1749,7 +1748,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 			}
 		}
 
-		if (intent == locitypes.IntentAddPOI || intent == locitypes.IntentModifyItinerary) && userLocation != nil && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
+		if (intent == locitypes.IntentAddPOI || intent == locitypes.IntentModifyItinerary) && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
 			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, sessionID, cityID, *userLocation)
 			if err != nil {
 				l.logger.WarnContext(ctx, "Failed to sort POIs by distance", slog.Any("error", err))
@@ -2834,9 +2833,15 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("part_type", partType),
 			slog.Any("error", err))
 		if ctx.Err() == nil {
+			errorMsg := fmt.Sprintf("%s worker failed: %v", partType, err)
+			// Check for quota/rate limit errors
+			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") || strings.Contains(err.Error(), "quota") {
+				errorMsg = "We are experiencing high traffic (Quota Exceeded). Please try again in a minute."
+			}
+
 			sendEvent(locitypes.StreamEvent{
 				Type:  locitypes.EventTypeError,
-				Error: fmt.Sprintf("%s worker failed: %v", partType, err),
+				Error: errorMsg,
 			})
 		}
 		return

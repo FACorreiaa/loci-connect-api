@@ -22,7 +22,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/llm"
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Service = (*ServiceImpl)(nil)
@@ -87,7 +87,7 @@ func NewServiceImpl(
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey)
+	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey, "gemini-1.5-flash")
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
 		// For now, set to nil and handle gracefully in methods
@@ -935,11 +935,13 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 
 func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
+	// func (s *ServiceImpl) generatePOIsFromLLM...
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.getGeneralPOIByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-		Temperature:     genai.Ptr[float32](0.7),
-		MaxOutputTokens: 16384,
+	wg.Go(func() {
+		s.getGeneralPOIByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](0.7),
+			MaxOutputTokens: 16384,
+		})
 	})
 	wg.Wait()
 	close(resultCh)
@@ -951,7 +953,7 @@ func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID,
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context, wg *sync.WaitGroup,
+func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- locitypes.GenAIResponse,
@@ -964,7 +966,6 @@ func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context, wg *sync.Wait
 		attribute.String("user.id", userID.String())))
 
 	defer span.End()
-	defer wg.Done()
 
 	prompt := getGeneralPOIByDistance(lat, lon, distance)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
@@ -1383,11 +1384,13 @@ func (s *ServiceImpl) filterAttractions(attractions []locitypes.POIDetailedInfo,
 // generateRestaurantsFromLLM
 func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
+	// func (s *ServiceImpl) generateRestaurantsFromLLM...
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.getGeneralRestaurantByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-		Temperature:     genai.Ptr[float32](0.7),
-		MaxOutputTokens: 16384,
+	wg.Go(func() {
+		s.getGeneralRestaurantByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](0.7),
+			MaxOutputTokens: 16384,
+		})
 	})
 	wg.Wait()
 	close(resultCh)
@@ -1399,7 +1402,7 @@ func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uui
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context, wg *sync.WaitGroup,
+func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- locitypes.GenAIResponse,
@@ -1412,7 +1415,6 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context, wg *sy
 		attribute.String("user.id", userID.String())))
 
 	defer span.End()
-	defer wg.Done()
 
 	userLocation := locitypes.UserLocation{
 		UserLat:        lat,
@@ -1483,11 +1485,13 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context, wg *sy
 
 func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
+	// func (s *ServiceImpl) generateActivitiesFromLLM...
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.getGeneralActivitiesByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-		Temperature:     genai.Ptr[float32](0.7),
-		MaxOutputTokens: 16384,
+	wg.Go(func() {
+		s.getGeneralActivitiesByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](0.7),
+			MaxOutputTokens: 16384,
+		})
 	})
 	wg.Wait()
 	close(resultCh)
@@ -1499,7 +1503,7 @@ func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context, wg *sync.WaitGroup,
+func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- locitypes.GenAIResponse,
@@ -1512,7 +1516,6 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context, wg *sy
 		attribute.String("user.id", userID.String())))
 
 	defer span.End()
-	defer wg.Done()
 
 	userLocation := locitypes.UserLocation{
 		UserLat:        lat,
@@ -1583,11 +1586,13 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context, wg *sy
 
 func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
+	// func (s *ServiceImpl) generateHotelsFromLLM...
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.getGeneralHotelsByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-		Temperature:     genai.Ptr[float32](0.7),
-		MaxOutputTokens: 16384,
+	wg.Go(func() {
+		s.getGeneralHotelsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](0.7),
+			MaxOutputTokens: 16384,
+		})
 	})
 	wg.Wait()
 	close(resultCh)
@@ -1599,7 +1604,7 @@ func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUI
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context, wg *sync.WaitGroup,
+func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- locitypes.GenAIResponse,
@@ -1612,7 +1617,6 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context, wg *sync.W
 		attribute.String("user.id", userID.String())))
 
 	defer span.End()
-	defer wg.Done()
 
 	userLocation := locitypes.UserLocation{
 		UserLat:        lat,
@@ -1683,11 +1687,13 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context, wg *sync.W
 
 func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
+	// func (s *ServiceImpl) generateAttractionsFromLLM...
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go s.getGeneralAttractionsByDistance(ctx, &wg, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-		Temperature:     genai.Ptr[float32](0.7),
-		MaxOutputTokens: 16384,
+	wg.Go(func() {
+		s.getGeneralAttractionsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](0.7),
+			MaxOutputTokens: 16384,
+		})
 	})
 	wg.Wait()
 	close(resultCh)
@@ -1699,7 +1705,7 @@ func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uui
 	return &result, nil
 }
 
-func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context, wg *sync.WaitGroup,
+func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
 	resultCh chan<- locitypes.GenAIResponse,
@@ -1712,7 +1718,6 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context, wg *s
 		attribute.String("user.id", userID.String())))
 
 	defer span.End()
-	defer wg.Done()
 
 	userLocation := locitypes.UserLocation{
 		UserLat:        lat,
@@ -1817,6 +1822,7 @@ func cleanJSONResponse(response string) string {
 
 	braceCount := 0
 	lastValidBrace := -1
+loop:
 	for i := firstBrace; i < len(response); i++ {
 		switch response[i] {
 		case '{':
@@ -1825,7 +1831,7 @@ func cleanJSONResponse(response string) string {
 			braceCount--
 			if braceCount == 0 {
 				lastValidBrace = i
-				break
+				break loop
 			}
 		}
 	}

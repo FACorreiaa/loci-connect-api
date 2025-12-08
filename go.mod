@@ -6,7 +6,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
-	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251202175640-67c5b828923b
+	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208120654-4a7f0a7d6983
 	github.com/FACorreiaa/go-poi-au-suggestions v0.0.0-20250830093125-122af8ca55fe
 	github.com/FACorreiaa/loci-connect-proto v0.0.0
 	github.com/Masterminds/squirrel v1.5.4
@@ -29,9 +29,9 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.45.0
-	golang.org/x/sync v0.18.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.14.0
-	google.golang.org/genai v1.36.0
+	google.golang.org/genai v1.37.0
 	google.golang.org/protobuf v1.36.10
 )
 
@@ -91,11 +91,11 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
 	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/oauth2 v0.33.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20251124214823-79d6a2a48846 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251124214823-79d6a2a48846 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/grpc v1.77.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 func skipInterestsLegacy(t *testing.T) {
@@ -78,7 +77,7 @@ func TestCreateInterest(t *testing.T) {
 	// Setup
 	mockRepo := new(MockinterestsRepo)
 	logger := slog.Default()
-	service := NewinterestsService(mockRepo, logger)
+	service := NewService(mockRepo, logger)
 	ctx := context.Background()
 
 	// Test data
@@ -147,7 +146,7 @@ func TestRemoveinterests(t *testing.T) {
 	// Setup
 	mockRepo := new(MockinterestsRepo)
 	logger := slog.Default()
-	service := NewinterestsService(mockRepo, logger)
+	service := NewService(mockRepo, logger)
 	ctx := context.Background()
 
 	// Test data
@@ -183,7 +182,7 @@ func TestRemoveinterests(t *testing.T) {
 			tc.setupMock()
 
 			// Call the method
-			err := service.Removeinterests(ctx, userID, interestID)
+			err := service.RemoveInterests(ctx, userID, interestID)
 
 			// Assertions
 			if tc.expectedError {
@@ -203,7 +202,7 @@ func TestGetAllInterests(t *testing.T) {
 	// Setup
 	mockRepo := new(MockinterestsRepo)
 	logger := slog.Default()
-	service := NewinterestsService(mockRepo, logger)
+	service := NewService(mockRepo, logger)
 	ctx := context.Background()
 
 	// Test data
@@ -278,7 +277,7 @@ func TestUpdateinterests(t *testing.T) {
 	// Setup
 	mockRepo := new(MockinterestsRepo)
 	logger := slog.Default()
-	service := NewinterestsService(mockRepo, logger)
+	service := NewService(mockRepo, logger)
 	ctx := context.Background()
 
 	// Test data
@@ -322,7 +321,7 @@ func TestUpdateinterests(t *testing.T) {
 			tc.setupMock()
 
 			// Call the method
-			err := service.Updateinterests(ctx, userID, interestID, params)
+			err := service.UpdateInterests(ctx, userID, interestID, params)
 
 			// Assertions
 			if tc.expectedError {

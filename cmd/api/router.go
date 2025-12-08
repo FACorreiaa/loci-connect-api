@@ -13,6 +13,7 @@ import (
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -135,6 +136,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		profilePath, profileHandler := profileconnect.NewProfileServiceHandler(deps.ProfileHandler, opts)
 		mux.Handle(profilePath, profileHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", profilePath)
+	}
+
+	if deps.ItineraryHandler != nil {
+		itineraryPath, itineraryHandler := itineraryconnect.NewItineraryServiceHandler(deps.ItineraryHandler, opts)
+		mux.Handle(itineraryPath, itineraryHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", itineraryPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

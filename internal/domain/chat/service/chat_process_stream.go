@@ -157,7 +157,7 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	addUniquePOI(data.PointsOfInterest)
 	addUniquePOI(data.AIItineraryResponse.Restaurants)
 	addUniquePOI(convertHotelsToPOIs(data.Hotels))
-	//addUniquePOI(data.Restaurants)
+	addUniquePOI(convertRestaurantsToPOIs(data.Restaurants))
 	addUniquePOI(data.Activities)
 
 	// Final assignment
@@ -212,38 +212,33 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	// Spawn workers based on Domain
 	switch cc.Domain {
 	case locitypes.DomainItinerary, locitypes.DomainGeneral:
-		wg.Add(3)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			prompt := getCityDataPrompt(cc.CityName)
 			partCacheKey := cc.CacheKey + "_city_data"
 			responsesMutex.Lock()
 			partCacheKeys["city_data"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			prompt := getGeneralPOIPrompt(cc.CityName)
 			partCacheKey := cc.CacheKey + "_general_pois"
 			responsesMutex.Lock()
 			partCacheKeys["general_pois"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			prompt := getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences)
 			partCacheKey := cc.CacheKey + "_itinerary"
 			responsesMutex.Lock()
 			partCacheKeys["itinerary"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
-	case locitypes.DomainAccommodation:
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		})
+
+		// Added Hotels Worker
+		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
 				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
@@ -254,11 +249,10 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			partCacheKeys["hotels"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
-	case locitypes.DomainDining:
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		})
+
+		// Added Restaurants Worker
+		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
 				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
@@ -269,11 +263,10 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			partCacheKeys["restaurants"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
-	case locitypes.DomainActivities:
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		})
+
+		// Added Activities Worker
+		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
 				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
@@ -284,7 +277,46 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			partCacheKeys["activities"] = partCacheKey
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
-		}()
+		})
+	case locitypes.DomainAccommodation:
+		wg.Go(func() {
+			var lat, lon float64
+			if cc.UserLocation != nil {
+				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+			}
+			prompt := getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+			partCacheKey := cc.CacheKey + "_hotels"
+			responsesMutex.Lock()
+			partCacheKeys["hotels"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+	case locitypes.DomainDining:
+		wg.Go(func() {
+			var lat, lon float64
+			if cc.UserLocation != nil {
+				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+			}
+			prompt := getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+			partCacheKey := cc.CacheKey + "_restaurants"
+			responsesMutex.Lock()
+			partCacheKeys["restaurants"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+	case locitypes.DomainActivities:
+		wg.Go(func() {
+			var lat, lon float64
+			if cc.UserLocation != nil {
+				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+			}
+			prompt := getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+			partCacheKey := cc.CacheKey + "_activities"
+			responsesMutex.Lock()
+			partCacheKeys["activities"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
 	default:
 		return nil, fmt.Errorf("unhandled domain type: %s", cc.Domain)
 	}

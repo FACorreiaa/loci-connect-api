@@ -10,11 +10,10 @@ import (
 	"testing"
 	"time"
 
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // TestCacheTTL verifies that cache is set to 48 hours
@@ -201,13 +200,11 @@ func TestConcurrentCacheAccess(t *testing.T) {
 
 	// Concurrent writes
 	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			key := fmt.Sprintf("key-%d", id)
-			value := fmt.Sprintf("value-%d", id)
+		wg.Go(func() {
+			key := fmt.Sprintf("key-%d", i)
+			value := fmt.Sprintf("value-%d", i)
 			testCache.Set(key, value, cache.DefaultExpiration)
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -224,16 +221,14 @@ func TestConcurrentCacheAccess(t *testing.T) {
 
 	// Concurrent reads
 	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			key := fmt.Sprintf("key-%d", id)
-			expectedValue := fmt.Sprintf("value-%d", id)
+		wg.Go(func() {
+			key := fmt.Sprintf("key-%d", i)
+			expectedValue := fmt.Sprintf("value-%d", i)
 
 			val, found := testCache.Get(key)
 			assert.True(t, found)
 			assert.Equal(t, expectedValue, val)
-		}(i)
+		})
 	}
 
 	wg.Wait()

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 func getUserPreferencesPrompt(searchProfile *locitypes.UserPreferenceProfileResponse) string {
@@ -412,30 +412,6 @@ Respond with JSON:
 }`, cityName, basePreferences)
 }
 
-func getGeneralizedItineraryPrompt(cityName string) string {
-	return fmt.Sprintf(`
-You are a travel planning assistant. Create a personalized itinerary with a max of 5 results for %s with multi things to do and different activities.
-Respond with JSON:
-{
-    "itinerary_name": "Creative itinerary name",
-    "overall_description": "Detailed description (100-150 words)",
-    "points_of_interest": [
-        {
-            "name": "POI Name",
-            "latitude": <float>,
-            "longitude": <float>,
-            "category": "",
-            "description_poi": "",
-            "address": "",
-            "website": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-,
-            "distance": <float>
-        }
-    ]
-}`, cityName)
-}
-
 func getAccommodationPrompt(cityName string, lat, lon float64, basePreferences string) string {
 	return fmt.Sprintf(`
 You are a hotel recommendation assistant. Find suitable accommodation in %s near coordinates %.4f, %.4f.
@@ -463,33 +439,6 @@ Respond with JSON:
         }
     ]
 }`, cityName, lat, lon, basePreferences, cityName)
-}
-
-func getGeneralAccommodationPrompt(cityName string) string {
-	return fmt.Sprintf(`
-You are a hotel recommendation assistant. Find a max of 5 suitable accommodation in %s.
-Respond with JSON:
-{
-    "hotels": [
-        {
-            "city": "%s",
-            "name": "Hotel Name",
-            "latitude": <float>,
-            "longitude": <float>,
-            "category": "Hotel|Hostel|Guesthouse|Apartment",
-            "description": "Description matching preferences",
-            "address": "",
-            "phone_number": null,
-            "website": null,
-            "opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')",
-            "price_range": null,
-            "rating": 0,
-            "tags": null,
-            "images": null,
-            "distance": <float>
-        }
-    ]
-}`, cityName, cityName)
 }
 
 func getDiningPrompt(cityName string, lat, lon float64, basePreferences string) string {
@@ -522,35 +471,6 @@ Respond with JSON:
 }`, cityName, lat, lon, basePreferences, cityName)
 }
 
-func getGeneralDiningPrompt(cityName string) string {
-	return fmt.Sprintf(`
-You are a restaurant recommendation assistant. Find a max of 5 dining options in %s.
-Respond with JSON:
-{
-    "restaurants": [
-        {
-            "city": "%s",
-            "name": "Restaurant Name",
-            "latitude": <float>,
-            "longitude": <float>,
-            "category": "Fine Dining|Casual Dining|Fast Food|Cafe|Bar",
-            "description": "Description matching preferences",
-            "address": "",
-            "website": "",
-            "phone_number": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-,
-            "price_level": "$|$|$$|$$",
-            "cuisine_type": "",
-            "tags": [],
-            "images": [],
-            "rating": 0,
-            "distance": <float>
-        }
-    ]
-}`, cityName, cityName)
-}
-
 func getActivitiesPrompt(cityName string, lat, lon float64, basePreferences string) string {
 	return fmt.Sprintf(`
 You are an activity recommendation assistant. Find activities in %s near coordinates %.4f, %.4f.
@@ -578,31 +498,4 @@ Respond with JSON:
         }
     ]
 }`, cityName, lat, lon, basePreferences, cityName)
-}
-
-func getGeneralActivitiesPrompt(cityName string) string {
-	return fmt.Sprintf(`
-You are an activity recommendation assistant. Find a max of 5 activities in %s.
-Respond with JSON:
-{
-    "activities": [
-        {
-            "city": "%s",
-            "name": "Activity Name",
-            "latitude": <float>,
-            "longitude": <float>,
-            "category": "Museum|Outdoor Activity|Entertainment|Cultural|Sports",
-            "description": "Description matching preferences",
-            "address": "",
-            "website": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-,
-            "price_range": "Free|$|$$|$$$",
-            "rating": 0,
-            "tags": [],
-            "images": [],
-            "distance": <float>
-        }
-    ]
-}`, cityName, cityName)
 }

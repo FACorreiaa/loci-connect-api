@@ -14,7 +14,8 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/discover/presenter"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+
+	//chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	discoverv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 
