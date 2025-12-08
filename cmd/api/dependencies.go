@@ -60,7 +60,7 @@ type Dependencies struct {
 }
 
 // InitDependencies initializes all application dependencies
-func InitDependencies(cfg *config.Config, logger *slog.Logger, apiKey string, model string) (*Dependencies, error) {
+func InitDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, error) {
 	deps := &Dependencies{
 		Config: cfg,
 		Logger: logger,
@@ -77,7 +77,7 @@ func InitDependencies(cfg *config.Config, logger *slog.Logger, apiKey string, mo
 	}
 
 	// Initialize handler
-	if err := deps.initServices(apiKey, model); err != nil {
+	if err := deps.initServices(); err != nil {
 		return nil, fmt.Errorf("failed to init services: %w", err)
 	}
 
@@ -141,7 +141,7 @@ func (d *Dependencies) initRepositories() error {
 }
 
 // initServices initializes all service layer dependencies
-func (d *Dependencies) initServices(apiKey, model string) error {
+func (d *Dependencies) initServices() error {
 	jwtSecret := []byte(d.Config.Auth.JWTSecret)
 	if len(jwtSecret) == 0 {
 		return fmt.Errorf("jwt secret is required")
@@ -170,8 +170,8 @@ func (d *Dependencies) initServices(apiKey, model string) error {
 		d.CityRepo,
 		d.POIRepo,
 		d.Logger,
-		apiKey,
-		model,
+		d.Config.Gemini.APIKey,
+		d.Config.Gemini.Model,
 	)
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)

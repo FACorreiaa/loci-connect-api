@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,8 +17,12 @@ type Config struct {
 	Auth          AuthConfig
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
-	GeminiAPIKey  string
-	GeminiModel   string
+	Gemini        GeminiConfig
+}
+
+type GeminiConfig struct {
+	APIKey string
+	Model  string
 }
 
 type ServerConfig struct {
@@ -78,6 +83,18 @@ func Load() (*Config, error) {
 			Enabled: getEnvAsBool("PPROF_ENABLED", false),
 			Port:    getEnvAsInt("PPROF_PORT", 6060),
 		},
+		Gemini: GeminiConfig{
+			APIKey: getEnv("GEMINI_API_KEY", ""),
+			Model:  getEnv("GEMINI_MODEL", ""),
+		},
+	}
+
+	if cfg.Gemini.APIKey == "" {
+		return nil, errors.New("GEMINI_API_KEY is required")
+	}
+
+	if cfg.Gemini.Model == "" {
+		return nil, errors.New("GEMINI_MODEL is required")
 	}
 
 	return cfg, nil

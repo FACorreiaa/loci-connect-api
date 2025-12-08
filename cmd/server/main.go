@@ -27,8 +27,8 @@ func main() {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("GEMINI_MODEL")
 
-	fmt.Printf("Gemini API Key: %s \n", os.Getenv("GEMINI_API_KEY"))
-	fmt.Printf("Gemini model: %s \n", os.Getenv("GEMINI_MODEL"))
+	fmt.Printf("Gemini API Key: %s \n", apiKey)
+	fmt.Printf("Gemini model: %s \n", model)
 	// Initialize logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -44,7 +44,7 @@ func main() {
 	}
 
 	// Initialize dependencies
-	deps, err := api.InitDependencies(cfg, logger, apiKey, model)
+	deps, err := api.InitDependencies(cfg, logger)
 	if err != nil {
 		logger.Error("failed to initialize dependencies", "error", err)
 		os.Exit(1)
