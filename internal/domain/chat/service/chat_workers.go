@@ -7,14 +7,13 @@ import (
 	"sync"
 	"time"
 
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/genai"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitGroup,
@@ -220,7 +219,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 		SessionID:    sessionID,
 		Prompt:       prompt,
 		ResponseText: txt,
-		ModelUsed:    model, // Adjust based on your AI client
+		ModelUsed:    l.model, // Adjust based on your AI client
 		LatencyMs:    latencyMs,
 		CityName:     cityName,
 		// request payload
@@ -318,7 +317,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 		SessionID:    sessionID,
 		Prompt:       prompt,
 		ResponseText: txt,
-		ModelUsed:    model,
+		ModelUsed:    l.model,
 		LatencyMs:    latencyMs,
 		CityName:     cityName,
 	}

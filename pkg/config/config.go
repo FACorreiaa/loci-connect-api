@@ -16,6 +16,8 @@ type Config struct {
 	Auth          AuthConfig
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
+	GeminiAPIKey  string
+	GeminiModel   string
 }
 
 type ServerConfig struct {

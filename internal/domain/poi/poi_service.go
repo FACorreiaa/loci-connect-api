@@ -97,7 +97,7 @@ func NewServiceImpl(
 	}
 
 	if embeddingService == nil {
-		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, "", logger)
+		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, model, logger)
 		if err != nil {
 			logger.Error("Failed to initialize embedding client", slog.Any("error", err))
 		}

@@ -8,7 +8,6 @@ import (
 	"log"
 	"log/slog"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -37,8 +36,6 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
-
-var model = os.Getenv("GEMINI_MODEL")
 
 const (
 	defaultTemperature = 0.5
@@ -98,6 +95,7 @@ type ServiceImpl struct {
 	cityRepo           city.Repository
 	poiRepo            poi.Repository
 	cache              *cache.Cache
+	model              string
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
@@ -113,16 +111,17 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	cityRepo city.Repository,
 	poiRepo poi.Repository,
 	logger *slog.Logger,
+	apiKey string,
+	model string,
 ) *ServiceImpl {
 	ctx := context.Background()
-	apiKey := os.Getenv("GEMINI_API_KEY")
 	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
 		panic(err)
 	}
 
 	// Initialize embedding service
-	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, "", logger)
+	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, model, logger)
 	if err != nil {
 		log.Fatalf("Failed to create embedding service: %v", err) // Terminate if initialization fails
 	}
@@ -142,6 +141,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		cityRepo:           cityRepo,
 		poiRepo:            poiRepo,
 		cache:              c,
+		model:              model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
 	}
@@ -862,7 +862,7 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context,
 		UserID:       userID,
 		Prompt:       prompt,
 		ResponseText: txt,
-		ModelUsed:    model, // Adjust based on your AI client
+		ModelUsed:    l.model, // Adjust based on your AI client
 		LatencyMs:    latencyMs,
 		CityName:     city,
 		// request payload
@@ -1028,7 +1028,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 		UserID:       userID,
 		Prompt:       prompt,
 		ResponseText: response,
-		ModelUsed:    model,
+		ModelUsed:    l.model,
 		CityName:     cityName,
 	}
 	savedLlmInteractionID, err := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
@@ -2008,7 +2008,7 @@ func (l *ServiceImpl) saveCityInteraction(ctx context.Context, interaction locit
 		interaction.LatencyMs = int(time.Since(interaction.Timestamp).Milliseconds())
 	}
 	if interaction.ModelUsed == "" {
-		interaction.ModelUsed = model // Default model
+		interaction.ModelUsed = l.model // Default model
 	}
 
 	interactionID, err := l.llmInteractionRepo.SaveInteraction(ctx, interaction)

@@ -23,6 +23,12 @@ func main() {
 		slog.Warn("Error loading .env file")
 		log.Fatal(err)
 	}
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	model := os.Getenv("GEMINI_MODEL")
+
+	fmt.Printf("Gemini API Key: %s \n", os.Getenv("GEMINI_API_KEY"))
+	fmt.Printf("Gemini model: %s \n", os.Getenv("GEMINI_MODEL"))
 	// Initialize logger
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -38,7 +44,7 @@ func main() {
 	}
 
 	// Initialize dependencies
-	deps, err := api.InitDependencies(cfg, logger)
+	deps, err := api.InitDependencies(cfg, logger, apiKey, model)
 	if err != nil {
 		logger.Error("failed to initialize dependencies", "error", err)
 		os.Exit(1)
