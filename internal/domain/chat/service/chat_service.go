@@ -27,6 +27,7 @@ import (
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
@@ -34,7 +35,6 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
-	"github.com/FACorreiaa/loci-connect-api/internal/llm"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -91,8 +91,8 @@ type ServiceImpl struct {
 	searchProfileRepo  profiles.Repository
 	searchProfileSvc   profiles.Service // Add service for enhanced methods
 	tagsRepo           tags.Repository
-	aiClient           llm.ChatClient
-	embeddingService   llm.EmbeddingClient
+	aiClient           generativeAI.ChatClient
+	embeddingService   generativeAI.EmbeddingClient
 	llmInteractionRepo repository.Repository
 	cityRepo           city.Repository
 	poiRepo            poi.Repository
@@ -115,13 +115,13 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey, model)
+	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
 		panic(err)
 	}
 
 	// Initialize embedding service
-	embeddingService, err := llm.NewGeminiEmbeddingClient(ctx, logger)
+	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, "", logger)
 	if err != nil {
 		log.Fatalf("Failed to create embedding service: %v", err) // Terminate if initialization fails
 	}
@@ -1036,7 +1036,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 		// Decide if this is fatal for POI generation. It might be if FK is NOT NULL.
 		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
 	}
-	span.SetAttributes(attribute.String("llm.interaction_id.for_poi_data", savedLlmInteractionID.String()))
+	span.SetAttributes(attribute.String("generativeAI.interaction_id.for_poi_data", savedLlmInteractionID.String()))
 
 	cleanResponse := CleanJSONResponse(response)
 	var poiData locitypes.POIDetailedInfo

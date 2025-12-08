@@ -13,16 +13,15 @@ import (
 
 	"google.golang.org/genai"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
-	"github.com/FACorreiaa/loci-connect-api/internal/llm"
-	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Service = (*ServiceImpl)(nil)
@@ -67,8 +66,8 @@ type Service interface {
 type ServiceImpl struct {
 	logger           *slog.Logger
 	poiRepository    Repository
-	embeddingService llm.EmbeddingClient
-	aiClient         llm.ChatClient
+	embeddingService generativeAI.EmbeddingClient
+	aiClient         generativeAI.ChatClient
 	cityRepo         city.Repository
 	discoverRepo     interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
@@ -78,7 +77,7 @@ type ServiceImpl struct {
 
 func NewServiceImpl(
 	poiRepository Repository,
-	embeddingService llm.EmbeddingClient,
+	embeddingService generativeAI.EmbeddingClient,
 	cityRepo city.Repository,
 	discoverRepo interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
@@ -87,7 +86,7 @@ func NewServiceImpl(
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := llm.NewGeminiChatClient(ctx, apiKey, "gemini-1.5-flash")
+	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, "gemini-1.5-flash")
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
 		// For now, set to nil and handle gracefully in methods
@@ -95,7 +94,7 @@ func NewServiceImpl(
 	}
 
 	if embeddingService == nil {
-		embeddingService, err = llm.NewGeminiEmbeddingClient(ctx, logger)
+		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, "", logger)
 		if err != nil {
 			logger.Error("Failed to initialize embedding client", slog.Any("error", err))
 		}
@@ -935,7 +934,7 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 
 func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generatePOIsFromLLM...
+	// func (s *ServiceImpl) generatePOIsFromgenerativeAI...
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		s.getGeneralPOIByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
@@ -1384,7 +1383,7 @@ func (s *ServiceImpl) filterAttractions(attractions []locitypes.POIDetailedInfo,
 // generateRestaurantsFromLLM
 func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generateRestaurantsFromLLM...
+	// func (s *ServiceImpl) generateRestaurantsFromgenerativeAI...
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		s.getGeneralRestaurantByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
@@ -1485,7 +1484,7 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context,
 
 func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generateActivitiesFromLLM...
+	// func (s *ServiceImpl) generateActivitiesFromgenerativeAI...
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		s.getGeneralActivitiesByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
@@ -1586,7 +1585,7 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context,
 
 func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generateHotelsFromLLM...
+	// func (s *ServiceImpl) generateHotelsFromgenerativeAI...
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		s.getGeneralHotelsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
@@ -1687,7 +1686,7 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context,
 
 func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, _, _ string) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generateAttractionsFromLLM...
+	// func (s *ServiceImpl) generateAttractionsFromgenerativeAI...
 	var wg sync.WaitGroup
 	wg.Go(func() {
 		s.getGeneralAttractionsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{

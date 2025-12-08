@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types" // Ensure this path is correct
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types" // Ensure this path is correct
 )
 
 type MockCityRepository struct {
@@ -44,6 +44,26 @@ func (stubDiscoverRepo) TrackSearch(_ context.Context, _ uuid.UUID, _, _, _ stri
 }
 
 type stubEmbeddingClient struct{}
+
+// BatchGenerateEmbeddings implements genai_sdk.EmbeddingClient.
+func (s stubEmbeddingClient) BatchGenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error) {
+	panic("unimplemented")
+}
+
+// Close implements genai_sdk.EmbeddingClient.
+func (s stubEmbeddingClient) Close() {
+	panic("unimplemented")
+}
+
+// GenerateCityEmbedding implements genai_sdk.EmbeddingClient.
+func (s stubEmbeddingClient) GenerateCityEmbedding(ctx context.Context, name string, country string, description string) ([]float32, error) {
+	panic("unimplemented")
+}
+
+// GenerateUserPreferenceEmbedding implements genai_sdk.EmbeddingClient.
+func (s stubEmbeddingClient) GenerateUserPreferenceEmbedding(ctx context.Context, interests []string, preferences map[string]string) ([]float32, error) {
+	panic("unimplemented")
+}
 
 func (stubEmbeddingClient) GenerateQueryEmbedding(_ context.Context, _ string) ([]float32, error) {
 	return nil, nil
