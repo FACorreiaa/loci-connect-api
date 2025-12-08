@@ -38,8 +38,9 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
+var model = os.Getenv("GEMINI_MODEL")
+
 const (
-	model              = "gemini-1.5-flash"
 	defaultTemperature = 0.5
 )
 

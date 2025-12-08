@@ -86,7 +86,10 @@ func NewServiceImpl(
 ) *ServiceImpl {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, "gemini-1.5-flash")
+	model := os.Getenv("GEMINI_MODEL")
+	fmt.Println("Model: \n", model)
+	fmt.Println("API Key: \n", apiKey)
+	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
 		// For now, set to nil and handle gracefully in methods
