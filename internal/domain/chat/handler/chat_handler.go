@@ -18,7 +18,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -136,41 +136,24 @@ func (h *ChatHandler) StreamChat(
 		}
 	}()
 
-	for {
-		select {
-		case event, ok := <-eventCh:
-			if !ok {
-				h.logger.Info("Event channel closed, stream finished successfully")
-				return nil // Stream finished successfully
-			}
+	for event := range eventCh {
+		resp, err := h.mapEventToProto(event)
+		if err != nil {
+			h.logger.Error("Failed to map event", "error", err)
+			continue
+		}
 
-			resp, err := h.mapEventToProto(event)
-			if err != nil {
-				h.logger.Error("Failed to map event", "error", err)
-				continue
-			}
-
-			if err := stream.Send(resp); err != nil {
-				h.logger.Warn("Failed to send event to client",
-					"error", err,
-					"event_type", event.Type)
-				return err
-			}
-
-			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
-				h.logger.Info("Stream completed", "event_type", event.Type)
-				return nil
-			}
-
-		case <-ctx.Done():
-			h.logger.Warn("RPC context canceled",
-				"error", ctx.Err(),
-				"reason", "client_disconnected_or_timeout")
-			return ctx.Err()
+		if err := stream.Send(resp); err != nil {
+			h.logger.Warn("Failed to send event to client",
+				"error", err)
 		}
 	}
+
+	h.logger.Info("Event channel closed, stream finished successfully")
+	return nil
 }
 
+// toConnectError converts an error to a Connect error.
 func (h *ChatHandler) toConnectError(err error) error {
 	switch {
 	case errors.Is(err, common.ErrChatNotFound):

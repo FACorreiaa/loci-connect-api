@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/patrickmn/go-cache"
 
 	"github.com/google/uuid"
@@ -31,6 +29,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
+	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
@@ -56,7 +55,10 @@ type LlmInteractiontService interface {
 	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*locitypes.ChatResponse, error)
 	SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error)
 	GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error)
+	GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserPOIsResponse, error)
+	BookmarkPOI(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error)
 	RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error
+	RemovePOI(ctx context.Context, userID, poiID uuid.UUID) error
 	GetPOIDetailedInfosResponse(ctx context.Context, userID uuid.UUID, city string, lat, lon float64) (*locitypes.POIDetailedInfo, error)
 
 	ContinueSessionStreamed(
@@ -94,6 +96,7 @@ type ServiceImpl struct {
 	llmInteractionRepo repository.Repository
 	cityRepo           city.Repository
 	poiRepo            poi.Repository
+	listSvc            itinerarylist.Service
 	cache              *cache.Cache
 	model              string
 
@@ -110,6 +113,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	llmInteractionRepo repository.Repository,
 	cityRepo city.Repository,
 	poiRepo poi.Repository,
+	listSvc itinerarylist.Service,
 	logger *slog.Logger,
 	apiKey string,
 	model string,
@@ -127,8 +131,6 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	}
 
 	// Initialize RAG service
-
-	c := cache.New(48*time.Hour, 1*time.Hour) // Cache for 48 hours with cleanup every hour
 	service := &ServiceImpl{
 		logger:             logger,
 		tagsRepo:           tagsRepo,
@@ -140,7 +142,8 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		llmInteractionRepo: llmInteractionRepo,
 		cityRepo:           cityRepo,
 		poiRepo:            poiRepo,
-		cache:              c,
+		listSvc:            listSvc,
+		cache:              cache.New(5*time.Minute, 10*time.Minute),
 		model:              model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
@@ -500,237 +503,6 @@ func getBasePersonalizedPromptInstructions() string {
 - Include practical details like accessibility if relevant to user preferences
 - Consider user's pace and planning style preferences in the selection
 - Maximum 8-10 POIs to maintain quality over quantity`
-}
-
-func (l *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
-	var llmInteractionIDStr string
-	if req.LlmInteractionID != nil {
-		llmInteractionIDStr = req.LlmInteractionID.String()
-	} else {
-		llmInteractionIDStr = "nil"
-	}
-
-	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "SaveItineraryFromInteraction", trace.WithAttributes(
-		attribute.String("user.id", userID.String()),
-		attribute.String("llm_interaction.id", llmInteractionIDStr),
-		attribute.String("title", req.Title),
-	))
-	defer span.End()
-
-	l.logger.InfoContext(ctx, "Attempting to bookmark interaction",
-		slog.String("userID", userID.String()),
-		slog.String("llmInteractionID", llmInteractionIDStr),
-		slog.String("title", req.Title))
-
-	var sourceInteractionID pgtype.UUID
-	if req.LlmInteractionID != nil {
-		// Use specific interaction ID if provided
-		sourceInteractionID = pgtype.UUID{
-			Bytes: *req.LlmInteractionID,
-			Valid: true,
-		}
-		l.logger.InfoContext(ctx, "Using provided LlmInteractionID for bookmark",
-			slog.String("llmInteractionID", req.LlmInteractionID.String()))
-	} else if req.SessionID != nil {
-		// If SessionID is provided, try to find the latest LLM interaction in that session
-		// But always store the session ID for tracking purposes
-		latestInteraction, err := l.llmInteractionRepo.GetLatestInteractionBySessionID(ctx, *req.SessionID)
-		if err != nil || latestInteraction == nil {
-			l.logger.InfoContext(ctx, "No interaction found for session, storing session ID without interaction reference",
-				slog.String("sessionID", req.SessionID.String()),
-				slog.Any("findError", err))
-			sourceInteractionID = pgtype.UUID{Valid: false} // Set to NULL for interaction reference
-		} else {
-			sourceInteractionID = pgtype.UUID{
-				Bytes: latestInteraction.ID,
-				Valid: true,
-			}
-			l.logger.InfoContext(ctx, "Found latest interaction for session",
-				slog.String("sessionID", req.SessionID.String()),
-				slog.String("interactionID", latestInteraction.ID.String()))
-		}
-	} else {
-		sourceInteractionID = pgtype.UUID{Valid: false} // Explicitly invalid for NULL
-		l.logger.InfoContext(ctx, "No LlmInteractionID or SessionID provided, bookmark will have no source reference")
-	}
-
-	// Prepare primaryCityID - handle both PrimaryCityID and PrimaryCityName
-	var primaryCityID pgtype.UUID
-
-	// Handle city resolution
-	if req.PrimaryCityID != nil {
-		// Use provided city ID
-		primaryCityID = pgtype.UUID{
-			Bytes: *req.PrimaryCityID,
-			Valid: true,
-		}
-	} else if req.PrimaryCityName != "" {
-		// Look up or create city by name
-		city, err := l.cityRepo.FindCityByNameAndCountry(ctx, req.PrimaryCityName, "")
-		if err != nil {
-			l.logger.ErrorContext(ctx, "Failed to find city", slog.Any("error", err))
-			span.RecordError(err)
-			return uuid.Nil, fmt.Errorf("failed to find city: %w", err)
-		}
-
-		if city == nil {
-			// City doesn't exist, create it
-			cityDetail := locitypes.CityDetail{
-				Name:      req.PrimaryCityName,
-				Country:   "Unknown", // Could be extracted from LLM interaction context
-				AiSummary: "",
-			}
-			cityID, err := l.cityRepo.SaveCity(ctx, cityDetail)
-			if err != nil {
-				l.logger.ErrorContext(ctx, "Failed to save city", slog.Any("error", err))
-				span.RecordError(err)
-				return uuid.Nil, fmt.Errorf("failed to save city: %w", err)
-			}
-			primaryCityID = pgtype.UUID{
-				Bytes: cityID,
-				Valid: true,
-			}
-			l.logger.InfoContext(ctx, "Created new city", slog.String("cityName", req.PrimaryCityName), slog.String("cityID", cityID.String()))
-		} else {
-			primaryCityID = pgtype.UUID{
-				Bytes: city.ID,
-				Valid: true,
-			}
-			l.logger.InfoContext(ctx, "Found existing city", slog.String("cityName", req.PrimaryCityName), slog.String("cityID", city.ID.String()))
-		}
-	} else {
-		primaryCityID = pgtype.UUID{Valid: false}
-	}
-
-	// Fetch original interaction only if LlmInteractionID is provided
-	var originalInteraction *locitypes.LlmInteraction
-	var err error
-	if req.LlmInteractionID != nil {
-		originalInteraction, err = l.llmInteractionRepo.GetInteractionByID(ctx, *req.LlmInteractionID)
-		if err != nil || originalInteraction == nil {
-			l.logger.ErrorContext(ctx, "Failed to fetch original LLM interaction", slog.Any("error", err))
-			span.RecordError(err)
-			return uuid.Nil, fmt.Errorf("could not retrieve original interaction: %w", err)
-		}
-	}
-
-	// Prepare and save to user_saved_itineraries
-	var markdownContent string
-	if originalInteraction != nil {
-		markdownContent = originalInteraction.ResponseText
-	} else {
-		if req.Description != nil {
-			markdownContent = *req.Description
-		} else {
-			markdownContent = ""
-		}
-	}
-
-	var description sql.NullString
-	if req.Description != nil {
-		description.String = *req.Description
-		description.Valid = true
-	}
-	isPublic := false
-	if req.IsPublic != nil {
-		isPublic = *req.IsPublic
-	}
-
-	// Prepare session ID if provided
-	var sessionID pgtype.UUID
-	if req.SessionID != nil {
-		sessionID = pgtype.UUID{
-			Bytes: *req.SessionID,
-			Valid: true,
-		}
-	} else {
-		sessionID = pgtype.UUID{Valid: false}
-	}
-
-	newBookmark := &locitypes.UserSavedItinerary{
-		UserID:                 userID,
-		SourceLlmInteractionID: sourceInteractionID, // Will be nil if not provided
-		SessionID:              sessionID,           // Store the session ID separately
-		PrimaryCityID:          primaryCityID,
-		Title:                  req.Title,
-		Description:            description,
-		MarkdownContent:        markdownContent,
-		Tags:                   req.Tags,
-		IsPublic:               isPublic,
-	}
-	savedID, err := l.llmInteractionRepo.AddChatToBookmark(ctx, newBookmark)
-	if err != nil {
-		span.RecordError(err)
-		return uuid.Nil, err
-	}
-
-	// Note: We skip saving to the old 'itineraries' table for bookmarks
-	// because it has a unique constraint on (user_id, city_id) that prevents
-	// multiple itineraries per city. Bookmarks should only use user_saved_itineraries.
-
-	l.logger.InfoContext(ctx, "Successfully saved bookmark to user_saved_itineraries",
-		slog.String("savedID", savedID.String()),
-		slog.String("title", req.Title))
-
-	span.SetAttributes(attribute.String("saved_itinerary.id", savedID.String()))
-	span.SetStatus(codes.Ok, "Bookmark saved successfully")
-	return savedID, nil
-}
-
-func (l *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error) {
-	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "GetBookmarkedItineraries", trace.WithAttributes(
-		attribute.String("user.id", userID.String()),
-		attribute.Int("page", page),
-		attribute.Int("limit", limit),
-	))
-	defer span.End()
-
-	l.logger.InfoContext(ctx, "Retrieving bookmarked itineraries",
-		slog.String("userID", userID.String()),
-		slog.Int("page", page),
-		slog.Int("limit", limit))
-
-	response, err := l.llmInteractionRepo.GetBookmarkedItineraries(ctx, userID, page, limit)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to retrieve bookmarked itineraries")
-		return nil, fmt.Errorf("failed to retrieve bookmarked itineraries: %w", err)
-	}
-
-	l.logger.InfoContext(ctx, "Successfully retrieved bookmarked itineraries",
-		slog.String("userID", userID.String()),
-		slog.Int("totalRecords", response.TotalRecords),
-		slog.Int("page", response.Page),
-		slog.Int("pageSize", response.PageSize))
-
-	span.SetAttributes(
-		attribute.Int("total_records", response.TotalRecords),
-		attribute.Int("returned_count", len(response.Itineraries)),
-	)
-	span.SetStatus(codes.Ok, "Bookmarked itineraries retrieved successfully")
-	return response, nil
-}
-
-func (l *ServiceImpl) RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error {
-	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "RemoveItinerary", trace.WithAttributes(
-		attribute.String("user.id", userID.String()),
-		attribute.String("itinerary.id", itineraryID.String()),
-	))
-	defer span.End()
-
-	l.logger.InfoContext(ctx, "Attempting to remove chat from bookmark",
-		slog.String("itineraryID", itineraryID.String()))
-
-	if err := l.llmInteractionRepo.RemoveChatFromBookmark(ctx, userID, itineraryID); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to remove chat from bookmark", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to remove chat from bookmark")
-		return fmt.Errorf("failed to remove chat from bookmark: %w", err)
-	}
-
-	l.logger.InfoContext(ctx, "Successfully removed chat from bookmark", slog.String("itineraryID", itineraryID.String()))
-	span.SetStatus(codes.Ok, "Itinerary removed successfully")
-	return nil
 }
 
 // GetUserChatSessions retrieves paginated chat sessions for a user

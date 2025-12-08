@@ -160,6 +160,7 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
+	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	d.ChatService = chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
@@ -169,12 +170,12 @@ func (d *Dependencies) initServices() error {
 		d.ChatRepo,
 		d.CityRepo,
 		d.POIRepo,
+		d.ListSvc,
 		d.Logger,
 		d.Config.Gemini.APIKey,
 		d.Config.Gemini.Model,
 	)
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
-	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 
 	d.Logger.Info("services initialized")
 	return nil

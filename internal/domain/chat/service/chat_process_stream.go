@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -358,13 +359,18 @@ func (l *ServiceImpl) persistResults(
 ) error {
 	ctx := cc.Ctx
 
+	// Distinguish between client context (for streaming) and storage context (for persistence)
+	// Create a detached context for database operations to prevent cancellation on client disconnect
+	storageCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 60*time.Second) // 60s for DB ops
+	defer cancel()
+
 	// 1. Save City (if needed)
 	var cityID uuid.UUID
 	cityDataContent := rawResponses["city_data"]
 	if cityDataContent != "" {
 		parsedCityData, err := l.parseCityDataFromResponse(ctx, cityDataContent)
 		if err == nil && parsedCityData != nil {
-			savedCityID, err := l.HandleCityData(ctx, *parsedCityData)
+			savedCityID, err := l.HandleCityData(storageCtx, *parsedCityData)
 			if err == nil {
 				cityID = savedCityID
 				l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
@@ -373,7 +379,7 @@ func (l *ServiceImpl) persistResults(
 	}
 	// Fallback: try to get existing city from database, or create it
 	if cityID == uuid.Nil && cc.CityName != "" {
-		existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cc.CityName, "Unknown")
+		existingCity, err := l.cityRepo.FindCityByNameAndCountry(storageCtx, cc.CityName, "Unknown")
 		if err == nil && existingCity != nil {
 			cityID = existingCity.ID
 			l.logger.InfoContext(ctx, "Found existing city",
@@ -388,7 +394,7 @@ func (l *ServiceImpl) persistResults(
 				Country:       "Unknown",
 				StateProvince: "Unknown",
 			}
-			cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
+			cityID, err = l.cityRepo.SaveCity(storageCtx, cityDetail)
 			if err != nil {
 				l.logger.WarnContext(ctx, "Failed to create city entry",
 					slog.String("city", cc.CityName),
@@ -424,7 +430,7 @@ func (l *ServiceImpl) persistResults(
 		LatencyMs:    int(time.Since(startTime).Milliseconds()),
 		Timestamp:    startTime,
 	}
-	savedID, err := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
+	savedID, err := l.llmInteractionRepo.SaveInteraction(storageCtx, interaction)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to save interaction", slog.Any("error", err))
 		return err
@@ -452,16 +458,15 @@ func (l *ServiceImpl) persistResults(
 		Type: locitypes.EventTypeItinerary,
 		Data: *data,
 	}, 3)
-
 	// 4. Update Session
-	session, err := l.llmInteractionRepo.GetSession(ctx, cc.SessionID)
+	session, err := l.llmInteractionRepo.GetSession(storageCtx, cc.SessionID)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to get session for update", slog.Any("error", err))
 		return err
 	}
 	session.CurrentItinerary = data
 	session.UpdatedAt = time.Now()
-	if err := l.llmInteractionRepo.UpdateSession(ctx, *session); err != nil {
+	if err := l.llmInteractionRepo.UpdateSession(storageCtx, *session); err != nil {
 		l.logger.WarnContext(ctx, "Failed to update session with initial itinerary", slog.Any("error", err))
 		return err
 	}
@@ -485,8 +490,12 @@ func (l *ServiceImpl) persistResults(
 
 	// Restore background processing for POI details saving
 	go func() {
+		// Use detached context with long timeout for background processing
+		bgCtx, bgCancel := context.WithTimeout(context.WithoutCancel(cc.Ctx), 5*time.Minute)
+		defer bgCancel()
+
 		l.ProcessAndSaveUnifiedResponse(
-			ctx,             // 1. Context
+			bgCtx,             // 1. Context
 			rawResponses,    // 2. The map[string]*strings.Builder
 			cc.UserID,       // 3. User UUID (Extract this from 'data' or 'cc'?)
 			cc.ProfileID,    // 4. Profile UUID (Extract this from 'data' or 'cc'?)

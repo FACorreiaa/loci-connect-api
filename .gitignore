@@ -27,4 +27,5 @@ improve.md
 icons
 loci-connect-api
 bin
-server
+# server binary (anchored to root)
+/server

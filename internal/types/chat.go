@@ -147,6 +147,13 @@ type PaginatedUserItinerariesResponse struct {
 	PageSize     int                  `json:"page_size"`
 }
 
+type PaginatedUserPOIsResponse struct {
+	POIs         []POIDetailedInfo `json:"pois"`
+	TotalRecords int               `json:"total_records"`
+	Page         int               `json:"page"`
+	PageSize     int               `json:"page_size"`
+}
+
 type BookmarkRequest struct {
 	LlmInteractionID *uuid.UUID `json:"llm_interaction_id,omitempty"` // Optional - if provided, use this specific interaction
 	SessionID        *uuid.UUID `json:"session_id,omitempty"`         // Optional - if provided, use latest interaction from this session
@@ -156,6 +163,8 @@ type BookmarkRequest struct {
 	Description      *string    `json:"description"` // Optional
 	Tags             []string   `json:"tags"`        // Optional
 	IsPublic         *bool      `json:"is_public"`   // Optional
+	POIID            *uuid.UUID `json:"poi_id,omitempty"`
+	ItineraryID      *uuid.UUID `json:"itinerary_id,omitempty"`
 }
 
 type ChatMessage struct {
