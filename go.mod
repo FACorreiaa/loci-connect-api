@@ -6,7 +6,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
-	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208120654-4a7f0a7d6983
+	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208125730-d635e30aa705
 	github.com/FACorreiaa/go-poi-au-suggestions v0.0.0-20250830093125-122af8ca55fe
 	github.com/FACorreiaa/loci-connect-proto v0.0.0
 	github.com/Masterminds/squirrel v1.5.4
