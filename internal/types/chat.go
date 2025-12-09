@@ -240,6 +240,69 @@ type HotelDetailedInfo struct {
 	Err              error     `json:"-"` // Not serialized
 }
 
+// UnmarshalJSON implements custom JSON unmarshaling for HotelDetailedInfo
+// to handle fields that can be either string or number from LLM responses
+func (h *HotelDetailedInfo) UnmarshalJSON(data []byte) error {
+	type Alias HotelDetailedInfo
+	aux := &struct {
+		PriceRange   json.RawMessage `json:"price_range"`
+		Rating       json.RawMessage `json:"rating"`
+		OpeningHours json.RawMessage `json:"opening_hours"`
+		*Alias
+	}{
+		Alias: (*Alias)(h),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Handle PriceRange field (can be string or number)
+	if len(aux.PriceRange) > 0 && string(aux.PriceRange) != "null" {
+		var prStr string
+		if err := json.Unmarshal(aux.PriceRange, &prStr); err == nil {
+			h.PriceRange = &prStr
+		} else {
+			var prNum json.Number
+			if err := json.Unmarshal(aux.PriceRange, &prNum); err == nil {
+				s := prNum.String()
+				h.PriceRange = &s
+			}
+		}
+	}
+
+	// Handle Rating field (can be string or number)
+	if len(aux.Rating) > 0 && string(aux.Rating) != "null" {
+		var rFloat float64
+		if err := json.Unmarshal(aux.Rating, &rFloat); err == nil {
+			h.Rating = rFloat
+		} else {
+			var rStr string
+			if err := json.Unmarshal(aux.Rating, &rStr); err == nil {
+				// Try to parse as float, ignore error
+				var parsed float64
+				if _, scanErr := json.Number(rStr).Float64(); scanErr == nil {
+					parsed, _ = json.Number(rStr).Float64()
+					h.Rating = parsed
+				}
+			}
+		}
+	}
+
+	// Handle OpeningHours field (can be string or object)
+	if len(aux.OpeningHours) > 0 && string(aux.OpeningHours) != "null" {
+		var ohStr string
+		if err := json.Unmarshal(aux.OpeningHours, &ohStr); err == nil {
+			h.OpeningHours = &ohStr
+		} else {
+			// If it's an object, just stringify it
+			h.OpeningHours = nil
+		}
+	}
+
+	return nil
+}
+
 type HotelPreferenceRequest struct {
 	City        string               `json:"city"`
 	Lat         float64              `json:"lat"`

@@ -348,7 +348,7 @@ func getCityDescriptionPrompt(cityName string) string {
 func getCityDataPrompt(cityName string) string {
 	return fmt.Sprintf(`
 You are a travel assistant. Provide general information about %s.
-Respond with JSON:
+Respond ONLY WITH with JSON:
 {
     "city": "%s",
     "country": "Country name",
@@ -369,7 +369,7 @@ Respond with JSON:
 func getGeneralPOIPrompt(cityName string) string {
 	return fmt.Sprintf(`
 List general points of interest in %s.
-Respond with JSON:
+Respond ONLY WITH with JSON:
 {
     "points_of_interest": [
         {
@@ -391,7 +391,7 @@ func getPersonalizedItineraryPrompt(cityName, basePreferences string) string {
 You are a travel planning assistant. Create a personalized itinerary for %s based on user preferences.
 USER PREFERENCES:
 %s
-Respond with JSON:
+Respond ONLY WITH with JSON:
 {
     "itinerary_name": "Creative itinerary name",
     "overall_description": "Detailed description (100-150 words)",
@@ -413,11 +413,20 @@ Respond with JSON:
 }
 
 func getAccommodationPrompt(cityName string, lat, lon float64, basePreferences string) string {
+	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
+	// (0,0) is in the Atlantic Ocean, not a valid city location
+	var locationDesc string
+	if lat != 0 || lon != 0 {
+		locationDesc = fmt.Sprintf("in %s near coordinates %.4f, %.4f", cityName, lat, lon)
+	} else {
+		locationDesc = fmt.Sprintf("in %s", cityName)
+	}
+
 	return fmt.Sprintf(`
-You are a hotel recommendation assistant. Find suitable accommodation in %s near coordinates %.4f, %.4f.
+You are a hotel recommendation assistant. Find suitable accommodation %s.
 USER PREFERENCES:
 %s
-Respond with JSON:
+Respond ONLY WITH with JSON:
 {
     "hotels": [
         {
@@ -428,22 +437,30 @@ Respond with JSON:
             "category": "Hotel|Hostel|Guesthouse|Apartment",
             "description": "Description matching preferences",
             "address": "",
-            "phone_number": null,
-            "website": null,
+            "phone_number": nil,
+            "website": nil,
             "opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')",
-            "price_range": null,
+            "price_range": nil,
             "rating": 0,
-            "tags": null,
-            "images": null,
+            "tags": nil,
+            "images": nil,
             "distance": <float>
         }
     ]
-}`, cityName, lat, lon, basePreferences, cityName)
+}`, locationDesc, basePreferences, cityName)
 }
 
 func getDiningPrompt(cityName string, lat, lon float64, basePreferences string) string {
+	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
+	var locationDesc string
+	if lat != 0 || lon != 0 {
+		locationDesc = fmt.Sprintf("in %s near coordinates %.4f, %.4f", cityName, lat, lon)
+	} else {
+		locationDesc = fmt.Sprintf("in %s", cityName)
+	}
+
 	return fmt.Sprintf(`
-Find 10 dining options in %s near coordinates %.4f, %.4f.
+Find 10 dining options %s.
 USER PREFERENCES:
 %s
 Respond with JSON:
@@ -468,15 +485,23 @@ Respond with JSON:
             "distance": <float>
         }
     ]
-}`, cityName, lat, lon, basePreferences, cityName)
+}`, locationDesc, basePreferences, cityName)
 }
 
 func getActivitiesPrompt(cityName string, lat, lon float64, basePreferences string) string {
+	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
+	var locationDesc string
+	if lat != 0 || lon != 0 {
+		locationDesc = fmt.Sprintf("in %s near coordinates %.4f, %.4f", cityName, lat, lon)
+	} else {
+		locationDesc = fmt.Sprintf("in %s", cityName)
+	}
+
 	return fmt.Sprintf(`
-You are an activity recommendation assistant. Find activities in %s near coordinates %.4f, %.4f.
+You are an activity recommendation assistant. Find activities %s.
 USER PREFERENCES:
 %s
-Respond with JSON:
+Respond ONLY WITH with JSON:
 {
     "activities": [
         {
@@ -488,8 +513,7 @@ Respond with JSON:
             "description": "Description matching preferences",
             "address": "",
             "website": "",
-                		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
-,
+            "opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')",
             "price_range": "Free|$|$$|$$$",
             "rating": 0,
             "tags": [],
@@ -497,5 +521,5 @@ Respond with JSON:
             "distance": <float>
         }
     ]
-}`, cityName, lat, lon, basePreferences, cityName)
+}`, locationDesc, basePreferences, cityName)
 }

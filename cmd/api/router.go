@@ -10,11 +10,15 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/recents/v1/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/statistics/v1/statisticsv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
+	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/otel"
@@ -38,6 +42,9 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		authconnect.AuthServiceLoginProcedure,
 		authconnect.AuthServiceRefreshTokenProcedure,
 		authconnect.AuthServiceValidateSessionProcedure,
+		// Public statistics endpoint
+		statisticsv1connect.StatisticsServiceGetMainPageStatisticsProcedure,
+		statisticsv1connect.StatisticsServiceStreamMainPageStatisticsProcedure,
 	}
 
 	tracer := otel.GetTracerProvider().Tracer("loci/api")
@@ -142,6 +149,30 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		itineraryPath, itineraryHandler := itineraryconnect.NewItineraryServiceHandler(deps.ItineraryHandler, opts)
 		mux.Handle(itineraryPath, itineraryHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", itineraryPath)
+	}
+
+	if deps.StatisticsHandler != nil {
+		statsPath, statsHandler := statisticsv1connect.NewStatisticsServiceHandler(deps.StatisticsHandler, opts)
+		mux.Handle(statsPath, statsHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", statsPath)
+	}
+
+	if deps.RecentsHandler != nil {
+		recentsPath, recentsHandler := recentsv1connect.NewRecentsServiceHandler(deps.RecentsHandler, opts)
+		mux.Handle(recentsPath, recentsHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", recentsPath)
+	}
+
+	if deps.UserHandler != nil {
+		userPath, userHandler := userconnect.NewUserServiceHandler(deps.UserHandler, opts)
+		mux.Handle(userPath, userHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", userPath)
+	}
+
+	if deps.InterestHandler != nil {
+		interestPath, interestHandler := interestconnect.NewInterestServiceHandler(deps.InterestHandler, opts)
+		mux.Handle(interestPath, interestHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", interestPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

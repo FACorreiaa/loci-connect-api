@@ -293,6 +293,16 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
 		// })
 	case locitypes.DomainAccommodation:
+		// Spawn city_data worker
+		wg.Go(func() {
+			prompt := getCityDataPrompt(cc.CityName)
+			partCacheKey := cc.CacheKey + "_city_data"
+			responsesMutex.Lock()
+			partCacheKeys["city_data"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+		// Spawn hotels worker
 		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
@@ -306,6 +316,16 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 	case locitypes.DomainDining:
+		// Spawn city_data worker
+		wg.Go(func() {
+			prompt := getCityDataPrompt(cc.CityName)
+			partCacheKey := cc.CacheKey + "_city_data"
+			responsesMutex.Lock()
+			partCacheKeys["city_data"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+		// Spawn restaurants worker
 		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
@@ -319,6 +339,16 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 	case locitypes.DomainActivities:
+		// Spawn city_data worker
+		wg.Go(func() {
+			prompt := getCityDataPrompt(cc.CityName)
+			partCacheKey := cc.CacheKey + "_city_data"
+			responsesMutex.Lock()
+			partCacheKeys["city_data"] = partCacheKey
+			responsesMutex.Unlock()
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+		// Spawn activities worker
 		wg.Go(func() {
 			var lat, lon float64
 			if cc.UserLocation != nil {
@@ -466,12 +496,46 @@ func (l *ServiceImpl) persistResults(
 		}
 	}
 
-	// Send Itinerary Event - use context.Background() to bypass cancelled context
-	// The event channel is still open (managed by handler), so we MUST deliver this data
-	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
-		Type: locitypes.EventTypeItinerary,
-		Data: *data,
-	}, 3)
+	// Send domain-specific event with pre-parsed data
+	// Use context.Background() to bypass cancelled context - we MUST deliver this data
+	switch cc.Domain {
+	case locitypes.DomainAccommodation:
+		// Send hotels as pre-parsed data
+		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeHotels,
+			Data: map[string]interface{}{
+				"general_city_data": data.GeneralCityData,
+				"hotels":            data.Hotels,
+				"session_id":        cc.SessionID.String(),
+			},
+		}, 3)
+	case locitypes.DomainDining:
+		// Send restaurants as pre-parsed data
+		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeRestaurants,
+			Data: map[string]interface{}{
+				"general_city_data": data.GeneralCityData,
+				"restaurants":       data.Restaurants,
+				"session_id":        cc.SessionID.String(),
+			},
+		}, 3)
+	case locitypes.DomainActivities:
+		// Send activities as pre-parsed data
+		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
+			Type: "activities",
+			Data: map[string]interface{}{
+				"general_city_data": data.GeneralCityData,
+				"activities":        data.Activities,
+				"session_id":        cc.SessionID.String(),
+			},
+		}, 3)
+	default:
+		// Send full itinerary for DomainItinerary/DomainGeneral
+		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeItinerary,
+			Data: *data,
+		}, 3)
+	}
 	// 4. Update Session
 	session, err := l.llmInteractionRepo.GetSession(storageCtx, cc.SessionID)
 	if err != nil {

@@ -15,12 +15,17 @@ import (
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
+	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
+	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 )
@@ -33,30 +38,41 @@ type Dependencies struct {
 	sqlDB  *sql.DB
 
 	// Repositories
-	AuthRepo     repository.AuthRepository
-	InterestRepo interestrepo.Repository
-	TagRepo      tagrepo.Repository
-	ProfileRepo  profiles.Repository
-	POIRepo      poirepo.Repository
-	CityRepo     cityrepo.Repository
-	ChatRepo     chatrepo.Repository
-	DiscoverRepo discoverdomain.Repository
-	ListRepo     itinerarylist.Repository
+	AuthRepo       repository.AuthRepository
+	InterestRepo   interestrepo.Repository
+	TagRepo        tagrepo.Repository
+	ProfileRepo    profiles.Repository
+	POIRepo        poirepo.Repository
+	CityRepo       cityrepo.Repository
+	ChatRepo       chatrepo.Repository
+	DiscoverRepo   discoverdomain.Repository
+	ListRepo       itinerarylist.Repository
+	StatisticsRepo statistics.Repository
+	RecentsRepo    recents.Repository
+	UserRepo       user.UserRepo
 
 	// Services
-	TokenManager service.TokenManager
-	AuthService  *service.AuthService
-	ChatService  chatservice.LlmInteractiontService
-	ProfileSvc   profiles.Service
-	DiscoverSvc  discoverdomain.Service
-	ListSvc      itinerarylist.Service
+	TokenManager  service.TokenManager
+	AuthService   *service.AuthService
+	ChatService   chatservice.LlmInteractiontService
+	ProfileSvc    profiles.Service
+	DiscoverSvc   discoverdomain.Service
+	ListSvc       itinerarylist.Service
+	StatisticsSvc statistics.Service
+	RecentsSvc    recents.Service
+	UserSvc       user.UserService
+	InterestSvc   interestrepo.Service
 
 	// Handlers
-	AuthHandler      *handler.AuthHandler
-	ChatHandler      *chathandler.ChatHandler
-	ProfileHandler   *profilehandler.ProfileHandler
-	DiscoverHandler  *discoverdomain.Handler
-	ItineraryHandler *itineraryhandler.ItineraryHandler
+	AuthHandler       *handler.AuthHandler
+	ChatHandler       *chathandler.ChatHandler
+	ProfileHandler    *profilehandler.ProfileHandler
+	DiscoverHandler   *discoverdomain.Handler
+	ItineraryHandler  *itineraryhandler.ItineraryHandler
+	StatisticsHandler *statistics.Handler
+	RecentsHandler    *recents.Handler
+	UserHandler       *userhandler.UserHandler
+	InterestHandler   *interesthandler.InterestHandler
 }
 
 // InitDependencies initializes all application dependencies
@@ -135,6 +151,9 @@ func (d *Dependencies) initRepositories() error {
 	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.DiscoverRepo = discoverdomain.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.ListRepo = itinerarylist.NewRepository(d.DB.Pool, d.Logger)
+	d.StatisticsRepo = statistics.NewRepository(d.Logger, d.DB.Pool)
+	d.RecentsRepo = recents.NewRepository(d.DB.Pool, d.Logger)
+	d.UserRepo = user.NewPostgresUserRepo(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -147,7 +166,7 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("jwt secret is required")
 	}
 
-	accessTokenTTL := 15 * time.Minute
+	accessTokenTTL := 1 * time.Hour // Increased from 15 minutes for better UX
 	refreshTokenTTL := 30 * 24 * time.Hour
 
 	d.TokenManager = service.NewTokenManager(jwtSecret, jwtSecret, accessTokenTTL, refreshTokenTTL)
@@ -176,6 +195,10 @@ func (d *Dependencies) initServices() error {
 		d.Config.Gemini.Model,
 	)
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
+	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
+	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
+	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
+	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
 
 	d.Logger.Info("services initialized")
 	return nil
@@ -188,6 +211,10 @@ func (d *Dependencies) initHandlers() error {
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
+	d.StatisticsHandler = statistics.NewHandler(d.StatisticsSvc, d.Logger)
+	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
+	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
+	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

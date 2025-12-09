@@ -50,6 +50,14 @@ const (
 	ChatServiceGetRecentInteractionsProcedure = "/loci.chat.ChatService/GetRecentInteractions"
 	// ChatServiceEndSessionProcedure is the fully-qualified name of the ChatService's EndSession RPC.
 	ChatServiceEndSessionProcedure = "/loci.chat.ChatService/EndSession"
+	// ChatServiceBookmarkPOIProcedure is the fully-qualified name of the ChatService's BookmarkPOI RPC.
+	ChatServiceBookmarkPOIProcedure = "/loci.chat.ChatService/BookmarkPOI"
+	// ChatServiceBookmarkItineraryProcedure is the fully-qualified name of the ChatService's
+	// BookmarkItinerary RPC.
+	ChatServiceBookmarkItineraryProcedure = "/loci.chat.ChatService/BookmarkItinerary"
+	// ChatServiceRemoveBookmarkProcedure is the fully-qualified name of the ChatService's
+	// RemoveBookmark RPC.
+	ChatServiceRemoveBookmarkProcedure = "/loci.chat.ChatService/RemoveBookmark"
 	// ChatServiceStreamChatProcedure is the fully-qualified name of the ChatService's StreamChat RPC.
 	ChatServiceStreamChatProcedure = "/loci.chat.ChatService/StreamChat"
 )
@@ -63,6 +71,9 @@ var (
 	chatServiceGetChatSessionsMethodDescriptor       = chatServiceServiceDescriptor.Methods().ByName("GetChatSessions")
 	chatServiceGetRecentInteractionsMethodDescriptor = chatServiceServiceDescriptor.Methods().ByName("GetRecentInteractions")
 	chatServiceEndSessionMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("EndSession")
+	chatServiceBookmarkPOIMethodDescriptor           = chatServiceServiceDescriptor.Methods().ByName("BookmarkPOI")
+	chatServiceBookmarkItineraryMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("BookmarkItinerary")
+	chatServiceRemoveBookmarkMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("RemoveBookmark")
 	chatServiceStreamChatMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("StreamChat")
 )
 
@@ -74,6 +85,10 @@ type ChatServiceClient interface {
 	GetChatSessions(context.Context, *connect.Request[chat.GetChatSessionsRequest]) (*connect.Response[chat.GetChatSessionsResponse], error)
 	GetRecentInteractions(context.Context, *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error)
 	EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error)
+	// Bookmarking RPCs
+	BookmarkPOI(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
+	BookmarkItinerary(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
+	RemoveBookmark(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
 	// Streaming RPC for real-time chat responses
 	StreamChat(context.Context, *connect.Request[chat.ChatRequest]) (*connect.ServerStreamForClient[chat.StreamEvent], error)
 }
@@ -124,6 +139,24 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceEndSessionMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		bookmarkPOI: connect.NewClient[chat.BookmarkRequest, chat.BookmarkResponse](
+			httpClient,
+			baseURL+ChatServiceBookmarkPOIProcedure,
+			connect.WithSchema(chatServiceBookmarkPOIMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		bookmarkItinerary: connect.NewClient[chat.BookmarkRequest, chat.BookmarkResponse](
+			httpClient,
+			baseURL+ChatServiceBookmarkItineraryProcedure,
+			connect.WithSchema(chatServiceBookmarkItineraryMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		removeBookmark: connect.NewClient[chat.BookmarkRequest, chat.BookmarkResponse](
+			httpClient,
+			baseURL+ChatServiceRemoveBookmarkProcedure,
+			connect.WithSchema(chatServiceRemoveBookmarkMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		streamChat: connect.NewClient[chat.ChatRequest, chat.StreamEvent](
 			httpClient,
 			baseURL+ChatServiceStreamChatProcedure,
@@ -141,6 +174,9 @@ type chatServiceClient struct {
 	getChatSessions       *connect.Client[chat.GetChatSessionsRequest, chat.GetChatSessionsResponse]
 	getRecentInteractions *connect.Client[chat.GetRecentInteractionsRequest, chat.GetRecentInteractionsResponse]
 	endSession            *connect.Client[chat.GetChatSessionRequest, common.Response]
+	bookmarkPOI           *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
+	bookmarkItinerary     *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
+	removeBookmark        *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
 	streamChat            *connect.Client[chat.ChatRequest, chat.StreamEvent]
 }
 
@@ -174,6 +210,21 @@ func (c *chatServiceClient) EndSession(ctx context.Context, req *connect.Request
 	return c.endSession.CallUnary(ctx, req)
 }
 
+// BookmarkPOI calls loci.chat.ChatService.BookmarkPOI.
+func (c *chatServiceClient) BookmarkPOI(ctx context.Context, req *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return c.bookmarkPOI.CallUnary(ctx, req)
+}
+
+// BookmarkItinerary calls loci.chat.ChatService.BookmarkItinerary.
+func (c *chatServiceClient) BookmarkItinerary(ctx context.Context, req *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return c.bookmarkItinerary.CallUnary(ctx, req)
+}
+
+// RemoveBookmark calls loci.chat.ChatService.RemoveBookmark.
+func (c *chatServiceClient) RemoveBookmark(ctx context.Context, req *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return c.removeBookmark.CallUnary(ctx, req)
+}
+
 // StreamChat calls loci.chat.ChatService.StreamChat.
 func (c *chatServiceClient) StreamChat(ctx context.Context, req *connect.Request[chat.ChatRequest]) (*connect.ServerStreamForClient[chat.StreamEvent], error) {
 	return c.streamChat.CallServerStream(ctx, req)
@@ -187,6 +238,10 @@ type ChatServiceHandler interface {
 	GetChatSessions(context.Context, *connect.Request[chat.GetChatSessionsRequest]) (*connect.Response[chat.GetChatSessionsResponse], error)
 	GetRecentInteractions(context.Context, *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error)
 	EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error)
+	// Bookmarking RPCs
+	BookmarkPOI(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
+	BookmarkItinerary(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
+	RemoveBookmark(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
 	// Streaming RPC for real-time chat responses
 	StreamChat(context.Context, *connect.Request[chat.ChatRequest], *connect.ServerStream[chat.StreamEvent]) error
 }
@@ -233,6 +288,24 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceEndSessionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceBookmarkPOIHandler := connect.NewUnaryHandler(
+		ChatServiceBookmarkPOIProcedure,
+		svc.BookmarkPOI,
+		connect.WithSchema(chatServiceBookmarkPOIMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceBookmarkItineraryHandler := connect.NewUnaryHandler(
+		ChatServiceBookmarkItineraryProcedure,
+		svc.BookmarkItinerary,
+		connect.WithSchema(chatServiceBookmarkItineraryMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceRemoveBookmarkHandler := connect.NewUnaryHandler(
+		ChatServiceRemoveBookmarkProcedure,
+		svc.RemoveBookmark,
+		connect.WithSchema(chatServiceRemoveBookmarkMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceStreamChatHandler := connect.NewServerStreamHandler(
 		ChatServiceStreamChatProcedure,
 		svc.StreamChat,
@@ -253,6 +326,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceGetRecentInteractionsHandler.ServeHTTP(w, r)
 		case ChatServiceEndSessionProcedure:
 			chatServiceEndSessionHandler.ServeHTTP(w, r)
+		case ChatServiceBookmarkPOIProcedure:
+			chatServiceBookmarkPOIHandler.ServeHTTP(w, r)
+		case ChatServiceBookmarkItineraryProcedure:
+			chatServiceBookmarkItineraryHandler.ServeHTTP(w, r)
+		case ChatServiceRemoveBookmarkProcedure:
+			chatServiceRemoveBookmarkHandler.ServeHTTP(w, r)
 		case ChatServiceStreamChatProcedure:
 			chatServiceStreamChatHandler.ServeHTTP(w, r)
 		default:
@@ -286,6 +365,18 @@ func (UnimplementedChatServiceHandler) GetRecentInteractions(context.Context, *c
 
 func (UnimplementedChatServiceHandler) EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.EndSession is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) BookmarkPOI(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.BookmarkPOI is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) BookmarkItinerary(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.BookmarkItinerary is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) RemoveBookmark(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.RemoveBookmark is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) StreamChat(context.Context, *connect.Request[chat.ChatRequest], *connect.ServerStream[chat.StreamEvent]) error {

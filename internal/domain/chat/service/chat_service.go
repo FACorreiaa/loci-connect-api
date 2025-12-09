@@ -1182,6 +1182,7 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamE
 			return false
 		default:
 			// Protect against panic from sending to closed channel
+			sent := false
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
@@ -1194,6 +1195,7 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamE
 				select {
 				case ch <- event:
 					// Successfully sent
+					sent = true
 				case <-ctx.Done():
 					l.logger.WarnContext(ctx, "Context cancelled while trying to send stream event",
 						slog.String("eventType", event.Type),
@@ -1207,11 +1209,16 @@ func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamE
 				}
 			}()
 
+			// Return true immediately on successful send
+			if sent {
+				return true
+			}
+
 			if ctx.Err() != nil {
 				return false
 			}
 		}
-		time.Sleep(100 * time.Millisecond) // Backoff
+		time.Sleep(100 * time.Millisecond) // Backoff before retry
 	}
 	return false
 }
