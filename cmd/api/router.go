@@ -18,6 +18,7 @@ import (
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/v1/tagsv1connect"
 	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -173,6 +174,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		interestPath, interestHandler := interestconnect.NewInterestServiceHandler(deps.InterestHandler, opts)
 		mux.Handle(interestPath, interestHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", interestPath)
+	}
+
+	if deps.TagsHandler != nil {
+		tagsPath, tagsHandler := tagsv1connect.NewTagsServiceHandler(deps.TagsHandler, opts)
+		mux.Handle(tagsPath, tagsHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", tagsPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

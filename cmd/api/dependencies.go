@@ -24,6 +24,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
+	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
@@ -62,6 +63,7 @@ type Dependencies struct {
 	RecentsSvc    recents.Service
 	UserSvc       user.UserService
 	InterestSvc   interestrepo.Service
+	TagsSvc       tagshandler.Service
 
 	// Handlers
 	AuthHandler       *handler.AuthHandler
@@ -73,6 +75,7 @@ type Dependencies struct {
 	RecentsHandler    *recents.Handler
 	UserHandler       *userhandler.UserHandler
 	InterestHandler   *interesthandler.InterestHandler
+	TagsHandler       *tagshandler.TagsHandler
 }
 
 // InitDependencies initializes all application dependencies
@@ -199,6 +202,7 @@ func (d *Dependencies) initServices() error {
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
 	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
 	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
+	d.TagsSvc = tagrepo.NewtagsService(d.TagRepo, d.Logger)
 
 	d.Logger.Info("services initialized")
 	return nil
@@ -215,6 +219,7 @@ func (d *Dependencies) initHandlers() error {
 	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
+	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
