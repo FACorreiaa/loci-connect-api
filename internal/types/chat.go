@@ -67,7 +67,7 @@ type GeneralCityData struct {
 
 type AiCityResponse struct {
 	GeneralCityData     GeneralCityData          `json:"general_city_data"`
-	PointsOfInterest    []POIDetailedInfo        `json:"points_of_interest"`
+	PointsOfInterest    []POIDetailedInfo        `json:"points_of_interest,omitempty"` // omitempty: don't send null/empty for incremental updates
 	AIItineraryResponse AIItineraryResponse      `json:"itinerary_response"`
 	Hotels              []HotelDetailedInfo      `json:"hotels,omitempty"`
 	Restaurants         []RestaurantDetailedInfo `json:"restaurants,omitempty"`
