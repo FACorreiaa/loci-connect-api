@@ -179,7 +179,12 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	ctx := cc.Ctx
 	var wg sync.WaitGroup
 
-	l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
+	// Create a detached context for LLM workers - they MUST complete even if client disconnects
+	// This prevents partial JSON responses when the user navigates away
+	workerCtx, cancelWorker := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
+	defer cancelWorker()
+
+	l.sendEvent(workerCtx, cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
 		Data: map[string]interface{}{
 			"domain":     string(cc.Domain),
@@ -195,6 +200,8 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	var responsesMutex sync.Mutex
 
 	// Helper to send events and capture chunks
+	// Use workerCtx for sending events - this ensures we continue capturing responses
+	// even if the client disconnects, while still attempting to deliver events
 	sendEventWithResponse := func(event locitypes.StreamEvent) {
 		if event.Type == locitypes.EventTypeChunk {
 			responsesMutex.Lock()
@@ -210,7 +217,10 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			}
 			responsesMutex.Unlock()
 		}
-		l.sendEvent(ctx, cc.EventCh, event, 3)
+		// Use workerCtx instead of ctx - this prevents context cancellation from
+		// blocking event delivery. The sendEvent function will still handle
+		// closed channels gracefully via its recover() mechanism.
+		l.sendEvent(workerCtx, cc.EventCh, event, 3)
 	}
 
 	// Spawn workers based on Domain
@@ -222,7 +232,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["city_data"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 		wg.Go(func() {
 			prompt := getGeneralPOIPrompt(cc.CityName)
@@ -230,7 +240,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["general_pois"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "general_pois", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 		wg.Go(func() {
 			prompt := getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences)
@@ -238,7 +248,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["itinerary"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "itinerary", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 
 		// // Added Hotels Worker
@@ -293,7 +303,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["hotels"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 	case locitypes.DomainDining:
 		wg.Go(func() {
@@ -306,7 +316,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["restaurants"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 	case locitypes.DomainActivities:
 		wg.Go(func() {
@@ -319,7 +329,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys["activities"] = partCacheKey
 			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
+			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 	default:
 		return nil, fmt.Errorf("unhandled domain type: %s", cc.Domain)
@@ -456,8 +466,9 @@ func (l *ServiceImpl) persistResults(
 		}
 	}
 
-	// Send Itinerary Event
-	l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
+	// Send Itinerary Event - use context.Background() to bypass cancelled context
+	// The event channel is still open (managed by handler), so we MUST deliver this data
+	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeItinerary,
 		Data: *data,
 	}, 3)
@@ -531,7 +542,8 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 		baseURL = "/itinerary"
 	}
 
-	l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
+	// Use context.Background() to bypass cancelled context - we MUST deliver this event
+	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeComplete,
 		Data: map[string]interface{}{"session_id": cc.SessionID.String()},
 		Navigation: &locitypes.NavigationData{

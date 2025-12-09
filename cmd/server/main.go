@@ -108,12 +108,18 @@ func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) er
 	protocols.SetUnencryptedHTTP2(true)
 
 	srv := &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		Protocols:    protocols,
+		Addr:    addr,
+		Handler: handler,
+		// ReadTimeout: Time to read the entire request including body
+		ReadTimeout: 30 * time.Second,
+		// WriteTimeout: For streaming endpoints (SSE/gRPC streams), this must be long enough
+		// to handle the entire response duration. LLM responses can take 30+ seconds.
+		// Setting to 0 disables the timeout - we rely on application-level timeouts
+		// (context.WithTimeout in chat_process_stream.go) for proper deadline management.
+		WriteTimeout: 0,
+		// IdleTimeout: Time to wait for the next request when keep-alives are enabled
+		IdleTimeout: 120 * time.Second,
+		Protocols:   protocols,
 	}
 
 	// Start server in goroutine
