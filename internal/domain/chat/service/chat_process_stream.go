@@ -162,8 +162,11 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	addUniquePOI(data.Activities)
 
 	// Final assignment
-	data.PointsOfInterest = allPOIs
-	data.AIItineraryResponse.PointsOfInterest = allPOIs
+	// We do NOT want to merge all POIs into the specific lists.
+	// data.PointsOfInterest should remain as General POIs
+	// data.AIItineraryResponse.PointsOfInterest should remain as Itinerary POIs
+	// data.PointsOfInterest = allPOIs
+	// data.AIItineraryResponse.PointsOfInterest = allPOIs
 
 	l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs",
 		slog.Int("total_unique_pois", len(allPOIs)))
@@ -238,47 +241,47 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
 
-		// Added Hotels Worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_hotels"
-			responsesMutex.Lock()
-			partCacheKeys["hotels"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		// // Added Hotels Worker
+		// wg.Go(func() {
+		// 	var lat, lon float64
+		// 	if cc.UserLocation != nil {
+		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		// 	}
+		// 	prompt := getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+		// 	partCacheKey := cc.CacheKey + "_hotels"
+		// 	responsesMutex.Lock()
+		// 	partCacheKeys["hotels"] = partCacheKey
+		// 	responsesMutex.Unlock()
+		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
+		// })
 
-		// Added Restaurants Worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_restaurants"
-			responsesMutex.Lock()
-			partCacheKeys["restaurants"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		// // Added Restaurants Worker
+		// wg.Go(func() {
+		// 	var lat, lon float64
+		// 	if cc.UserLocation != nil {
+		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		// 	}
+		// 	prompt := getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+		// 	partCacheKey := cc.CacheKey + "_restaurants"
+		// 	responsesMutex.Lock()
+		// 	partCacheKeys["restaurants"] = partCacheKey
+		// 	responsesMutex.Unlock()
+		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
+		// })
 
-		// Added Activities Worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_activities"
-			responsesMutex.Lock()
-			partCacheKeys["activities"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		// // Added Activities Worker
+		// wg.Go(func() {
+		// 	var lat, lon float64
+		// 	if cc.UserLocation != nil {
+		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		// 	}
+		// 	prompt := getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences)
+		// 	partCacheKey := cc.CacheKey + "_activities"
+		// 	responsesMutex.Lock()
+		// 	partCacheKeys["activities"] = partCacheKey
+		// 	responsesMutex.Unlock()
+		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
+		// })
 	case locitypes.DomainAccommodation:
 		wg.Go(func() {
 			var lat, lon float64
@@ -495,7 +498,7 @@ func (l *ServiceImpl) persistResults(
 		defer bgCancel()
 
 		l.ProcessAndSaveUnifiedResponse(
-			bgCtx,             // 1. Context
+			bgCtx,           // 1. Context
 			rawResponses,    // 2. The map[string]*strings.Builder
 			cc.UserID,       // 3. User UUID (Extract this from 'data' or 'cc'?)
 			cc.ProfileID,    // 4. Profile UUID (Extract this from 'data' or 'cc'?)
