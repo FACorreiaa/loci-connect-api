@@ -71,7 +71,7 @@ type LlmInteractiontService interface {
 
 	ProcessUnifiedChatMessageStream(cc common.ChatContext) error
 
-	//GetUserChatSessions Chat session management
+	// GetUserChatSessions Chat session management
 	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error)
 	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*locitypes.ChatSession, error)
 	EndSession(ctx context.Context, userID, sessionID uuid.UUID) error
@@ -317,8 +317,8 @@ func (l *ServiceImpl) HandleCityData(ctx context.Context, cityData locitypes.Gen
 			Country:         cityData.Country,
 			StateProvince:   cityData.StateProvince,
 			AiSummary:       cityData.Description,
-			CenterLatitude:  cityData.CenterLatitude,
-			CenterLongitude: cityData.CenterLongitude,
+			CenterLatitude:  &cityData.CenterLatitude,
+			CenterLongitude: &cityData.CenterLongitude,
 		}
 		cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
 		if err != nil {

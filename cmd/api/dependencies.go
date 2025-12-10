@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
@@ -36,7 +35,6 @@ type Dependencies struct {
 	Config *config.Config
 	DB     *db.DB
 	Logger *slog.Logger
-	sqlDB  *sql.DB
 
 	// Repositories
 	AuthRepo       repository.AuthRepository
@@ -137,16 +135,7 @@ func (d *Dependencies) initDatabase() error {
 
 // initRepositories initializes all repository layer dependencies
 func (d *Dependencies) initRepositories() error {
-	sqlDB, err := sql.Open("pgx", d.Config.Database.DSN())
-	if err != nil {
-		return fmt.Errorf("failed to open sql DB: %w", err)
-	}
-	if err := sqlDB.Ping(); err != nil {
-		return fmt.Errorf("failed to ping sql DB: %w", err)
-	}
-
-	d.sqlDB = sqlDB
-	d.AuthRepo = repository.NewPostgresAuthRepository(sqlDB)
+	d.AuthRepo = repository.NewPostgresAuthRepository(d.DB.Pool)
 	d.InterestRepo = interestrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.TagRepo = tagrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.ProfileRepo = profiles.NewPostgresUserRepo(d.DB.Pool, d.Logger)
@@ -231,9 +220,6 @@ func (d *Dependencies) initHandlers() error {
 func (d *Dependencies) Cleanup() {
 	if d.DB != nil {
 		d.DB.Close()
-	}
-	if d.sqlDB != nil {
-		d.sqlDB.Close()
 	}
 	d.Logger.Info("cleanup completed")
 }

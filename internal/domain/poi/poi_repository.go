@@ -20,7 +20,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -173,15 +173,27 @@ func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, 
 	return &poi, nil
 }
 
+// poiCityDistanceRow is a DB row struct for GetPOIsByCityAndDistance query
+type poiCityDistanceRow struct {
+	ID             uuid.UUID `db:"id"`
+	Name           string    `db:"name"`
+	Longitude      float64   `db:"longitude"`
+	Latitude       float64   `db:"latitude"`
+	Category       string    `db:"category"`
+	DescriptionPOI string    `db:"description_poi"`
+	Distance       float64   `db:"distance"`
+}
+
 func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
 	userPoint := fmt.Sprintf("SRID=4326;POINT(%f %f)", userLocation.UserLon, userLocation.UserLat)
 	query := `
         SELECT
-            id, name,
+            id,
+            name,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            poi_type AS category,
-            ai_summary AS description_poi,
+            COALESCE(poi_type, '') AS category,
+            COALESCE(ai_summary, '') AS description_poi,
             ST_Distance(location::geography, ST_GeomFromText($1, 4326)::geography) AS distance
         FROM points_of_interest
         WHERE city_id = $2 AND ST_DWithin(location::geography, ST_GeomFromText($1, 4326)::geography, $3 * 1000)
@@ -191,21 +203,24 @@ func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uu
 	if err != nil {
 		return nil, fmt.Errorf("failed to query POIs: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		err := rows.Scan(&poi.ID, &poi.Name, &poi.Longitude,
-			&poi.Latitude, &poi.Category, &poi.DescriptionPOI, &poi.Distance)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan POI row: %w", err)
-		}
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[poiCityDistanceRow])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating POI rows: %w", err)
+	// Convert DB rows to domain type
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			DescriptionPOI: row.DescriptionPOI,
+			Distance:       row.Distance,
+		}
 	}
 
 	return pois, nil
@@ -286,138 +301,119 @@ func (r *RepositoryImpl) RemoveLLMPoiFromFavourite(ctx context.Context, userID, 
 	return nil
 }
 
+// favoritePOIRow is a DB row struct for GetFavouritePOIsByUserID query
+type favoritePOIRow struct {
+	FavoriteID     uuid.UUID `db:"favorite_id"`
+	Notes          string    `db:"notes"`
+	AddedAt        time.Time `db:"added_at"`
+	ID             uuid.UUID `db:"id"`
+	Name           string    `db:"name"`
+	Longitude      float64   `db:"longitude"`
+	Latitude       float64   `db:"latitude"`
+	Category       string    `db:"category"`
+	DescriptionPOI string    `db:"description_poi"`
+	Address        string    `db:"address"`
+	Website        string    `db:"website"`
+	PhoneNumber    string    `db:"phone_number"`
+	OpeningHours   string    `db:"opening_hours"`
+	Rating         float64   `db:"rating"`
+	PriceLevel     string    `db:"price_level"`
+	POISource      string    `db:"poi_source"`
+}
+
 func (r *RepositoryImpl) GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	query := `
 		SELECT
-    favorite_id,
-    notes,
-    added_at,
-    id,
-    name,
-    longitude,
-    latitude,
-    category,
-    description_poi,
-    address,
-    website,
-    phone_number,
-    opening_hours,
-    rating,
-    price_level,
-    poi_source
-FROM (
-         -- Regular POI favorites
-         SELECT
-             ufp.id as favorite_id,
-             ufp.notes,
-             ufp.added_at,
-             poi.id,
-             poi.name,
-             ST_X(poi.location) AS longitude,
-             ST_Y(poi.location) AS latitude,
-             poi.poi_type AS category,
-             poi.description AS description_poi,
-             poi.address,
-             poi.website,
-             poi.phone_number,
-             poi.opening_hours,
-             poi.average_rating as rating,
-             poi.price_level::text as price_level,
-             'regular' as poi_source
-         FROM user_favorite_pois ufp
-                  INNER JOIN points_of_interest poi ON ufp.poi_id = poi.id
-         WHERE ufp.user_id = $1
+			favorite_id,
+			COALESCE(notes, '') AS notes,
+			added_at,
+			id,
+			name,
+			longitude,
+			latitude,
+			COALESCE(category, '') AS category,
+			COALESCE(description_poi, '') AS description_poi,
+			COALESCE(address, '') AS address,
+			COALESCE(website, '') AS website,
+			COALESCE(phone_number, '') AS phone_number,
+			COALESCE(opening_hours::text, '') AS opening_hours,
+			COALESCE(rating, 0) AS rating,
+			COALESCE(price_level, '') AS price_level,
+			poi_source
+		FROM (
+			SELECT
+				ufp.id as favorite_id,
+				ufp.notes,
+				ufp.added_at,
+				poi.id,
+				poi.name,
+				ST_X(poi.location) AS longitude,
+				ST_Y(poi.location) AS latitude,
+				poi.poi_type AS category,
+				poi.description AS description_poi,
+				poi.address,
+				poi.website,
+				poi.phone_number,
+				poi.opening_hours,
+				poi.average_rating as rating,
+				poi.price_level::text as price_level,
+				'regular' as poi_source
+			FROM user_favorite_pois ufp
+			INNER JOIN points_of_interest poi ON ufp.poi_id = poi.id
+			WHERE ufp.user_id = $1
 
-         UNION ALL
+			UNION ALL
 
-         -- LLM POI favorites
-         SELECT
-             uflp.id as favorite_id,
-             uflp.notes,
-             uflp.added_at,
-             llmsp.id,
-             llmsp.name,
-             llmsp.longitude,
-             llmsp.latitude,
-             llmsp.category,
-             llmsp.description AS description_poi,
-             llmsp.address,
-             llmsp.website,
-             llmsp.phone_number,
-             llmsp.opening_hours,
-             llmsp.rating,
-             llmsp.price_level,
-             'llm' as poi_source
-         FROM user_favorite_llm_pois uflp
-                  INNER JOIN llm_suggested_pois as llmsp ON uflp.llm_poi_id = llm_suggested_pois.id
-         WHERE uflp.user_id = $1
-     ) combined_favorites
-ORDER BY added_at DESC;
+			SELECT
+				uflp.id as favorite_id,
+				uflp.notes,
+				uflp.added_at,
+				llmsp.id,
+				llmsp.name,
+				llmsp.longitude,
+				llmsp.latitude,
+				llmsp.category,
+				llmsp.description AS description_poi,
+				llmsp.address,
+				llmsp.website,
+				llmsp.phone_number,
+				llmsp.opening_hours,
+				llmsp.rating,
+				llmsp.price_level,
+				'llm' as poi_source
+			FROM user_favorite_llm_pois uflp
+			INNER JOIN llm_suggested_pois as llmsp ON uflp.llm_poi_id = llmsp.id
+			WHERE uflp.user_id = $1
+		) combined_favorites
+		ORDER BY added_at DESC
 	`
 	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query favourite POIs: %w", err)
 	}
-	defer rows.Close()
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var favoriteID uuid.UUID
-		var notes *string
-		var addedAt time.Time
-		var address, website, phoneNumber *string
-		var openingHours *string
-		var rating *float64
-		var priceLevel *string
-		var poiSource string
 
-		err := rows.Scan(
-			&favoriteID,         // favorite_id
-			&notes,              // notes
-			&addedAt,            // added_at
-			&poi.ID,             // id
-			&poi.Name,           // name
-			&poi.Longitude,      // longitude
-			&poi.Latitude,       // latitude
-			&poi.Category,       // category
-			&poi.DescriptionPOI, // description_poi
-			&address,            // address
-			&website,            // website
-			&phoneNumber,        // phone_number
-			&openingHours,       // opening_hours
-			&rating,             // rating
-			&priceLevel,         // price_level
-			&poiSource,          // poi_source
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan favourite POI row: %w", err)
-		}
-
-		// Set optional fields
-		if address != nil {
-			poi.Address = *address
-		}
-		if website != nil {
-			poi.Website = *website
-		}
-		if phoneNumber != nil {
-			poi.PhoneNumber = *phoneNumber
-		}
-		//if openingHours != nil {
-		//poi.OpeningHours = openingHours
-		//}
-		if rating != nil {
-			poi.Rating = *rating
-		}
-		if priceLevel != nil {
-			poi.PriceLevel = *priceLevel
-		}
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[favoritePOIRow])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect favourite POI rows: %w", err)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating favourite POI rows: %w", err)
+
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			DescriptionPOI: row.DescriptionPOI,
+			Address:        row.Address,
+			Website:        row.Website,
+			PhoneNumber:    row.PhoneNumber,
+			Rating:         row.Rating,
+			PriceLevel:     row.PriceLevel,
+		}
 	}
+
 	r.logger.Info("Favourite POIs retrieved successfully", slog.String("userID", userID.String()), slog.Int("count", len(pois)))
 	return pois, nil
 }
@@ -444,141 +440,99 @@ func (r *RepositoryImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, 
 		return nil, 0, fmt.Errorf("failed to count favourite POIs: %w", err)
 	}
 
-	// Then get the paginated results
+	// Then get the paginated results with COALESCE for nullable fields
 	query := `
 		SELECT
-    favorite_id,
-    notes,
-    added_at,
-    id,
-    name,
-    longitude,
-    latitude,
-    category,
-    description_poi,
-    address,
-    website,
-    phone_number,
-    opening_hours,
-    rating,
-    price_level,
-    poi_source
-FROM (
-         -- Regular POI favorites
-         SELECT
-             ufp.id as favorite_id,
-             ufp.notes,
-             ufp.added_at,
-             poi.id,
-             poi.name,
-             ST_X(poi.location) AS longitude,
-             ST_Y(poi.location) AS latitude,
-             poi.poi_type AS category,
-             poi.description AS description_poi,
-             poi.address,
-             poi.website,
-             poi.phone_number,
-             poi.opening_hours,
-             poi.average_rating as rating,
-             poi.price_level::text as price_level,
-             'regular' as poi_source
-         FROM user_favorite_pois ufp
-                  INNER JOIN points_of_interest poi ON ufp.poi_id = poi.id
-         WHERE ufp.user_id = $1
+			favorite_id,
+			COALESCE(notes, '') AS notes,
+			added_at,
+			id,
+			name,
+			longitude,
+			latitude,
+			COALESCE(category, '') AS category,
+			COALESCE(description_poi, '') AS description_poi,
+			COALESCE(address, '') AS address,
+			COALESCE(website, '') AS website,
+			COALESCE(phone_number, '') AS phone_number,
+			COALESCE(opening_hours::text, '') AS opening_hours,
+			COALESCE(rating, 0) AS rating,
+			COALESCE(price_level, '') AS price_level,
+			poi_source
+		FROM (
+			SELECT
+				ufp.id as favorite_id,
+				ufp.notes,
+				ufp.added_at,
+				poi.id,
+				poi.name,
+				ST_X(poi.location) AS longitude,
+				ST_Y(poi.location) AS latitude,
+				poi.poi_type AS category,
+				poi.description AS description_poi,
+				poi.address,
+				poi.website,
+				poi.phone_number,
+				poi.opening_hours,
+				poi.average_rating as rating,
+				poi.price_level::text as price_level,
+				'regular' as poi_source
+			FROM user_favorite_pois ufp
+			INNER JOIN points_of_interest poi ON ufp.poi_id = poi.id
+			WHERE ufp.user_id = $1
 
-         UNION ALL
+			UNION ALL
 
-         -- LLM POI favorites
-         SELECT
-             uflp.id as favorite_id,
-             uflp.notes,
-             uflp.added_at,
-             llmsp.id,
-             llmsp.name,
-             llmsp.longitude,
-             llmsp.latitude,
-             llmsp.category,
-             llmsp.description AS description_poi,
-             llmsp.address,
-             llmsp.website,
-             llmsp.phone_number,
-             llmsp.opening_hours,
-             llmsp.rating,
-             llmsp.price_level,
-             'llm' as poi_source
-         FROM user_favorite_llm_pois uflp
-                  INNER JOIN llm_suggested_pois llmsp ON uflp.llm_poi_id = llmsp.id
-         WHERE uflp.user_id = $1
-     ) combined_favorites
-ORDER BY added_at DESC
-LIMIT $2 OFFSET $3;
+			SELECT
+				uflp.id as favorite_id,
+				uflp.notes,
+				uflp.added_at,
+				llmsp.id,
+				llmsp.name,
+				llmsp.longitude,
+				llmsp.latitude,
+				llmsp.category,
+				llmsp.description AS description_poi,
+				llmsp.address,
+				llmsp.website,
+				llmsp.phone_number,
+				llmsp.opening_hours,
+				llmsp.rating,
+				llmsp.price_level,
+				'llm' as poi_source
+			FROM user_favorite_llm_pois uflp
+			INNER JOIN llm_suggested_pois llmsp ON uflp.llm_poi_id = llmsp.id
+			WHERE uflp.user_id = $1
+		) combined_favorites
+		ORDER BY added_at DESC
+		LIMIT $2 OFFSET $3
 	`
 
 	rows, err := r.pgpool.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to query favourite POIs: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var favoriteID uuid.UUID
-		var notes *string
-		var addedAt time.Time
-		var descriptionPOI, address, website, phoneNumber *string
-		var openingHours *string
-		var rating *float64
-		var priceLevel *string
-		var poiSource string
-
-		err := rows.Scan(
-			&favoriteID,     // favorite_id
-			&notes,          // notes
-			&addedAt,        // added_at
-			&poi.ID,         // id
-			&poi.Name,       // name
-			&poi.Longitude,  // longitude
-			&poi.Latitude,   // latitude
-			&poi.Category,   // category
-			&descriptionPOI, // description_poi
-			&address,        // address
-			&website,        // website
-			&phoneNumber,    // phone_number
-			&openingHours,   // opening_hours
-			&rating,         // rating
-			&priceLevel,     // price_level
-			&poiSource,      // poi_source
-		)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to scan favourite POI row: %w", err)
-		}
-
-		// Set optional fields
-		if descriptionPOI != nil {
-			poi.DescriptionPOI = *descriptionPOI
-		}
-
-		if address != nil {
-			poi.Address = *address
-		}
-		if website != nil {
-			poi.Website = *website
-		}
-		if phoneNumber != nil {
-			poi.PhoneNumber = *phoneNumber
-		}
-		if rating != nil {
-			poi.Rating = *rating
-		}
-		if priceLevel != nil {
-			poi.PriceLevel = *priceLevel
-		}
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[favoritePOIRow])
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to collect favourite POI rows: %w", err)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating favourite POI rows: %w", err)
+
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			DescriptionPOI: row.DescriptionPOI,
+			Address:        row.Address,
+			Website:        row.Website,
+			PhoneNumber:    row.PhoneNumber,
+			Rating:         row.Rating,
+			PriceLevel:     row.PriceLevel,
+		}
 	}
 
 	r.logger.Info("Paginated favourite POIs retrieved successfully",
@@ -590,9 +544,25 @@ LIMIT $2 OFFSET $3;
 	return pois, totalCount, nil
 }
 
+// poiCityIDRow is a DB row struct for GetPOIsByCityID query
+type poiCityIDRow struct {
+	ID             uuid.UUID `db:"id"`
+	Name           string    `db:"name"`
+	DescriptionPOI string    `db:"description"`
+	Longitude      float64   `db:"longitude"`
+	Latitude       float64   `db:"latitude"`
+	Category       string    `db:"poi_type"`
+}
+
 func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	query := `
-		SELECT id, name, description, ST_X(location) AS longitude, ST_Y(location) AS latitude, poi_type
+		SELECT 
+			id, 
+			name, 
+			COALESCE(description, '') AS description, 
+			ST_X(location) AS longitude, 
+			ST_Y(location) AS latitude, 
+			COALESCE(poi_type, '') AS poi_type
 		FROM points_of_interest
 		WHERE city_id = $1
 	`
@@ -600,20 +570,22 @@ func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query POIs by city ID: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		err := rows.Scan(&poi.ID, &poi.Name, &poi.DescriptionPOI, &poi.Longitude, &poi.Latitude, &poi.Category)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan POI row: %w", err)
-		}
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[poiCityIDRow])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.DescriptionPOI,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+		}
 	}
 
 	r.logger.Info("POIs retrieved successfully by city ID", slog.String("cityID", cityID.String()), slog.Int("count", len(pois)))
@@ -851,6 +823,25 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 	return poiID, nil
 }
 
+// hotelDetailsRow is a DB row struct for FindHotelDetails query
+type hotelDetailsRow struct {
+	ID               uuid.UUID     `db:"id"`
+	Name             string        `db:"name"`
+	Description      string        `db:"description"`
+	Latitude         float64       `db:"latitude"`
+	Longitude        float64       `db:"longitude"`
+	Address          string        `db:"address"`
+	Website          string        `db:"website"`
+	PhoneNumber      string        `db:"phone_number"`
+	OpeningHours     string        `db:"opening_hours"`
+	PriceRange       string        `db:"price_range"`
+	Category         string        `db:"category"`
+	Tags             []string      `db:"tags"`
+	Images           []string      `db:"images"`
+	Rating           float64       `db:"rating"`
+	LlmInteractionID uuid.NullUUID `db:"llm_interaction_id"`
+}
+
 func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error) {
 	ctx, span := otel.Tracer("HotelRepository").Start(ctx, "FindHotelDetails", trace.WithAttributes(
 		attribute.String("city.id", cityID.String()),
@@ -861,8 +852,12 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 
 	query := `
         SELECT
-            id, name, description, latitude, longitude, address, website, phone_number,
-            opening_hours, price_range, category, tags, images, rating, llm_interaction_id
+            id, name, COALESCE(description, '') AS description, latitude, longitude, 
+            COALESCE(address, '') AS address, COALESCE(website, '') AS website, 
+            COALESCE(phone_number, '') AS phone_number, COALESCE(opening_hours::text, '') AS opening_hours, 
+            COALESCE(price_range, '') AS price_range, COALESCE(category, '') AS category, 
+            COALESCE(tags, '{}') AS tags, COALESCE(images, '{}') AS images, 
+            COALESCE(rating, 0) AS rating, llm_interaction_id
         FROM hotel_details
         WHERE city_id = $1
         AND ST_DWithin(
@@ -877,36 +872,46 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 		span.SetStatus(codes.Error, "Failed to query hotel details")
 		return nil, fmt.Errorf("failed to query hotel_details: %w", err)
 	}
-	defer rows.Close()
 
-	var hotels []locitypes.HotelDetailedInfo
-	for rows.Next() {
-		var hotel locitypes.HotelDetailedInfo
-		var llmInteractionID uuid.NullUUID
-		var website, phoneNumber, openingHours, priceRange *string
-		err := rows.Scan(
-			&hotel.ID, &hotel.Name, &hotel.Description, &hotel.Latitude, &hotel.Longitude,
-			&hotel.Address, &website, &phoneNumber, &openingHours, &priceRange,
-			&hotel.Category, &hotel.Tags, &hotel.Images, &hotel.Rating, &llmInteractionID,
-		)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Failed to scan hotel details")
-			return nil, fmt.Errorf("failed to scan hotel_details: %w", err)
-		}
-		hotel.Website = website
-		hotel.PhoneNumber = phoneNumber
-		hotel.OpeningHours = openingHours
-		hotel.PriceRange = priceRange
-		if llmInteractionID.Valid {
-			hotel.LlmInteractionID = llmInteractionID.UUID
-		}
-		hotels = append(hotels, hotel)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[hotelDetailsRow])
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to collect hotel details")
+		return nil, fmt.Errorf("failed to collect hotel_details: %w", err)
 	}
-	if rows.Err() != nil {
-		span.RecordError(rows.Err())
-		span.SetStatus(codes.Error, "Failed to iterate hotel details")
-		return nil, fmt.Errorf("failed to iterate hotel_details: %w", rows.Err())
+
+	hotels := make([]locitypes.HotelDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		var website, phoneNumber, openingHours, priceRange *string
+		if row.Website != "" {
+			website = &row.Website
+		}
+		if row.PhoneNumber != "" {
+			phoneNumber = &row.PhoneNumber
+		}
+		if row.OpeningHours != "" {
+			openingHours = &row.OpeningHours
+		}
+		if row.PriceRange != "" {
+			priceRange = &row.PriceRange
+		}
+		hotels[i] = locitypes.HotelDetailedInfo{
+			ID:               row.ID,
+			Name:             row.Name,
+			Description:      row.Description,
+			Latitude:         row.Latitude,
+			Longitude:        row.Longitude,
+			Address:          row.Address,
+			Website:          website,
+			PhoneNumber:      phoneNumber,
+			OpeningHours:     openingHours,
+			PriceRange:       priceRange,
+			Category:         row.Category,
+			Tags:             row.Tags,
+			Images:           row.Images,
+			Rating:           row.Rating,
+			LlmInteractionID: row.LlmInteractionID.UUID,
+		}
 	}
 
 	span.SetStatus(codes.Ok, "Hotel details found")
@@ -1002,14 +1007,38 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 	return &hotel, nil
 }
 
+// restaurantDetailsRow is a DB row struct for FindRestaurantDetails query
+type restaurantDetailsRow struct {
+	ID               uuid.UUID     `db:"id"`
+	Name             string        `db:"name"`
+	Description      string        `db:"description"`
+	Latitude         float64       `db:"latitude"`
+	Longitude        float64       `db:"longitude"`
+	Address          string        `db:"address"`
+	Website          string        `db:"website"`
+	PhoneNumber      string        `db:"phone_number"`
+	OpeningHours     string        `db:"opening_hours"`
+	PriceLevel       string        `db:"price_level"`
+	Category         string        `db:"category"`
+	Tags             []string      `db:"tags"`
+	Images           []string      `db:"images"`
+	Rating           float64       `db:"rating"`
+	CuisineType      string        `db:"cuisine_type"`
+	LlmInteractionID uuid.NullUUID `db:"llm_interaction_id"`
+}
+
 func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *locitypes.RestaurantUserPreferences) ([]locitypes.RestaurantDetailedInfo, error) {
 	ctx, span := otel.Tracer("RestaurantRepository").Start(ctx, "FindRestaurantDetails")
 	defer span.End()
 
 	query := `
         SELECT
-            id, name, description, latitude, longitude, address, website, phone_number,
-            opening_hours, price_level, category, tags, images, rating, cuisine_type, llm_interaction_id
+            id, name, COALESCE(description, '') AS description, latitude, longitude, 
+            COALESCE(address, '') AS address, COALESCE(website, '') AS website, 
+            COALESCE(phone_number, '') AS phone_number, COALESCE(opening_hours::text, '') AS opening_hours,
+            COALESCE(price_level, '') AS price_level, COALESCE(category, '') AS category, 
+            COALESCE(tags, '{}') AS tags, COALESCE(images, '{}') AS images, 
+            COALESCE(rating, 0) AS rating, COALESCE(cuisine_type, '') AS cuisine_type, llm_interaction_id
         FROM restaurant_details
         WHERE city_id = $1
         AND ST_DWithin(
@@ -1036,23 +1065,52 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
 		span.SetStatus(codes.Error, "Failed to query restaurants")
 		return nil, fmt.Errorf("failed to query restaurant_details: %w", err)
 	}
-	defer rows.Close()
 
-	var restaurants []locitypes.RestaurantDetailedInfo
-	for rows.Next() {
-		var r locitypes.RestaurantDetailedInfo
-		var llmID uuid.NullUUID
-		err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Latitude, &r.Longitude, &r.Address,
-			&r.Website, &r.PhoneNumber, &r.OpeningHours, &r.PriceLevel, &r.Category,
-			&r.Tags, &r.Images, &r.Rating, &r.CuisineType, &llmID)
-		if err != nil {
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan restaurant: %w", err)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[restaurantDetailsRow])
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect restaurant rows: %w", err)
+	}
+
+	restaurants := make([]locitypes.RestaurantDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		var address, website, phoneNumber, openingHours, priceLevel, cuisineType *string
+		if row.Address != "" {
+			address = &row.Address
 		}
-		if llmID.Valid {
-			r.LlmInteractionID = llmID.UUID
+		if row.Website != "" {
+			website = &row.Website
 		}
-		restaurants = append(restaurants, r)
+		if row.PhoneNumber != "" {
+			phoneNumber = &row.PhoneNumber
+		}
+		if row.OpeningHours != "" {
+			openingHours = &row.OpeningHours
+		}
+		if row.PriceLevel != "" {
+			priceLevel = &row.PriceLevel
+		}
+		if row.CuisineType != "" {
+			cuisineType = &row.CuisineType
+		}
+		restaurants[i] = locitypes.RestaurantDetailedInfo{
+			ID:               row.ID,
+			Name:             row.Name,
+			Description:      row.Description,
+			Latitude:         row.Latitude,
+			Longitude:        row.Longitude,
+			Address:          address,
+			Website:          website,
+			PhoneNumber:      phoneNumber,
+			OpeningHours:     openingHours,
+			PriceLevel:       priceLevel,
+			Category:         row.Category,
+			Tags:             row.Tags,
+			Images:           row.Images,
+			Rating:           row.Rating,
+			CuisineType:      cuisineType,
+			LlmInteractionID: row.LlmInteractionID.UUID,
+		}
 	}
 	span.SetStatus(codes.Ok, "Restaurants found")
 	return restaurants, nil
@@ -1209,6 +1267,17 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
 	return &restaurant, nil
 }
 
+// searchPOIsRow is a DB row struct for SearchPOIs query
+type searchPOIsRow struct {
+	ID             uuid.UUID `db:"id"`
+	Name           string    `db:"name"`
+	Description    string    `db:"description"`
+	Longitude      float64   `db:"longitude"`
+	Latitude       float64   `db:"latitude"`
+	Category       string    `db:"category"`
+	DistanceMeters float64   `db:"distance_meters"`
+}
+
 func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "SearchPOIs", trace.WithAttributes(
 		attribute.Float64("location.latitude", filter.Location.Latitude),
@@ -1220,15 +1289,15 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 
 	l := r.logger.With(slog.String("method", "SearchPOIs"))
 
-	// Base query using PostGIS for geospatial filtering
+	// Base query using PostGIS for geospatial filtering with COALESCE for nullable fields
 	query := `
         SELECT
             id,
             name,
-            description,
+            COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            category,
+            COALESCE(category, '') AS category,
             ST_Distance(
                 location,
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -1265,46 +1334,25 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to search points_of_interest: %w", err)
 	}
-	defer rows.Close()
 
-	// Collect results
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var distanceMeters float64
-		var description sql.NullString // Handle NULL description
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&distanceMeters,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan POI row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan POI row: %w", err)
-		}
-
-		// Set description if valid
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-
-		// Convert distance from meters to kilometers
-		poi.Distance = distanceMeters / 1000
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[searchPOIsRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
 	}
 
-	// Check for errors during row iteration
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.Description,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			Distance:       row.DistanceMeters / 1000, // Convert meters to km
+		}
 	}
 
 	// Log and set span status
@@ -1390,35 +1438,11 @@ func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, p
 		span.RecordError(err)
 		return nil, 0, fmt.Errorf("failed to query user_saved_itineraries: %w", err)
 	}
-	defer rows.Close()
 
-	var itineraries []locitypes.UserSavedItinerary
-	for rows.Next() {
-		var itinerary locitypes.UserSavedItinerary
-		if err := rows.Scan(
-			&itinerary.ID,
-			&itinerary.UserID,
-			&itinerary.SourceLlmInteractionID,
-			&itinerary.SessionID,
-			&itinerary.PrimaryCityID,
-			&itinerary.Title,
-			&itinerary.Description,
-			&itinerary.MarkdownContent,
-			&itinerary.Tags,
-			&itinerary.EstimatedDurationDays,
-			&itinerary.EstimatedCostLevel,
-			&itinerary.IsPublic,
-		); err != nil {
-			if err == pgx.ErrNoRows {
-				continue // No more rows to scan
-			}
-			return nil, 0, fmt.Errorf("failed to scan user_saved_itineraries row: %w", err)
-		}
-		itineraries = append(itineraries, itinerary)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating user_saved_itineraries rows: %w", err)
+	itineraries, err := pgx.CollectRows(rows, pgx.RowToStructByName[locitypes.UserSavedItinerary])
+	if err != nil {
+		span.RecordError(err)
+		return nil, 0, fmt.Errorf("failed to collect user_saved_itineraries rows: %w", err)
 	}
 
 	countQuery := `
@@ -1677,6 +1701,17 @@ func (r *RepositoryImpl) CityExists(ctx context.Context, cityID uuid.UUID) (bool
 	return exists, nil
 }
 
+// similarPOIRow is a DB row struct for FindSimilarPOIs query
+type similarPOIRow struct {
+	ID              uuid.UUID `db:"id"`
+	Name            string    `db:"name"`
+	Description     string    `db:"description"`
+	Longitude       float64   `db:"longitude"`
+	Latitude        float64   `db:"latitude"`
+	Category        string    `db:"category"`
+	SimilarityScore float64   `db:"similarity_score"`
+}
+
 // FindSimilarPOIs finds POIs similar to the provided query embedding using cosine similarity
 func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "FindSimilarPOIs", trace.WithAttributes(
@@ -1700,10 +1735,10 @@ func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []f
         SELECT
             id,
             name,
-            description,
+            COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            poi_type AS category,
+            COALESCE(poi_type, '') AS category,
             1 - (embedding <=> $1::vector) AS similarity_score
         FROM points_of_interest
         WHERE embedding IS NOT NULL
@@ -1723,43 +1758,25 @@ func (r *RepositoryImpl) FindSimilarPOIs(ctx context.Context, queryEmbedding []f
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to search similar POIs: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var similarityScore float64
-		var description sql.NullString
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&similarityScore,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan similar POI row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan similar POI row: %w", err)
-		}
-
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-
-		// Store similarity score in distance field for now (could add dedicated field)
-		poi.Distance = similarityScore
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[similarPOIRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect similar POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect similar POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating similar POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating similar POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.Description,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			Distance:       row.SimilarityScore, // Store similarity score in distance field
+		}
 	}
 
 	l.InfoContext(ctx, "Similar POIs found", slog.Int("count", len(pois)))
@@ -1793,10 +1810,10 @@ func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbeddi
         SELECT
             id,
             name,
-            description,
+            COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            poi_type AS category,
+            COALESCE(poi_type, '') AS category,
             1 - (embedding <=> $1::vector) AS similarity_score
         FROM points_of_interest
         WHERE embedding IS NOT NULL AND city_id = $2
@@ -1816,43 +1833,26 @@ func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbeddi
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to search similar POIs by city: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var similarityScore float64
-		var description sql.NullString
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&similarityScore,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan similar POI row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan similar POI row: %w", err)
-		}
-
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-
-		poi.Distance = similarityScore
-		poi.CityID = cityID
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[similarPOIRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect similar POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect similar POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating similar POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating similar POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.Description,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			Distance:       row.SimilarityScore,
+			CityID:         cityID,
+		}
 	}
 
 	l.InfoContext(ctx, "Similar POIs by city found",
@@ -1865,6 +1865,19 @@ func (r *RepositoryImpl) FindSimilarPOIsByCity(ctx context.Context, queryEmbeddi
 	span.SetStatus(codes.Ok, "Similar POIs by city found")
 
 	return pois, nil
+}
+
+// hybridSearchRow is a DB row struct for SearchPOIsHybrid query
+type hybridSearchRow struct {
+	ID              uuid.UUID `db:"id"`
+	Name            string    `db:"name"`
+	Description     string    `db:"description"`
+	Longitude       float64   `db:"longitude"`
+	Latitude        float64   `db:"latitude"`
+	Category        string    `db:"category"`
+	DistanceMeters  float64   `db:"distance_meters"`
+	SimilarityScore float64   `db:"similarity_score"`
+	HybridScore     float64   `db:"hybrid_score"`
 }
 
 // SearchPOIsHybrid combines spatial filtering with semantic similarity search
@@ -1895,10 +1908,10 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
         SELECT
             id,
             name,
-            description,
+            COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            poi_type AS category,
+            COALESCE(poi_type, '') AS category,
             ST_Distance(
                 location,
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -1956,45 +1969,25 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to execute hybrid POI search: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var distanceMeters, similarityScore, hybridScore float64
-		var description sql.NullString
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&distanceMeters,
-			&similarityScore,
-			&hybridScore,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan hybrid search POI row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan hybrid search POI row: %w", err)
-		}
-
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-
-		// Store the actual distance in meters converted to km
-		poi.Distance = distanceMeters / 1000
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[hybridSearchRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect hybrid search rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect hybrid search rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating hybrid search POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating hybrid search POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.Description,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			Distance:       row.DistanceMeters / 1000, // Convert meters to km
+		}
 	}
 
 	l.InfoContext(ctx, "Hybrid search POIs found",
@@ -2064,6 +2057,17 @@ func (r *RepositoryImpl) UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID
 	return nil
 }
 
+// poiWithoutEmbeddingRow is a DB row struct for GetPOIsWithoutEmbeddings query
+type poiWithoutEmbeddingRow struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Description string    `db:"description"`
+	Longitude   float64   `db:"longitude"`
+	Latitude    float64   `db:"latitude"`
+	Category    string    `db:"category"`
+	CityID      uuid.UUID `db:"city_id"`
+}
+
 // GetPOIsWithoutEmbeddings retrieves POIs that don't have embeddings generated yet
 func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("Repository").Start(ctx, "GetPOIsWithoutEmbeddings", trace.WithAttributes(
@@ -2077,10 +2081,10 @@ func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int
         SELECT
             id,
             name,
-            description,
+            COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            poi_type AS category,
+            COALESCE(poi_type, '') AS category,
             city_id
         FROM points_of_interest
         WHERE embedding IS NULL
@@ -2095,39 +2099,25 @@ func (r *RepositoryImpl) GetPOIsWithoutEmbeddings(ctx context.Context, limit int
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query POIs without embeddings: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var description sql.NullString
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&poi.CityID,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan POI without embedding row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan POI without embedding row: %w", err)
-		}
-
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[poiWithoutEmbeddingRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating POI without embedding rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating POI without embedding rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, len(dbRows))
+	for i, row := range dbRows {
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:             row.ID,
+			Name:           row.Name,
+			DescriptionPOI: row.Description,
+			Longitude:      row.Longitude,
+			Latitude:       row.Latitude,
+			Category:       row.Category,
+			CityID:         row.CityID,
+		}
 	}
 
 	l.InfoContext(ctx, "POIs without embeddings found", slog.Int("count", len(pois)))

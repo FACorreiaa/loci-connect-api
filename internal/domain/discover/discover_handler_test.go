@@ -15,7 +15,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/discover/presenter"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 
-	//chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+	// chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	discoverv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 
@@ -36,18 +36,22 @@ func (s *stubService) GetDiscoverPageData(ctx context.Context, userID uuid.UUID,
 	s.lastCalls = append(s.lastCalls, "GetDiscoverPageData")
 	return s.pageData, s.err
 }
+
 func (s *stubService) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
 	s.lastCalls = append(s.lastCalls, "GetTrendingDiscoveries")
 	return s.trending, s.err
 }
+
 func (s *stubService) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
 	s.lastCalls = append(s.lastCalls, "GetFeaturedCollections")
 	return s.featured, s.err
 }
+
 func (s *stubService) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, page, limit int) ([]locitypes.ChatSession, int, error) {
 	s.lastCalls = append(s.lastCalls, "GetRecentDiscoveries")
 	return s.recent, len(s.recent), s.err
 }
+
 func (s *stubService) GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error) {
 	s.lastCalls = append(s.lastCalls, "GetCategoryResults")
 	return s.category, s.err

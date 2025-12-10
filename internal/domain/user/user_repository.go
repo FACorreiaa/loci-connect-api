@@ -18,7 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ UserRepo = (*PostgresUserRepo)(nil)
@@ -62,16 +62,39 @@ func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *PostgresUs
 	}
 }
 
+// changePasswordRow is used for ChangePassword query
+type changePasswordRow struct {
+	ID           string `db:"id"`
+	PasswordHash string `db:"password_hash"`
+}
+
+// existsRow is used for EXISTS queries that return a single bool
+type existsRow struct {
+	Exists bool `db:"exists"`
+}
+
+// isActiveRow is used for querying is_active column
+type isActiveRow struct {
+	IsActive bool `db:"is_active"`
+}
+
 func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error {
-	var userID, hashedPassword string
-	err := r.pgpool.QueryRow(ctx,
+	rows, err := r.pgpool.Query(ctx,
 		"SELECT id, password_hash FROM users WHERE email = $1",
-		email).Scan(&userID, &hashedPassword)
+		email)
 	if err != nil {
+		return fmt.Errorf("failed to query user: %w", err)
+	}
+
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[changePasswordRow])
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
+		}
 		return fmt.Errorf("user not found: %w", err)
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(oldPassword))
+	err = bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(oldPassword))
 	if err != nil {
 		return errors.New("invalid old password")
 	}
@@ -83,7 +106,7 @@ func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPasswor
 
 	_, err = r.pgpool.Exec(ctx,
 		"UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
-		string(newHashedPassword), time.Now(), userID)
+		string(newHashedPassword), time.Now(), row.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
@@ -91,7 +114,7 @@ func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPasswor
 	// Invalidate all refresh tokens
 	_, err = r.pgpool.Exec(ctx,
 		"UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL",
-		time.Now(), userID)
+		time.Now(), row.ID)
 	if err != nil {
 		fmt.Printf("Warning: failed to invalidate refresh tokens: %v\n", err)
 	}
@@ -99,60 +122,104 @@ func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPasswor
 	return nil
 }
 
+// userProfileRow is a local struct for GetUserByID query that includes stats fields
+type userProfileRow struct {
+	ID              uuid.UUID  `db:"id"`
+	Username        *string    `db:"username"`
+	Firstname       *string    `db:"firstname"`
+	Lastname        *string    `db:"lastname"`
+	PhoneNumber     *string    `db:"phone"`
+	Age             *int       `db:"age"`
+	City            *string    `db:"city"`
+	Country         *string    `db:"country"`
+	Email           string     `db:"email"`
+	DisplayName     *string    `db:"display_name"`
+	ProfileImageURL *string    `db:"profile_image_url"`
+	EmailVerifiedAt *time.Time `db:"email_verified_at"`
+	AboutYou        *string    `db:"about_you"`
+	Location        *string    `db:"location"`
+	Interests       []string   `db:"interests"`
+	Badges          []string   `db:"badges"`
+	PlacesVisited   int        `db:"places_visited"`
+	ReviewsWritten  int        `db:"reviews_written"`
+	ListsCreated    int        `db:"lists_created"`
+	Followers       int        `db:"followers"`
+	Following       int        `db:"following"`
+	IsActive        bool       `db:"is_active"`
+	LastLoginAt     *time.Time `db:"last_login_at"`
+	Theme           *string    `db:"theme"`
+	Language        *string    `db:"language"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at"`
+}
+
 func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*locitypes.UserProfile, error) {
-	var user locitypes.UserProfile
-	var interests, badges []string
 	query := `
 		SELECT id, username, firstname, lastname, phone, age, city,
 		       country, email, display_name, profile_image_url,
-		       email_verified_at, about_you, location, interests, badges,
-		       places_visited, reviews_written, lists_created, followers, following,
+		       email_verified_at, about_you, location, 
+		       COALESCE(interests, '{}') as interests, 
+		       COALESCE(badges, '{}') as badges,
+		       COALESCE(places_visited, 0) as places_visited, 
+		       COALESCE(reviews_written, 0) as reviews_written, 
+		       COALESCE(lists_created, 0) as lists_created, 
+		       COALESCE(followers, 0) as followers, 
+		       COALESCE(following, 0) as following,
 		       is_active, last_login_at, theme, language, created_at, updated_at
 		FROM users WHERE id = $1 AND is_active = TRUE
 	`
 
-	stats := &locitypes.UserStats{}
-	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Firstname,
-		&user.Lastname,
-		&user.PhoneNumber,
-		&user.Age,
-		&user.City,
-		&user.Country,
-		&user.Email,
-		&user.DisplayName,
-		&user.ProfileImageURL,
-		&user.EmailVerifiedAt,
-		&user.AboutYou,
-		&user.Location,
-		&interests,
-		&badges,
-		&stats.PlacesVisited,
-		&stats.ReviewsWritten,
-		&stats.ListsCreated,
-		&stats.Followers,
-		&stats.Following,
-		&user.IsActive,
-		&user.LastLoginAt,
-		&user.Theme,
-		&user.Language,
-		&user.CreatedAt,
-		&user.UpdatedAt)
+	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
+		return nil, fmt.Errorf("failed to query user: %w", err)
+	}
+
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[userProfileRow])
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
+		}
 		return nil, fmt.Errorf("user not found: %w", err)
+	}
+
+	user := &locitypes.UserProfile{
+		ID:              row.ID,
+		Email:           row.Email,
+		Username:        row.Username,
+		Firstname:       row.Firstname,
+		Lastname:        row.Lastname,
+		PhoneNumber:     row.PhoneNumber,
+		Age:             row.Age,
+		City:            row.City,
+		Country:         row.Country,
+		DisplayName:     row.DisplayName,
+		ProfileImageURL: row.ProfileImageURL,
+		EmailVerifiedAt: row.EmailVerifiedAt,
+		AboutYou:        row.AboutYou,
+		Location:        row.Location,
+		Interests:       row.Interests,
+		Badges:          row.Badges,
+		IsActive:        row.IsActive,
+		LastLoginAt:     row.LastLoginAt,
+		Theme:           row.Theme,
+		Language:        row.Language,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
 	}
 
 	// Set additional fields for frontend compatibility
 	user.Bio = user.AboutYou           // Map about_you to bio
 	user.Avatar = user.ProfileImageURL // Map profile_image_url to avatar
 	user.JoinedDate = user.CreatedAt   // Map created_at to joinedDate
-	user.Interests = interests
-	user.Badges = badges
-	user.Stats = stats
+	user.Stats = &locitypes.UserStats{
+		PlacesVisited:  row.PlacesVisited,
+		ReviewsWritten: row.ReviewsWritten,
+		ListsCreated:   row.ListsCreated,
+		Followers:      row.Followers,
+		Following:      row.Following,
+	}
 
-	return &user, nil
+	return user, nil
 }
 
 func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, params locitypes.UpdateProfileParams) error {
@@ -296,11 +363,12 @@ func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, 
 		l.WarnContext(ctx, "User not found or no update occurred", slog.Int64("rows_affected", tag.RowsAffected()))
 		span.SetStatus(codes.Error, "User not found or no change")
 		// Check if user exists to differentiate "not found" vs "no effective change"
-		var exists bool
-		// Use a separate query or modify the UPDATE to return something on match
-		checkErr := r.pgpool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND is_active = TRUE)", userID).Scan(&exists)
-		if checkErr == nil && !exists {
-			return fmt.Errorf("user not found for update: %w", locitypes.ErrNotFound)
+		checkRows, checkErr := r.pgpool.Query(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND is_active = TRUE) as exists", userID)
+		if checkErr == nil {
+			existsRow, collectErr := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[existsRow])
+			if collectErr == nil && !existsRow.Exists {
+				return fmt.Errorf("user not found for update: %w", locitypes.ErrNotFound)
+			}
 		}
 		// If user exists, maybe the provided values were the same as existing ones.
 		// Or maybe user was inactive. Treat as not found for simplicity for now.
@@ -381,16 +449,20 @@ func (r *PostgresUserRepo) MarkEmailAsVerified(ctx context.Context, userID uuid.
 
 	if tag.RowsAffected() == 0 {
 		// Check if the user exists
-		var exists bool
-		err := r.pgpool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", userID).Scan(&exists)
+		checkRows, err := r.pgpool.Query(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as exists", userID)
 		if err != nil {
 			l.ErrorContext(ctx, "Failed to check if user exists", slog.Any("error", err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "DB query failed")
 			return fmt.Errorf("database error checking user existence: %w", err)
 		}
+		existsResult, collectErr := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[existsRow])
+		if collectErr != nil {
+			l.ErrorContext(ctx, "Failed to collect exists result", slog.Any("error", collectErr))
+			return fmt.Errorf("database error checking user existence: %w", collectErr)
+		}
 
-		if !exists {
+		if !existsResult.Exists {
 			err := fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
 			l.WarnContext(ctx, "Attempted to mark email as verified for non-existent user")
 			span.RecordError(err)
@@ -432,8 +504,17 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 	}
 
 	// First, check if the user exists and is active
-	var isActive bool
-	err = tx.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive)
+	activeRows, err := tx.Query(ctx, "SELECT is_active FROM users WHERE id = $1", userID)
+	if err != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+		l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB query failed")
+		return fmt.Errorf("database error checking user status: %w", err)
+	}
+	activeResult, err := pgx.CollectOneRow(activeRows, pgx.RowToStructByName[isActiveRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -452,6 +533,7 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 		span.SetStatus(codes.Error, "DB query failed")
 		return fmt.Errorf("database error checking user status: %w", err)
 	}
+	isActive := activeResult.IsActive
 
 	if !isActive {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -526,8 +608,14 @@ func (r *PostgresUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID)
 	l.DebugContext(ctx, "Reactivating user")
 
 	// Check if the user exists and is inactive
-	var isActive bool
-	err := r.pgpool.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive)
+	activeRows, err := r.pgpool.Query(ctx, "SELECT is_active FROM users WHERE id = $1", userID)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB query failed")
+		return fmt.Errorf("database error checking user status: %w", err)
+	}
+	activeResult, err := pgx.CollectOneRow(activeRows, pgx.RowToStructByName[isActiveRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			l.WarnContext(ctx, "Attempted to reactivate non-existent user")
@@ -540,6 +628,7 @@ func (r *PostgresUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID)
 		span.SetStatus(codes.Error, "DB query failed")
 		return fmt.Errorf("database error checking user status: %w", err)
 	}
+	isActive := activeResult.IsActive
 
 	if isActive {
 		l.InfoContext(ctx, "User is already active")

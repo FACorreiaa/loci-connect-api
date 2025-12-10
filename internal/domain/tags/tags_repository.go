@@ -16,7 +16,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
@@ -59,6 +59,37 @@ func NewRepositoryImpl(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryIm
 		logger: logger,
 		pgpool: pgxpool,
 	}
+}
+
+// tagRow is used for most tag queries
+type tagRow struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Description *string   `db:"description"`
+	TagType     string    `db:"tag_type"`
+	Source      string    `db:"source"`
+	Active      bool      `db:"active"`
+	CreatedAt   time.Time `db:"created_at"`
+}
+
+// tagRowWithoutActive is used for queries that don't include active column
+type tagRowWithoutActive struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Description *string   `db:"description"`
+	TagType     string    `db:"tag_type"`
+	Source      string    `db:"source"`
+	CreatedAt   time.Time `db:"created_at"`
+}
+
+// tagRowForProfile is used for GetTagsForProfile query which includes updated_at
+type tagRowForProfile struct {
+	ID          uuid.UUID  `db:"id"`
+	Name        string     `db:"name"`
+	TagType     string     `db:"tag_type"`
+	Description *string    `db:"description"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at"`
 }
 
 // GetAll implements user.UserRepo.
@@ -107,32 +138,28 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*locit
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching global tags: %w", err)
 	}
-	defer rows.Close()
 
-	var tags []*locitypes.Tags
-	for rows.Next() {
-		var t locitypes.Tags
-		err := rows.Scan(
-			&t.ID,
-			&t.Name,
-			&t.Description,
-			&t.TagType,
-			&t.Source,
-			&t.Active,
-			&t.CreatedAt,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan global tag row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("database error scanning global tag: %w", err)
-		}
-		tags = append(tags, &t)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[tagRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect tag rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading global tags: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating global tag rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("database error reading global tags: %w", err)
+	tags := make([]*locitypes.Tags, 0, len(dbRows))
+	for _, row := range dbRows {
+		source := row.Source
+		active := row.Active
+		tags = append(tags, &locitypes.Tags{
+			ID:          row.ID,
+			Name:        row.Name,
+			Description: row.Description,
+			TagType:     row.TagType,
+			Source:      &source,
+			Active:      &active,
+			CreatedAt:   row.CreatedAt,
+		})
 	}
 
 	l.DebugContext(ctx, "Fetched all active global tags successfully", slog.Int("count", len(tags)))
@@ -142,7 +169,6 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*locit
 
 // Get implements user.UserRepo.
 func (r *RepositoryImpl) Get(ctx context.Context, userID, tagID uuid.UUID) (*locitypes.Tags, error) {
-	var tag locitypes.Tags
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetUserAvoidTags", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "user_avoid_tags, global_tags"),
@@ -172,32 +198,47 @@ func (r *RepositoryImpl) Get(ctx context.Context, userID, tagID uuid.UUID) (*loc
         SELECT
             upt.id,
             upt.name,
-            upt.description, -- Use upt.description here
+            upt.description,
             upt.tag_type,
             'personal' AS source,
             upt.created_at
         FROM user_personal_tags upt
         WHERE upt.user_id = $1
     ) AS combined_tags
-    WHERE combined_tags.id = $2 -- Filter the combined set by the specific tag_id LAST`
+    WHERE combined_tags.id = $2`
 
-	err := r.pgpool.QueryRow(ctx, query, userID, tagID).Scan(
-		&tag.ID,
-		&tag.Name,
-		&tag.Description,
-		&tag.Source,
-		&tag.TagType,
-		&tag.CreatedAt,
-	)
+	rows, err := r.pgpool.Query(ctx, query, userID, tagID)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query user avoid tags", slog.Any("error", err))
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching avoid tags: %w", err)
 	}
 
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[tagRowWithoutActive])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			l.WarnContext(ctx, "Tag not found", slog.String("tagID", tagID.String()))
+			span.SetStatus(codes.Error, "Tag not found")
+			return nil, locitypes.ErrNotFound
+		}
+		l.ErrorContext(ctx, "Failed to read tag row", slog.Any("error", err))
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error fetching avoid tags: %w", err)
+	}
+
+	source := row.Source
+	tag := &locitypes.Tags{
+		ID:          row.ID,
+		Name:        row.Name,
+		Description: row.Description,
+		TagType:     row.TagType,
+		Source:      &source,
+		CreatedAt:   row.CreatedAt,
+	}
+
 	l.DebugContext(ctx, "Fetched user avoid tags successfully")
 	span.SetStatus(codes.Ok, "Avoid tags fetched")
-	return &tag, nil
+	return tag, nil
 }
 
 // Create creates a new personal tag for a specific user.
@@ -406,19 +447,29 @@ func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*locity
 	l := r.logger.With(slog.String("method", "GetTagByName"), slog.String("name", name))
 	l.DebugContext(ctx, "Fetching tag by name")
 
+	// Need a struct without source and active since this query doesn't select them
+	type tagByNameRow struct {
+		ID          uuid.UUID `db:"id"`
+		Name        string    `db:"name"`
+		Description *string   `db:"description"`
+		TagType     string    `db:"tag_type"`
+		CreatedAt   time.Time `db:"created_at"`
+	}
+
 	query := `
         SELECT id, name, description, tag_type, created_at
         FROM global_tags
         WHERE name = $1 AND active = TRUE`
 
-	var tag locitypes.Tags
-	err := r.pgpool.QueryRow(ctx, query, name).Scan(
-		&tag.ID,
-		&tag.Name,
-		&tag.Description,
-		&tag.TagType,
-		&tag.CreatedAt,
-	)
+	rows, err := r.pgpool.Query(ctx, query, name)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to query tag by name", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB query failed")
+		return nil, fmt.Errorf("database error fetching tag: %w", err)
+	}
+
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[tagByNameRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			l.WarnContext(ctx, "Tag not found", slog.String("name", name))
@@ -431,9 +482,17 @@ func (r *RepositoryImpl) GetTagByName(ctx context.Context, name string) (*locity
 		return nil, fmt.Errorf("database error fetching tag: %w", err)
 	}
 
+	tag := &locitypes.Tags{
+		ID:          row.ID,
+		Name:        row.Name,
+		Description: row.Description,
+		TagType:     row.TagType,
+		CreatedAt:   row.CreatedAt,
+	}
+
 	l.DebugContext(ctx, "Fetched tag by name successfully", slog.String("tagID", tag.ID.String()))
 	span.SetStatus(codes.Ok, "Tag fetched")
-	return &tag, nil
+	return tag, nil
 }
 
 // LinkPersonalTagToProfile links a tag to a profile.
@@ -496,31 +555,24 @@ func (r *RepositoryImpl) GetTagsForProfile(ctx context.Context, profileID uuid.U
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching tags for profile: %w", err)
 	}
-	defer rows.Close()
 
-	var tags []*locitypes.Tags
-	for rows.Next() {
-		var tag locitypes.Tags
-		err := rows.Scan(
-			&tag.ID,
-			&tag.Name,
-			&tag.TagType,
-			&tag.Description,
-			&tag.CreatedAt,
-			&tag.UpdatedAt,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan tag row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("database error scanning tag: %w", err)
-		}
-		tags = append(tags, &tag)
-	}
-
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating tag rows", slog.Any("error", err))
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[tagRowForProfile])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect tag rows", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("database error reading tags: %w", err)
+	}
+
+	tags := make([]*locitypes.Tags, 0, len(dbRows))
+	for _, row := range dbRows {
+		tags = append(tags, &locitypes.Tags{
+			ID:          row.ID,
+			Name:        row.Name,
+			TagType:     row.TagType,
+			Description: row.Description,
+			CreatedAt:   row.CreatedAt,
+			UpdatedAt:   row.UpdatedAt,
+		})
 	}
 
 	l.DebugContext(ctx, "Fetched tags for profile successfully", slog.Int("count", len(tags)))

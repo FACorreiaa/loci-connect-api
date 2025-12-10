@@ -8,46 +8,46 @@ import (
 )
 
 type User struct {
-	ID              uuid.UUID
-	Email           string
-	Username        string
-	HashedPassword  string
-	DisplayName     string
-	AvatarURL       *string
-	Role            string
-	IsActive        bool
-	EmailVerifiedAt *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	LastLoginAt     *time.Time
+	ID              uuid.UUID  `db:"id"`
+	Email           string     `db:"email"`
+	Username        string     `db:"username"`
+	HashedPassword  string     `db:"hashed_password"`
+	DisplayName     string     `db:"display_name"`
+	AvatarURL       *string    `db:"avatar_url"`
+	Role            string     `db:"role"`
+	IsActive        bool       `db:"is_active"`
+	EmailVerifiedAt *time.Time `db:"email_verified_at"`
+	CreatedAt       time.Time  `db:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at"`
+	LastLoginAt     *time.Time `db:"last_login_at"`
 }
 
 type UserSession struct {
-	ID                 uuid.UUID
-	UserID             uuid.UUID
-	HashedRefreshToken string
-	UserAgent          *string
-	ClientIP           *string
-	ExpiresAt          time.Time
-	CreatedAt          time.Time
+	ID                 uuid.UUID `db:"id"`
+	UserID             uuid.UUID `db:"user_id"`
+	HashedRefreshToken string    `db:"hashed_refresh_token"`
+	UserAgent          *string   `db:"user_agent"`
+	ClientIP           *string   `db:"client_ip"`
+	ExpiresAt          time.Time `db:"expires_at"`
+	CreatedAt          time.Time `db:"created_at"`
 }
 
 type UserToken struct {
-	TokenHash string
-	UserID    uuid.UUID
-	Type      string
-	ExpiresAt time.Time
-	CreatedAt time.Time
+	TokenHash string    `db:"token_hash"`
+	UserID    uuid.UUID `db:"user_id"`
+	Type      string    `db:"type"`
+	ExpiresAt time.Time `db:"expires_at"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 type OAuthIdentity struct {
-	ProviderName         string
-	ProviderUserID       string
-	UserID               uuid.UUID
-	ProviderAccessToken  *string
-	ProviderRefreshToken *string
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ProviderName         string    `db:"provider_name"`
+	ProviderUserID       string    `db:"provider_user_id"`
+	UserID               uuid.UUID `db:"user_id"`
+	ProviderAccessToken  *string   `db:"provider_access_token"`
+	ProviderRefreshToken *string   `db:"provider_refresh_token"`
+	CreatedAt            time.Time `db:"created_at"`
+	UpdatedAt            time.Time `db:"updated_at"`
 }
 
 type AuthRepository interface {
