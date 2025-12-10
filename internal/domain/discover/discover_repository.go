@@ -198,7 +198,7 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 
 	// Get count
 	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1`, userID).Scan(&count)
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) as count FROM chat_sessions WHERE user_id = $1`, userID).Scan(&count)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query count", slog.Any("error", err))
 		return nil, 0, fmt.Errorf("failed to count recent discoveries: %w", err)
@@ -263,8 +263,8 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 	l.InfoContext(ctx, "Successfully fetched recent discoveries",
 		slog.String("user_id", userID.String()),
 		slog.Int("count", len(sessions)),
-		slog.Int("total", countResult.Count))
-	return sessions, countResult.Count, nil
+		slog.Int("total", count))
+	return sessions, count, nil
 }
 
 // discoverResultRow is a row struct for GetPOIsByCategory query

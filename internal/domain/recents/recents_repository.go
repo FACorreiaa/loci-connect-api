@@ -322,28 +322,22 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 	// Use the same args except for limit and offset
 	countArgs := args[:len(args)-2]
 
-	countRows, err := r.pgpool.Query(ctx, countWrapperQuery, countArgs...)
-	if err != nil {
+	var totalCount int
+	if err := r.pgpool.QueryRow(ctx, countWrapperQuery, countArgs...).Scan(&totalCount); err != nil {
 		l.ErrorContext(ctx, "Failed to query total recent interactions count", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get total count: %w", err)
 	}
 
-	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[countRow])
-	if err != nil {
-		l.ErrorContext(ctx, "Failed to read count result", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to read total count: %w", err)
-	}
-
 	l.InfoContext(ctx, "Successfully retrieved recent interactions",
-		slog.Int("cities_count", countResult.Count),
+		slog.Int("cities_count", totalCount),
 		slog.String("user_id", userID.String()))
 
-	span.SetAttributes(attribute.Int("results.cities", countResult.Count))
+	span.SetAttributes(attribute.Int("results.cities", totalCount))
 	span.SetStatus(codes.Ok, "Recent interactions retrieved")
 
 	return &locitypes.RecentInteractionsResponse{
 		Cities: cities,
-		Total:  countResult.Count,
+		Total:  totalCount,
 	}, nil
 }
 
@@ -729,40 +723,20 @@ func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, us
 	itineraries := make([]locitypes.UserSavedItinerary, 0, len(dbRows))
 	for _, row := range dbRows {
 		itinerary := locitypes.UserSavedItinerary{
-			ID:              row.ID,
-			UserID:          row.UserID,
-			Title:           row.Title,
-			MarkdownContent: row.MarkdownContent,
-			Tags:            row.Tags,
-			IsPublic:        row.IsPublic,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
-		}
-
-		// Convert nullable fields to pgtype/sql types
-		if row.SourceLlmInteractionID != nil {
-			itinerary.SourceLlmInteractionID.Bytes = *row.SourceLlmInteractionID
-			itinerary.SourceLlmInteractionID.Valid = true
-		}
-		if row.SessionID != nil {
-			itinerary.SessionID.Bytes = *row.SessionID
-			itinerary.SessionID.Valid = true
-		}
-		if row.PrimaryCityID != nil {
-			itinerary.PrimaryCityID.Bytes = *row.PrimaryCityID
-			itinerary.PrimaryCityID.Valid = true
-		}
-		if row.Description != nil {
-			itinerary.Description.String = *row.Description
-			itinerary.Description.Valid = true
-		}
-		if row.EstimatedDurationDays != nil {
-			itinerary.EstimatedDurationDays.Int32 = *row.EstimatedDurationDays
-			itinerary.EstimatedDurationDays.Valid = true
-		}
-		if row.EstimatedCostLevel != nil {
-			itinerary.EstimatedCostLevel.Int32 = *row.EstimatedCostLevel
-			itinerary.EstimatedCostLevel.Valid = true
+			ID:                     row.ID,
+			UserID:                 row.UserID,
+			Title:                  row.Title,
+			MarkdownContent:        row.MarkdownContent,
+			Tags:                   row.Tags,
+			IsPublic:               row.IsPublic,
+			CreatedAt:              row.CreatedAt,
+			UpdatedAt:              row.UpdatedAt,
+			SourceLlmInteractionID: row.SourceLlmInteractionID,
+			SessionID:              row.SessionID,
+			PrimaryCityID:          row.PrimaryCityID,
+			Description:            row.Description,
+			EstimatedDurationDays:  row.EstimatedDurationDays,
+			EstimatedCostLevel:     row.EstimatedCostLevel,
 		}
 
 		itineraries = append(itineraries, itinerary)

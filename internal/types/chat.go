@@ -2,7 +2,6 @@ package locitypes
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	a "github.com/petar-dambovaliev/aho-corasick"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"google.golang.org/genai"
 )
@@ -114,20 +112,20 @@ type UserLocation struct {
 }
 
 type UserSavedItinerary struct {
-	ID                     uuid.UUID      `json:"id"`
-	UserID                 uuid.UUID      `json:"user_id"`
-	SourceLlmInteractionID pgtype.UUID    `json:"source_llm_interaction_id,omitempty"` // Nullable UUID for the source LLM interaction
-	SessionID              pgtype.UUID    `json:"session_id,omitempty"`                // Nullable UUID for the chat session
-	PrimaryCityID          pgtype.UUID    `json:"primary_city_id,omitempty"`           // Nullable UUID for the primary city
-	Title                  string         `json:"title"`
-	Description            sql.NullString `json:"description"`             // Use sql.NullString for nullable text fields
-	MarkdownContent        string         `json:"markdown_content"`        // Markdown content for the itinerary
-	Tags                   []string       `json:"tags"`                    // Tags for the itinerary
-	EstimatedDurationDays  sql.NullInt32  `json:"estimated_duration_days"` // Nullable int32 for estimated duration in days
-	EstimatedCostLevel     sql.NullInt32  `json:"estimated_cost_level"`    // Nullable int32 for estimated cost level
-	IsPublic               bool           `json:"is_public"`               // Indicates if the itinerary is public
-	CreatedAt              time.Time      `json:"created_at"`
-	UpdatedAt              time.Time      `json:"updated_at"`
+	ID                     uuid.UUID  `json:"id"`
+	UserID                 uuid.UUID  `json:"user_id"`
+	SourceLlmInteractionID *uuid.UUID `json:"source_llm_interaction_id,omitempty"` // Nullable UUID for source LLM
+	SessionID              *uuid.UUID `json:"session_id,omitempty"`                // Nullable UUID for chat session
+	PrimaryCityID          *uuid.UUID `json:"primary_city_id,omitempty"`           // Nullable UUID for primary city
+	Title                  string     `json:"title"`
+	Description            *string    `json:"description"`             // Nullable text
+	MarkdownContent        string     `json:"markdown_content"`        // Markdown content
+	Tags                   []string   `json:"tags"`                    // Tags
+	EstimatedDurationDays  *int32     `json:"estimated_duration_days"` // Nullable int32
+	EstimatedCostLevel     *int32     `json:"estimated_cost_level"`    // Nullable int32
+	IsPublic               bool       `json:"is_public"`               // Indicates if public
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type UpdateItineraryRequest struct {

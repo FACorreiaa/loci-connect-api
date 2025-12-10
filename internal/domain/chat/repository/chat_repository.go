@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -81,6 +79,16 @@ type llmSuggestedPOIRow struct {
 	Longitude   float64   `db:"longitude"`
 	Latitude    float64   `db:"latitude"`
 	Distance    float64   `db:"distance"`
+}
+
+type sessionPOIRow struct {
+	ID             uuid.UUID `db:"id"`
+	Name           string    `db:"name"`
+	Latitude       *float64  `db:"latitude"`
+	Longitude      *float64  `db:"longitude"`
+	Category       *string   `db:"category"`
+	DescriptionPOI *string   `db:"description_poi"`
+	Distance       *float64  `db:"distance"`
 }
 
 type llmInteractionRow struct {
@@ -152,13 +160,20 @@ type chatSessionAggRow struct {
 	FirstInteraction      time.Time `db:"first_interaction"`
 	LastInteraction       time.Time `db:"last_interaction"`
 	InteractionCount      int       `db:"interaction_count"`
-	AvgLatencyMs          int64     `db:"avg_latency_ms"`
-	TotalTokens           int64     `db:"total_tokens"`
-	TotalPromptTokens     int64     `db:"total_prompt_tokens"`
-	TotalCompletionTokens int64     `db:"total_completion_tokens"`
-	TotalLatencyMs        int64     `db:"total_latency_ms"`
+	AvgLatencyMs          *int64    `db:"avg_latency_ms"`
+	TotalTokens           *int64    `db:"total_tokens"`
+	TotalPromptTokens     *int64    `db:"total_prompt_tokens"`
+	TotalCompletionTokens *int64    `db:"total_completion_tokens"`
+	TotalLatencyMs        *int64    `db:"total_latency_ms"`
 	ModelsUsed            []string  `db:"models_used"`
 	InteractionsJSON      string    `db:"interactions"`
+}
+
+func ptrToInt64(v *int64) int64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }
 
 func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
@@ -310,6 +325,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 				for i := 0; i < poiBatch.Len(); i++ {
 					_, execErr := br.Exec()
 					if execErr != nil {
+						// Consider how to handle partial failures. Log and continue, or return error?
 						err = fmt.Errorf("failed to insert itinerary_poi in batch (operation %d of %d for itinerary %s): %w", i+1, poiBatch.Len(), itineraryID.String(), execErr)
 						if closeErr := br.Close(); closeErr != nil {
 							r.logger.ErrorContext(ctx, "Failed to close batch for itinerary_pois after an exec error", "close_error", closeErr, "original_batch_error", err)
@@ -523,17 +539,17 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locit
 	`
 	var savedItineraryID uuid.UUID
 	err = tx.QueryRow(ctx, query,
-		&itinerary.UserID,
-		&itinerary.SourceLlmInteractionID,
-		&itinerary.SessionID,
-		&itinerary.PrimaryCityID,
-		&itinerary.Title,
-		&itinerary.Description,
-		&itinerary.MarkdownContent,
-		&itinerary.Tags,
-		&itinerary.EstimatedDurationDays,
-		&itinerary.EstimatedCostLevel,
-		&itinerary.IsPublic,
+		itinerary.UserID,
+		itinerary.SourceLlmInteractionID,
+		itinerary.SessionID,
+		itinerary.PrimaryCityID,
+		itinerary.Title,
+		itinerary.Description,
+		itinerary.MarkdownContent,
+		itinerary.Tags,
+		itinerary.EstimatedDurationDays,
+		itinerary.EstimatedCostLevel,
+		itinerary.IsPublic,
 	).Scan(&savedItineraryID)
 	if err != nil {
 		span.RecordError(err)
@@ -553,14 +569,14 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locit
 		slog.String("user_id", itinerary.UserID.String()),
 		slog.String("title", itinerary.Title),
 		slog.String("session_id", func() string {
-			if itinerary.SessionID.Valid {
-				return uuid.UUID(itinerary.SessionID.Bytes).String()
+			if itinerary.SessionID != nil {
+				return itinerary.SessionID.String()
 			}
 			return "null"
 		}()),
 		slog.String("source_llm_interaction_id", func() string {
-			if itinerary.SourceLlmInteractionID.Valid {
-				return uuid.UUID(itinerary.SourceLlmInteractionID.Bytes).String()
+			if itinerary.SourceLlmInteractionID != nil {
+				return itinerary.SourceLlmInteractionID.String()
 			}
 			return "null"
 		}()))
@@ -737,82 +753,6 @@ func (r *RepositoryImpl) RemoveChatFromBookmark(ctx context.Context, userID, iti
 		return fmt.Errorf("failed to delete user_saved_itinerary with ID %s: %w", itineraryID, err)
 	}
 
-	//if tag.RowsAffected() == 0 {
-	//	// Debug: List all itineraries for this user to help with debugging
-	//	r.logger.InfoContext(ctx, "Attempting to remove non-existent itinerary, debugging available itineraries",
-	//		slog.String("requested_itinerary_id", itineraryID.String()),
-	//		slog.String("user_id", userID.String()))
-	//
-	//	debugQuery := `SELECT id, title, session_id, source_llm_interaction_id, created_at FROM user_saved_itineraries WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`
-	//	rows, debugErr := r.pgpool.Query(ctx, debugQuery, userID)
-	//	if debugErr != nil {
-	//		r.logger.ErrorContext(ctx, "Failed to execute debug query", slog.Any("error", debugErr))
-	//	} else {
-	//		defer rows.Close()
-	//		count := 0
-	//		for rows.Next() {
-	//			var id uuid.UUID
-	//			var title string
-	//			var createdAt time.Time
-	//			var sessionIDStr, sourceIDStr sql.NullString
-	//
-	//			if scanErr := rows.Scan(&id, &title, &sessionIDStr, &sourceIDStr, &createdAt); scanErr == nil {
-	//				count++
-	//				r.logger.InfoContext(ctx, "Found existing itinerary",
-	//					slog.Int("index", count),
-	//					slog.String("id", id.String()),
-	//					slog.String("title", title),
-	//					slog.String("session_id", func() string {
-	//						if sessionIDStr.Valid {
-	//							return sessionIDStr.String
-	//						}
-	//						return "null"
-	//					}()),
-	//					slog.String("source_llm_interaction_id", func() string {
-	//						if sourceIDStr.Valid {
-	//							return sourceIDStr.String
-	//						}
-	//						return "null"
-	//					}()),
-	//					slog.Time("created_at", createdAt))
-	//			} else {
-	//				r.logger.WarnContext(ctx, "Failed to scan debug row", slog.Any("error", scanErr))
-	//			}
-	//		}
-	//		if count == 0 {
-	//			r.logger.InfoContext(ctx, "No itineraries found for user")
-	//		} else {
-	//			r.logger.InfoContext(ctx, "Debug query completed", slog.Int("total_found", count))
-	//		}
-	//	}
-	//
-	//	// Check if the itinerary exists but belongs to a different user
-	//	var existsForOtherUser bool
-	//	checkQuery := `SELECT EXISTS(SELECT 1 FROM user_saved_itineraries WHERE id = $1)`
-	//	checkErr := r.pgpool.QueryRow(ctx, checkQuery, itineraryID).Scan(&existsForOtherUser)
-	//	if checkErr != nil {
-	//		r.logger.ErrorContext(ctx, "Failed to check if itinerary exists for other user", slog.Any("error", checkErr))
-	//	}
-	//
-	//	if existsForOtherUser {
-	//		err := fmt.Errorf("itinerary with ID %s exists but belongs to a different user (attempted by user %s)", itineraryID, userID)
-	//		r.logger.WarnContext(ctx, "Attempted to delete itinerary belonging to different user",
-	//			slog.String("itineraryID", itineraryID.String()),
-	//			slog.String("userID", userID.String()))
-	//		span.RecordError(err)
-	//		span.SetStatus(codes.Error, "Itinerary belongs to different user")
-	//		return err
-	//	} else {
-	//		// Itinerary doesn't exist - this is actually OK for idempotent DELETE operations
-	//		// The desired outcome (itinerary not existing) is achieved
-	//		r.logger.InfoContext(ctx, "Attempted to delete non-existent itinerary - treating as successful (idempotent)",
-	//			slog.String("itineraryID", itineraryID.String()),
-	//			slog.String("userID", userID.String()))
-	//		span.SetStatus(codes.Ok, "Itinerary already deleted (idempotent operation)")
-	//		return nil
-	//	}
-	//}
-
 	if err := tx.Commit(ctx); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to commit transaction")
@@ -874,50 +814,24 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 
 	itineraries := make([]locitypes.UserSavedItinerary, 0, len(dbRows))
 	for _, row := range dbRows {
-		// Convert *uuid.UUID to pgtype.UUID
-		sourceLlmInteractionID := pgtype.UUID{}
-		if row.SourceLlmInteractionID != nil {
-			sourceLlmInteractionID = pgtype.UUID{Bytes: *row.SourceLlmInteractionID, Valid: true}
-		}
-		sessionID := pgtype.UUID{}
-		if row.SessionID != nil {
-			sessionID = pgtype.UUID{Bytes: *row.SessionID, Valid: true}
-		}
-		primaryCityID := pgtype.UUID{}
-		if row.PrimaryCityID != nil {
-			primaryCityID = pgtype.UUID{Bytes: *row.PrimaryCityID, Valid: true}
-		}
-		// Convert *string to sql.NullString
-		description := sql.NullString{}
-		if row.Description != nil {
-			description = sql.NullString{String: *row.Description, Valid: true}
-		}
-		// Convert *int32 to sql.NullInt32
-		estimatedDurationDays := sql.NullInt32{}
-		if row.EstimatedDurationDays != nil {
-			estimatedDurationDays = sql.NullInt32{Int32: *row.EstimatedDurationDays, Valid: true}
-		}
-		estimatedCostLevel := sql.NullInt32{}
-		if row.EstimatedCostLevel != nil {
-			estimatedCostLevel = sql.NullInt32{Int32: *row.EstimatedCostLevel, Valid: true}
-		}
-
-		itineraries = append(itineraries, locitypes.UserSavedItinerary{
+		itinerary := locitypes.UserSavedItinerary{
 			ID:                     row.ID,
 			UserID:                 row.UserID,
-			SourceLlmInteractionID: sourceLlmInteractionID,
-			SessionID:              sessionID,
-			PrimaryCityID:          primaryCityID,
 			Title:                  row.Title,
-			Description:            description,
 			MarkdownContent:        row.MarkdownContent,
 			Tags:                   row.Tags,
-			EstimatedDurationDays:  estimatedDurationDays,
-			EstimatedCostLevel:     estimatedCostLevel,
 			IsPublic:               row.IsPublic,
 			CreatedAt:              row.CreatedAt,
 			UpdatedAt:              row.UpdatedAt,
-		})
+			SourceLlmInteractionID: row.SourceLlmInteractionID,
+			SessionID:              row.SessionID,
+			PrimaryCityID:          row.PrimaryCityID,
+			Description:            row.Description,
+			EstimatedDurationDays:  row.EstimatedDurationDays,
+			EstimatedCostLevel:     row.EstimatedCostLevel,
+		}
+
+		itineraries = append(itineraries, itinerary)
 	}
 
 	response := &locitypes.PaginatedUserItinerariesResponse{
@@ -1127,7 +1041,6 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		return nil, fmt.Errorf("failed to get total count: %w", err)
 	}
 
-	// Execute main query
 	rows, err := r.pgpool.Query(ctx, query, userID, limit, offset)
 	if err != nil {
 		span.RecordError(err)
@@ -1135,32 +1048,18 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		r.logger.ErrorContext(ctx, "Failed to get user chat sessions from LLM interactions", slog.Any("error", err), slog.String("user_id", userID.String()))
 		return nil, fmt.Errorf("failed to get user chat sessions: %w", err)
 	}
-	defer rows.Close()
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[chatSessionAggRow])
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to read chat session rows")
+		r.logger.ErrorContext(ctx, "Failed to collect chat session rows", slog.Any("error", err), slog.String("user_id", userID.String()))
+		return nil, fmt.Errorf("failed to read chat session rows: %w", err)
+	}
 
 	var sessions []locitypes.ChatSession
-	for rows.Next() {
-		var sessionKey, cityName string
-		var userIDFromDB uuid.UUID
-		var firstInteraction, lastInteraction time.Time
-		var interactionCount int
-		var avgLatencyMs, totalTokens, totalPromptTokens, totalCompletionTokens, totalLatencyMs sql.NullInt64
-		var modelsUsed []string
-		var interactionsJSON string
-
-		err := rows.Scan(
-			&sessionKey, &userIDFromDB, &cityName, &firstInteraction, &lastInteraction, &interactionCount,
-			&avgLatencyMs, &totalTokens, &totalPromptTokens, &totalCompletionTokens, &totalLatencyMs,
-			&modelsUsed, &interactionsJSON,
-		)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Failed to scan LLM interaction row")
-			r.logger.ErrorContext(ctx, "Failed to scan LLM interaction row", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to scan LLM interaction row: %w", err)
-		}
-
+	for _, row := range dbRows {
 		var interactions []map[string]interface{}
-		if err := json.Unmarshal([]byte(interactionsJSON), &interactions); err != nil {
+		if err := json.Unmarshal([]byte(row.InteractionsJSON), &interactions); err != nil {
 			r.logger.WarnContext(ctx, "Failed to parse interactions JSON", slog.Any("error", err))
 			continue
 		}
@@ -1181,7 +1080,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			}
 			if response, ok := interaction["response"].(string); ok {
 				if response == "" {
-					response = fmt.Sprintf("I provided recommendations for %s", cityName)
+					response = fmt.Sprintf("I provided recommendations for %s", row.CityName)
 				} else {
 					// Count content items from response for metrics
 					contentCounts := common.CountContentFromResponse(response)
@@ -1194,7 +1093,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 					dominantCategories = append(dominantCategories, contentCounts.Categories...)
 
 					// Convert JSON response to human-readable format
-					response = formatResponseForDisplay(response, cityName)
+					response = formatResponseForDisplay(response, row.CityName)
 				}
 				conversationHistory = append(conversationHistory, locitypes.ConversationMessage{
 					Role:      "assistant",
@@ -1206,17 +1105,17 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 		// Calculate enriched metrics
 		performanceMetrics := locitypes.SessionPerformanceMetrics{
-			AvgResponseTimeMs: int(avgLatencyMs.Int64),
-			TotalTokens:       int(totalTokens.Int64),
-			PromptTokens:      int(totalPromptTokens.Int64),
-			CompletionTokens:  int(totalCompletionTokens.Int64),
-			ModelsUsed:        modelsUsed,
-			TotalLatencyMs:    int(totalLatencyMs.Int64),
+			AvgResponseTimeMs: int(ptrToInt64(row.AvgLatencyMs)),
+			TotalTokens:       int(ptrToInt64(row.TotalTokens)),
+			PromptTokens:      int(ptrToInt64(row.TotalPromptTokens)),
+			CompletionTokens:  int(ptrToInt64(row.TotalCompletionTokens)),
+			ModelsUsed:        row.ModelsUsed,
+			TotalLatencyMs:    int(ptrToInt64(row.TotalLatencyMs)),
 		}
 
 		// Calculate unique cities covered
 		citiesMap := make(map[string]bool)
-		citiesMap[cityName] = true
+		citiesMap[row.CityName] = true
 		for _, city := range citiesCovered {
 			citiesMap[city] = true
 		}
@@ -1240,7 +1139,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 		// Calculate engagement metrics
 		userMsgCount, assistantMsgCount := common.CountMessagesByRole(conversationHistory)
-		conversationDuration := lastInteraction.Sub(firstInteraction)
+		conversationDuration := row.LastInteraction.Sub(row.FirstInteraction)
 		avgMsgLength := common.CalculateAverageMessageLength(conversationHistory)
 		engagementLevel := common.CalculateEngagementLevel(len(conversationHistory), conversationDuration, complexityScore)
 
@@ -1253,14 +1152,14 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			EngagementLevel:       engagementLevel,
 		}
 
-		sessionID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(sessionKey))
+		sessionID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(row.SessionKey))
 		session := locitypes.ChatSession{
 			ID:                  sessionID,
-			UserID:              userIDFromDB,
-			CityName:            cityName,
+			UserID:              row.UserID,
+			CityName:            row.CityName,
 			ConversationHistory: conversationHistory,
-			CreatedAt:           firstInteraction,
-			UpdatedAt:           lastInteraction,
+			CreatedAt:           row.FirstInteraction,
+			UpdatedAt:           row.LastInteraction,
 			Status:              "active",
 			PerformanceMetrics:  performanceMetrics,
 			ContentMetrics:      contentMetrics,
@@ -1680,39 +1579,34 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 	if err != nil {
 		return nil, fmt.Errorf("failed to query POIs for session: %w", err)
 	}
-	defer rows.Close()
-
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var p locitypes.POIDetailedInfo
-		var lat, lon, dist sql.NullFloat64 // Use nullable types
-		var cat, desc sql.NullString
-
-		// Adjust scan to match selected columns and their nullability
-		err := rows.Scan(&p.ID, &p.Name, &lat, &lon, &cat, &desc, &dist)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan POI for session: %w", err)
-		}
-
-		if lat.Valid {
-			p.Latitude = lat.Float64
-		}
-		if lon.Valid {
-			p.Longitude = lon.Float64
-		}
-		if cat.Valid {
-			p.Category = cat.String
-		}
-		if desc.Valid {
-			p.DescriptionPOI = desc.String
-		}
-		if dist.Valid {
-			p.Distance = dist.Float64
-		}
-
-		pois = append(pois, p)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[sessionPOIRow])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read POIs for session: %w", err)
 	}
-	return pois, rows.Err()
+
+	pois := make([]locitypes.POIDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		var poi locitypes.POIDetailedInfo
+		poi.ID = row.ID
+		poi.Name = row.Name
+		if row.Latitude != nil {
+			poi.Latitude = *row.Latitude
+		}
+		if row.Longitude != nil {
+			poi.Longitude = *row.Longitude
+		}
+		if row.Category != nil {
+			poi.Category = *row.Category
+		}
+		if row.DescriptionPOI != nil {
+			poi.DescriptionPOI = *row.DescriptionPOI
+		}
+		if row.Distance != nil {
+			poi.Distance = *row.Distance
+		}
+		pois = append(pois, poi)
+	}
+	return pois, nil
 }
 
 // type POIDetailedInfo struct {

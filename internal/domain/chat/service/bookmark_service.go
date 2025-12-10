@@ -219,35 +219,21 @@ func (s *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID u
 
 	// Map request to UserSavedItinerary
 	itinerary := &locitypes.UserSavedItinerary{
-		UserID:          userID,
-		Title:           req.Title,
-		Tags:            req.Tags,
-		IsPublic:        false,
-		MarkdownContent: "", // Populate if available from request?
+		UserID:                 userID,
+		Title:                  req.Title,
+		Tags:                   req.Tags,
+		IsPublic:               false,
+		MarkdownContent:        "", // Populate if available from request?
+		SourceLlmInteractionID: req.LlmInteractionID,
+		SessionID:              req.SessionID,
+		PrimaryCityID:          req.PrimaryCityID,
+		Description:            req.Description,
 	}
-	if req.Description != nil {
-		itinerary.Description.String = *req.Description
-		itinerary.Description.Valid = true
-	}
+
 	if req.IsPublic != nil {
 		itinerary.IsPublic = *req.IsPublic
 	}
-	if req.SessionID != nil {
-		// uuid.UUID -> pgtype.UUID
-		// Need conversion logic or assume repo handles it?
-		// Repo expects `locitypes.UserSavedItinerary`.
-		// `internal/types` `UserSavedItinerary` uses `pgtype.UUID` for nullable fields.
-		// I need `github.com/jackc/pgx/v5/pgtype`.
-		// But I might not have it imported in `chat_service.go` correctly alias-wise.
-		// `chat_service.go` imports `github.com/jackc/pgx/v5/pgtype`.
-		// So I can use it.
-		// But better to let repo handle robust conversion, but structs are structs.
-		// I wll try to assign if possible.
-	}
 
-	// Call repository
-	// Note: `AddChatToBookmark` in repo expects `UserSavedItinerary`.
-	// But `repository.Repository` interface (viewed earlier) has `AddChatToBookmark`.
 	return s.llmInteractionRepo.AddChatToBookmark(ctx, itinerary)
 }
 
