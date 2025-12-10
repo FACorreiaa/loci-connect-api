@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -20,6 +21,16 @@ import (
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
+
+// PgxPool abstracts pgxpool.Pool for easier testing.
+type PgxPool interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
 
 // Repository tagsRepo defines the contract for user data persistence.
 type Repository interface {
@@ -51,13 +62,13 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-func NewRepositoryImpl(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+func NewRepositoryImpl(pgpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
-		pgpool: pgxpool,
+		pgpool: pgpool,
 	}
 }
 

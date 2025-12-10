@@ -19,12 +19,22 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
 
-// profilessRepo defines the contract for user data persistence.
+// PgxPool is an interface that abstracts pgxpool.Pool for testing.
+type PgxPool interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
+
+// profilesRepo defines the contract for user data persistence.
 type Repository interface {
 	// GetSearchProfiles --- User Preference Profiles ---
 	// GetSearchProfiles retrieves all preference profiles for a user
@@ -45,26 +55,57 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+func NewPostgresUserRepo(pgpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
-		pgpool: pgxpool,
+		pgpool: pgpool,
 	}
 }
 
-// SELECT upp.profile_name, upp.is_default, upp.search_radius_km,
-// upp.preferred_time, upp.budget_level, upp.preferred_pace,
-// upp.prefer_accessible_pois, prefer_outdoor_seating,
-// upp.prefer_dog_friendly, upp.preferred_vibes,
-// upp.preferred_transport, upp.dietary_needs,
-// ucc.name, ucc.description ,ucc.active
-// FROM user_preference_profiles upp
-// JOIN user_custom_interests ucc ON ucc.user_id = upp.user_id
-// WHERE upp.user_id = 'f835199b-7d87-4450-841c-b94fcf9706b0'
-// ORDER BY upp.profile_name
+// profileRow is used for database scanning
+type profileRow struct {
+	ID                   uuid.UUID                     `db:"id"`
+	UserID               uuid.UUID                     `db:"user_id"`
+	ProfileName          string                        `db:"profile_name"`
+	IsDefault            bool                          `db:"is_default"`
+	SearchRadiusKm       float64                       `db:"search_radius_km"`
+	PreferredTime        locitypes.DayPreference       `db:"preferred_time"`
+	BudgetLevel          int                           `db:"budget_level"`
+	PreferredPace        locitypes.SearchPace          `db:"preferred_pace"`
+	PreferAccessiblePOIs bool                          `db:"prefer_accessible_pois"`
+	PreferOutdoorSeating bool                          `db:"prefer_outdoor_seating"`
+	PreferDogFriendly    bool                          `db:"prefer_dog_friendly"`
+	PreferredVibes       []string                      `db:"preferred_vibes"`
+	PreferredTransport   locitypes.TransportPreference `db:"preferred_transport"`
+	DietaryNeeds         []string                      `db:"dietary_needs"`
+	CreatedAt            time.Time                     `db:"created_at"`
+	UpdatedAt            time.Time                     `db:"updated_at"`
+}
+
+// toResponse converts a profileRow to UserPreferenceProfileResponse
+func (r *profileRow) toResponse() locitypes.UserPreferenceProfileResponse {
+	return locitypes.UserPreferenceProfileResponse{
+		ID:                   r.ID,
+		UserID:               r.UserID,
+		ProfileName:          r.ProfileName,
+		IsDefault:            r.IsDefault,
+		SearchRadiusKm:       r.SearchRadiusKm,
+		PreferredTime:        r.PreferredTime,
+		BudgetLevel:          r.BudgetLevel,
+		PreferredPace:        r.PreferredPace,
+		PreferAccessiblePOIs: r.PreferAccessiblePOIs,
+		PreferOutdoorSeating: r.PreferOutdoorSeating,
+		PreferDogFriendly:    r.PreferDogFriendly,
+		PreferredVibes:       r.PreferredVibes,
+		PreferredTransport:   r.PreferredTransport,
+		DietaryNeeds:         r.DietaryNeeds,
+		CreatedAt:            r.CreatedAt,
+		UpdatedAt:            r.UpdatedAt,
+	}
+}
 
 // GetProfiles implements user.UserRepo.
 func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID) ([]locitypes.UserPreferenceProfileResponse, error) {
@@ -94,29 +135,18 @@ func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching preference profiles: %w", err)
 	}
-	defer rows.Close()
 
-	var profiles []locitypes.UserPreferenceProfileResponse
-	for rows.Next() {
-		var p locitypes.UserPreferenceProfileResponse
-		err := rows.Scan(
-			&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
-			&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
-			&p.PreferDogFriendly, &p.PreferredVibes, &p.PreferredTransport, &p.DietaryNeeds,
-			&p.CreatedAt, &p.UpdatedAt,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan preference profile row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("database error scanning preference profile: %w", err)
-		}
-		profiles = append(profiles, p)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[profileRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect profile rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading preference profiles: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating preference profile rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("database error reading preference profiles: %w", err)
+	profiles := make([]locitypes.UserPreferenceProfileResponse, 0, len(dbRows))
+	for _, row := range dbRows {
+		profiles = append(profiles, row.toResponse())
 	}
 
 	l.DebugContext(ctx, "Fetched user preference profiles successfully", slog.Int("count", len(profiles)))
@@ -144,23 +174,31 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
         FROM user_preference_profiles
         WHERE id = $1 AND user_id = $2`
 
-	var p locitypes.UserPreferenceProfileResponse
-	err := r.pgpool.QueryRow(ctx, query, profileID, userID).Scan(
-		&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
-		&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
-		&p.PreferDogFriendly, &p.PreferredVibes, &p.PreferredTransport, &p.DietaryNeeds,
-		&p.CreatedAt, &p.UpdatedAt,
-	)
+	rows, err := r.pgpool.Query(ctx, query, profileID, userID)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query user preference profile", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB query failed")
-		return nil, fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
+		return nil, fmt.Errorf("database error fetching preference profile: %w", err)
 	}
 
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[profileRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			l.WarnContext(ctx, "Preference profile not found")
+			span.SetStatus(codes.Error, "Profile not found")
+			return nil, fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
+		}
+		l.ErrorContext(ctx, "Failed to read preference profile", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading preference profile: %w", err)
+	}
+
+	response := row.toResponse()
 	l.DebugContext(ctx, "Fetched user preference profile successfully")
 	span.SetStatus(codes.Ok, "Preference profile fetched")
-	return &p, nil
+	return &response, nil
 }
 
 // GetDefaultProfile implements user.UserRepo.
@@ -183,23 +221,31 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
         FROM user_preference_profiles
         WHERE user_id = $1 AND is_default = TRUE`
 
-	var p locitypes.UserPreferenceProfileResponse
-	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
-		&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
-		&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
-		&p.PreferDogFriendly, &p.PreferredVibes, &p.PreferredTransport, &p.DietaryNeeds,
-		&p.CreatedAt, &p.UpdatedAt,
-	)
+	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query default user preference profile", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB query failed")
-		return nil, fmt.Errorf("default preference profile not found: %w", locitypes.ErrNotFound)
+		return nil, fmt.Errorf("database error fetching default preference profile: %w", err)
 	}
 
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[profileRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			l.WarnContext(ctx, "Default preference profile not found")
+			span.SetStatus(codes.Error, "Default profile not found")
+			return nil, fmt.Errorf("default preference profile not found: %w", locitypes.ErrNotFound)
+		}
+		l.ErrorContext(ctx, "Failed to read default preference profile", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading default preference profile: %w", err)
+	}
+
+	response := row.toResponse()
 	l.DebugContext(ctx, "Fetched default user preference profile successfully")
 	span.SetStatus(codes.Ok, "Default preference profile fetched")
-	return &p, nil
+	return &response, nil
 }
 
 // CreateProfile implements user.UserRepo.
@@ -220,7 +266,7 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	l := r.logger.With(slog.String("method", "CreateUserPreferenceProfile"), slog.String("userID", userID.String()))
 	l.DebugContext(ctx, "Creating user preference profile", slog.String("profileName", params.ProfileName))
 
-	// Set default values for optional parameters (as before)
+	// Set default values for optional parameters
 	isDefault := false
 	if params.IsDefault != nil {
 		isDefault = *params.IsDefault
@@ -268,11 +314,10 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 
 	if isDefault {
 		query := "UPDATE user_preference_profiles SET is_default = FALSE WHERE user_id = $1 AND id != $2"
-		_, err := tx.Exec(ctx, query, userID, uuid.Nil) // uuid.Nil as placeholder; will be updated after insert
+		_, err := tx.Exec(ctx, query, userID, uuid.Nil)
 		if err != nil {
-			err = tx.Rollback(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to rollback transaction: %w", err)
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 			}
 			l.ErrorContext(ctx, "Failed to reset existing default profiles", slog.Any("error", err))
 			span.RecordError(err)
@@ -282,7 +327,6 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	}
 
 	// Insert base profile
-	var p locitypes.UserPreferenceProfileResponse
 	query := `
         INSERT INTO user_preference_profiles (
             user_id, profile_name, is_default, search_radius_km, preferred_time,
@@ -294,23 +338,18 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
                    budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                    prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
                    created_at, updated_at`
-	err = tx.QueryRow(ctx, query,
+
+	rows, err := tx.Query(ctx, query,
 		userID, params.ProfileName, isDefault, searchRadiusKm, preferredTime,
 		budgetLevel, preferredPace, preferAccessiblePOIs, preferOutdoorSeating,
 		preferDogFriendly, preferredVibes, preferredTransport, dietaryNeeds,
-	).Scan(
-		&p.ID, &p.UserID, &p.ProfileName, &p.IsDefault, &p.SearchRadiusKm, &p.PreferredTime,
-		&p.BudgetLevel, &p.PreferredPace, &p.PreferAccessiblePOIs, &p.PreferOutdoorSeating,
-		&p.PreferDogFriendly, &p.PreferredVibes, &p.PreferredTransport, &p.DietaryNeeds,
-		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
-		err = tx.Rollback(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to rollback transaction: %w", err)
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // Unique violation
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			l.WarnContext(ctx, "Profile name already exists for this user", slog.Any("error", err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Profile name conflict")
@@ -322,21 +361,40 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 		return nil, fmt.Errorf("database error creating preference profile: %w", err)
 	}
 
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[profileRow])
+	if err != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			l.WarnContext(ctx, "Profile name already exists for this user", slog.Any("error", err))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Profile name conflict")
+			return nil, fmt.Errorf("profile name already exists: %w", locitypes.ErrConflict)
+		}
+		l.ErrorContext(ctx, "Failed to read created profile", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading created profile: %w", err)
+	}
+
+	p := row.toResponse()
+
 	// Insert domain-specific preferences if provided
 	if params.AccommodationPreferences != nil {
 		accommodationJSON, err := json.Marshal(params.AccommodationPreferences)
 		if err != nil {
-			err = tx.Rollback(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to rollback transaction: %w", err)
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 			}
 			l.ErrorContext(ctx, "Failed to marshal accommodation preferences", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to marshal accommodation preferences: %w", err)
 		}
-		query = `
+		insertQuery := `
             INSERT INTO user_accommodation_preferences (user_preference_profile_id, accommodation_filters)
             VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, query, p.ID, accommodationJSON)
+		_, err = tx.Exec(ctx, insertQuery, p.ID, accommodationJSON)
 		if err != nil {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
@@ -355,10 +413,10 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 			l.ErrorContext(ctx, "Failed to marshal dining preferences", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to marshal dining preferences: %w", err)
 		}
-		query = `
+		insertQuery := `
             INSERT INTO user_dining_preferences (user_preference_profile_id, dining_filters)
             VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, query, p.ID, diningJSON)
+		_, err = tx.Exec(ctx, insertQuery, p.ID, diningJSON)
 		if err != nil {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
@@ -377,10 +435,10 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 			l.ErrorContext(ctx, "Failed to marshal activity preferences", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to marshal activity preferences: %w", err)
 		}
-		query = `
+		insertQuery := `
             INSERT INTO user_activity_preferences (user_preference_profile_id, activity_filters)
             VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, query, p.ID, activityJSON)
+		_, err = tx.Exec(ctx, insertQuery, p.ID, activityJSON)
 		if err != nil {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
@@ -399,10 +457,10 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 			l.ErrorContext(ctx, "Failed to marshal itinerary preferences", slog.Any("error", err))
 			return nil, fmt.Errorf("failed to marshal itinerary preferences: %w", err)
 		}
-		query = `
+		insertQuery := `
             INSERT INTO user_itinerary_preferences (user_preference_profile_id, itinerary_filters)
             VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, query, p.ID, itineraryJSON)
+		_, err = tx.Exec(ctx, insertQuery, p.ID, itineraryJSON)
 		if err != nil {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
@@ -636,7 +694,6 @@ func (r *RepositoryImpl) DeleteSearchProfile(ctx context.Context, userID, profil
 	}
 
 	if tag.RowsAffected() == 0 {
-		// This should not happen since we already checked if the profile exists
 		err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 		l.WarnContext(ctx, "Attempted to delete non-existent preference profile")
 		span.RecordError(err)
@@ -715,7 +772,6 @@ func (r *RepositoryImpl) SetDefaultSearchProfile(ctx context.Context, userID, pr
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("rollback_error", rollbackErr))
 		}
-		// This should not happen since we already checked if the profile exists
 		err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
 		l.WarnContext(ctx, "Attempted to set non-existent profile as default")
 		span.RecordError(err)

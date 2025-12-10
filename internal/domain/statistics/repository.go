@@ -14,6 +14,13 @@ import (
 
 var _ Repository = (*RepositoryImpl)(nil)
 
+// PgxPool is an interface that abstracts pgxpool.Pool for testing.
+type PgxPool interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
+
 type Repository interface {
 	// GetMainPageStatistics retrieves the main page statistics.
 	GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error)
@@ -25,10 +32,10 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-func NewRepository(logger *slog.Logger, pgpool *pgxpool.Pool) *RepositoryImpl {
+func NewRepository(logger *slog.Logger, pgpool PgxPool) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
 		pgpool: pgpool,
@@ -172,16 +179,16 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 		args = append(args, userID)
 	}
 
-	var stats locitypes.MainPageStatistics
+	rows, err := r.pgpool.Query(ctx, query, args...)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "failed to query main page statistics", slog.Any("error", err))
+		return nil, fmt.Errorf("database error fetching main page statistics: %w", err)
+	}
 
-	err := r.pgpool.QueryRow(ctx, query, args...).Scan(
-		&stats.TotalUsersCount,
-		&stats.TotalItinerariesSaved,
-		&stats.TotalUniquePOIs,
-	)
+	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.MainPageStatistics])
 	if err != nil {
 		r.logger.ErrorContext(ctx, "failed to get main page statistics", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("database error reading main page statistics: %w", err)
 	}
 
 	r.logger.InfoContext(ctx, "Successfully retrieved main page statistics",
@@ -210,18 +217,16 @@ func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uu
 		WHERE li.user_id = $1
 	`
 
-	var stats locitypes.DetailedPOIStatistics
+	rows, err := r.pgpool.Query(ctx, query, userID)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "failed to query detailed POI statistics", slog.Any("error", err))
+		return nil, fmt.Errorf("database error fetching detailed POI statistics: %w", err)
+	}
 
-	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
-		&stats.GeneralPOIs,
-		&stats.SuggestedPOIs,
-		&stats.Hotels,
-		&stats.Restaurants,
-		&stats.TotalPOIs,
-	)
+	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.DetailedPOIStatistics])
 	if err != nil {
 		r.logger.ErrorContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
-		return nil, err
+		return nil, fmt.Errorf("database error reading detailed POI statistics: %w", err)
 	}
 
 	r.logger.InfoContext(ctx, "Successfully retrieved detailed POI statistics",
@@ -245,17 +250,16 @@ func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.
     (SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1) AS discoveries;
 	`
 
-	var stats locitypes.LandingPageUserStats
-
-	err := r.pgpool.QueryRow(ctx, query, userID).Scan(
-		&stats.SavedPlaces,
-		&stats.Itineraries,
-		&stats.CitiesExplored,
-		&stats.Discoveries,
-	)
+	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
-		return nil, err
+		r.logger.ErrorContext(ctx, "failed to query landing page statistics", slog.Any("error", err))
+		return nil, fmt.Errorf("database error fetching landing page statistics: %w", err)
+	}
+
+	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.LandingPageUserStats])
+	if err != nil {
+		r.logger.ErrorContext(ctx, "failed to get landing page statistics", slog.Any("error", err))
+		return nil, fmt.Errorf("database error reading landing page statistics: %w", err)
 	}
 
 	r.logger.InfoContext(ctx, "Successfully retrieved user Stats",

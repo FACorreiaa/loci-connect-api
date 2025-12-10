@@ -8,16 +8,25 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
+
+// PgxPool is an interface that abstracts pgxpool.Pool for testing.
+type PgxPool interface {
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
 
 type Repository interface {
 	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error)
@@ -29,15 +38,119 @@ type Repository interface {
 }
 
 type RepositoryImpl struct {
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 	logger *slog.Logger
 }
 
-func NewRepository(pgpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+func NewRepository(pgpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		pgpool: pgpool,
 		logger: logger,
 	}
+}
+
+// Local row structs for database scanning
+
+// cityInteractionRow is used for the main recent interactions query
+type cityInteractionRow struct {
+	CityName         string    `db:"city_name"`
+	LastActivity     time.Time `db:"last_activity"`
+	InteractionCount int       `db:"interaction_count"`
+	SessionID        uuid.UUID `db:"session_id"`
+	Title            string    `db:"title"`
+	POICount         int       `db:"poi_count"`
+}
+
+// recentInteractionRow is used for getCityInteractions query
+type recentInteractionRow struct {
+	ID        uuid.UUID  `db:"id"`
+	UserID    uuid.UUID  `db:"user_id"`
+	CityName  string     `db:"city_name"`
+	CityID    *uuid.UUID `db:"city_id"`
+	Prompt    string     `db:"prompt"`
+	Response  *string    `db:"response"`
+	ModelName string     `db:"model_name"`
+	LatencyMs int        `db:"latency_ms"`
+	CreatedAt time.Time  `db:"created_at"`
+}
+
+// poiRow is used for POI queries
+type poiRow struct {
+	ID           uuid.UUID `db:"id"`
+	Name         string    `db:"name"`
+	Latitude     float64   `db:"latitude"`
+	Longitude    float64   `db:"longitude"`
+	Description  *string   `db:"description"`
+	Address      *string   `db:"address"`
+	Website      *string   `db:"website"`
+	PhoneNumber  *string   `db:"phone_number"`
+	OpeningHours *string   `db:"opening_hours"`
+	PriceRange   *string   `db:"price_range"`
+	Category     *string   `db:"category"`
+	Tags         []string  `db:"tags"`
+	Images       []string  `db:"images"`
+	Rating       float64   `db:"rating"`
+	CreatedAt    time.Time `db:"created_at"`
+}
+
+// hotelRow is used for hotel queries
+type hotelRow struct {
+	ID               uuid.UUID `db:"id"`
+	Name             string    `db:"name"`
+	Latitude         float64   `db:"latitude"`
+	Longitude        float64   `db:"longitude"`
+	Category         *string   `db:"category"`
+	Description      *string   `db:"description"`
+	Address          *string   `db:"address"`
+	Website          *string   `db:"website"`
+	PhoneNumber      *string   `db:"phone_number"`
+	PriceRange       *string   `db:"price_range"`
+	Tags             []string  `db:"tags"`
+	Images           []string  `db:"images"`
+	Rating           float64   `db:"rating"`
+	LlmInteractionID uuid.UUID `db:"llm_interaction_id"`
+}
+
+// restaurantRow is used for restaurant queries
+type restaurantRow struct {
+	ID               uuid.UUID `db:"id"`
+	Name             string    `db:"name"`
+	Latitude         float64   `db:"latitude"`
+	Longitude        float64   `db:"longitude"`
+	Category         *string   `db:"category"`
+	Description      *string   `db:"description"`
+	Address          *string   `db:"address"`
+	Website          *string   `db:"website"`
+	PhoneNumber      *string   `db:"phone_number"`
+	PriceLevel       *string   `db:"price_level"`
+	CuisineType      *string   `db:"cuisine_type"`
+	Tags             []string  `db:"tags"`
+	Images           []string  `db:"images"`
+	Rating           float64   `db:"rating"`
+	LlmInteractionID uuid.UUID `db:"llm_interaction_id"`
+}
+
+// itineraryRow is used for itinerary queries
+type itineraryRow struct {
+	ID                     uuid.UUID  `db:"id"`
+	UserID                 uuid.UUID  `db:"user_id"`
+	SourceLlmInteractionID *uuid.UUID `db:"source_llm_interaction_id"`
+	SessionID              *uuid.UUID `db:"session_id"`
+	PrimaryCityID          *uuid.UUID `db:"primary_city_id"`
+	Title                  string     `db:"title"`
+	Description            *string    `db:"description"`
+	MarkdownContent        string     `db:"markdown_content"`
+	Tags                   []string   `db:"tags"`
+	EstimatedDurationDays  *int32     `db:"estimated_duration_days"`
+	EstimatedCostLevel     *int32     `db:"estimated_cost_level"`
+	IsPublic               bool       `db:"is_public"`
+	CreatedAt              time.Time  `db:"created_at"`
+	UpdatedAt              time.Time  `db:"updated_at"`
+}
+
+// countRow is used for count queries
+type countRow struct {
+	Count int `db:"count"`
 }
 
 // GetUserRecentInteractions fetches recent interactions grouped by city
@@ -156,48 +269,34 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query recent interactions: %w", err)
 	}
-	defer rows.Close()
+
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[cityInteractionRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect city interaction rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read recent interactions: %w", err)
+	}
 
 	var cities []locitypes.CityInteractions
-	for rows.Next() {
-		var cityName string
-		var lastActivity time.Time
-		var interactionCount int
-		var sessionID uuid.UUID
-		var title string
-		var poiCount int
-
-		err := rows.Scan(&cityName, &lastActivity, &interactionCount, &sessionID, &title, &poiCount)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan city row", slog.Any("error", err))
-			continue
-		}
-
-		interactions, err := r.getCityInteractions(ctx, userID, cityName)
+	for _, row := range dbRows {
+		interactions, err := r.getCityInteractions(ctx, userID, row.CityName)
 		if err != nil {
 			l.WarnContext(ctx, "Failed to get interactions for city",
-				slog.String("city", cityName),
+				slog.String("city", row.CityName),
 				slog.Any("error", err))
 			continue
 		}
 
-		// POI count is now included in the main query
-
 		cities = append(cities, locitypes.CityInteractions{
-			CityName:     cityName,
+			CityName:     row.CityName,
 			Interactions: interactions,
-			SessionIDs:   []uuid.UUID{sessionID},
-			POICount:     poiCount,
-			LastActivity: lastActivity,
-			SessionID:    sessionID,
-			Title:        title,
+			SessionIDs:   []uuid.UUID{row.SessionID},
+			POICount:     row.POICount,
+			LastActivity: row.LastActivity,
+			SessionID:    row.SessionID,
+			Title:        row.Title,
 		})
-	}
-
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
 	// Build count query with same filters - count cities, not sessions
@@ -218,29 +317,33 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 		}())
 
 	// For count, we need to count the results from the grouped query
-	countWrapperQuery := fmt.Sprintf("SELECT COUNT(*) FROM (%s) as grouped_results", countSubquery)
+	countWrapperQuery := fmt.Sprintf("SELECT COUNT(*) as count FROM (%s) as grouped_results", countSubquery)
 
 	// Use the same args except for limit and offset
 	countArgs := args[:len(args)-2]
 
-	var total int
-	err = r.pgpool.QueryRow(ctx, countWrapperQuery, countArgs...).Scan(&total)
+	countRows, err := r.pgpool.Query(ctx, countWrapperQuery, countArgs...)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query total recent interactions count", slog.Any("error", err))
-		// Handle the error - you could return an error or default to 0
 		return nil, fmt.Errorf("failed to get total count: %w", err)
 	}
 
+	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[countRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to read count result", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to read total count: %w", err)
+	}
+
 	l.InfoContext(ctx, "Successfully retrieved recent interactions",
-		slog.Int("cities_count", total),
+		slog.Int("cities_count", countResult.Count),
 		slog.String("user_id", userID.String()))
 
-	span.SetAttributes(attribute.Int("results.cities", total))
+	span.SetAttributes(attribute.Int("results.cities", countResult.Count))
 	span.SetStatus(codes.Ok, "Recent interactions retrieved")
 
 	return &locitypes.RecentInteractionsResponse{
 		Cities: cities,
-		Total:  total,
+		Total:  countResult.Count,
 	}, nil
 }
 
@@ -267,35 +370,27 @@ func (r *RepositoryImpl) getCityInteractions(ctx context.Context, userID uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("failed to query city interactions: %w", err)
 	}
-	defer rows.Close()
 
-	var interactions []locitypes.RecentInteraction
-	for rows.Next() {
-		var interaction locitypes.RecentInteraction
-		var cityID *uuid.UUID
-		var responseText *string
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[recentInteractionRow])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read city interactions: %w", err)
+	}
 
-		err := rows.Scan(
-			&interaction.ID,
-			&interaction.UserID,
-			&interaction.CityName,
-			&cityID,
-			&interaction.Prompt,
-			&responseText,
-			&interaction.ModelUsed,
-			&interaction.LatencyMs,
-			&interaction.CreatedAt,
-		)
-		if err != nil {
-			r.logger.WarnContext(ctx, "Failed to scan interaction row", slog.Any("error", err))
-			continue
+	interactions := make([]locitypes.RecentInteraction, 0, len(dbRows))
+	for _, row := range dbRows {
+		interaction := locitypes.RecentInteraction{
+			ID:        row.ID,
+			UserID:    row.UserID,
+			CityName:  row.CityName,
+			CityID:    row.CityID,
+			Prompt:    row.Prompt,
+			ModelUsed: row.ModelName,
+			LatencyMs: row.LatencyMs,
+			CreatedAt: row.CreatedAt,
 		}
-
-		interaction.CityID = cityID
-		if responseText != nil {
-			interaction.ResponseText = *responseText
+		if row.Response != nil {
+			interaction.ResponseText = *row.Response
 		}
-
 		interactions = append(interactions, interaction)
 	}
 
@@ -342,68 +437,51 @@ func (r *RepositoryImpl) GetCityPOIsByInteraction(ctx context.Context, userID uu
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query city POIs: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var description, address, website, phoneNumber, openingHours, priceRange, category *string
-		var tags, images []string
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&poi.Latitude,
-			&poi.Longitude,
-			&description,
-			&address,
-			&website,
-			&phoneNumber,
-			&openingHours,
-			&priceRange,
-			&category,
-			&tags,
-			&images,
-			&poi.Rating,
-			&poi.CreatedAt,
-		)
-		if err != nil {
-			l.WarnContext(ctx, "Failed to scan POI row", slog.Any("error", err))
-			continue
-		}
-
-		// Handle nullable fields
-		if description != nil {
-			poi.Description = *description
-		}
-		if address != nil {
-			poi.Address = *address
-		}
-		if website != nil {
-			poi.Website = *website
-		}
-		if phoneNumber != nil {
-			poi.PhoneNumber = *phoneNumber
-		}
-		if openingHours != nil {
-			poi.OpeningHours = map[string]string{"general": *openingHours}
-		}
-		if priceRange != nil {
-			poi.PriceRange = *priceRange
-		}
-		if category != nil {
-			poi.Category = *category
-		}
-		poi.Tags = tags
-		poi.Images = images
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[poiRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read city POIs: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		poi := locitypes.POIDetailedInfo{
+			ID:        row.ID,
+			Name:      row.Name,
+			Latitude:  row.Latitude,
+			Longitude: row.Longitude,
+			Rating:    row.Rating,
+			Tags:      row.Tags,
+			Images:    row.Images,
+			CreatedAt: row.CreatedAt,
+		}
+
+		if row.Description != nil {
+			poi.Description = *row.Description
+		}
+		if row.Address != nil {
+			poi.Address = *row.Address
+		}
+		if row.Website != nil {
+			poi.Website = *row.Website
+		}
+		if row.PhoneNumber != nil {
+			poi.PhoneNumber = *row.PhoneNumber
+		}
+		if row.OpeningHours != nil {
+			poi.OpeningHours = map[string]string{"general": *row.OpeningHours}
+		}
+		if row.PriceRange != nil {
+			poi.PriceRange = *row.PriceRange
+		}
+		if row.Category != nil {
+			poi.Category = *row.Category
+		}
+
+		pois = append(pois, poi)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city POIs",
@@ -455,65 +533,49 @@ func (r *RepositoryImpl) GetCityHotelsByInteraction(ctx context.Context, userID 
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query city hotels: %w", err)
 	}
-	defer rows.Close()
 
-	var hotels []locitypes.HotelDetailedInfo
-	for rows.Next() {
-		var hotel locitypes.HotelDetailedInfo
-		var category, description, address, website, phoneNumber, priceRange *string
-		var tags, images []string
-
-		err := rows.Scan(
-			&hotel.ID,
-			&hotel.Name,
-			&hotel.Latitude,
-			&hotel.Longitude,
-			&category,
-			&description,
-			&address,
-			&website,
-			&phoneNumber,
-			&priceRange,
-			&tags,
-			&images,
-			&hotel.Rating,
-			&hotel.LlmInteractionID,
-		)
-		if err != nil {
-			l.WarnContext(ctx, "Failed to scan hotel row", slog.Any("error", err))
-			continue
-		}
-
-		// Handle nullable fields
-		if category != nil {
-			hotel.Category = *category
-		}
-		if description != nil {
-			hotel.Description = *description
-		}
-		if address != nil {
-			hotel.Address = *address
-		}
-		if website != nil {
-			hotel.Website = website
-		}
-		if phoneNumber != nil {
-			hotel.PhoneNumber = phoneNumber
-		}
-		if priceRange != nil {
-			hotel.PriceRange = priceRange
-		}
-		hotel.Tags = tags
-		hotel.Images = images
-		hotel.City = cityName
-
-		hotels = append(hotels, hotel)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[hotelRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect hotel rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read city hotels: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating hotel rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating hotel rows: %w", err)
+	hotels := make([]locitypes.HotelDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		hotel := locitypes.HotelDetailedInfo{
+			ID:               row.ID,
+			Name:             row.Name,
+			Latitude:         row.Latitude,
+			Longitude:        row.Longitude,
+			Rating:           row.Rating,
+			Tags:             row.Tags,
+			Images:           row.Images,
+			LlmInteractionID: row.LlmInteractionID,
+			City:             cityName,
+		}
+
+		if row.Category != nil {
+			hotel.Category = *row.Category
+		}
+		if row.Description != nil {
+			hotel.Description = *row.Description
+		}
+		if row.Address != nil {
+			hotel.Address = *row.Address
+		}
+		if row.Website != nil {
+			hotel.Website = row.Website
+		}
+		if row.PhoneNumber != nil {
+			hotel.PhoneNumber = row.PhoneNumber
+		}
+		if row.PriceRange != nil {
+			hotel.PriceRange = row.PriceRange
+		}
+
+		hotels = append(hotels, hotel)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city hotels",
@@ -566,60 +628,42 @@ func (r *RepositoryImpl) GetCityRestaurantsByInteraction(ctx context.Context, us
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query city restaurants: %w", err)
 	}
-	defer rows.Close()
 
-	var restaurants []locitypes.RestaurantDetailedInfo
-	for rows.Next() {
-		var restaurant locitypes.RestaurantDetailedInfo
-		var category, description *string
-		var address, website, phoneNumber, priceLevel, cuisineType *string
-		var tags, images []string
-
-		err := rows.Scan(
-			&restaurant.ID,
-			&restaurant.Name,
-			&restaurant.Latitude,
-			&restaurant.Longitude,
-			&category,
-			&description,
-			&address,
-			&website,
-			&phoneNumber,
-			&priceLevel,
-			&cuisineType,
-			&tags,
-			&images,
-			&restaurant.Rating,
-			&restaurant.LlmInteractionID,
-		)
-		if err != nil {
-			l.WarnContext(ctx, "Failed to scan restaurant row", slog.Any("error", err))
-			continue
-		}
-
-		// Handle nullable fields
-		if category != nil {
-			restaurant.Category = *category
-		}
-		if description != nil {
-			restaurant.Description = *description
-		}
-		restaurant.Address = address
-		restaurant.Website = website
-		restaurant.PhoneNumber = phoneNumber
-		restaurant.PriceLevel = priceLevel
-		restaurant.CuisineType = cuisineType
-		restaurant.Tags = tags
-		restaurant.Images = images
-		restaurant.City = cityName
-
-		restaurants = append(restaurants, restaurant)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[restaurantRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect restaurant rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read city restaurants: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating restaurant rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating restaurant rows: %w", err)
+	restaurants := make([]locitypes.RestaurantDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		restaurant := locitypes.RestaurantDetailedInfo{
+			ID:               row.ID,
+			Name:             row.Name,
+			Latitude:         row.Latitude,
+			Longitude:        row.Longitude,
+			Rating:           row.Rating,
+			Tags:             row.Tags,
+			Images:           row.Images,
+			LlmInteractionID: row.LlmInteractionID,
+			City:             cityName,
+		}
+
+		if row.Category != nil {
+			restaurant.Category = *row.Category
+		}
+		if row.Description != nil {
+			restaurant.Description = *row.Description
+		}
+		restaurant.Address = row.Address
+		restaurant.Website = row.Website
+		restaurant.PhoneNumber = row.PhoneNumber
+		restaurant.PriceLevel = row.PriceLevel
+		restaurant.CuisineType = row.CuisineType
+
+		restaurants = append(restaurants, restaurant)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city restaurants",
@@ -673,40 +717,55 @@ func (r *RepositoryImpl) GetCityItinerariesByInteraction(ctx context.Context, us
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query city itineraries: %w", err)
 	}
-	defer rows.Close()
 
-	var itineraries []locitypes.UserSavedItinerary
-	for rows.Next() {
-		var itinerary locitypes.UserSavedItinerary
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[itineraryRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect itinerary rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read city itineraries: %w", err)
+	}
 
-		err := rows.Scan(
-			&itinerary.ID,
-			&itinerary.UserID,
-			&itinerary.SourceLlmInteractionID,
-			&itinerary.SessionID,
-			&itinerary.PrimaryCityID,
-			&itinerary.Title,
-			&itinerary.Description,
-			&itinerary.MarkdownContent,
-			&itinerary.Tags,
-			&itinerary.EstimatedDurationDays,
-			&itinerary.EstimatedCostLevel,
-			&itinerary.IsPublic,
-			&itinerary.CreatedAt,
-			&itinerary.UpdatedAt,
-		)
-		if err != nil {
-			l.WarnContext(ctx, "Failed to scan itinerary row", slog.Any("error", err))
-			continue
+	itineraries := make([]locitypes.UserSavedItinerary, 0, len(dbRows))
+	for _, row := range dbRows {
+		itinerary := locitypes.UserSavedItinerary{
+			ID:              row.ID,
+			UserID:          row.UserID,
+			Title:           row.Title,
+			MarkdownContent: row.MarkdownContent,
+			Tags:            row.Tags,
+			IsPublic:        row.IsPublic,
+			CreatedAt:       row.CreatedAt,
+			UpdatedAt:       row.UpdatedAt,
+		}
+
+		// Convert nullable fields to pgtype/sql types
+		if row.SourceLlmInteractionID != nil {
+			itinerary.SourceLlmInteractionID.Bytes = *row.SourceLlmInteractionID
+			itinerary.SourceLlmInteractionID.Valid = true
+		}
+		if row.SessionID != nil {
+			itinerary.SessionID.Bytes = *row.SessionID
+			itinerary.SessionID.Valid = true
+		}
+		if row.PrimaryCityID != nil {
+			itinerary.PrimaryCityID.Bytes = *row.PrimaryCityID
+			itinerary.PrimaryCityID.Valid = true
+		}
+		if row.Description != nil {
+			itinerary.Description.String = *row.Description
+			itinerary.Description.Valid = true
+		}
+		if row.EstimatedDurationDays != nil {
+			itinerary.EstimatedDurationDays.Int32 = *row.EstimatedDurationDays
+			itinerary.EstimatedDurationDays.Valid = true
+		}
+		if row.EstimatedCostLevel != nil {
+			itinerary.EstimatedCostLevel.Int32 = *row.EstimatedCostLevel
+			itinerary.EstimatedCostLevel.Valid = true
 		}
 
 		itineraries = append(itineraries, itinerary)
-	}
-
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating itinerary rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating itinerary rows: %w", err)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city itineraries",
@@ -787,68 +846,51 @@ func (r *RepositoryImpl) GetCityFavorites(ctx context.Context, userID uuid.UUID,
 		span.SetStatus(codes.Error, "Database query failed")
 		return nil, fmt.Errorf("failed to query city favorites: %w", err)
 	}
-	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var description, address, website, phoneNumber, openingHours, priceRange, category *string
-		var tags, images []string
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&poi.Latitude,
-			&poi.Longitude,
-			&description,
-			&address,
-			&website,
-			&phoneNumber,
-			&openingHours,
-			&priceRange,
-			&category,
-			&tags,
-			&images,
-			&poi.Rating,
-			&poi.CreatedAt,
-		)
-		if err != nil {
-			l.WarnContext(ctx, "Failed to scan favorite POI row", slog.Any("error", err))
-			continue
-		}
-
-		// Handle nullable fields
-		if description != nil {
-			poi.Description = *description
-		}
-		if address != nil {
-			poi.Address = *address
-		}
-		if website != nil {
-			poi.Website = *website
-		}
-		if phoneNumber != nil {
-			poi.PhoneNumber = *phoneNumber
-		}
-		if openingHours != nil {
-			poi.OpeningHours = map[string]string{"general": *openingHours}
-		}
-		if priceRange != nil {
-			poi.PriceRange = *priceRange
-		}
-		if category != nil {
-			poi.Category = *category
-		}
-		poi.Tags = tags
-		poi.Images = images
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[poiRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect favorite POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read city favorites: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating favorite POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating favorite POI rows: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		poi := locitypes.POIDetailedInfo{
+			ID:        row.ID,
+			Name:      row.Name,
+			Latitude:  row.Latitude,
+			Longitude: row.Longitude,
+			Rating:    row.Rating,
+			Tags:      row.Tags,
+			Images:    row.Images,
+			CreatedAt: row.CreatedAt,
+		}
+
+		if row.Description != nil {
+			poi.Description = *row.Description
+		}
+		if row.Address != nil {
+			poi.Address = *row.Address
+		}
+		if row.Website != nil {
+			poi.Website = *row.Website
+		}
+		if row.PhoneNumber != nil {
+			poi.PhoneNumber = *row.PhoneNumber
+		}
+		if row.OpeningHours != nil {
+			poi.OpeningHours = map[string]string{"general": *row.OpeningHours}
+		}
+		if row.PriceRange != nil {
+			poi.PriceRange = *row.PriceRange
+		}
+		if row.Category != nil {
+			poi.Category = *row.Category
+		}
+
+		pois = append(pois, poi)
 	}
 
 	l.InfoContext(ctx, "Successfully retrieved city favorites",
