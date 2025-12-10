@@ -74,18 +74,6 @@ type RepositoryImpl struct {
 	pgpool PgxPool
 }
 
-type idRow struct {
-	ID uuid.UUID `db:"id"`
-}
-
-type existsRow struct {
-	Exists bool `db:"exists"`
-}
-
-type countRow struct {
-	Count int `db:"count"`
-}
-
 type llmSuggestedPOIRow struct {
 	ID          uuid.UUID `db:"id"`
 	Name        string    `db:"name"`
@@ -219,7 +207,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
         RETURNING id
     `
 	var interactionID uuid.UUID
-	insertRows, err := tx.Query(ctx, interactionQuery,
+	err = tx.QueryRow(ctx, interactionQuery,
 		interaction.UserID,
 		interaction.SessionID,
 		interaction.Prompt,
@@ -227,35 +215,18 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 		interaction.ModelUsed,
 		interaction.LatencyMs,
 		interaction.CityName,
-	)
+	).Scan(&interactionID)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to insert llm_interaction")
 		return uuid.Nil, fmt.Errorf("failed to insert llm_interaction: %w", err)
 	}
-	insertRow, err := pgx.CollectOneRow(insertRows, pgx.RowToStructByName[idRow])
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to read llm_interaction id")
-		return uuid.Nil, fmt.Errorf("failed to read llm_interaction id: %w", err)
-	}
-	interactionID = insertRow.ID
 	span.SetAttributes(attribute.String("llm_interaction.id", interactionID.String()))
 
 	var cityID uuid.UUID
 	if interaction.CityName != "" {
 		cityQuery := `SELECT id FROM cities WHERE name = $1 LIMIT 1`
-		cityRows, cityErr := tx.Query(ctx, cityQuery, interaction.CityName)
-		if cityErr != nil {
-			err = cityErr
-		} else {
-			cityRow, collectErr := pgx.CollectOneRow(cityRows, pgx.RowToStructByName[idRow])
-			if collectErr != nil {
-				err = collectErr
-			} else {
-				cityID = cityRow.ID
-			}
-		}
+		err = tx.QueryRow(ctx, cityQuery, interaction.CityName).Scan(&cityID)
 		if err != nil {
 			if err == pgx.ErrNoRows {
 				r.logger.WarnContext(ctx, "City not found in database, itinerary creation will be skipped", "city_name", interaction.CityName, "interaction_id", interactionID.String())
@@ -285,17 +256,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 	            source_llm_interaction_id = EXCLUDED.source_llm_interaction_id
 	        RETURNING id
 	    `
-		itineraryRows, ierr := tx.Query(ctx, itineraryQuery, interaction.UserID, cityID, interactionID)
-		if ierr != nil {
-			err = ierr
-		} else {
-			itineraryRow, collectErr := pgx.CollectOneRow(itineraryRows, pgx.RowToStructByName[idRow])
-			if collectErr != nil {
-				err = collectErr
-			} else {
-				itineraryID = itineraryRow.ID
-			}
-		}
+		err = tx.QueryRow(ctx, itineraryQuery, interaction.UserID, cityID, interactionID).Scan(&itineraryID)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to insert or update itinerary")
@@ -410,17 +371,11 @@ func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []l
 	// Verify the llm_interaction_id exists before trying to insert POIs
 	var exists bool
 	checkQuery := `SELECT EXISTS(SELECT 1 FROM llm_interactions WHERE id = $1)`
-	checkRows, err := r.pgpool.Query(ctx, checkQuery, llmInteractionID)
+	err := r.pgpool.QueryRow(ctx, checkQuery, llmInteractionID).Scan(&exists)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to check if llm_interaction exists", slog.Any("error", err))
 		return fmt.Errorf("failed to check if llm_interaction exists: %w", err)
 	}
-	existsRow, err := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[existsRow])
-	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to check if llm_interaction exists", slog.Any("error", err))
-		return fmt.Errorf("failed to check if llm_interaction exists: %w", err)
-	}
-	exists = existsRow.Exists
 	if !exists {
 		r.logger.ErrorContext(ctx, "llm_interaction_id does not exist in database",
 			slog.String("llm_interaction_id", llmInteractionID.String()))
@@ -566,7 +521,8 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locit
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id
 	`
-	insertRows, err := tx.Query(ctx, query,
+	var savedItineraryID uuid.UUID
+	err = tx.QueryRow(ctx, query,
 		&itinerary.UserID,
 		&itinerary.SourceLlmInteractionID,
 		&itinerary.SessionID,
@@ -578,20 +534,12 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locit
 		&itinerary.EstimatedDurationDays,
 		&itinerary.EstimatedCostLevel,
 		&itinerary.IsPublic,
-	)
+	).Scan(&savedItineraryID)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to insert itinerary")
 		return uuid.Nil, fmt.Errorf("failed to insert user_saved_itineraries: %w", err)
 	}
-
-	insertRow, err := pgx.CollectOneRow(insertRows, pgx.RowToStructByName[idRow])
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to read saved itinerary id")
-		return uuid.Nil, fmt.Errorf("failed to read saved itinerary id: %w", err)
-	}
-	savedItineraryID := insertRow.ID
 
 	if err := tx.Commit(ctx); err != nil {
 		span.RecordError(err)
@@ -890,20 +838,14 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 	offset := (page - 1) * limit
 
 	// Get total count
+	var totalCount int
 	countQuery := `SELECT COUNT(*) FROM user_saved_itineraries WHERE user_id = $1`
-	countRows, err := r.pgpool.Query(ctx, countQuery, userID)
+	err := r.pgpool.QueryRow(ctx, countQuery, userID).Scan(&totalCount)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to count bookmarked itineraries")
 		return nil, fmt.Errorf("failed to count bookmarked itineraries: %w", err)
 	}
-	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[countRow])
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to read total count")
-		return nil, fmt.Errorf("failed to read total count: %w", err)
-	}
-	totalCount := countResult.Count
 
 	// Get paginated results
 	query := `
@@ -1176,20 +1118,14 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
     `
 
 	// Execute count query first
-	countRows, err := r.pgpool.Query(ctx, countQuery, userID)
+	var total int
+	err := r.pgpool.QueryRow(ctx, countQuery, userID).Scan(&total)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to get total count")
 		r.logger.ErrorContext(ctx, "Failed to get total chat sessions count", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get total count: %w", err)
 	}
-	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[countRow])
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to read total count")
-		return nil, fmt.Errorf("failed to read total count: %w", err)
-	}
-	total := countResult.Count
 
 	// Execute main query
 	rows, err := r.pgpool.Query(ctx, query, userID, limit, offset)

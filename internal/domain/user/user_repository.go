@@ -68,16 +68,6 @@ type changePasswordRow struct {
 	PasswordHash string `db:"password_hash"`
 }
 
-// existsRow is used for EXISTS queries that return a single bool
-type existsRow struct {
-	Exists bool `db:"exists"`
-}
-
-// isActiveRow is used for querying is_active column
-type isActiveRow struct {
-	IsActive bool `db:"is_active"`
-}
-
 func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error {
 	rows, err := r.pgpool.Query(ctx,
 		"SELECT id, password_hash FROM users WHERE email = $1",
@@ -363,12 +353,10 @@ func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, 
 		l.WarnContext(ctx, "User not found or no update occurred", slog.Int64("rows_affected", tag.RowsAffected()))
 		span.SetStatus(codes.Error, "User not found or no change")
 		// Check if user exists to differentiate "not found" vs "no effective change"
-		checkRows, checkErr := r.pgpool.Query(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND is_active = TRUE) as exists", userID)
-		if checkErr == nil {
-			existsRow, collectErr := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[existsRow])
-			if collectErr == nil && !existsRow.Exists {
-				return fmt.Errorf("user not found for update: %w", locitypes.ErrNotFound)
-			}
+		var exists bool
+		checkErr := r.pgpool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE id = $1 AND is_active = TRUE)", userID).Scan(&exists)
+		if checkErr == nil && !exists {
+			return fmt.Errorf("user not found for update: %w", locitypes.ErrNotFound)
 		}
 		// If user exists, maybe the provided values were the same as existing ones.
 		// Or maybe user was inactive. Treat as not found for simplicity for now.
@@ -449,20 +437,16 @@ func (r *PostgresUserRepo) MarkEmailAsVerified(ctx context.Context, userID uuid.
 
 	if tag.RowsAffected() == 0 {
 		// Check if the user exists
-		checkRows, err := r.pgpool.Query(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1) as exists", userID)
+		var exists bool
+		err := r.pgpool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)", userID).Scan(&exists)
 		if err != nil {
 			l.ErrorContext(ctx, "Failed to check if user exists", slog.Any("error", err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "DB query failed")
 			return fmt.Errorf("database error checking user existence: %w", err)
 		}
-		existsResult, collectErr := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[existsRow])
-		if collectErr != nil {
-			l.ErrorContext(ctx, "Failed to collect exists result", slog.Any("error", collectErr))
-			return fmt.Errorf("database error checking user existence: %w", collectErr)
-		}
 
-		if !existsResult.Exists {
+		if !exists {
 			err := fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
 			l.WarnContext(ctx, "Attempted to mark email as verified for non-existent user")
 			span.RecordError(err)
@@ -504,17 +488,8 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 	}
 
 	// First, check if the user exists and is active
-	activeRows, err := tx.Query(ctx, "SELECT is_active FROM users WHERE id = $1", userID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-		l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB query failed")
-		return fmt.Errorf("database error checking user status: %w", err)
-	}
-	activeResult, err := pgx.CollectOneRow(activeRows, pgx.RowToStructByName[isActiveRow])
+	var isActive bool
+	err = tx.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -533,7 +508,6 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 		span.SetStatus(codes.Error, "DB query failed")
 		return fmt.Errorf("database error checking user status: %w", err)
 	}
-	isActive := activeResult.IsActive
 
 	if !isActive {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -608,14 +582,8 @@ func (r *PostgresUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID)
 	l.DebugContext(ctx, "Reactivating user")
 
 	// Check if the user exists and is inactive
-	activeRows, err := r.pgpool.Query(ctx, "SELECT is_active FROM users WHERE id = $1", userID)
-	if err != nil {
-		l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB query failed")
-		return fmt.Errorf("database error checking user status: %w", err)
-	}
-	activeResult, err := pgx.CollectOneRow(activeRows, pgx.RowToStructByName[isActiveRow])
+	var isActive bool
+	err := r.pgpool.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			l.WarnContext(ctx, "Attempted to reactivate non-existent user")
@@ -628,7 +596,6 @@ func (r *PostgresUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID)
 		span.SetStatus(codes.Error, "DB query failed")
 		return fmt.Errorf("database error checking user status: %w", err)
 	}
-	isActive := activeResult.IsActive
 
 	if isActive {
 		l.InfoContext(ctx, "User is already active")

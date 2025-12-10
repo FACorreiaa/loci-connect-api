@@ -9,6 +9,7 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -35,19 +36,19 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-type idRow struct {
-	ID uuid.UUID `db:"id"`
+// PgxPool abstracts pgxpool.Pool for easier testing.
+type PgxPool interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-type idNameRow struct {
-	ID   uuid.UUID `db:"id"`
-	Name string    `db:"name"`
-}
+var _ PgxPool = (*pgxpool.Pool)(nil)
 
-func NewCityRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+func NewCityRepository(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
 		pgpool: pgxpool,
@@ -95,22 +96,15 @@ func (r *RepositoryImpl) SaveCity(ctx context.Context, city locitypes.CityDetail
         RETURNING id
     `
 	// Use normalized values for the insert
-	insertRows, err := r.pgpool.Query(ctx, query,
+	var id uuid.UUID
+	err = r.pgpool.QueryRow(ctx, query,
 		city.Name,
 		normalizedCountry,
 		normalizedState,
 		city.AiSummary,
-		city.CenterLongitude, // Pass pointer directly - pgx handles nil as NULL
-		city.CenterLatitude,  // Pass pointer directly - pgx handles nil as NULL
-	)
-	if err == nil {
-		insertRow, collectErr := pgx.CollectOneRow(insertRows, pgx.RowToStructByName[idRow])
-		if collectErr == nil {
-			return insertRow.ID, nil
-		}
-		err = collectErr
-	}
-
+		city.CenterLongitude,
+		city.CenterLatitude,
+	).Scan(&id)
 	if err != nil {
 		// If there's still a conflict (race condition), try to find and return existing city
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
@@ -122,7 +116,7 @@ func (r *RepositoryImpl) SaveCity(ctx context.Context, city locitypes.CityDetail
 		return uuid.Nil, fmt.Errorf("failed to insert city: %w", err)
 	}
 
-	return uuid.Nil, fmt.Errorf("failed to insert city: %w", err)
+	return id, nil
 }
 
 // FindCityByNameAndCountry You'll also need to update FindCityByNameAndCountry to retrieve these new fields.
@@ -202,8 +196,14 @@ func (r *RepositoryImpl) GetCityIDByName(ctx context.Context, cityName string) (
         LIMIT 1
     `
 
-	rows, err := r.pgpool.Query(ctx, query, cityName)
+	var cityID uuid.UUID
+	err := r.pgpool.QueryRow(ctx, query, cityName).Scan(&cityID)
 	if err != nil {
+		if err == pgx.ErrNoRows {
+			l.WarnContext(ctx, "City not found", slog.String("city_name", cityName))
+			span.SetStatus(codes.Error, "City not found")
+			return uuid.Nil, fmt.Errorf("city not found: %s", cityName)
+		}
 		l.ErrorContext(ctx, "Failed to get city ID by name",
 			slog.Any("error", err),
 			slog.String("city_name", cityName))
@@ -212,28 +212,16 @@ func (r *RepositoryImpl) GetCityIDByName(ctx context.Context, cityName string) (
 		return uuid.Nil, fmt.Errorf("failed to get city ID by name '%s': %w", cityName, err)
 	}
 
-	cityRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[idRow])
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			l.WarnContext(ctx, "City not found", slog.String("city_name", cityName))
-			span.SetStatus(codes.Error, "City not found")
-			return uuid.Nil, fmt.Errorf("city not found: %s", cityName)
-		}
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Database query failed")
-		return uuid.Nil, fmt.Errorf("failed to get city ID by name '%s': %w", cityName, err)
-	}
-
 	l.InfoContext(ctx, "City ID retrieved successfully",
 		slog.String("city_name", cityName),
-		slog.String("city_id", cityRow.ID.String()))
+		slog.String("city_id", cityID.String()))
 	span.SetAttributes(
 		attribute.String("city.name", cityName),
-		attribute.String("city.id", cityRow.ID.String()),
+		attribute.String("city.id", cityID.String()),
 	)
 	span.SetStatus(codes.Ok, "City ID retrieved")
 
-	return cityRow.ID, nil
+	return cityID, nil
 }
 
 // cityWithSimilarity is used for FindSimilarCities query which includes similarity_score
@@ -491,20 +479,9 @@ func (r *RepositoryImpl) GetCity(ctx context.Context, lat, lon float64) (uuid.UU
         LIMIT 1
     `
 
-	rows, err := r.pgpool.Query(ctx, query, point)
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			r.logger.WarnContext(ctx, "No city found for the given coordinates")
-			span.SetStatus(codes.Error, "No city found")
-			return uuid.Nil, "", fmt.Errorf("no city found for coordinates (%f, %f)", lat, lon)
-		}
-		r.logger.ErrorContext(ctx, "Failed to determine city ID", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Database query failed")
-		return uuid.Nil, "", fmt.Errorf("failed to determine city ID: %w", err)
-	}
-
-	cityRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[idNameRow])
+	var cityID uuid.UUID
+	var cityName string
+	err := r.pgpool.QueryRow(ctx, query, point).Scan(&cityID, &cityName)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			r.logger.WarnContext(ctx, "No city found for the given coordinates")
@@ -519,13 +496,13 @@ func (r *RepositoryImpl) GetCity(ctx context.Context, lat, lon float64) (uuid.UU
 
 	// Log success and set tracing attributes
 	r.logger.InfoContext(ctx, "City determined",
-		slog.String("city_id", cityRow.ID.String()),
-		slog.String("city_name", cityRow.Name))
+		slog.String("city_id", cityID.String()),
+		slog.String("city_name", cityName))
 	span.SetAttributes(
-		attribute.String("city.id", cityRow.ID.String()),
-		attribute.String("city.name", cityRow.Name),
+		attribute.String("city.id", cityID.String()),
+		attribute.String("city.name", cityName),
 	)
 	span.SetStatus(codes.Ok, "City determined")
 
-	return cityRow.ID, cityRow.Name, nil
+	return cityID, cityName, nil
 }

@@ -2,7 +2,6 @@ package poi
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -92,10 +92,22 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-func NewRepository(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+// PgxPool abstracts the pgxpool.Pool for easier testing.
+type PgxPool interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
+
+func NewRepository(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
 		pgpool: pgxpool,
@@ -123,11 +135,21 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
             $1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5, $6, $7, $8
         ) RETURNING id
     `
-	var id uuid.UUID
-	if err = tx.QueryRow(ctx, query,
+	rows, err := tx.Query(ctx, query,
 		poi.Name, poi.DescriptionPOI, poi.Longitude, poi.Latitude, cityID,
 		poi.Category, "loci_ai", poi.DescriptionPOI,
-	).Scan(&id); err != nil {
+	)
+	if err != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+		}
+		return uuid.Nil, fmt.Errorf("failed to insert POI: %w", err)
+	}
+
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
 		if err == pgx.ErrNoRows {
 			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 				r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
@@ -143,34 +165,51 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
 		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	// Log the successful insertion
-	r.logger.Info("POI saved successfully", slog.String("name", poi.Name), slog.String("id", id.String()))
+	r.logger.Info("POI saved successfully", slog.String("name", poi.Name), slog.String("id", insertRow.ID.String()))
 
-	return id, nil
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
 	query := `
-        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '')
+        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '') AS category
         FROM points_of_interest
         WHERE name = $1 AND city_id = $2
     `
-	var poi locitypes.POIDetailedInfo
-	if err := r.pgpool.QueryRow(ctx, query, name, cityID).Scan(
-		&poi.Name, &poi.DescriptionPOI, &poi.Latitude, &poi.Longitude, &poi.Category,
-	); err != nil {
-		if err == pgx.ErrNoRows {
+	rows, err := r.pgpool.Query(ctx, query, name, cityID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find POI: %w", err)
+	}
+
+	type poiRow struct {
+		Name           string  `db:"name"`
+		DescriptionPOI string  `db:"description"`
+		Latitude       float64 `db:"lat"`
+		Longitude      float64 `db:"lon"`
+		Category       string  `db:"category"`
+	}
+
+	poiDbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find POI: %w", err)
+		return nil, fmt.Errorf("failed to collect POI: %w", err)
 	}
 	// Log the successful retrieval
 	r.logger.Info("POI found successfully",
-		slog.String("name", poi.Name),
-		slog.Float64("latitude", poi.Latitude),
-		slog.Float64("longitude", poi.Longitude),
+		slog.String("name", poiDbRow.Name),
+		slog.Float64("latitude", poiDbRow.Latitude),
+		slog.Float64("longitude", poiDbRow.Longitude),
 		slog.String("cityID", cityID.String()))
 
-	return &poi, nil
+	return &locitypes.POIDetailedInfo{
+		Name:           poiDbRow.Name,
+		DescriptionPOI: poiDbRow.DescriptionPOI,
+		Latitude:       poiDbRow.Latitude,
+		Longitude:      poiDbRow.Longitude,
+		Category:       poiDbRow.Category,
+	}, nil
 }
 
 // poiCityDistanceRow is a DB row struct for GetPOIsByCityAndDistance query
@@ -227,13 +266,18 @@ func (r *RepositoryImpl) GetPOIsByCityAndDistance(ctx context.Context, cityID uu
 }
 
 func (r *RepositoryImpl) CheckPoiExists(ctx context.Context, poiID uuid.UUID) (bool, error) {
-	var exists bool
 	query := `SELECT EXISTS(SELECT 1 FROM points_of_interest WHERE id = $1)`
-	err := r.pgpool.QueryRow(ctx, query, poiID).Scan(&exists)
+	rows, err := r.pgpool.Query(ctx, query, poiID)
 	if err != nil {
 		return false, fmt.Errorf("failed to query points_of_interest: %w", err)
 	}
-	return exists, nil
+	result, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		Exists bool `db:"exists"`
+	}])
+	if err != nil {
+		return false, fmt.Errorf("failed to read exists flag: %w", err)
+	}
+	return result.Exists, nil
 }
 
 func (r *RepositoryImpl) AddPoiToFavourites(ctx context.Context, userID, poiID uuid.UUID) (uuid.UUID, error) {
@@ -243,12 +287,17 @@ func (r *RepositoryImpl) AddPoiToFavourites(ctx context.Context, userID, poiID u
 		ON CONFLICT (user_id, poi_id) DO UPDATE SET user_id = EXCLUDED.user_id
 		RETURNING id
     `
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, userID, poiID).Scan(&id)
+	rows, err := r.pgpool.Query(ctx, query, userID, poiID)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to add POI to favourites: %w", err)
 	}
-	return id, nil
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to read inserted favourite id: %w", err)
+	}
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) AddLLMPoiToFavourite(ctx context.Context, userID, llmPoiID uuid.UUID) (uuid.UUID, error) {
@@ -258,12 +307,17 @@ func (r *RepositoryImpl) AddLLMPoiToFavourite(ctx context.Context, userID, llmPo
         ON CONFLICT (user_id, llm_poi_id) DO UPDATE SET user_id = EXCLUDED.user_id
 		RETURNING id
     `
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, userID, llmPoiID).Scan(&id)
+	rows, err := r.pgpool.Query(ctx, query, userID, llmPoiID)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("failed to insert into user_favorite_llm_pois: %w", err)
 	}
-	return id, nil
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to read inserted llm favourite id: %w", err)
+	}
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) RemovePoiFromFavourites(ctx context.Context, userID, poiID uuid.UUID) error {
@@ -434,10 +488,15 @@ func (r *RepositoryImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, 
 		) combined_count
 	`
 
-	var totalCount int
-	err := r.pgpool.QueryRow(ctx, countQuery, userID).Scan(&totalCount)
+	countRows, err := r.pgpool.Query(ctx, countQuery, userID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count favourite POIs: %w", err)
+	}
+	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[struct {
+		Count int `db:"count"`
+	}])
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read favourite POIs count: %w", err)
 	}
 
 	// Then get the paginated results with COALESCE for nullable fields
@@ -538,10 +597,10 @@ func (r *RepositoryImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, 
 	r.logger.Info("Paginated favourite POIs retrieved successfully",
 		slog.String("userID", userID.String()),
 		slog.Int("count", len(pois)),
-		slog.Int("total", totalCount),
+		slog.Int("total", countResult.Count),
 		slog.Int("limit", limit),
 		slog.Int("offset", offset))
-	return pois, totalCount, nil
+	return pois, countResult.Count, nil
 }
 
 // poiCityIDRow is a DB row struct for GetPOIsByCityID query
@@ -613,29 +672,63 @@ func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, l
         )
         LIMIT 1
     `
-	row := r.pgpool.QueryRow(ctx, query, cityID, lon, lat, tolerance)
-
-	var poi locitypes.POIDetailedInfo
-	var llmInteractionID uuid.NullUUID
-	err := row.Scan(
-		&poi.ID, &poi.Name, &poi.Description, &poi.Latitude, &poi.Longitude,
-		&poi.Address, &poi.Website, &poi.PhoneNumber, &poi.OpeningHours,
-		&poi.PriceRange, &poi.Category, &poi.Tags, &poi.Images, &poi.Rating,
-		&llmInteractionID,
-	)
+	rows, err := r.pgpool.Query(ctx, query, cityID, lon, lat, tolerance)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			span.SetStatus(codes.Ok, "No POI found")
-			return nil, nil
-		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to query POI details")
 		return nil, fmt.Errorf("failed to query poi_details: %w", err)
 	}
 
-	if llmInteractionID.Valid {
-		poi.LlmInteractionID = llmInteractionID.UUID
+	type poiDetailsRow struct {
+		ID               uuid.UUID         `db:"id"`
+		Name             string            `db:"name"`
+		Description      string            `db:"description"`
+		Latitude         float64           `db:"latitude"`
+		Longitude        float64           `db:"longitude"`
+		Address          string            `db:"address"`
+		Website          string            `db:"website"`
+		PhoneNumber      string            `db:"phone_number"`
+		OpeningHours     map[string]string `db:"opening_hours"`
+		PriceRange       string            `db:"price_range"`
+		Category         string            `db:"category"`
+		Tags             []string          `db:"tags"`
+		Images           []string          `db:"images"`
+		Rating           float64           `db:"rating"`
+		LlmInteractionID *uuid.UUID        `db:"llm_interaction_id"`
 	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiDetailsRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			span.SetStatus(codes.Ok, "No POI found")
+			return nil, nil
+		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to read POI details")
+		return nil, fmt.Errorf("failed to read poi_details: %w", err)
+	}
+
+	poi := locitypes.POIDetailedInfo{
+		ID:               dbRow.ID,
+		Name:             dbRow.Name,
+		Description:      dbRow.Description,
+		Latitude:         dbRow.Latitude,
+		Longitude:        dbRow.Longitude,
+		Address:          dbRow.Address,
+		Website:          dbRow.Website,
+		PhoneNumber:      dbRow.PhoneNumber,
+		OpeningHours:     dbRow.OpeningHours,
+		PriceRange:       dbRow.PriceRange,
+		Category:         dbRow.Category,
+		Tags:             dbRow.Tags,
+		Images:           dbRow.Images,
+		Rating:           dbRow.Rating,
+		LlmInteractionID: uuid.Nil,
+	}
+	if dbRow.LlmInteractionID != nil {
+		poi.LlmInteractionID = *dbRow.LlmInteractionID
+	}
+
 	span.SetStatus(codes.Ok, "POI details found")
 	return &poi, nil
 }
@@ -669,20 +762,27 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 		)
 		LIMIT 1
 	`
-	var existingID uuid.UUID
-	err := r.pgpool.QueryRow(ctx, duplicateCheckQuery, poi.Name, poi.Longitude, poi.Latitude).Scan(&existingID)
+	duplicateRows, err := r.pgpool.Query(ctx, duplicateCheckQuery, poi.Name, poi.Longitude, poi.Latitude)
+	var existingRow struct {
+		ID uuid.UUID `db:"id"`
+	}
+	if err == nil {
+		existingRow, err = pgx.CollectOneRow(duplicateRows, pgx.RowToStructByName[struct {
+			ID uuid.UUID `db:"id"`
+		}])
+	}
 	if err == nil {
 		// Duplicate found
 		r.logger.InfoContext(ctx, "POI already exists, skipping save",
 			slog.String("poi_name", poi.Name),
-			slog.String("existing_id", existingID.String()),
+			slog.String("existing_id", existingRow.ID.String()),
 			slog.String("city_id", func() string {
 				return "null"
 			}()))
-		span.SetAttributes(attribute.String("poi.existing_id", existingID.String()))
+		span.SetAttributes(attribute.String("poi.existing_id", existingRow.ID.String()))
 		span.SetStatus(codes.Ok, "POI already exists")
-		return existingID, nil
-	} else if err != pgx.ErrNoRows {
+		return existingRow.ID, nil
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		// Unexpected error
 		r.logger.WarnContext(ctx, "Error checking for duplicate POI",
 			slog.Any("error", err),
@@ -715,7 +815,12 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 		poi.Longitude, poi.Latitude, // lon, lat for ST_MakePoint
 		poi.Address, poi.Website, poi.PhoneNumber, poi.OpeningHours,
 		poi.PriceRange, poi.Category, poi.Tags, poi.Images, poi.Rating,
-		uuid.NullUUID{UUID: poi.LlmInteractionID, Valid: poi.LlmInteractionID != uuid.Nil},
+		func() any {
+			if poi.LlmInteractionID == uuid.Nil {
+				return nil
+			}
+			return poi.LlmInteractionID
+		}(),
 	)
 	if err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -825,21 +930,21 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 
 // hotelDetailsRow is a DB row struct for FindHotelDetails query
 type hotelDetailsRow struct {
-	ID               uuid.UUID     `db:"id"`
-	Name             string        `db:"name"`
-	Description      string        `db:"description"`
-	Latitude         float64       `db:"latitude"`
-	Longitude        float64       `db:"longitude"`
-	Address          string        `db:"address"`
-	Website          string        `db:"website"`
-	PhoneNumber      string        `db:"phone_number"`
-	OpeningHours     string        `db:"opening_hours"`
-	PriceRange       string        `db:"price_range"`
-	Category         string        `db:"category"`
-	Tags             []string      `db:"tags"`
-	Images           []string      `db:"images"`
-	Rating           float64       `db:"rating"`
-	LlmInteractionID uuid.NullUUID `db:"llm_interaction_id"`
+	ID               uuid.UUID  `db:"id"`
+	Name             string     `db:"name"`
+	Description      string     `db:"description"`
+	Latitude         float64    `db:"latitude"`
+	Longitude        float64    `db:"longitude"`
+	Address          string     `db:"address"`
+	Website          string     `db:"website"`
+	PhoneNumber      string     `db:"phone_number"`
+	OpeningHours     string     `db:"opening_hours"`
+	PriceRange       string     `db:"price_range"`
+	Category         string     `db:"category"`
+	Tags             []string   `db:"tags"`
+	Images           []string   `db:"images"`
+	Rating           float64    `db:"rating"`
+	LlmInteractionID *uuid.UUID `db:"llm_interaction_id"`
 }
 
 func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error) {
@@ -896,21 +1001,26 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 			priceRange = &row.PriceRange
 		}
 		hotels[i] = locitypes.HotelDetailedInfo{
-			ID:               row.ID,
-			Name:             row.Name,
-			Description:      row.Description,
-			Latitude:         row.Latitude,
-			Longitude:        row.Longitude,
-			Address:          row.Address,
-			Website:          website,
-			PhoneNumber:      phoneNumber,
-			OpeningHours:     openingHours,
-			PriceRange:       priceRange,
-			Category:         row.Category,
-			Tags:             row.Tags,
-			Images:           row.Images,
-			Rating:           row.Rating,
-			LlmInteractionID: row.LlmInteractionID.UUID,
+			ID:           row.ID,
+			Name:         row.Name,
+			Description:  row.Description,
+			Latitude:     row.Latitude,
+			Longitude:    row.Longitude,
+			Address:      row.Address,
+			Website:      website,
+			PhoneNumber:  phoneNumber,
+			OpeningHours: openingHours,
+			PriceRange:   priceRange,
+			Category:     row.Category,
+			Tags:         row.Tags,
+			Images:       row.Images,
+			Rating:       row.Rating,
+			LlmInteractionID: func() uuid.UUID {
+				if row.LlmInteractionID == nil {
+					return uuid.Nil
+				}
+				return *row.LlmInteractionID
+			}(),
 		}
 	}
 
@@ -948,23 +1058,36 @@ func (r *RepositoryImpl) SaveHotelDetails(ctx context.Context, hotel locitypes.H
         )
         RETURNING id
     `
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query,
+	rows, err := r.pgpool.Query(ctx, query,
 		uuid.New(), cityID, hotel.Name, hotel.Description, hotel.Latitude, hotel.Longitude,
 		hotel.Longitude, hotel.Latitude, // lon, lat for ST_MakePoint
 		hotel.Address, hotel.Website, hotel.PhoneNumber, openingHours,
 		hotel.PriceRange, hotel.Category, hotel.Tags, hotel.Images, hotel.Rating,
-		uuid.NullUUID{UUID: hotel.LlmInteractionID, Valid: hotel.LlmInteractionID != uuid.Nil},
-	).Scan(&id)
+		func() any {
+			if hotel.LlmInteractionID == uuid.Nil {
+				return nil
+			}
+			return hotel.LlmInteractionID
+		}(),
+	)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to save hotel details")
 		return uuid.Nil, fmt.Errorf("failed to save hotel_details: %w", err)
 	}
 
-	span.SetAttributes(attribute.String("hotel.id", id.String()))
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to read saved hotel details id")
+		return uuid.Nil, fmt.Errorf("failed to read hotel_details id: %w", err)
+	}
+
+	span.SetAttributes(attribute.String("hotel.id", insertRow.ID.String()))
 	span.SetStatus(codes.Ok, "Hotel details saved successfully")
-	return id, nil
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*locitypes.HotelDetailedInfo, error) {
@@ -980,51 +1103,84 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 		FROM hotel_details
 		WHERE id = $1
 	`
-	row := r.pgpool.QueryRow(ctx, query, hotelID)
-
-	var hotel locitypes.HotelDetailedInfo
-	var llmInteractionID uuid.NullUUID
-	err := row.Scan(
-		&hotel.ID, &hotel.Name, &hotel.Description, &hotel.Latitude, &hotel.Longitude,
-		&hotel.Address, &hotel.Website, &hotel.PhoneNumber, &hotel.OpeningHours,
-		&hotel.PriceRange, &hotel.Category, &hotel.Tags, &hotel.Images, &hotel.Rating,
-		&llmInteractionID,
-	)
+	rows, err := r.pgpool.Query(ctx, query, hotelID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
-			span.SetStatus(codes.Ok, "No hotel found")
-			return nil, nil
-		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to query hotel details by ID")
 		return nil, fmt.Errorf("failed to query hotel_details by ID: %w", err)
 	}
 
-	if llmInteractionID.Valid {
-		hotel.LlmInteractionID = llmInteractionID.UUID
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[hotelDetailsRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			span.SetStatus(codes.Ok, "No hotel found")
+			return nil, nil
+		}
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to collect hotel details by ID")
+		return nil, fmt.Errorf("failed to collect hotel_details by ID: %w", err)
 	}
+
+	var openingHours *string
+	if dbRow.OpeningHours != "" {
+		openingHours = &dbRow.OpeningHours
+	}
+	var website *string
+	if dbRow.Website != "" {
+		website = &dbRow.Website
+	}
+	var phoneNumber *string
+	if dbRow.PhoneNumber != "" {
+		phoneNumber = &dbRow.PhoneNumber
+	}
+	var priceRange *string
+	if dbRow.PriceRange != "" {
+		priceRange = &dbRow.PriceRange
+	}
+
+	hotel := locitypes.HotelDetailedInfo{
+		ID:               dbRow.ID,
+		Name:             dbRow.Name,
+		Description:      dbRow.Description,
+		Latitude:         dbRow.Latitude,
+		Longitude:        dbRow.Longitude,
+		Address:          dbRow.Address,
+		Website:          website,
+		PhoneNumber:      phoneNumber,
+		OpeningHours:     openingHours,
+		PriceRange:       priceRange,
+		Category:         dbRow.Category,
+		Tags:             dbRow.Tags,
+		Images:           dbRow.Images,
+		Rating:           dbRow.Rating,
+		LlmInteractionID: uuid.Nil,
+	}
+	if dbRow.LlmInteractionID != nil {
+		hotel.LlmInteractionID = *dbRow.LlmInteractionID
+	}
+
 	span.SetStatus(codes.Ok, "Hotel details found by ID")
 	return &hotel, nil
 }
 
 // restaurantDetailsRow is a DB row struct for FindRestaurantDetails query
 type restaurantDetailsRow struct {
-	ID               uuid.UUID     `db:"id"`
-	Name             string        `db:"name"`
-	Description      string        `db:"description"`
-	Latitude         float64       `db:"latitude"`
-	Longitude        float64       `db:"longitude"`
-	Address          string        `db:"address"`
-	Website          string        `db:"website"`
-	PhoneNumber      string        `db:"phone_number"`
-	OpeningHours     string        `db:"opening_hours"`
-	PriceLevel       string        `db:"price_level"`
-	Category         string        `db:"category"`
-	Tags             []string      `db:"tags"`
-	Images           []string      `db:"images"`
-	Rating           float64       `db:"rating"`
-	CuisineType      string        `db:"cuisine_type"`
-	LlmInteractionID uuid.NullUUID `db:"llm_interaction_id"`
+	ID               uuid.UUID  `db:"id"`
+	Name             string     `db:"name"`
+	Description      string     `db:"description"`
+	Latitude         float64    `db:"latitude"`
+	Longitude        float64    `db:"longitude"`
+	Address          string     `db:"address"`
+	Website          string     `db:"website"`
+	PhoneNumber      string     `db:"phone_number"`
+	OpeningHours     string     `db:"opening_hours"`
+	PriceLevel       string     `db:"price_level"`
+	Category         string     `db:"category"`
+	Tags             []string   `db:"tags"`
+	Images           []string   `db:"images"`
+	Rating           float64    `db:"rating"`
+	CuisineType      string     `db:"cuisine_type"`
+	LlmInteractionID *uuid.UUID `db:"llm_interaction_id"`
 }
 
 func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *locitypes.RestaurantUserPreferences) ([]locitypes.RestaurantDetailedInfo, error) {
@@ -1094,22 +1250,27 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
 			cuisineType = &row.CuisineType
 		}
 		restaurants[i] = locitypes.RestaurantDetailedInfo{
-			ID:               row.ID,
-			Name:             row.Name,
-			Description:      row.Description,
-			Latitude:         row.Latitude,
-			Longitude:        row.Longitude,
-			Address:          address,
-			Website:          website,
-			PhoneNumber:      phoneNumber,
-			OpeningHours:     openingHours,
-			PriceLevel:       priceLevel,
-			Category:         row.Category,
-			Tags:             row.Tags,
-			Images:           row.Images,
-			Rating:           row.Rating,
-			CuisineType:      cuisineType,
-			LlmInteractionID: row.LlmInteractionID.UUID,
+			ID:           row.ID,
+			Name:         row.Name,
+			Description:  row.Description,
+			Latitude:     row.Latitude,
+			Longitude:    row.Longitude,
+			Address:      address,
+			Website:      website,
+			PhoneNumber:  phoneNumber,
+			OpeningHours: openingHours,
+			PriceLevel:   priceLevel,
+			Category:     row.Category,
+			Tags:         row.Tags,
+			Images:       row.Images,
+			Rating:       row.Rating,
+			CuisineType:  cuisineType,
+			LlmInteractionID: func() uuid.UUID {
+				if row.LlmInteractionID == nil {
+					return uuid.Nil
+				}
+				return *row.LlmInteractionID
+			}(),
 		}
 	}
 	span.SetStatus(codes.Ok, "Restaurants found")
@@ -1124,59 +1285,19 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
 	defer span.End()
 
 	// Normalize opening_hours
-	var openingHoursJSON sql.NullString // Use sql.NullString for JSONB to handle NULL correctly
+	var openingHoursJSON *string
 	if restaurant.OpeningHours != nil && *restaurant.OpeningHours != "" {
 		if json.Valid([]byte(*restaurant.OpeningHours)) {
-			openingHoursJSON.String = *restaurant.OpeningHours
-			openingHoursJSON.Valid = true
+			openingHoursJSON = restaurant.OpeningHours
+		} else if marshalled, err := json.Marshal(map[string]string{"general": *restaurant.OpeningHours}); err == nil {
+			marshalledStr := string(marshalled)
+			openingHoursJSON = &marshalledStr
 		} else {
-			// Wrap plain string into a simple JSON object so we don't drop data
-			if marshalled, err := json.Marshal(map[string]string{"general": *restaurant.OpeningHours}); err == nil {
-				openingHoursJSON.String = string(marshalled)
-				openingHoursJSON.Valid = true
-			} else {
-				r.logger.WarnContext(ctx, "Invalid JSON for opening_hours, setting to NULL",
-					slog.String("value", *restaurant.OpeningHours),
-					slog.String("restaurant_name", restaurant.Name),
-					slog.Any("marshal_error", err))
-				// openingHoursJSON remains invalid, which inserts NULL
-			}
+			r.logger.WarnContext(ctx, "Invalid JSON for opening_hours, setting to NULL",
+				slog.String("value", *restaurant.OpeningHours),
+				slog.String("restaurant_name", restaurant.Name),
+				slog.Any("marshal_error", err))
 		}
-	}
-
-	// Normalize price_level and cuisine_type (using sql.NullString is safer for text fields that can be null)
-	var priceLevel sql.NullString
-	if restaurant.PriceLevel != nil && *restaurant.PriceLevel != "" {
-		priceLevel.String = *restaurant.PriceLevel
-		priceLevel.Valid = true
-	}
-
-	var cuisineType sql.NullString
-	if restaurant.CuisineType != nil && *restaurant.CuisineType != "" {
-		cuisineType.String = *restaurant.CuisineType
-		cuisineType.Valid = true
-	}
-
-	// Handle nullable text fields from restaurant struct
-	var address sql.NullString
-	if restaurant.Address != nil {
-		address.String = *restaurant.Address
-		address.Valid = true
-	}
-	var website sql.NullString
-	if restaurant.Website != nil {
-		website.String = *restaurant.Website
-		website.Valid = true
-	}
-	var phoneNumber sql.NullString
-	if restaurant.PhoneNumber != nil {
-		phoneNumber.String = *restaurant.PhoneNumber
-		phoneNumber.Valid = true
-	}
-	var category sql.NullString
-	if restaurant.Category != "" { // Assuming Category is not a pointer in the struct
-		category.String = restaurant.Category
-		category.Valid = true
 	}
 
 	query := `
@@ -1189,8 +1310,7 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
             $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19 -- Added $19
         ) RETURNING id
     `
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query,
+	rows, err := r.pgpool.Query(ctx, query,
 		restaurant.ID,
 		cityID,                      // $2: city_id
 		restaurant.Name,             // $3: name
@@ -1199,18 +1319,18 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
 		restaurant.Longitude,        // $6: longitude
 		restaurant.Longitude,        // $7: location (longitude for ST_MakePoint)
 		restaurant.Latitude,         // $8: location (latitude for ST_MakePoint)
-		address,                     // $9: address (sql.NullString)
-		website,                     // $10: website (sql.NullString)
-		phoneNumber,                 // $11: phone_number (sql.NullString)
-		openingHoursJSON,            // $12: opening_hours (sql.NullString representing JSON)
-		priceLevel,                  // $13: price_level (sql.NullString)
-		category,                    // $14: category (sql.NullString)
-		cuisineType,                 // $15: cuisine_type (sql.NullString)
+		restaurant.Address,          // $9: address
+		restaurant.Website,          // $10: website
+		restaurant.PhoneNumber,      // $11: phone_number
+		openingHoursJSON,            // $12: opening_hours JSON or nil
+		restaurant.PriceLevel,       // $13: price_level
+		restaurant.Category,         // $14: category
+		restaurant.CuisineType,      // $15: cuisine_type
 		restaurant.Tags,             // $16: tags (TEXT[])
 		restaurant.Images,           // $17: images (TEXT[])
 		restaurant.Rating,           // $18: rating (DOUBLE PRECISION)
 		restaurant.LlmInteractionID, // $19: llm_interaction_id (UUID)
-	).Scan(&id)
+	)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to save restaurant details",
 			slog.Any("error", err),
@@ -1221,14 +1341,18 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
 		return uuid.Nil, fmt.Errorf("failed to save restaurant_details: %w", err)
 	}
 
-	// If the `id` scanned back is different from `restaurant.ID` (which it will be if you used uuid.New() in the query's $1)
-	// and you need the database-generated ID, then `id` is what you want.
-	// If you want to ensure the ID from the service layer (which was already in restaurant.ID) is used and is the PK,
-	// then you should pass restaurant.ID as $1. My correction above assumes you pass restaurant.ID as $1.
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB INSERT failed")
+		return uuid.Nil, fmt.Errorf("failed to read inserted restaurant id: %w", err)
+	}
 
-	span.SetAttributes(attribute.String("db.restaurant.id", id.String())) // Log the ID returned by the DB
+	span.SetAttributes(attribute.String("db.restaurant.id", insertRow.ID.String())) // Log the ID returned by the DB
 	span.SetStatus(codes.Ok, "Restaurant saved")
-	return id, nil
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*locitypes.RestaurantDetailedInfo, error) {
@@ -1242,26 +1366,44 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
         FROM restaurant_details
         WHERE id = $1
     `
-	var restaurant locitypes.RestaurantDetailedInfo
-	var llmID uuid.NullUUID
-	err := r.pgpool.QueryRow(ctx, query, restaurantID).Scan(&restaurant.ID, &restaurant.Name,
-		&restaurant.Description, &restaurant.Latitude,
-		&restaurant.Longitude, &restaurant.Address,
-		&restaurant.Website, &restaurant.PhoneNumber,
-		&restaurant.OpeningHours, &restaurant.PriceLevel,
-		&restaurant.Category, &restaurant.Tags,
-		&restaurant.Images, &restaurant.Rating,
-		&restaurant.CuisineType, &llmID)
+	rows, err := r.pgpool.Query(ctx, query, restaurantID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to get restaurant: %w", err)
+	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[restaurantDetailsRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			span.SetStatus(codes.Ok, "Restaurant not found")
 			return nil, nil
 		}
 		span.RecordError(err)
-		return nil, fmt.Errorf("failed to get restaurant: %w", err)
+		return nil, fmt.Errorf("failed to collect restaurant: %w", err)
 	}
-	if llmID.Valid {
-		restaurant.LlmInteractionID = llmID.UUID
+
+	restaurant := locitypes.RestaurantDetailedInfo{
+		ID:           dbRow.ID,
+		Name:         dbRow.Name,
+		Description:  dbRow.Description,
+		Latitude:     dbRow.Latitude,
+		Longitude:    dbRow.Longitude,
+		Address:      stringPtr(dbRow.Address),
+		Website:      stringPtr(dbRow.Website),
+		PhoneNumber:  stringPtr(dbRow.PhoneNumber),
+		OpeningHours: stringPtr(dbRow.OpeningHours),
+		PriceLevel:   stringPtr(dbRow.PriceLevel),
+		Category:     dbRow.Category,
+		Tags:         dbRow.Tags,
+		Images:       dbRow.Images,
+		Rating:       dbRow.Rating,
+		CuisineType:  stringPtr(dbRow.CuisineType),
+		LlmInteractionID: func() uuid.UUID {
+			if dbRow.LlmInteractionID == nil {
+				return uuid.Nil
+			}
+			return *dbRow.LlmInteractionID
+		}(),
 	}
 	span.SetStatus(codes.Ok, "Restaurant found")
 	return &restaurant, nil
@@ -1384,30 +1526,69 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 		FROM user_saved_itineraries
 		WHERE id = $1 AND user_id = $2
 	`
-	row := r.pgpool.QueryRow(ctx, query, itineraryID, userID)
+	rows, err := r.pgpool.Query(ctx, query, itineraryID, userID)
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to query user_saved_itineraries: %w", err)
+	}
 
-	var itinerary locitypes.UserSavedItinerary
-	if err := row.Scan(
-		&itinerary.ID,
-		&itinerary.UserID,
-		&itinerary.SourceLlmInteractionID,
-		&itinerary.SessionID,
-		&itinerary.PrimaryCityID,
-		&itinerary.Title,
-		&itinerary.Description,
-		&itinerary.MarkdownContent,
-		&itinerary.Tags,
-		&itinerary.EstimatedDurationDays,
-		&itinerary.EstimatedCostLevel,
-		&itinerary.IsPublic,
-	); err != nil {
-		if err == pgx.ErrNoRows {
+	type itineraryRow struct {
+		ID                     uuid.UUID  `db:"id"`
+		UserID                 uuid.UUID  `db:"user_id"`
+		SourceLlmInteractionID *uuid.UUID `db:"source_llm_interaction_id"`
+		SessionID              *uuid.UUID `db:"session_id"`
+		PrimaryCityID          *uuid.UUID `db:"primary_city_id"`
+		Title                  string     `db:"title"`
+		Description            *string    `db:"description"`
+		MarkdownContent        string     `db:"markdown_content"`
+		Tags                   []string   `db:"tags"`
+		EstimatedDurationDays  *int32     `db:"estimated_duration_days"`
+		EstimatedCostLevel     *int32     `db:"estimated_cost_level"`
+		IsPublic               bool       `db:"is_public"`
+	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[itineraryRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			err = fmt.Errorf("no itinerary found with ID %s for user %s", itineraryID, userID)
 			span.RecordError(err)
 			return nil, err
 		}
 		span.RecordError(err)
-		return nil, fmt.Errorf("failed to scan user_saved_itineraries row: %w", err)
+		return nil, fmt.Errorf("failed to read itinerary: %w", err)
+	}
+
+	itinerary := locitypes.UserSavedItinerary{
+		ID:              dbRow.ID,
+		UserID:          dbRow.UserID,
+		Title:           dbRow.Title,
+		MarkdownContent: dbRow.MarkdownContent,
+		Tags:            dbRow.Tags,
+		IsPublic:        dbRow.IsPublic,
+	}
+	if dbRow.SourceLlmInteractionID != nil {
+		itinerary.SourceLlmInteractionID.Bytes = *dbRow.SourceLlmInteractionID
+		itinerary.SourceLlmInteractionID.Valid = true
+	}
+	if dbRow.SessionID != nil {
+		itinerary.SessionID.Bytes = *dbRow.SessionID
+		itinerary.SessionID.Valid = true
+	}
+	if dbRow.PrimaryCityID != nil {
+		itinerary.PrimaryCityID.Bytes = *dbRow.PrimaryCityID
+		itinerary.PrimaryCityID.Valid = true
+	}
+	if dbRow.Description != nil {
+		itinerary.Description.String = *dbRow.Description
+		itinerary.Description.Valid = true
+	}
+	if dbRow.EstimatedDurationDays != nil {
+		itinerary.EstimatedDurationDays.Int32 = *dbRow.EstimatedDurationDays
+		itinerary.EstimatedDurationDays.Valid = true
+	}
+	if dbRow.EstimatedCostLevel != nil {
+		itinerary.EstimatedCostLevel.Int32 = *dbRow.EstimatedCostLevel
+		itinerary.EstimatedCostLevel.Valid = true
 	}
 
 	return &itinerary, nil
@@ -1448,17 +1629,24 @@ func (r *RepositoryImpl) GetItineraries(ctx context.Context, userID uuid.UUID, p
 	countQuery := `
 		SELECT COUNT(*) FROM user_saved_itineraries WHERE user_id = $1
 	`
-	var totalRecords int
-	if err := r.pgpool.QueryRow(ctx, countQuery, userID).Scan(&totalRecords); err != nil {
+	countRows, err := r.pgpool.Query(ctx, countQuery, userID)
+	if err != nil {
 		span.RecordError(err)
 		return nil, 0, fmt.Errorf("failed to count user_saved_itineraries: %w", err)
 	}
+	countResult, err := pgx.CollectOneRow(countRows, pgx.RowToStructByName[struct {
+		Total int `db:"count"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		return nil, 0, fmt.Errorf("failed to read itinerary count: %w", err)
+	}
 	span.SetAttributes(
-		attribute.Int("total_records", totalRecords),
+		attribute.Int("total_records", countResult.Total),
 		attribute.Int("itineraries.count", len(itineraries)),
 	)
 	span.SetStatus(codes.Ok, "Itineraries retrieved successfully")
-	return itineraries, totalRecords, nil
+	return itineraries, countResult.Total, nil
 }
 
 func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryID uuid.UUID, updates locitypes.UpdateItineraryRequest) (*locitypes.UserSavedItinerary, error) {
@@ -1483,11 +1671,11 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 	}
 	if updates.Description != nil {
 		setClauses = append(setClauses, fmt.Sprintf("description = $%d", argCount))
-		if *updates.Description == "" {
-			args = append(args, sql.NullString{Valid: false})
-		} else {
-			args = append(args, sql.NullString{String: *updates.Description, Valid: true})
+		var desc any
+		if *updates.Description != "" {
+			desc = *updates.Description
 		}
+		args = append(args, desc)
 		argCount++
 		span.SetAttributes(attribute.Bool("update.description", true))
 	}
@@ -1499,13 +1687,13 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 	}
 	if updates.EstimatedDurationDays != nil {
 		setClauses = append(setClauses, fmt.Sprintf("estimated_duration_days = $%d", argCount))
-		args = append(args, sql.NullInt32{Int32: *updates.EstimatedDurationDays, Valid: true})
+		args = append(args, *updates.EstimatedDurationDays)
 		argCount++
 		span.SetAttributes(attribute.Bool("update.duration", true))
 	}
 	if updates.EstimatedCostLevel != nil {
 		setClauses = append(setClauses, fmt.Sprintf("estimated_cost_level = $%d", argCount))
-		args = append(args, sql.NullInt32{Int32: *updates.EstimatedCostLevel, Valid: true})
+		args = append(args, *updates.EstimatedCostLevel)
 		argCount++
 		span.SetAttributes(attribute.Bool("update.cost", true))
 	}
@@ -1550,24 +1738,33 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 
 	r.logger.DebugContext(ctx, "Executing UpdateItinerary query", slog.String("query", query), slog.Any("args_count", len(args)))
 
-	var updatedItinerary locitypes.UserSavedItinerary
-	err := r.pgpool.QueryRow(ctx, query, args...).Scan(
-		&updatedItinerary.ID,
-		&updatedItinerary.UserID,
-		&updatedItinerary.SourceLlmInteractionID,
-		&updatedItinerary.PrimaryCityID,
-		&updatedItinerary.Title,
-		&updatedItinerary.Description,
-		&updatedItinerary.MarkdownContent,
-		&updatedItinerary.Tags,
-		&updatedItinerary.EstimatedDurationDays,
-		&updatedItinerary.EstimatedCostLevel,
-		&updatedItinerary.IsPublic,
-		&updatedItinerary.CreatedAt,
-		&updatedItinerary.UpdatedAt,
-	)
+	updateRows, err := r.pgpool.Query(ctx, query, args...)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB UPDATE failed")
+		r.logger.ErrorContext(ctx, "Failed to update itinerary", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to update user_saved_itineraries: %w", err)
+	}
+
+	type itineraryRow struct {
+		ID                     uuid.UUID  `db:"id"`
+		UserID                 uuid.UUID  `db:"user_id"`
+		SourceLlmInteractionID *uuid.UUID `db:"source_llm_interaction_id"`
+		PrimaryCityID          *uuid.UUID `db:"primary_city_id"`
+		Title                  string     `db:"title"`
+		Description            *string    `db:"description"`
+		MarkdownContent        string     `db:"markdown_content"`
+		Tags                   []string   `db:"tags"`
+		EstimatedDurationDays  *int32     `db:"estimated_duration_days"`
+		EstimatedCostLevel     *int32     `db:"estimated_cost_level"`
+		IsPublic               bool       `db:"is_public"`
+		CreatedAt              time.Time  `db:"created_at"`
+		UpdatedAt              time.Time  `db:"updated_at"`
+	}
+
+	dbRow, err := pgx.CollectOneRow(updateRows, pgx.RowToStructByName[itineraryRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
 			notFoundErr := fmt.Errorf("itinerary with ID %s not found for user %s or does not exist", itineraryID, userID)
 			span.RecordError(notFoundErr)
 			span.SetStatus(codes.Error, "Itinerary not found or not owned by user")
@@ -1575,8 +1772,39 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB UPDATE failed")
-		r.logger.ErrorContext(ctx, "Failed to update itinerary", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to update user_saved_itineraries: %w", err)
+		r.logger.ErrorContext(ctx, "Failed to read updated itinerary", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to read updated itinerary: %w", err)
+	}
+
+	updatedItinerary := locitypes.UserSavedItinerary{
+		ID:              dbRow.ID,
+		UserID:          dbRow.UserID,
+		Title:           dbRow.Title,
+		MarkdownContent: dbRow.MarkdownContent,
+		Tags:            dbRow.Tags,
+		IsPublic:        dbRow.IsPublic,
+		CreatedAt:       dbRow.CreatedAt,
+		UpdatedAt:       dbRow.UpdatedAt,
+	}
+	if dbRow.SourceLlmInteractionID != nil {
+		updatedItinerary.SourceLlmInteractionID.Bytes = *dbRow.SourceLlmInteractionID
+		updatedItinerary.SourceLlmInteractionID.Valid = true
+	}
+	if dbRow.PrimaryCityID != nil {
+		updatedItinerary.PrimaryCityID.Bytes = *dbRow.PrimaryCityID
+		updatedItinerary.PrimaryCityID.Valid = true
+	}
+	if dbRow.Description != nil {
+		updatedItinerary.Description.String = *dbRow.Description
+		updatedItinerary.Description.Valid = true
+	}
+	if dbRow.EstimatedDurationDays != nil {
+		updatedItinerary.EstimatedDurationDays.Int32 = *dbRow.EstimatedDurationDays
+		updatedItinerary.EstimatedDurationDays.Valid = true
+	}
+	if dbRow.EstimatedCostLevel != nil {
+		updatedItinerary.EstimatedCostLevel.Int32 = *dbRow.EstimatedCostLevel
+		updatedItinerary.EstimatedCostLevel.Valid = true
 	}
 
 	span.SetStatus(codes.Ok, "Itinerary updated successfully")
@@ -1592,14 +1820,20 @@ func (r *RepositoryImpl) SaveItinerary(ctx context.Context, userID, cityID uuid.
         VALUES ($1, $2, NOW(), NOW())
         RETURNING id
     `
-	var itineraryID uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, userID, cityID).Scan(&itineraryID)
+	rows, err := r.pgpool.Query(ctx, query, userID, cityID)
 	if err != nil {
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to save itinerary: %w", err)
 	}
-	span.SetAttributes(attribute.String("itinerary.id", itineraryID.String()))
-	return itineraryID, nil
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		return uuid.Nil, fmt.Errorf("failed to read saved itinerary id: %w", err)
+	}
+	span.SetAttributes(attribute.String("itinerary.id", insertRow.ID.String()))
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
@@ -1611,12 +1845,17 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
         SELECT id FROM points_of_interest
         WHERE name = $1 AND city_id = $2
     `
-	var poiID uuid.UUID
-	err := r.pgpool.QueryRow(ctx, queryCheck, poi.Name, cityID).Scan(&poiID)
+	checkRows, err := r.pgpool.Query(ctx, queryCheck, poi.Name, cityID)
 	if err == nil {
-		return poiID, nil // POI already exists
+		existing, collectErr := pgx.CollectOneRow(checkRows, pgx.RowToStructByName[struct {
+			ID uuid.UUID `db:"id"`
+		}])
+		if collectErr == nil {
+			return existing.ID, nil // POI already exists
+		}
+		err = collectErr
 	}
-	if err != pgx.ErrNoRows {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to check POI existence: %w", err)
 	}
@@ -1627,14 +1866,21 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
     `
-	poiID = uuid.New()
-	err = r.pgpool.QueryRow(ctx, queryInsert, poiID, cityID, poi.Name, poi.Latitude, poi.Longitude, poi.Category).Scan(&poiID)
+	poiID := uuid.New()
+	insertRows, err := r.pgpool.Query(ctx, queryInsert, poiID, cityID, poi.Name, poi.Latitude, poi.Longitude, poi.Category)
 	if err != nil {
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to save POI to points_of_interest: %w", err)
 	}
+	inserted, err := pgx.CollectOneRow(insertRows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		return uuid.Nil, fmt.Errorf("failed to read saved POI id: %w", err)
+	}
 	span.SetAttributes(attribute.String("poi.id", poiID.String()))
-	return poiID, nil
+	return inserted.ID, nil
 }
 
 type ItineraryPOISource struct {
@@ -1651,6 +1897,13 @@ func (ips *ItineraryPOISource) Next() bool {
 func (ips *ItineraryPOISource) Values() ([]interface{}, error) {
 	poi := ips.pois[ips.idx]
 	return []interface{}{ips.itineraryID, poi.ID, ips.idx, poi.DescriptionPOI}, nil
+}
+
+func stringPtr(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
 }
 
 func (ips *ItineraryPOISource) Err() error {
@@ -1693,12 +1946,17 @@ func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid
 
 func (r *RepositoryImpl) CityExists(ctx context.Context, cityID uuid.UUID) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM cities WHERE id = $1)`
-	var exists bool
-	err := r.pgpool.QueryRow(ctx, query, cityID).Scan(&exists) // Assuming r.db is your database connection
+	rows, err := r.pgpool.Query(ctx, query, cityID)
 	if err != nil {
 		return false, fmt.Errorf("failed to check city existence: %w", err)
 	}
-	return exists, nil
+	result, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		Exists bool `db:"exists"`
+	}])
+	if err != nil {
+		return false, fmt.Errorf("failed to read city existence: %w", err)
+	}
+	return result.Exists, nil
 }
 
 // similarPOIRow is a DB row struct for FindSimilarPOIs query
@@ -2207,63 +2465,63 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, 
 	}
 	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var description, address, website, phoneNumber, poiType sql.NullString
-		var openingHours sql.NullString // JSONB can be scanned as string
-		var priceLevel sql.NullInt32
-		var rating sql.NullFloat64
-		var cityID sql.NullString
-		var tagsRaw []byte // Postgres array of text
-		var ratingCount sql.NullInt32
-		var isSponsored sql.NullBool
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[struct {
+		ID           uuid.UUID `db:"id"`
+		Name         string    `db:"name"`
+		Description  *string   `db:"description"`
+		Longitude    float64   `db:"longitude"`
+		Latitude     float64   `db:"latitude"`
+		Category     string    `db:"category"`
+		Address      *string   `db:"address"`
+		Website      *string   `db:"website"`
+		PhoneNumber  *string   `db:"phone_number"`
+		OpeningHours *string   `db:"opening_hours"`
+		PoiType      *string   `db:"poi_type"`
+		PriceLevel   *int32    `db:"price_level"`
+		Rating       *float64  `db:"rating"`
+		Distance     float64   `db:"distance"`
+		CityID       *string   `db:"city_id"`
+		Tags         []string  `db:"tags"`
+		RatingCount  *int32    `db:"rating_count"`
+		IsSponsored  *bool     `db:"is_sponsored"`
+	}])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
+	}
 
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&address,
-			&website,
-			&phoneNumber,
-			&openingHours,
-			&poiType,
-			&priceLevel,
-			&rating,
-			&poi.Distance, // Already calculated in km
-			&cityID,
-			&tagsRaw,
-			&ratingCount,
-			&isSponsored,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan POI row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("failed to scan POI row: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		poi := locitypes.POIDetailedInfo{
+			ID:        row.ID,
+			Name:      row.Name,
+			Longitude: row.Longitude,
+			Latitude:  row.Latitude,
+			Category:  row.Category,
+			Distance:  row.Distance,
+			Tags:      row.Tags,
 		}
-
-		// Set optional fields
-		if description.Valid {
-			poi.Description = description.String
+		if row.Description != nil {
+			poi.Description = *row.Description
 		}
-		if address.Valid {
-			poi.Address = address.String
+		if row.Address != nil {
+			poi.Address = *row.Address
 		}
-		if website.Valid {
-			poi.Website = website.String
+		if row.Website != nil {
+			poi.Website = *row.Website
 		}
-		if phoneNumber.Valid {
-			poi.PhoneNumber = phoneNumber.String
+		if row.PhoneNumber != nil {
+			poi.PhoneNumber = *row.PhoneNumber
 		}
-		if rating.Valid {
-			poi.Rating = rating.Float64
+		if row.OpeningHours != nil {
+			poi.OpeningHours = map[string]string{"general": *row.OpeningHours}
 		}
-		if priceLevel.Valid {
-			// Convert price level to string format
-			switch priceLevel.Int32 {
+		if row.PoiType != nil && *row.PoiType != "" {
+			poi.Category = *row.PoiType
+		}
+		if row.PriceLevel != nil {
+			switch *row.PriceLevel {
 			case 1:
 				poi.PriceLevel = "€"
 			case 2:
@@ -2278,48 +2536,27 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, 
 		} else {
 			poi.PriceLevel = "Free"
 		}
-
-		// Process tags array from PostgreSQL
-		if tagsRaw != nil {
-			// Parse PostgreSQL array format: {tag1,tag2,tag3}
-			tagsStr := string(tagsRaw)
-			if tagsStr != "{}" && len(tagsStr) > 2 {
-				// Remove braces and split by commas
-				tagsStr = strings.Trim(tagsStr, "{}")
-				if tagsStr != "" {
-					poi.Tags = strings.Split(tagsStr, ",")
-					// Clean up quotes and spaces
-					for i, tag := range poi.Tags {
-						poi.Tags[i] = strings.Trim(strings.Trim(tag, `"`), " ")
-					}
-				}
+		if row.Rating != nil {
+			poi.Rating = *row.Rating
+		}
+		if row.CityID != nil {
+			poi.City = *row.CityID
+		}
+		if row.RatingCount != nil {
+			popularityScore := int(*row.RatingCount)
+			if row.IsSponsored != nil && *row.IsSponsored {
+				popularityScore += 50
+			}
+			if popularityScore > 100 {
+				poi.Priority = 10
+			} else if popularityScore > 0 {
+				poi.Priority = (popularityScore / 10) + 1
+			} else {
+				poi.Priority = 1
 			}
 		}
 
-		// Calculate popularity from rating count and sponsored status
-		popularityScore := 0
-		if ratingCount.Valid {
-			popularityScore = int(ratingCount.Int32)
-		}
-		if isSponsored.Valid && isSponsored.Bool {
-			popularityScore += 50 // Boost sponsored items
-		}
-		// Map popularity score to 1-10 scale for display
-		if popularityScore > 100 {
-			poi.Priority = 10
-		} else if popularityScore > 0 {
-			poi.Priority = (popularityScore / 10) + 1
-		} else {
-			poi.Priority = 1
-		}
-
 		pois = append(pois, poi)
-	}
-
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating POI rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("error iterating POI rows: %w", err)
 	}
 
 	l.InfoContext(ctx, "POIs by location and distance found",
@@ -2414,96 +2651,72 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Co
 	}
 	defer rows.Close()
 
-	var pois []locitypes.POIDetailedInfo
-	for rows.Next() {
-		var poi locitypes.POIDetailedInfo
-		var description, address, website, phoneNumber, poiType sql.NullString
-		var openingHours sql.NullString // JSONB can be scanned as string
-		var priceLevel sql.NullInt32
-		var rating sql.NullFloat64
-		var cityID sql.NullString
-		var tagsRaw []byte // Postgres array of text
-		var ratingCount sql.NullInt32
-		var isSponsored sql.NullBool
-
-		err := rows.Scan(
-			&poi.ID,
-			&poi.Name,
-			&description,
-			&poi.Longitude,
-			&poi.Latitude,
-			&poi.Category,
-			&address,
-			&website,
-			&phoneNumber,
-			&openingHours,
-			&poiType,
-			&priceLevel,
-			&rating,
-			&poi.Distance,
-			&cityID,
-			&tagsRaw,
-			&ratingCount,
-			&isSponsored,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan POI row", slog.Any("error", err))
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Row scan failed")
-			return nil, fmt.Errorf("failed to scan POI row: %w", err)
-		}
-
-		// Handle nullable fields
-		if description.Valid {
-			poi.DescriptionPOI = description.String
-		}
-		if address.Valid {
-			poi.Address = address.String
-		}
-		if website.Valid {
-			poi.Website = website.String
-		}
-		if phoneNumber.Valid {
-			poi.PhoneNumber = phoneNumber.String
-		}
-		if openingHours.Valid {
-			poi.OpeningHours = map[string]string{"general": openingHours.String}
-		}
-		if poiType.Valid {
-			poi.Category = poiType.String
-		}
-		if priceLevel.Valid {
-			poi.PriceLevel = fmt.Sprintf("%d", priceLevel.Int32)
-		}
-		if rating.Valid {
-			poi.Rating = rating.Float64
-		}
-		if cityID.Valid {
-			poi.City = cityID.String
-		}
-
-		// Parse tags from JSON array
-		if len(tagsRaw) > 0 {
-			var tags []string
-			err := json.Unmarshal(tagsRaw, &tags)
-			if err != nil {
-				l.WarnContext(ctx, "Failed to parse tags", slog.Any("error", err))
-				poi.Tags = []string{}
-			} else {
-				poi.Tags = tags
-			}
-		} else {
-			poi.Tags = []string{}
-		}
-
-		pois = append(pois, poi)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[struct {
+		ID           uuid.UUID `db:"id"`
+		Name         string    `db:"name"`
+		Description  *string   `db:"description"`
+		Longitude    float64   `db:"longitude"`
+		Latitude     float64   `db:"latitude"`
+		Category     string    `db:"category"`
+		Address      *string   `db:"address"`
+		Website      *string   `db:"website"`
+		PhoneNumber  *string   `db:"phone_number"`
+		OpeningHours *string   `db:"opening_hours"`
+		PoiType      *string   `db:"poi_type"`
+		PriceLevel   *int32    `db:"price_level"`
+		Rating       *float64  `db:"rating"`
+		Distance     float64   `db:"distance"`
+		CityID       *string   `db:"city_id"`
+		Tags         []string  `db:"tags"`
+		RatingCount  *int32    `db:"rating_count"`
+		IsSponsored  *bool     `db:"is_sponsored"`
+	}])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POI rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Row collection failed")
+		return nil, fmt.Errorf("failed to collect POI rows: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Row iteration error", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Row iteration failed")
-		return nil, fmt.Errorf("row iteration error: %w", err)
+	pois := make([]locitypes.POIDetailedInfo, 0, len(dbRows))
+	for _, row := range dbRows {
+		poi := locitypes.POIDetailedInfo{
+			ID:        row.ID,
+			Name:      row.Name,
+			Longitude: row.Longitude,
+			Latitude:  row.Latitude,
+			Category:  row.Category,
+			Distance:  row.Distance,
+			Tags:      row.Tags,
+		}
+		if row.Description != nil {
+			poi.DescriptionPOI = *row.Description
+		}
+		if row.Address != nil {
+			poi.Address = *row.Address
+		}
+		if row.Website != nil {
+			poi.Website = *row.Website
+		}
+		if row.PhoneNumber != nil {
+			poi.PhoneNumber = *row.PhoneNumber
+		}
+		if row.OpeningHours != nil {
+			poi.OpeningHours = map[string]string{"general": *row.OpeningHours}
+		}
+		if row.PoiType != nil {
+			poi.Category = *row.PoiType
+		}
+		if row.PriceLevel != nil {
+			poi.PriceLevel = fmt.Sprintf("%d", *row.PriceLevel)
+		}
+		if row.Rating != nil {
+			poi.Rating = *row.Rating
+		}
+		if row.CityID != nil {
+			poi.City = *row.CityID
+		}
+		pois = append(pois, poi)
 	}
 
 	l.InfoContext(ctx, "POIs by location, distance and category found",
@@ -2528,17 +2741,24 @@ func (r *RepositoryImpl) SaveLlmInteraction(ctx context.Context, interaction *lo
 		RETURNING id
 	`
 
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, interaction.UserID, interaction.ModelName, interaction.Prompt, interaction.Response, interaction.Latitude, interaction.Longitude, interaction.Distance).Scan(&id)
+	rows, err := r.pgpool.Query(ctx, query, interaction.UserID, interaction.ModelName, interaction.Prompt, interaction.Response, interaction.Latitude, interaction.Longitude, interaction.Distance)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to save LLM interaction", slog.Any("error", err))
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to save LLM interaction: %w", err)
 	}
 
-	l.InfoContext(ctx, "Successfully saved LLM interaction", slog.String("id", id.String()))
+	insertRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		span.RecordError(err)
+		return uuid.Nil, fmt.Errorf("failed to read LLM interaction id: %w", err)
+	}
+
+	l.InfoContext(ctx, "Successfully saved LLM interaction", slog.String("id", insertRow.ID.String()))
 	span.SetStatus(codes.Ok, "LLM interaction saved successfully")
-	return id, nil
+	return insertRow.ID, nil
 }
 
 func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []locitypes.POIDetailedInfo, _ *locitypes.GenAIResponse, llmInteractionID uuid.UUID) error {
@@ -2624,12 +2844,17 @@ func (r *RepositoryImpl) CalculateDistancePostGIS(ctx context.Context, userLat, 
             ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography
         ) AS distance;
     `
-	var distance float64
-	err := r.pgpool.QueryRow(ctx, query, userLon, userLat, poiLon, poiLat).Scan(&distance)
+	rows, err := r.pgpool.Query(ctx, query, userLon, userLat, poiLon, poiLat)
 	if err != nil {
 		return 0, fmt.Errorf("failed to calculate distance with PostGIS: %w", err)
 	}
-	return distance, nil
+	distanceRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		Distance float64 `db:"distance"`
+	}])
+	if err != nil {
+		return 0, fmt.Errorf("failed to read distance: %w", err)
+	}
+	return distanceRow.Distance, nil
 }
 
 // FindLLMPOIByNameAndCity finds an existing LLM POI by name and city
@@ -2643,18 +2868,25 @@ func (r *RepositoryImpl) FindLLMPOIByNameAndCity(ctx context.Context, name, city
 		WHERE LOWER(name) = LOWER($1) AND LOWER(city_name) = LOWER($2)
 		LIMIT 1
 	`
-
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, name, city).Scan(&id)
+	rows, err := r.pgpool.Query(ctx, query, name, city)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, fmt.Errorf("LLM POI not found")
 		}
 		return uuid.Nil, fmt.Errorf("failed to find LLM POI: %w", err)
 	}
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, fmt.Errorf("LLM POI not found")
+		}
+		return uuid.Nil, fmt.Errorf("failed to read LLM POI id: %w", err)
+	}
 
 	span.SetAttributes(attribute.String("poi.name", name), attribute.String("poi.city", city))
-	return id, nil
+	return dbRow.ID, nil
 }
 
 // FindLLMPOIByName finds an existing LLM POI by name across all cities
@@ -2668,16 +2900,23 @@ func (r *RepositoryImpl) FindLLMPOIByName(ctx context.Context, name string) (uui
 		WHERE LOWER(name) = LOWER($1)
 		LIMIT 1
 	`
-
-	var id uuid.UUID
-	err := r.pgpool.QueryRow(ctx, query, name).Scan(&id)
+	rows, err := r.pgpool.Query(ctx, query, name)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, fmt.Errorf("LLM POI not found")
 		}
 		return uuid.Nil, fmt.Errorf("failed to find LLM POI: %w", err)
 	}
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[struct {
+		ID uuid.UUID `db:"id"`
+	}])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, fmt.Errorf("LLM POI not found")
+		}
+		return uuid.Nil, fmt.Errorf("failed to read LLM POI id: %w", err)
+	}
 
 	span.SetAttributes(attribute.String("poi.name", name))
-	return id, nil
+	return dbRow.ID, nil
 }

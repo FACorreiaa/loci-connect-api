@@ -2,15 +2,16 @@ package discover
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 type Repository interface {
@@ -33,18 +34,34 @@ type Repository interface {
 	TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
 }
 
+// PgxPool abstracts pgxpool.Pool for easier testing.
+type PgxPool interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
+
 type RepositoryImpl struct {
-	db     *pgxpool.Pool
+	db     PgxPool
 	logger *slog.Logger
 }
 
 const repoDefaultPageSize = 10
 
-func NewRepositoryImpl(db *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+func NewRepositoryImpl(db PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		db:     db,
 		logger: logger,
 	}
+}
+
+// trendingDiscoveryRow is a row struct for GetTrendingDiscoveries query
+type trendingDiscoveryRow struct {
+	CityName    string    `db:"city_name"`
+	SearchCount int       `db:"search_count"`
+	LastSearch  time.Time `db:"last_search"`
 }
 
 // GetTrendingDiscoveries retrieves trending discoveries based on recent search activity
@@ -72,28 +89,31 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 		l.ErrorContext(ctx, "Failed to query trending discoveries", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query trending discoveries: %w", err)
 	}
-	defer rows.Close()
 
-	var trending []locitypes.TrendingDiscovery
-	for rows.Next() {
-		var t locitypes.TrendingDiscovery
-		var lastSearch time.Time
-		err := rows.Scan(&t.CityName, &t.SearchCount, &lastSearch)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan trending discovery", slog.Any("error", err))
-			continue
-		}
-		t.Emoji = getCityEmoji(t.CityName)
-		trending = append(trending, t)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[trendingDiscoveryRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect trending discoveries", slog.Any("error", err))
+		return nil, fmt.Errorf("error reading trending discoveries: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating trending discoveries", slog.Any("error", err))
-		return nil, fmt.Errorf("error iterating trending discoveries: %w", err)
+	trending := make([]locitypes.TrendingDiscovery, 0, len(dbRows))
+	for _, row := range dbRows {
+		trending = append(trending, locitypes.TrendingDiscovery{
+			CityName:    row.CityName,
+			SearchCount: row.SearchCount,
+			Emoji:       getCityEmoji(row.CityName),
+		})
 	}
 
 	l.InfoContext(ctx, "Successfully fetched trending discoveries", slog.Int("count", len(trending)))
 	return trending, nil
+}
+
+// featuredCollectionRow is a row struct for GetFeaturedCollections query
+type featuredCollectionRow struct {
+	Category    string    `db:"category"`
+	ItemCount   int       `db:"item_count"`
+	LastUpdated time.Time `db:"last_updated"`
 }
 
 // GetFeaturedCollections retrieves featured collections
@@ -121,29 +141,44 @@ func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) 
 		l.ErrorContext(ctx, "Failed to query featured collections", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query featured collections: %w", err)
 	}
-	defer rows.Close()
 
-	var featured []locitypes.FeaturedCollection
-	for rows.Next() {
-		var f locitypes.FeaturedCollection
-		var lastUpdated time.Time
-		err := rows.Scan(&f.Category, &f.ItemCount, &lastUpdated)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan featured collection", slog.Any("error", err))
-			continue
-		}
-		f.Title = getCategoryTitle(f.Category)
-		f.Emoji = getCategoryEmoji(f.Category)
-		featured = append(featured, f)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[featuredCollectionRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect featured collections", slog.Any("error", err))
+		return nil, fmt.Errorf("error reading featured collections: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating featured collections", slog.Any("error", err))
-		return nil, fmt.Errorf("error iterating featured collections: %w", err)
+	featured := make([]locitypes.FeaturedCollection, 0, len(dbRows))
+	for _, row := range dbRows {
+		featured = append(featured, locitypes.FeaturedCollection{
+			Category:  row.Category,
+			ItemCount: row.ItemCount,
+			Title:     getCategoryTitle(row.Category),
+			Emoji:     getCategoryEmoji(row.Category),
+		})
 	}
 
 	l.InfoContext(ctx, "Successfully fetched featured collections", slog.Int("count", len(featured)))
 	return featured, nil
+}
+
+// countRow is used for COUNT queries
+type countRow struct {
+	Count int `db:"count"`
+}
+
+// chatSessionRow is a row struct for GetRecentDiscoveriesByUserID query
+type chatSessionRow struct {
+	ID                  uuid.UUID  `db:"id"`
+	UserID              uuid.UUID  `db:"user_id"`
+	ProfileID           *uuid.UUID `db:"profile_id"`
+	CityName            string     `db:"city_name"`
+	ConversationHistory []byte     `db:"conversation_history"`
+	SessionContext      []byte     `db:"session_context"`
+	CreatedAt           time.Time  `db:"created_at"`
+	UpdatedAt           time.Time  `db:"updated_at"`
+	ExpiresAt           time.Time  `db:"expires_at"`
+	Status              string     `db:"status"`
 }
 
 // GetRecentDiscoveriesByUserID retrieves user's recent discover searches with pagination
@@ -161,9 +196,11 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 		offset = 0
 	}
 
-	var total int
-	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1`, userID).Scan(&total); err != nil {
-		l.ErrorContext(ctx, "Failed to count recent discoveries", slog.Any("error", err))
+	// Get count
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM chat_sessions WHERE user_id = $1`, userID).Scan(&count)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to query count", slog.Any("error", err))
 		return nil, 0, fmt.Errorf("failed to count recent discoveries: %w", err)
 	}
 
@@ -191,64 +228,59 @@ func (r *RepositoryImpl) GetRecentDiscoveriesByUserID(ctx context.Context, userI
 		l.ErrorContext(ctx, "Failed to query recent discoveries", slog.Any("error", err))
 		return nil, 0, fmt.Errorf("failed to query recent discoveries: %w", err)
 	}
-	defer rows.Close()
 
-	var sessions []locitypes.ChatSession
-	for rows.Next() {
-		var session locitypes.ChatSession
-		var conversationHistory []byte
-		var sessionContext []byte
-		var profileID sql.NullString
-
-		err := rows.Scan(
-			&session.ID,
-			&session.UserID,
-			&profileID,
-			&session.CityName,
-			&conversationHistory,
-			&sessionContext,
-			&session.CreatedAt,
-			&session.UpdatedAt,
-			&session.ExpiresAt,
-			&session.Status,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan chat session", slog.Any("error", err))
-			continue
-		}
-
-		if profileID.Valid {
-			if pid, err := uuid.Parse(profileID.String); err == nil {
-				session.ProfileID = pid
-			}
-		}
-
-		// Parse conversation history JSON
-		if len(conversationHistory) > 0 {
-			// You may need to implement JSON parsing here based on your types
-			// For now, we'll leave it empty
-			session.ConversationHistory = []locitypes.ConversationMessage{}
-		}
-
-		// Parse session context JSON
-		if len(sessionContext) > 0 {
-			// You may need to implement JSON parsing here based on your types
-			session.SessionContext = locitypes.SessionContext{}
-		}
-
-		sessions = append(sessions, session)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[chatSessionRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect chat sessions", slog.Any("error", err))
+		return nil, 0, fmt.Errorf("error reading recent discoveries: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating recent discoveries", slog.Any("error", err))
-		return nil, 0, fmt.Errorf("error iterating recent discoveries: %w", err)
+	sessions := make([]locitypes.ChatSession, 0, len(dbRows))
+	for _, row := range dbRows {
+		session := locitypes.ChatSession{
+			ID:        row.ID,
+			UserID:    row.UserID,
+			CityName:  row.CityName,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+			ExpiresAt: row.ExpiresAt,
+			Status:    locitypes.SessionStatus(row.Status),
+		}
+		if row.ProfileID != nil {
+			session.ProfileID = *row.ProfileID
+		}
+		// Parse conversation history JSON
+		if len(row.ConversationHistory) > 0 {
+			session.ConversationHistory = []locitypes.ConversationMessage{}
+		}
+		// Parse session context JSON
+		if len(row.SessionContext) > 0 {
+			session.SessionContext = locitypes.SessionContext{}
+		}
+		sessions = append(sessions, session)
 	}
 
 	l.InfoContext(ctx, "Successfully fetched recent discoveries",
 		slog.String("user_id", userID.String()),
 		slog.Int("count", len(sessions)),
-		slog.Int("total", total))
-	return sessions, total, nil
+		slog.Int("total", countResult.Count))
+	return sessions, countResult.Count, nil
+}
+
+// discoverResultRow is a row struct for GetPOIsByCategory query
+type discoverResultRow struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Latitude    float64   `db:"latitude"`
+	Longitude   float64   `db:"longitude"`
+	Category    string    `db:"category"`
+	Description string    `db:"description_poi"`
+	Address     string    `db:"address"`
+	Website     *string   `db:"website"`
+	PhoneNumber *string   `db:"phone_number"`
+	PriceLevel  string    `db:"price_level"`
+	Rating      float64   `db:"rating"`
+	Tags        []string  `db:"tags"`
 }
 
 // GetPOIsByCategory retrieves POIs by category (optionally filtered by city) with pagination.
@@ -297,48 +329,29 @@ func (r *RepositoryImpl) GetPOIsByCategory(ctx context.Context, category, cityNa
 		l.ErrorContext(ctx, "Failed to query POIs by category", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query POIs by category: %w", err)
 	}
-	defer rows.Close()
 
-	var results []locitypes.DiscoverResult
-	for rows.Next() {
-		var result locitypes.DiscoverResult
-		var website sql.NullString
-		var phoneNumber sql.NullString
-		var tags []string
-
-		err := rows.Scan(
-			&result.ID,
-			&result.Name,
-			&result.Latitude,
-			&result.Longitude,
-			&result.Category,
-			&result.Description,
-			&result.Address,
-			&website,
-			&phoneNumber,
-			&result.PriceLevel,
-			&result.Rating,
-			&tags,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan POI", slog.Any("error", err))
-			continue
-		}
-
-		if website.Valid {
-			result.Website = &website.String
-		}
-		if phoneNumber.Valid {
-			result.PhoneNumber = &phoneNumber.String
-		}
-		result.Tags = tags
-
-		results = append(results, result)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[discoverResultRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect POIs", slog.Any("error", err))
+		return nil, fmt.Errorf("error reading POIs: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating POIs", slog.Any("error", err))
-		return nil, fmt.Errorf("error iterating POIs: %w", err)
+	results := make([]locitypes.DiscoverResult, 0, len(dbRows))
+	for _, row := range dbRows {
+		results = append(results, locitypes.DiscoverResult{
+			ID:          row.ID.String(),
+			Name:        row.Name,
+			Latitude:    row.Latitude,
+			Longitude:   row.Longitude,
+			Category:    row.Category,
+			Description: row.Description,
+			Address:     row.Address,
+			Website:     row.Website,
+			PhoneNumber: row.PhoneNumber,
+			PriceLevel:  row.PriceLevel,
+			Rating:      row.Rating,
+			Tags:        row.Tags,
+		})
 	}
 
 	l.InfoContext(ctx, "Successfully fetched POIs by category",
@@ -420,7 +433,14 @@ func getCategoryEmoji(category string) string {
 	return "📍"
 }
 
-// GetTrendingSearchesToday retrieves the most searched queries today
+// trendingSearchRow is a row struct for GetTrendingSearchesToday query
+type trendingSearchRow struct {
+	Query        string    `db:"query"`
+	CityName     string    `db:"city_name"`
+	SearchCount  int       `db:"search_count"`
+	LastSearched time.Time `db:"last_searched"`
+}
+
 func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int) ([]locitypes.TrendingSearch, error) {
 	l := r.logger.With(slog.String("repository", "GetTrendingSearchesToday"))
 	l.DebugContext(ctx, "Fetching trending searches today", slog.Int("limit", limit))
@@ -448,32 +468,21 @@ func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int
 		l.ErrorContext(ctx, "Failed to query trending searches", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query trending searches: %w", err)
 	}
-	defer rows.Close()
 
-	var searches []locitypes.TrendingSearch
-	for rows.Next() {
-		var search locitypes.TrendingSearch
-		var lastSearched time.Time
-
-		err := rows.Scan(
-			&search.Query,
-			&search.CityName,
-			&search.SearchCount,
-			&lastSearched,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan trending search", slog.Any("error", err))
-			continue
-		}
-
-		// Format last searched as human-readable time
-		search.LastSearched = formatTimeAgo(lastSearched)
-		searches = append(searches, search)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[trendingSearchRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect trending searches", slog.Any("error", err))
+		return nil, fmt.Errorf("error reading trending searches: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating trending searches", slog.Any("error", err))
-		return nil, fmt.Errorf("error iterating trending searches: %w", err)
+	searches := make([]locitypes.TrendingSearch, 0, len(dbRows))
+	for _, row := range dbRows {
+		searches = append(searches, locitypes.TrendingSearch{
+			Query:        row.Query,
+			CityName:     row.CityName,
+			SearchCount:  row.SearchCount,
+			LastSearched: formatTimeAgo(row.LastSearched),
+		})
 	}
 
 	l.InfoContext(ctx, "Successfully fetched trending searches", slog.Int("count", len(searches)))

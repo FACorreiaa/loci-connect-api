@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
@@ -17,7 +18,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
@@ -39,14 +40,27 @@ type Repository interface {
 
 type RepositoryImpl struct {
 	logger *slog.Logger
-	pgpool *pgxpool.Pool
+	pgpool PgxPool
 }
 
-func NewRepositoryImpl(pgxpool *pgxpool.Pool, logger *slog.Logger) *RepositoryImpl {
+// PgxPool abstracts pgxpool.Pool for easier testing.
+type PgxPool interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+var _ PgxPool = (*pgxpool.Pool)(nil)
+
+func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
 		pgpool: pgxpool,
 	}
+}
+
+func pointerBool(v bool) *bool {
+	return &v
 }
 
 // CreateInterest implements user.CreateInterest
@@ -69,21 +83,30 @@ func (r *RepositoryImpl) CreateInterest(ctx context.Context, name string, descri
 		return nil, fmt.Errorf("interest name cannot be empty: %w", locitypes.ErrBadRequest) // Example domain error
 	}
 
-	var interest locitypes.Interest
 	query := `
         INSERT INTO user_custom_interests (name, description, active, created_at, updated_at, user_id)
         VALUES ($1, $2, $3, Now(), Now(), $4)
         RETURNING id, name, description, active, created_at, updated_at`
 
 	// Note: Use current time for both created_at (via DEFAULT) and updated_at on insert
-	err := r.pgpool.QueryRow(ctx, query, name, description, isActive, userID).Scan(
-		&interest.ID,
-		&interest.Name,
-		&interest.Description,
-		&interest.Active,
-		&interest.CreatedAt,
-		&interest.UpdatedAt, // Scan the updated_at timestamp set by the query
-	)
+	rows, err := r.pgpool.Query(ctx, query, name, description, isActive, userID)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to insert new interest", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB INSERT failed")
+		return nil, fmt.Errorf("database error creating interest: %w", err)
+	}
+
+	type interestRow struct {
+		ID          uuid.UUID `db:"id"`
+		Name        string    `db:"name"`
+		Description *string   `db:"description"`
+		Active      bool      `db:"active"`
+		CreatedAt   time.Time `db:"created_at"`
+		UpdatedAt   time.Time `db:"updated_at"`
+	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[interestRow])
 	// TODO also add to user_custom_interests
 	if err != nil {
 		// Check for unique constraint violation (name already exists)
@@ -100,6 +123,16 @@ func (r *RepositoryImpl) CreateInterest(ctx context.Context, name string, descri
 		span.SetStatus(codes.Error, "DB INSERT failed")
 		return nil, fmt.Errorf("database error creating interest: %w", err)
 	}
+
+	interest := locitypes.Interest{
+		ID:        dbRow.ID,
+		Name:      dbRow.Name,
+		Active:    pointerBool(dbRow.Active),
+		CreatedAt: dbRow.CreatedAt,
+		Source:    "custom",
+	}
+	interest.Description = dbRow.Description
+	interest.UpdatedAt = &dbRow.UpdatedAt
 
 	l.InfoContext(ctx, "Global interest created successfully", slog.String("interestID", interest.ID.String()))
 	span.SetAttributes(attribute.String("db.interest.id", interest.ID.String()))
@@ -171,26 +204,36 @@ func (r *RepositoryImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Inte
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching interests: %w", err)
 	}
-	defer rows.Close()
 
-	var interests []*locitypes.Interest
-	for rows.Next() {
-		var i locitypes.Interest
-		err := rows.Scan(
-			&i.ID, &i.Name, &i.Description, &i.Active, &i.CreatedAt, &i.UpdatedAt, &i.Source,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan interest row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("database error scanning interest: %w", err)
-		}
-		interests = append(interests, &i)
+	type interestRow struct {
+		ID          uuid.UUID  `db:"id"`
+		Name        string     `db:"name"`
+		Description *string    `db:"description"`
+		Active      *bool      `db:"active"`
+		CreatedAt   time.Time  `db:"created_at"`
+		UpdatedAt   *time.Time `db:"updated_at"`
+		Source      string     `db:"type"`
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating interests rows", slog.Any("error", err))
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[interestRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect interest rows", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("database error reading interests: %w", err)
+	}
+
+	interests := make([]*locitypes.Interest, 0, len(dbRows))
+	for _, row := range dbRows {
+		interest := locitypes.Interest{
+			ID:        row.ID,
+			Name:      row.Name,
+			Active:    row.Active,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+			Source:    row.Source,
+		}
+		interest.Description = row.Description
+		interests = append(interests, &interest)
 	}
 
 	l.DebugContext(ctx, "Fetched all active interests successfully", slog.Int("count", len(interests)))
@@ -385,17 +428,34 @@ func (r *RepositoryImpl) GetInterest(ctx context.Context, interestID uuid.UUID) 
 		) AS combined_interests
         WHERE id = $1`
 
-	err := r.pgpool.QueryRow(ctx, query, interestID).Scan(
-		&interest.ID,
-		&interest.Name,
-		&interest.Description,
-		&interest.Active,
-		&interest.CreatedAt,
-		&interest.UpdatedAt,
-		&interest.Source,
-	)
+	rows, err := r.pgpool.Query(ctx, query, interestID)
 	if err != nil {
 		return nil, fmt.Errorf("database error fetching interest: %w", err)
+	}
+
+	type interestRow struct {
+		ID          uuid.UUID  `db:"id"`
+		Name        string     `db:"name"`
+		Description *string    `db:"description"`
+		Active      *bool      `db:"active"`
+		CreatedAt   time.Time  `db:"created_at"`
+		UpdatedAt   *time.Time `db:"updated_at"`
+		Source      string     `db:"type"`
+	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[interestRow])
+	if err != nil {
+		return nil, fmt.Errorf("database error reading interest: %w", err)
+	}
+
+	interest = locitypes.Interest{
+		ID:          dbRow.ID,
+		Description: dbRow.Description,
+		Name:        dbRow.Name,
+		Active:      dbRow.Active,
+		CreatedAt:   dbRow.CreatedAt,
+		UpdatedAt:   dbRow.UpdatedAt,
+		Source:      dbRow.Source,
 	}
 
 	return &interest, nil
@@ -458,29 +518,29 @@ func (r *RepositoryImpl) GetInterestsForProfile(ctx context.Context, profileID u
 		span.SetStatus(codes.Error, "DB query failed")
 		return nil, fmt.Errorf("database error fetching interests for profile: %w", err)
 	}
-	defer rows.Close()
 
-	var interests []*locitypes.Interest
-	for rows.Next() {
-		var interest locitypes.Interest
-		err := rows.Scan(
-			&interest.ID,
-			&interest.Name,
-			&interest.Description,
-			&interest.Active,
-		)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to scan interest row", slog.Any("error", err))
-			span.RecordError(err)
-			return nil, fmt.Errorf("database error scanning interest: %w", err)
-		}
-		interests = append(interests, &interest)
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[struct {
+		ID          uuid.UUID `db:"id"`
+		Name        string    `db:"name"`
+		Description *string   `db:"description"`
+		Active      *bool     `db:"active"`
+	}])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect interests for profile", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, fmt.Errorf("database error reading interests for profile: %w", err)
 	}
 
-	if err = rows.Err(); err != nil {
-		l.ErrorContext(ctx, "Error iterating interest rows", slog.Any("error", err))
-		span.RecordError(err)
-		return nil, fmt.Errorf("database error reading interests: %w", err)
+	interests := make([]*locitypes.Interest, 0, len(dbRows))
+	for _, row := range dbRows {
+		interest := locitypes.Interest{
+			ID:     row.ID,
+			Name:   row.Name,
+			Active: row.Active,
+		}
+		interest.Description = row.Description
+		interests = append(interests, &interest)
 	}
 
 	l.DebugContext(ctx, "Fetched interests for profile successfully", slog.Int("count", len(interests)))
