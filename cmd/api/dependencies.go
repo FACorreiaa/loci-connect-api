@@ -57,6 +57,7 @@ type Dependencies struct {
 	AuthService   *service.AuthService
 	ChatService   chatservice.LlmInteractiontService
 	ProfileSvc    profiles.Service
+	POISvc        poirepo.Service
 	DiscoverSvc   discoverdomain.Service
 	ListSvc       itinerarylist.Service
 	StatisticsSvc statistics.Service
@@ -184,6 +185,7 @@ func (d *Dependencies) initServices() error {
 
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
+	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Logger)
 	d.ChatService = chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,
@@ -192,6 +194,7 @@ func (d *Dependencies) initServices() error {
 		d.ChatRepo,
 		d.CityRepo,
 		d.POIRepo,
+		d.POISvc,
 		d.ListSvc,
 		d.Logger,
 		d.Config.Gemini.APIKey,

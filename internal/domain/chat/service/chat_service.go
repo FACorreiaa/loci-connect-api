@@ -96,6 +96,7 @@ type ServiceImpl struct {
 	llmInteractionRepo repository.Repository
 	cityRepo           city.Repository
 	poiRepo            poi.Repository
+	poiSvc             poi.Service // POI service for nearby queries with cache + DB + LLM fallback
 	listSvc            itinerarylist.Service
 	cache              *cache.Cache
 	model              string
@@ -113,6 +114,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	llmInteractionRepo repository.Repository,
 	cityRepo city.Repository,
 	poiRepo poi.Repository,
+	poiSvc poi.Service,
 	listSvc itinerarylist.Service,
 	logger *slog.Logger,
 	apiKey string,
@@ -142,6 +144,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		llmInteractionRepo: llmInteractionRepo,
 		cityRepo:           cityRepo,
 		poiRepo:            poiRepo,
+		poiSvc:             poiSvc,
 		listSvc:            listSvc,
 		cache:              cache.New(5*time.Minute, 10*time.Minute),
 		model:              model,

@@ -393,6 +393,8 @@ var (
 	})
 
 	domainMatcher = domainMatcherBuilder.Build([]string{
+		// Nearby/Proximity keywords (highest priority)
+		"nearby", "near", "close", "around", "nearme", "kilometer", "kilometers", "km", "mile", "miles", "radius", "distance",
 		// Accommodation keywords
 		"hotel", "hotels", "hostel", "hostels", "accommodation", "stay", "sleep", "room", "rooms",
 		"booking", "bookings", "airbnb", "lodge", "resort", "resorts", "guesthouse", "guesthouses",
@@ -409,6 +411,10 @@ var (
 
 	// Map keywords to their respective domains
 	keywordToDomain = map[string]DomainType{
+		// Nearby/Proximity
+		"nearby": DomainNearby, "near": DomainNearby, "close": DomainNearby, "around": DomainNearby,
+		"nearme": DomainNearby, "kilometer": DomainNearby, "kilometers": DomainNearby, "km": DomainNearby,
+		"mile": DomainNearby, "miles": DomainNearby, "radius": DomainNearby, "distance": DomainNearby,
 		// Accommodation
 		"hotel": DomainAccommodation, "hotels": DomainAccommodation,
 		"hostel": DomainAccommodation, "hostels": DomainAccommodation,
@@ -442,7 +448,8 @@ var (
 
 	// Priority order for domain selection when multiple domains match
 	domainPriority = map[DomainType]int{
-		DomainItinerary:     1, // Highest priority
+		DomainNearby:        0, // Highest priority - location-based queries
+		DomainItinerary:     1,
 		DomainAccommodation: 2,
 		DomainDining:        3,
 		DomainActivities:    4,

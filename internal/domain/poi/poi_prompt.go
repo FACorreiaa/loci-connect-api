@@ -3,7 +3,7 @@ package poi
 import (
 	"fmt"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 func getRestaurantsNearbyPrompt(userLocation locitypes.UserLocation) string {
@@ -93,20 +93,35 @@ func getAttractionsNeabyPrompt(userLocation locitypes.UserLocation) string {
 }
 
 func getGeneralPOIByDistance(lat, lon, distance float64) string {
-	return fmt.Sprintf(`
-            Generate a list of points of interest that people usually see no matter. Could be points of interest, bars, restaurants, hotels, activities, etc.
-            The user location is at latitude %0.2f and longitude %0.2f.
-            Only include points of interest that are within %0.2f kilometers from the user's location.
-            Return the response STRICTLY as a JSON object with:
-            {
-            "points_of_interest": [
-                {
-                "name": "Name of the Point of Interest",
-                "latitude": <float>,
-                "longitude": <float>,
-                "category": "Primary category (e.g., Museum, Historical Site, Park, Restaurant, Bar)",
-                "description_poi": "A 2-3 sentence description of this specific POI and why it's relevant."
-                }
-            ]
-            }`, lat, lon, distance/1000)
+	radiusKm := distance / 1000
+	return fmt.Sprintf(`You are a travel assistant generating points of interest for a user at a SPECIFIC location.
+
+CRITICAL REQUIREMENTS:
+- User's EXACT location: latitude %.6f, longitude %.6f
+- Search radius: %.1f kilometers (%.0f meters)
+- ONLY include POIs that are WITHIN this radius from the user's coordinates
+- Calculate the approximate distance from the user's coordinates before including each POI
+
+First, identify what town/city is at coordinates (%.4f, %.4f) and find POIs there and in immediate surroundings within %.1f km.
+
+Generate up to 10 diverse points of interest including: restaurants, bars, hotels, museums, parks, historical sites, and activities.
+
+Return STRICTLY as JSON:
+{
+  "points_of_interest": [
+    {
+      "name": "POI Name",
+      "latitude": <float within %.1f km of %.6f>,
+      "longitude": <float within %.1f km of %.6f>,
+      "category": "Category (Museum, Restaurant, Park, etc.)",
+      "description_poi": "2-3 sentence description of this specific POI."
+    }
+  ]
+}
+
+IMPORTANT: Every POI latitude/longitude MUST be within %.1f km of (%.6f, %.6f). Do not include popular POIs from other cities.`,
+		lat, lon, radiusKm, distance,
+		lat, lon, radiusKm,
+		radiusKm, lat, radiusKm, lon,
+		radiusKm, lat, lon)
 }

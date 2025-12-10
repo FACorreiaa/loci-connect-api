@@ -343,6 +343,7 @@ const (
 	DomainActivities    DomainType = "activities"
 	DomainItinerary     DomainType = "itinerary"
 	DomainTransport     DomainType = "transport"
+	DomainNearby        DomainType = "nearby"
 )
 
 // CombinedFilters represents merged filters from all domains

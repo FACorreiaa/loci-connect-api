@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -361,6 +363,11 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Unlock()
 			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
 		})
+	case locitypes.DomainNearby:
+		// Handle location-based "nearme" queries using PostGIS database queries
+		wg.Go(func() {
+			l.handleNearbyDomain(workerCtx, cc, sendEventWithResponse, &responsesMutex, responses, partCacheKeys)
+		})
 	default:
 		return nil, fmt.Errorf("unhandled domain type: %s", cc.Domain)
 	}
@@ -529,6 +536,9 @@ func (l *ServiceImpl) persistResults(
 				"session_id":        cc.SessionID.String(),
 			},
 		}, 3)
+	case locitypes.DomainNearby:
+		// For nearby domain, the handleNearbyDomain already sends events directly
+		// Don't send another event here as it would overwrite the POI data with empty data
 	default:
 		// Send full itinerary for DomainItinerary/DomainGeneral
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
@@ -601,6 +611,9 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 	case locitypes.DomainActivities:
 		routeType = "activities"
 		baseURL = "/activities"
+	case locitypes.DomainNearby:
+		routeType = "nearme"
+		baseURL = "/nearme"
 	default:
 		routeType = "itinerary"
 		baseURL = "/itinerary"
@@ -620,4 +633,136 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 			},
 		},
 	}, 3)
+}
+
+// handleNearbyDomain handles location-based POI queries using the PostGIS database.
+// It fetches nearby POIs (restaurants, activities, hotels, attractions) from the database
+// instead of generating them via LLM, providing more accurate and real-world data.
+func (l *ServiceImpl) handleNearbyDomain(
+	ctx context.Context,
+	cc *common.ChatContext,
+	sendEventWithResponse func(locitypes.StreamEvent),
+	responsesMutex *sync.Mutex,
+	responses map[string]*strings.Builder,
+	partCacheKeys map[string]string,
+) {
+	// Extract location from user location
+	var lat, lon, distance float64
+	if cc.UserLocation != nil {
+		lat = cc.UserLocation.UserLat
+		lon = cc.UserLocation.UserLon
+
+		// Try to parse distance from message using regex
+		// Format: "within X kilometers" or "within X km"
+		distanceRegex := regexp.MustCompile(`within\s+(\d+(?:\.\d+)?)\s*(?:kilometers?|km)`)
+		if matches := distanceRegex.FindStringSubmatch(strings.ToLower(cc.Message)); len(matches) > 1 {
+			if parsedDist, err := strconv.ParseFloat(matches[1], 64); err == nil {
+				distance = parsedDist * 1000 // Convert km to meters for PostGIS
+			}
+		}
+
+		if distance <= 0 {
+			distance = 50000 // Default 50km radius in meters
+		}
+	} else {
+		// No location available - send error event
+		sendEventWithResponse(locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
+			Error:     "Location data is required for nearby searches. Please enable location services.",
+			Timestamp: time.Now(),
+			EventID:   uuid.New().String(),
+		})
+		return
+	}
+
+	l.logger.InfoContext(ctx, "Handling nearby domain query",
+		slog.Float64("lat", lat),
+		slog.Float64("lon", lon),
+		slog.Float64("distance_m", distance))
+
+	// Send start event
+	sendEventWithResponse(locitypes.StreamEvent{
+		Type: locitypes.EventTypeStart,
+		Data: map[string]interface{}{
+			"domain":     "nearby",
+			"city":       cc.CityName,
+			"session_id": cc.SessionID.String(),
+			"cache_key":  cc.CacheKey,
+			"lat":        lat,
+			"lon":        lon,
+			"distance":   distance,
+		},
+		Timestamp: time.Now(),
+		EventID:   uuid.New().String(),
+	})
+
+	// Query POIs using POI service with full cache + DB + LLM fallback flow
+	pois, err := l.poiSvc.GetGeneralPOIByDistance(ctx, cc.UserID, lat, lon, distance)
+	if err != nil {
+		l.logger.ErrorContext(ctx, "Failed to query nearby POIs",
+			slog.Any("error", err))
+		// Send user-friendly error message instead of internal error details
+		sendEventWithResponse(locitypes.StreamEvent{
+			Type:      locitypes.EventTypeError,
+			Error:     "Unable to find places near your location. Please try again or expand your search radius.",
+			Timestamp: time.Now(),
+			EventID:   uuid.New().String(),
+		})
+		return
+	}
+
+	l.logger.InfoContext(ctx, "Found nearby POIs",
+		slog.Int("count", len(pois)))
+
+	// If no POIs found in database, send appropriate message
+	if len(pois) == 0 {
+		sendEventWithResponse(locitypes.StreamEvent{
+			Type: locitypes.EventTypeProgress,
+			Data: map[string]interface{}{
+				"status":  "no_pois_found",
+				"message": "No POIs found in the database for this location. Try expanding the search radius.",
+			},
+			Timestamp: time.Now(),
+			EventID:   uuid.New().String(),
+		})
+	}
+
+	// Build response data
+	responseData := &locitypes.AiCityResponse{
+		SessionID: cc.SessionID,
+		GeneralCityData: locitypes.GeneralCityData{
+			City:            cc.CityName,
+			Description:     fmt.Sprintf("Places near your location (%.2f, %.2f) within %.1f km", lat, lon, distance/1000),
+			CenterLatitude:  lat,
+			CenterLongitude: lon,
+		},
+		PointsOfInterest: pois,
+	}
+
+	// Store in responses map for persistence
+	responsesMutex.Lock()
+	if responses["nearby_pois"] == nil {
+		responses["nearby_pois"] = &strings.Builder{}
+	}
+	// Marshal POIs to JSON for storage
+	poisJSON, _ := json.Marshal(pois)
+	responses["nearby_pois"].WriteString(string(poisJSON))
+	partCacheKeys["nearby_pois"] = cc.CacheKey + "_nearby_pois"
+	responsesMutex.Unlock()
+
+	// Send the POIs as a structured event
+	sendEventWithResponse(locitypes.StreamEvent{
+		Type: "nearby",
+		Data: map[string]interface{}{
+			"general_city_data":  responseData.GeneralCityData,
+			"points_of_interest": pois,
+			"session_id":         cc.SessionID.String(),
+			"total_count":        len(pois),
+		},
+		Timestamp: time.Now(),
+		EventID:   uuid.New().String(),
+	})
+
+	l.logger.InfoContext(ctx, "Successfully streamed nearby POIs",
+		slog.Int("poi_count", len(pois)))
 }

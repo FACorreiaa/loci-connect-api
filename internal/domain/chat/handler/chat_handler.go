@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -115,8 +116,12 @@ func (h *ChatHandler) StreamChat(
 
 	eventCh := make(chan locitypes.StreamEvent, 100)
 
+	// Create a detached context for LLM processing that won't be cancelled
+	// when the RPC stream ends. Use a reasonable timeout for LLM operations.
+	llmCtx, llmCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+
 	cc := common.ChatContext{
-		Ctx:          ctx,
+		Ctx:          llmCtx,
 		UserID:       userID,
 		ProfileID:    profileID,
 		CityName:     cityName,
@@ -126,31 +131,63 @@ func (h *ChatHandler) StreamChat(
 	}
 
 	go func() {
-		defer close(eventCh)
+		defer func() {
+			llmCancel()
+			close(eventCh)
+		}()
 		err := h.service.ProcessUnifiedChatMessageStream(cc)
 		if err != nil {
 			select {
 			case eventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}:
-			case <-ctx.Done():
+			case <-llmCtx.Done():
 			}
 		}
 	}()
 
-	for event := range eventCh {
-		resp, err := h.mapEventToProto(event)
-		if err != nil {
-			h.logger.Error("Failed to map event", "error", err)
-			continue
-		}
+	for {
+		select {
+		case event, ok := <-eventCh:
+			if !ok {
+				h.logger.Info("Event channel closed, stream finished successfully")
+				return nil
+			}
 
-		if err := stream.Send(resp); err != nil {
-			h.logger.Warn("Failed to send event to client",
-				"error", err)
+			resp, err := h.mapEventToProto(event)
+			if err != nil {
+				h.logger.Error("Failed to map event", "error", err)
+				continue
+			}
+
+			if err := stream.Send(resp); err != nil {
+				// Client disconnected - let goroutine finish processing
+				h.logger.Info("Client disconnected during streaming, LLM processing continues in background",
+					"error", err)
+				// Drain remaining events to allow graceful cleanup
+				go func() {
+					for range eventCh {
+						// Drain channel
+					}
+				}()
+				return nil
+			}
+
+			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
+				h.logger.Info("Stream completed", "event_type", event.Type)
+				return nil
+			}
+
+		case <-ctx.Done():
+			// RPC context cancelled (client disconnected) but LLM processing continues
+			h.logger.Info("Client disconnected, LLM processing continues in background")
+			// Drain eventCh to prevent goroutine block
+			go func() {
+				for range eventCh {
+					// Drain channel
+				}
+			}()
+			return nil
 		}
 	}
-
-	h.logger.Info("Event channel closed, stream finished successfully")
-	return nil
 }
 
 // toConnectError converts an error to a Connect error.
