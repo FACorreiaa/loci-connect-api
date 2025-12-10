@@ -162,11 +162,6 @@ func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) 
 	return featured, nil
 }
 
-// countRow is used for COUNT queries
-type countRow struct {
-	Count int `db:"count"`
-}
-
 // chatSessionRow is a row struct for GetRecentDiscoveriesByUserID query
 type chatSessionRow struct {
 	ID                  uuid.UUID  `db:"id"`
