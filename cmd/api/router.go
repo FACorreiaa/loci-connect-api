@@ -18,7 +18,7 @@ import (
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/v1/tagsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/tags/v1/tagsv1connect"
 	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
