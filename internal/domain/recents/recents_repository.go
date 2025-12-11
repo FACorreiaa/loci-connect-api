@@ -167,8 +167,8 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 
 	l := r.logger.With(slog.String("method", "GetUserRecentInteractions"))
 
-	// Build WHERE clause with filters
-	whereConditions := []string{"user_id = $1", "city_name != ''", "city_name IS NOT NULL"}
+	// Build WHERE clause with filters - include ALL interactions, not just those with city_name
+	whereConditions := []string{"user_id = $1"}
 	args := []interface{}{userID}
 	argIndex := 2
 
@@ -180,11 +180,12 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 	}
 
 	// Build HAVING clause for interaction count filters
+	// Only add conditions when they're actually specified (> 0)
 	havingConditions := []string{}
-	if filterOptions.MinInteractions >= 0 {
+	if filterOptions.MinInteractions > 0 {
 		havingConditions = append(havingConditions, fmt.Sprintf("COUNT(*) >= %d", filterOptions.MinInteractions))
 	}
-	if filterOptions.MaxInteractions >= 0 {
+	if filterOptions.MaxInteractions > 0 {
 		havingConditions = append(havingConditions, fmt.Sprintf("COUNT(*) <= %d", filterOptions.MaxInteractions))
 	}
 
@@ -207,34 +208,23 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 		orderBy += " DESC"
 	}
 
-	// Build the main query - we need a subquery to properly aggregate by city
+	// Build the main query - simplified to avoid correlated subquery issues
+	// Group by normalized city_name (NULL/empty becomes 'General Search')
 	subquery := fmt.Sprintf(`
         SELECT
-            l.city_name,
+            COALESCE(NULLIF(l.city_name, ''), 'General Search') as city_name,
             MAX(l.created_at) as last_activity,
             COUNT(*) as interaction_count,
-            (
-                SELECT session_id
-                FROM llm_interactions llmi
-                WHERE llmi.user_id = l.user_id
-                  AND llmi.city_name = l.city_name
-                ORDER BY llmi.created_at DESC
-                LIMIT 1
-            ) as session_id,
+            MAX(l.session_id::text)::uuid as session_id,
             CASE
-                WHEN l.city_name IS NOT NULL AND l.city_name != ''
-                THEN 'Trip to ' || l.city_name
+                WHEN MAX(l.city_name) IS NOT NULL AND MAX(l.city_name) != ''
+                THEN 'Trip to ' || MAX(l.city_name)
                 ELSE 'Travel Planning'
             END as title,
-            COALESCE((
-                SELECT COUNT(DISTINCT pd.id)
-                FROM poi_details pd
-                JOIN llm_interactions li ON pd.llm_interaction_id = li.id
-                WHERE li.user_id = l.user_id AND li.city_name = l.city_name
-            ), 0) as poi_count
+            0 as poi_count
         FROM llm_interactions l
         WHERE %s
-        GROUP BY l.city_name, l.user_id
+        GROUP BY COALESCE(NULLIF(l.city_name, ''), 'General Search')
         %s
     `, strings.Join(whereConditions, " AND "),
 		func() string {

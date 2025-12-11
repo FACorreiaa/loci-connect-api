@@ -190,6 +190,7 @@ func (h *Handler) GetLandingPageStatistics(
 			NewFavoritesThisWeek:        int32(stats.SavedPlaces),
 			ItinerariesCreatedThisMonth: int32(stats.Itineraries),
 			RecentlySearchedCities:      []string{}, // Not implemented yet
+			CitiesExplored:              int32(stats.CitiesExplored),
 		},
 	}
 
