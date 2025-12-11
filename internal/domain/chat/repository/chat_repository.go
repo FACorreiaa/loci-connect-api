@@ -1066,7 +1066,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 		var conversationHistory []locitypes.ConversationMessage
 		var totalPOIs, totalHotels, totalRestaurants int
-		var citiesCovered []string
+
 		var hasItinerary bool
 		var dominantCategories []string
 
@@ -1114,15 +1114,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 		}
 
 		// Calculate unique cities covered
-		citiesMap := make(map[string]bool)
-		citiesMap[row.CityName] = true
-		for _, city := range citiesCovered {
-			citiesMap[city] = true
-		}
-		uniqueCities := make([]string, 0, len(citiesMap))
-		for city := range citiesMap {
-			uniqueCities = append(uniqueCities, city)
-		}
+		uniqueCities := []string{row.CityName}
 
 		// Calculate complexity score (1-10)
 		complexityScore := common.CalculateComplexityScore(totalPOIs, totalHotels, totalRestaurants, len(conversationHistory), hasItinerary)
@@ -1691,7 +1683,7 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitype
 			logger.Debug("parsePOIsFromResponse: Parsed as unified chat response", "poiCount", len(allPOIs))
 			return allPOIs, nil
 		}
-	} else if err != nil {
+	} else {
 		logger.Debug("parsePOIsFromResponse: Failed to parse as unified response", "error", err.Error())
 	}
 

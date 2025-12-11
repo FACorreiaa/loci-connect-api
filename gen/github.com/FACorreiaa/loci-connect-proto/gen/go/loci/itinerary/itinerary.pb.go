@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/itinerary.proto
+// source: proto/loci/itinerary/itinerary.proto
 
 package itinerary
 
@@ -65,11 +65,11 @@ func (x ContentType) String() string {
 }
 
 func (ContentType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_itinerary_proto_enumTypes[0].Descriptor()
+	return file_proto_loci_itinerary_itinerary_proto_enumTypes[0].Descriptor()
 }
 
 func (ContentType) Type() protoreflect.EnumType {
-	return &file_proto_itinerary_proto_enumTypes[0]
+	return &file_proto_loci_itinerary_itinerary_proto_enumTypes[0]
 }
 
 func (x ContentType) Number() protoreflect.EnumNumber {
@@ -78,7 +78,7 @@ func (x ContentType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContentType.Descriptor instead.
 func (ContentType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{0}
 }
 
 // List represents a list or itinerary
@@ -103,7 +103,7 @@ type List struct {
 
 func (x *List) Reset() {
 	*x = List{}
-	mi := &file_proto_itinerary_proto_msgTypes[0]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -115,7 +115,7 @@ func (x *List) String() string {
 func (*List) ProtoMessage() {}
 
 func (x *List) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[0]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -128,7 +128,7 @@ func (x *List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use List.ProtoReflect.Descriptor instead.
 func (*List) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *List) GetId() string {
@@ -244,7 +244,7 @@ type ListItem struct {
 
 func (x *ListItem) Reset() {
 	*x = ListItem{}
-	mi := &file_proto_itinerary_proto_msgTypes[1]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -256,7 +256,7 @@ func (x *ListItem) String() string {
 func (*ListItem) ProtoMessage() {}
 
 func (x *ListItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[1]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -269,7 +269,7 @@ func (x *ListItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItem.ProtoReflect.Descriptor instead.
 func (*ListItem) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{1}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ListItem) GetListId() string {
@@ -377,7 +377,7 @@ type ListItemWithContent struct {
 
 func (x *ListItemWithContent) Reset() {
 	*x = ListItemWithContent{}
-	mi := &file_proto_itinerary_proto_msgTypes[2]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +389,7 @@ func (x *ListItemWithContent) String() string {
 func (*ListItemWithContent) ProtoMessage() {}
 
 func (x *ListItemWithContent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[2]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +402,7 @@ func (x *ListItemWithContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItemWithContent.ProtoReflect.Descriptor instead.
 func (*ListItemWithContent) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{2}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListItemWithContent) GetListItem() *ListItem {
@@ -451,7 +451,7 @@ type ListWithDetailedItems struct {
 
 func (x *ListWithDetailedItems) Reset() {
 	*x = ListWithDetailedItems{}
-	mi := &file_proto_itinerary_proto_msgTypes[3]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -463,7 +463,7 @@ func (x *ListWithDetailedItems) String() string {
 func (*ListWithDetailedItems) ProtoMessage() {}
 
 func (x *ListWithDetailedItems) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[3]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -476,7 +476,7 @@ func (x *ListWithDetailedItems) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWithDetailedItems.ProtoReflect.Descriptor instead.
 func (*ListWithDetailedItems) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{3}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListWithDetailedItems) GetList() *List {
@@ -516,7 +516,7 @@ type UserSavedItinerary struct {
 
 func (x *UserSavedItinerary) Reset() {
 	*x = UserSavedItinerary{}
-	mi := &file_proto_itinerary_proto_msgTypes[4]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -528,7 +528,7 @@ func (x *UserSavedItinerary) String() string {
 func (*UserSavedItinerary) ProtoMessage() {}
 
 func (x *UserSavedItinerary) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[4]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -541,7 +541,7 @@ func (x *UserSavedItinerary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSavedItinerary.ProtoReflect.Descriptor instead.
 func (*UserSavedItinerary) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{4}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UserSavedItinerary) GetId() string {
@@ -656,7 +656,7 @@ type CreateListRequest struct {
 
 func (x *CreateListRequest) Reset() {
 	*x = CreateListRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[5]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -668,7 +668,7 @@ func (x *CreateListRequest) String() string {
 func (*CreateListRequest) ProtoMessage() {}
 
 func (x *CreateListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[5]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -681,7 +681,7 @@ func (x *CreateListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateListRequest.ProtoReflect.Descriptor instead.
 func (*CreateListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{5}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateListRequest) GetName() string {
@@ -734,7 +734,7 @@ type UpdateListRequest struct {
 
 func (x *UpdateListRequest) Reset() {
 	*x = UpdateListRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[6]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +746,7 @@ func (x *UpdateListRequest) String() string {
 func (*UpdateListRequest) ProtoMessage() {}
 
 func (x *UpdateListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[6]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +759,7 @@ func (x *UpdateListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListRequest.ProtoReflect.Descriptor instead.
 func (*UpdateListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{6}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateListRequest) GetListId() string {
@@ -823,7 +823,7 @@ type AddListItemRequest struct {
 
 func (x *AddListItemRequest) Reset() {
 	*x = AddListItemRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[7]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -835,7 +835,7 @@ func (x *AddListItemRequest) String() string {
 func (*AddListItemRequest) ProtoMessage() {}
 
 func (x *AddListItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[7]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -848,7 +848,7 @@ func (x *AddListItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddListItemRequest.ProtoReflect.Descriptor instead.
 func (*AddListItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{7}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AddListItemRequest) GetListId() string {
@@ -940,7 +940,7 @@ type UpdateListItemRequest struct {
 
 func (x *UpdateListItemRequest) Reset() {
 	*x = UpdateListItemRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[8]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -952,7 +952,7 @@ func (x *UpdateListItemRequest) String() string {
 func (*UpdateListItemRequest) ProtoMessage() {}
 
 func (x *UpdateListItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[8]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -965,7 +965,7 @@ func (x *UpdateListItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListItemRequest.ProtoReflect.Descriptor instead.
 func (*UpdateListItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{8}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UpdateListItemRequest) GetListId() string {
@@ -1055,7 +1055,7 @@ type UpdateItineraryRequest struct {
 
 func (x *UpdateItineraryRequest) Reset() {
 	*x = UpdateItineraryRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[9]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1067,7 +1067,7 @@ func (x *UpdateItineraryRequest) String() string {
 func (*UpdateItineraryRequest) ProtoMessage() {}
 
 func (x *UpdateItineraryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[9]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1080,7 +1080,7 @@ func (x *UpdateItineraryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateItineraryRequest.ProtoReflect.Descriptor instead.
 func (*UpdateItineraryRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{9}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateItineraryRequest) GetItineraryId() string {
@@ -1156,7 +1156,7 @@ type BookmarkRequest struct {
 
 func (x *BookmarkRequest) Reset() {
 	*x = BookmarkRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[10]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1168,7 +1168,7 @@ func (x *BookmarkRequest) String() string {
 func (*BookmarkRequest) ProtoMessage() {}
 
 func (x *BookmarkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[10]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1181,7 +1181,7 @@ func (x *BookmarkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BookmarkRequest.ProtoReflect.Descriptor instead.
 func (*BookmarkRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{10}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BookmarkRequest) GetLlmInteractionId() string {
@@ -1251,7 +1251,7 @@ type GetListRequest struct {
 
 func (x *GetListRequest) Reset() {
 	*x = GetListRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[11]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1263,7 +1263,7 @@ func (x *GetListRequest) String() string {
 func (*GetListRequest) ProtoMessage() {}
 
 func (x *GetListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[11]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1276,7 +1276,7 @@ func (x *GetListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListRequest.ProtoReflect.Descriptor instead.
 func (*GetListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{11}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetListRequest) GetListId() string {
@@ -1303,7 +1303,7 @@ type GetListResponse struct {
 
 func (x *GetListResponse) Reset() {
 	*x = GetListResponse{}
-	mi := &file_proto_itinerary_proto_msgTypes[12]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1315,7 +1315,7 @@ func (x *GetListResponse) String() string {
 func (*GetListResponse) ProtoMessage() {}
 
 func (x *GetListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[12]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1328,7 +1328,7 @@ func (x *GetListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListResponse.ProtoReflect.Descriptor instead.
 func (*GetListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{12}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetListResponse) GetList() *ListWithDetailedItems {
@@ -1350,7 +1350,7 @@ type GetUserListsRequest struct {
 
 func (x *GetUserListsRequest) Reset() {
 	*x = GetUserListsRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[13]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1362,7 +1362,7 @@ func (x *GetUserListsRequest) String() string {
 func (*GetUserListsRequest) ProtoMessage() {}
 
 func (x *GetUserListsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[13]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1375,7 +1375,7 @@ func (x *GetUserListsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserListsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserListsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{13}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetUserListsRequest) GetUserId() string {
@@ -1410,7 +1410,7 @@ type GetUserListsResponse struct {
 
 func (x *GetUserListsResponse) Reset() {
 	*x = GetUserListsResponse{}
-	mi := &file_proto_itinerary_proto_msgTypes[14]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1422,7 +1422,7 @@ func (x *GetUserListsResponse) String() string {
 func (*GetUserListsResponse) ProtoMessage() {}
 
 func (x *GetUserListsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[14]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1435,7 +1435,7 @@ func (x *GetUserListsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserListsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserListsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{14}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetUserListsResponse) GetLists() []*List {
@@ -1463,7 +1463,7 @@ type GetUserItinerariesRequest struct {
 
 func (x *GetUserItinerariesRequest) Reset() {
 	*x = GetUserItinerariesRequest{}
-	mi := &file_proto_itinerary_proto_msgTypes[15]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1475,7 +1475,7 @@ func (x *GetUserItinerariesRequest) String() string {
 func (*GetUserItinerariesRequest) ProtoMessage() {}
 
 func (x *GetUserItinerariesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[15]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1488,7 +1488,7 @@ func (x *GetUserItinerariesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserItinerariesRequest.ProtoReflect.Descriptor instead.
 func (*GetUserItinerariesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{15}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetUserItinerariesRequest) GetUserId() string {
@@ -1516,7 +1516,7 @@ type GetUserItinerariesResponse struct {
 
 func (x *GetUserItinerariesResponse) Reset() {
 	*x = GetUserItinerariesResponse{}
-	mi := &file_proto_itinerary_proto_msgTypes[16]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1528,7 +1528,7 @@ func (x *GetUserItinerariesResponse) String() string {
 func (*GetUserItinerariesResponse) ProtoMessage() {}
 
 func (x *GetUserItinerariesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_itinerary_proto_msgTypes[16]
+	mi := &file_proto_loci_itinerary_itinerary_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1541,7 +1541,7 @@ func (x *GetUserItinerariesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserItinerariesResponse.ProtoReflect.Descriptor instead.
 func (*GetUserItinerariesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_itinerary_proto_rawDescGZIP(), []int{16}
+	return file_proto_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetUserItinerariesResponse) GetItineraries() []*UserSavedItinerary {
@@ -1558,11 +1558,11 @@ func (x *GetUserItinerariesResponse) GetPagination() *common.PaginationMetadata 
 	return nil
 }
 
-var File_proto_itinerary_proto protoreflect.FileDescriptor
+var File_proto_loci_itinerary_itinerary_proto protoreflect.FileDescriptor
 
-const file_proto_itinerary_proto_rawDesc = "" +
+const file_proto_loci_itinerary_itinerary_proto_rawDesc = "" +
 	"\n" +
-	"\x15proto/itinerary.proto\x12\x0eloci.itinerary\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\x1a\x0fproto/poi.proto\"\xbf\x04\n" +
+	"$proto/loci/itinerary/itinerary.proto\x12\x0eloci.itinerary\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eproto/loci/common/common.proto\x1a\x18proto/loci/poi/poi.proto\"\xbf\x04\n" +
 	"\x04List\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +
@@ -1815,20 +1815,20 @@ const file_proto_itinerary_proto_rawDesc = "" +
 	"\x11BookmarkItinerary\x12\x1f.loci.itinerary.BookmarkRequest\x1a\x15.loci.common.ResponseBJZHgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary;itineraryb\x06proto3"
 
 var (
-	file_proto_itinerary_proto_rawDescOnce sync.Once
-	file_proto_itinerary_proto_rawDescData []byte
+	file_proto_loci_itinerary_itinerary_proto_rawDescOnce sync.Once
+	file_proto_loci_itinerary_itinerary_proto_rawDescData []byte
 )
 
-func file_proto_itinerary_proto_rawDescGZIP() []byte {
-	file_proto_itinerary_proto_rawDescOnce.Do(func() {
-		file_proto_itinerary_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_itinerary_proto_rawDesc), len(file_proto_itinerary_proto_rawDesc)))
+func file_proto_loci_itinerary_itinerary_proto_rawDescGZIP() []byte {
+	file_proto_loci_itinerary_itinerary_proto_rawDescOnce.Do(func() {
+		file_proto_loci_itinerary_itinerary_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_itinerary_itinerary_proto_rawDesc), len(file_proto_loci_itinerary_itinerary_proto_rawDesc)))
 	})
-	return file_proto_itinerary_proto_rawDescData
+	return file_proto_loci_itinerary_itinerary_proto_rawDescData
 }
 
-var file_proto_itinerary_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_itinerary_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
-var file_proto_itinerary_proto_goTypes = []any{
+var file_proto_loci_itinerary_itinerary_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_loci_itinerary_itinerary_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_loci_itinerary_itinerary_proto_goTypes = []any{
 	(ContentType)(0),                   // 0: loci.itinerary.ContentType
 	(*List)(nil),                       // 1: loci.itinerary.List
 	(*ListItem)(nil),                   // 2: loci.itinerary.ListItem
@@ -1855,7 +1855,7 @@ var file_proto_itinerary_proto_goTypes = []any{
 	(*common.PaginationMetadata)(nil),  // 23: loci.common.PaginationMetadata
 	(*common.Response)(nil),            // 24: loci.common.Response
 }
-var file_proto_itinerary_proto_depIdxs = []int32{
+var file_proto_loci_itinerary_itinerary_proto_depIdxs = []int32{
 	18, // 0: loci.itinerary.List.created_at:type_name -> google.protobuf.Timestamp
 	18, // 1: loci.itinerary.List.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: loci.itinerary.ListItem.content_type:type_name -> loci.itinerary.ContentType
@@ -1907,40 +1907,40 @@ var file_proto_itinerary_proto_depIdxs = []int32{
 	0,  // [0:26] is the sub-list for field type_name
 }
 
-func init() { file_proto_itinerary_proto_init() }
-func file_proto_itinerary_proto_init() {
-	if File_proto_itinerary_proto != nil {
+func init() { file_proto_loci_itinerary_itinerary_proto_init() }
+func file_proto_loci_itinerary_itinerary_proto_init() {
+	if File_proto_loci_itinerary_itinerary_proto != nil {
 		return
 	}
-	file_proto_itinerary_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[1].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[4].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[5].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[6].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[7].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[8].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[9].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[10].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[11].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[13].OneofWrappers = []any{}
-	file_proto_itinerary_proto_msgTypes[15].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[0].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[1].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[2].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[4].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[5].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[6].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[7].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[8].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[9].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[10].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[11].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[13].OneofWrappers = []any{}
+	file_proto_loci_itinerary_itinerary_proto_msgTypes[15].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_itinerary_proto_rawDesc), len(file_proto_itinerary_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_itinerary_itinerary_proto_rawDesc), len(file_proto_loci_itinerary_itinerary_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_itinerary_proto_goTypes,
-		DependencyIndexes: file_proto_itinerary_proto_depIdxs,
-		EnumInfos:         file_proto_itinerary_proto_enumTypes,
-		MessageInfos:      file_proto_itinerary_proto_msgTypes,
+		GoTypes:           file_proto_loci_itinerary_itinerary_proto_goTypes,
+		DependencyIndexes: file_proto_loci_itinerary_itinerary_proto_depIdxs,
+		EnumInfos:         file_proto_loci_itinerary_itinerary_proto_enumTypes,
+		MessageInfos:      file_proto_loci_itinerary_itinerary_proto_msgTypes,
 	}.Build()
-	File_proto_itinerary_proto = out.File
-	file_proto_itinerary_proto_goTypes = nil
-	file_proto_itinerary_proto_depIdxs = nil
+	File_proto_loci_itinerary_itinerary_proto = out.File
+	file_proto_loci_itinerary_itinerary_proto_goTypes = nil
+	file_proto_loci_itinerary_itinerary_proto_depIdxs = nil
 }

@@ -736,7 +736,7 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 		span.SetAttributes(attribute.String("poi.existing_id", existingID.String()))
 		span.SetStatus(codes.Ok, "POI already exists")
 		return existingID, nil
-	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		// Unexpected error
 		r.logger.WarnContext(ctx, "Error checking for duplicate POI",
 			slog.Any("error", err),
@@ -1740,7 +1740,7 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
 	if err == nil {
 		return existingID, nil // POI already exists
 	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to check POI existence: %w", err)
 	}

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/discover.proto
+// source: proto/loci/discover/discover.proto
 
 package discover
 
@@ -36,7 +36,7 @@ type TrendingDiscovery struct {
 
 func (x *TrendingDiscovery) Reset() {
 	*x = TrendingDiscovery{}
-	mi := &file_proto_discover_proto_msgTypes[0]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -48,7 +48,7 @@ func (x *TrendingDiscovery) String() string {
 func (*TrendingDiscovery) ProtoMessage() {}
 
 func (x *TrendingDiscovery) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[0]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -61,7 +61,7 @@ func (x *TrendingDiscovery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrendingDiscovery.ProtoReflect.Descriptor instead.
 func (*TrendingDiscovery) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *TrendingDiscovery) GetCityName() string {
@@ -98,7 +98,7 @@ type FeaturedCollection struct {
 
 func (x *FeaturedCollection) Reset() {
 	*x = FeaturedCollection{}
-	mi := &file_proto_discover_proto_msgTypes[1]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +110,7 @@ func (x *FeaturedCollection) String() string {
 func (*FeaturedCollection) ProtoMessage() {}
 
 func (x *FeaturedCollection) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[1]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +123,7 @@ func (x *FeaturedCollection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeaturedCollection.ProtoReflect.Descriptor instead.
 func (*FeaturedCollection) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{1}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *FeaturedCollection) GetCategory() string {
@@ -179,7 +179,7 @@ type DiscoverResult struct {
 
 func (x *DiscoverResult) Reset() {
 	*x = DiscoverResult{}
-	mi := &file_proto_discover_proto_msgTypes[2]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -191,7 +191,7 @@ func (x *DiscoverResult) String() string {
 func (*DiscoverResult) ProtoMessage() {}
 
 func (x *DiscoverResult) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[2]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -204,7 +204,7 @@ func (x *DiscoverResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverResult.ProtoReflect.Descriptor instead.
 func (*DiscoverResult) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{2}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DiscoverResult) GetId() string {
@@ -331,7 +331,7 @@ type DiscoverPageData struct {
 
 func (x *DiscoverPageData) Reset() {
 	*x = DiscoverPageData{}
-	mi := &file_proto_discover_proto_msgTypes[3]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -343,7 +343,7 @@ func (x *DiscoverPageData) String() string {
 func (*DiscoverPageData) ProtoMessage() {}
 
 func (x *DiscoverPageData) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[3]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -356,7 +356,7 @@ func (x *DiscoverPageData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverPageData.ProtoReflect.Descriptor instead.
 func (*DiscoverPageData) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{3}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DiscoverPageData) GetTrending() []*TrendingDiscovery {
@@ -389,7 +389,7 @@ type GetDiscoverPageRequest struct {
 
 func (x *GetDiscoverPageRequest) Reset() {
 	*x = GetDiscoverPageRequest{}
-	mi := &file_proto_discover_proto_msgTypes[4]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -401,7 +401,7 @@ func (x *GetDiscoverPageRequest) String() string {
 func (*GetDiscoverPageRequest) ProtoMessage() {}
 
 func (x *GetDiscoverPageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[4]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -414,7 +414,7 @@ func (x *GetDiscoverPageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiscoverPageRequest.ProtoReflect.Descriptor instead.
 func (*GetDiscoverPageRequest) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{4}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{4}
 }
 
 // GetDiscoverPageResponse for discover page data retrieval
@@ -427,7 +427,7 @@ type GetDiscoverPageResponse struct {
 
 func (x *GetDiscoverPageResponse) Reset() {
 	*x = GetDiscoverPageResponse{}
-	mi := &file_proto_discover_proto_msgTypes[5]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -439,7 +439,7 @@ func (x *GetDiscoverPageResponse) String() string {
 func (*GetDiscoverPageResponse) ProtoMessage() {}
 
 func (x *GetDiscoverPageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[5]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -452,7 +452,7 @@ func (x *GetDiscoverPageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDiscoverPageResponse.ProtoReflect.Descriptor instead.
 func (*GetDiscoverPageResponse) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{5}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetDiscoverPageResponse) GetData() *DiscoverPageData {
@@ -472,7 +472,7 @@ type GetTrendingRequest struct {
 
 func (x *GetTrendingRequest) Reset() {
 	*x = GetTrendingRequest{}
-	mi := &file_proto_discover_proto_msgTypes[6]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -484,7 +484,7 @@ func (x *GetTrendingRequest) String() string {
 func (*GetTrendingRequest) ProtoMessage() {}
 
 func (x *GetTrendingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[6]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -497,7 +497,7 @@ func (x *GetTrendingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTrendingRequest.ProtoReflect.Descriptor instead.
 func (*GetTrendingRequest) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{6}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetTrendingRequest) GetLimit() int32 {
@@ -517,7 +517,7 @@ type GetTrendingResponse struct {
 
 func (x *GetTrendingResponse) Reset() {
 	*x = GetTrendingResponse{}
-	mi := &file_proto_discover_proto_msgTypes[7]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -529,7 +529,7 @@ func (x *GetTrendingResponse) String() string {
 func (*GetTrendingResponse) ProtoMessage() {}
 
 func (x *GetTrendingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[7]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -542,7 +542,7 @@ func (x *GetTrendingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTrendingResponse.ProtoReflect.Descriptor instead.
 func (*GetTrendingResponse) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{7}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetTrendingResponse) GetTrending() []*TrendingDiscovery {
@@ -562,7 +562,7 @@ type GetFeaturedRequest struct {
 
 func (x *GetFeaturedRequest) Reset() {
 	*x = GetFeaturedRequest{}
-	mi := &file_proto_discover_proto_msgTypes[8]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +574,7 @@ func (x *GetFeaturedRequest) String() string {
 func (*GetFeaturedRequest) ProtoMessage() {}
 
 func (x *GetFeaturedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[8]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,7 +587,7 @@ func (x *GetFeaturedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeaturedRequest.ProtoReflect.Descriptor instead.
 func (*GetFeaturedRequest) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{8}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetFeaturedRequest) GetLimit() int32 {
@@ -607,7 +607,7 @@ type GetFeaturedResponse struct {
 
 func (x *GetFeaturedResponse) Reset() {
 	*x = GetFeaturedResponse{}
-	mi := &file_proto_discover_proto_msgTypes[9]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -619,7 +619,7 @@ func (x *GetFeaturedResponse) String() string {
 func (*GetFeaturedResponse) ProtoMessage() {}
 
 func (x *GetFeaturedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[9]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -632,7 +632,7 @@ func (x *GetFeaturedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeaturedResponse.ProtoReflect.Descriptor instead.
 func (*GetFeaturedResponse) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{9}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetFeaturedResponse) GetFeatured() []*FeaturedCollection {
@@ -653,7 +653,7 @@ type GetRecentDiscoveriesRequest struct {
 
 func (x *GetRecentDiscoveriesRequest) Reset() {
 	*x = GetRecentDiscoveriesRequest{}
-	mi := &file_proto_discover_proto_msgTypes[10]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -665,7 +665,7 @@ func (x *GetRecentDiscoveriesRequest) String() string {
 func (*GetRecentDiscoveriesRequest) ProtoMessage() {}
 
 func (x *GetRecentDiscoveriesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[10]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -678,7 +678,7 @@ func (x *GetRecentDiscoveriesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentDiscoveriesRequest.ProtoReflect.Descriptor instead.
 func (*GetRecentDiscoveriesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{10}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetRecentDiscoveriesRequest) GetUserId() string {
@@ -706,7 +706,7 @@ type GetRecentDiscoveriesResponse struct {
 
 func (x *GetRecentDiscoveriesResponse) Reset() {
 	*x = GetRecentDiscoveriesResponse{}
-	mi := &file_proto_discover_proto_msgTypes[11]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -718,7 +718,7 @@ func (x *GetRecentDiscoveriesResponse) String() string {
 func (*GetRecentDiscoveriesResponse) ProtoMessage() {}
 
 func (x *GetRecentDiscoveriesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[11]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -731,7 +731,7 @@ func (x *GetRecentDiscoveriesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentDiscoveriesResponse.ProtoReflect.Descriptor instead.
 func (*GetRecentDiscoveriesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{11}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetRecentDiscoveriesResponse) GetSessions() []*chat.ChatSession {
@@ -760,7 +760,7 @@ type GetCategoryResultsRequest struct {
 
 func (x *GetCategoryResultsRequest) Reset() {
 	*x = GetCategoryResultsRequest{}
-	mi := &file_proto_discover_proto_msgTypes[12]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -772,7 +772,7 @@ func (x *GetCategoryResultsRequest) String() string {
 func (*GetCategoryResultsRequest) ProtoMessage() {}
 
 func (x *GetCategoryResultsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[12]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -785,7 +785,7 @@ func (x *GetCategoryResultsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCategoryResultsRequest.ProtoReflect.Descriptor instead.
 func (*GetCategoryResultsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{12}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetCategoryResultsRequest) GetCategory() string {
@@ -821,7 +821,7 @@ type GetCategoryResultsResponse struct {
 
 func (x *GetCategoryResultsResponse) Reset() {
 	*x = GetCategoryResultsResponse{}
-	mi := &file_proto_discover_proto_msgTypes[13]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -833,7 +833,7 @@ func (x *GetCategoryResultsResponse) String() string {
 func (*GetCategoryResultsResponse) ProtoMessage() {}
 
 func (x *GetCategoryResultsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_discover_proto_msgTypes[13]
+	mi := &file_proto_loci_discover_discover_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -846,7 +846,7 @@ func (x *GetCategoryResultsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCategoryResultsResponse.ProtoReflect.Descriptor instead.
 func (*GetCategoryResultsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_discover_proto_rawDescGZIP(), []int{13}
+	return file_proto_loci_discover_discover_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetCategoryResultsResponse) GetCategory() string {
@@ -870,11 +870,11 @@ func (x *GetCategoryResultsResponse) GetPagination() *common.PaginationMetadata 
 	return nil
 }
 
-var File_proto_discover_proto protoreflect.FileDescriptor
+var File_proto_loci_discover_discover_proto protoreflect.FileDescriptor
 
-const file_proto_discover_proto_rawDesc = "" +
+const file_proto_loci_discover_discover_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto/discover.proto\x12\rloci.discover\x1a\x1bbuf/validate/validate.proto\x1a\x12proto/common.proto\x1a\x10proto/chat.proto\"\x89\x01\n" +
+	"\"proto/loci/discover/discover.proto\x12\rloci.discover\x1a\x1bbuf/validate/validate.proto\x1a\x1eproto/loci/common/common.proto\x1a\x1aproto/loci/chat/chat.proto\"\x89\x01\n" +
 	"\x11TrendingDiscovery\x12'\n" +
 	"\tcity_name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcityName\x12*\n" +
@@ -973,19 +973,19 @@ const file_proto_discover_proto_rawDesc = "" +
 	"\x12GetCategoryResults\x12(.loci.discover.GetCategoryResultsRequest\x1a).loci.discover.GetCategoryResultsResponseBHZFgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover;discoverb\x06proto3"
 
 var (
-	file_proto_discover_proto_rawDescOnce sync.Once
-	file_proto_discover_proto_rawDescData []byte
+	file_proto_loci_discover_discover_proto_rawDescOnce sync.Once
+	file_proto_loci_discover_discover_proto_rawDescData []byte
 )
 
-func file_proto_discover_proto_rawDescGZIP() []byte {
-	file_proto_discover_proto_rawDescOnce.Do(func() {
-		file_proto_discover_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_discover_proto_rawDesc), len(file_proto_discover_proto_rawDesc)))
+func file_proto_loci_discover_discover_proto_rawDescGZIP() []byte {
+	file_proto_loci_discover_discover_proto_rawDescOnce.Do(func() {
+		file_proto_loci_discover_discover_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_discover_discover_proto_rawDesc), len(file_proto_loci_discover_discover_proto_rawDesc)))
 	})
-	return file_proto_discover_proto_rawDescData
+	return file_proto_loci_discover_discover_proto_rawDescData
 }
 
-var file_proto_discover_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
-var file_proto_discover_proto_goTypes = []any{
+var file_proto_loci_discover_discover_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_proto_loci_discover_discover_proto_goTypes = []any{
 	(*TrendingDiscovery)(nil),            // 0: loci.discover.TrendingDiscovery
 	(*FeaturedCollection)(nil),           // 1: loci.discover.FeaturedCollection
 	(*DiscoverResult)(nil),               // 2: loci.discover.DiscoverResult
@@ -1004,7 +1004,7 @@ var file_proto_discover_proto_goTypes = []any{
 	(*common.PaginationRequest)(nil),     // 15: loci.common.PaginationRequest
 	(*common.PaginationMetadata)(nil),    // 16: loci.common.PaginationMetadata
 }
-var file_proto_discover_proto_depIdxs = []int32{
+var file_proto_loci_discover_discover_proto_depIdxs = []int32{
 	0,  // 0: loci.discover.DiscoverPageData.trending:type_name -> loci.discover.TrendingDiscovery
 	1,  // 1: loci.discover.DiscoverPageData.featured:type_name -> loci.discover.FeaturedCollection
 	14, // 2: loci.discover.DiscoverPageData.recent_discoveries:type_name -> loci.chat.ChatSession
@@ -1034,31 +1034,31 @@ var file_proto_discover_proto_depIdxs = []int32{
 	0,  // [0:12] is the sub-list for field type_name
 }
 
-func init() { file_proto_discover_proto_init() }
-func file_proto_discover_proto_init() {
-	if File_proto_discover_proto != nil {
+func init() { file_proto_loci_discover_discover_proto_init() }
+func file_proto_loci_discover_discover_proto_init() {
+	if File_proto_loci_discover_discover_proto != nil {
 		return
 	}
-	file_proto_discover_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_discover_proto_msgTypes[6].OneofWrappers = []any{}
-	file_proto_discover_proto_msgTypes[8].OneofWrappers = []any{}
-	file_proto_discover_proto_msgTypes[10].OneofWrappers = []any{}
-	file_proto_discover_proto_msgTypes[12].OneofWrappers = []any{}
+	file_proto_loci_discover_discover_proto_msgTypes[2].OneofWrappers = []any{}
+	file_proto_loci_discover_discover_proto_msgTypes[6].OneofWrappers = []any{}
+	file_proto_loci_discover_discover_proto_msgTypes[8].OneofWrappers = []any{}
+	file_proto_loci_discover_discover_proto_msgTypes[10].OneofWrappers = []any{}
+	file_proto_loci_discover_discover_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_discover_proto_rawDesc), len(file_proto_discover_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_discover_discover_proto_rawDesc), len(file_proto_loci_discover_discover_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_discover_proto_goTypes,
-		DependencyIndexes: file_proto_discover_proto_depIdxs,
-		MessageInfos:      file_proto_discover_proto_msgTypes,
+		GoTypes:           file_proto_loci_discover_discover_proto_goTypes,
+		DependencyIndexes: file_proto_loci_discover_discover_proto_depIdxs,
+		MessageInfos:      file_proto_loci_discover_discover_proto_msgTypes,
 	}.Build()
-	File_proto_discover_proto = out.File
-	file_proto_discover_proto_goTypes = nil
-	file_proto_discover_proto_depIdxs = nil
+	File_proto_loci_discover_discover_proto = out.File
+	file_proto_loci_discover_discover_proto_goTypes = nil
+	file_proto_loci_discover_discover_proto_depIdxs = nil
 }

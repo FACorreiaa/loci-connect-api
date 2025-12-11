@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/interest.proto
+// source: proto/loci/interest/interest.proto
 
 package interest
 
@@ -40,7 +40,7 @@ type Interest struct {
 
 func (x *Interest) Reset() {
 	*x = Interest{}
-	mi := &file_proto_interest_proto_msgTypes[0]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -52,7 +52,7 @@ func (x *Interest) String() string {
 func (*Interest) ProtoMessage() {}
 
 func (x *Interest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[0]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +65,7 @@ func (x *Interest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Interest.ProtoReflect.Descriptor instead.
 func (*Interest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Interest) GetId() string {
@@ -134,7 +134,7 @@ type Tags struct {
 
 func (x *Tags) Reset() {
 	*x = Tags{}
-	mi := &file_proto_interest_proto_msgTypes[1]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -146,7 +146,7 @@ func (x *Tags) String() string {
 func (*Tags) ProtoMessage() {}
 
 func (x *Tags) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[1]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -159,7 +159,7 @@ func (x *Tags) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Tags.ProtoReflect.Descriptor instead.
 func (*Tags) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{1}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Tags) GetId() string {
@@ -230,7 +230,7 @@ type CreateInterestRequest struct {
 
 func (x *CreateInterestRequest) Reset() {
 	*x = CreateInterestRequest{}
-	mi := &file_proto_interest_proto_msgTypes[2]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -242,7 +242,7 @@ func (x *CreateInterestRequest) String() string {
 func (*CreateInterestRequest) ProtoMessage() {}
 
 func (x *CreateInterestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[2]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -255,7 +255,7 @@ func (x *CreateInterestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateInterestRequest.ProtoReflect.Descriptor instead.
 func (*CreateInterestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{2}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateInterestRequest) GetName() string {
@@ -292,7 +292,7 @@ type UpdateInterestRequest struct {
 
 func (x *UpdateInterestRequest) Reset() {
 	*x = UpdateInterestRequest{}
-	mi := &file_proto_interest_proto_msgTypes[3]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +304,7 @@ func (x *UpdateInterestRequest) String() string {
 func (*UpdateInterestRequest) ProtoMessage() {}
 
 func (x *UpdateInterestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[3]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +317,7 @@ func (x *UpdateInterestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateInterestRequest.ProtoReflect.Descriptor instead.
 func (*UpdateInterestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{3}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UpdateInterestRequest) GetInterestId() string {
@@ -358,7 +358,7 @@ type AddInterestRequest struct {
 
 func (x *AddInterestRequest) Reset() {
 	*x = AddInterestRequest{}
-	mi := &file_proto_interest_proto_msgTypes[4]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -370,7 +370,7 @@ func (x *AddInterestRequest) String() string {
 func (*AddInterestRequest) ProtoMessage() {}
 
 func (x *AddInterestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[4]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -383,7 +383,7 @@ func (x *AddInterestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddInterestRequest.ProtoReflect.Descriptor instead.
 func (*AddInterestRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{4}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AddInterestRequest) GetInterestId() string {
@@ -403,7 +403,7 @@ type UpdatePreferenceLevelRequest struct {
 
 func (x *UpdatePreferenceLevelRequest) Reset() {
 	*x = UpdatePreferenceLevelRequest{}
-	mi := &file_proto_interest_proto_msgTypes[5]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -415,7 +415,7 @@ func (x *UpdatePreferenceLevelRequest) String() string {
 func (*UpdatePreferenceLevelRequest) ProtoMessage() {}
 
 func (x *UpdatePreferenceLevelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[5]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -428,7 +428,7 @@ func (x *UpdatePreferenceLevelRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePreferenceLevelRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePreferenceLevelRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{5}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdatePreferenceLevelRequest) GetPreferenceLevel() int32 {
@@ -448,7 +448,7 @@ type GetInterestsRequest struct {
 
 func (x *GetInterestsRequest) Reset() {
 	*x = GetInterestsRequest{}
-	mi := &file_proto_interest_proto_msgTypes[6]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -460,7 +460,7 @@ func (x *GetInterestsRequest) String() string {
 func (*GetInterestsRequest) ProtoMessage() {}
 
 func (x *GetInterestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[6]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -473,7 +473,7 @@ func (x *GetInterestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInterestsRequest.ProtoReflect.Descriptor instead.
 func (*GetInterestsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{6}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetInterestsRequest) GetActiveOnly() bool {
@@ -493,7 +493,7 @@ type GetInterestsResponse struct {
 
 func (x *GetInterestsResponse) Reset() {
 	*x = GetInterestsResponse{}
-	mi := &file_proto_interest_proto_msgTypes[7]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +505,7 @@ func (x *GetInterestsResponse) String() string {
 func (*GetInterestsResponse) ProtoMessage() {}
 
 func (x *GetInterestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[7]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +518,7 @@ func (x *GetInterestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInterestsResponse.ProtoReflect.Descriptor instead.
 func (*GetInterestsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{7}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetInterestsResponse) GetInterests() []*Interest {
@@ -538,7 +538,7 @@ type GetUserInterestsRequest struct {
 
 func (x *GetUserInterestsRequest) Reset() {
 	*x = GetUserInterestsRequest{}
-	mi := &file_proto_interest_proto_msgTypes[8]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -550,7 +550,7 @@ func (x *GetUserInterestsRequest) String() string {
 func (*GetUserInterestsRequest) ProtoMessage() {}
 
 func (x *GetUserInterestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[8]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -563,7 +563,7 @@ func (x *GetUserInterestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserInterestsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserInterestsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{8}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetUserInterestsRequest) GetUserId() string {
@@ -583,7 +583,7 @@ type GetUserInterestsResponse struct {
 
 func (x *GetUserInterestsResponse) Reset() {
 	*x = GetUserInterestsResponse{}
-	mi := &file_proto_interest_proto_msgTypes[9]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -595,7 +595,7 @@ func (x *GetUserInterestsResponse) String() string {
 func (*GetUserInterestsResponse) ProtoMessage() {}
 
 func (x *GetUserInterestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_interest_proto_msgTypes[9]
+	mi := &file_proto_loci_interest_interest_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -608,7 +608,7 @@ func (x *GetUserInterestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserInterestsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserInterestsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_interest_proto_rawDescGZIP(), []int{9}
+	return file_proto_loci_interest_interest_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetUserInterestsResponse) GetInterests() []*Interest {
@@ -618,11 +618,11 @@ func (x *GetUserInterestsResponse) GetInterests() []*Interest {
 	return nil
 }
 
-var File_proto_interest_proto protoreflect.FileDescriptor
+var File_proto_loci_interest_interest_proto protoreflect.FileDescriptor
 
-const file_proto_interest_proto_rawDesc = "" +
+const file_proto_loci_interest_interest_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto/interest.proto\x12\rloci.interest\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12proto/common.proto\"\xe5\x02\n" +
+	"\"proto/loci/interest/interest.proto\x12\rloci.interest\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eproto/loci/common/common.proto\"\xe5\x02\n" +
 	"\bInterest\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
@@ -698,19 +698,19 @@ const file_proto_interest_proto_rawDesc = "" +
 	"\x15UpdatePreferenceLevel\x12+.loci.interest.UpdatePreferenceLevelRequest\x1a\x15.loci.common.ResponseBHZFgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest;interestb\x06proto3"
 
 var (
-	file_proto_interest_proto_rawDescOnce sync.Once
-	file_proto_interest_proto_rawDescData []byte
+	file_proto_loci_interest_interest_proto_rawDescOnce sync.Once
+	file_proto_loci_interest_interest_proto_rawDescData []byte
 )
 
-func file_proto_interest_proto_rawDescGZIP() []byte {
-	file_proto_interest_proto_rawDescOnce.Do(func() {
-		file_proto_interest_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_interest_proto_rawDesc), len(file_proto_interest_proto_rawDesc)))
+func file_proto_loci_interest_interest_proto_rawDescGZIP() []byte {
+	file_proto_loci_interest_interest_proto_rawDescOnce.Do(func() {
+		file_proto_loci_interest_interest_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_interest_interest_proto_rawDesc), len(file_proto_loci_interest_interest_proto_rawDesc)))
 	})
-	return file_proto_interest_proto_rawDescData
+	return file_proto_loci_interest_interest_proto_rawDescData
 }
 
-var file_proto_interest_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_proto_interest_proto_goTypes = []any{
+var file_proto_loci_interest_interest_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_proto_loci_interest_interest_proto_goTypes = []any{
 	(*Interest)(nil),                     // 0: loci.interest.Interest
 	(*Tags)(nil),                         // 1: loci.interest.Tags
 	(*CreateInterestRequest)(nil),        // 2: loci.interest.CreateInterestRequest
@@ -724,7 +724,7 @@ var file_proto_interest_proto_goTypes = []any{
 	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
 	(*common.Response)(nil),              // 11: loci.common.Response
 }
-var file_proto_interest_proto_depIdxs = []int32{
+var file_proto_loci_interest_interest_proto_depIdxs = []int32{
 	10, // 0: loci.interest.Interest.created_at:type_name -> google.protobuf.Timestamp
 	10, // 1: loci.interest.Interest.updated_at:type_name -> google.protobuf.Timestamp
 	10, // 2: loci.interest.Tags.created_at:type_name -> google.protobuf.Timestamp
@@ -750,32 +750,32 @@ var file_proto_interest_proto_depIdxs = []int32{
 	0,  // [0:6] is the sub-list for field type_name
 }
 
-func init() { file_proto_interest_proto_init() }
-func file_proto_interest_proto_init() {
-	if File_proto_interest_proto != nil {
+func init() { file_proto_loci_interest_interest_proto_init() }
+func file_proto_loci_interest_interest_proto_init() {
+	if File_proto_loci_interest_interest_proto != nil {
 		return
 	}
-	file_proto_interest_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_interest_proto_msgTypes[1].OneofWrappers = []any{}
-	file_proto_interest_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_interest_proto_msgTypes[3].OneofWrappers = []any{}
-	file_proto_interest_proto_msgTypes[6].OneofWrappers = []any{}
-	file_proto_interest_proto_msgTypes[8].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[0].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[1].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[2].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[3].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[6].OneofWrappers = []any{}
+	file_proto_loci_interest_interest_proto_msgTypes[8].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_interest_proto_rawDesc), len(file_proto_interest_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_interest_interest_proto_rawDesc), len(file_proto_loci_interest_interest_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_interest_proto_goTypes,
-		DependencyIndexes: file_proto_interest_proto_depIdxs,
-		MessageInfos:      file_proto_interest_proto_msgTypes,
+		GoTypes:           file_proto_loci_interest_interest_proto_goTypes,
+		DependencyIndexes: file_proto_loci_interest_interest_proto_depIdxs,
+		MessageInfos:      file_proto_loci_interest_interest_proto_msgTypes,
 	}.Build()
-	File_proto_interest_proto = out.File
-	file_proto_interest_proto_goTypes = nil
-	file_proto_interest_proto_depIdxs = nil
+	File_proto_loci_interest_interest_proto = out.File
+	file_proto_loci_interest_interest_proto_goTypes = nil
+	file_proto_loci_interest_interest_proto_depIdxs = nil
 }

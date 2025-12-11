@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/recents.proto
+// source: proto/loci/recents/recents.proto
 
 package recentsv1
 
@@ -81,11 +81,11 @@ func (x InteractionType) String() string {
 }
 
 func (InteractionType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_recents_proto_enumTypes[0].Descriptor()
+	return file_proto_loci_recents_recents_proto_enumTypes[0].Descriptor()
 }
 
 func (InteractionType) Type() protoreflect.EnumType {
-	return &file_proto_recents_proto_enumTypes[0]
+	return &file_proto_loci_recents_recents_proto_enumTypes[0]
 }
 
 func (x InteractionType) Number() protoreflect.EnumNumber {
@@ -94,7 +94,7 @@ func (x InteractionType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use InteractionType.Descriptor instead.
 func (InteractionType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{0}
 }
 
 // Recent interaction entity
@@ -119,7 +119,7 @@ type RecentInteraction struct {
 
 func (x *RecentInteraction) Reset() {
 	*x = RecentInteraction{}
-	mi := &file_proto_recents_proto_msgTypes[0]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -131,7 +131,7 @@ func (x *RecentInteraction) String() string {
 func (*RecentInteraction) ProtoMessage() {}
 
 func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[0]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -144,7 +144,7 @@ func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentInteraction.ProtoReflect.Descriptor instead.
 func (*RecentInteraction) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *RecentInteraction) GetId() string {
@@ -254,7 +254,7 @@ type InteractionContext struct {
 
 func (x *InteractionContext) Reset() {
 	*x = InteractionContext{}
-	mi := &file_proto_recents_proto_msgTypes[1]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -266,7 +266,7 @@ func (x *InteractionContext) String() string {
 func (*InteractionContext) ProtoMessage() {}
 
 func (x *InteractionContext) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[1]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -279,7 +279,7 @@ func (x *InteractionContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InteractionContext.ProtoReflect.Descriptor instead.
 func (*InteractionContext) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{1}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *InteractionContext) GetSourcePage() string {
@@ -345,7 +345,7 @@ type GeoLocation struct {
 
 func (x *GeoLocation) Reset() {
 	*x = GeoLocation{}
-	mi := &file_proto_recents_proto_msgTypes[2]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +357,7 @@ func (x *GeoLocation) String() string {
 func (*GeoLocation) ProtoMessage() {}
 
 func (x *GeoLocation) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[2]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +370,7 @@ func (x *GeoLocation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoLocation.ProtoReflect.Descriptor instead.
 func (*GeoLocation) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{2}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GeoLocation) GetLatitude() float64 {
@@ -430,7 +430,7 @@ type CityInteractions struct {
 
 func (x *CityInteractions) Reset() {
 	*x = CityInteractions{}
-	mi := &file_proto_recents_proto_msgTypes[3]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -442,7 +442,7 @@ func (x *CityInteractions) String() string {
 func (*CityInteractions) ProtoMessage() {}
 
 func (x *CityInteractions) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[3]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -455,7 +455,7 @@ func (x *CityInteractions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInteractions.ProtoReflect.Descriptor instead.
 func (*CityInteractions) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{3}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CityInteractions) GetCityId() string {
@@ -563,7 +563,7 @@ type CityPreferences struct {
 
 func (x *CityPreferences) Reset() {
 	*x = CityPreferences{}
-	mi := &file_proto_recents_proto_msgTypes[4]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -575,7 +575,7 @@ func (x *CityPreferences) String() string {
 func (*CityPreferences) ProtoMessage() {}
 
 func (x *CityPreferences) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[4]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -588,7 +588,7 @@ func (x *CityPreferences) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityPreferences.ProtoReflect.Descriptor instead.
 func (*CityPreferences) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{4}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CityPreferences) GetPreferredCategories() []string {
@@ -648,7 +648,7 @@ type FrequentPlace struct {
 
 func (x *FrequentPlace) Reset() {
 	*x = FrequentPlace{}
-	mi := &file_proto_recents_proto_msgTypes[5]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +660,7 @@ func (x *FrequentPlace) String() string {
 func (*FrequentPlace) ProtoMessage() {}
 
 func (x *FrequentPlace) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[5]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +673,7 @@ func (x *FrequentPlace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrequentPlace.ProtoReflect.Descriptor instead.
 func (*FrequentPlace) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{5}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *FrequentPlace) GetPlaceId() string {
@@ -783,7 +783,7 @@ type InteractionFilter struct {
 
 func (x *InteractionFilter) Reset() {
 	*x = InteractionFilter{}
-	mi := &file_proto_recents_proto_msgTypes[6]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -795,7 +795,7 @@ func (x *InteractionFilter) String() string {
 func (*InteractionFilter) ProtoMessage() {}
 
 func (x *InteractionFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[6]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -808,7 +808,7 @@ func (x *InteractionFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InteractionFilter.ProtoReflect.Descriptor instead.
 func (*InteractionFilter) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{6}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *InteractionFilter) GetInteractionTypes() []InteractionType {
@@ -874,7 +874,7 @@ type GetRecentInteractionsRequest struct {
 
 func (x *GetRecentInteractionsRequest) Reset() {
 	*x = GetRecentInteractionsRequest{}
-	mi := &file_proto_recents_proto_msgTypes[7]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -886,7 +886,7 @@ func (x *GetRecentInteractionsRequest) String() string {
 func (*GetRecentInteractionsRequest) ProtoMessage() {}
 
 func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[7]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -899,7 +899,7 @@ func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsRequest.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{7}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetRecentInteractionsRequest) GetUserId() string {
@@ -949,7 +949,7 @@ type GetRecentInteractionsResponse struct {
 
 func (x *GetRecentInteractionsResponse) Reset() {
 	*x = GetRecentInteractionsResponse{}
-	mi := &file_proto_recents_proto_msgTypes[8]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -961,7 +961,7 @@ func (x *GetRecentInteractionsResponse) String() string {
 func (*GetRecentInteractionsResponse) ProtoMessage() {}
 
 func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[8]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -974,7 +974,7 @@ func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsResponse.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{8}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetRecentInteractionsResponse) GetInteractions() []*RecentInteraction {
@@ -1020,7 +1020,7 @@ type CityInteractionSummary struct {
 
 func (x *CityInteractionSummary) Reset() {
 	*x = CityInteractionSummary{}
-	mi := &file_proto_recents_proto_msgTypes[9]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1032,7 +1032,7 @@ func (x *CityInteractionSummary) String() string {
 func (*CityInteractionSummary) ProtoMessage() {}
 
 func (x *CityInteractionSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[9]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1045,7 +1045,7 @@ func (x *CityInteractionSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInteractionSummary.ProtoReflect.Descriptor instead.
 func (*CityInteractionSummary) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{9}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CityInteractionSummary) GetCityId() string {
@@ -1105,7 +1105,7 @@ type InteractionAnalytics struct {
 
 func (x *InteractionAnalytics) Reset() {
 	*x = InteractionAnalytics{}
-	mi := &file_proto_recents_proto_msgTypes[10]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1117,7 +1117,7 @@ func (x *InteractionAnalytics) String() string {
 func (*InteractionAnalytics) ProtoMessage() {}
 
 func (x *InteractionAnalytics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[10]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1130,7 +1130,7 @@ func (x *InteractionAnalytics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InteractionAnalytics.ProtoReflect.Descriptor instead.
 func (*InteractionAnalytics) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{10}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *InteractionAnalytics) GetTotalInteractionsToday() int32 {
@@ -1188,7 +1188,7 @@ type GetCityInteractionsRequest struct {
 
 func (x *GetCityInteractionsRequest) Reset() {
 	*x = GetCityInteractionsRequest{}
-	mi := &file_proto_recents_proto_msgTypes[11]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +1200,7 @@ func (x *GetCityInteractionsRequest) String() string {
 func (*GetCityInteractionsRequest) ProtoMessage() {}
 
 func (x *GetCityInteractionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[11]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +1213,7 @@ func (x *GetCityInteractionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCityInteractionsRequest.ProtoReflect.Descriptor instead.
 func (*GetCityInteractionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{11}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetCityInteractionsRequest) GetUserId() string {
@@ -1262,7 +1262,7 @@ type GetCityInteractionsResponse struct {
 
 func (x *GetCityInteractionsResponse) Reset() {
 	*x = GetCityInteractionsResponse{}
-	mi := &file_proto_recents_proto_msgTypes[12]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1274,7 +1274,7 @@ func (x *GetCityInteractionsResponse) String() string {
 func (*GetCityInteractionsResponse) ProtoMessage() {}
 
 func (x *GetCityInteractionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[12]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1287,7 +1287,7 @@ func (x *GetCityInteractionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCityInteractionsResponse.ProtoReflect.Descriptor instead.
 func (*GetCityInteractionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{12}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetCityInteractionsResponse) GetCityInteractions() *CityInteractions {
@@ -1325,7 +1325,7 @@ type CityInsights struct {
 
 func (x *CityInsights) Reset() {
 	*x = CityInsights{}
-	mi := &file_proto_recents_proto_msgTypes[13]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1337,7 +1337,7 @@ func (x *CityInsights) String() string {
 func (*CityInsights) ProtoMessage() {}
 
 func (x *CityInsights) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[13]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1350,7 +1350,7 @@ func (x *CityInsights) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInsights.ProtoReflect.Descriptor instead.
 func (*CityInsights) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{13}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CityInsights) GetDiscoveryPattern() string {
@@ -1404,7 +1404,7 @@ type RecordInteractionRequest struct {
 
 func (x *RecordInteractionRequest) Reset() {
 	*x = RecordInteractionRequest{}
-	mi := &file_proto_recents_proto_msgTypes[14]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1416,7 +1416,7 @@ func (x *RecordInteractionRequest) String() string {
 func (*RecordInteractionRequest) ProtoMessage() {}
 
 func (x *RecordInteractionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[14]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1429,7 +1429,7 @@ func (x *RecordInteractionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordInteractionRequest.ProtoReflect.Descriptor instead.
 func (*RecordInteractionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{14}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RecordInteractionRequest) GetUserId() string {
@@ -1499,7 +1499,7 @@ type RecordInteractionResponse struct {
 
 func (x *RecordInteractionResponse) Reset() {
 	*x = RecordInteractionResponse{}
-	mi := &file_proto_recents_proto_msgTypes[15]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1511,7 +1511,7 @@ func (x *RecordInteractionResponse) String() string {
 func (*RecordInteractionResponse) ProtoMessage() {}
 
 func (x *RecordInteractionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[15]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1524,7 +1524,7 @@ func (x *RecordInteractionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecordInteractionResponse.ProtoReflect.Descriptor instead.
 func (*RecordInteractionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{15}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RecordInteractionResponse) GetSuccess() bool {
@@ -1563,7 +1563,7 @@ type GetInteractionHistoryRequest struct {
 
 func (x *GetInteractionHistoryRequest) Reset() {
 	*x = GetInteractionHistoryRequest{}
-	mi := &file_proto_recents_proto_msgTypes[16]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1575,7 +1575,7 @@ func (x *GetInteractionHistoryRequest) String() string {
 func (*GetInteractionHistoryRequest) ProtoMessage() {}
 
 func (x *GetInteractionHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[16]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1588,7 +1588,7 @@ func (x *GetInteractionHistoryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInteractionHistoryRequest.ProtoReflect.Descriptor instead.
 func (*GetInteractionHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{16}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetInteractionHistoryRequest) GetUserId() string {
@@ -1652,7 +1652,7 @@ type GetInteractionHistoryResponse struct {
 
 func (x *GetInteractionHistoryResponse) Reset() {
 	*x = GetInteractionHistoryResponse{}
-	mi := &file_proto_recents_proto_msgTypes[17]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1664,7 +1664,7 @@ func (x *GetInteractionHistoryResponse) String() string {
 func (*GetInteractionHistoryResponse) ProtoMessage() {}
 
 func (x *GetInteractionHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[17]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1677,7 +1677,7 @@ func (x *GetInteractionHistoryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetInteractionHistoryResponse.ProtoReflect.Descriptor instead.
 func (*GetInteractionHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{17}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetInteractionHistoryResponse) GetInteractions() []*RecentInteraction {
@@ -1720,7 +1720,7 @@ type TrendData struct {
 
 func (x *TrendData) Reset() {
 	*x = TrendData{}
-	mi := &file_proto_recents_proto_msgTypes[18]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1732,7 +1732,7 @@ func (x *TrendData) String() string {
 func (*TrendData) ProtoMessage() {}
 
 func (x *TrendData) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[18]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1745,7 +1745,7 @@ func (x *TrendData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrendData.ProtoReflect.Descriptor instead.
 func (*TrendData) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{18}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *TrendData) GetDate() *timestamppb.Timestamp {
@@ -1779,7 +1779,7 @@ type InteractionTypeCount struct {
 
 func (x *InteractionTypeCount) Reset() {
 	*x = InteractionTypeCount{}
-	mi := &file_proto_recents_proto_msgTypes[19]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1791,7 +1791,7 @@ func (x *InteractionTypeCount) String() string {
 func (*InteractionTypeCount) ProtoMessage() {}
 
 func (x *InteractionTypeCount) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[19]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1804,7 +1804,7 @@ func (x *InteractionTypeCount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InteractionTypeCount.ProtoReflect.Descriptor instead.
 func (*InteractionTypeCount) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{19}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *InteractionTypeCount) GetType() InteractionType {
@@ -1834,7 +1834,7 @@ type GetFrequentPlacesRequest struct {
 
 func (x *GetFrequentPlacesRequest) Reset() {
 	*x = GetFrequentPlacesRequest{}
-	mi := &file_proto_recents_proto_msgTypes[20]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1846,7 +1846,7 @@ func (x *GetFrequentPlacesRequest) String() string {
 func (*GetFrequentPlacesRequest) ProtoMessage() {}
 
 func (x *GetFrequentPlacesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[20]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1859,7 +1859,7 @@ func (x *GetFrequentPlacesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFrequentPlacesRequest.ProtoReflect.Descriptor instead.
 func (*GetFrequentPlacesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{20}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetFrequentPlacesRequest) GetUserId() string {
@@ -1907,7 +1907,7 @@ type GetFrequentPlacesResponse struct {
 
 func (x *GetFrequentPlacesResponse) Reset() {
 	*x = GetFrequentPlacesResponse{}
-	mi := &file_proto_recents_proto_msgTypes[21]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1919,7 +1919,7 @@ func (x *GetFrequentPlacesResponse) String() string {
 func (*GetFrequentPlacesResponse) ProtoMessage() {}
 
 func (x *GetFrequentPlacesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[21]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1932,7 +1932,7 @@ func (x *GetFrequentPlacesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFrequentPlacesResponse.ProtoReflect.Descriptor instead.
 func (*GetFrequentPlacesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{21}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetFrequentPlacesResponse) GetPlaces() []*FrequentPlace {
@@ -1963,7 +1963,7 @@ type FrequentPlaceInsights struct {
 
 func (x *FrequentPlaceInsights) Reset() {
 	*x = FrequentPlaceInsights{}
-	mi := &file_proto_recents_proto_msgTypes[22]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1975,7 +1975,7 @@ func (x *FrequentPlaceInsights) String() string {
 func (*FrequentPlaceInsights) ProtoMessage() {}
 
 func (x *FrequentPlaceInsights) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_recents_proto_msgTypes[22]
+	mi := &file_proto_loci_recents_recents_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1988,7 +1988,7 @@ func (x *FrequentPlaceInsights) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FrequentPlaceInsights.ProtoReflect.Descriptor instead.
 func (*FrequentPlaceInsights) Descriptor() ([]byte, []int) {
-	return file_proto_recents_proto_rawDescGZIP(), []int{22}
+	return file_proto_loci_recents_recents_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *FrequentPlaceInsights) GetTravelPattern() string {
@@ -2026,11 +2026,11 @@ func (x *FrequentPlaceInsights) GetRecommendedNewPlaces() []string {
 	return nil
 }
 
-var File_proto_recents_proto protoreflect.FileDescriptor
+var File_proto_loci_recents_recents_proto protoreflect.FileDescriptor
 
-const file_proto_recents_proto_rawDesc = "" +
+const file_proto_loci_recents_recents_proto_rawDesc = "" +
 	"\n" +
-	"\x13proto/recents.proto\x12\x11ai_poi.recents.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x04\n" +
+	" proto/loci/recents/recents.proto\x12\x11ai_poi.recents.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe5\x04\n" +
 	"\x11RecentInteraction\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12M\n" +
@@ -2261,20 +2261,20 @@ const file_proto_recents_proto_rawDesc = "" +
 	"\x11GetFrequentPlaces\x12+.ai_poi.recents.v1.GetFrequentPlacesRequest\x1a,.ai_poi.recents.v1.GetFrequentPlacesResponseBMZKgithub.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/recents/v1;recentsv1b\x06proto3"
 
 var (
-	file_proto_recents_proto_rawDescOnce sync.Once
-	file_proto_recents_proto_rawDescData []byte
+	file_proto_loci_recents_recents_proto_rawDescOnce sync.Once
+	file_proto_loci_recents_recents_proto_rawDescData []byte
 )
 
-func file_proto_recents_proto_rawDescGZIP() []byte {
-	file_proto_recents_proto_rawDescOnce.Do(func() {
-		file_proto_recents_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_recents_proto_rawDesc), len(file_proto_recents_proto_rawDesc)))
+func file_proto_loci_recents_recents_proto_rawDescGZIP() []byte {
+	file_proto_loci_recents_recents_proto_rawDescOnce.Do(func() {
+		file_proto_loci_recents_recents_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_recents_recents_proto_rawDesc), len(file_proto_loci_recents_recents_proto_rawDesc)))
 	})
-	return file_proto_recents_proto_rawDescData
+	return file_proto_loci_recents_recents_proto_rawDescData
 }
 
-var file_proto_recents_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_recents_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
-var file_proto_recents_proto_goTypes = []any{
+var file_proto_loci_recents_recents_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_loci_recents_recents_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_proto_loci_recents_recents_proto_goTypes = []any{
 	(InteractionType)(0),                  // 0: ai_poi.recents.v1.InteractionType
 	(*RecentInteraction)(nil),             // 1: ai_poi.recents.v1.RecentInteraction
 	(*InteractionContext)(nil),            // 2: ai_poi.recents.v1.InteractionContext
@@ -2304,7 +2304,7 @@ var file_proto_recents_proto_goTypes = []any{
 	nil,                                   // 26: ai_poi.recents.v1.RecordInteractionRequest.MetadataEntry
 	(*timestamppb.Timestamp)(nil),         // 27: google.protobuf.Timestamp
 }
-var file_proto_recents_proto_depIdxs = []int32{
+var file_proto_loci_recents_recents_proto_depIdxs = []int32{
 	0,  // 0: ai_poi.recents.v1.RecentInteraction.interaction_type:type_name -> ai_poi.recents.v1.InteractionType
 	2,  // 1: ai_poi.recents.v1.RecentInteraction.context:type_name -> ai_poi.recents.v1.InteractionContext
 	24, // 2: ai_poi.recents.v1.RecentInteraction.metadata:type_name -> ai_poi.recents.v1.RecentInteraction.MetadataEntry
@@ -2360,27 +2360,27 @@ var file_proto_recents_proto_depIdxs = []int32{
 	0,  // [0:38] is the sub-list for field type_name
 }
 
-func init() { file_proto_recents_proto_init() }
-func file_proto_recents_proto_init() {
-	if File_proto_recents_proto != nil {
+func init() { file_proto_loci_recents_recents_proto_init() }
+func file_proto_loci_recents_recents_proto_init() {
+	if File_proto_loci_recents_recents_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_recents_proto_rawDesc), len(file_proto_recents_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_recents_recents_proto_rawDesc), len(file_proto_loci_recents_recents_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_recents_proto_goTypes,
-		DependencyIndexes: file_proto_recents_proto_depIdxs,
-		EnumInfos:         file_proto_recents_proto_enumTypes,
-		MessageInfos:      file_proto_recents_proto_msgTypes,
+		GoTypes:           file_proto_loci_recents_recents_proto_goTypes,
+		DependencyIndexes: file_proto_loci_recents_recents_proto_depIdxs,
+		EnumInfos:         file_proto_loci_recents_recents_proto_enumTypes,
+		MessageInfos:      file_proto_loci_recents_recents_proto_msgTypes,
 	}.Build()
-	File_proto_recents_proto = out.File
-	file_proto_recents_proto_goTypes = nil
-	file_proto_recents_proto_depIdxs = nil
+	File_proto_loci_recents_recents_proto = out.File
+	file_proto_loci_recents_recents_proto_goTypes = nil
+	file_proto_loci_recents_recents_proto_depIdxs = nil
 }

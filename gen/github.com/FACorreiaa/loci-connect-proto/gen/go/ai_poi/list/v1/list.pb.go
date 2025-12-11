@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/list.proto
+// source: proto/loci/list/list.proto
 
 package listv1
 
@@ -63,11 +63,11 @@ func (x ContentType) String() string {
 }
 
 func (ContentType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_list_proto_enumTypes[0].Descriptor()
+	return file_proto_loci_list_list_proto_enumTypes[0].Descriptor()
 }
 
 func (ContentType) Type() protoreflect.EnumType {
-	return &file_proto_list_proto_enumTypes[0]
+	return &file_proto_loci_list_list_proto_enumTypes[0]
 }
 
 func (x ContentType) Number() protoreflect.EnumNumber {
@@ -76,7 +76,7 @@ func (x ContentType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContentType.Descriptor instead.
 func (ContentType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{0}
 }
 
 // Core list entity
@@ -102,7 +102,7 @@ type List struct {
 
 func (x *List) Reset() {
 	*x = List{}
-	mi := &file_proto_list_proto_msgTypes[0]
+	mi := &file_proto_loci_list_list_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -114,7 +114,7 @@ func (x *List) String() string {
 func (*List) ProtoMessage() {}
 
 func (x *List) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[0]
+	mi := &file_proto_loci_list_list_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -127,7 +127,7 @@ func (x *List) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use List.ProtoReflect.Descriptor instead.
 func (*List) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{0}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *List) GetId() string {
@@ -250,7 +250,7 @@ type ListItem struct {
 
 func (x *ListItem) Reset() {
 	*x = ListItem{}
-	mi := &file_proto_list_proto_msgTypes[1]
+	mi := &file_proto_loci_list_list_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -262,7 +262,7 @@ func (x *ListItem) String() string {
 func (*ListItem) ProtoMessage() {}
 
 func (x *ListItem) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[1]
+	mi := &file_proto_loci_list_list_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -275,7 +275,7 @@ func (x *ListItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItem.ProtoReflect.Descriptor instead.
 func (*ListItem) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{1}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ListItem) GetListId() string {
@@ -380,7 +380,7 @@ type ListWithItems struct {
 
 func (x *ListWithItems) Reset() {
 	*x = ListWithItems{}
-	mi := &file_proto_list_proto_msgTypes[2]
+	mi := &file_proto_loci_list_list_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +392,7 @@ func (x *ListWithItems) String() string {
 func (*ListWithItems) ProtoMessage() {}
 
 func (x *ListWithItems) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[2]
+	mi := &file_proto_loci_list_list_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +405,7 @@ func (x *ListWithItems) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWithItems.ProtoReflect.Descriptor instead.
 func (*ListWithItems) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{2}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListWithItems) GetList() *List {
@@ -436,7 +436,7 @@ type ListItemWithContent struct {
 
 func (x *ListItemWithContent) Reset() {
 	*x = ListItemWithContent{}
-	mi := &file_proto_list_proto_msgTypes[3]
+	mi := &file_proto_loci_list_list_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +448,7 @@ func (x *ListItemWithContent) String() string {
 func (*ListItemWithContent) ProtoMessage() {}
 
 func (x *ListItemWithContent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[3]
+	mi := &file_proto_loci_list_list_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +461,7 @@ func (x *ListItemWithContent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItemWithContent.ProtoReflect.Descriptor instead.
 func (*ListItemWithContent) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{3}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListItemWithContent) GetListItem() *ListItem {
@@ -510,7 +510,7 @@ type ListWithDetailedItems struct {
 
 func (x *ListWithDetailedItems) Reset() {
 	*x = ListWithDetailedItems{}
-	mi := &file_proto_list_proto_msgTypes[4]
+	mi := &file_proto_loci_list_list_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -522,7 +522,7 @@ func (x *ListWithDetailedItems) String() string {
 func (*ListWithDetailedItems) ProtoMessage() {}
 
 func (x *ListWithDetailedItems) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[4]
+	mi := &file_proto_loci_list_list_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -535,7 +535,7 @@ func (x *ListWithDetailedItems) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWithDetailedItems.ProtoReflect.Descriptor instead.
 func (*ListWithDetailedItems) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{4}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListWithDetailedItems) GetList() *List {
@@ -574,7 +574,7 @@ type POIDetailedInfo struct {
 
 func (x *POIDetailedInfo) Reset() {
 	*x = POIDetailedInfo{}
-	mi := &file_proto_list_proto_msgTypes[5]
+	mi := &file_proto_loci_list_list_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +586,7 @@ func (x *POIDetailedInfo) String() string {
 func (*POIDetailedInfo) ProtoMessage() {}
 
 func (x *POIDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[5]
+	mi := &file_proto_loci_list_list_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +599,7 @@ func (x *POIDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use POIDetailedInfo.ProtoReflect.Descriptor instead.
 func (*POIDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{5}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *POIDetailedInfo) GetId() string {
@@ -707,7 +707,7 @@ type RestaurantDetailedInfo struct {
 
 func (x *RestaurantDetailedInfo) Reset() {
 	*x = RestaurantDetailedInfo{}
-	mi := &file_proto_list_proto_msgTypes[6]
+	mi := &file_proto_loci_list_list_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -719,7 +719,7 @@ func (x *RestaurantDetailedInfo) String() string {
 func (*RestaurantDetailedInfo) ProtoMessage() {}
 
 func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[6]
+	mi := &file_proto_loci_list_list_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +732,7 @@ func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantDetailedInfo.ProtoReflect.Descriptor instead.
 func (*RestaurantDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{6}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RestaurantDetailedInfo) GetPoi() *POIDetailedInfo {
@@ -785,7 +785,7 @@ type HotelDetailedInfo struct {
 
 func (x *HotelDetailedInfo) Reset() {
 	*x = HotelDetailedInfo{}
-	mi := &file_proto_list_proto_msgTypes[7]
+	mi := &file_proto_loci_list_list_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -797,7 +797,7 @@ func (x *HotelDetailedInfo) String() string {
 func (*HotelDetailedInfo) ProtoMessage() {}
 
 func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[7]
+	mi := &file_proto_loci_list_list_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -810,7 +810,7 @@ func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelDetailedInfo.ProtoReflect.Descriptor instead.
 func (*HotelDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{7}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *HotelDetailedInfo) GetPoi() *POIDetailedInfo {
@@ -872,7 +872,7 @@ type UserSavedItinerary struct {
 
 func (x *UserSavedItinerary) Reset() {
 	*x = UserSavedItinerary{}
-	mi := &file_proto_list_proto_msgTypes[8]
+	mi := &file_proto_loci_list_list_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +884,7 @@ func (x *UserSavedItinerary) String() string {
 func (*UserSavedItinerary) ProtoMessage() {}
 
 func (x *UserSavedItinerary) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[8]
+	mi := &file_proto_loci_list_list_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +897,7 @@ func (x *UserSavedItinerary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserSavedItinerary.ProtoReflect.Descriptor instead.
 func (*UserSavedItinerary) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{8}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UserSavedItinerary) GetId() string {
@@ -971,7 +971,7 @@ type CreateListRequest struct {
 
 func (x *CreateListRequest) Reset() {
 	*x = CreateListRequest{}
-	mi := &file_proto_list_proto_msgTypes[9]
+	mi := &file_proto_loci_list_list_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -983,7 +983,7 @@ func (x *CreateListRequest) String() string {
 func (*CreateListRequest) ProtoMessage() {}
 
 func (x *CreateListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[9]
+	mi := &file_proto_loci_list_list_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -996,7 +996,7 @@ func (x *CreateListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateListRequest.ProtoReflect.Descriptor instead.
 func (*CreateListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{9}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateListRequest) GetUserId() string {
@@ -1052,7 +1052,7 @@ type CreateListResponse struct {
 
 func (x *CreateListResponse) Reset() {
 	*x = CreateListResponse{}
-	mi := &file_proto_list_proto_msgTypes[10]
+	mi := &file_proto_loci_list_list_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1064,7 +1064,7 @@ func (x *CreateListResponse) String() string {
 func (*CreateListResponse) ProtoMessage() {}
 
 func (x *CreateListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[10]
+	mi := &file_proto_loci_list_list_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1077,7 +1077,7 @@ func (x *CreateListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateListResponse.ProtoReflect.Descriptor instead.
 func (*CreateListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{10}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateListResponse) GetSuccess() bool {
@@ -1113,7 +1113,7 @@ type GetListsRequest struct {
 
 func (x *GetListsRequest) Reset() {
 	*x = GetListsRequest{}
-	mi := &file_proto_list_proto_msgTypes[11]
+	mi := &file_proto_loci_list_list_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1125,7 +1125,7 @@ func (x *GetListsRequest) String() string {
 func (*GetListsRequest) ProtoMessage() {}
 
 func (x *GetListsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[11]
+	mi := &file_proto_loci_list_list_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1138,7 +1138,7 @@ func (x *GetListsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListsRequest.ProtoReflect.Descriptor instead.
 func (*GetListsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{11}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetListsRequest) GetUserId() string {
@@ -1179,7 +1179,7 @@ type GetListsResponse struct {
 
 func (x *GetListsResponse) Reset() {
 	*x = GetListsResponse{}
-	mi := &file_proto_list_proto_msgTypes[12]
+	mi := &file_proto_loci_list_list_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1191,7 +1191,7 @@ func (x *GetListsResponse) String() string {
 func (*GetListsResponse) ProtoMessage() {}
 
 func (x *GetListsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[12]
+	mi := &file_proto_loci_list_list_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1204,7 +1204,7 @@ func (x *GetListsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListsResponse.ProtoReflect.Descriptor instead.
 func (*GetListsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{12}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetListsResponse) GetLists() []*ListWithItems {
@@ -1232,7 +1232,7 @@ type GetListRequest struct {
 
 func (x *GetListRequest) Reset() {
 	*x = GetListRequest{}
-	mi := &file_proto_list_proto_msgTypes[13]
+	mi := &file_proto_loci_list_list_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1244,7 +1244,7 @@ func (x *GetListRequest) String() string {
 func (*GetListRequest) ProtoMessage() {}
 
 func (x *GetListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[13]
+	mi := &file_proto_loci_list_list_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1257,7 +1257,7 @@ func (x *GetListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListRequest.ProtoReflect.Descriptor instead.
 func (*GetListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{13}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetListRequest) GetUserId() string {
@@ -1290,7 +1290,7 @@ type GetListResponse struct {
 
 func (x *GetListResponse) Reset() {
 	*x = GetListResponse{}
-	mi := &file_proto_list_proto_msgTypes[14]
+	mi := &file_proto_loci_list_list_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1302,7 +1302,7 @@ func (x *GetListResponse) String() string {
 func (*GetListResponse) ProtoMessage() {}
 
 func (x *GetListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[14]
+	mi := &file_proto_loci_list_list_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1315,7 +1315,7 @@ func (x *GetListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListResponse.ProtoReflect.Descriptor instead.
 func (*GetListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{14}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetListResponse) GetList() *ListWithDetailedItems {
@@ -1340,7 +1340,7 @@ type UpdateListRequest struct {
 
 func (x *UpdateListRequest) Reset() {
 	*x = UpdateListRequest{}
-	mi := &file_proto_list_proto_msgTypes[15]
+	mi := &file_proto_loci_list_list_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1352,7 +1352,7 @@ func (x *UpdateListRequest) String() string {
 func (*UpdateListRequest) ProtoMessage() {}
 
 func (x *UpdateListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[15]
+	mi := &file_proto_loci_list_list_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1365,7 +1365,7 @@ func (x *UpdateListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListRequest.ProtoReflect.Descriptor instead.
 func (*UpdateListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{15}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UpdateListRequest) GetUserId() string {
@@ -1428,7 +1428,7 @@ type UpdateListResponse struct {
 
 func (x *UpdateListResponse) Reset() {
 	*x = UpdateListResponse{}
-	mi := &file_proto_list_proto_msgTypes[16]
+	mi := &file_proto_loci_list_list_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1440,7 +1440,7 @@ func (x *UpdateListResponse) String() string {
 func (*UpdateListResponse) ProtoMessage() {}
 
 func (x *UpdateListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[16]
+	mi := &file_proto_loci_list_list_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1453,7 +1453,7 @@ func (x *UpdateListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListResponse.ProtoReflect.Descriptor instead.
 func (*UpdateListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{16}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *UpdateListResponse) GetSuccess() bool {
@@ -1487,7 +1487,7 @@ type DeleteListRequest struct {
 
 func (x *DeleteListRequest) Reset() {
 	*x = DeleteListRequest{}
-	mi := &file_proto_list_proto_msgTypes[17]
+	mi := &file_proto_loci_list_list_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1499,7 +1499,7 @@ func (x *DeleteListRequest) String() string {
 func (*DeleteListRequest) ProtoMessage() {}
 
 func (x *DeleteListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[17]
+	mi := &file_proto_loci_list_list_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1512,7 +1512,7 @@ func (x *DeleteListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteListRequest.ProtoReflect.Descriptor instead.
 func (*DeleteListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{17}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DeleteListRequest) GetUserId() string {
@@ -1539,7 +1539,7 @@ type DeleteListResponse struct {
 
 func (x *DeleteListResponse) Reset() {
 	*x = DeleteListResponse{}
-	mi := &file_proto_list_proto_msgTypes[18]
+	mi := &file_proto_loci_list_list_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1551,7 +1551,7 @@ func (x *DeleteListResponse) String() string {
 func (*DeleteListResponse) ProtoMessage() {}
 
 func (x *DeleteListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[18]
+	mi := &file_proto_loci_list_list_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1564,7 +1564,7 @@ func (x *DeleteListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteListResponse.ProtoReflect.Descriptor instead.
 func (*DeleteListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{18}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DeleteListResponse) GetSuccess() bool {
@@ -1595,7 +1595,7 @@ type CreateItineraryRequest struct {
 
 func (x *CreateItineraryRequest) Reset() {
 	*x = CreateItineraryRequest{}
-	mi := &file_proto_list_proto_msgTypes[19]
+	mi := &file_proto_loci_list_list_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1607,7 +1607,7 @@ func (x *CreateItineraryRequest) String() string {
 func (*CreateItineraryRequest) ProtoMessage() {}
 
 func (x *CreateItineraryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[19]
+	mi := &file_proto_loci_list_list_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1620,7 +1620,7 @@ func (x *CreateItineraryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateItineraryRequest.ProtoReflect.Descriptor instead.
 func (*CreateItineraryRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{19}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CreateItineraryRequest) GetUserId() string {
@@ -1669,7 +1669,7 @@ type CreateItineraryResponse struct {
 
 func (x *CreateItineraryResponse) Reset() {
 	*x = CreateItineraryResponse{}
-	mi := &file_proto_list_proto_msgTypes[20]
+	mi := &file_proto_loci_list_list_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1681,7 +1681,7 @@ func (x *CreateItineraryResponse) String() string {
 func (*CreateItineraryResponse) ProtoMessage() {}
 
 func (x *CreateItineraryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[20]
+	mi := &file_proto_loci_list_list_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1694,7 +1694,7 @@ func (x *CreateItineraryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateItineraryResponse.ProtoReflect.Descriptor instead.
 func (*CreateItineraryResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{20}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CreateItineraryResponse) GetSuccess() bool {
@@ -1738,7 +1738,7 @@ type AddListItemRequest struct {
 
 func (x *AddListItemRequest) Reset() {
 	*x = AddListItemRequest{}
-	mi := &file_proto_list_proto_msgTypes[21]
+	mi := &file_proto_loci_list_list_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1750,7 +1750,7 @@ func (x *AddListItemRequest) String() string {
 func (*AddListItemRequest) ProtoMessage() {}
 
 func (x *AddListItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[21]
+	mi := &file_proto_loci_list_list_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1763,7 +1763,7 @@ func (x *AddListItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddListItemRequest.ProtoReflect.Descriptor instead.
 func (*AddListItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{21}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AddListItemRequest) GetUserId() string {
@@ -1854,7 +1854,7 @@ type AddListItemResponse struct {
 
 func (x *AddListItemResponse) Reset() {
 	*x = AddListItemResponse{}
-	mi := &file_proto_list_proto_msgTypes[22]
+	mi := &file_proto_loci_list_list_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1866,7 +1866,7 @@ func (x *AddListItemResponse) String() string {
 func (*AddListItemResponse) ProtoMessage() {}
 
 func (x *AddListItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[22]
+	mi := &file_proto_loci_list_list_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1879,7 +1879,7 @@ func (x *AddListItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddListItemResponse.ProtoReflect.Descriptor instead.
 func (*AddListItemResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{22}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AddListItemResponse) GetSuccess() bool {
@@ -1922,7 +1922,7 @@ type UpdateListItemRequest struct {
 
 func (x *UpdateListItemRequest) Reset() {
 	*x = UpdateListItemRequest{}
-	mi := &file_proto_list_proto_msgTypes[23]
+	mi := &file_proto_loci_list_list_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1934,7 +1934,7 @@ func (x *UpdateListItemRequest) String() string {
 func (*UpdateListItemRequest) ProtoMessage() {}
 
 func (x *UpdateListItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[23]
+	mi := &file_proto_loci_list_list_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1947,7 +1947,7 @@ func (x *UpdateListItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListItemRequest.ProtoReflect.Descriptor instead.
 func (*UpdateListItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{23}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateListItemRequest) GetUserId() string {
@@ -2038,7 +2038,7 @@ type UpdateListItemResponse struct {
 
 func (x *UpdateListItemResponse) Reset() {
 	*x = UpdateListItemResponse{}
-	mi := &file_proto_list_proto_msgTypes[24]
+	mi := &file_proto_loci_list_list_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2050,7 +2050,7 @@ func (x *UpdateListItemResponse) String() string {
 func (*UpdateListItemResponse) ProtoMessage() {}
 
 func (x *UpdateListItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[24]
+	mi := &file_proto_loci_list_list_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2063,7 +2063,7 @@ func (x *UpdateListItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateListItemResponse.ProtoReflect.Descriptor instead.
 func (*UpdateListItemResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{24}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UpdateListItemResponse) GetSuccess() bool {
@@ -2099,7 +2099,7 @@ type RemoveListItemRequest struct {
 
 func (x *RemoveListItemRequest) Reset() {
 	*x = RemoveListItemRequest{}
-	mi := &file_proto_list_proto_msgTypes[25]
+	mi := &file_proto_loci_list_list_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2111,7 +2111,7 @@ func (x *RemoveListItemRequest) String() string {
 func (*RemoveListItemRequest) ProtoMessage() {}
 
 func (x *RemoveListItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[25]
+	mi := &file_proto_loci_list_list_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2124,7 +2124,7 @@ func (x *RemoveListItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveListItemRequest.ProtoReflect.Descriptor instead.
 func (*RemoveListItemRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{25}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RemoveListItemRequest) GetUserId() string {
@@ -2165,7 +2165,7 @@ type RemoveListItemResponse struct {
 
 func (x *RemoveListItemResponse) Reset() {
 	*x = RemoveListItemResponse{}
-	mi := &file_proto_list_proto_msgTypes[26]
+	mi := &file_proto_loci_list_list_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2177,7 +2177,7 @@ func (x *RemoveListItemResponse) String() string {
 func (*RemoveListItemResponse) ProtoMessage() {}
 
 func (x *RemoveListItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[26]
+	mi := &file_proto_loci_list_list_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2190,7 +2190,7 @@ func (x *RemoveListItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveListItemResponse.ProtoReflect.Descriptor instead.
 func (*RemoveListItemResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{26}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RemoveListItemResponse) GetSuccess() bool {
@@ -2218,7 +2218,7 @@ type GetListItemsRequest struct {
 
 func (x *GetListItemsRequest) Reset() {
 	*x = GetListItemsRequest{}
-	mi := &file_proto_list_proto_msgTypes[27]
+	mi := &file_proto_loci_list_list_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2230,7 +2230,7 @@ func (x *GetListItemsRequest) String() string {
 func (*GetListItemsRequest) ProtoMessage() {}
 
 func (x *GetListItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[27]
+	mi := &file_proto_loci_list_list_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2243,7 +2243,7 @@ func (x *GetListItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListItemsRequest.ProtoReflect.Descriptor instead.
 func (*GetListItemsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{27}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetListItemsRequest) GetUserId() string {
@@ -2277,7 +2277,7 @@ type GetListItemsResponse struct {
 
 func (x *GetListItemsResponse) Reset() {
 	*x = GetListItemsResponse{}
-	mi := &file_proto_list_proto_msgTypes[28]
+	mi := &file_proto_loci_list_list_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2289,7 +2289,7 @@ func (x *GetListItemsResponse) String() string {
 func (*GetListItemsResponse) ProtoMessage() {}
 
 func (x *GetListItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[28]
+	mi := &file_proto_loci_list_list_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2302,7 +2302,7 @@ func (x *GetListItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListItemsResponse.ProtoReflect.Descriptor instead.
 func (*GetListItemsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{28}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetListItemsResponse) GetItems() []*ListItemWithContent {
@@ -2330,7 +2330,7 @@ type GetListRestaurantsRequest struct {
 
 func (x *GetListRestaurantsRequest) Reset() {
 	*x = GetListRestaurantsRequest{}
-	mi := &file_proto_list_proto_msgTypes[29]
+	mi := &file_proto_loci_list_list_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2342,7 +2342,7 @@ func (x *GetListRestaurantsRequest) String() string {
 func (*GetListRestaurantsRequest) ProtoMessage() {}
 
 func (x *GetListRestaurantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[29]
+	mi := &file_proto_loci_list_list_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2355,7 +2355,7 @@ func (x *GetListRestaurantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListRestaurantsRequest.ProtoReflect.Descriptor instead.
 func (*GetListRestaurantsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{29}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetListRestaurantsRequest) GetUserId() string {
@@ -2381,7 +2381,7 @@ type GetListRestaurantsResponse struct {
 
 func (x *GetListRestaurantsResponse) Reset() {
 	*x = GetListRestaurantsResponse{}
-	mi := &file_proto_list_proto_msgTypes[30]
+	mi := &file_proto_loci_list_list_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2393,7 +2393,7 @@ func (x *GetListRestaurantsResponse) String() string {
 func (*GetListRestaurantsResponse) ProtoMessage() {}
 
 func (x *GetListRestaurantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[30]
+	mi := &file_proto_loci_list_list_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2406,7 +2406,7 @@ func (x *GetListRestaurantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListRestaurantsResponse.ProtoReflect.Descriptor instead.
 func (*GetListRestaurantsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{30}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetListRestaurantsResponse) GetRestaurants() []*RestaurantDetailedInfo {
@@ -2426,7 +2426,7 @@ type GetListHotelsRequest struct {
 
 func (x *GetListHotelsRequest) Reset() {
 	*x = GetListHotelsRequest{}
-	mi := &file_proto_list_proto_msgTypes[31]
+	mi := &file_proto_loci_list_list_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2438,7 +2438,7 @@ func (x *GetListHotelsRequest) String() string {
 func (*GetListHotelsRequest) ProtoMessage() {}
 
 func (x *GetListHotelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[31]
+	mi := &file_proto_loci_list_list_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2451,7 +2451,7 @@ func (x *GetListHotelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListHotelsRequest.ProtoReflect.Descriptor instead.
 func (*GetListHotelsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{31}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetListHotelsRequest) GetUserId() string {
@@ -2477,7 +2477,7 @@ type GetListHotelsResponse struct {
 
 func (x *GetListHotelsResponse) Reset() {
 	*x = GetListHotelsResponse{}
-	mi := &file_proto_list_proto_msgTypes[32]
+	mi := &file_proto_loci_list_list_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2489,7 +2489,7 @@ func (x *GetListHotelsResponse) String() string {
 func (*GetListHotelsResponse) ProtoMessage() {}
 
 func (x *GetListHotelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[32]
+	mi := &file_proto_loci_list_list_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2502,7 +2502,7 @@ func (x *GetListHotelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListHotelsResponse.ProtoReflect.Descriptor instead.
 func (*GetListHotelsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{32}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetListHotelsResponse) GetHotels() []*HotelDetailedInfo {
@@ -2522,7 +2522,7 @@ type GetListItinerariesRequest struct {
 
 func (x *GetListItinerariesRequest) Reset() {
 	*x = GetListItinerariesRequest{}
-	mi := &file_proto_list_proto_msgTypes[33]
+	mi := &file_proto_loci_list_list_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2534,7 +2534,7 @@ func (x *GetListItinerariesRequest) String() string {
 func (*GetListItinerariesRequest) ProtoMessage() {}
 
 func (x *GetListItinerariesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[33]
+	mi := &file_proto_loci_list_list_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2547,7 +2547,7 @@ func (x *GetListItinerariesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListItinerariesRequest.ProtoReflect.Descriptor instead.
 func (*GetListItinerariesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{33}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetListItinerariesRequest) GetUserId() string {
@@ -2573,7 +2573,7 @@ type GetListItinerariesResponse struct {
 
 func (x *GetListItinerariesResponse) Reset() {
 	*x = GetListItinerariesResponse{}
-	mi := &file_proto_list_proto_msgTypes[34]
+	mi := &file_proto_loci_list_list_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2585,7 +2585,7 @@ func (x *GetListItinerariesResponse) String() string {
 func (*GetListItinerariesResponse) ProtoMessage() {}
 
 func (x *GetListItinerariesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[34]
+	mi := &file_proto_loci_list_list_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2598,7 +2598,7 @@ func (x *GetListItinerariesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetListItinerariesResponse.ProtoReflect.Descriptor instead.
 func (*GetListItinerariesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{34}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetListItinerariesResponse) GetItineraries() []*UserSavedItinerary {
@@ -2619,7 +2619,7 @@ type SavePublicListRequest struct {
 
 func (x *SavePublicListRequest) Reset() {
 	*x = SavePublicListRequest{}
-	mi := &file_proto_list_proto_msgTypes[35]
+	mi := &file_proto_loci_list_list_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2631,7 +2631,7 @@ func (x *SavePublicListRequest) String() string {
 func (*SavePublicListRequest) ProtoMessage() {}
 
 func (x *SavePublicListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[35]
+	mi := &file_proto_loci_list_list_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2644,7 +2644,7 @@ func (x *SavePublicListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavePublicListRequest.ProtoReflect.Descriptor instead.
 func (*SavePublicListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{35}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SavePublicListRequest) GetUserId() string {
@@ -2671,7 +2671,7 @@ type SavePublicListResponse struct {
 
 func (x *SavePublicListResponse) Reset() {
 	*x = SavePublicListResponse{}
-	mi := &file_proto_list_proto_msgTypes[36]
+	mi := &file_proto_loci_list_list_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2683,7 +2683,7 @@ func (x *SavePublicListResponse) String() string {
 func (*SavePublicListResponse) ProtoMessage() {}
 
 func (x *SavePublicListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[36]
+	mi := &file_proto_loci_list_list_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2696,7 +2696,7 @@ func (x *SavePublicListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SavePublicListResponse.ProtoReflect.Descriptor instead.
 func (*SavePublicListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{36}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SavePublicListResponse) GetSuccess() bool {
@@ -2723,7 +2723,7 @@ type UnsaveListRequest struct {
 
 func (x *UnsaveListRequest) Reset() {
 	*x = UnsaveListRequest{}
-	mi := &file_proto_list_proto_msgTypes[37]
+	mi := &file_proto_loci_list_list_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2735,7 +2735,7 @@ func (x *UnsaveListRequest) String() string {
 func (*UnsaveListRequest) ProtoMessage() {}
 
 func (x *UnsaveListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[37]
+	mi := &file_proto_loci_list_list_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2748,7 +2748,7 @@ func (x *UnsaveListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsaveListRequest.ProtoReflect.Descriptor instead.
 func (*UnsaveListRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{37}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *UnsaveListRequest) GetUserId() string {
@@ -2775,7 +2775,7 @@ type UnsaveListResponse struct {
 
 func (x *UnsaveListResponse) Reset() {
 	*x = UnsaveListResponse{}
-	mi := &file_proto_list_proto_msgTypes[38]
+	mi := &file_proto_loci_list_list_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2787,7 +2787,7 @@ func (x *UnsaveListResponse) String() string {
 func (*UnsaveListResponse) ProtoMessage() {}
 
 func (x *UnsaveListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[38]
+	mi := &file_proto_loci_list_list_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2800,7 +2800,7 @@ func (x *UnsaveListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsaveListResponse.ProtoReflect.Descriptor instead.
 func (*UnsaveListResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{38}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *UnsaveListResponse) GetSuccess() bool {
@@ -2828,7 +2828,7 @@ type GetSavedListsRequest struct {
 
 func (x *GetSavedListsRequest) Reset() {
 	*x = GetSavedListsRequest{}
-	mi := &file_proto_list_proto_msgTypes[39]
+	mi := &file_proto_loci_list_list_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2840,7 +2840,7 @@ func (x *GetSavedListsRequest) String() string {
 func (*GetSavedListsRequest) ProtoMessage() {}
 
 func (x *GetSavedListsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[39]
+	mi := &file_proto_loci_list_list_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2853,7 +2853,7 @@ func (x *GetSavedListsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSavedListsRequest.ProtoReflect.Descriptor instead.
 func (*GetSavedListsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{39}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetSavedListsRequest) GetUserId() string {
@@ -2887,7 +2887,7 @@ type GetSavedListsResponse struct {
 
 func (x *GetSavedListsResponse) Reset() {
 	*x = GetSavedListsResponse{}
-	mi := &file_proto_list_proto_msgTypes[40]
+	mi := &file_proto_loci_list_list_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2899,7 +2899,7 @@ func (x *GetSavedListsResponse) String() string {
 func (*GetSavedListsResponse) ProtoMessage() {}
 
 func (x *GetSavedListsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[40]
+	mi := &file_proto_loci_list_list_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2912,7 +2912,7 @@ func (x *GetSavedListsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSavedListsResponse.ProtoReflect.Descriptor instead.
 func (*GetSavedListsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{40}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetSavedListsResponse) GetLists() []*ListWithItems {
@@ -2943,7 +2943,7 @@ type SearchPublicListsRequest struct {
 
 func (x *SearchPublicListsRequest) Reset() {
 	*x = SearchPublicListsRequest{}
-	mi := &file_proto_list_proto_msgTypes[41]
+	mi := &file_proto_loci_list_list_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2955,7 +2955,7 @@ func (x *SearchPublicListsRequest) String() string {
 func (*SearchPublicListsRequest) ProtoMessage() {}
 
 func (x *SearchPublicListsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[41]
+	mi := &file_proto_loci_list_list_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2968,7 +2968,7 @@ func (x *SearchPublicListsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPublicListsRequest.ProtoReflect.Descriptor instead.
 func (*SearchPublicListsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{41}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *SearchPublicListsRequest) GetQuery() string {
@@ -3024,7 +3024,7 @@ type SearchPublicListsResponse struct {
 
 func (x *SearchPublicListsResponse) Reset() {
 	*x = SearchPublicListsResponse{}
-	mi := &file_proto_list_proto_msgTypes[42]
+	mi := &file_proto_loci_list_list_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3036,7 +3036,7 @@ func (x *SearchPublicListsResponse) String() string {
 func (*SearchPublicListsResponse) ProtoMessage() {}
 
 func (x *SearchPublicListsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[42]
+	mi := &file_proto_loci_list_list_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3049,7 +3049,7 @@ func (x *SearchPublicListsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPublicListsResponse.ProtoReflect.Descriptor instead.
 func (*SearchPublicListsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{42}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *SearchPublicListsResponse) GetLists() []*ListWithItems {
@@ -3084,7 +3084,7 @@ type SearchMetadata struct {
 
 func (x *SearchMetadata) Reset() {
 	*x = SearchMetadata{}
-	mi := &file_proto_list_proto_msgTypes[43]
+	mi := &file_proto_loci_list_list_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3096,7 +3096,7 @@ func (x *SearchMetadata) String() string {
 func (*SearchMetadata) ProtoMessage() {}
 
 func (x *SearchMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_list_proto_msgTypes[43]
+	mi := &file_proto_loci_list_list_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3109,7 +3109,7 @@ func (x *SearchMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchMetadata.ProtoReflect.Descriptor instead.
 func (*SearchMetadata) Descriptor() ([]byte, []int) {
-	return file_proto_list_proto_rawDescGZIP(), []int{43}
+	return file_proto_loci_list_list_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *SearchMetadata) GetQueryTimeMs() float64 {
@@ -3133,11 +3133,11 @@ func (x *SearchMetadata) GetFiltersApplied() map[string]string {
 	return nil
 }
 
-var File_proto_list_proto protoreflect.FileDescriptor
+var File_proto_loci_list_list_proto protoreflect.FileDescriptor
 
-const file_proto_list_proto_rawDesc = "" +
+const file_proto_loci_list_list_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/list.proto\x12\x0eai_poi.list.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xcb\x04\n" +
+	"\x1aproto/loci/list/list.proto\x12\x0eai_poi.list.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xcb\x04\n" +
 	"\x04List\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +
@@ -3447,20 +3447,20 @@ const file_proto_list_proto_rawDesc = "" +
 	"\x11SearchPublicLists\x12(.ai_poi.list.v1.SearchPublicListsRequest\x1a).ai_poi.list.v1.SearchPublicListsResponseBGZEgithub.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/list/v1;listv1b\x06proto3"
 
 var (
-	file_proto_list_proto_rawDescOnce sync.Once
-	file_proto_list_proto_rawDescData []byte
+	file_proto_loci_list_list_proto_rawDescOnce sync.Once
+	file_proto_loci_list_list_proto_rawDescData []byte
 )
 
-func file_proto_list_proto_rawDescGZIP() []byte {
-	file_proto_list_proto_rawDescOnce.Do(func() {
-		file_proto_list_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_list_proto_rawDesc), len(file_proto_list_proto_rawDesc)))
+func file_proto_loci_list_list_proto_rawDescGZIP() []byte {
+	file_proto_loci_list_list_proto_rawDescOnce.Do(func() {
+		file_proto_loci_list_list_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_list_list_proto_rawDesc), len(file_proto_loci_list_list_proto_rawDesc)))
 	})
-	return file_proto_list_proto_rawDescData
+	return file_proto_loci_list_list_proto_rawDescData
 }
 
-var file_proto_list_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_proto_list_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
-var file_proto_list_proto_goTypes = []any{
+var file_proto_loci_list_list_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_proto_loci_list_list_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
+var file_proto_loci_list_list_proto_goTypes = []any{
 	(ContentType)(0),                   // 0: ai_poi.list.v1.ContentType
 	(*List)(nil),                       // 1: ai_poi.list.v1.List
 	(*ListItem)(nil),                   // 2: ai_poi.list.v1.ListItem
@@ -3509,7 +3509,7 @@ var file_proto_list_proto_goTypes = []any{
 	nil,                                // 45: ai_poi.list.v1.SearchMetadata.FiltersAppliedEntry
 	(*timestamppb.Timestamp)(nil),      // 46: google.protobuf.Timestamp
 }
-var file_proto_list_proto_depIdxs = []int32{
+var file_proto_loci_list_list_proto_depIdxs = []int32{
 	46, // 0: ai_poi.list.v1.List.created_at:type_name -> google.protobuf.Timestamp
 	46, // 1: ai_poi.list.v1.List.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: ai_poi.list.v1.ListItem.content_type:type_name -> ai_poi.list.v1.ContentType
@@ -3590,27 +3590,27 @@ var file_proto_list_proto_depIdxs = []int32{
 	0,  // [0:39] is the sub-list for field type_name
 }
 
-func init() { file_proto_list_proto_init() }
-func file_proto_list_proto_init() {
-	if File_proto_list_proto != nil {
+func init() { file_proto_loci_list_list_proto_init() }
+func file_proto_loci_list_list_proto_init() {
+	if File_proto_loci_list_list_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_list_proto_rawDesc), len(file_proto_list_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_list_list_proto_rawDesc), len(file_proto_loci_list_list_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_list_proto_goTypes,
-		DependencyIndexes: file_proto_list_proto_depIdxs,
-		EnumInfos:         file_proto_list_proto_enumTypes,
-		MessageInfos:      file_proto_list_proto_msgTypes,
+		GoTypes:           file_proto_loci_list_list_proto_goTypes,
+		DependencyIndexes: file_proto_loci_list_list_proto_depIdxs,
+		EnumInfos:         file_proto_loci_list_list_proto_enumTypes,
+		MessageInfos:      file_proto_loci_list_list_proto_msgTypes,
 	}.Build()
-	File_proto_list_proto = out.File
-	file_proto_list_proto_goTypes = nil
-	file_proto_list_proto_depIdxs = nil
+	File_proto_loci_list_list_proto = out.File
+	file_proto_loci_list_list_proto_goTypes = nil
+	file_proto_loci_list_list_proto_depIdxs = nil
 }
