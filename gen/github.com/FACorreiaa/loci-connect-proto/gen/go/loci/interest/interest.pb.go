@@ -283,9 +283,9 @@ func (x *CreateInterestRequest) GetActive() bool {
 type UpdateInterestRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	InterestId    string                 `protobuf:"bytes,1,opt,name=interest_id,json=interestId,proto3" json:"interest_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Name          *string                `protobuf:"bytes,2,opt,name=name,proto3,oneof" json:"name,omitempty"`
 	Description   *string                `protobuf:"bytes,3,opt,name=description,proto3,oneof" json:"description,omitempty"`
-	Active        bool                   `protobuf:"varint,4,opt,name=active,proto3" json:"active,omitempty"`
+	Active        *bool                  `protobuf:"varint,4,opt,name=active,proto3,oneof" json:"active,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -328,8 +328,8 @@ func (x *UpdateInterestRequest) GetInterestId() string {
 }
 
 func (x *UpdateInterestRequest) GetName() string {
-	if x != nil {
-		return x.Name
+	if x != nil && x.Name != nil {
+		return *x.Name
 	}
 	return ""
 }
@@ -342,8 +342,8 @@ func (x *UpdateInterestRequest) GetDescription() string {
 }
 
 func (x *UpdateInterestRequest) GetActive() bool {
-	if x != nil {
-		return x.Active
+	if x != nil && x.Active != nil {
+		return *x.Active
 	}
 	return false
 }
@@ -661,16 +661,18 @@ const file_proto_loci_interest_interest_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tB\r\xbaH\n" +
 	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\x00R\vdescription\x88\x01\x01\x12\x16\n" +
 	"\x06active\x18\x03 \x01(\bR\x06activeB\x0e\n" +
-	"\f_description\"\xc1\x01\n" +
+	"\f_description\"\xe2\x01\n" +
 	"\x15UpdateInterestRequest\x12*\n" +
 	"\vinterest_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\n" +
-	"interestId\x12\x1e\n" +
-	"\x04name\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x124\n" +
+	"interestId\x12&\n" +
+	"\x04name\x18\x02 \x01(\tB\r\xbaH\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01H\x00R\x04name\x88\x01\x01\x124\n" +
 	"\vdescription\x18\x03 \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\x00R\vdescription\x88\x01\x01\x12\x16\n" +
-	"\x06active\x18\x04 \x01(\bR\x06activeB\x0e\n" +
-	"\f_description\"@\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\x01R\vdescription\x88\x01\x01\x12\x1b\n" +
+	"\x06active\x18\x04 \x01(\bH\x02R\x06active\x88\x01\x01B\a\n" +
+	"\x05_nameB\x0e\n" +
+	"\f_descriptionB\t\n" +
+	"\a_active\"@\n" +
 	"\x12AddInterestRequest\x12*\n" +
 	"\vinterest_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\n" +
 	"interestId\"T\n" +

@@ -28,8 +28,8 @@ func ToInterestProtos(interests []*locitypes.Interest) []*interestv1.Interest {
 
 func FromUpdateProto(req *interestv1.UpdateInterestRequest) (locitypes.UpdateinterestsParams, error) {
 	return locitypes.UpdateinterestsParams{
-		Name:        &req.Name,
+		Name:        req.Name,
 		Description: req.Description,
-		Active:      &req.Active,
+		Active:      req.Active,
 	}, nil
 }
