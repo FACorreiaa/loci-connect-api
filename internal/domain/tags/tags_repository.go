@@ -121,9 +121,10 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*locit
             g.description,
             g.tag_type,
             'global' AS source,
-			CASE WHEN 'global' = 'global' THEN false ELSE g.active END AS active,
+            COALESCE(ugts.active, TRUE) AS active,
             g.created_at
         FROM global_tags g
+        LEFT JOIN user_global_tag_settings ugts ON g.id = ugts.global_tag_id AND ugts.user_id = $1
         WHERE g.active = TRUE
 
         UNION ALL
@@ -132,10 +133,10 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, userID uuid.UUID) ([]*locit
         SELECT
             upt.id,
             upt.name,
-            NULL AS description,
+            upt.description,
             upt.tag_type,
             'personal' AS source,
-			active,
+            upt.active,
             upt.created_at
         FROM user_personal_tags upt
         WHERE upt.user_id = $1
@@ -323,14 +324,23 @@ func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params lo
 	return tag, nil
 }
 
-// Update updates the name and/or type of an existing personal tag for a specific user.
+// Update updates a tag. For global tags, it only updates the user's active setting.
+// For personal tags, it updates name, tag_type, description, and active status.
 func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, params locitypes.UpdatePersonalTagParams) error {
-	ctx, span := otel.Tracer("tagsRepo").Start(ctx, "UpdatePersonalTag", trace.WithAttributes(
+	ctx, span := otel.Tracer("tagsRepo").Start(ctx, "UpdateTag", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
-		attribute.String("db.operation", "UPDATE"),
-		attribute.String("db.sql.table", "user_personal_tags"),
+		attribute.String("db.operation", "UPDATE/UPSERT"),
+		attribute.String("db.user.id", userID.String()),
+		attribute.String("db.tag.id", tagsID.String()),
 	))
 	defer span.End()
+
+	l := r.logger.With(
+		slog.String("method", "UpdateTag"),
+		slog.String("userID", userID.String()),
+		slog.String("tagID", tagsID.String()),
+	)
+	l.DebugContext(ctx, "Updating tag")
 
 	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
@@ -339,40 +349,61 @@ func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, p
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 	}()
 
-	l := r.logger.With(
-		slog.String("method", "UpdatePersonalTag"),
-		slog.String("userID", userID.String()),
-		slog.String("tagID", tagsID.String()),
-		slog.String("newName", params.Name),
-		slog.String("newTagType", params.TagType),
-	)
-	l.DebugContext(ctx, "Updating user personal tag")
-
-	query := `
-        UPDATE user_personal_tags
-        SET name = $1, tag_type = $2, active = $3, updated_at = $4
-        WHERE id = $5 AND user_id = $6
-    `
-	now := time.Now()
-
-	cmdTag, err := tx.Exec(ctx, query, params.Name, params.TagType, params.Active, now, tagsID, userID)
+	// First, check if this is a global tag
+	checkGlobalQuery := `SELECT EXISTS(SELECT 1 FROM global_tags WHERE id = $1 AND active = TRUE)`
+	var isGlobalTag bool
+	err = tx.QueryRow(ctx, checkGlobalQuery, tagsID).Scan(&isGlobalTag)
 	if err != nil {
 		span.RecordError(err)
-		l.ErrorContext(ctx, "Failed to update user personal tag", slog.Any("error", err))
-		span.SetStatus(codes.Error, "DB UPDATE failed")
-		return fmt.Errorf("database error updating personal tag: %w", err)
+		l.ErrorContext(ctx, "Failed to check if tag is global", slog.Any("error", err))
+		span.SetStatus(codes.Error, "DB query failed")
+		return fmt.Errorf("database error checking tag type: %w", err)
 	}
 
-	if cmdTag.RowsAffected() == 0 {
-		l.WarnContext(ctx, "Attempted to update non-existent or unauthorized personal tag")
-		span.SetStatus(codes.Error, "Tag not found or not owned by user")
-		// It didn't exist OR didn't belong to the user, return NotFound
-		return fmt.Errorf("personal tag not found or not owned by user: %w", locitypes.ErrNotFound)
+	now := time.Now()
+
+	if isGlobalTag {
+		// For global tags, upsert the user's active setting
+		l.DebugContext(ctx, "Tag is global, upserting user settings")
+		upsertQuery := `
+			INSERT INTO user_global_tag_settings (user_id, global_tag_id, active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $4)
+			ON CONFLICT (user_id, global_tag_id)
+			DO UPDATE SET active = $3, updated_at = $4
+		`
+		_, err = tx.Exec(ctx, upsertQuery, userID, tagsID, params.Active, now)
+		if err != nil {
+			span.RecordError(err)
+			l.ErrorContext(ctx, "Failed to upsert global tag setting", slog.Any("error", err))
+			span.SetStatus(codes.Error, "DB UPSERT failed")
+			return fmt.Errorf("database error updating global tag setting: %w", err)
+		}
+	} else {
+		// For personal tags, update the user_personal_tags table
+		l.DebugContext(ctx, "Tag is personal, updating user_personal_tags")
+		updateQuery := `
+			UPDATE user_personal_tags
+			SET name = $1, tag_type = $2, active = $3, updated_at = $4
+			WHERE id = $5 AND user_id = $6
+		`
+		cmdTag, err := tx.Exec(ctx, updateQuery, params.Name, params.TagType, params.Active, now, tagsID, userID)
+		if err != nil {
+			span.RecordError(err)
+			l.ErrorContext(ctx, "Failed to update user personal tag", slog.Any("error", err))
+			span.SetStatus(codes.Error, "DB UPDATE failed")
+			return fmt.Errorf("database error updating personal tag: %w", err)
+		}
+
+		if cmdTag.RowsAffected() == 0 {
+			l.WarnContext(ctx, "Attempted to update non-existent or unauthorized personal tag")
+			span.SetStatus(codes.Error, "Tag not found or not owned by user")
+			return fmt.Errorf("personal tag not found or not owned by user: %w", locitypes.ErrNotFound)
+		}
 	}
 
 	err = tx.Commit(ctx)
@@ -382,8 +413,8 @@ func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, p
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	l.InfoContext(ctx, "User personal tag updated successfully")
-	span.SetStatus(codes.Ok, "Personal tag updated")
+	l.InfoContext(ctx, "Tag updated successfully", slog.Bool("isGlobal", isGlobalTag))
+	span.SetStatus(codes.Ok, "Tag updated")
 	return nil
 }
 

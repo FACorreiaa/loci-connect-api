@@ -26,10 +26,6 @@ func main() {
 	}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
-	model := os.Getenv("GEMINI_MODEL")
-
-	fmt.Printf("Gemini API Key: %s \n", apiKey)
-	fmt.Printf("Gemini model: %s \n", model)
 
 	// List available models if requested (or just for debug)
 	if os.Getenv("LIST_GEMINI_MODELS") == "true" {

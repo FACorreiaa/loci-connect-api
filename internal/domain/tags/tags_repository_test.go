@@ -28,9 +28,10 @@ func TestGetAll(t *testing.T) {
             g.description,
             g.tag_type,
             'global' AS source,
-			CASE WHEN 'global' = 'global' THEN false ELSE g.active END AS active,
+            COALESCE(ugts.active, TRUE) AS active,
             g.created_at
         FROM global_tags g
+        LEFT JOIN user_global_tag_settings ugts ON g.id = ugts.global_tag_id AND ugts.user_id = $1
         WHERE g.active = TRUE
 
         UNION ALL
@@ -39,10 +40,10 @@ func TestGetAll(t *testing.T) {
         SELECT
             upt.id,
             upt.name,
-            NULL AS description,
+            upt.description,
             upt.tag_type,
             'personal' AS source,
-			active,
+            upt.active,
             upt.created_at
         FROM user_personal_tags upt
         WHERE upt.user_id = $1
