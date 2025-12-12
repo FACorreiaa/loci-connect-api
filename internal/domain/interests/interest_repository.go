@@ -28,7 +28,7 @@ type Repository interface {
 	// CreateInterest ---  / Interests ---
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error)
 	Removeinterests(ctx context.Context, userID, interestID uuid.UUID) error
-	GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error)
+	GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error)
 	GetInterest(ctx context.Context, interestID uuid.UUID) (*locitypes.Interest, error)
 	Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error
 	AddInterestToProfile(ctx context.Context, profileID, interestID uuid.UUID) error
@@ -177,27 +177,38 @@ func (r *RepositoryImpl) Removeinterests(ctx context.Context, userID, interestID
 
 // GetAllInterests TODO does it make sense to only return the active interests ? Just mark active on the UI ?
 // GetAllInterests implements user.UserRepo.
-func (r *RepositoryImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
+func (r *RepositoryImpl) GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("UserRepo").Start(ctx, "GetAllInterests", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.sql.table", "interests"),
+		attribute.String("user.id", userID.String()),
 	))
 	defer span.End()
 
-	l := r.logger.With(slog.String("method", "GetAllInterests"))
-	l.DebugContext(ctx, "Fetching all active interests")
+	l := r.logger.With(slog.String("method", "GetAllInterests"), slog.String("userID", userID.String()))
+	l.DebugContext(ctx, "Fetching all interests")
 
 	query := `
-        SELECT id, name, description,
-               CASE WHEN 'global' = 'global' THEN false ELSE active END AS active,
-               created_at, updated_at, 'global' AS type
-		FROM interests
-		UNION
-		SELECT id, name, description, active, created_at, updated_at, 'custom' AS type
-		FROM user_custom_interests
+        SELECT 
+            g.id, 
+            g.name, 
+            g.description,
+            COALESCE(ugis.active, TRUE) AS active,
+            g.created_at, 
+            g.updated_at, 
+            'global' AS type
+        FROM interests g
+        LEFT JOIN user_global_interest_settings ugis ON g.id = ugis.global_interest_id AND ugis.user_id = $1
+
+        UNION ALL
+
+        SELECT id, name, description, active, created_at, updated_at, 'custom' AS type
+        FROM user_custom_interests
+        WHERE user_id = $1
+
         ORDER BY name`
 
-	rows, err := r.pgpool.Query(ctx, query)
+	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to query all interests", slog.Any("error", err))
 		span.RecordError(err)
@@ -295,22 +306,67 @@ func (r *RepositoryImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Inte
 //}
 
 func (r *RepositoryImpl) Updateinterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error {
-	ctx, span := otel.Tracer("UserRepo").Start(ctx, "UpdateUserCustomInterest", trace.WithAttributes(
+	ctx, span := otel.Tracer("UserRepo").Start(ctx, "UpdateInterest", trace.WithAttributes(
 		semconv.DBSystemPostgreSQL,
 		attribute.String("db.operation", "UPDATE"),
-		attribute.String("db.sql.table", "user_custom_interests"),
 		attribute.String("db.user.id", userID.String()),
 		attribute.String("db.interest.id", interestID.String()),
 	))
 	defer span.End()
 
 	l := r.logger.With(
-		slog.String("method", "UpdateUserCustomInterest"),
+		slog.String("method", "UpdateInterest"),
 		slog.String("userID", userID.String()),
 		slog.String("interestID", interestID.String()),
 	)
-	l.DebugContext(ctx, "Updating user custom interest", slog.Any("params", params))
+	l.DebugContext(ctx, "Updating interest", slog.Any("params", params))
 
+	// First, determine if this is a global or custom interest
+	interest, err := r.GetInterest(ctx, interestID)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to get interest to determine type", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to get interest")
+		return fmt.Errorf("failed to get interest: %w", err)
+	}
+
+	if interest.Source == "global" {
+		// For global interests, upsert into user_global_interest_settings
+		return r.updateGlobalInterestSettings(ctx, userID, interestID, params, l, span)
+	}
+
+	// For custom interests, update user_custom_interests as before
+	return r.updateCustomInterest(ctx, userID, interestID, params, l, span)
+}
+
+func (r *RepositoryImpl) updateGlobalInterestSettings(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams, l *slog.Logger, span trace.Span) error {
+	// For global interests, we only allow updating the active state per user
+	if params.Active == nil {
+		l.InfoContext(ctx, "No active state provided for global interest update")
+		span.SetStatus(codes.Ok, "No update needed")
+		return nil
+	}
+
+	query := `
+		INSERT INTO user_global_interest_settings (user_id, global_interest_id, active, created_at, updated_at)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (user_id, global_interest_id)
+		DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()`
+
+	_, err := r.pgpool.Exec(ctx, query, userID, interestID, *params.Active)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to upsert global interest settings", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB upsert failed")
+		return fmt.Errorf("database error updating global interest settings: %w", err)
+	}
+
+	l.InfoContext(ctx, "Global interest settings updated successfully")
+	span.SetStatus(codes.Ok, "Global interest updated")
+	return nil
+}
+
+func (r *RepositoryImpl) updateCustomInterest(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams, l *slog.Logger, span trace.Span) error {
 	// Build dynamic query
 	setClauses := []string{}
 	args := []interface{}{}

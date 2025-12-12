@@ -31,15 +31,23 @@ func NewLoggingInterceptor(logger *slog.Logger) connect.UnaryInterceptorFunc {
 
 			duration := time.Since(start)
 
-			// Calculate response payload size
+			// Calculate response payload size safely
 			responseSize := 0
 			if resp != nil {
-				// Safely access resp.Any() - it can be nil even if resp is not nil
-				if anyResp := resp.Any(); anyResp != nil {
-					if msg, ok := anyResp.(proto.Message); ok {
-						responseSize = proto.Size(msg)
+				// Use defer/recover because resp.Any() can panic on nil inner message
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							// resp.Any() panicked - response has nil inner message
+							responseSize = 0
+						}
+					}()
+					if anyResp := resp.Any(); anyResp != nil {
+						if msg, ok := anyResp.(proto.Message); ok {
+							responseSize = proto.Size(msg)
+						}
 					}
-				}
+				}()
 			}
 
 			if err != nil {

@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/mock"
@@ -423,8 +423,8 @@ func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interes
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
-	args := m.Called(ctx)
+func (m *MockinterestsRepo) GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error) {
+	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

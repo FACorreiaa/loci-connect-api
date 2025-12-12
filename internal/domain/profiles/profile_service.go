@@ -16,7 +16,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
-	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // Ensure implementation satisfies the interface
@@ -220,7 +220,7 @@ func (s *ServiceImpl) CreateSearchProfileCC(ctx context.Context, userID uuid.UUI
 
 	gResp.Go(func() error {
 		var fetchErr error
-		fetchedInterests, fetchErr = s.intRepo.GetAllInterests(respCtx)
+		fetchedInterests, fetchErr = s.intRepo.GetAllInterests(respCtx, userID)
 		l.DebugContext(respCtx, "Fetched interests for response", slog.Int("count", len(fetchedInterests)), slog.Any("error", fetchErr)) // Log count and error
 		return fetchErr                                                                                                                  // Return error if fetching fails
 	})

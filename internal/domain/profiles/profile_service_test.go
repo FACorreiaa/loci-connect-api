@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types" // Adjust path
-	"github.com/google/uuid"                                // For mocking transaction
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types" // Adjust path
+	"github.com/google/uuid"                                          // For mocking transaction
 
 	// For mocking transaction
 	"github.com/pashagolub/pgxmock/v4" // pgxmock for transaction mocking
@@ -108,8 +108,8 @@ func (m *MockinterestsRepo) GetInterest(ctx context.Context, interestID uuid.UUI
 	return args.Get(0).(*locitypes.Interest), args.Error(1)
 }
 
-func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) { // Added for CreateSearchProfileCC
-	args := m.Called(ctx)
+func (m *MockinterestsRepo) GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error) { // Added for CreateSearchProfileCC
+	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

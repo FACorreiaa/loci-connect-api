@@ -38,8 +38,8 @@ func (m *MockinterestsRepo) Removeinterests(ctx context.Context, userID, interes
 	return args.Error(0)
 }
 
-func (m *MockinterestsRepo) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
-	args := m.Called(ctx)
+func (m *MockinterestsRepo) GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error) {
+	args := m.Called(ctx, userID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -204,6 +204,7 @@ func TestGetAllInterests(t *testing.T) {
 	logger := slog.Default()
 	service := NewService(mockRepo, logger)
 	ctx := context.Background()
+	userID := uuid.New()
 
 	// Test data
 	active1 := true
@@ -235,14 +236,14 @@ func TestGetAllInterests(t *testing.T) {
 		{
 			name: "Success",
 			setupMock: func() {
-				mockRepo.On("GetAllInterests", mock.Anything).Return(expectedInterests, nil)
+				mockRepo.On("GetAllInterests", mock.Anything, mock.AnythingOfType("uuid.UUID")).Return(expectedInterests, nil)
 			},
 			expectedError: false,
 		},
 		{
 			name: "Repository Error",
 			setupMock: func() {
-				mockRepo.On("GetAllInterests", mock.Anything).Return(nil, errors.New("repository error"))
+				mockRepo.On("GetAllInterests", mock.Anything, mock.AnythingOfType("uuid.UUID")).Return(nil, errors.New("repository error"))
 			},
 			expectedError: true,
 		},
@@ -255,7 +256,7 @@ func TestGetAllInterests(t *testing.T) {
 			tc.setupMock()
 
 			// Call the method
-			interests, err := service.GetAllInterests(ctx)
+			interests, err := service.GetAllInterests(ctx, userID)
 
 			// Assertions
 			if tc.expectedError {

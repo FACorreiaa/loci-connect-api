@@ -53,23 +53,35 @@ func TestRepoGetAllInterests(t *testing.T) {
 	}
 	defer mock.Close()
 
+	userID := uuid.New()
 	active := true
 	now := time.Now()
 	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT id, name, description,
-               CASE WHEN 'global' = 'global' THEN false ELSE active END AS active,
-               created_at, updated_at, 'global' AS type
-        FROM interests
-        UNION
+        SELECT 
+            g.id, 
+            g.name, 
+            g.description,
+            COALESCE(ugis.active, TRUE) AS active,
+            g.created_at, 
+            g.updated_at, 
+            'global' AS type
+        FROM interests g
+        LEFT JOIN user_global_interest_settings ugis ON g.id = ugis.global_interest_id AND ugis.user_id = $1
+
+        UNION ALL
+
         SELECT id, name, description, active, created_at, updated_at, 'custom' AS type
         FROM user_custom_interests
+        WHERE user_id = $1
+
         ORDER BY name`)).
+		WithArgs(userID).
 		WillReturnRows(pgxmock.NewRows([]string{"id", "name", "description", "active", "created_at", "updated_at", "type"}).
 			AddRow(uuid.New(), "hiking", nil, &active, now, &now, "global"))
 
 	repo := NewRepositoryImpl(mock, slog.Default())
 
-	interests, err := repo.GetAllInterests(context.Background())
+	interests, err := repo.GetAllInterests(context.Background(), userID)
 	if err != nil {
 		t.Fatalf("GetAllInterests: %v", err)
 	}

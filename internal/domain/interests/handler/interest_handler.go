@@ -24,7 +24,16 @@ func NewInterestHandler(svc interests.Service) *InterestHandler {
 }
 
 func (h *InterestHandler) GetInterests(ctx context.Context, req *connect.Request[interestv1.GetInterestsRequest]) (*connect.Response[interestv1.GetInterestsResponse], error) {
-	interestsList, err := h.service.GetAllInterests(ctx)
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	interestsList, err := h.service.GetAllInterests(ctx, userID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

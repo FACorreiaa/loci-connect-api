@@ -21,7 +21,7 @@ var _ Service = (*ServiceImpl)(nil)
 type Service interface {
 	// RemoveInterests remove interests
 	RemoveInterests(ctx context.Context, userID, interestID uuid.UUID) error
-	GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error)
+	GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error)
 	CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error)
 	UpdateInterests(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams) error
 }
@@ -44,14 +44,19 @@ func NewService(repo Repository, logger *slog.Logger) *ServiceImpl {
 
 // CreateInterest create user interest
 func (s *ServiceImpl) CreateInterest(ctx context.Context, name string, description *string, isActive bool, userID string) (*locitypes.Interest, error) {
+	descStr := ""
+	if description != nil {
+		descStr = *description
+	}
+
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "Createinterests", trace.WithAttributes(
 		attribute.String("name", name),
-		attribute.String("description", *description),
+		attribute.String("description", descStr),
 	))
 	defer span.End()
 
 	l := s.logger.With(slog.String("method", "Createinterests"),
-		slog.String("name", name), slog.String("description", *description))
+		slog.String("name", name), slog.String("description", descStr))
 	l.DebugContext(ctx, "Adding user interest")
 
 	interest, err := s.repo.CreateInterest(ctx, name, description, isActive, userID)
@@ -92,14 +97,14 @@ func (s *ServiceImpl) RemoveInterests(ctx context.Context, userID, interestID uu
 }
 
 // GetAllInterests retrieves all available interests.
-func (s *ServiceImpl) GetAllInterests(ctx context.Context) ([]*locitypes.Interest, error) {
+func (s *ServiceImpl) GetAllInterests(ctx context.Context, userID uuid.UUID) ([]*locitypes.Interest, error) {
 	ctx, span := otel.Tracer("interestsService").Start(ctx, "GetAllInterests")
 	defer span.End()
 
-	l := s.logger.With(slog.String("method", "GetAllInterests"))
+	l := s.logger.With(slog.String("method", "GetAllInterests"), slog.String("userID", userID.String()))
 	l.DebugContext(ctx, "Fetching all interests")
 
-	interests, err := s.repo.GetAllInterests(ctx)
+	interests, err := s.repo.GetAllInterests(ctx, userID)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to fetch all interests", slog.Any("error", err))
 		span.RecordError(err)
