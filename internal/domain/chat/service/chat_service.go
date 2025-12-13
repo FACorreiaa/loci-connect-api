@@ -38,7 +38,33 @@ import (
 
 const (
 	defaultTemperature = 0.5
+	// Retry configuration for LLM calls
+	maxLLMRetries  = 3
+	baseRetryDelay = 1 * time.Second
+	maxRetryDelay  = 30 * time.Second
 )
+
+// isRetryableLLMError checks if the error is transient and should be retried.
+func isRetryableLLMError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Rate limits and quota exceeded
+	if strings.Contains(errStr, "429") ||
+		strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
+		strings.Contains(errStr, "quota") {
+		return true
+	}
+	// Transient server errors
+	if strings.Contains(errStr, "500") ||
+		strings.Contains(errStr, "503") ||
+		strings.Contains(errStr, "INTERNAL") ||
+		strings.Contains(errStr, "UNAVAILABLE") {
+		return true
+	}
+	return false
+}
 
 type ChatSession struct {
 	History []genai.Chat
@@ -2610,9 +2636,46 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 		slog.String("cache_key", cacheKey),
 		slog.Int("prompt_length", len(prompt)))
 
+	// Step 2: Cache miss or no cache key - call LLM
+	l.logger.InfoContext(ctx, "Calling LLM for streaming",
+		slog.String("part_type", partType),
+		slog.String("cache_key", cacheKey),
+		slog.Int("prompt_length", len(prompt)))
+
 	iter, err := l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
+
+	// Retry loop with exponential backoff
+	if err != nil && isRetryableLLMError(err) {
+		backoff := baseRetryDelay
+		for attempt := 0; attempt < maxLLMRetries; attempt++ {
+			l.logger.WarnContext(ctx, "LLM call failed, retrying",
+				slog.String("part_type", partType),
+				slog.Int("attempt", attempt+1),
+				slog.Duration("backoff", backoff),
+				slog.Any("error", err))
+
+			select {
+			case <-ctx.Done():
+				return // Context canceled
+			case <-time.After(backoff):
+				backoff *= 2
+				if backoff > maxRetryDelay {
+					backoff = maxRetryDelay
+				}
+			}
+
+			iter, err = l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
+			if err == nil {
+				break
+			}
+			if !isRetryableLLMError(err) {
+				break
+			}
+		}
+	}
+
 	if err != nil {
-		l.logger.ErrorContext(ctx, "LLM call failed",
+		l.logger.ErrorContext(ctx, "LLM call failed after retries",
 			slog.String("part_type", partType),
 			slog.Any("error", err))
 		if ctx.Err() == nil {
@@ -2629,7 +2692,6 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 		}
 		return
 	}
-
 	// Step 3: Stream response and collect full text for caching
 	var fullResponse strings.Builder
 	chunkCount := 0
