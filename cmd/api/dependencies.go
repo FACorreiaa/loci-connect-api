@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -17,17 +18,20 @@ import (
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 )
 
 // Dependencies holds all application dependencies
@@ -49,20 +53,24 @@ type Dependencies struct {
 	StatisticsRepo statistics.Repository
 	RecentsRepo    recents.Repository
 	UserRepo       user.UserRepo
+	UsageRepo      subscription.Repository
+	PaymentRepo    payment.Repository
 
 	// Services
-	TokenManager  service.TokenManager
-	AuthService   *service.AuthService
-	ChatService   chatservice.LlmInteractiontService
-	ProfileSvc    profiles.Service
-	POISvc        poirepo.Service
-	DiscoverSvc   discoverdomain.Service
-	ListSvc       itinerarylist.Service
-	StatisticsSvc statistics.Service
-	RecentsSvc    recents.Service
-	UserSvc       user.UserService
-	InterestSvc   interestrepo.Service
-	TagsSvc       tagshandler.Service
+	TokenManager        service.TokenManager
+	AuthService         *service.AuthService
+	ChatService         chatservice.LlmInteractiontService
+	ProfileSvc          profiles.Service
+	POISvc              poirepo.Service
+	DiscoverSvc         discoverdomain.Service
+	ListSvc             itinerarylist.Service
+	StatisticsSvc       statistics.Service
+	RecentsSvc          recents.Service
+	UserSvc             user.UserService
+	InterestSvc         interestrepo.Service
+	TagsSvc             tagshandler.Service
+	SubscriptionService subscription.Service
+	PaymentService      payment.Service
 
 	// Handlers
 	AuthHandler       *handler.AuthHandler
@@ -75,6 +83,7 @@ type Dependencies struct {
 	UserHandler       *userhandler.UserHandler
 	InterestHandler   *interesthandler.InterestHandler
 	TagsHandler       *tagshandler.TagsHandler
+	PaymentHandler    paymentv1connect.PaymentServiceHandler
 }
 
 // InitDependencies initializes all application dependencies
@@ -147,6 +156,8 @@ func (d *Dependencies) initRepositories() error {
 	d.StatisticsRepo = statistics.NewRepository(d.Logger, d.DB.Pool)
 	d.RecentsRepo = recents.NewRepository(d.DB.Pool, d.Logger)
 	d.UserRepo = user.NewPostgresUserRepo(d.DB.Pool, d.Logger)
+	d.UsageRepo = subscription.NewRepository(d.DB.Pool)
+	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -194,10 +205,22 @@ func (d *Dependencies) initServices() error {
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
 	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
 	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
+	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
+	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
 	d.TagsSvc = tagrepo.NewtagsService(d.TagRepo, d.Logger)
+	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail)
+	// Using STRIPE_API_KEY from environment
+	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, os.Getenv("STRIPE_API_KEY"))
+
+	// Handlers
+	d.PaymentHandler = payment.NewPaymentServiceHandler(d.PaymentService, d.UserRepo, d.Logger)
 
 	d.Logger.Info("services initialized")
 	return nil
+
+	// Needs imports and struct fields.
+	// Since replace_file_content is single block, I will use multi_replace for this file.
+
 }
 
 // initHandlers initializes all handler dependencies

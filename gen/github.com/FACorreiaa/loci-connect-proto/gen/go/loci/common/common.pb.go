@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/loci/common/common.proto
+// source: loci/common/common.proto
 
 package common
 
@@ -34,7 +34,7 @@ type Response struct {
 
 func (x *Response) Reset() {
 	*x = Response{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[0]
+	mi := &file_loci_common_common_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +46,7 @@ func (x *Response) String() string {
 func (*Response) ProtoMessage() {}
 
 func (x *Response) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[0]
+	mi := &file_loci_common_common_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -59,7 +59,7 @@ func (x *Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Response.ProtoReflect.Descriptor instead.
 func (*Response) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{0}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Response) GetSuccess() bool {
@@ -95,7 +95,7 @@ type ErrorResponse struct {
 
 func (x *ErrorResponse) Reset() {
 	*x = ErrorResponse{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[1]
+	mi := &file_loci_common_common_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -107,7 +107,7 @@ func (x *ErrorResponse) String() string {
 func (*ErrorResponse) ProtoMessage() {}
 
 func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[1]
+	mi := &file_loci_common_common_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -120,7 +120,7 @@ func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorResponse.ProtoReflect.Descriptor instead.
 func (*ErrorResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{1}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ErrorResponse) GetCode() string {
@@ -157,7 +157,7 @@ type PaginationRequest struct {
 
 func (x *PaginationRequest) Reset() {
 	*x = PaginationRequest{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[2]
+	mi := &file_loci_common_common_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -169,7 +169,7 @@ func (x *PaginationRequest) String() string {
 func (*PaginationRequest) ProtoMessage() {}
 
 func (x *PaginationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[2]
+	mi := &file_loci_common_common_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -182,7 +182,7 @@ func (x *PaginationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PaginationRequest.ProtoReflect.Descriptor instead.
 func (*PaginationRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{2}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PaginationRequest) GetPage() int32 {
@@ -227,7 +227,7 @@ type PaginationMetadata struct {
 
 func (x *PaginationMetadata) Reset() {
 	*x = PaginationMetadata{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[3]
+	mi := &file_loci_common_common_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +239,7 @@ func (x *PaginationMetadata) String() string {
 func (*PaginationMetadata) ProtoMessage() {}
 
 func (x *PaginationMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[3]
+	mi := &file_loci_common_common_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +252,7 @@ func (x *PaginationMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PaginationMetadata.ProtoReflect.Descriptor instead.
 func (*PaginationMetadata) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{3}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PaginationMetadata) GetTotalRecords() int32 {
@@ -301,7 +301,7 @@ type GeoPoint struct {
 
 func (x *GeoPoint) Reset() {
 	*x = GeoPoint{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[4]
+	mi := &file_loci_common_common_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +313,7 @@ func (x *GeoPoint) String() string {
 func (*GeoPoint) ProtoMessage() {}
 
 func (x *GeoPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[4]
+	mi := &file_loci_common_common_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +326,7 @@ func (x *GeoPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoPoint.ProtoReflect.Descriptor instead.
 func (*GeoPoint) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{4}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GeoPoint) GetLatitude() float64 {
@@ -354,7 +354,7 @@ type RangeFilter struct {
 
 func (x *RangeFilter) Reset() {
 	*x = RangeFilter{}
-	mi := &file_proto_loci_common_common_proto_msgTypes[5]
+	mi := &file_loci_common_common_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -366,7 +366,7 @@ func (x *RangeFilter) String() string {
 func (*RangeFilter) ProtoMessage() {}
 
 func (x *RangeFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_common_common_proto_msgTypes[5]
+	mi := &file_loci_common_common_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -379,7 +379,7 @@ func (x *RangeFilter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeFilter.ProtoReflect.Descriptor instead.
 func (*RangeFilter) Descriptor() ([]byte, []int) {
-	return file_proto_loci_common_common_proto_rawDescGZIP(), []int{5}
+	return file_loci_common_common_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RangeFilter) GetMin() float64 {
@@ -396,11 +396,11 @@ func (x *RangeFilter) GetMax() float64 {
 	return 0
 }
 
-var File_proto_loci_common_common_proto protoreflect.FileDescriptor
+var File_loci_common_common_proto protoreflect.FileDescriptor
 
-const file_proto_loci_common_common_proto_rawDesc = "" +
+const file_loci_common_common_proto_rawDesc = "" +
 	"\n" +
-	"\x1eproto/loci/common/common.proto\x12\vloci.common\x1a\x1bbuf/validate/validate.proto\"\x8e\x01\n" +
+	"\x18loci/common/common.proto\x12\vloci.common\x1a\x1bbuf/validate/validate.proto\"\x8e\x01\n" +
 	"\bResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12*\n" +
 	"\amessage\x18\x02 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xe8\aH\x00R\amessage\x88\x01\x01\x12&\n" +
@@ -442,19 +442,19 @@ const file_proto_loci_common_common_proto_rawDesc = "" +
 	"\x04_maxBDZBgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/common;commonb\x06proto3"
 
 var (
-	file_proto_loci_common_common_proto_rawDescOnce sync.Once
-	file_proto_loci_common_common_proto_rawDescData []byte
+	file_loci_common_common_proto_rawDescOnce sync.Once
+	file_loci_common_common_proto_rawDescData []byte
 )
 
-func file_proto_loci_common_common_proto_rawDescGZIP() []byte {
-	file_proto_loci_common_common_proto_rawDescOnce.Do(func() {
-		file_proto_loci_common_common_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_common_common_proto_rawDesc), len(file_proto_loci_common_common_proto_rawDesc)))
+func file_loci_common_common_proto_rawDescGZIP() []byte {
+	file_loci_common_common_proto_rawDescOnce.Do(func() {
+		file_loci_common_common_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_loci_common_common_proto_rawDesc), len(file_loci_common_common_proto_rawDesc)))
 	})
-	return file_proto_loci_common_common_proto_rawDescData
+	return file_loci_common_common_proto_rawDescData
 }
 
-var file_proto_loci_common_common_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_proto_loci_common_common_proto_goTypes = []any{
+var file_loci_common_common_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_loci_common_common_proto_goTypes = []any{
 	(*Response)(nil),           // 0: loci.common.Response
 	(*ErrorResponse)(nil),      // 1: loci.common.ErrorResponse
 	(*PaginationRequest)(nil),  // 2: loci.common.PaginationRequest
@@ -463,7 +463,7 @@ var file_proto_loci_common_common_proto_goTypes = []any{
 	(*RangeFilter)(nil),        // 5: loci.common.RangeFilter
 	nil,                        // 6: loci.common.ErrorResponse.DetailsEntry
 }
-var file_proto_loci_common_common_proto_depIdxs = []int32{
+var file_loci_common_common_proto_depIdxs = []int32{
 	6, // 0: loci.common.ErrorResponse.details:type_name -> loci.common.ErrorResponse.DetailsEntry
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
@@ -472,29 +472,29 @@ var file_proto_loci_common_common_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_proto_loci_common_common_proto_init() }
-func file_proto_loci_common_common_proto_init() {
-	if File_proto_loci_common_common_proto != nil {
+func init() { file_loci_common_common_proto_init() }
+func file_loci_common_common_proto_init() {
+	if File_loci_common_common_proto != nil {
 		return
 	}
-	file_proto_loci_common_common_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_loci_common_common_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_loci_common_common_proto_msgTypes[5].OneofWrappers = []any{}
+	file_loci_common_common_proto_msgTypes[0].OneofWrappers = []any{}
+	file_loci_common_common_proto_msgTypes[2].OneofWrappers = []any{}
+	file_loci_common_common_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_common_common_proto_rawDesc), len(file_proto_loci_common_common_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_common_common_proto_rawDesc), len(file_loci_common_common_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_proto_loci_common_common_proto_goTypes,
-		DependencyIndexes: file_proto_loci_common_common_proto_depIdxs,
-		MessageInfos:      file_proto_loci_common_common_proto_msgTypes,
+		GoTypes:           file_loci_common_common_proto_goTypes,
+		DependencyIndexes: file_loci_common_common_proto_depIdxs,
+		MessageInfos:      file_loci_common_common_proto_msgTypes,
 	}.Build()
-	File_proto_loci_common_common_proto = out.File
-	file_proto_loci_common_common_proto_goTypes = nil
-	file_proto_loci_common_common_proto_depIdxs = nil
+	File_loci_common_common_proto = out.File
+	file_loci_common_common_proto_goTypes = nil
+	file_loci_common_common_proto_depIdxs = nil
 }

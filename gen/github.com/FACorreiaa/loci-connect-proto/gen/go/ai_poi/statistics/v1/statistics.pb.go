@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/loci/statistics/statistics.proto
+// source: loci/statistics/statistics.proto
 
 package statisticsv1
 
@@ -42,7 +42,7 @@ type MainPageStatistics struct {
 
 func (x *MainPageStatistics) Reset() {
 	*x = MainPageStatistics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[0]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -54,7 +54,7 @@ func (x *MainPageStatistics) String() string {
 func (*MainPageStatistics) ProtoMessage() {}
 
 func (x *MainPageStatistics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[0]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -67,7 +67,7 @@ func (x *MainPageStatistics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MainPageStatistics.ProtoReflect.Descriptor instead.
 func (*MainPageStatistics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{0}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *MainPageStatistics) GetTotalPois() int64 {
@@ -153,7 +153,7 @@ type RecentActivity struct {
 
 func (x *RecentActivity) Reset() {
 	*x = RecentActivity{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[1]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -165,7 +165,7 @@ func (x *RecentActivity) String() string {
 func (*RecentActivity) ProtoMessage() {}
 
 func (x *RecentActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[1]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -178,7 +178,7 @@ func (x *RecentActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentActivity.ProtoReflect.Descriptor instead.
 func (*RecentActivity) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{1}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *RecentActivity) GetSearchesLastHour() int32 {
@@ -224,7 +224,7 @@ type PopularDestination struct {
 
 func (x *PopularDestination) Reset() {
 	*x = PopularDestination{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[2]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +236,7 @@ func (x *PopularDestination) String() string {
 func (*PopularDestination) ProtoMessage() {}
 
 func (x *PopularDestination) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[2]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +249,7 @@ func (x *PopularDestination) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PopularDestination.ProtoReflect.Descriptor instead.
 func (*PopularDestination) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{2}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PopularDestination) GetCityId() string {
@@ -305,7 +305,7 @@ type TrendingCategories struct {
 
 func (x *TrendingCategories) Reset() {
 	*x = TrendingCategories{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[3]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -317,7 +317,7 @@ func (x *TrendingCategories) String() string {
 func (*TrendingCategories) ProtoMessage() {}
 
 func (x *TrendingCategories) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[3]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -330,7 +330,7 @@ func (x *TrendingCategories) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrendingCategories.ProtoReflect.Descriptor instead.
 func (*TrendingCategories) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{3}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TrendingCategories) GetCategories() []*CategoryTrend {
@@ -359,7 +359,7 @@ type CategoryTrend struct {
 
 func (x *CategoryTrend) Reset() {
 	*x = CategoryTrend{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[4]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -371,7 +371,7 @@ func (x *CategoryTrend) String() string {
 func (*CategoryTrend) ProtoMessage() {}
 
 func (x *CategoryTrend) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[4]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -384,7 +384,7 @@ func (x *CategoryTrend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CategoryTrend.ProtoReflect.Descriptor instead.
 func (*CategoryTrend) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{4}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CategoryTrend) GetCategory() string {
@@ -433,7 +433,7 @@ type DetailedPOIStatistics struct {
 
 func (x *DetailedPOIStatistics) Reset() {
 	*x = DetailedPOIStatistics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[5]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -445,7 +445,7 @@ func (x *DetailedPOIStatistics) String() string {
 func (*DetailedPOIStatistics) ProtoMessage() {}
 
 func (x *DetailedPOIStatistics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[5]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +458,7 @@ func (x *DetailedPOIStatistics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DetailedPOIStatistics.ProtoReflect.Descriptor instead.
 func (*DetailedPOIStatistics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{5}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DetailedPOIStatistics) GetUserId() string {
@@ -539,7 +539,7 @@ type CityInteractionStats struct {
 
 func (x *CityInteractionStats) Reset() {
 	*x = CityInteractionStats{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[6]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -551,7 +551,7 @@ func (x *CityInteractionStats) String() string {
 func (*CityInteractionStats) ProtoMessage() {}
 
 func (x *CityInteractionStats) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[6]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -564,7 +564,7 @@ func (x *CityInteractionStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInteractionStats.ProtoReflect.Descriptor instead.
 func (*CityInteractionStats) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{6}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CityInteractionStats) GetCityId() string {
@@ -624,7 +624,7 @@ type SearchPatterns struct {
 
 func (x *SearchPatterns) Reset() {
 	*x = SearchPatterns{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[7]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -636,7 +636,7 @@ func (x *SearchPatterns) String() string {
 func (*SearchPatterns) ProtoMessage() {}
 
 func (x *SearchPatterns) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[7]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -649,7 +649,7 @@ func (x *SearchPatterns) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPatterns.ProtoReflect.Descriptor instead.
 func (*SearchPatterns) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{7}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchPatterns) GetFrequentKeywords() []string {
@@ -706,7 +706,7 @@ type TimeBasedAnalytics struct {
 
 func (x *TimeBasedAnalytics) Reset() {
 	*x = TimeBasedAnalytics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[8]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -718,7 +718,7 @@ func (x *TimeBasedAnalytics) String() string {
 func (*TimeBasedAnalytics) ProtoMessage() {}
 
 func (x *TimeBasedAnalytics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[8]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -731,7 +731,7 @@ func (x *TimeBasedAnalytics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimeBasedAnalytics.ProtoReflect.Descriptor instead.
 func (*TimeBasedAnalytics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{8}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TimeBasedAnalytics) GetHourlyActivity() []*HourlyActivity {
@@ -765,7 +765,7 @@ type HourlyActivity struct {
 
 func (x *HourlyActivity) Reset() {
 	*x = HourlyActivity{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[9]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +777,7 @@ func (x *HourlyActivity) String() string {
 func (*HourlyActivity) ProtoMessage() {}
 
 func (x *HourlyActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[9]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +790,7 @@ func (x *HourlyActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HourlyActivity.ProtoReflect.Descriptor instead.
 func (*HourlyActivity) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{9}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *HourlyActivity) GetHour() int32 {
@@ -819,7 +819,7 @@ type DailyActivity struct {
 
 func (x *DailyActivity) Reset() {
 	*x = DailyActivity{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[10]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +831,7 @@ func (x *DailyActivity) String() string {
 func (*DailyActivity) ProtoMessage() {}
 
 func (x *DailyActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[10]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,7 +844,7 @@ func (x *DailyActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DailyActivity.ProtoReflect.Descriptor instead.
 func (*DailyActivity) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{10}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *DailyActivity) GetDate() *timestamppb.Timestamp {
@@ -887,7 +887,7 @@ type MonthlyActivity struct {
 
 func (x *MonthlyActivity) Reset() {
 	*x = MonthlyActivity{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[11]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -899,7 +899,7 @@ func (x *MonthlyActivity) String() string {
 func (*MonthlyActivity) ProtoMessage() {}
 
 func (x *MonthlyActivity) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[11]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -912,7 +912,7 @@ func (x *MonthlyActivity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MonthlyActivity.ProtoReflect.Descriptor instead.
 func (*MonthlyActivity) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{11}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *MonthlyActivity) GetYear() int32 {
@@ -961,7 +961,7 @@ type LandingPageUserStats struct {
 
 func (x *LandingPageUserStats) Reset() {
 	*x = LandingPageUserStats{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[12]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -973,7 +973,7 @@ func (x *LandingPageUserStats) String() string {
 func (*LandingPageUserStats) ProtoMessage() {}
 
 func (x *LandingPageUserStats) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[12]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -986,7 +986,7 @@ func (x *LandingPageUserStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LandingPageUserStats.ProtoReflect.Descriptor instead.
 func (*LandingPageUserStats) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{12}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *LandingPageUserStats) GetUserId() string {
@@ -1066,7 +1066,7 @@ type RecentInteraction struct {
 
 func (x *RecentInteraction) Reset() {
 	*x = RecentInteraction{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[13]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1078,7 +1078,7 @@ func (x *RecentInteraction) String() string {
 func (*RecentInteraction) ProtoMessage() {}
 
 func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[13]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1091,7 +1091,7 @@ func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentInteraction.ProtoReflect.Descriptor instead.
 func (*RecentInteraction) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{13}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RecentInteraction) GetType() string {
@@ -1141,7 +1141,7 @@ type PersonalizedRecommendations struct {
 
 func (x *PersonalizedRecommendations) Reset() {
 	*x = PersonalizedRecommendations{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[14]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1153,7 +1153,7 @@ func (x *PersonalizedRecommendations) String() string {
 func (*PersonalizedRecommendations) ProtoMessage() {}
 
 func (x *PersonalizedRecommendations) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[14]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1166,7 +1166,7 @@ func (x *PersonalizedRecommendations) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PersonalizedRecommendations.ProtoReflect.Descriptor instead.
 func (*PersonalizedRecommendations) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{14}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PersonalizedRecommendations) GetSuggestedCities() []string {
@@ -1201,7 +1201,7 @@ type AchievementBadges struct {
 
 func (x *AchievementBadges) Reset() {
 	*x = AchievementBadges{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[15]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1213,7 +1213,7 @@ func (x *AchievementBadges) String() string {
 func (*AchievementBadges) ProtoMessage() {}
 
 func (x *AchievementBadges) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[15]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1226,7 +1226,7 @@ func (x *AchievementBadges) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AchievementBadges.ProtoReflect.Descriptor instead.
 func (*AchievementBadges) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{15}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AchievementBadges) GetEarnedBadges() []*Badge {
@@ -1258,7 +1258,7 @@ type Badge struct {
 
 func (x *Badge) Reset() {
 	*x = Badge{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[16]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1270,7 +1270,7 @@ func (x *Badge) String() string {
 func (*Badge) ProtoMessage() {}
 
 func (x *Badge) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[16]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1283,7 +1283,7 @@ func (x *Badge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Badge.ProtoReflect.Descriptor instead.
 func (*Badge) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{16}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Badge) GetId() string {
@@ -1351,7 +1351,7 @@ type SystemAnalytics struct {
 
 func (x *SystemAnalytics) Reset() {
 	*x = SystemAnalytics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[17]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1363,7 +1363,7 @@ func (x *SystemAnalytics) String() string {
 func (*SystemAnalytics) ProtoMessage() {}
 
 func (x *SystemAnalytics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[17]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1376,7 +1376,7 @@ func (x *SystemAnalytics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemAnalytics.ProtoReflect.Descriptor instead.
 func (*SystemAnalytics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{17}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SystemAnalytics) GetUserGrowth() *UserGrowthMetrics {
@@ -1446,7 +1446,7 @@ type UserGrowthMetrics struct {
 
 func (x *UserGrowthMetrics) Reset() {
 	*x = UserGrowthMetrics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[18]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1458,7 +1458,7 @@ func (x *UserGrowthMetrics) String() string {
 func (*UserGrowthMetrics) ProtoMessage() {}
 
 func (x *UserGrowthMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[18]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1471,7 +1471,7 @@ func (x *UserGrowthMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserGrowthMetrics.ProtoReflect.Descriptor instead.
 func (*UserGrowthMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{18}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *UserGrowthMetrics) GetTotalUsers() int64 {
@@ -1559,7 +1559,7 @@ type UsageMetrics struct {
 
 func (x *UsageMetrics) Reset() {
 	*x = UsageMetrics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[19]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1571,7 +1571,7 @@ func (x *UsageMetrics) String() string {
 func (*UsageMetrics) ProtoMessage() {}
 
 func (x *UsageMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[19]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1584,7 +1584,7 @@ func (x *UsageMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageMetrics.ProtoReflect.Descriptor instead.
 func (*UsageMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{19}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *UsageMetrics) GetTotalSearches() int64 {
@@ -1650,7 +1650,7 @@ type PerformanceMetrics struct {
 
 func (x *PerformanceMetrics) Reset() {
 	*x = PerformanceMetrics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[20]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1662,7 +1662,7 @@ func (x *PerformanceMetrics) String() string {
 func (*PerformanceMetrics) ProtoMessage() {}
 
 func (x *PerformanceMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[20]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1675,7 +1675,7 @@ func (x *PerformanceMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PerformanceMetrics.ProtoReflect.Descriptor instead.
 func (*PerformanceMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{20}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PerformanceMetrics) GetCpuUsagePercentage() float64 {
@@ -1732,7 +1732,7 @@ type ErrorMetrics struct {
 
 func (x *ErrorMetrics) Reset() {
 	*x = ErrorMetrics{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[21]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1744,7 +1744,7 @@ func (x *ErrorMetrics) String() string {
 func (*ErrorMetrics) ProtoMessage() {}
 
 func (x *ErrorMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[21]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1757,7 +1757,7 @@ func (x *ErrorMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorMetrics.ProtoReflect.Descriptor instead.
 func (*ErrorMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{21}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ErrorMetrics) GetTotalErrorsToday() int32 {
@@ -1799,7 +1799,7 @@ type ErrorBreakdown struct {
 
 func (x *ErrorBreakdown) Reset() {
 	*x = ErrorBreakdown{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[22]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1811,7 +1811,7 @@ func (x *ErrorBreakdown) String() string {
 func (*ErrorBreakdown) ProtoMessage() {}
 
 func (x *ErrorBreakdown) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[22]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1824,7 +1824,7 @@ func (x *ErrorBreakdown) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorBreakdown.ProtoReflect.Descriptor instead.
 func (*ErrorBreakdown) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{22}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ErrorBreakdown) GetErrorType() string {
@@ -1858,7 +1858,7 @@ type GeographicDistribution struct {
 
 func (x *GeographicDistribution) Reset() {
 	*x = GeographicDistribution{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[23]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1870,7 +1870,7 @@ func (x *GeographicDistribution) String() string {
 func (*GeographicDistribution) ProtoMessage() {}
 
 func (x *GeographicDistribution) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[23]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1883,7 +1883,7 @@ func (x *GeographicDistribution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeographicDistribution.ProtoReflect.Descriptor instead.
 func (*GeographicDistribution) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{23}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GeographicDistribution) GetCountryStats() []*CountryStats {
@@ -1913,7 +1913,7 @@ type CountryStats struct {
 
 func (x *CountryStats) Reset() {
 	*x = CountryStats{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[24]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1925,7 +1925,7 @@ func (x *CountryStats) String() string {
 func (*CountryStats) ProtoMessage() {}
 
 func (x *CountryStats) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[24]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1938,7 +1938,7 @@ func (x *CountryStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CountryStats.ProtoReflect.Descriptor instead.
 func (*CountryStats) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{24}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CountryStats) GetCountryCode() string {
@@ -1989,7 +1989,7 @@ type CityStats struct {
 
 func (x *CityStats) Reset() {
 	*x = CityStats{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[25]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2001,7 +2001,7 @@ func (x *CityStats) String() string {
 func (*CityStats) ProtoMessage() {}
 
 func (x *CityStats) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[25]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2014,7 +2014,7 @@ func (x *CityStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityStats.ProtoReflect.Descriptor instead.
 func (*CityStats) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{25}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CityStats) GetCityId() string {
@@ -2066,7 +2066,7 @@ type FeatureUsage struct {
 
 func (x *FeatureUsage) Reset() {
 	*x = FeatureUsage{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[26]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2078,7 +2078,7 @@ func (x *FeatureUsage) String() string {
 func (*FeatureUsage) ProtoMessage() {}
 
 func (x *FeatureUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[26]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2091,7 +2091,7 @@ func (x *FeatureUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeatureUsage.ProtoReflect.Descriptor instead.
 func (*FeatureUsage) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{26}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *FeatureUsage) GetSemanticSearches() int32 {
@@ -2147,7 +2147,7 @@ type FeatureMetric struct {
 
 func (x *FeatureMetric) Reset() {
 	*x = FeatureMetric{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[27]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2159,7 +2159,7 @@ func (x *FeatureMetric) String() string {
 func (*FeatureMetric) ProtoMessage() {}
 
 func (x *FeatureMetric) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[27]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2172,7 +2172,7 @@ func (x *FeatureMetric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeatureMetric.ProtoReflect.Descriptor instead.
 func (*FeatureMetric) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{27}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *FeatureMetric) GetFeatureName() string {
@@ -2213,7 +2213,7 @@ type StatisticsEvent struct {
 
 func (x *StatisticsEvent) Reset() {
 	*x = StatisticsEvent{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[28]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2225,7 +2225,7 @@ func (x *StatisticsEvent) String() string {
 func (*StatisticsEvent) ProtoMessage() {}
 
 func (x *StatisticsEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[28]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2238,7 +2238,7 @@ func (x *StatisticsEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatisticsEvent.ProtoReflect.Descriptor instead.
 func (*StatisticsEvent) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{28}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StatisticsEvent) GetEventType() string {
@@ -2323,7 +2323,7 @@ type MetricUpdate struct {
 
 func (x *MetricUpdate) Reset() {
 	*x = MetricUpdate{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[29]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2335,7 +2335,7 @@ func (x *MetricUpdate) String() string {
 func (*MetricUpdate) ProtoMessage() {}
 
 func (x *MetricUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[29]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2348,7 +2348,7 @@ func (x *MetricUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricUpdate.ProtoReflect.Descriptor instead.
 func (*MetricUpdate) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{29}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *MetricUpdate) GetMetricName() string {
@@ -2391,7 +2391,7 @@ type SystemAlert struct {
 
 func (x *SystemAlert) Reset() {
 	*x = SystemAlert{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[30]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2403,7 +2403,7 @@ func (x *SystemAlert) String() string {
 func (*SystemAlert) ProtoMessage() {}
 
 func (x *SystemAlert) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[30]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2416,7 +2416,7 @@ func (x *SystemAlert) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SystemAlert.ProtoReflect.Descriptor instead.
 func (*SystemAlert) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{30}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *SystemAlert) GetAlertType() string {
@@ -2458,7 +2458,7 @@ type GetMainPageStatisticsRequest struct {
 
 func (x *GetMainPageStatisticsRequest) Reset() {
 	*x = GetMainPageStatisticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[31]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2470,7 +2470,7 @@ func (x *GetMainPageStatisticsRequest) String() string {
 func (*GetMainPageStatisticsRequest) ProtoMessage() {}
 
 func (x *GetMainPageStatisticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[31]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2483,7 +2483,7 @@ func (x *GetMainPageStatisticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMainPageStatisticsRequest.ProtoReflect.Descriptor instead.
 func (*GetMainPageStatisticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{31}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *GetMainPageStatisticsRequest) GetIncludeTrends() bool {
@@ -2509,7 +2509,7 @@ type GetMainPageStatisticsResponse struct {
 
 func (x *GetMainPageStatisticsResponse) Reset() {
 	*x = GetMainPageStatisticsResponse{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[32]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2521,7 +2521,7 @@ func (x *GetMainPageStatisticsResponse) String() string {
 func (*GetMainPageStatisticsResponse) ProtoMessage() {}
 
 func (x *GetMainPageStatisticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[32]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2534,7 +2534,7 @@ func (x *GetMainPageStatisticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMainPageStatisticsResponse.ProtoReflect.Descriptor instead.
 func (*GetMainPageStatisticsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{32}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetMainPageStatisticsResponse) GetStatistics() *MainPageStatistics {
@@ -2554,7 +2554,7 @@ type StreamMainPageStatisticsRequest struct {
 
 func (x *StreamMainPageStatisticsRequest) Reset() {
 	*x = StreamMainPageStatisticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[33]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2566,7 +2566,7 @@ func (x *StreamMainPageStatisticsRequest) String() string {
 func (*StreamMainPageStatisticsRequest) ProtoMessage() {}
 
 func (x *StreamMainPageStatisticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[33]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2579,7 +2579,7 @@ func (x *StreamMainPageStatisticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamMainPageStatisticsRequest.ProtoReflect.Descriptor instead.
 func (*StreamMainPageStatisticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{33}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *StreamMainPageStatisticsRequest) GetUpdateIntervalSeconds() int32 {
@@ -2607,7 +2607,7 @@ type GetDetailedPOIStatisticsRequest struct {
 
 func (x *GetDetailedPOIStatisticsRequest) Reset() {
 	*x = GetDetailedPOIStatisticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[34]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2619,7 +2619,7 @@ func (x *GetDetailedPOIStatisticsRequest) String() string {
 func (*GetDetailedPOIStatisticsRequest) ProtoMessage() {}
 
 func (x *GetDetailedPOIStatisticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[34]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2632,7 +2632,7 @@ func (x *GetDetailedPOIStatisticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDetailedPOIStatisticsRequest.ProtoReflect.Descriptor instead.
 func (*GetDetailedPOIStatisticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{34}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetDetailedPOIStatisticsRequest) GetUserId() string {
@@ -2666,7 +2666,7 @@ type GetDetailedPOIStatisticsResponse struct {
 
 func (x *GetDetailedPOIStatisticsResponse) Reset() {
 	*x = GetDetailedPOIStatisticsResponse{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[35]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2678,7 +2678,7 @@ func (x *GetDetailedPOIStatisticsResponse) String() string {
 func (*GetDetailedPOIStatisticsResponse) ProtoMessage() {}
 
 func (x *GetDetailedPOIStatisticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[35]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2691,7 +2691,7 @@ func (x *GetDetailedPOIStatisticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDetailedPOIStatisticsResponse.ProtoReflect.Descriptor instead.
 func (*GetDetailedPOIStatisticsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{35}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetDetailedPOIStatisticsResponse) GetStatistics() *DetailedPOIStatistics {
@@ -2720,7 +2720,7 @@ type Prediction struct {
 
 func (x *Prediction) Reset() {
 	*x = Prediction{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[36]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2732,7 +2732,7 @@ func (x *Prediction) String() string {
 func (*Prediction) ProtoMessage() {}
 
 func (x *Prediction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[36]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2745,7 +2745,7 @@ func (x *Prediction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Prediction.ProtoReflect.Descriptor instead.
 func (*Prediction) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{36}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Prediction) GetMetric() string {
@@ -2785,7 +2785,7 @@ type GetLandingPageStatisticsRequest struct {
 
 func (x *GetLandingPageStatisticsRequest) Reset() {
 	*x = GetLandingPageStatisticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[37]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2797,7 +2797,7 @@ func (x *GetLandingPageStatisticsRequest) String() string {
 func (*GetLandingPageStatisticsRequest) ProtoMessage() {}
 
 func (x *GetLandingPageStatisticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[37]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2810,7 +2810,7 @@ func (x *GetLandingPageStatisticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLandingPageStatisticsRequest.ProtoReflect.Descriptor instead.
 func (*GetLandingPageStatisticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{37}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetLandingPageStatisticsRequest) GetUserId() string {
@@ -2829,7 +2829,7 @@ type GetLandingPageStatisticsResponse struct {
 
 func (x *GetLandingPageStatisticsResponse) Reset() {
 	*x = GetLandingPageStatisticsResponse{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[38]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2841,7 +2841,7 @@ func (x *GetLandingPageStatisticsResponse) String() string {
 func (*GetLandingPageStatisticsResponse) ProtoMessage() {}
 
 func (x *GetLandingPageStatisticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[38]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2854,7 +2854,7 @@ func (x *GetLandingPageStatisticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLandingPageStatisticsResponse.ProtoReflect.Descriptor instead.
 func (*GetLandingPageStatisticsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{38}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetLandingPageStatisticsResponse) GetStatistics() *LandingPageUserStats {
@@ -2876,7 +2876,7 @@ type GetUserActivityAnalyticsRequest struct {
 
 func (x *GetUserActivityAnalyticsRequest) Reset() {
 	*x = GetUserActivityAnalyticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[39]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2888,7 +2888,7 @@ func (x *GetUserActivityAnalyticsRequest) String() string {
 func (*GetUserActivityAnalyticsRequest) ProtoMessage() {}
 
 func (x *GetUserActivityAnalyticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[39]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2901,7 +2901,7 @@ func (x *GetUserActivityAnalyticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserActivityAnalyticsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserActivityAnalyticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{39}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetUserActivityAnalyticsRequest) GetUserId() string {
@@ -2942,7 +2942,7 @@ type GetUserActivityAnalyticsResponse struct {
 
 func (x *GetUserActivityAnalyticsResponse) Reset() {
 	*x = GetUserActivityAnalyticsResponse{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[40]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2954,7 +2954,7 @@ func (x *GetUserActivityAnalyticsResponse) String() string {
 func (*GetUserActivityAnalyticsResponse) ProtoMessage() {}
 
 func (x *GetUserActivityAnalyticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[40]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2967,7 +2967,7 @@ func (x *GetUserActivityAnalyticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserActivityAnalyticsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserActivityAnalyticsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{40}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetUserActivityAnalyticsResponse) GetActivityData() []*ActivityDataPoint {
@@ -2997,7 +2997,7 @@ type ActivityDataPoint struct {
 
 func (x *ActivityDataPoint) Reset() {
 	*x = ActivityDataPoint{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[41]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3009,7 +3009,7 @@ func (x *ActivityDataPoint) String() string {
 func (*ActivityDataPoint) ProtoMessage() {}
 
 func (x *ActivityDataPoint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[41]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3022,7 +3022,7 @@ func (x *ActivityDataPoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityDataPoint.ProtoReflect.Descriptor instead.
 func (*ActivityDataPoint) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{41}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ActivityDataPoint) GetTimestamp() *timestamppb.Timestamp {
@@ -3073,7 +3073,7 @@ type ActivitySummary struct {
 
 func (x *ActivitySummary) Reset() {
 	*x = ActivitySummary{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[42]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3085,7 +3085,7 @@ func (x *ActivitySummary) String() string {
 func (*ActivitySummary) ProtoMessage() {}
 
 func (x *ActivitySummary) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[42]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3098,7 +3098,7 @@ func (x *ActivitySummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivitySummary.ProtoReflect.Descriptor instead.
 func (*ActivitySummary) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{42}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ActivitySummary) GetTotalSearches() int32 {
@@ -3146,7 +3146,7 @@ type GetSystemAnalyticsRequest struct {
 
 func (x *GetSystemAnalyticsRequest) Reset() {
 	*x = GetSystemAnalyticsRequest{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[43]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3158,7 +3158,7 @@ func (x *GetSystemAnalyticsRequest) String() string {
 func (*GetSystemAnalyticsRequest) ProtoMessage() {}
 
 func (x *GetSystemAnalyticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[43]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3171,7 +3171,7 @@ func (x *GetSystemAnalyticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSystemAnalyticsRequest.ProtoReflect.Descriptor instead.
 func (*GetSystemAnalyticsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{43}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GetSystemAnalyticsRequest) GetTimeRange() string {
@@ -3197,7 +3197,7 @@ type GetSystemAnalyticsResponse struct {
 
 func (x *GetSystemAnalyticsResponse) Reset() {
 	*x = GetSystemAnalyticsResponse{}
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[44]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3209,7 +3209,7 @@ func (x *GetSystemAnalyticsResponse) String() string {
 func (*GetSystemAnalyticsResponse) ProtoMessage() {}
 
 func (x *GetSystemAnalyticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_statistics_statistics_proto_msgTypes[44]
+	mi := &file_loci_statistics_statistics_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3222,7 +3222,7 @@ func (x *GetSystemAnalyticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSystemAnalyticsResponse.ProtoReflect.Descriptor instead.
 func (*GetSystemAnalyticsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_statistics_statistics_proto_rawDescGZIP(), []int{44}
+	return file_loci_statistics_statistics_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GetSystemAnalyticsResponse) GetAnalytics() *SystemAnalytics {
@@ -3232,11 +3232,11 @@ func (x *GetSystemAnalyticsResponse) GetAnalytics() *SystemAnalytics {
 	return nil
 }
 
-var File_proto_loci_statistics_statistics_proto protoreflect.FileDescriptor
+var File_loci_statistics_statistics_proto protoreflect.FileDescriptor
 
-const file_proto_loci_statistics_statistics_proto_rawDesc = "" +
+const file_loci_statistics_statistics_proto_rawDesc = "" +
 	"\n" +
-	"&proto/loci/statistics/statistics.proto\x12\x14ai_poi.statistics.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\x05\n" +
+	" loci/statistics/statistics.proto\x12\x14ai_poi.statistics.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x88\x05\n" +
 	"\x12MainPageStatistics\x12&\n" +
 	"\n" +
 	"total_pois\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\ttotalPois\x12*\n" +
@@ -3537,19 +3537,19 @@ const file_proto_loci_statistics_statistics_proto_rawDesc = "" +
 	"\x12GetSystemAnalytics\x12/.ai_poi.statistics.v1.GetSystemAnalyticsRequest\x1a0.ai_poi.statistics.v1.GetSystemAnalyticsResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/statistics/v1;statisticsv1b\x06proto3"
 
 var (
-	file_proto_loci_statistics_statistics_proto_rawDescOnce sync.Once
-	file_proto_loci_statistics_statistics_proto_rawDescData []byte
+	file_loci_statistics_statistics_proto_rawDescOnce sync.Once
+	file_loci_statistics_statistics_proto_rawDescData []byte
 )
 
-func file_proto_loci_statistics_statistics_proto_rawDescGZIP() []byte {
-	file_proto_loci_statistics_statistics_proto_rawDescOnce.Do(func() {
-		file_proto_loci_statistics_statistics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_statistics_statistics_proto_rawDesc), len(file_proto_loci_statistics_statistics_proto_rawDesc)))
+func file_loci_statistics_statistics_proto_rawDescGZIP() []byte {
+	file_loci_statistics_statistics_proto_rawDescOnce.Do(func() {
+		file_loci_statistics_statistics_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_loci_statistics_statistics_proto_rawDesc), len(file_loci_statistics_statistics_proto_rawDesc)))
 	})
-	return file_proto_loci_statistics_statistics_proto_rawDescData
+	return file_loci_statistics_statistics_proto_rawDescData
 }
 
-var file_proto_loci_statistics_statistics_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
-var file_proto_loci_statistics_statistics_proto_goTypes = []any{
+var file_loci_statistics_statistics_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
+var file_loci_statistics_statistics_proto_goTypes = []any{
 	(*MainPageStatistics)(nil),               // 0: ai_poi.statistics.v1.MainPageStatistics
 	(*RecentActivity)(nil),                   // 1: ai_poi.statistics.v1.RecentActivity
 	(*PopularDestination)(nil),               // 2: ai_poi.statistics.v1.PopularDestination
@@ -3599,7 +3599,7 @@ var file_proto_loci_statistics_statistics_proto_goTypes = []any{
 	nil,                                      // 46: ai_poi.statistics.v1.SystemAlert.DetailsEntry
 	(*timestamppb.Timestamp)(nil),            // 47: google.protobuf.Timestamp
 }
-var file_proto_loci_statistics_statistics_proto_depIdxs = []int32{
+var file_loci_statistics_statistics_proto_depIdxs = []int32{
 	1,  // 0: ai_poi.statistics.v1.MainPageStatistics.recent_activity:type_name -> ai_poi.statistics.v1.RecentActivity
 	2,  // 1: ai_poi.statistics.v1.MainPageStatistics.popular_destinations:type_name -> ai_poi.statistics.v1.PopularDestination
 	3,  // 2: ai_poi.statistics.v1.MainPageStatistics.trending_categories:type_name -> ai_poi.statistics.v1.TrendingCategories
@@ -3667,12 +3667,12 @@ var file_proto_loci_statistics_statistics_proto_depIdxs = []int32{
 	0,  // [0:48] is the sub-list for field type_name
 }
 
-func init() { file_proto_loci_statistics_statistics_proto_init() }
-func file_proto_loci_statistics_statistics_proto_init() {
-	if File_proto_loci_statistics_statistics_proto != nil {
+func init() { file_loci_statistics_statistics_proto_init() }
+func file_loci_statistics_statistics_proto_init() {
+	if File_loci_statistics_statistics_proto != nil {
 		return
 	}
-	file_proto_loci_statistics_statistics_proto_msgTypes[28].OneofWrappers = []any{
+	file_loci_statistics_statistics_proto_msgTypes[28].OneofWrappers = []any{
 		(*StatisticsEvent_MainStats)(nil),
 		(*StatisticsEvent_MetricUpdate)(nil),
 		(*StatisticsEvent_SystemAlert)(nil),
@@ -3681,17 +3681,17 @@ func file_proto_loci_statistics_statistics_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_statistics_statistics_proto_rawDesc), len(file_proto_loci_statistics_statistics_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_statistics_statistics_proto_rawDesc), len(file_loci_statistics_statistics_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_loci_statistics_statistics_proto_goTypes,
-		DependencyIndexes: file_proto_loci_statistics_statistics_proto_depIdxs,
-		MessageInfos:      file_proto_loci_statistics_statistics_proto_msgTypes,
+		GoTypes:           file_loci_statistics_statistics_proto_goTypes,
+		DependencyIndexes: file_loci_statistics_statistics_proto_depIdxs,
+		MessageInfos:      file_loci_statistics_statistics_proto_msgTypes,
 	}.Build()
-	File_proto_loci_statistics_statistics_proto = out.File
-	file_proto_loci_statistics_statistics_proto_goTypes = nil
-	file_proto_loci_statistics_statistics_proto_depIdxs = nil
+	File_loci_statistics_statistics_proto = out.File
+	file_loci_statistics_statistics_proto_goTypes = nil
+	file_loci_statistics_statistics_proto_depIdxs = nil
 }

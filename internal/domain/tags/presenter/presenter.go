@@ -2,7 +2,7 @@ package presenter
 
 import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	tagsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/tags/v1"
+	tagsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/loci/city/city.proto
+// source: loci/city/city.proto
 
 package city
 
@@ -38,7 +38,7 @@ type CityDetail struct {
 
 func (x *CityDetail) Reset() {
 	*x = CityDetail{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[0]
+	mi := &file_loci_city_city_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +50,7 @@ func (x *CityDetail) String() string {
 func (*CityDetail) ProtoMessage() {}
 
 func (x *CityDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[0]
+	mi := &file_loci_city_city_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,7 +63,7 @@ func (x *CityDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityDetail.ProtoReflect.Descriptor instead.
 func (*CityDetail) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{0}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *CityDetail) GetId() string {
@@ -137,7 +137,7 @@ type GeneralCityData struct {
 
 func (x *GeneralCityData) Reset() {
 	*x = GeneralCityData{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[1]
+	mi := &file_loci_city_city_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -149,7 +149,7 @@ func (x *GeneralCityData) String() string {
 func (*GeneralCityData) ProtoMessage() {}
 
 func (x *GeneralCityData) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[1]
+	mi := &file_loci_city_city_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -162,7 +162,7 @@ func (x *GeneralCityData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeneralCityData.ProtoReflect.Descriptor instead.
 func (*GeneralCityData) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{1}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GeneralCityData) GetCity() string {
@@ -270,7 +270,7 @@ type GetCityRequest struct {
 
 func (x *GetCityRequest) Reset() {
 	*x = GetCityRequest{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[2]
+	mi := &file_loci_city_city_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -282,7 +282,7 @@ func (x *GetCityRequest) String() string {
 func (*GetCityRequest) ProtoMessage() {}
 
 func (x *GetCityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[2]
+	mi := &file_loci_city_city_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -295,7 +295,7 @@ func (x *GetCityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCityRequest.ProtoReflect.Descriptor instead.
 func (*GetCityRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{2}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetCityRequest) GetIdentifier() isGetCityRequest_Identifier {
@@ -349,7 +349,7 @@ type GetCityResponse struct {
 
 func (x *GetCityResponse) Reset() {
 	*x = GetCityResponse{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[3]
+	mi := &file_loci_city_city_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -361,7 +361,7 @@ func (x *GetCityResponse) String() string {
 func (*GetCityResponse) ProtoMessage() {}
 
 func (x *GetCityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[3]
+	mi := &file_loci_city_city_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -374,7 +374,7 @@ func (x *GetCityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCityResponse.ProtoReflect.Descriptor instead.
 func (*GetCityResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{3}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetCityResponse) GetCity() *CityDetail {
@@ -395,7 +395,7 @@ type SearchCitiesRequest struct {
 
 func (x *SearchCitiesRequest) Reset() {
 	*x = SearchCitiesRequest{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[4]
+	mi := &file_loci_city_city_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -407,7 +407,7 @@ func (x *SearchCitiesRequest) String() string {
 func (*SearchCitiesRequest) ProtoMessage() {}
 
 func (x *SearchCitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[4]
+	mi := &file_loci_city_city_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -420,7 +420,7 @@ func (x *SearchCitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchCitiesRequest.ProtoReflect.Descriptor instead.
 func (*SearchCitiesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{4}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SearchCitiesRequest) GetQuery() string {
@@ -447,7 +447,7 @@ type SearchCitiesResponse struct {
 
 func (x *SearchCitiesResponse) Reset() {
 	*x = SearchCitiesResponse{}
-	mi := &file_proto_loci_city_city_proto_msgTypes[5]
+	mi := &file_loci_city_city_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -459,7 +459,7 @@ func (x *SearchCitiesResponse) String() string {
 func (*SearchCitiesResponse) ProtoMessage() {}
 
 func (x *SearchCitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_city_city_proto_msgTypes[5]
+	mi := &file_loci_city_city_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -472,7 +472,7 @@ func (x *SearchCitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchCitiesResponse.ProtoReflect.Descriptor instead.
 func (*SearchCitiesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_city_city_proto_rawDescGZIP(), []int{5}
+	return file_loci_city_city_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SearchCitiesResponse) GetCities() []*CityDetail {
@@ -482,11 +482,11 @@ func (x *SearchCitiesResponse) GetCities() []*CityDetail {
 	return nil
 }
 
-var File_proto_loci_city_city_proto protoreflect.FileDescriptor
+var File_loci_city_city_proto protoreflect.FileDescriptor
 
-const file_proto_loci_city_city_proto_rawDesc = "" +
+const file_loci_city_city_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/loci/city/city.proto\x12\tloci.city\x1a\x1bbuf/validate/validate.proto\"\xa3\x03\n" +
+	"\x14loci/city/city.proto\x12\tloci.city\x1a\x1bbuf/validate/validate.proto\"\xa3\x03\n" +
 	"\n" +
 	"CityDetail\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
@@ -547,19 +547,19 @@ const file_proto_loci_city_city_proto_rawDesc = "" +
 	"\fSearchCities\x12\x1e.loci.city.SearchCitiesRequest\x1a\x1f.loci.city.SearchCitiesResponseB@Z>github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city;cityb\x06proto3"
 
 var (
-	file_proto_loci_city_city_proto_rawDescOnce sync.Once
-	file_proto_loci_city_city_proto_rawDescData []byte
+	file_loci_city_city_proto_rawDescOnce sync.Once
+	file_loci_city_city_proto_rawDescData []byte
 )
 
-func file_proto_loci_city_city_proto_rawDescGZIP() []byte {
-	file_proto_loci_city_city_proto_rawDescOnce.Do(func() {
-		file_proto_loci_city_city_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_city_city_proto_rawDesc), len(file_proto_loci_city_city_proto_rawDesc)))
+func file_loci_city_city_proto_rawDescGZIP() []byte {
+	file_loci_city_city_proto_rawDescOnce.Do(func() {
+		file_loci_city_city_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_loci_city_city_proto_rawDesc), len(file_loci_city_city_proto_rawDesc)))
 	})
-	return file_proto_loci_city_city_proto_rawDescData
+	return file_loci_city_city_proto_rawDescData
 }
 
-var file_proto_loci_city_city_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
-var file_proto_loci_city_city_proto_goTypes = []any{
+var file_loci_city_city_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_loci_city_city_proto_goTypes = []any{
 	(*CityDetail)(nil),           // 0: loci.city.CityDetail
 	(*GeneralCityData)(nil),      // 1: loci.city.GeneralCityData
 	(*GetCityRequest)(nil),       // 2: loci.city.GetCityRequest
@@ -567,7 +567,7 @@ var file_proto_loci_city_city_proto_goTypes = []any{
 	(*SearchCitiesRequest)(nil),  // 4: loci.city.SearchCitiesRequest
 	(*SearchCitiesResponse)(nil), // 5: loci.city.SearchCitiesResponse
 }
-var file_proto_loci_city_city_proto_depIdxs = []int32{
+var file_loci_city_city_proto_depIdxs = []int32{
 	0, // 0: loci.city.GetCityResponse.city:type_name -> loci.city.CityDetail
 	0, // 1: loci.city.SearchCitiesResponse.cities:type_name -> loci.city.CityDetail
 	2, // 2: loci.city.CityService.GetCity:input_type -> loci.city.GetCityRequest
@@ -581,33 +581,33 @@ var file_proto_loci_city_city_proto_depIdxs = []int32{
 	0, // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_proto_loci_city_city_proto_init() }
-func file_proto_loci_city_city_proto_init() {
-	if File_proto_loci_city_city_proto != nil {
+func init() { file_loci_city_city_proto_init() }
+func file_loci_city_city_proto_init() {
+	if File_loci_city_city_proto != nil {
 		return
 	}
-	file_proto_loci_city_city_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_loci_city_city_proto_msgTypes[1].OneofWrappers = []any{}
-	file_proto_loci_city_city_proto_msgTypes[2].OneofWrappers = []any{
+	file_loci_city_city_proto_msgTypes[0].OneofWrappers = []any{}
+	file_loci_city_city_proto_msgTypes[1].OneofWrappers = []any{}
+	file_loci_city_city_proto_msgTypes[2].OneofWrappers = []any{
 		(*GetCityRequest_CityId)(nil),
 		(*GetCityRequest_CityName)(nil),
 	}
-	file_proto_loci_city_city_proto_msgTypes[4].OneofWrappers = []any{}
+	file_loci_city_city_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_city_city_proto_rawDesc), len(file_proto_loci_city_city_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_city_city_proto_rawDesc), len(file_loci_city_city_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_loci_city_city_proto_goTypes,
-		DependencyIndexes: file_proto_loci_city_city_proto_depIdxs,
-		MessageInfos:      file_proto_loci_city_city_proto_msgTypes,
+		GoTypes:           file_loci_city_city_proto_goTypes,
+		DependencyIndexes: file_loci_city_city_proto_depIdxs,
+		MessageInfos:      file_loci_city_city_proto_msgTypes,
 	}.Build()
-	File_proto_loci_city_city_proto = out.File
-	file_proto_loci_city_city_proto_goTypes = nil
-	file_proto_loci_city_city_proto_depIdxs = nil
+	File_loci_city_city_proto = out.File
+	file_loci_city_city_proto_goTypes = nil
+	file_loci_city_city_proto_depIdxs = nil
 }

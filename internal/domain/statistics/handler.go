@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/statistics/v1"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/statistics/v1/statisticsv1connect"
+	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

@@ -42,7 +42,8 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret string
+	JWTSecret  string
+	AdminEmail string
 }
 
 type ObservabilityConfig struct {
@@ -73,7 +74,8 @@ func Load() (*Config, error) {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Auth: AuthConfig{
-			JWTSecret: getEnv("JWT_SECRET", "changeme"),
+			JWTSecret:  getEnv("JWT_SECRET", "changeme"),
+			AdminEmail: getEnv("ADMIN_EMAIL", ""),
 		},
 		Observability: ObservabilityConfig{
 			MetricsEnabled: getEnvAsBool("METRICS_ENABLED", true),

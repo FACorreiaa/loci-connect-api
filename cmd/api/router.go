@@ -10,21 +10,24 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/recents/v1/recentsv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/statistics/v1/statisticsv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
+	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect" // Add import
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/tags/v1/tagsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
 	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/otel"
 	"golang.org/x/time/rate"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
@@ -62,6 +65,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	requestIDInterceptor := interceptors.NewRequestIDInterceptor("X-Request-ID")
 	tracingInterceptor := interceptors.NewTracingInterceptor(tracer)
 	validationInterceptor := validate.NewInterceptor()
+	subscriptionInterceptor := subscription.NewRateLimitInterceptor(deps.SubscriptionService)
 
 	// Setup interceptor chain
 	interceptorChain := connect.WithInterceptors(
@@ -69,6 +73,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		tracingInterceptor,
 		validationInterceptor,
 		rateLimiter,
+		subscriptionInterceptor,
 		interceptors.NewRecoveryInterceptor(deps.Logger),
 		interceptors.NewLoggingInterceptor(deps.Logger),
 		interceptors.NewAuthInterceptor(jwtSecret, publicProcedures...),
@@ -77,6 +82,12 @@ func SetupRouter(deps *Dependencies) http.Handler {
 
 	// Register Connect RPC routes
 	registerConnectRoutes(mux, deps, interceptorChain)
+
+	// Register Webhooks
+	if deps.PaymentService != nil {
+		mux.Handle("/webhooks/stripe", payment.WebhookHandler(deps.PaymentService, deps.Logger))
+		deps.Logger.Info("registered webhook", "path", "/webhooks/stripe")
+	}
 
 	// Register health and metrics routes
 	registerUtilityRoutes(mux, deps)
@@ -180,6 +191,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		tagsPath, tagsHandler := tagsv1connect.NewTagsServiceHandler(deps.TagsHandler, opts)
 		mux.Handle(tagsPath, tagsHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", tagsPath)
+	}
+
+	if deps.PaymentHandler != nil {
+		paymentPath, paymentHandler := paymentv1connect.NewPaymentServiceHandler(deps.PaymentHandler, opts)
+		mux.Handle(paymentPath, paymentHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", paymentPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

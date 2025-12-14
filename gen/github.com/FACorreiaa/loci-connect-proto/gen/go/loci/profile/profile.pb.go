@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/loci/profile/profile.proto
+// source: loci/profile/profile.proto
 
 package profile
 
@@ -62,11 +62,11 @@ func (x DayPreference) String() string {
 }
 
 func (DayPreference) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_profile_profile_proto_enumTypes[0].Descriptor()
+	return file_loci_profile_profile_proto_enumTypes[0].Descriptor()
 }
 
 func (DayPreference) Type() protoreflect.EnumType {
-	return &file_proto_loci_profile_profile_proto_enumTypes[0]
+	return &file_loci_profile_profile_proto_enumTypes[0]
 }
 
 func (x DayPreference) Number() protoreflect.EnumNumber {
@@ -75,7 +75,7 @@ func (x DayPreference) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DayPreference.Descriptor instead.
 func (DayPreference) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{0}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{0}
 }
 
 type SearchPace int32
@@ -117,11 +117,11 @@ func (x SearchPace) String() string {
 }
 
 func (SearchPace) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_profile_profile_proto_enumTypes[1].Descriptor()
+	return file_loci_profile_profile_proto_enumTypes[1].Descriptor()
 }
 
 func (SearchPace) Type() protoreflect.EnumType {
-	return &file_proto_loci_profile_profile_proto_enumTypes[1]
+	return &file_loci_profile_profile_proto_enumTypes[1]
 }
 
 func (x SearchPace) Number() protoreflect.EnumNumber {
@@ -130,7 +130,7 @@ func (x SearchPace) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SearchPace.Descriptor instead.
 func (SearchPace) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{1}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{1}
 }
 
 type TransportPreference int32
@@ -172,11 +172,11 @@ func (x TransportPreference) String() string {
 }
 
 func (TransportPreference) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_profile_profile_proto_enumTypes[2].Descriptor()
+	return file_loci_profile_profile_proto_enumTypes[2].Descriptor()
 }
 
 func (TransportPreference) Type() protoreflect.EnumType {
-	return &file_proto_loci_profile_profile_proto_enumTypes[2]
+	return &file_loci_profile_profile_proto_enumTypes[2]
 }
 
 func (x TransportPreference) Number() protoreflect.EnumNumber {
@@ -185,7 +185,7 @@ func (x TransportPreference) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TransportPreference.Descriptor instead.
 func (TransportPreference) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{2}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{2}
 }
 
 // AccommodationPreferences represents accommodation-specific filters
@@ -209,7 +209,7 @@ type AccommodationPreferences struct {
 
 func (x *AccommodationPreferences) Reset() {
 	*x = AccommodationPreferences{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[0]
+	mi := &file_loci_profile_profile_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +221,7 @@ func (x *AccommodationPreferences) String() string {
 func (*AccommodationPreferences) ProtoMessage() {}
 
 func (x *AccommodationPreferences) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[0]
+	mi := &file_loci_profile_profile_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +234,7 @@ func (x *AccommodationPreferences) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccommodationPreferences.ProtoReflect.Descriptor instead.
 func (*AccommodationPreferences) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{0}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *AccommodationPreferences) GetId() string {
@@ -345,7 +345,7 @@ type DiningPreferences struct {
 
 func (x *DiningPreferences) Reset() {
 	*x = DiningPreferences{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[1]
+	mi := &file_loci_profile_profile_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +357,7 @@ func (x *DiningPreferences) String() string {
 func (*DiningPreferences) ProtoMessage() {}
 
 func (x *DiningPreferences) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[1]
+	mi := &file_loci_profile_profile_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +370,7 @@ func (x *DiningPreferences) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiningPreferences.ProtoReflect.Descriptor instead.
 func (*DiningPreferences) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{1}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DiningPreferences) GetId() string {
@@ -501,7 +501,7 @@ type ActivityPreferences struct {
 
 func (x *ActivityPreferences) Reset() {
 	*x = ActivityPreferences{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[2]
+	mi := &file_loci_profile_profile_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +513,7 @@ func (x *ActivityPreferences) String() string {
 func (*ActivityPreferences) ProtoMessage() {}
 
 func (x *ActivityPreferences) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[2]
+	mi := &file_loci_profile_profile_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +526,7 @@ func (x *ActivityPreferences) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityPreferences.ProtoReflect.Descriptor instead.
 func (*ActivityPreferences) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{2}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ActivityPreferences) GetId() string {
@@ -649,7 +649,7 @@ type ItineraryPreferences struct {
 
 func (x *ItineraryPreferences) Reset() {
 	*x = ItineraryPreferences{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[3]
+	mi := &file_loci_profile_profile_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -661,7 +661,7 @@ func (x *ItineraryPreferences) String() string {
 func (*ItineraryPreferences) ProtoMessage() {}
 
 func (x *ItineraryPreferences) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[3]
+	mi := &file_loci_profile_profile_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -674,7 +674,7 @@ func (x *ItineraryPreferences) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItineraryPreferences.ProtoReflect.Descriptor instead.
 func (*ItineraryPreferences) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{3}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ItineraryPreferences) GetId() string {
@@ -801,7 +801,7 @@ type UserPreferenceProfile struct {
 
 func (x *UserPreferenceProfile) Reset() {
 	*x = UserPreferenceProfile{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[4]
+	mi := &file_loci_profile_profile_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -813,7 +813,7 @@ func (x *UserPreferenceProfile) String() string {
 func (*UserPreferenceProfile) ProtoMessage() {}
 
 func (x *UserPreferenceProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[4]
+	mi := &file_loci_profile_profile_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -826,7 +826,7 @@ func (x *UserPreferenceProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserPreferenceProfile.ProtoReflect.Descriptor instead.
 func (*UserPreferenceProfile) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{4}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *UserPreferenceProfile) GetId() string {
@@ -1024,7 +1024,7 @@ type CreateUserPreferenceProfileRequest struct {
 
 func (x *CreateUserPreferenceProfileRequest) Reset() {
 	*x = CreateUserPreferenceProfileRequest{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[5]
+	mi := &file_loci_profile_profile_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +1036,7 @@ func (x *CreateUserPreferenceProfileRequest) String() string {
 func (*CreateUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *CreateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[5]
+	mi := &file_loci_profile_profile_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1049,7 @@ func (x *CreateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CreateUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{5}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateUserPreferenceProfileRequest) GetProfileName() string {
@@ -1206,7 +1206,7 @@ type UpdateUserPreferenceProfileRequest struct {
 
 func (x *UpdateUserPreferenceProfileRequest) Reset() {
 	*x = UpdateUserPreferenceProfileRequest{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[6]
+	mi := &file_loci_profile_profile_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1218,7 +1218,7 @@ func (x *UpdateUserPreferenceProfileRequest) String() string {
 func (*UpdateUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *UpdateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[6]
+	mi := &file_loci_profile_profile_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1231,7 +1231,7 @@ func (x *UpdateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use UpdateUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{6}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateUserPreferenceProfileRequest) GetProfileId() string {
@@ -1377,7 +1377,7 @@ type GetUserPreferenceProfilesRequest struct {
 
 func (x *GetUserPreferenceProfilesRequest) Reset() {
 	*x = GetUserPreferenceProfilesRequest{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[7]
+	mi := &file_loci_profile_profile_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1389,7 +1389,7 @@ func (x *GetUserPreferenceProfilesRequest) String() string {
 func (*GetUserPreferenceProfilesRequest) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[7]
+	mi := &file_loci_profile_profile_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1402,7 +1402,7 @@ func (x *GetUserPreferenceProfilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserPreferenceProfilesRequest.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfilesRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{7}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetUserPreferenceProfilesRequest) GetUserId() string {
@@ -1422,7 +1422,7 @@ type GetUserPreferenceProfilesResponse struct {
 
 func (x *GetUserPreferenceProfilesResponse) Reset() {
 	*x = GetUserPreferenceProfilesResponse{}
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[8]
+	mi := &file_loci_profile_profile_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1434,7 +1434,7 @@ func (x *GetUserPreferenceProfilesResponse) String() string {
 func (*GetUserPreferenceProfilesResponse) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_profile_profile_proto_msgTypes[8]
+	mi := &file_loci_profile_profile_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1447,7 +1447,7 @@ func (x *GetUserPreferenceProfilesResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetUserPreferenceProfilesResponse.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfilesResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_profile_profile_proto_rawDescGZIP(), []int{8}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetUserPreferenceProfilesResponse) GetProfiles() []*UserPreferenceProfile {
@@ -1457,11 +1457,11 @@ func (x *GetUserPreferenceProfilesResponse) GetProfiles() []*UserPreferenceProfi
 	return nil
 }
 
-var File_proto_loci_profile_profile_proto protoreflect.FileDescriptor
+var File_loci_profile_profile_proto protoreflect.FileDescriptor
 
-const file_proto_loci_profile_profile_proto_rawDesc = "" +
+const file_loci_profile_profile_proto_rawDesc = "" +
 	"\n" +
-	" proto/loci/profile/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eproto/loci/common/common.proto\x1a\"proto/loci/interest/interest.proto\"\xc2\x06\n" +
+	"\x1aloci/profile/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a\x1cloci/interest/interest.proto\"\xc2\x06\n" +
 	"\x18AccommodationPreferences\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
 	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12?\n" +
@@ -1722,20 +1722,20 @@ const file_proto_loci_profile_profile_proto_rawDesc = "" +
 	"\x1bUpdateUserPreferenceProfile\x120.loci.profile.UpdateUserPreferenceProfileRequest\x1a\x15.loci.common.ResponseBFZDgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile;profileb\x06proto3"
 
 var (
-	file_proto_loci_profile_profile_proto_rawDescOnce sync.Once
-	file_proto_loci_profile_profile_proto_rawDescData []byte
+	file_loci_profile_profile_proto_rawDescOnce sync.Once
+	file_loci_profile_profile_proto_rawDescData []byte
 )
 
-func file_proto_loci_profile_profile_proto_rawDescGZIP() []byte {
-	file_proto_loci_profile_profile_proto_rawDescOnce.Do(func() {
-		file_proto_loci_profile_profile_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_profile_profile_proto_rawDesc), len(file_proto_loci_profile_profile_proto_rawDesc)))
+func file_loci_profile_profile_proto_rawDescGZIP() []byte {
+	file_loci_profile_profile_proto_rawDescOnce.Do(func() {
+		file_loci_profile_profile_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_loci_profile_profile_proto_rawDesc), len(file_loci_profile_profile_proto_rawDesc)))
 	})
-	return file_proto_loci_profile_profile_proto_rawDescData
+	return file_loci_profile_profile_proto_rawDescData
 }
 
-var file_proto_loci_profile_profile_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_proto_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_proto_loci_profile_profile_proto_goTypes = []any{
+var file_loci_profile_profile_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_loci_profile_profile_proto_goTypes = []any{
 	(DayPreference)(0),                         // 0: loci.profile.DayPreference
 	(SearchPace)(0),                            // 1: loci.profile.SearchPace
 	(TransportPreference)(0),                   // 2: loci.profile.TransportPreference
@@ -1754,7 +1754,7 @@ var file_proto_loci_profile_profile_proto_goTypes = []any{
 	(*interest.Tags)(nil),                      // 15: loci.interest.Tags
 	(*common.Response)(nil),                    // 16: loci.common.Response
 }
-var file_proto_loci_profile_profile_proto_depIdxs = []int32{
+var file_loci_profile_profile_proto_depIdxs = []int32{
 	12, // 0: loci.profile.AccommodationPreferences.star_rating:type_name -> loci.common.RangeFilter
 	12, // 1: loci.profile.AccommodationPreferences.price_range_per_night:type_name -> loci.common.RangeFilter
 	13, // 2: loci.profile.AccommodationPreferences.created_at:type_name -> google.protobuf.Timestamp
@@ -1805,35 +1805,35 @@ var file_proto_loci_profile_profile_proto_depIdxs = []int32{
 	0,  // [0:37] is the sub-list for field type_name
 }
 
-func init() { file_proto_loci_profile_profile_proto_init() }
-func file_proto_loci_profile_profile_proto_init() {
-	if File_proto_loci_profile_profile_proto != nil {
+func init() { file_loci_profile_profile_proto_init() }
+func file_loci_profile_profile_proto_init() {
+	if File_loci_profile_profile_proto != nil {
 		return
 	}
-	file_proto_loci_profile_profile_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[1].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[3].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[4].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[5].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[6].OneofWrappers = []any{}
-	file_proto_loci_profile_profile_proto_msgTypes[7].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[0].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[1].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[2].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[3].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[4].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[5].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[6].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_profile_profile_proto_rawDesc), len(file_proto_loci_profile_profile_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_profile_profile_proto_rawDesc), len(file_loci_profile_profile_proto_rawDesc)),
 			NumEnums:      3,
 			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_loci_profile_profile_proto_goTypes,
-		DependencyIndexes: file_proto_loci_profile_profile_proto_depIdxs,
-		EnumInfos:         file_proto_loci_profile_profile_proto_enumTypes,
-		MessageInfos:      file_proto_loci_profile_profile_proto_msgTypes,
+		GoTypes:           file_loci_profile_profile_proto_goTypes,
+		DependencyIndexes: file_loci_profile_profile_proto_depIdxs,
+		EnumInfos:         file_loci_profile_profile_proto_enumTypes,
+		MessageInfos:      file_loci_profile_profile_proto_msgTypes,
 	}.Build()
-	File_proto_loci_profile_profile_proto = out.File
-	file_proto_loci_profile_profile_proto_goTypes = nil
-	file_proto_loci_profile_profile_proto_depIdxs = nil
+	File_loci_profile_profile_proto = out.File
+	file_loci_profile_profile_proto_goTypes = nil
+	file_loci_profile_profile_proto_depIdxs = nil
 }

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/loci/chat/chat.proto
+// source: loci/chat/chat.proto
 
 package chat
 
@@ -64,11 +64,11 @@ func (x MessageRole) String() string {
 }
 
 func (MessageRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_chat_chat_proto_enumTypes[0].Descriptor()
+	return file_loci_chat_chat_proto_enumTypes[0].Descriptor()
 }
 
 func (MessageRole) Type() protoreflect.EnumType {
-	return &file_proto_loci_chat_chat_proto_enumTypes[0]
+	return &file_loci_chat_chat_proto_enumTypes[0]
 }
 
 func (x MessageRole) Number() protoreflect.EnumNumber {
@@ -77,7 +77,7 @@ func (x MessageRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MessageRole.Descriptor instead.
 func (MessageRole) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{0}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{0}
 }
 
 type MessageType int32
@@ -125,11 +125,11 @@ func (x MessageType) String() string {
 }
 
 func (MessageType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_chat_chat_proto_enumTypes[1].Descriptor()
+	return file_loci_chat_chat_proto_enumTypes[1].Descriptor()
 }
 
 func (MessageType) Type() protoreflect.EnumType {
-	return &file_proto_loci_chat_chat_proto_enumTypes[1]
+	return &file_loci_chat_chat_proto_enumTypes[1]
 }
 
 func (x MessageType) Number() protoreflect.EnumNumber {
@@ -138,7 +138,7 @@ func (x MessageType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MessageType.Descriptor instead.
 func (MessageType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{1}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{1}
 }
 
 type SessionStatus int32
@@ -177,11 +177,11 @@ func (x SessionStatus) String() string {
 }
 
 func (SessionStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_chat_chat_proto_enumTypes[2].Descriptor()
+	return file_loci_chat_chat_proto_enumTypes[2].Descriptor()
 }
 
 func (SessionStatus) Type() protoreflect.EnumType {
-	return &file_proto_loci_chat_chat_proto_enumTypes[2]
+	return &file_loci_chat_chat_proto_enumTypes[2]
 }
 
 func (x SessionStatus) Number() protoreflect.EnumNumber {
@@ -190,7 +190,7 @@ func (x SessionStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SessionStatus.Descriptor instead.
 func (SessionStatus) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{2}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{2}
 }
 
 type IntentType int32
@@ -268,11 +268,11 @@ func (x IntentType) String() string {
 }
 
 func (IntentType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_chat_chat_proto_enumTypes[3].Descriptor()
+	return file_loci_chat_chat_proto_enumTypes[3].Descriptor()
 }
 
 func (IntentType) Type() protoreflect.EnumType {
-	return &file_proto_loci_chat_chat_proto_enumTypes[3]
+	return &file_loci_chat_chat_proto_enumTypes[3]
 }
 
 func (x IntentType) Number() protoreflect.EnumNumber {
@@ -281,7 +281,7 @@ func (x IntentType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IntentType.Descriptor instead.
 func (IntentType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{3}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{3}
 }
 
 type DomainType int32
@@ -329,11 +329,11 @@ func (x DomainType) String() string {
 }
 
 func (DomainType) Descriptor() protoreflect.EnumDescriptor {
-	return file_proto_loci_chat_chat_proto_enumTypes[4].Descriptor()
+	return file_loci_chat_chat_proto_enumTypes[4].Descriptor()
 }
 
 func (DomainType) Type() protoreflect.EnumType {
-	return &file_proto_loci_chat_chat_proto_enumTypes[4]
+	return &file_loci_chat_chat_proto_enumTypes[4]
 }
 
 func (x DomainType) Number() protoreflect.EnumNumber {
@@ -342,7 +342,7 @@ func (x DomainType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DomainType.Descriptor instead.
 func (DomainType) EnumDescriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{4}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{4}
 }
 
 // LlmInteraction represents an interaction with the LLM
@@ -372,7 +372,7 @@ type LlmInteraction struct {
 
 func (x *LlmInteraction) Reset() {
 	*x = LlmInteraction{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[0]
+	mi := &file_loci_chat_chat_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -384,7 +384,7 @@ func (x *LlmInteraction) String() string {
 func (*LlmInteraction) ProtoMessage() {}
 
 func (x *LlmInteraction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[0]
+	mi := &file_loci_chat_chat_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +397,7 @@ func (x *LlmInteraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LlmInteraction.ProtoReflect.Descriptor instead.
 func (*LlmInteraction) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{0}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *LlmInteraction) GetId() string {
@@ -541,7 +541,7 @@ type ConversationMessage struct {
 
 func (x *ConversationMessage) Reset() {
 	*x = ConversationMessage{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[1]
+	mi := &file_loci_chat_chat_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -553,7 +553,7 @@ func (x *ConversationMessage) String() string {
 func (*ConversationMessage) ProtoMessage() {}
 
 func (x *ConversationMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[1]
+	mi := &file_loci_chat_chat_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -566,7 +566,7 @@ func (x *ConversationMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConversationMessage.ProtoReflect.Descriptor instead.
 func (*ConversationMessage) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{1}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ConversationMessage) GetId() string {
@@ -623,7 +623,7 @@ type MessageMetadata struct {
 
 func (x *MessageMetadata) Reset() {
 	*x = MessageMetadata{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[2]
+	mi := &file_loci_chat_chat_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -635,7 +635,7 @@ func (x *MessageMetadata) String() string {
 func (*MessageMetadata) ProtoMessage() {}
 
 func (x *MessageMetadata) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[2]
+	mi := &file_loci_chat_chat_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -648,7 +648,7 @@ func (x *MessageMetadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MessageMetadata.ProtoReflect.Descriptor instead.
 func (*MessageMetadata) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{2}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MessageMetadata) GetLlmInteractionId() string {
@@ -685,7 +685,7 @@ type ModificationRecord struct {
 
 func (x *ModificationRecord) Reset() {
 	*x = ModificationRecord{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[3]
+	mi := &file_loci_chat_chat_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -697,7 +697,7 @@ func (x *ModificationRecord) String() string {
 func (*ModificationRecord) ProtoMessage() {}
 
 func (x *ModificationRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[3]
+	mi := &file_loci_chat_chat_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -710,7 +710,7 @@ func (x *ModificationRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ModificationRecord.ProtoReflect.Descriptor instead.
 func (*ModificationRecord) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{3}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ModificationRecord) GetType() string {
@@ -757,7 +757,7 @@ type SessionContext struct {
 
 func (x *SessionContext) Reset() {
 	*x = SessionContext{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[4]
+	mi := &file_loci_chat_chat_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -769,7 +769,7 @@ func (x *SessionContext) String() string {
 func (*SessionContext) ProtoMessage() {}
 
 func (x *SessionContext) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[4]
+	mi := &file_loci_chat_chat_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -782,7 +782,7 @@ func (x *SessionContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionContext.ProtoReflect.Descriptor instead.
 func (*SessionContext) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{4}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SessionContext) GetCityName() string {
@@ -848,7 +848,7 @@ type AIItineraryResponse struct {
 
 func (x *AIItineraryResponse) Reset() {
 	*x = AIItineraryResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[5]
+	mi := &file_loci_chat_chat_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -860,7 +860,7 @@ func (x *AIItineraryResponse) String() string {
 func (*AIItineraryResponse) ProtoMessage() {}
 
 func (x *AIItineraryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[5]
+	mi := &file_loci_chat_chat_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -873,7 +873,7 @@ func (x *AIItineraryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AIItineraryResponse.ProtoReflect.Descriptor instead.
 func (*AIItineraryResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{5}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AIItineraryResponse) GetItineraryName() string {
@@ -924,7 +924,7 @@ type AiCityResponse struct {
 
 func (x *AiCityResponse) Reset() {
 	*x = AiCityResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[6]
+	mi := &file_loci_chat_chat_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -936,7 +936,7 @@ func (x *AiCityResponse) String() string {
 func (*AiCityResponse) ProtoMessage() {}
 
 func (x *AiCityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[6]
+	mi := &file_loci_chat_chat_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -949,7 +949,7 @@ func (x *AiCityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AiCityResponse.ProtoReflect.Descriptor instead.
 func (*AiCityResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{6}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AiCityResponse) GetGeneralCityData() *city.GeneralCityData {
@@ -995,7 +995,7 @@ type SessionPerformanceMetrics struct {
 
 func (x *SessionPerformanceMetrics) Reset() {
 	*x = SessionPerformanceMetrics{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[7]
+	mi := &file_loci_chat_chat_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1007,7 +1007,7 @@ func (x *SessionPerformanceMetrics) String() string {
 func (*SessionPerformanceMetrics) ProtoMessage() {}
 
 func (x *SessionPerformanceMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[7]
+	mi := &file_loci_chat_chat_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1020,7 +1020,7 @@ func (x *SessionPerformanceMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionPerformanceMetrics.ProtoReflect.Descriptor instead.
 func (*SessionPerformanceMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{7}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SessionPerformanceMetrics) GetAvgResponseTimeMs() int32 {
@@ -1081,7 +1081,7 @@ type SessionContentMetrics struct {
 
 func (x *SessionContentMetrics) Reset() {
 	*x = SessionContentMetrics{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[8]
+	mi := &file_loci_chat_chat_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1093,7 +1093,7 @@ func (x *SessionContentMetrics) String() string {
 func (*SessionContentMetrics) ProtoMessage() {}
 
 func (x *SessionContentMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[8]
+	mi := &file_loci_chat_chat_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1106,7 +1106,7 @@ func (x *SessionContentMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionContentMetrics.ProtoReflect.Descriptor instead.
 func (*SessionContentMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{8}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SessionContentMetrics) GetTotalPois() int32 {
@@ -1174,7 +1174,7 @@ type SessionEngagementMetrics struct {
 
 func (x *SessionEngagementMetrics) Reset() {
 	*x = SessionEngagementMetrics{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[9]
+	mi := &file_loci_chat_chat_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1186,7 +1186,7 @@ func (x *SessionEngagementMetrics) String() string {
 func (*SessionEngagementMetrics) ProtoMessage() {}
 
 func (x *SessionEngagementMetrics) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[9]
+	mi := &file_loci_chat_chat_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1199,7 +1199,7 @@ func (x *SessionEngagementMetrics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionEngagementMetrics.ProtoReflect.Descriptor instead.
 func (*SessionEngagementMetrics) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{9}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SessionEngagementMetrics) GetMessageCount() int32 {
@@ -1274,7 +1274,7 @@ type ChatSession struct {
 
 func (x *ChatSession) Reset() {
 	*x = ChatSession{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[10]
+	mi := &file_loci_chat_chat_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1286,7 @@ func (x *ChatSession) String() string {
 func (*ChatSession) ProtoMessage() {}
 
 func (x *ChatSession) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[10]
+	mi := &file_loci_chat_chat_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1299,7 @@ func (x *ChatSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatSession.ProtoReflect.Descriptor instead.
 func (*ChatSession) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{10}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ChatSession) GetId() string {
@@ -1414,7 +1414,7 @@ type ChatRequest struct {
 
 func (x *ChatRequest) Reset() {
 	*x = ChatRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[11]
+	mi := &file_loci_chat_chat_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1426,7 +1426,7 @@ func (x *ChatRequest) String() string {
 func (*ChatRequest) ProtoMessage() {}
 
 func (x *ChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[11]
+	mi := &file_loci_chat_chat_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1439,7 +1439,7 @@ func (x *ChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatRequest.ProtoReflect.Descriptor instead.
 func (*ChatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{11}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ChatRequest) GetSessionId() string {
@@ -1492,7 +1492,7 @@ type ChatResponse struct {
 
 func (x *ChatResponse) Reset() {
 	*x = ChatResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[12]
+	mi := &file_loci_chat_chat_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1504,7 +1504,7 @@ func (x *ChatResponse) String() string {
 func (*ChatResponse) ProtoMessage() {}
 
 func (x *ChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[12]
+	mi := &file_loci_chat_chat_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1517,7 +1517,7 @@ func (x *ChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatResponse.ProtoReflect.Descriptor instead.
 func (*ChatResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{12}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ChatResponse) GetSessionId() string {
@@ -1579,7 +1579,7 @@ type StreamEvent struct {
 
 func (x *StreamEvent) Reset() {
 	*x = StreamEvent{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[13]
+	mi := &file_loci_chat_chat_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1591,7 +1591,7 @@ func (x *StreamEvent) String() string {
 func (*StreamEvent) ProtoMessage() {}
 
 func (x *StreamEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[13]
+	mi := &file_loci_chat_chat_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1604,7 +1604,7 @@ func (x *StreamEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEvent.ProtoReflect.Descriptor instead.
 func (*StreamEvent) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{13}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StreamEvent) GetType() string {
@@ -1675,7 +1675,7 @@ type NavigationData struct {
 
 func (x *NavigationData) Reset() {
 	*x = NavigationData{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[14]
+	mi := &file_loci_chat_chat_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1687,7 +1687,7 @@ func (x *NavigationData) String() string {
 func (*NavigationData) ProtoMessage() {}
 
 func (x *NavigationData) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[14]
+	mi := &file_loci_chat_chat_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1700,7 +1700,7 @@ func (x *NavigationData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NavigationData.ProtoReflect.Descriptor instead.
 func (*NavigationData) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{14}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *NavigationData) GetUrl() string {
@@ -1734,7 +1734,7 @@ type UserLocation struct {
 
 func (x *UserLocation) Reset() {
 	*x = UserLocation{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[15]
+	mi := &file_loci_chat_chat_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1746,7 +1746,7 @@ func (x *UserLocation) String() string {
 func (*UserLocation) ProtoMessage() {}
 
 func (x *UserLocation) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[15]
+	mi := &file_loci_chat_chat_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1759,7 +1759,7 @@ func (x *UserLocation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserLocation.ProtoReflect.Descriptor instead.
 func (*UserLocation) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{15}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UserLocation) GetLatitude() float64 {
@@ -1790,7 +1790,7 @@ type StartChatRequest struct {
 
 func (x *StartChatRequest) Reset() {
 	*x = StartChatRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[16]
+	mi := &file_loci_chat_chat_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1802,7 +1802,7 @@ func (x *StartChatRequest) String() string {
 func (*StartChatRequest) ProtoMessage() {}
 
 func (x *StartChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[16]
+	mi := &file_loci_chat_chat_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1815,7 +1815,7 @@ func (x *StartChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartChatRequest.ProtoReflect.Descriptor instead.
 func (*StartChatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{16}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *StartChatRequest) GetCityName() string {
@@ -1866,7 +1866,7 @@ type ContinueChatRequest struct {
 
 func (x *ContinueChatRequest) Reset() {
 	*x = ContinueChatRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[17]
+	mi := &file_loci_chat_chat_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1878,7 +1878,7 @@ func (x *ContinueChatRequest) String() string {
 func (*ContinueChatRequest) ProtoMessage() {}
 
 func (x *ContinueChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[17]
+	mi := &file_loci_chat_chat_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1891,7 +1891,7 @@ func (x *ContinueChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ContinueChatRequest.ProtoReflect.Descriptor instead.
 func (*ContinueChatRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{17}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ContinueChatRequest) GetSessionId() string {
@@ -1932,7 +1932,7 @@ type GetChatSessionRequest struct {
 
 func (x *GetChatSessionRequest) Reset() {
 	*x = GetChatSessionRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[18]
+	mi := &file_loci_chat_chat_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1944,7 +1944,7 @@ func (x *GetChatSessionRequest) String() string {
 func (*GetChatSessionRequest) ProtoMessage() {}
 
 func (x *GetChatSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[18]
+	mi := &file_loci_chat_chat_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1957,7 +1957,7 @@ func (x *GetChatSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetChatSessionRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{18}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetChatSessionRequest) GetSessionId() string {
@@ -1977,7 +1977,7 @@ type GetChatSessionResponse struct {
 
 func (x *GetChatSessionResponse) Reset() {
 	*x = GetChatSessionResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[19]
+	mi := &file_loci_chat_chat_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1989,7 +1989,7 @@ func (x *GetChatSessionResponse) String() string {
 func (*GetChatSessionResponse) ProtoMessage() {}
 
 func (x *GetChatSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[19]
+	mi := &file_loci_chat_chat_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2002,7 +2002,7 @@ func (x *GetChatSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetChatSessionResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{19}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetChatSessionResponse) GetSession() *ChatSession {
@@ -2023,7 +2023,7 @@ type GetChatSessionsRequest struct {
 
 func (x *GetChatSessionsRequest) Reset() {
 	*x = GetChatSessionsRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[20]
+	mi := &file_loci_chat_chat_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2035,7 +2035,7 @@ func (x *GetChatSessionsRequest) String() string {
 func (*GetChatSessionsRequest) ProtoMessage() {}
 
 func (x *GetChatSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[20]
+	mi := &file_loci_chat_chat_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2048,7 +2048,7 @@ func (x *GetChatSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionsRequest.ProtoReflect.Descriptor instead.
 func (*GetChatSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{20}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetChatSessionsRequest) GetUserId() string {
@@ -2076,7 +2076,7 @@ type GetChatSessionsResponse struct {
 
 func (x *GetChatSessionsResponse) Reset() {
 	*x = GetChatSessionsResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[21]
+	mi := &file_loci_chat_chat_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2088,7 +2088,7 @@ func (x *GetChatSessionsResponse) String() string {
 func (*GetChatSessionsResponse) ProtoMessage() {}
 
 func (x *GetChatSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[21]
+	mi := &file_loci_chat_chat_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2101,7 +2101,7 @@ func (x *GetChatSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatSessionsResponse.ProtoReflect.Descriptor instead.
 func (*GetChatSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{21}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetChatSessionsResponse) GetSessions() []*ChatSession {
@@ -2139,7 +2139,7 @@ type RecentInteraction struct {
 
 func (x *RecentInteraction) Reset() {
 	*x = RecentInteraction{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[22]
+	mi := &file_loci_chat_chat_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2151,7 +2151,7 @@ func (x *RecentInteraction) String() string {
 func (*RecentInteraction) ProtoMessage() {}
 
 func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[22]
+	mi := &file_loci_chat_chat_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2164,7 +2164,7 @@ func (x *RecentInteraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentInteraction.ProtoReflect.Descriptor instead.
 func (*RecentInteraction) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{22}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *RecentInteraction) GetId() string {
@@ -2269,7 +2269,7 @@ type CityInteractions struct {
 
 func (x *CityInteractions) Reset() {
 	*x = CityInteractions{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[23]
+	mi := &file_loci_chat_chat_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2281,7 +2281,7 @@ func (x *CityInteractions) String() string {
 func (*CityInteractions) ProtoMessage() {}
 
 func (x *CityInteractions) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[23]
+	mi := &file_loci_chat_chat_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2294,7 +2294,7 @@ func (x *CityInteractions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CityInteractions.ProtoReflect.Descriptor instead.
 func (*CityInteractions) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{23}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CityInteractions) GetCityName() string {
@@ -2371,7 +2371,7 @@ type GetRecentInteractionsRequest struct {
 
 func (x *GetRecentInteractionsRequest) Reset() {
 	*x = GetRecentInteractionsRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[24]
+	mi := &file_loci_chat_chat_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2383,7 +2383,7 @@ func (x *GetRecentInteractionsRequest) String() string {
 func (*GetRecentInteractionsRequest) ProtoMessage() {}
 
 func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[24]
+	mi := &file_loci_chat_chat_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2396,7 +2396,7 @@ func (x *GetRecentInteractionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsRequest.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{24}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetRecentInteractionsRequest) GetUserId() string {
@@ -2424,7 +2424,7 @@ type GetRecentInteractionsResponse struct {
 
 func (x *GetRecentInteractionsResponse) Reset() {
 	*x = GetRecentInteractionsResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[25]
+	mi := &file_loci_chat_chat_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2436,7 +2436,7 @@ func (x *GetRecentInteractionsResponse) String() string {
 func (*GetRecentInteractionsResponse) ProtoMessage() {}
 
 func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[25]
+	mi := &file_loci_chat_chat_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2449,7 +2449,7 @@ func (x *GetRecentInteractionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecentInteractionsResponse.ProtoReflect.Descriptor instead.
 func (*GetRecentInteractionsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{25}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetRecentInteractionsResponse) GetCities() []*CityInteractions {
@@ -2486,7 +2486,7 @@ type BookmarkRequest struct {
 
 func (x *BookmarkRequest) Reset() {
 	*x = BookmarkRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[26]
+	mi := &file_loci_chat_chat_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2498,7 +2498,7 @@ func (x *BookmarkRequest) String() string {
 func (*BookmarkRequest) ProtoMessage() {}
 
 func (x *BookmarkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[26]
+	mi := &file_loci_chat_chat_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2511,7 +2511,7 @@ func (x *BookmarkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BookmarkRequest.ProtoReflect.Descriptor instead.
 func (*BookmarkRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{26}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *BookmarkRequest) GetTitle() string {
@@ -2595,7 +2595,7 @@ type BookmarkResponse struct {
 
 func (x *BookmarkResponse) Reset() {
 	*x = BookmarkResponse{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[27]
+	mi := &file_loci_chat_chat_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2607,7 +2607,7 @@ func (x *BookmarkResponse) String() string {
 func (*BookmarkResponse) ProtoMessage() {}
 
 func (x *BookmarkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[27]
+	mi := &file_loci_chat_chat_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2620,7 +2620,7 @@ func (x *BookmarkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BookmarkResponse.ProtoReflect.Descriptor instead.
 func (*BookmarkResponse) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{27}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *BookmarkResponse) GetId() string {
@@ -2654,7 +2654,7 @@ type GetBookmarksRequest struct {
 
 func (x *GetBookmarksRequest) Reset() {
 	*x = GetBookmarksRequest{}
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[28]
+	mi := &file_loci_chat_chat_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2666,7 +2666,7 @@ func (x *GetBookmarksRequest) String() string {
 func (*GetBookmarksRequest) ProtoMessage() {}
 
 func (x *GetBookmarksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_loci_chat_chat_proto_msgTypes[28]
+	mi := &file_loci_chat_chat_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2679,7 +2679,7 @@ func (x *GetBookmarksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBookmarksRequest.ProtoReflect.Descriptor instead.
 func (*GetBookmarksRequest) Descriptor() ([]byte, []int) {
-	return file_proto_loci_chat_chat_proto_rawDescGZIP(), []int{28}
+	return file_loci_chat_chat_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetBookmarksRequest) GetUserId() string {
@@ -2696,11 +2696,11 @@ func (x *GetBookmarksRequest) GetPagination() *common.PaginationRequest {
 	return nil
 }
 
-var File_proto_loci_chat_chat_proto protoreflect.FileDescriptor
+var File_loci_chat_chat_proto protoreflect.FileDescriptor
 
-const file_proto_loci_chat_chat_proto_rawDesc = "" +
+const file_loci_chat_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x1aproto/loci/chat/chat.proto\x12\tloci.chat\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1eproto/loci/common/common.proto\x1a\x1aproto/loci/city/city.proto\x1a\x18proto/loci/poi/poi.proto\x1a proto/loci/profile/profile.proto\"\xa3\a\n" +
+	"\x14loci/chat/chat.proto\x12\tloci.chat\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a\x14loci/city/city.proto\x1a\x12loci/poi/poi.proto\x1a\x1aloci/profile/profile.proto\"\xa3\a\n" +
 	"\x0eLlmInteraction\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12)\n" +
 	"\n" +
@@ -3086,20 +3086,20 @@ const file_proto_loci_chat_chat_proto_rawDesc = "" +
 	"StreamChat\x12\x16.loci.chat.ChatRequest\x1a\x16.loci.chat.StreamEvent0\x01B@Z>github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat;chatb\x06proto3"
 
 var (
-	file_proto_loci_chat_chat_proto_rawDescOnce sync.Once
-	file_proto_loci_chat_chat_proto_rawDescData []byte
+	file_loci_chat_chat_proto_rawDescOnce sync.Once
+	file_loci_chat_chat_proto_rawDescData []byte
 )
 
-func file_proto_loci_chat_chat_proto_rawDescGZIP() []byte {
-	file_proto_loci_chat_chat_proto_rawDescOnce.Do(func() {
-		file_proto_loci_chat_chat_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_loci_chat_chat_proto_rawDesc), len(file_proto_loci_chat_chat_proto_rawDesc)))
+func file_loci_chat_chat_proto_rawDescGZIP() []byte {
+	file_loci_chat_chat_proto_rawDescOnce.Do(func() {
+		file_loci_chat_chat_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_loci_chat_chat_proto_rawDesc), len(file_loci_chat_chat_proto_rawDesc)))
 	})
-	return file_proto_loci_chat_chat_proto_rawDescData
+	return file_loci_chat_chat_proto_rawDescData
 }
 
-var file_proto_loci_chat_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_proto_loci_chat_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
-var file_proto_loci_chat_chat_proto_goTypes = []any{
+var file_loci_chat_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_loci_chat_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_loci_chat_chat_proto_goTypes = []any{
 	(MessageRole)(0),                      // 0: loci.chat.MessageRole
 	(MessageType)(0),                      // 1: loci.chat.MessageType
 	(SessionStatus)(0),                    // 2: loci.chat.SessionStatus
@@ -3145,7 +3145,7 @@ var file_proto_loci_chat_chat_proto_goTypes = []any{
 	(*poi.RestaurantDetailedInfo)(nil),    // 42: loci.poi.RestaurantDetailedInfo
 	(*common.Response)(nil),               // 43: loci.common.Response
 }
-var file_proto_loci_chat_chat_proto_depIdxs = []int32{
+var file_loci_chat_chat_proto_depIdxs = []int32{
 	35, // 0: loci.chat.LlmInteraction.timestamp:type_name -> google.protobuf.Timestamp
 	0,  // 1: loci.chat.ConversationMessage.role:type_name -> loci.chat.MessageRole
 	1,  // 2: loci.chat.ConversationMessage.message_type:type_name -> loci.chat.MessageType
@@ -3220,45 +3220,45 @@ var file_proto_loci_chat_chat_proto_depIdxs = []int32{
 	0,  // [0:47] is the sub-list for field type_name
 }
 
-func init() { file_proto_loci_chat_chat_proto_init() }
-func file_proto_loci_chat_chat_proto_init() {
-	if File_proto_loci_chat_chat_proto != nil {
+func init() { file_loci_chat_chat_proto_init() }
+func file_loci_chat_chat_proto_init() {
+	if File_loci_chat_chat_proto != nil {
 		return
 	}
-	file_proto_loci_chat_chat_proto_msgTypes[0].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[1].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[2].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[4].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[9].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[10].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[11].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[12].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[13].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[15].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[16].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[17].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[20].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[22].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[23].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[24].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[26].OneofWrappers = []any{}
-	file_proto_loci_chat_chat_proto_msgTypes[28].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[0].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[1].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[2].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[4].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[9].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[10].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[11].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[12].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[13].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[15].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[16].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[17].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[20].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[22].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[23].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[24].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[26].OneofWrappers = []any{}
+	file_loci_chat_chat_proto_msgTypes[28].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_loci_chat_chat_proto_rawDesc), len(file_proto_loci_chat_chat_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_chat_chat_proto_rawDesc), len(file_loci_chat_chat_proto_rawDesc)),
 			NumEnums:      5,
 			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_loci_chat_chat_proto_goTypes,
-		DependencyIndexes: file_proto_loci_chat_chat_proto_depIdxs,
-		EnumInfos:         file_proto_loci_chat_chat_proto_enumTypes,
-		MessageInfos:      file_proto_loci_chat_chat_proto_msgTypes,
+		GoTypes:           file_loci_chat_chat_proto_goTypes,
+		DependencyIndexes: file_loci_chat_chat_proto_depIdxs,
+		EnumInfos:         file_loci_chat_chat_proto_enumTypes,
+		MessageInfos:      file_loci_chat_chat_proto_msgTypes,
 	}.Build()
-	File_proto_loci_chat_chat_proto = out.File
-	file_proto_loci_chat_chat_proto_goTypes = nil
-	file_proto_loci_chat_chat_proto_depIdxs = nil
+	File_loci_chat_chat_proto = out.File
+	file_loci_chat_chat_proto_goTypes = nil
+	file_loci_chat_chat_proto_depIdxs = nil
 }

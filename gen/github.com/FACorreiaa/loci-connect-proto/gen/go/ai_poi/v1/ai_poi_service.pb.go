@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.10
 // 	protoc        (unknown)
-// source: proto/ai_poi/v1/ai_poi_service.proto
+// source: ai_poi/v1/ai_poi_service.proto
 
 package ai_poiv1
 
@@ -32,7 +32,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[0]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +44,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[0]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,7 +57,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{0}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *HealthCheckRequest) GetService() string {
@@ -78,7 +78,7 @@ type GetServiceInfoRequest struct {
 
 func (x *GetServiceInfoRequest) Reset() {
 	*x = GetServiceInfoRequest{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[1]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -90,7 +90,7 @@ func (x *GetServiceInfoRequest) String() string {
 func (*GetServiceInfoRequest) ProtoMessage() {}
 
 func (x *GetServiceInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[1]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -103,7 +103,7 @@ func (x *GetServiceInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetServiceInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetServiceInfoRequest) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{1}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetServiceInfoRequest) GetIncludeEndpoints() bool {
@@ -131,7 +131,7 @@ type GetServiceInfoResponse struct {
 
 func (x *GetServiceInfoResponse) Reset() {
 	*x = GetServiceInfoResponse{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[2]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -143,7 +143,7 @@ func (x *GetServiceInfoResponse) String() string {
 func (*GetServiceInfoResponse) ProtoMessage() {}
 
 func (x *GetServiceInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[2]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -156,7 +156,7 @@ func (x *GetServiceInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetServiceInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetServiceInfoResponse) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{2}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetServiceInfoResponse) GetServiceInfo() *ServiceInfo {
@@ -195,7 +195,7 @@ type ServiceInfo struct {
 
 func (x *ServiceInfo) Reset() {
 	*x = ServiceInfo{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[3]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +207,7 @@ func (x *ServiceInfo) String() string {
 func (*ServiceInfo) ProtoMessage() {}
 
 func (x *ServiceInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[3]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,7 +220,7 @@ func (x *ServiceInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceInfo.ProtoReflect.Descriptor instead.
 func (*ServiceInfo) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{3}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ServiceInfo) GetName() string {
@@ -287,7 +287,7 @@ type ServiceEndpoint struct {
 
 func (x *ServiceEndpoint) Reset() {
 	*x = ServiceEndpoint{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[4]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -299,7 +299,7 @@ func (x *ServiceEndpoint) String() string {
 func (*ServiceEndpoint) ProtoMessage() {}
 
 func (x *ServiceEndpoint) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[4]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -312,7 +312,7 @@ func (x *ServiceEndpoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceEndpoint.ProtoReflect.Descriptor instead.
 func (*ServiceEndpoint) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{4}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ServiceEndpoint) GetName() string {
@@ -377,7 +377,7 @@ type GetFeatureFlagsRequest struct {
 
 func (x *GetFeatureFlagsRequest) Reset() {
 	*x = GetFeatureFlagsRequest{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[5]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +389,7 @@ func (x *GetFeatureFlagsRequest) String() string {
 func (*GetFeatureFlagsRequest) ProtoMessage() {}
 
 func (x *GetFeatureFlagsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[5]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +402,7 @@ func (x *GetFeatureFlagsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeatureFlagsRequest.ProtoReflect.Descriptor instead.
 func (*GetFeatureFlagsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{5}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetFeatureFlagsRequest) GetUserId() string {
@@ -443,7 +443,7 @@ type GetFeatureFlagsResponse struct {
 
 func (x *GetFeatureFlagsResponse) Reset() {
 	*x = GetFeatureFlagsResponse{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[6]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +455,7 @@ func (x *GetFeatureFlagsResponse) String() string {
 func (*GetFeatureFlagsResponse) ProtoMessage() {}
 
 func (x *GetFeatureFlagsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[6]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +468,7 @@ func (x *GetFeatureFlagsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFeatureFlagsResponse.ProtoReflect.Descriptor instead.
 func (*GetFeatureFlagsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{6}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetFeatureFlagsResponse) GetFlags() []*FeatureFlag {
@@ -499,7 +499,7 @@ type ServiceDependencies struct {
 
 func (x *ServiceDependencies) Reset() {
 	*x = ServiceDependencies{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[7]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -511,7 +511,7 @@ func (x *ServiceDependencies) String() string {
 func (*ServiceDependencies) ProtoMessage() {}
 
 func (x *ServiceDependencies) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[7]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -524,7 +524,7 @@ func (x *ServiceDependencies) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ServiceDependencies.ProtoReflect.Descriptor instead.
 func (*ServiceDependencies) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{7}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ServiceDependencies) GetDatabase() *ComponentHealth {
@@ -575,7 +575,7 @@ type ComponentHealth struct {
 
 func (x *ComponentHealth) Reset() {
 	*x = ComponentHealth{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[8]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -587,7 +587,7 @@ func (x *ComponentHealth) String() string {
 func (*ComponentHealth) ProtoMessage() {}
 
 func (x *ComponentHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[8]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -600,7 +600,7 @@ func (x *ComponentHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ComponentHealth.ProtoReflect.Descriptor instead.
 func (*ComponentHealth) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{8}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ComponentHealth) GetName() string {
@@ -648,7 +648,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[9]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +660,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[9]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +673,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{9}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *HealthCheckResponse) GetHealthy() bool {
@@ -700,7 +700,7 @@ type ApiVersion struct {
 
 func (x *ApiVersion) Reset() {
 	*x = ApiVersion{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[10]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -712,7 +712,7 @@ func (x *ApiVersion) String() string {
 func (*ApiVersion) ProtoMessage() {}
 
 func (x *ApiVersion) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[10]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -725,7 +725,7 @@ func (x *ApiVersion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApiVersion.ProtoReflect.Descriptor instead.
 func (*ApiVersion) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{10}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ApiVersion) GetVersion() string {
@@ -752,7 +752,7 @@ type RateLimitInfo struct {
 
 func (x *RateLimitInfo) Reset() {
 	*x = RateLimitInfo{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[11]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -764,7 +764,7 @@ func (x *RateLimitInfo) String() string {
 func (*RateLimitInfo) ProtoMessage() {}
 
 func (x *RateLimitInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[11]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -777,7 +777,7 @@ func (x *RateLimitInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RateLimitInfo.ProtoReflect.Descriptor instead.
 func (*RateLimitInfo) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{11}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RateLimitInfo) GetRequestsPerMinute() int32 {
@@ -804,7 +804,7 @@ type FeatureFlag struct {
 
 func (x *FeatureFlag) Reset() {
 	*x = FeatureFlag{}
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[12]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -816,7 +816,7 @@ func (x *FeatureFlag) String() string {
 func (*FeatureFlag) ProtoMessage() {}
 
 func (x *FeatureFlag) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes[12]
+	mi := &file_ai_poi_v1_ai_poi_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -829,7 +829,7 @@ func (x *FeatureFlag) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FeatureFlag.ProtoReflect.Descriptor instead.
 func (*FeatureFlag) Descriptor() ([]byte, []int) {
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{12}
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *FeatureFlag) GetName() string {
@@ -846,11 +846,11 @@ func (x *FeatureFlag) GetEnabled() bool {
 	return false
 }
 
-var File_proto_ai_poi_v1_ai_poi_service_proto protoreflect.FileDescriptor
+var File_ai_poi_v1_ai_poi_service_proto protoreflect.FileDescriptor
 
-const file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc = "" +
+const file_ai_poi_v1_ai_poi_service_proto_rawDesc = "" +
 	"\n" +
-	"$proto/ai_poi/v1/ai_poi_service.proto\x12\tai_poi.v1\x1a\x1bbuf/validate/validate.proto\":\n" +
+	"\x1eai_poi/v1/ai_poi_service.proto\x12\tai_poi.v1\x1a\x1bbuf/validate/validate.proto\":\n" +
 	"\x12HealthCheckRequest\x12$\n" +
 	"\aservice\x18\x01 \x01(\tB\n" +
 	"\xbaH\a\xd8\x01\x01r\x02\x18dR\aservice\"v\n" +
@@ -940,19 +940,19 @@ const file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc = "" +
 	"\x0fGetFeatureFlags\x12!.ai_poi.v1.GetFeatureFlagsRequest\x1a\".ai_poi.v1.GetFeatureFlagsResponseBDZBgithub.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/v1;ai_poiv1b\x06proto3"
 
 var (
-	file_proto_ai_poi_v1_ai_poi_service_proto_rawDescOnce sync.Once
-	file_proto_ai_poi_v1_ai_poi_service_proto_rawDescData []byte
+	file_ai_poi_v1_ai_poi_service_proto_rawDescOnce sync.Once
+	file_ai_poi_v1_ai_poi_service_proto_rawDescData []byte
 )
 
-func file_proto_ai_poi_v1_ai_poi_service_proto_rawDescGZIP() []byte {
-	file_proto_ai_poi_v1_ai_poi_service_proto_rawDescOnce.Do(func() {
-		file_proto_ai_poi_v1_ai_poi_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc), len(file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc)))
+func file_ai_poi_v1_ai_poi_service_proto_rawDescGZIP() []byte {
+	file_ai_poi_v1_ai_poi_service_proto_rawDescOnce.Do(func() {
+		file_ai_poi_v1_ai_poi_service_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_ai_poi_v1_ai_poi_service_proto_rawDesc), len(file_ai_poi_v1_ai_poi_service_proto_rawDesc)))
 	})
-	return file_proto_ai_poi_v1_ai_poi_service_proto_rawDescData
+	return file_ai_poi_v1_ai_poi_service_proto_rawDescData
 }
 
-var file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
-var file_proto_ai_poi_v1_ai_poi_service_proto_goTypes = []any{
+var file_ai_poi_v1_ai_poi_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_ai_poi_v1_ai_poi_service_proto_goTypes = []any{
 	(*HealthCheckRequest)(nil),      // 0: ai_poi.v1.HealthCheckRequest
 	(*GetServiceInfoRequest)(nil),   // 1: ai_poi.v1.GetServiceInfoRequest
 	(*GetServiceInfoResponse)(nil),  // 2: ai_poi.v1.GetServiceInfoResponse
@@ -971,7 +971,7 @@ var file_proto_ai_poi_v1_ai_poi_service_proto_goTypes = []any{
 	nil,                             // 15: ai_poi.v1.GetFeatureFlagsResponse.ExperimentsEntry
 	nil,                             // 16: ai_poi.v1.ComponentHealth.MetricsEntry
 }
-var file_proto_ai_poi_v1_ai_poi_service_proto_depIdxs = []int32{
+var file_ai_poi_v1_ai_poi_service_proto_depIdxs = []int32{
 	3,  // 0: ai_poi.v1.GetServiceInfoResponse.service_info:type_name -> ai_poi.v1.ServiceInfo
 	4,  // 1: ai_poi.v1.GetServiceInfoResponse.endpoints:type_name -> ai_poi.v1.ServiceEndpoint
 	10, // 2: ai_poi.v1.GetServiceInfoResponse.versions:type_name -> ai_poi.v1.ApiVersion
@@ -999,26 +999,26 @@ var file_proto_ai_poi_v1_ai_poi_service_proto_depIdxs = []int32{
 	0,  // [0:14] is the sub-list for field type_name
 }
 
-func init() { file_proto_ai_poi_v1_ai_poi_service_proto_init() }
-func file_proto_ai_poi_v1_ai_poi_service_proto_init() {
-	if File_proto_ai_poi_v1_ai_poi_service_proto != nil {
+func init() { file_ai_poi_v1_ai_poi_service_proto_init() }
+func file_ai_poi_v1_ai_poi_service_proto_init() {
+	if File_ai_poi_v1_ai_poi_service_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc), len(file_proto_ai_poi_v1_ai_poi_service_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ai_poi_v1_ai_poi_service_proto_rawDesc), len(file_ai_poi_v1_ai_poi_service_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_proto_ai_poi_v1_ai_poi_service_proto_goTypes,
-		DependencyIndexes: file_proto_ai_poi_v1_ai_poi_service_proto_depIdxs,
-		MessageInfos:      file_proto_ai_poi_v1_ai_poi_service_proto_msgTypes,
+		GoTypes:           file_ai_poi_v1_ai_poi_service_proto_goTypes,
+		DependencyIndexes: file_ai_poi_v1_ai_poi_service_proto_depIdxs,
+		MessageInfos:      file_ai_poi_v1_ai_poi_service_proto_msgTypes,
 	}.Build()
-	File_proto_ai_poi_v1_ai_poi_service_proto = out.File
-	file_proto_ai_poi_v1_ai_poi_service_proto_goTypes = nil
-	file_proto_ai_poi_v1_ai_poi_service_proto_depIdxs = nil
+	File_ai_poi_v1_ai_poi_service_proto = out.File
+	file_ai_poi_v1_ai_poi_service_proto_goTypes = nil
+	file_ai_poi_v1_ai_poi_service_proto_depIdxs = nil
 }

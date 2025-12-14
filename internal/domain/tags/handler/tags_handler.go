@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	tagsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/tags/v1"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/ai_poi/tags/v1/tagsv1connect"
+	tagsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags/presenter"
