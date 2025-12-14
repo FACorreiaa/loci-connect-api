@@ -14,6 +14,7 @@ import (
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
@@ -55,6 +56,7 @@ type Dependencies struct {
 	UserRepo       user.UserRepo
 	UsageRepo      subscription.Repository
 	PaymentRepo    payment.Repository
+	FavoritesRepo  favorites.Repository
 
 	// Services
 	TokenManager        service.TokenManager
@@ -84,6 +86,7 @@ type Dependencies struct {
 	InterestHandler   *interesthandler.InterestHandler
 	TagsHandler       *tagshandler.TagsHandler
 	PaymentHandler    paymentv1connect.PaymentServiceHandler
+	FavoritesHandler  *favorites.Handler
 }
 
 // InitDependencies initializes all application dependencies
@@ -158,6 +161,7 @@ func (d *Dependencies) initRepositories() error {
 	d.UserRepo = user.NewPostgresUserRepo(d.DB.Pool, d.Logger)
 	d.UsageRepo = subscription.NewRepository(d.DB.Pool)
 	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
+	d.FavoritesRepo = favorites.NewRepository(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -235,6 +239,7 @@ func (d *Dependencies) initHandlers() error {
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
+	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

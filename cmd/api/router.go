@@ -13,6 +13,7 @@ import (
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect" // Add import
@@ -197,6 +198,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		paymentPath, paymentHandler := paymentv1connect.NewPaymentServiceHandler(deps.PaymentHandler, opts)
 		mux.Handle(paymentPath, paymentHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", paymentPath)
+	}
+
+	if deps.FavoritesHandler != nil {
+		favoritesPath, favoritesHandler := favoritesv1connect.NewFavoritesServiceHandler(deps.FavoritesHandler, opts)
+		mux.Handle(favoritesPath, favoritesHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", favoritesPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

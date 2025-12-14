@@ -40,10 +40,18 @@ func (i *RequestIDInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFu
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		requestID, ctxWithID := i.ensureRequestID(ctx, req.Header())
 		resp, err := next(ctxWithID, req)
+		// Safely set response header - resp might be nil on error
 		if resp != nil && requestID != "" {
-			if header := resp.Header(); header != nil {
-				header.Set(i.headerName, requestID)
-			}
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// Silently handle nil pointer in response interface
+					}
+				}()
+				if header := resp.Header(); header != nil {
+					header.Set(i.headerName, requestID)
+				}
+			}()
 		}
 		return resp, err
 	}
