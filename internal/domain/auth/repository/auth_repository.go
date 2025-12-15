@@ -315,3 +315,65 @@ func (r *PostgresAuthRepository) GetUserByOAuthIdentity(ctx context.Context, pro
 
 	return &user, nil
 }
+
+// GetUserByPhone retrieves a user by phone number
+func (r *PostgresAuthRepository) GetUserByPhone(ctx context.Context, phone string) (*User, error) {
+	query := `
+		SELECT id, email, username, hashed_password, display_name, avatar_url, role,
+		       is_active, email_verified_at, created_at, updated_at, last_login_at
+		FROM users
+		WHERE phone = $1
+	`
+
+	rows, err := r.pgpool.Query(ctx, query, phone)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[User])
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, common.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// CreateUserWithPhone creates a new user with phone number (no email/password)
+func (r *PostgresAuthRepository) CreateUserWithPhone(ctx context.Context, phone, username string) (*User, error) {
+	user := &User{
+		ID:        uuid.New(),
+		Username:  username,
+		Role:      "member",
+		IsActive:  true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	query := `
+		INSERT INTO users (id, username, phone, role, is_active, phone_verified_at, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id, created_at, updated_at
+	`
+
+	rows, err := r.pgpool.Query(
+		ctx, query,
+		user.ID, user.Username, phone, user.Role, user.IsActive, time.Now(), user.CreatedAt, user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[userInsertRow])
+	if err != nil {
+		return nil, err
+	}
+
+	user.ID = dbRow.ID
+	user.CreatedAt = dbRow.CreatedAt
+	user.UpdatedAt = dbRow.UpdatedAt
+
+	return user, nil
+}

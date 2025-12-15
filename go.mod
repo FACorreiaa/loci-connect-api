@@ -9,7 +9,7 @@ require (
 	connectrpc.com/validate v0.6.0
 	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208143303-85fff446c095
 	github.com/FACorreiaa/go-poi-au-suggestions v0.0.0-20250830093125-122af8ca55fe
-	github.com/FACorreiaa/loci-connect-proto v0.0.0
+	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251214193512-5609d4e1b1a5
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
@@ -25,6 +25,7 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.11.1
 	github.com/stripe/stripe-go/v81 v81.4.0
+	github.com/twilio/twilio-go v1.28.8
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/trace v1.39.0
 	golang.org/x/crypto v0.46.0
@@ -51,6 +52,7 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect

@@ -234,6 +234,26 @@ func (m *MockAuthRepo) GetUserByOAuthIdentity(_ context.Context, _, _ string) (*
 	return nil, common.ErrUserNotFound
 }
 
+func (m *MockAuthRepo) GetUserByPhone(_ context.Context, phone string) (*repository.User, error) {
+	// Mock doesn't store phone, just return not found
+	_ = phone
+	return nil, common.ErrUserNotFound
+}
+
+func (m *MockAuthRepo) CreateUserWithPhone(_ context.Context, phone, username string) (*repository.User, error) {
+	user := &repository.User{
+		ID:        uuid.New(),
+		Username:  username,
+		Role:      "member",
+		IsActive:  true,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	// Store by a generated key since we don't track phone in mock
+	m.Users["phone:"+phone] = user
+	return CloneUser(user), nil
+}
+
 // NewTestAuthService bundles the mocks with a configured AuthService.
 func NewTestAuthService() (*service.AuthService, *MockAuthRepo, *MockTokenManager, *MockEmailSender) {
 	repo := NewMockAuthRepo()

@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/markbates/goth"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
@@ -429,4 +431,122 @@ func (s *AuthService) sendEmailVerification(ctx context.Context, user *repositor
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+// LoginOrRegisterOAuth handles OAuth authentication - finds existing user or creates new one
+func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, provider string, gothUser *goth.User, meta SessionMetadata) (*LoginResult, bool, error) {
+	isNewUser := false
+
+	// Try to find existing user by OAuth identity
+	user, err := s.repo.GetUserByOAuthIdentity(ctx, provider, gothUser.UserID)
+	if errors.Is(err, common.ErrUserNotFound) {
+		// No OAuth identity found, check if user exists by email
+		user, err = s.repo.GetUserByEmail(ctx, gothUser.Email)
+		if errors.Is(err, common.ErrUserNotFound) {
+			// Create new user
+			username := generateUsername(gothUser.NickName, gothUser.Email)
+			displayName := gothUser.Name
+			if displayName == "" {
+				displayName = username
+			}
+
+			user, err = s.repo.CreateUser(ctx, gothUser.Email, username, "", displayName)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to create user: %w", err)
+			}
+			isNewUser = true
+		} else if err != nil {
+			return nil, false, err
+		}
+
+		// Link OAuth identity to user
+		var accessToken, refreshToken *string
+		if gothUser.AccessToken != "" {
+			accessToken = &gothUser.AccessToken
+		}
+		if gothUser.RefreshToken != "" {
+			refreshToken = &gothUser.RefreshToken
+		}
+		if err := s.repo.CreateOrUpdateOAuthIdentity(ctx, provider, gothUser.UserID, user.ID, accessToken, refreshToken); err != nil {
+			return nil, false, fmt.Errorf("failed to link OAuth identity: %w", err)
+		}
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	if !user.IsActive {
+		return nil, false, ErrAccountInactive
+	}
+
+	// Generate tokens
+	tokens, err := s.tokenManager.GenerateTokenPair(user.ID.String(), user.Email, user.Username, user.Role)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if err := s.createSession(ctx, user.ID, tokens.RefreshToken, meta); err != nil {
+		return nil, false, err
+	}
+
+	_ = s.repo.UpdateLastLogin(ctx, user.ID)
+
+	return &LoginResult{User: user, Tokens: tokens}, isNewUser, nil
+}
+
+// LoginOrRegisterPhone handles phone authentication - finds existing user or creates new one
+func (s *AuthService) LoginOrRegisterPhone(ctx context.Context, phone string, meta SessionMetadata) (*LoginResult, bool, error) {
+	isNewUser := false
+
+	user, err := s.repo.GetUserByPhone(ctx, phone)
+	if errors.Is(err, common.ErrUserNotFound) {
+		// Create new user with phone
+		username := "user_" + generateShortID()
+
+		user, err = s.repo.CreateUserWithPhone(ctx, phone, username)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create user: %w", err)
+		}
+		isNewUser = true
+	} else if err != nil {
+		return nil, false, err
+	}
+
+	if !user.IsActive {
+		return nil, false, ErrAccountInactive
+	}
+
+	// Generate tokens (email may be empty for phone-only users)
+	tokens, err := s.tokenManager.GenerateTokenPair(user.ID.String(), user.Email, user.Username, user.Role)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if err := s.createSession(ctx, user.ID, tokens.RefreshToken, meta); err != nil {
+		return nil, false, err
+	}
+
+	_ = s.repo.UpdateLastLogin(ctx, user.ID)
+
+	return &LoginResult{User: user, Tokens: tokens}, isNewUser, nil
+}
+
+// generateUsername creates a username from OAuth profile data
+func generateUsername(nickname, email string) string {
+	if nickname != "" {
+		// Clean the nickname
+		clean := strings.ReplaceAll(nickname, " ", "_")
+		clean = strings.ToLower(clean)
+		return clean
+	}
+	// Use email prefix
+	parts := strings.Split(email, "@")
+	if len(parts) > 0 {
+		return strings.ToLower(parts[0])
+	}
+	return "user_" + generateShortID()
+}
+
+// generateShortID creates a short unique identifier
+func generateShortID() string {
+	return uuid.New().String()[:8]
 }

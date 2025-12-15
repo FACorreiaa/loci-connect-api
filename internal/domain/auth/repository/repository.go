@@ -52,7 +52,9 @@ type OAuthIdentity struct {
 
 type AuthRepository interface {
 	CreateUser(ctx context.Context, email, username, hashedPassword, displayName string) (*User, error)
+	CreateUserWithPhone(ctx context.Context, phone, username string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
+	GetUserByPhone(ctx context.Context, phone string) (*User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*User, error)
 	UpdateLastLogin(ctx context.Context, userID uuid.UUID) error
 
