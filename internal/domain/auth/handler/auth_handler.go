@@ -115,6 +115,43 @@ func (h *AuthHandler) ChangeEmail(_ context.Context, _ *connect.Request[auth.Cha
 	)
 }
 
+// ForgotPassword initiates the password reset flow.
+func (h *AuthHandler) ForgotPassword(ctx context.Context, req *connect.Request[auth.ForgotPasswordRequest]) (*connect.Response[commonpb.Response], error) {
+	if req.Msg.Email == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("email is required"))
+	}
+
+	// Always return success to prevent email enumeration attacks
+	// The service will silently fail if the email doesn't exist
+	if err := h.service.RequestPasswordReset(ctx, req.Msg.Email); err != nil {
+		// Log error but don't expose to client
+		// h.logger.Error("password reset request failed", "error", err)
+	}
+
+	msg := "If an account exists with this email, you will receive a password reset link"
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
+}
+
+// ResetPassword completes the password reset with a valid token.
+func (h *AuthHandler) ResetPassword(ctx context.Context, req *connect.Request[auth.ResetPasswordRequest]) (*connect.Response[commonpb.Response], error) {
+	if req.Msg.Token == "" || req.Msg.NewPassword == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("token and new password are required"))
+	}
+
+	if err := h.service.ResetPassword(ctx, req.Msg.Token, req.Msg.NewPassword); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	msg := "Password reset successfully"
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
+}
+
 // Logout deletes the refresh token session.
 func (h *AuthHandler) Logout(ctx context.Context, req *connect.Request[auth.LogoutRequest]) (*connect.Response[commonpb.Response], error) {
 	if req.Msg.RefreshToken == "" {

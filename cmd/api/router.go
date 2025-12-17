@@ -13,12 +13,14 @@ import (
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
-	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect" // Add import
+	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
 	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
@@ -47,6 +49,8 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		authconnect.AuthServiceLoginProcedure,
 		authconnect.AuthServiceRefreshTokenProcedure,
 		authconnect.AuthServiceValidateSessionProcedure,
+		authconnect.AuthServiceForgotPasswordProcedure,
+		authconnect.AuthServiceResetPasswordProcedure,
 		// Public statistics endpoint
 		statisticsv1connect.StatisticsServiceGetMainPageStatisticsProcedure,
 		statisticsv1connect.StatisticsServiceStreamMainPageStatisticsProcedure,
@@ -94,9 +98,9 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	registerUtilityRoutes(mux, deps)
 
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},                               // For testing ONLY—narrow to specifics like "http://localhost:3000" once working. Avoid in prod.
+		AllowedOrigins:   []string{"http://localhost:3000"},           // Restricted to localhost for development
 		AllowedMethods:   c.AllowedMethods(),                          // ["GET", "POST", "OPTIONS"]
-		AllowedHeaders:   append(c.AllowedHeaders(), "Authorization"), // Adds "Authorization" for safety; full list: ["Accept-Encoding", "Content-Encoding", "Content-Type", "Connect-Protocol-Version", "Connect-Timeout-Ms", "Grpc-Timeout", "X-Grpc-Web", "X-User-Agent", "Authorization"]
+		AllowedHeaders:   append(c.AllowedHeaders(), "Authorization"), // Adds "Authorization" for safety
 		ExposedHeaders:   c.ExposedHeaders(),                          // ["Grpc-Status", "Grpc-Message", "Grpc-Status-Details-Bin"]
 		AllowCredentials: true,
 		MaxAge:           7200, // Cache preflights for 2 hours
@@ -204,6 +208,23 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		favoritesPath, favoritesHandler := favoritesv1connect.NewFavoritesServiceHandler(deps.FavoritesHandler, opts)
 		mux.Handle(favoritesPath, favoritesHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", favoritesPath)
+	}
+
+	if deps.ExportHandler != nil {
+		exportPath, exportHandler := exportv1connect.NewExportServiceHandler(deps.ExportHandler, opts)
+		mux.Handle(exportPath, exportHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", exportPath)
+	}
+
+	if deps.ShareHandler != nil {
+		// Register ShareService RPC
+		sharePath, shareHandler := sharev1connect.NewShareServiceHandler(deps.ShareHandler, opts)
+		mux.Handle(sharePath, shareHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", sharePath)
+
+		// Register OG meta HTTP handler for social sharing
+		mux.Handle("/share/", deps.ShareHandler.OGMetaHandler())
+		deps.Logger.Info("registered OG meta handler", "path", "/share/")
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")

@@ -679,6 +679,104 @@ func (x *LogoutRequest) GetRefreshToken() string {
 	return ""
 }
 
+// ForgotPasswordRequest for initiating password reset
+type ForgotPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ForgotPasswordRequest) Reset() {
+	*x = ForgotPasswordRequest{}
+	mi := &file_loci_auth_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ForgotPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ForgotPasswordRequest) ProtoMessage() {}
+
+func (x *ForgotPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_auth_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ForgotPasswordRequest.ProtoReflect.Descriptor instead.
+func (*ForgotPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_loci_auth_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ForgotPasswordRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+// ResetPasswordRequest for completing password reset with token
+type ResetPasswordRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	NewPassword   string                 `protobuf:"bytes,2,opt,name=new_password,json=newPassword,proto3" json:"new_password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResetPasswordRequest) Reset() {
+	*x = ResetPasswordRequest{}
+	mi := &file_loci_auth_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResetPasswordRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResetPasswordRequest) ProtoMessage() {}
+
+func (x *ResetPasswordRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_auth_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResetPasswordRequest.ProtoReflect.Descriptor instead.
+func (*ResetPasswordRequest) Descriptor() ([]byte, []int) {
+	return file_loci_auth_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ResetPasswordRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *ResetPasswordRequest) GetNewPassword() string {
+	if x != nil {
+		return x.NewPassword
+	}
+	return ""
+}
+
 // Session represents session data
 type Session struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -691,7 +789,7 @@ type Session struct {
 
 func (x *Session) Reset() {
 	*x = Session{}
-	mi := &file_loci_auth_auth_proto_msgTypes[11]
+	mi := &file_loci_auth_auth_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +801,7 @@ func (x *Session) String() string {
 func (*Session) ProtoMessage() {}
 
 func (x *Session) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_auth_auth_proto_msgTypes[11]
+	mi := &file_loci_auth_auth_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +814,7 @@ func (x *Session) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Session.ProtoReflect.Descriptor instead.
 func (*Session) Descriptor() ([]byte, []int) {
-	return file_loci_auth_auth_proto_rawDescGZIP(), []int{11}
+	return file_loci_auth_auth_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *Session) GetId() string {
@@ -758,7 +856,7 @@ type Claims struct {
 
 func (x *Claims) Reset() {
 	*x = Claims{}
-	mi := &file_loci_auth_auth_proto_msgTypes[12]
+	mi := &file_loci_auth_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +868,7 @@ func (x *Claims) String() string {
 func (*Claims) ProtoMessage() {}
 
 func (x *Claims) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_auth_auth_proto_msgTypes[12]
+	mi := &file_loci_auth_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +881,7 @@ func (x *Claims) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Claims.ProtoReflect.Descriptor instead.
 func (*Claims) Descriptor() ([]byte, []int) {
-	return file_loci_auth_auth_proto_rawDescGZIP(), []int{12}
+	return file_loci_auth_auth_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Claims) GetUserId() string {
@@ -911,7 +1009,14 @@ const file_loci_auth_auth_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\x12$\n" +
 	"\tnew_email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\bnewEmail\"=\n" +
 	"\rLogoutRequest\x12,\n" +
-	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"}\n" +
+	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"6\n" +
+	"\x15ForgotPasswordRequest\x12\x1d\n" +
+	"\x05email\x18\x01 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\"g\n" +
+	"\x14ResetPasswordRequest\x12 \n" +
+	"\x05token\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10 \x18\x80\x01R\x05token\x12-\n" +
+	"\fnew_password\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\vnewPassword\"}\n" +
 	"\aSession\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x02id\x127\n" +
@@ -931,7 +1036,7 @@ const file_loci_auth_auth_proto_rawDesc = "" +
 	"\tissued_at\x18\t \x01(\x03B\a\xbaH\x04\"\x02 \x00R\bissuedAtB\x14\n" +
 	"\x12_subscription_planB\x16\n" +
 	"\x14_subscription_statusB\b\n" +
-	"\x06_scope2\xf7\x03\n" +
+	"\x06_scope2\x8b\x05\n" +
 	"\vAuthService\x12:\n" +
 	"\x05Login\x12\x17.loci.auth.LoginRequest\x1a\x18.loci.auth.LoginResponse\x12=\n" +
 	"\bRegister\x12\x1a.loci.auth.RegisterRequest\x1a\x15.loci.common.Response\x12H\n" +
@@ -939,7 +1044,9 @@ const file_loci_auth_auth_proto_rawDesc = "" +
 	"\x0fValidateSession\x12!.loci.auth.ValidateSessionRequest\x1a\".loci.auth.ValidateSessionResponse\x12I\n" +
 	"\x0eChangePassword\x12 .loci.auth.ChangePasswordRequest\x1a\x15.loci.common.Response\x12C\n" +
 	"\vChangeEmail\x12\x1d.loci.auth.ChangeEmailRequest\x1a\x15.loci.common.Response\x129\n" +
-	"\x06Logout\x12\x18.loci.auth.LogoutRequest\x1a\x15.loci.common.ResponseB@Z>github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth;authb\x06proto3"
+	"\x06Logout\x12\x18.loci.auth.LogoutRequest\x1a\x15.loci.common.Response\x12I\n" +
+	"\x0eForgotPassword\x12 .loci.auth.ForgotPasswordRequest\x1a\x15.loci.common.Response\x12G\n" +
+	"\rResetPassword\x12\x1f.loci.auth.ResetPasswordRequest\x1a\x15.loci.common.ResponseB@Z>github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth;authb\x06proto3"
 
 var (
 	file_loci_auth_auth_proto_rawDescOnce sync.Once
@@ -953,7 +1060,7 @@ func file_loci_auth_auth_proto_rawDescGZIP() []byte {
 	return file_loci_auth_auth_proto_rawDescData
 }
 
-var file_loci_auth_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_loci_auth_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_loci_auth_auth_proto_goTypes = []any{
 	(*UserAuth)(nil),                // 0: loci.auth.UserAuth
 	(*LoginRequest)(nil),            // 1: loci.auth.LoginRequest
@@ -966,14 +1073,16 @@ var file_loci_auth_auth_proto_goTypes = []any{
 	(*ChangePasswordRequest)(nil),   // 8: loci.auth.ChangePasswordRequest
 	(*ChangeEmailRequest)(nil),      // 9: loci.auth.ChangeEmailRequest
 	(*LogoutRequest)(nil),           // 10: loci.auth.LogoutRequest
-	(*Session)(nil),                 // 11: loci.auth.Session
-	(*Claims)(nil),                  // 12: loci.auth.Claims
-	(*timestamppb.Timestamp)(nil),   // 13: google.protobuf.Timestamp
-	(*common.Response)(nil),         // 14: loci.common.Response
+	(*ForgotPasswordRequest)(nil),   // 11: loci.auth.ForgotPasswordRequest
+	(*ResetPasswordRequest)(nil),    // 12: loci.auth.ResetPasswordRequest
+	(*Session)(nil),                 // 13: loci.auth.Session
+	(*Claims)(nil),                  // 14: loci.auth.Claims
+	(*timestamppb.Timestamp)(nil),   // 15: google.protobuf.Timestamp
+	(*common.Response)(nil),         // 16: loci.common.Response
 }
 var file_loci_auth_auth_proto_depIdxs = []int32{
-	13, // 0: loci.auth.UserAuth.created_at:type_name -> google.protobuf.Timestamp
-	13, // 1: loci.auth.UserAuth.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 0: loci.auth.UserAuth.created_at:type_name -> google.protobuf.Timestamp
+	15, // 1: loci.auth.UserAuth.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: loci.auth.AuthService.Login:input_type -> loci.auth.LoginRequest
 	3,  // 3: loci.auth.AuthService.Register:input_type -> loci.auth.RegisterRequest
 	4,  // 4: loci.auth.AuthService.RefreshToken:input_type -> loci.auth.RefreshTokenRequest
@@ -981,15 +1090,19 @@ var file_loci_auth_auth_proto_depIdxs = []int32{
 	8,  // 6: loci.auth.AuthService.ChangePassword:input_type -> loci.auth.ChangePasswordRequest
 	9,  // 7: loci.auth.AuthService.ChangeEmail:input_type -> loci.auth.ChangeEmailRequest
 	10, // 8: loci.auth.AuthService.Logout:input_type -> loci.auth.LogoutRequest
-	2,  // 9: loci.auth.AuthService.Login:output_type -> loci.auth.LoginResponse
-	14, // 10: loci.auth.AuthService.Register:output_type -> loci.common.Response
-	5,  // 11: loci.auth.AuthService.RefreshToken:output_type -> loci.auth.TokenResponse
-	7,  // 12: loci.auth.AuthService.ValidateSession:output_type -> loci.auth.ValidateSessionResponse
-	14, // 13: loci.auth.AuthService.ChangePassword:output_type -> loci.common.Response
-	14, // 14: loci.auth.AuthService.ChangeEmail:output_type -> loci.common.Response
-	14, // 15: loci.auth.AuthService.Logout:output_type -> loci.common.Response
-	9,  // [9:16] is the sub-list for method output_type
-	2,  // [2:9] is the sub-list for method input_type
+	11, // 9: loci.auth.AuthService.ForgotPassword:input_type -> loci.auth.ForgotPasswordRequest
+	12, // 10: loci.auth.AuthService.ResetPassword:input_type -> loci.auth.ResetPasswordRequest
+	2,  // 11: loci.auth.AuthService.Login:output_type -> loci.auth.LoginResponse
+	16, // 12: loci.auth.AuthService.Register:output_type -> loci.common.Response
+	5,  // 13: loci.auth.AuthService.RefreshToken:output_type -> loci.auth.TokenResponse
+	7,  // 14: loci.auth.AuthService.ValidateSession:output_type -> loci.auth.ValidateSessionResponse
+	16, // 15: loci.auth.AuthService.ChangePassword:output_type -> loci.common.Response
+	16, // 16: loci.auth.AuthService.ChangeEmail:output_type -> loci.common.Response
+	16, // 17: loci.auth.AuthService.Logout:output_type -> loci.common.Response
+	16, // 18: loci.auth.AuthService.ForgotPassword:output_type -> loci.common.Response
+	16, // 19: loci.auth.AuthService.ResetPassword:output_type -> loci.common.Response
+	11, // [11:20] is the sub-list for method output_type
+	2,  // [2:11] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -1002,14 +1115,14 @@ func file_loci_auth_auth_proto_init() {
 	}
 	file_loci_auth_auth_proto_msgTypes[3].OneofWrappers = []any{}
 	file_loci_auth_auth_proto_msgTypes[7].OneofWrappers = []any{}
-	file_loci_auth_auth_proto_msgTypes[12].OneofWrappers = []any{}
+	file_loci_auth_auth_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_auth_auth_proto_rawDesc), len(file_loci_auth_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

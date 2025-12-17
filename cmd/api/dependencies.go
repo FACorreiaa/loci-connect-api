@@ -14,6 +14,7 @@ import (
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
@@ -24,6 +25,7 @@ import (
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
@@ -87,6 +89,8 @@ type Dependencies struct {
 	TagsHandler       *tagshandler.TagsHandler
 	PaymentHandler    paymentv1connect.PaymentServiceHandler
 	FavoritesHandler  *favorites.Handler
+	ExportHandler     *export.Handler
+	ShareHandler      *share.Handler
 }
 
 // InitDependencies initializes all application dependencies
@@ -240,6 +244,8 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
+	d.ExportHandler = export.NewHandler(d.Logger)
+	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

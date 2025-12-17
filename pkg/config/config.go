@@ -28,6 +28,7 @@ type GeminiConfig struct {
 type ServerConfig struct {
 	Host               string
 	Port               int
+	BaseURL            string
 	RateLimitPerSecond int
 	RateLimitBurst     int
 }
@@ -62,6 +63,7 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Host:               getEnv("SERVER_HOST", "localhost"),
 			Port:               getEnvAsInt("SERVER_PORT", 8080),
+			BaseURL:            getEnv("BASE_URL", "http://localhost:8080"),
 			RateLimitPerSecond: getEnvAsInt("SERVER_RATE_LIMIT_PER_SECOND", 100),
 			RateLimitBurst:     getEnvAsInt("SERVER_RATE_LIMIT_BURST", 200),
 		},

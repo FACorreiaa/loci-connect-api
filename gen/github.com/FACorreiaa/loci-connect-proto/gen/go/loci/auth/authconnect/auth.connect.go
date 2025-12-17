@@ -51,6 +51,12 @@ const (
 	AuthServiceChangeEmailProcedure = "/loci.auth.AuthService/ChangeEmail"
 	// AuthServiceLogoutProcedure is the fully-qualified name of the AuthService's Logout RPC.
 	AuthServiceLogoutProcedure = "/loci.auth.AuthService/Logout"
+	// AuthServiceForgotPasswordProcedure is the fully-qualified name of the AuthService's
+	// ForgotPassword RPC.
+	AuthServiceForgotPasswordProcedure = "/loci.auth.AuthService/ForgotPassword"
+	// AuthServiceResetPasswordProcedure is the fully-qualified name of the AuthService's ResetPassword
+	// RPC.
+	AuthServiceResetPasswordProcedure = "/loci.auth.AuthService/ResetPassword"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -63,6 +69,8 @@ var (
 	authServiceChangePasswordMethodDescriptor  = authServiceServiceDescriptor.Methods().ByName("ChangePassword")
 	authServiceChangeEmailMethodDescriptor     = authServiceServiceDescriptor.Methods().ByName("ChangeEmail")
 	authServiceLogoutMethodDescriptor          = authServiceServiceDescriptor.Methods().ByName("Logout")
+	authServiceForgotPasswordMethodDescriptor  = authServiceServiceDescriptor.Methods().ByName("ForgotPassword")
+	authServiceResetPasswordMethodDescriptor   = authServiceServiceDescriptor.Methods().ByName("ResetPassword")
 )
 
 // AuthServiceClient is a client for the loci.auth.AuthService service.
@@ -74,6 +82,9 @@ type AuthServiceClient interface {
 	ChangePassword(context.Context, *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[common.Response], error)
 	ChangeEmail(context.Context, *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[common.Response], error)
 	Logout(context.Context, *connect.Request[auth.LogoutRequest]) (*connect.Response[common.Response], error)
+	// Password reset flow (does not require authentication)
+	ForgotPassword(context.Context, *connect.Request[auth.ForgotPasswordRequest]) (*connect.Response[common.Response], error)
+	ResetPassword(context.Context, *connect.Request[auth.ResetPasswordRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewAuthServiceClient constructs a client for the loci.auth.AuthService service. By default, it
@@ -128,6 +139,18 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceLogoutMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		forgotPassword: connect.NewClient[auth.ForgotPasswordRequest, common.Response](
+			httpClient,
+			baseURL+AuthServiceForgotPasswordProcedure,
+			connect.WithSchema(authServiceForgotPasswordMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		resetPassword: connect.NewClient[auth.ResetPasswordRequest, common.Response](
+			httpClient,
+			baseURL+AuthServiceResetPasswordProcedure,
+			connect.WithSchema(authServiceResetPasswordMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -140,6 +163,8 @@ type authServiceClient struct {
 	changePassword  *connect.Client[auth.ChangePasswordRequest, common.Response]
 	changeEmail     *connect.Client[auth.ChangeEmailRequest, common.Response]
 	logout          *connect.Client[auth.LogoutRequest, common.Response]
+	forgotPassword  *connect.Client[auth.ForgotPasswordRequest, common.Response]
+	resetPassword   *connect.Client[auth.ResetPasswordRequest, common.Response]
 }
 
 // Login calls loci.auth.AuthService.Login.
@@ -177,6 +202,16 @@ func (c *authServiceClient) Logout(ctx context.Context, req *connect.Request[aut
 	return c.logout.CallUnary(ctx, req)
 }
 
+// ForgotPassword calls loci.auth.AuthService.ForgotPassword.
+func (c *authServiceClient) ForgotPassword(ctx context.Context, req *connect.Request[auth.ForgotPasswordRequest]) (*connect.Response[common.Response], error) {
+	return c.forgotPassword.CallUnary(ctx, req)
+}
+
+// ResetPassword calls loci.auth.AuthService.ResetPassword.
+func (c *authServiceClient) ResetPassword(ctx context.Context, req *connect.Request[auth.ResetPasswordRequest]) (*connect.Response[common.Response], error) {
+	return c.resetPassword.CallUnary(ctx, req)
+}
+
 // AuthServiceHandler is an implementation of the loci.auth.AuthService service.
 type AuthServiceHandler interface {
 	Login(context.Context, *connect.Request[auth.LoginRequest]) (*connect.Response[auth.LoginResponse], error)
@@ -186,6 +221,9 @@ type AuthServiceHandler interface {
 	ChangePassword(context.Context, *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[common.Response], error)
 	ChangeEmail(context.Context, *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[common.Response], error)
 	Logout(context.Context, *connect.Request[auth.LogoutRequest]) (*connect.Response[common.Response], error)
+	// Password reset flow (does not require authentication)
+	ForgotPassword(context.Context, *connect.Request[auth.ForgotPasswordRequest]) (*connect.Response[common.Response], error)
+	ResetPassword(context.Context, *connect.Request[auth.ResetPasswordRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -236,6 +274,18 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceLogoutMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	authServiceForgotPasswordHandler := connect.NewUnaryHandler(
+		AuthServiceForgotPasswordProcedure,
+		svc.ForgotPassword,
+		connect.WithSchema(authServiceForgotPasswordMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	authServiceResetPasswordHandler := connect.NewUnaryHandler(
+		AuthServiceResetPasswordProcedure,
+		svc.ResetPassword,
+		connect.WithSchema(authServiceResetPasswordMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.auth.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthServiceLoginProcedure:
@@ -252,6 +302,10 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 			authServiceChangeEmailHandler.ServeHTTP(w, r)
 		case AuthServiceLogoutProcedure:
 			authServiceLogoutHandler.ServeHTTP(w, r)
+		case AuthServiceForgotPasswordProcedure:
+			authServiceForgotPasswordHandler.ServeHTTP(w, r)
+		case AuthServiceResetPasswordProcedure:
+			authServiceResetPasswordHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -287,4 +341,12 @@ func (UnimplementedAuthServiceHandler) ChangeEmail(context.Context, *connect.Req
 
 func (UnimplementedAuthServiceHandler) Logout(context.Context, *connect.Request[auth.LogoutRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.Logout is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) ForgotPassword(context.Context, *connect.Request[auth.ForgotPasswordRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.ForgotPassword is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) ResetPassword(context.Context, *connect.Request[auth.ResetPasswordRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.ResetPassword is not implemented"))
 }
