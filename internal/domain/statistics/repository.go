@@ -181,13 +181,13 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 
 	rows, err := r.pgpool.Query(ctx, query, args...)
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to query main page statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to query main page statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error fetching main page statistics: %w", err)
 	}
 
 	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.MainPageStatistics])
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to get main page statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to get main page statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error reading main page statistics: %w", err)
 	}
 
@@ -219,13 +219,13 @@ func (r *RepositoryImpl) GetDetailedPOIStatistics(ctx context.Context, userID uu
 
 	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to query detailed POI statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to query detailed POI statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error fetching detailed POI statistics: %w", err)
 	}
 
 	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.DetailedPOIStatistics])
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to get detailed POI statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error reading detailed POI statistics: %w", err)
 	}
 
@@ -252,13 +252,13 @@ func (r *RepositoryImpl) LandingPageStatistics(ctx context.Context, userID uuid.
 
 	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to query landing page statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to query landing page statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error fetching landing page statistics: %w", err)
 	}
 
 	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[locitypes.LandingPageUserStats])
 	if err != nil {
-		r.logger.ErrorContext(ctx, "failed to get landing page statistics", slog.Any("error", err))
+		r.DebugContext(ctx, "failed to get landing page statistics", slog.Any("error", err))
 		return nil, fmt.Errorf("database error reading landing page statistics: %w", err)
 	}
 

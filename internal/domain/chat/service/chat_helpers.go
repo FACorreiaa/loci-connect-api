@@ -150,7 +150,7 @@ func (l *ServiceImpl) handleGeneralPoisFromResponse(ctx context.Context, content
 		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &poiData); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to parse general POIs from unified response", slog.Any("error", err))
+		l.DebugContext(ctx, "Failed to parse general POIs from unified response", slog.Any("error", err))
 		return
 	}
 
@@ -170,14 +170,14 @@ func (l *ServiceImpl) handleItineraryFromResponse(
 		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
 	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &itineraryData); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to parse itinerary from unified response", slog.Any("error", err))
+		l.DebugContext(ctx, "Failed to parse itinerary from unified response", slog.Any("error", err))
 		return
 	}
 
 	// Save the itinerary and its POIs
 	_, err := l.HandlePersonalisedPOIs(ctx, itineraryData.PointsOfInterest, cityID, userLocation, llmInteractionID, userID, profileID)
 	if err != nil {
-		l.logger.ErrorContext(ctx, "Failed to save personalised POIs from unified response", slog.Any("error", err))
+		l.DebugContext(ctx, "Failed to save personalised POIs from unified response", slog.Any("error", err))
 	}
 }
 
@@ -187,7 +187,7 @@ func (l *ServiceImpl) handleHotelsFromResponse(ctx context.Context, content stri
 	}
 	clean := CleanJSONResponse(content)
 	if err := json.Unmarshal([]byte(clean), &hotelData); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to parse hotels from unified response", slog.Any("error", err))
+		l.DebugContext(ctx, "Failed to parse hotels from unified response", slog.Any("error", err))
 		return
 	}
 
@@ -209,7 +209,7 @@ func (l *ServiceImpl) handleRestaurantsFromResponse(ctx context.Context, content
 	}
 	clean := CleanJSONResponse(content)
 	if err := json.Unmarshal([]byte(clean), &restaurantData); err != nil {
-		l.logger.ErrorContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err), slog.String("cleaned_response", clean))
+		l.DebugContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err), slog.String("cleaned_response", clean))
 		return
 	}
 

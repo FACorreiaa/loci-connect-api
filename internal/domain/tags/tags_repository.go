@@ -271,7 +271,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, userID uuid.UUID, params lo
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 	}() // Rollback if commit is not successful
 
@@ -350,7 +350,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, userID, tagsID uuid.UUID, p
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 	}()
 
@@ -437,7 +437,7 @@ func (r *RepositoryImpl) Delete(ctx context.Context, userID, tagID uuid.UUID) er
 	}
 	defer func() {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 	}()
 
