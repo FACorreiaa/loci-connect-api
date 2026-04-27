@@ -154,7 +154,7 @@ func (h *ChatHandler) StreamChat(
 
 			resp, err := h.mapEventToProto(event)
 			if err != nil {
-				h.Debug("Failed to map event", "error", err)
+				h.logger.Error("Failed to map event", "error", err)
 				continue
 			}
 

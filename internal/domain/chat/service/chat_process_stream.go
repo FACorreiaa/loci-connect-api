@@ -88,7 +88,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 	}
 	cacheKeyBytes, err := json.Marshal(cacheKeyData)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
 		// Use a fallback cache key
 		cacheKeyBytes = []byte(fmt.Sprintf("fallback_%s_%s", cleanedMessage, cc.CityName))
 	}
@@ -699,7 +699,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 	// Query POIs using POI service with full cache + DB + LLM fallback flow
 	pois, err := l.poiSvc.GetGeneralPOIByDistance(ctx, cc.UserID, lat, lon, distance)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to query nearby POIs",
+		l.logger.ErrorContext(ctx, "Failed to query nearby POIs",
 			slog.Any("error", err))
 		// Send user-friendly error message instead of internal error details
 		sendEventWithResponse(locitypes.StreamEvent{

@@ -120,7 +120,7 @@ func (s *ServiceImpl) AddPoiToFavourites(ctx context.Context, userID, poiID uuid
 
 		id, err := s.poiRepository.AddPoiToFavourites(ctx, userID, poiID)
 		if err != nil {
-			s.Debug("failed to add POI to favourites", "error", err)
+			s.logger.Error("failed to add POI to favourites", "error", err)
 			return uuid.Nil, err
 		}
 		return id, nil
@@ -138,13 +138,13 @@ func (s *ServiceImpl) RemovePoiFromFavourites(ctx context.Context, userID, poiID
 	if isLLMGenerated {
 		err := s.poiRepository.RemoveLLMPoiFromFavourite(ctx, userID, poiID)
 		if err != nil {
-			s.Debug("failed to remove LLM POI from favourites", "error", err)
+			s.logger.Error("failed to remove LLM POI from favourites", "error", err)
 			return err
 		}
 	} else {
 		err := s.poiRepository.RemovePoiFromFavourites(ctx, userID, poiID)
 		if err != nil {
-			s.Debug("failed to remove POI from favourites", "error", err)
+			s.logger.Error("failed to remove POI from favourites", "error", err)
 			return err
 		}
 	}
@@ -154,7 +154,7 @@ func (s *ServiceImpl) RemovePoiFromFavourites(ctx context.Context, userID, poiID
 func (s *ServiceImpl) GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	pois, err := s.poiRepository.GetFavouritePOIsByUserID(ctx, userID)
 	if err != nil {
-		s.Debug("failed to get favourite POIs by user ID", "error", err)
+		s.logger.Error("failed to get favourite POIs by user ID", "error", err)
 		return nil, err
 	}
 	return pois, nil
@@ -163,7 +163,7 @@ func (s *ServiceImpl) GetFavouritePOIsByUserID(ctx context.Context, userID uuid.
 func (s *ServiceImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.POIDetailedInfo, int, error) {
 	pois, total, err := s.poiRepository.GetFavouritePOIsByUserIDPaginated(ctx, userID, limit, offset)
 	if err != nil {
-		s.Debug("failed to get paginated favourite POIs by user ID", "error", err)
+		s.logger.Error("failed to get paginated favourite POIs by user ID", "error", err)
 		return nil, 0, err
 	}
 	return pois, total, nil
@@ -172,7 +172,7 @@ func (s *ServiceImpl) GetFavouritePOIsByUserIDPaginated(ctx context.Context, use
 func (s *ServiceImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
 	pois, err := s.poiRepository.GetPOIsByCityID(ctx, cityID)
 	if err != nil {
-		s.Debug("failed to get POIs by city ID", "error", err)
+		s.logger.Error("failed to get POIs by city ID", "error", err)
 		return nil, err
 	}
 	return pois, nil
@@ -181,7 +181,7 @@ func (s *ServiceImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]
 func (s *ServiceImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error) {
 	pois, err := s.poiRepository.SearchPOIs(ctx, filter)
 	if err != nil {
-		s.Debug("failed to search POIs", "error", err)
+		s.logger.Error("failed to search POIs", "error", err)
 		return nil, err
 	}
 	return pois, nil
@@ -193,7 +193,7 @@ func (s *ServiceImpl) GetItinerary(ctx context.Context, userID, itineraryID uuid
 
 	itinerary, err := s.poiRepository.GetItinerary(ctx, userID, itineraryID)
 	if err != nil {
-		s.DebugContext(ctx, "Repository failed to get itinerary", slog.Any("error", err))
+		s.logger.ErrorContext(ctx, "Repository failed to get itinerary", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to get itinerary: %w", err)
 	}
@@ -224,7 +224,7 @@ func (s *ServiceImpl) GetItineraries(ctx context.Context, userID uuid.UUID, page
 
 	itineraries, totalRecords, err := s.poiRepository.GetItineraries(ctx, userID, page, pageSize)
 	if err != nil {
-		s.DebugContext(ctx, "Repository failed to get itineraries", slog.Any("error", err))
+		s.logger.ErrorContext(ctx, "Repository failed to get itineraries", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to retrieve itineraries: %w", err)
 	}
@@ -259,7 +259,7 @@ func (s *ServiceImpl) UpdateItinerary(ctx context.Context, userID, itineraryID u
 
 	updatedItinerary, err := s.poiRepository.UpdateItinerary(ctx, userID, itineraryID, updates)
 	if err != nil {
-		s.DebugContext(ctx, "Repository failed to update itinerary", slog.Any("error", err))
+		s.logger.ErrorContext(ctx, "Repository failed to update itinerary", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, err // Propagate error (could be not found, or DB error)
 	}
@@ -920,7 +920,7 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 
 		llmInteractionID, err := s.poiRepository.SaveLlmInteraction(ctx, interaction)
 		if err != nil {
-			s.DebugContext(ctx, "Failed to save LLM interaction", slog.Any("error", err))
+			s.logger.ErrorContext(ctx, "Failed to save LLM interaction", slog.Any("error", err))
 			return nil, err
 		}
 

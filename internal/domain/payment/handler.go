@@ -49,7 +49,7 @@ func (h *paymentHandler) CreatePayment(ctx context.Context, req *connect.Request
 
 	result, err := h.service.CreatePayment(ctx, params)
 	if err != nil {
-		h.Debug("failed to create payment", "error", err)
+		h.logger.Error("failed to create payment", "error", err)
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
@@ -141,7 +141,7 @@ func (h *paymentHandler) CreateSubscription(ctx context.Context, req *connect.Re
 	// Fetch user for Email
 	user, err := h.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
-		h.Debug("failed to fetch user", "error", err)
+		h.logger.Error("failed to fetch user", "error", err)
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to fetch user"))
 	}
 
@@ -154,7 +154,7 @@ func (h *paymentHandler) CreateSubscription(ctx context.Context, req *connect.Re
 
 	result, err := h.service.CreateSubscription(ctx, params)
 	if err != nil {
-		h.Debug("failed to create subscription", "error", err)
+		h.logger.Error("failed to create subscription", "error", err)
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 

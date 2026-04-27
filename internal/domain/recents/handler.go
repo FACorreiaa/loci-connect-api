@@ -40,7 +40,7 @@ func (h *Handler) getUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		h.Debug("failed to parse user ID", slog.Any("error", err))
+		h.logger.Error("failed to parse user ID", slog.Any("error", err))
 		return uuid.UUID{}, false
 	}
 	return userID, true

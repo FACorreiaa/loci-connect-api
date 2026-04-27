@@ -116,7 +116,7 @@ func (r *RepositoryImpl) CreateList(ctx context.Context, list locitypes.List) er
 		list.ParentListID, list.CityID, list.ViewCount, list.SaveCount, list.CreatedAt, list.UpdatedAt,
 	)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to create list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to create list", slog.Any("error", err))
 		return fmt.Errorf("failed to create list: %w", err)
 	}
 	return nil
@@ -133,7 +133,7 @@ func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locityp
     `
 	rows, err := r.pgpool.Query(ctx, query, listID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get list", slog.Any("error", err))
 		return locitypes.List{}, fmt.Errorf("failed to get list: %w", err)
 	}
 
@@ -142,7 +142,7 @@ func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locityp
 		if errors.Is(err, pgx.ErrNoRows) {
 			return locitypes.List{}, fmt.Errorf("list not found: %w", err)
 		}
-		r.DebugContext(ctx, "Failed to read list row", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to read list row", slog.Any("error", err))
 		return locitypes.List{}, fmt.Errorf("failed to get list: %w", err)
 	}
 
@@ -160,13 +160,13 @@ func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID
     `
 	rows, err := r.pgpool.Query(ctx, query, parentListID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get sub-lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get sub-lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get sub-lists: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[listRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect sub-list rows", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect sub-list rows", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get sub-lists: %w", err)
 	}
 
@@ -195,13 +195,13 @@ func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]
     `
 	rows, err := r.pgpool.Query(ctx, query, listID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get list items", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get list items", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get list items: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[listItemRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect list item rows", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect list item rows", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get list items: %w", err)
 	}
 
@@ -233,7 +233,7 @@ func (r *RepositoryImpl) AddListItem(ctx context.Context, item locitypes.ListIte
 		item.ItemAIDescription, item.CreatedAt, item.UpdatedAt, poiID,
 	)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to add list item", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to add list item", slog.Any("error", err))
 		return fmt.Errorf("failed to add list item: %w", err)
 	}
 	return nil
@@ -244,7 +244,7 @@ func (r *RepositoryImpl) DeleteListItem(ctx context.Context, listID, itemID uuid
 	query := `DELETE FROM list_items WHERE list_id = $1 AND item_id = $2 AND content_type = $3`
 	result, err := r.pgpool.Exec(ctx, query, listID, itemID, contentType)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to delete list item", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to delete list item", slog.Any("error", err))
 		return fmt.Errorf("failed to delete list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -258,7 +258,7 @@ func (r *RepositoryImpl) DeleteList(ctx context.Context, listID uuid.UUID) error
 	query := `DELETE FROM lists WHERE id = $1`
 	result, err := r.pgpool.Exec(ctx, query, listID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to delete list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to delete list", slog.Any("error", err))
 		return fmt.Errorf("failed to delete list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -280,7 +280,7 @@ func (r *RepositoryImpl) UpdateList(ctx context.Context, list locitypes.List) er
 		list.CityID, list.UpdatedAt, list.ID,
 	)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to update list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to update list", slog.Any("error", err))
 		return fmt.Errorf("failed to update list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -303,7 +303,7 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
     `
 	rows, err := r.pgpool.Query(ctx, query, listID, itemID, contentType)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get list item", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get list item", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 
@@ -312,7 +312,7 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
 		if errors.Is(err, pgx.ErrNoRows) {
 			return locitypes.ListItem{}, fmt.Errorf("list item not found: %w", err)
 		}
-		r.DebugContext(ctx, "Failed to collect list item row", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect list item row", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 
@@ -334,7 +334,7 @@ func (r *RepositoryImpl) UpdateListItem(ctx context.Context, item locitypes.List
 		item.UpdatedAt, item.ListID, item.ItemID,
 	)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to update list item", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to update list item", slog.Any("error", err))
 		return fmt.Errorf("failed to update list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -355,13 +355,13 @@ func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isI
     `
 	rows, err := r.pgpool.Query(ctx, query, userID, isItinerary)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get user lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get user lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get user lists: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[listRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect user lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect user lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get user lists: %w", err)
 	}
 
@@ -445,7 +445,7 @@ func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uui
     `
 	rows, err := r.pgpool.Query(ctx, query, listID, itemID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get list item by ID", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get list item by ID", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 
@@ -454,7 +454,7 @@ func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uui
 		if errors.Is(err, pgx.ErrNoRows) {
 			return locitypes.ListItem{}, fmt.Errorf("no list item found for list_id %s and item_id %s", listID, itemID)
 		}
-		r.DebugContext(ctx, "Failed to collect list item row", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect list item row", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
 	}
 
@@ -466,7 +466,7 @@ func (r *RepositoryImpl) DeleteListItemByID(ctx context.Context, listID, itemID 
 	query := `DELETE FROM list_items WHERE list_id = $1 AND item_id = $2`
 	result, err := r.pgpool.Exec(ctx, query, listID, itemID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to delete list item by ID", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to delete list item by ID", slog.Any("error", err))
 		return fmt.Errorf("failed to delete list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -484,7 +484,7 @@ func (r *RepositoryImpl) SaveList(ctx context.Context, userID, listID uuid.UUID)
 	`
 	_, err := r.pgpool.Exec(ctx, query, userID, listID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to save list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to save list", slog.Any("error", err))
 		return fmt.Errorf("failed to save list: %w", err)
 	}
 	return nil
@@ -495,7 +495,7 @@ func (r *RepositoryImpl) UnsaveList(ctx context.Context, userID, listID uuid.UUI
 	query := `DELETE FROM saved_lists WHERE user_id = $1 AND list_id = $2`
 	result, err := r.pgpool.Exec(ctx, query, userID, listID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to unsave list", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to unsave list", slog.Any("error", err))
 		return fmt.Errorf("failed to unsave list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
@@ -517,13 +517,13 @@ func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID
 	`
 	rows, err := r.pgpool.Query(ctx, query, userID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get user saved lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get user saved lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get user saved lists: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[listRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect saved lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect saved lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get user saved lists: %w", err)
 	}
 
@@ -552,13 +552,13 @@ func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID u
 	`
 	rows, err := r.pgpool.Query(ctx, query, listID, contentType)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get list items by content type", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get list items by content type", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get list items by content type: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[listItemRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect list items", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect list items", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get list items by content type: %w", err)
 	}
 
@@ -608,13 +608,13 @@ func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, 
 
 	rows, err := r.pgpool.Query(ctx, query, args...)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to search lists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to search lists", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to search lists: %w", err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[listRow])
 	if err != nil {
-		r.DebugContext(ctx, "Failed to collect search results", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to collect search results", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to search lists: %w", err)
 	}
 

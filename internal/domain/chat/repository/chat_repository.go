@@ -209,7 +209,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 		}
 		if err != nil {
 			if rbErr := tx.Rollback(ctx); rbErr != nil {
-				r.DebugContext(ctx, "Transaction rollback failed after error", "original_error", err, "rollback_error", rbErr)
+				r.logger.ErrorContext(ctx, "Transaction rollback failed after error", "original_error", err, "rollback_error", rbErr)
 				span.RecordError(fmt.Errorf("transaction rollback failed: %v (original error: %w)", rbErr, err))
 			}
 		}
@@ -328,7 +328,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 						// Consider how to handle partial failures. Log and continue, or return error?
 						err = fmt.Errorf("failed to insert itinerary_poi in batch (operation %d of %d for itinerary %s): %w", i+1, poiBatch.Len(), itineraryID.String(), execErr)
 						if closeErr := br.Close(); closeErr != nil {
-							r.DebugContext(ctx, "Failed to close batch for itinerary_pois after an exec error", "close_error", closeErr, "original_batch_error", err)
+							r.logger.ErrorContext(ctx, "Failed to close batch for itinerary_pois after an exec error", "close_error", closeErr, "original_batch_error", err)
 						}
 						span.RecordError(err)
 						span.SetStatus(codes.Error, "Failed to insert itinerary_poi in batch")
@@ -389,11 +389,11 @@ func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []l
 	checkQuery := `SELECT EXISTS(SELECT 1 FROM llm_interactions WHERE id = $1)`
 	err := r.pgpool.QueryRow(ctx, checkQuery, llmInteractionID).Scan(&exists)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to check if llm_interaction exists", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to check if llm_interaction exists", slog.Any("error", err))
 		return fmt.Errorf("failed to check if llm_interaction exists: %w", err)
 	}
 	if !exists {
-		r.DebugContext(ctx, "llm_interaction_id does not exist in database",
+		r.logger.ErrorContext(ctx, "llm_interaction_id does not exist in database",
 			slog.String("llm_interaction_id", llmInteractionID.String()))
 		return fmt.Errorf("llm_interaction_id %s does not exist in database", llmInteractionID.String())
 	}
@@ -849,7 +849,7 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.ChatSession) error {
 	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to begin transaction for session creation", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to begin transaction for session creation", slog.Any("error", err))
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
@@ -866,29 +866,29 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.Ch
     `
 	itineraryJSON, err := json.Marshal(session.CurrentItinerary)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal itinerary", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal itinerary", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal itinerary: %w", err)
 	}
 	historyJSON, err := json.Marshal(session.ConversationHistory)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal history", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal history", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal history: %w", err)
 	}
 	contextJSON, err := json.Marshal(session.SessionContext)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal context", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal context", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal context: %w", err)
 	}
 
 	_, err = tx.Exec(ctx, query, session.ID, session.UserID, session.ProfileID, session.CityName,
 		itineraryJSON, historyJSON, contextJSON, session.CreatedAt, session.UpdatedAt, session.ExpiresAt, session.Status)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to create session", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to create session", slog.Any("error", err))
 		return fmt.Errorf("failed to create session: %w", err)
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		r.DebugContext(ctx, "Failed to commit session creation transaction", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to commit session creation transaction", slog.Any("error", err))
 		return fmt.Errorf("failed to commit session creation: %w", err)
 	}
 
@@ -904,7 +904,7 @@ func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*
     `
 	rows, err := r.pgpool.Query(ctx, query, sessionID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to get session", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get session", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get session: %w", err)
 	}
 	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[chatSessionRow])
@@ -912,7 +912,7 @@ func (r *RepositoryImpl) GetSession(ctx context.Context, sessionID uuid.UUID) (*
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("session %s not found", sessionID)
 		}
-		r.DebugContext(ctx, "Failed to read session row", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to read session row", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to read session: %w", err)
 	}
 
@@ -1037,7 +1037,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to get total count")
-		r.DebugContext(ctx, "Failed to get total chat sessions count", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to get total chat sessions count", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to get total count: %w", err)
 	}
 
@@ -1045,14 +1045,14 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to query LLM interactions")
-		r.DebugContext(ctx, "Failed to get user chat sessions from LLM interactions", slog.Any("error", err), slog.String("user_id", userID.String()))
+		r.logger.ErrorContext(ctx, "Failed to get user chat sessions from LLM interactions", slog.Any("error", err), slog.String("user_id", userID.String()))
 		return nil, fmt.Errorf("failed to get user chat sessions: %w", err)
 	}
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[chatSessionAggRow])
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to read chat session rows")
-		r.DebugContext(ctx, "Failed to collect chat session rows", slog.Any("error", err), slog.String("user_id", userID.String()))
+		r.logger.ErrorContext(ctx, "Failed to collect chat session rows", slog.Any("error", err), slog.String("user_id", userID.String()))
 		return nil, fmt.Errorf("failed to read chat session rows: %w", err)
 	}
 
@@ -1163,7 +1163,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	if err = rows.Err(); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Error iterating through LLM interaction rows")
-		r.DebugContext(ctx, "Error iterating through LLM interaction rows", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Error iterating through LLM interaction rows", slog.Any("error", err))
 		return nil, fmt.Errorf("error iterating through LLM interaction rows: %w", err)
 	}
 
@@ -1449,24 +1449,24 @@ func (r *RepositoryImpl) UpdateSession(ctx context.Context, session locitypes.Ch
     `
 	itineraryJSON, err := json.Marshal(session.CurrentItinerary)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal itinerary", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal itinerary", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal itinerary: %w", err)
 	}
 	historyJSON, err := json.Marshal(session.ConversationHistory)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal history", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal history", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal history: %w", err)
 	}
 	contextJSON, err := json.Marshal(session.SessionContext)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to marshal context", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to marshal context", slog.Any("error", err))
 		return fmt.Errorf("failed to marshal context: %w", err)
 	}
 
 	_, err = r.pgpool.Exec(ctx, query, session.ID, itineraryJSON, historyJSON, contextJSON,
 		session.UpdatedAt, session.ExpiresAt, session.Status)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to update session", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to update session", slog.Any("error", err))
 		return fmt.Errorf("failed to update session: %w", err)
 	}
 	return nil
@@ -1541,7 +1541,7 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDet
 		poi.DescriptionPOI, // $9: description_poi
 	).Scan(&returnedID)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to insert llm_suggested_poi", slog.Any("error", err), slog.String("query", query), slog.String("name", poi.Name))
+		r.logger.ErrorContext(ctx, "Failed to insert llm_suggested_poi", slog.Any("error", err), slog.String("query", query), slog.String("name", poi.Name))
 		span.RecordError(err)
 		return uuid.Nil, fmt.Errorf("failed to save llm_suggested_poi: %w", err)
 	}
@@ -1750,11 +1750,11 @@ func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetai
 			POIDetailedInfo.DescriptionPOI, // Assumes locitypes.POIDetailedInfo has DescriptionPOI from JSON
 		).Scan(&poiDBID)
 		if err != nil {
-			r.DebugContext(ctx, "GetOrCreatePOI: Failed to insert new POI", "error", err, "poi_name", POIDetailedInfo.Name)
+			r.logger.ErrorContext(ctx, "GetOrCreatePOI: Failed to insert new POI", "error", err, "poi_name", POIDetailedInfo.Name)
 			return uuid.Nil, fmt.Errorf("GetOrCreatePOI: failed to insert new POI '%s': %w", POIDetailedInfo.Name, err)
 		}
 	} else if err != nil {
-		r.DebugContext(ctx, "GetOrCreatePOI: Failed to query existing POI", "error", err, "poi_name", POIDetailedInfo.Name)
+		r.logger.ErrorContext(ctx, "GetOrCreatePOI: Failed to query existing POI", "error", err, "poi_name", POIDetailedInfo.Name)
 		return uuid.Nil, fmt.Errorf("GetOrCreatePOI: failed to query existing POI '%s': %w", POIDetailedInfo.Name, err)
 	}
 	return poiDBID, nil
@@ -1799,7 +1799,7 @@ func (r *RepositoryImpl) GetRecentChatSessions(ctx context.Context, userID uuid.
 
 	rows, err := r.pgpool.Query(ctx, query, userID, limit)
 	if err != nil {
-		r.Debug("Failed to query recent chat sessions", slog.Any("error", err))
+		r.logger.Error("Failed to query recent chat sessions", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query recent chat sessions: %w", err)
 	}
 	defer rows.Close()
@@ -1841,7 +1841,7 @@ func (r *RepositoryImpl) GetRecentChatSessionsByType(ctx context.Context, userID
 
 	rows, err := r.pgpool.Query(ctx, query, userID, searchType, limit)
 	if err != nil {
-		r.Debug("Failed to query recent chat sessions by type",
+		r.logger.Error("Failed to query recent chat sessions by type",
 			slog.Any("error", err),
 			slog.String("search_type", string(searchType)))
 		return nil, fmt.Errorf("failed to query recent chat sessions by type: %w", err)
@@ -1915,7 +1915,7 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 
 	rows, err := r.pgpool.Query(ctx, query, limit)
 	if err != nil {
-		r.Debug("Failed to query trending discoveries", slog.Any("error", err))
+		r.logger.Error("Failed to query trending discoveries", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to query trending discoveries: %w", err)
 	}
 	defer rows.Close()

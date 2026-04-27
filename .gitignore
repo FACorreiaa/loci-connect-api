@@ -29,3 +29,4 @@ loci-connect-api
 bin
 # server binary (anchored to root)
 /server
+.DS_Store

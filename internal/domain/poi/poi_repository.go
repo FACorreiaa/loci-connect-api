@@ -141,7 +141,7 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
 		poi.Category, "loci_ai", poi.DescriptionPOI,
 	).Scan(&id); err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
 		return uuid.Nil, fmt.Errorf("failed to insert POI: %w", err)
 	}
@@ -778,9 +778,9 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 	)
 	if err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
-		r.DebugContext(ctx, "Failed to save POI details",
+		r.logger.ErrorContext(ctx, "Failed to save POI details",
 			slog.Any("error", err),
 			slog.String("poi_name", poi.Name),
 			slog.String("poi_id", poiID.String()),
@@ -842,9 +842,9 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 	)
 	if err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.DebugContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
-		r.DebugContext(ctx, "Failed to save POI to points_of_interest",
+		r.logger.ErrorContext(ctx, "Failed to save POI to points_of_interest",
 			slog.Any("error", err),
 			slog.String("poi_name", poi.Name),
 			slog.String("poi_id", poiID.String()),
@@ -859,7 +859,7 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 	// Commit the transaction
 	err = tx.Commit(ctx)
 	if err != nil {
-		r.DebugContext(ctx, "Failed to commit POI transaction",
+		r.logger.ErrorContext(ctx, "Failed to commit POI transaction",
 			slog.Any("error", err),
 			slog.String("poi_name", poi.Name),
 			slog.String("poi_id", poiID.String()))
@@ -1278,7 +1278,7 @@ func (r *RepositoryImpl) SaveRestaurantDetails(ctx context.Context, restaurant l
 		restaurant.Rating,           // $18: rating (DOUBLE PRECISION)
 		restaurant.LlmInteractionID, // $19: llm_interaction_id (UUID)
 	).Scan(&id); err != nil {
-		r.DebugContext(ctx, "Failed to save restaurant details",
+		r.logger.ErrorContext(ctx, "Failed to save restaurant details",
 			slog.Any("error", err),
 			slog.String("restaurant_name", restaurant.Name),
 			slog.String("city_id", cityID.String()))
@@ -1654,7 +1654,7 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB UPDATE failed")
-		r.DebugContext(ctx, "Failed to update itinerary", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to update itinerary", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to update user_saved_itineraries: %w", err)
 	}
 
@@ -1684,7 +1684,7 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 		}
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB UPDATE failed")
-		r.DebugContext(ctx, "Failed to read updated itinerary", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to read updated itinerary", slog.Any("error", err))
 		return nil, fmt.Errorf("failed to read updated itinerary: %w", err)
 	}
 

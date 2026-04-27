@@ -60,7 +60,7 @@ func (s *service) CheckRateLimit(ctx context.Context, userID uuid.UUID, email st
 
 	usage, err := s.repo.GetDailyUsage(ctx, userID)
 	if err != nil {
-		s.DebugContext(ctx, "failed to get usage", "error", err)
+		s.logger.ErrorContext(ctx, "failed to get usage", "error", err)
 		return err // Fail safe or fail open? Fail safe for now.
 	}
 

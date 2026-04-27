@@ -391,7 +391,7 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []locityp
 
 	itineraryID, err := l.poiRepo.SaveItinerary(ctx, userID, cityID)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to save itinerary, skipping itinerary creation",
+		l.logger.ErrorContext(ctx, "Failed to save itinerary, skipping itinerary creation",
 			slog.Any("error", err),
 			slog.String("cityID", cityID.String()),
 			slog.String("userID", userID.String()))
@@ -405,7 +405,7 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []locityp
 
 	sortedPois, err := l.llmInteractionRepo.GetLlmSuggestedPOIsByInteractionSortedByDistance(ctx, llmInteractionID, cityID, *userLocation)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to fetch sorted POIs", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to fetch sorted POIs", slog.Any("error", err))
 		return pois, nil // Return unsorted POIs
 	}
 	return sortedPois, nil
@@ -550,7 +550,7 @@ func (l *ServiceImpl) GetUserChatSessions(ctx context.Context, userID uuid.UUID,
 
 	response, err := l.llmInteractionRepo.GetUserChatSessions(ctx, userID, page, limit)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to get user chat sessions", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to get user chat sessions", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to get user chat sessions")
 		return nil, fmt.Errorf("failed to get user chat sessions: %w", err)
@@ -732,7 +732,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	// Find city ID
 	cityData, err := l.cityRepo.FindCityByNameAndCountry(ctx, city, "") // Adjust country if needed
 	if err != nil {
-		l.DebugContext(ctx, "Failed to find city", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to find city", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to find city: %w", err)
 	}
@@ -745,7 +745,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 
 	p, err := l.poiRepo.FindPOIDetails(ctx, cityID, lat, lon, 100.0) // 100m tolerance
 	if err != nil {
-		l.DebugContext(ctx, "Failed to query POI details from database", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to query POI details from database", slog.Any("error", err))
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to query POI details: %w", err)
 	}
@@ -782,7 +782,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	}
 
 	if res.Err != nil {
-		l.DebugContext(ctx, "Error generating POI details", slog.Any("error", res.Err))
+		l.logger.ErrorContext(ctx, "Error generating POI details", slog.Any("error", res.Err))
 		span.RecordError(res.Err)
 		span.SetStatus(codes.Error, "Failed to generate POI details")
 		return nil, res.Err
@@ -834,7 +834,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 	}
 	savedLlmInteractionID, err := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to save LLM interaction in generatePOIData", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to save LLM interaction in generatePOIData", slog.Any("error", err))
 		// Decide if this is fatal for POI generation. It might be if FK is NOT NULL.
 		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to save LLM interaction: %w", err)
 	}
@@ -933,7 +933,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //
 //	queryEmbedding, err := l.embeddingService.GenerateQueryEmbedding(ctx, searchQuery)
 //	if err != nil {
-//		l.DebugContext(ctx, "Failed to generate query embedding",
+//		l.logger.ErrorContext(ctx, "Failed to generate query embedding",
 //			slog.Any("error", err),
 //			slog.String("query", searchQuery))
 //		span.RecordError(err)
@@ -944,7 +944,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 //	// Search for similar POIs in the city
 //	similarPOIs, err := l.poiRepo.FindSimilarPOIsByCity(ctx, queryEmbedding, cityID, limit)
 //	if err != nil {
-//		l.DebugContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
+//		l.logger.ErrorContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
 //		span.RecordError(err)
 //		span.SetStatus(codes.Error, "Failed to find similar POIs")
 //		return []locitypes.POIDetailedInfo{}, fmt.Errorf("failed to find similar POIs: %w", err)
@@ -979,7 +979,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 
 	if l.embeddingService == nil {
 		err := fmt.Errorf("embedding service not available")
-		l.DebugContext(ctx, "Embedding service not available", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Embedding service not available", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Embedding service not available")
 		return nil, err
@@ -988,7 +988,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 	// Generate embedding for user message
 	queryEmbedding, err := l.embeddingService.GenerateQueryEmbedding(ctx, userMessage)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to generate query embedding", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to generate query embedding", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate query embedding")
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
@@ -1008,7 +1008,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 
 		hybridPOIs, err := l.poiRepo.SearchPOIsHybrid(ctx, filter, queryEmbedding, semanticWeight)
 		if err != nil {
-			l.DebugContext(ctx, "Failed to perform hybrid search", slog.Any("error", err))
+			l.logger.ErrorContext(ctx, "Failed to perform hybrid search", slog.Any("error", err))
 			span.RecordError(err)
 			// Fall back to semantic-only search
 		} else {
@@ -1023,7 +1023,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 	if len(pois) == 0 {
 		semanticPOIs, err := l.poiRepo.FindSimilarPOIsByCity(ctx, queryEmbedding, cityID, 10)
 		if err != nil {
-			l.DebugContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
+			l.logger.ErrorContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to find similar POIs")
 			return nil, fmt.Errorf("failed to find similar POIs: %w", err)
@@ -1191,7 +1191,7 @@ If no city is mentioned, use empty string for city.
 
 // TODO For robustness, send unprocessed events to a dead letter queue (e.g., a separate channel or database table) for later analysis:
 // if !l.sendEvent(ctx, eventCh, event) {
-//     l.DebugContext(ctx, "Sending to dead letter queue", slog.Any("event", event))
+//     l.logger.ErrorContext(ctx, "Sending to dead letter queue", slog.Any("event", event))
 //     // Save to a persistent store
 // }
 
@@ -1267,7 +1267,7 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		// Note: eventCh is closed by ProcessUnifiedChatMessageStream via closeOnce
 		err := l.ProcessUnifiedChatMessageStream(cc)
 		if err != nil {
-			l.Debug("error processing stream", "error", err)
+			l.logger.Error("error processing stream", "error", err)
 		}
 	}()
 
@@ -1301,7 +1301,7 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		defer close(eventCh) // Ensure channel is closed when goroutine exits
 		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
 		if err != nil {
-			l.Debug("error processing continue stream", "error", err)
+			l.logger.Error("error processing continue stream", "error", err)
 		}
 	}()
 
@@ -1524,7 +1524,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 				if strings.Contains(strings.ToLower(p.Name), oldPOI) {
 					newPOI, err := l.generatePOIData(ctx, newPOIName, session.SessionContext.CityName, userLocation, session.UserID, cityID)
 					if err != nil {
-						l.DebugContext(ctx, "Failed to generate POI data", slog.Any("error", err))
+						l.logger.ErrorContext(ctx, "Failed to generate POI data", slog.Any("error", err))
 						span.RecordError(err)
 						finalResponseMessage = fmt.Sprintf("Could not replace %s with %s due to an error.", oldPOI, newPOIName)
 					} else {
@@ -1942,7 +1942,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 
 	newPOI, err := l.generatePOIDataStream(ctx, poiName, session.SessionContext.CityName, userLocation, session.UserID, cityID, eventCh)
 	if err != nil {
-		l.DebugContext(ctx, "Failed to generate POI data for streaming", slog.Any("error", err))
+		l.logger.ErrorContext(ctx, "Failed to generate POI data for streaming", slog.Any("error", err))
 		span.RecordError(err)
 		return "", fmt.Errorf("failed to generate POI data: %w", err)
 	}
@@ -2090,7 +2090,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 //	}
 //	cacheKeyBytes, err := json.Marshal(cacheKeyData)
 //	if err != nil {
-//		l.DebugContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
+//		l.logger.ErrorContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
 //		// Use a fallback cache key
 //		cacheKeyBytes = []byte(fmt.Sprintf("fallback_%s_%s", cleanedMessage, cc.CityName))
 //	}
@@ -2675,7 +2675,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 	}
 
 	if err != nil {
-		l.DebugContext(ctx, "LLM call failed after retries",
+		l.logger.ErrorContext(ctx, "LLM call failed after retries",
 			slog.String("part_type", partType),
 			slog.Any("error", err))
 		if ctx.Err() == nil {
@@ -2703,7 +2703,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			return // Stop if context is canceled
 		}
 		if err != nil {
-			l.DebugContext(ctx, "Streaming error from LLM",
+			l.logger.ErrorContext(ctx, "Streaming error from LLM",
 				slog.String("part_type", partType),
 				slog.Any("error", err))
 			if ctx.Err() == nil {

@@ -126,7 +126,7 @@ func (s *service) CreatePayment(ctx context.Context, req *CreatePaymentParams) (
 
 	pi, err := paymentintent.New(params)
 	if err != nil {
-		s.Debug("failed to create payment intent", "error", err)
+		s.logger.Error("failed to create payment intent", "error", err)
 		return nil, fmt.Errorf("fake stripe error: %w", err)
 	}
 

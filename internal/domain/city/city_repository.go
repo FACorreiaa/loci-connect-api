@@ -488,7 +488,7 @@ func (r *RepositoryImpl) GetCity(ctx context.Context, lat, lon float64) (uuid.UU
 			span.SetStatus(codes.Error, "No city found")
 			return uuid.Nil, "", fmt.Errorf("no city found for coordinates (%f, %f)", lat, lon)
 		}
-		r.DebugContext(ctx, "Failed to determine city ID", slog.Any("error", err))
+		r.logger.ErrorContext(ctx, "Failed to determine city ID", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Database query failed")
 		return uuid.Nil, "", fmt.Errorf("failed to determine city ID: %w", err)

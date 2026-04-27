@@ -125,7 +125,7 @@ func (h *AuthHandler) ForgotPassword(ctx context.Context, req *connect.Request[a
 	// The service will silently fail if the email doesn't exist
 	if err := h.service.RequestPasswordReset(ctx, req.Msg.Email); err != nil {
 		// Log error but don't expose to client
-		// h.Debug("password reset request failed", "error", err)
+		// h.logger.Error("password reset request failed", "error", err)
 	}
 
 	msg := "If an account exists with this email, you will receive a password reset link"
