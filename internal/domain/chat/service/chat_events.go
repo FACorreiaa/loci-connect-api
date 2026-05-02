@@ -39,7 +39,7 @@ func (l *ServiceImpl) enqueueDeadLetter(ctx context.Context, event locitypes.Str
 }
 
 func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamEvent, event locitypes.StreamEvent, retries int) bool {
-	for i := 0; i < retries; i++ {
+	for range retries {
 		if event.EventID == "" {
 			event.EventID = uuid.New().String()
 		}

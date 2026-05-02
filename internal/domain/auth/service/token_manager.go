@@ -118,7 +118,7 @@ func (tm *jwtTokenManager) ValidateRefreshToken(tokenString string) (*Claims, er
 // validateToken is a helper function to validate tokens
 func (tm *jwtTokenManager) validateToken(tokenString string, secret []byte) (*Claims, error) {
 	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}

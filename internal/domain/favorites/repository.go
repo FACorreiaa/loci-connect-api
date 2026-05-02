@@ -123,8 +123,8 @@ func (r *RepositoryImpl) GetFavorites(ctx context.Context, userID uuid.UUID, con
 	`
 	countQuery := `SELECT COUNT(*) FROM user_favorites WHERE user_id = $1`
 
-	args := []interface{}{userID}
-	countArgs := []interface{}{userID}
+	args := []any{userID}
+	countArgs := []any{userID}
 
 	if contentType != "" && contentType != "unspecified" {
 		baseQuery += ` AND content_type = $2`
@@ -218,7 +218,7 @@ func (r *RepositoryImpl) GetFavoritesCount(ctx context.Context, userID uuid.UUID
 	l := r.logger.With(slog.String("method", "GetFavoritesCount"))
 
 	query := `SELECT COUNT(*) FROM user_favorites WHERE user_id = $1`
-	args := []interface{}{userID}
+	args := []any{userID}
 
 	if contentType != "" && contentType != "unspecified" {
 		query += ` AND content_type = $2`

@@ -187,26 +187,27 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context
 func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []string, cityName, tagsPromptPart, userPrefs string, semanticPOIs []locitypes.POIDetailedInfo) string {
-	prompt := fmt.Sprintf(`
+	var prompt strings.Builder
+	prompt.WriteString(fmt.Sprintf(`
         Generate a personalized trip itinerary for %s, tailored to user interests [%s].
 
         **SEMANTIC CONTEXT - Consider these highly relevant POIs found via semantic search:**
-        `, cityName, strings.Join(interestNames, ", "))
+        `, cityName, strings.Join(interestNames, ", ")))
 
 	// Add semantic POI context
 	if len(semanticPOIs) > 0 {
-		prompt += "\n**Contextually Relevant POIs:**\n"
+		prompt.WriteString("\n**Contextually Relevant POIs:**\n")
 		for i, p := range semanticPOIs {
 			if i >= 10 { // Limit context to avoid token overuse
 				break
 			}
-			prompt += fmt.Sprintf("- %s (%s): %s [Lat: %.6f, Lon: %.6f]\n",
-				p.Name, p.Category, p.DescriptionPOI, p.Latitude, p.Longitude)
+			prompt.WriteString(fmt.Sprintf("- %s (%s): %s [Lat: %.6f, Lon: %.6f]\n",
+				p.Name, p.Category, p.DescriptionPOI, p.Latitude, p.Longitude))
 		}
-		prompt += "\n**Instructions:** Use these semantic matches as inspiration and context. You may include them directly or use them to find similar places. Ensure variety and avoid exact duplicates.\n\n"
+		prompt.WriteString("\n**Instructions:** Use these semantic matches as inspiration and context. You may include them directly or use them to find similar places. Ensure variety and avoid exact duplicates.\n\n")
 	}
 
-	prompt += `Include:
+	prompt.WriteString(`Include:
         1. An itinerary name that reflects both user interests and semantic context.
         2. An overall description highlighting semantic relevance.
         3. A list of points of interest with name, category, coordinates, and detailed description.
@@ -231,16 +232,16 @@ func (l *ServiceImpl) getPersonalizedPOIWithSemanticContext(interestNames []stri
                     "description_poi": "Detailed description explaining semantic relevance to user interests and why this matches their preferences"
                 }
             ]
-        }`
+        }`)
 
 	if tagsPromptPart != "" {
-		prompt += "\n**User Tags Context:** " + tagsPromptPart
+		prompt.WriteString("\n**User Tags Context:** " + tagsPromptPart)
 	}
 	if userPrefs != "" {
-		prompt += "\n**User Preferences:** " + userPrefs
+		prompt.WriteString("\n**User Preferences:** " + userPrefs)
 	}
 
-	return prompt
+	return prompt.String()
 }
 
 func (l *ServiceImpl) FetchUserData(ctx context.Context, userID, profileID uuid.UUID) (interests []*locitypes.Interest, searchProfile *locitypes.UserPreferenceProfileResponse, tags []*locitypes.Tags, err error) {
@@ -1153,22 +1154,22 @@ If no city is mentioned, use empty string for city.
 		return "", "", fmt.Errorf("failed to parse message: %w", err)
 	}
 
-	var responseText string
+	var responseText strings.Builder
 	for _, cand := range response.Candidates {
 		if cand.Content != nil {
 			for _, part := range cand.Content.Parts {
 				if part.Text != "" {
-					responseText += part.Text
+					responseText.WriteString(part.Text)
 				}
 			}
 		}
 	}
 
-	if responseText == "" {
+	if responseText.String() == "" {
 		return "", "", fmt.Errorf("empty response from AI parser")
 	}
 
-	cleanResponse := CleanJSONResponse(responseText)
+	cleanResponse := CleanJSONResponse(responseText.String())
 	var parsed struct {
 		City    string `json:"city"`
 		Message string `json:"message"`
@@ -1346,7 +1347,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		}
 	}
 	cityID := cityData.ID
-	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: map[string]interface{}{"status": "context_loaded", "city_id": cityID.String()}}, 3)
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: map[string]any{"status": "context_loaded", "city_id": cityID.String()}}, 3)
 
 	// --- 3. Add User Message to History ---
 	userMessage := locitypes.ConversationMessage{
@@ -1371,7 +1372,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	// --- 5. Enhance with Semantic POI Recommendations ---
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeProgress,
-		Data: map[string]interface{}{"status": "generating_semantic_context", "progress": 20},
+		Data: map[string]any{"status": "generating_semantic_context", "progress": 20},
 	}, 3)
 
 	semanticPOIs, err := l.generateSemanticPOIRecommendations(ctx, message, cityID, session.UserID, userLocation, 0.6)
@@ -1379,14 +1380,14 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		l.logger.WarnContext(ctx, "Failed to generate semantic POI recommendations for streaming session", slog.Any("error", err))
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeProgress,
-			Data: map[string]interface{}{"status": "semantic_context_failed", "progress": 22},
+			Data: map[string]any{"status": "semantic_context_failed", "progress": 22},
 		}, 3)
 	} else {
 		l.logger.InfoContext(ctx, "Generated semantic POI recommendations for streaming session",
 			slog.Int("semantic_recommendations", len(semanticPOIs)))
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: "semantic_context_generated",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"status":                         "semantic_context_ready",
 				"semantic_recommendations_count": len(semanticPOIs),
 				"progress":                       25,
@@ -1776,7 +1777,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	if len(semanticPOIs) > 0 {
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeProgress,
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"status":           "analyzing_semantic_matches",
 				"semantic_options": len(semanticPOIs),
 			},
@@ -1794,7 +1795,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 			if !alreadyExists {
 				l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 					Type: "semantic_poi_added",
-					Data: map[string]interface{}{
+					Data: map[string]any{
 						"poi_name":       semanticPOI.Name,
 						"poi_category":   semanticPOI.Category,
 						"latitude":       semanticPOI.Latitude,
@@ -1819,7 +1820,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 		// If semantic POIs exist but all are already in itinerary
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type: "semantic_alternatives_suggested",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"message": "All semantic matches already in itinerary",
 				"alternatives": func() []string {
 					var names []string
@@ -1850,7 +1851,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	// Fallback to traditional POI name extraction and generation
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeProgress,
-		Data: map[string]interface{}{"status": "extracting_poi_name"},
+		Data: map[string]any{"status": "extracting_poi_name"},
 	}, 3)
 
 	poiName := extractPOIName(message)
@@ -1868,7 +1869,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	// Generate new POI data with streaming updates
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeProgress,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"status":   "generating_poi_data",
 			"poi_name": poiName,
 		},
@@ -1886,7 +1887,7 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: "poi_added_successfully",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"poi_name":       newPOI.Name,
 			"poi_category":   newPOI.Category,
 			"semantic_match": false,
@@ -2535,15 +2536,12 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 						return // Stop if context is canceled
 					}
 
-					end := i + chunkSize
-					if end > len(cachedText) {
-						end = len(cachedText)
-					}
+					end := min(i+chunkSize, len(cachedText))
 					chunk := cachedText[i:end]
 
 					sendEvent(locitypes.StreamEvent{
 						Type: locitypes.EventTypeChunk,
-						Data: map[string]interface{}{
+						Data: map[string]any{
 							"part":       partType,
 							"chunk":      chunk,
 							"domain":     string(domain),
@@ -2581,7 +2579,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 	// Retry loop with exponential backoff
 	if err != nil && isRetryableLLMError(err) {
 		backoff := baseRetryDelay
-		for attempt := 0; attempt < maxLLMRetries; attempt++ {
+		for attempt := range maxLLMRetries {
 			l.logger.WarnContext(ctx, "LLM call failed, retrying",
 				slog.String("part_type", partType),
 				slog.Int("attempt", attempt+1),
@@ -2665,7 +2663,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 
 						sendEvent(locitypes.StreamEvent{
 							Type: locitypes.EventTypeChunk,
-							Data: map[string]interface{}{
+							Data: map[string]any{
 								"part":       partType,
 								"chunk":      chunk,
 								"domain":     string(domain),

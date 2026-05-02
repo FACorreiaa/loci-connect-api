@@ -236,12 +236,12 @@ func CleanLLMResponse(responseText string) string {
 	cleaned := strings.TrimSpace(responseText)
 
 	// Remove markdown code blocks if present
-	if strings.HasPrefix(cleaned, "```json") {
-		cleaned = strings.TrimPrefix(cleaned, "```json")
+	if after, ok := strings.CutPrefix(cleaned, "```json"); ok {
+		cleaned = after
 		cleaned = strings.TrimSuffix(cleaned, "```")
 		cleaned = strings.TrimSpace(cleaned)
-	} else if strings.HasPrefix(cleaned, "```") {
-		cleaned = strings.TrimPrefix(cleaned, "```")
+	} else if after, ok := strings.CutPrefix(cleaned, "```"); ok {
+		cleaned = after
 		cleaned = strings.TrimSuffix(cleaned, "```")
 		cleaned = strings.TrimSpace(cleaned)
 	}
@@ -260,10 +260,10 @@ func CleanJSONResponse(response string) string {
 	response = strings.TrimSpace(response)
 
 	// Remove markdown code block markers
-	if strings.HasPrefix(response, "```json") {
-		response = strings.TrimPrefix(response, "```json")
-	} else if strings.HasPrefix(response, "```") {
-		response = strings.TrimPrefix(response, "```")
+	if after, ok := strings.CutPrefix(response, "```json"); ok {
+		response = after
+	} else if after, ok := strings.CutPrefix(response, "```"); ok {
+		response = after
 	}
 	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)

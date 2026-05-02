@@ -48,7 +48,7 @@ func (r *RepositoryImpl) GetMainPageStatistics(ctx context.Context, userID uuid.
 	// Check if this is a request for aggregate statistics (system user)
 	systemUserID := uuid.MustParse("00000000-0000-0000-0000-000000000000")
 	var query string
-	var args []interface{}
+	var args []any
 	if userID == systemUserID {
 		query = `
 			WITH all_unique_pois AS (

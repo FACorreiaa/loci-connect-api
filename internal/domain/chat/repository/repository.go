@@ -185,7 +185,7 @@ type ConversationMessage struct {
 	Content     string          `json:"content"`
 	MessageType MessageType     `json:"message_type"` // initial_request, modification_request, response
 	Timestamp   time.Time       `json:"timestamp"`
-	Metadata    MessageMetadata `json:"metadata,omitempty"`
+	Metadata    MessageMetadata `json:"metadata"`
 }
 
 type MessageRole string
@@ -289,10 +289,10 @@ type StreamingChatEvent struct {
 }
 
 type Intent struct {
-	Type           IntentType             `json:"type"`
-	Confidence     float64                `json:"confidence"`
-	Entities       map[string]interface{} `json:"entities"` // Good for flexibility
-	RequiredAction ActionType             `json:"required_action"`
+	Type           IntentType     `json:"type"`
+	Confidence     float64        `json:"confidence"`
+	Entities       map[string]any `json:"entities"` // Good for flexibility
+	RequiredAction ActionType     `json:"required_action"`
 }
 
 type IntentType string
@@ -334,7 +334,7 @@ const (
 type StreamEvent struct {
 	Type       string          `json:"type"`
 	Message    string          `json:"message"`
-	Data       interface{}     `json:"data,omitempty"`
+	Data       any             `json:"data,omitempty"`
 	Error      string          `json:"error,omitempty"`
 	Timestamp  time.Time       `json:"timestamp"`
 	EventID    string          `json:"event_id"`

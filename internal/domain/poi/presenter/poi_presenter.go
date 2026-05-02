@@ -1,6 +1,8 @@
 package presenter
 
 import (
+	"maps"
+
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -12,9 +14,7 @@ func ToPOIProto(poi *locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	}
 
 	openingHours := make(map[string]string)
-	for k, v := range poi.OpeningHours {
-		openingHours[k] = v
-	}
+	maps.Copy(openingHours, poi.OpeningHours)
 
 	website := ""
 	if poi.Website != "" {

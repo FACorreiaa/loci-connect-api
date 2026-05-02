@@ -58,8 +58,8 @@ func fallbackDomain(message string) DomainType {
 			continue
 		}
 		candidates := []string{token}
-		if strings.HasSuffix(token, "s") {
-			candidates = append(candidates, strings.TrimSuffix(token, "s"))
+		if before, ok := strings.CutSuffix(token, "s"); ok {
+			candidates = append(candidates, before)
 		}
 		for _, c := range candidates {
 			if domain, ok := keywordMap[c]; ok {

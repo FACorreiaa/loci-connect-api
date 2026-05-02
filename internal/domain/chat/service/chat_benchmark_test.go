@@ -55,13 +55,13 @@ type ChatBenchmarkResult struct {
 
 // SSEEvent represents a Server-Sent Event
 type SSEEvent struct {
-	Type      string      `json:"type"`
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data,omitempty"`
-	Error     string      `json:"error,omitempty"`
-	Timestamp time.Time   `json:"timestamp"`
-	EventID   string      `json:"event_id"`
-	IsFinal   bool        `json:"is_final,omitempty"`
+	Type      string    `json:"type"`
+	Message   string    `json:"message"`
+	Data      any       `json:"data,omitempty"`
+	Error     string    `json:"error,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+	EventID   string    `json:"event_id"`
+	IsFinal   bool      `json:"is_final,omitempty"`
 }
 
 // NewBenchmarkConfig creates a new benchmark configuration
@@ -219,7 +219,7 @@ func benchmarkStartChat(config *BenchmarkConfig, message string) ChatBenchmarkRe
 	}
 
 	// Prepare request body
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"message":       message,
 		"user_location": config.TestUserLocation,
 	}
@@ -294,7 +294,7 @@ func benchmarkStartChat(config *BenchmarkConfig, message string) ChatBenchmarkRe
 
 				// Extract session ID from the first event
 				if result.SessionID == uuid.Nil && event.Data != nil {
-					if dataMap, ok := event.Data.(map[string]interface{}); ok {
+					if dataMap, ok := event.Data.(map[string]any); ok {
 						if sessionIDStr, ok := dataMap["session_id"].(string); ok {
 							if parsedID, err := uuid.Parse(sessionIDStr); err == nil {
 								result.SessionID = parsedID
@@ -337,7 +337,7 @@ func benchmarkContinueChat(config *BenchmarkConfig, sessionID uuid.UUID, message
 	}
 
 	// Prepare request body
-	requestBody := map[string]interface{}{
+	requestBody := map[string]any{
 		"message":       message,
 		"city_name":     "Esposende",
 		"context_type":  "modify_itinerary",
@@ -440,7 +440,7 @@ func generateTestAuthToken(userID uuid.UUID) string {
 	// In a real scenario, this would create a proper JWT token
 	// For benchmarking, we'll create a simple token format
 	// This assumes your auth middleware can handle test tokens
-	claims := map[string]interface{}{
+	claims := map[string]any{
 		"user_id": userID.String(),
 		"exp":     time.Now().Add(1 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
@@ -539,7 +539,6 @@ func BenchmarkConcurrentChatRequests(b *testing.B) {
 
 		// Start concurrent StartChat requests
 		for _, msg := range startMessages {
-			msg := msg // capture loop variable
 			wg.Go(func() {
 				result := benchmarkStartChat(config, msg)
 				if !result.Success {
@@ -550,7 +549,6 @@ func BenchmarkConcurrentChatRequests(b *testing.B) {
 
 		// Start concurrent ContinueChat requests
 		for _, msg := range continueMessages {
-			msg := msg // capture loop variable
 			wg.Go(func() {
 				result := benchmarkContinueChat(config, sessionID, msg)
 				if !result.Success {

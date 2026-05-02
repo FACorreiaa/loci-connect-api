@@ -31,7 +31,7 @@ func NewStripeProvider(apiKey string) *StripeProvider {
 
 // CreatePaymentIntent creates a new payment intent in Stripe
 // This supports credit cards, Apple Pay, and Google Pay automatically through Stripe's Payment Element.
-func (s *StripeProvider) CreatePaymentIntent(amount int64, currency string, metadata map[string]interface{}) (string, string, error) {
+func (s *StripeProvider) CreatePaymentIntent(amount int64, currency string, metadata map[string]any) (string, string, error) {
 	// Convert metadata to string map for Stripe
 	stripeMetadata := make(map[string]string)
 	for k, v := range metadata {
@@ -88,7 +88,7 @@ func (s *StripeProvider) RefundPayment(paymentIntentID string, amount *int64) er
 
 // CreateCustomer creates a new Stripe customer
 // This is useful for subscription management and storing payment methods.
-func (s *StripeProvider) CreateCustomer(userID uuid.UUID, email string, metadata map[string]interface{}) (string, error) {
+func (s *StripeProvider) CreateCustomer(userID uuid.UUID, email string, metadata map[string]any) (string, error) {
 	stripeMetadata := make(map[string]string)
 	for k, v := range metadata {
 		stripeMetadata[k] = fmt.Sprintf("%v", v)
@@ -122,7 +122,7 @@ func (s *StripeProvider) DeleteCustomer(customerID string) error {
 }
 
 // CreateProduct creates a Stripe product.
-func (s *StripeProvider) CreateProduct(name, description string, metadata map[string]interface{}) (string, error) {
+func (s *StripeProvider) CreateProduct(name, description string, metadata map[string]any) (string, error) {
 	stripeMetadata := make(map[string]string)
 	for k, v := range metadata {
 		stripeMetadata[k] = fmt.Sprintf("%v", v)
@@ -162,7 +162,7 @@ func (s *StripeProvider) CreatePrice(productID string, amount int64, currency, i
 }
 
 // CreateSubscription creates a Stripe subscription for a customer.
-func (s *StripeProvider) CreateSubscription(customerID, priceID string, metadata map[string]interface{}) (string, string, error) {
+func (s *StripeProvider) CreateSubscription(customerID, priceID string, metadata map[string]any) (string, string, error) {
 	stripeMetadata := make(map[string]string)
 	for k, v := range metadata {
 		stripeMetadata[k] = fmt.Sprintf("%v", v)
@@ -294,7 +294,7 @@ func (s *StripeProvider) GetConnectedAccount(accountID string) (*stripe.Account,
 // applicationFeePercent: percentage the platform takes (e.g., 10.0 for 10%).
 func (s *StripeProvider) CreateSubscriptionWithConnect(
 	customerID, priceID string,
-	metadata map[string]interface{},
+	metadata map[string]any,
 	connectedAccountID string,
 	applicationFeePercent float64,
 ) (string, string, error) {

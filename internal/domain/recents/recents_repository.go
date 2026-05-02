@@ -164,7 +164,7 @@ func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID u
 
 	// Build WHERE clause with filters - include ALL interactions, not just those with city_name
 	whereConditions := []string{"user_id = $1"}
-	args := []interface{}{userID}
+	args := []any{userID}
 	argIndex := 2
 
 	// Add search filter

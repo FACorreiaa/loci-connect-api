@@ -13,9 +13,9 @@ import (
 // DBAL defines the methods that the repository needs to interact with the database.
 // This interface allows for easier mocking and testing.
 type DBAL interface {
-	Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 // Note: pgxpool.Pool implements this implicitly/explicitly via its methods.
@@ -75,7 +75,7 @@ type Payment struct {
 	Currency          string
 	Status            string
 	Description       *string
-	Metadata          map[string]interface{}
+	Metadata          map[string]any
 	FailureReason     *string
 	FailedAt          *time.Time
 	CompletedAt       *time.Time
@@ -92,7 +92,7 @@ type Invoice struct {
 	Currency      string
 	Status        string
 	PdfURL        *string
-	LineItems     map[string]interface{} // or []interface{}
+	LineItems     map[string]any // or []interface{}
 	IssuedAt      *time.Time
 	PaidAt        *time.Time
 	CreatedAt     time.Time

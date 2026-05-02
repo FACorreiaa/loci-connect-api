@@ -152,7 +152,7 @@ func (s *service) CreatePayment(ctx context.Context, req *CreatePaymentParams) (
 		return nil, fmt.Errorf("invalid user id: %w", err)
 	}
 
-	metaMap := make(map[string]interface{})
+	metaMap := make(map[string]any)
 	for k, v := range req.Metadata {
 		metaMap[k] = v
 	}

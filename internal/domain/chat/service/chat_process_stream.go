@@ -78,7 +78,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 	}
 
 	// 5. Generate Cache Key
-	cacheKeyData := map[string]interface{}{
+	cacheKeyData := map[string]any{
 		"user_id":     cc.UserID.String(),
 		"profile_id":  cc.ProfileID.String(),
 		"city":        normalizeCacheComponent(cc.CityName),
@@ -90,7 +90,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 	if err != nil {
 		l.logger.ErrorContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
 		// Use a fallback cache key
-		cacheKeyBytes = []byte(fmt.Sprintf("fallback_%s_%s", cleanedMessage, cc.CityName))
+		cacheKeyBytes = fmt.Appendf(nil, "fallback_%s_%s", cleanedMessage, cc.CityName)
 	}
 	hash := md5.Sum(cacheKeyBytes)
 	cc.CacheKey = hex.EncodeToString(hash[:])
@@ -104,16 +104,16 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	data := &locitypes.AiCityResponse{SessionID: cc.SessionID}
 
 	// Helper to parse part robustly
-	parsePart := func(key string, target interface{}, nestedKey string) {
+	parsePart := func(key string, target any, nestedKey string) {
 		if str, ok := rawResponses[key]; ok {
 			clean := extractJSONFromMarkdown(str)
-			var parsed interface{}
+			var parsed any
 			if err := json.Unmarshal([]byte(clean), &parsed); err != nil {
 				l.logger.WarnContext(ctx, "failed to unmarshal raw", "key", key, "err", err)
 				return
 			}
 			// Handle nested or flat structures
-			if m, ok := parsed.(map[string]interface{}); ok && nestedKey != "" {
+			if m, ok := parsed.(map[string]any); ok && nestedKey != "" {
 				if nested, exists := m[nestedKey]; exists {
 					if jsonBytes, err := json.Marshal(nested); err == nil {
 						if err := json.Unmarshal(jsonBytes, target); err != nil {
@@ -188,7 +188,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 
 	l.sendEvent(workerCtx, cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"domain":     string(cc.Domain),
 			"city":       cc.CityName,
 			"session_id": cc.SessionID.String(),
@@ -207,7 +207,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	sendEventWithResponse := func(event locitypes.StreamEvent) {
 		if event.Type == locitypes.EventTypeChunk {
 			responsesMutex.Lock()
-			if data, ok := event.Data.(map[string]interface{}); ok {
+			if data, ok := event.Data.(map[string]any); ok {
 				if partType, exists := data["part"].(string); exists {
 					if chunk, chunkExists := data["chunk"].(string); chunkExists {
 						if responses[partType] == nil {
@@ -510,7 +510,7 @@ func (l *ServiceImpl) persistResults(
 		// Send hotels as pre-parsed data
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeHotels,
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"general_city_data": data.GeneralCityData,
 				"hotels":            data.Hotels,
 				"session_id":        cc.SessionID.String(),
@@ -520,7 +520,7 @@ func (l *ServiceImpl) persistResults(
 		// Send restaurants as pre-parsed data
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeRestaurants,
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"general_city_data": data.GeneralCityData,
 				"restaurants":       data.Restaurants,
 				"session_id":        cc.SessionID.String(),
@@ -530,7 +530,7 @@ func (l *ServiceImpl) persistResults(
 		// Send activities as pre-parsed data
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: "activities",
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"general_city_data": data.GeneralCityData,
 				"activities":        data.Activities,
 				"session_id":        cc.SessionID.String(),
@@ -622,7 +622,7 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 	// Use context.Background() to bypass cancelled context - we MUST deliver this event
 	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeComplete,
-		Data: map[string]interface{}{"session_id": cc.SessionID.String()},
+		Data: map[string]any{"session_id": cc.SessionID.String()},
 		Navigation: &locitypes.NavigationData{
 			URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), routeType),
 			RouteType: routeType,
@@ -683,7 +683,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 	// Send start event
 	sendEventWithResponse(locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"domain":     "nearby",
 			"city":       cc.CityName,
 			"session_id": cc.SessionID.String(),
@@ -718,7 +718,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 	if len(pois) == 0 {
 		sendEventWithResponse(locitypes.StreamEvent{
 			Type: locitypes.EventTypeProgress,
-			Data: map[string]interface{}{
+			Data: map[string]any{
 				"status":  "no_pois_found",
 				"message": "No POIs found in the database for this location. Try expanding the search radius.",
 			},
@@ -753,7 +753,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 	// Send the POIs as a structured event
 	sendEventWithResponse(locitypes.StreamEvent{
 		Type: "nearby",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"general_city_data":  responseData.GeneralCityData,
 			"points_of_interest": pois,
 			"session_id":         cc.SessionID.String(),

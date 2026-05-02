@@ -501,7 +501,7 @@ func (r *RepositoryImpl) TrackSearch(ctx context.Context, userID uuid.UUID, quer
 	`
 
 	// Use NULL for anonymous users
-	var userIDParam interface{}
+	var userIDParam any
 	if userID == uuid.Nil {
 		userIDParam = nil
 	} else {

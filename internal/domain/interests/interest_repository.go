@@ -369,7 +369,7 @@ func (r *RepositoryImpl) updateGlobalInterestSettings(ctx context.Context, userI
 func (r *RepositoryImpl) updateCustomInterest(ctx context.Context, userID, interestID uuid.UUID, params locitypes.UpdateinterestsParams, l *slog.Logger, span trace.Span) error {
 	// Build dynamic query
 	setClauses := []string{}
-	args := []interface{}{}
+	args := []any{}
 	argID := 1 // Start placeholders at $1
 
 	// --- Add parameters dynamically ---

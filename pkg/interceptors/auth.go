@@ -90,7 +90,7 @@ func (a *AuthInterceptor) UnaryInterceptor() connect.UnaryInterceptorFunc {
 
 			// Parse and validate JWT
 			claims := &Claims{}
-			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 				// Validate signing method
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 					return nil, errors.New("unexpected signing method")
@@ -144,7 +144,7 @@ func (a *AuthInterceptor) OptionalAuthInterceptor() connect.UnaryInterceptorFunc
 				parts := strings.SplitN(authHeader, " ", 2)
 				if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
 					claims := &Claims{}
-					token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
+					token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (any, error) {
 						if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 							return nil, errors.New("unexpected signing method")
 						}
@@ -275,7 +275,7 @@ func (a *AuthInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc
 
 		// Parse and validate JWT
 		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 			// Validate signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, errors.New("unexpected signing method")

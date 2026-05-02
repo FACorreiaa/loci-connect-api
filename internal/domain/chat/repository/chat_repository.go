@@ -418,7 +418,7 @@ func (r *RepositoryImpl) SaveLlmSuggestedPOIsBatch(ctx context.Context, pois []l
 	br := r.pgpool.SendBatch(ctx, batch)
 	defer br.Close()
 
-	for i := 0; i < len(pois); i++ {
+	for i := range pois {
 		_, err := br.Exec()
 		if err != nil {
 			// Consider how to handle partial failures. Log and continue, or return error?
@@ -462,7 +462,7 @@ func (r *RepositoryImpl) GetLlmSuggestedPOIsByInteractionSortedByDistance(
         FROM llm_suggested_pois
         WHERE llm_interaction_id = $2 `
 
-	args := []interface{}{userPoint, llmInteractionID}
+	args := []any{userPoint, llmInteractionID}
 	argCounter := 3
 
 	if cityID != uuid.Nil {
@@ -1058,7 +1058,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 	var sessions []locitypes.ChatSession
 	for _, row := range dbRows {
-		var interactions []map[string]interface{}
+		var interactions []map[string]any
 		if err := json.Unmarshal([]byte(row.InteractionsJSON), &interactions); err != nil {
 			r.logger.WarnContext(ctx, "Failed to parse interactions JSON", slog.Any("error", err))
 			continue
@@ -1198,7 +1198,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 }
 
 // Helper function to parse time from interface{}
-func parseTimeFromInterface(timeInterface interface{}) time.Time {
+func parseTimeFromInterface(timeInterface any) time.Time {
 	switch t := timeInterface.(type) {
 	case time.Time:
 		return t
@@ -1652,10 +1652,7 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitype
 		"cleanedLength", len(cleanedResponse),
 		"cleanedPreview", cleanedResponse[:min(500, len(cleanedResponse))],
 		"cleanedSuffix", func() string {
-			start := len(cleanedResponse) - 200
-			if start < 0 {
-				start = 0
-			}
+			start := max(len(cleanedResponse)-200, 0)
 			return cleanedResponse[start:]
 		}())
 
@@ -1777,7 +1774,7 @@ func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid
 	br := r.pgpool.SendBatch(ctx, batch)
 	defer br.Close()
 
-	for i := 0; i < len(pois); i++ {
+	for i := range pois {
 		_, err := br.Exec()
 		if err != nil {
 			return fmt.Errorf("failed to execute batch insert for itinerary_poi %d: %w", i, err)

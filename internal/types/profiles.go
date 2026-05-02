@@ -21,7 +21,7 @@ const (
 )
 
 // Scan implements the sql.Scanner interface for DayPreference.
-func (s *DayPreference) Scan(value interface{}) error {
+func (s *DayPreference) Scan(value any) error {
 	strVal, ok := value.(string)
 	if !ok {
 		bytesVal, ok := value.([]byte) // Sometimes comes as bytes
@@ -62,7 +62,7 @@ const (
 )
 
 // Scan implements the sql.Scanner interface for SearchPace.
-func (s *SearchPace) Scan(value interface{}) error {
+func (s *SearchPace) Scan(value any) error {
 	strVal, ok := value.(string)
 	if !ok {
 		bytesVal, ok := value.([]byte)
@@ -100,7 +100,7 @@ const (
 )
 
 // Scan implements the sql.Scanner interface for SearchPace.
-func (s *TransportPreference) Scan(value interface{}) error {
+func (s *TransportPreference) Scan(value any) error {
 	strVal, ok := value.(string)
 	if !ok {
 		bytesVal, ok := value.([]byte)
@@ -353,5 +353,5 @@ type CombinedFilters struct {
 	DiningPreferences        *DiningPreferences             `json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences           `json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences          `json:"itinerary_preferences,omitempty"`
-	InferredFilters          map[string]interface{}         `json:"inferred_filters,omitempty"`
+	InferredFilters          map[string]any                 `json:"inferred_filters,omitempty"`
 }

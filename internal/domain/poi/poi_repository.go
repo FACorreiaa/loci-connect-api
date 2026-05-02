@@ -1225,7 +1225,7 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
             $4
         )
     `
-	args := []interface{}{cityID, lon, lat, tolerance}
+	args := []any{cityID, lon, lat, tolerance}
 	if preferences != nil {
 		if preferences.PreferredCuisine != "" {
 			query += ` AND cuisine_type = $5`
@@ -1464,7 +1464,7 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
             $3
         )
     `
-	args := []interface{}{
+	args := []any{
 		filter.Location.Longitude, // $1
 		filter.Location.Latitude,  // $2
 		filter.Radius * 1000,      // $3 (convert km to meters for ST_DWithin)
@@ -1648,7 +1648,7 @@ func (r *RepositoryImpl) UpdateItinerary(ctx context.Context, userID, itineraryI
 	defer span.End()
 
 	setClauses := []string{}
-	args := []interface{}{}
+	args := []any{}
 	argCount := 1 // Start arg counter for $1, $2, ...
 
 	if updates.Title != nil {
@@ -1847,9 +1847,9 @@ func (ips *ItineraryPOISource) Next() bool {
 	return ips.idx < len(ips.pois)
 }
 
-func (ips *ItineraryPOISource) Values() ([]interface{}, error) {
+func (ips *ItineraryPOISource) Values() ([]any, error) {
 	poi := ips.pois[ips.idx]
-	return []interface{}{ips.itineraryID, poi.ID, ips.idx, poi.DescriptionPOI}, nil
+	return []any{ips.itineraryID, poi.ID, ips.idx, poi.DescriptionPOI}, nil
 }
 
 func stringPtr(v string) *string {
@@ -2141,7 +2141,7 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
         )
     `
 
-	args := []interface{}{
+	args := []any{
 		filter.Location.Longitude, // $1
 		filter.Location.Latitude,  // $2
 		filter.Radius * 1000,      // $3 (convert km to meters)
@@ -2394,7 +2394,7 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistance(ctx context.Context, lat, 
 					ORDER BY distance ASC LIMIT 50
 				`
 
-	var args []interface{}
+	var args []any
 	args = append(args, lon, lat, radiusMeters) // $1, $2, $3
 
 	l.DebugContext(ctx, "Executing POI distance query",
@@ -2579,7 +2579,7 @@ func (r *RepositoryImpl) GetPOIsByLocationAndDistanceWithCategory(ctx context.Co
 					ORDER BY distance ASC LIMIT 50
 				`
 
-	var args []interface{}
+	var args []any
 	args = append(args, lon, lat, radiusMeters, category) // $1, $2, $3, $4
 
 	l.DebugContext(ctx, "Executing POI distance query with category filter",

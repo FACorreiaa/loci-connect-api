@@ -147,13 +147,13 @@ func (s *smtpEmailService) sendEmail(to, subject, body string) error {
 
 	from := fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail)
 
-	message := []byte(fmt.Sprintf("From: %s\r\n"+
+	message := fmt.Appendf(nil, "From: %s\r\n"+
 		"To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: text/html; charset=UTF-8\r\n"+
 		"\r\n"+
-		"%s\r\n", from, to, subject, body))
+		"%s\r\n", from, to, subject, body)
 
 	addr := fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort)
 	return smtp.SendMail(addr, auth, s.fromEmail, []string{to}, message)

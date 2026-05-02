@@ -95,7 +95,7 @@ func TestCacheKeyGeneration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cacheKeyData := map[string]interface{}{
+			cacheKeyData := map[string]any{
 				"user_id":     userID.String(),
 				"profile_id":  profileID.String(),
 				"city":        tt.city,
@@ -140,7 +140,7 @@ func TestCacheKeyUniqueness(t *testing.T) {
 	for _, city := range cities {
 		for _, pref := range preferences {
 			for _, domain := range domains {
-				cacheKeyData := map[string]interface{}{
+				cacheKeyData := map[string]any{
 					"user_id":     userID.String(),
 					"profile_id":  profileID.String(),
 					"city":        city,
@@ -199,7 +199,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	numGoroutines := 100
 
 	// Concurrent writes
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Go(func() {
 			key := fmt.Sprintf("key-%d", i)
 			value := fmt.Sprintf("value-%d", i)
@@ -210,7 +210,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	wg.Wait()
 
 	// Verify all writes succeeded
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		key := fmt.Sprintf("key-%d", i)
 		expectedValue := fmt.Sprintf("value-%d", i)
 
@@ -220,7 +220,7 @@ func TestConcurrentCacheAccess(t *testing.T) {
 	}
 
 	// Concurrent reads
-	for i := 0; i < numGoroutines; i++ {
+	for i := range numGoroutines {
 		wg.Go(func() {
 			key := fmt.Sprintf("key-%d", i)
 			expectedValue := fmt.Sprintf("value-%d", i)
@@ -245,7 +245,7 @@ func TestCacheDifferentPreferencesSameCity(t *testing.T) {
 	pref2 := "Food & Nightlife"
 
 	// Generate key for first preference
-	cacheKeyData1 := map[string]interface{}{
+	cacheKeyData1 := map[string]any{
 		"user_id":     userID.String(),
 		"profile_id":  profileID.String(),
 		"city":        city,
@@ -258,7 +258,7 @@ func TestCacheDifferentPreferencesSameCity(t *testing.T) {
 	cacheKey1 := hex.EncodeToString(hash1[:])
 
 	// Generate key for second preference
-	cacheKeyData2 := map[string]interface{}{
+	cacheKeyData2 := map[string]any{
 		"user_id":     userID.String(),
 		"profile_id":  profileID.String(),
 		"city":        city,
@@ -307,7 +307,7 @@ func TestAllEndpointCacheKeys(t *testing.T) {
 	cacheKeys := make(map[string]string)
 
 	for _, endpoint := range endpoints {
-		cacheKeyData := map[string]interface{}{
+		cacheKeyData := map[string]any{
 			"user_id":     userID.String(),
 			"profile_id":  profileID.String(),
 			"city":        "Paris",
@@ -339,7 +339,7 @@ func TestCacheSetAndGet(t *testing.T) {
 
 	testCases := []struct {
 		key   string
-		value interface{}
+		value any
 	}{
 		{"string-key", "string value"},
 		{"int-key", 12345},
@@ -367,7 +367,7 @@ func TestCacheItemCount(t *testing.T) {
 	assert.Equal(t, 0, testCache.ItemCount(), "Cache should start empty")
 
 	// Add items
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		testCache.Set(fmt.Sprintf("key-%d", i), fmt.Sprintf("value-%d", i), cache.DefaultExpiration)
 	}
 

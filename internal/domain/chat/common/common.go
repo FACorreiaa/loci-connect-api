@@ -41,18 +41,18 @@ func CountContentFromResponse(response string) ContentCounts {
 	}
 
 	// Try to parse as JSON first
-	var jsonData map[string]interface{}
+	var jsonData map[string]any
 	if err := json.Unmarshal([]byte(response), &jsonData); err == nil {
 		// Handle JSON response
-		if pois, ok := jsonData["points_of_interest"].([]interface{}); ok {
+		if pois, ok := jsonData["points_of_interest"].([]any); ok {
 			counts.POIs = len(pois)
 			counts.Categories = append(counts.Categories, "attractions")
 		}
-		if hotels, ok := jsonData["hotels"].([]interface{}); ok {
+		if hotels, ok := jsonData["hotels"].([]any); ok {
 			counts.Hotels = len(hotels)
 			counts.Categories = append(counts.Categories, "accommodation")
 		}
-		if restaurants, ok := jsonData["restaurants"].([]interface{}); ok {
+		if restaurants, ok := jsonData["restaurants"].([]any); ok {
 			counts.Restaurants = len(restaurants)
 			counts.Categories = append(counts.Categories, "dining")
 		}
@@ -232,10 +232,10 @@ func CleanJSONResponse(response string) string {
 		response = strings.TrimSpace(response)
 	} else {
 		// Fallback to prefix/suffix removal
-		if strings.HasPrefix(response, "```json") {
-			response = strings.TrimPrefix(response, "```json")
-		} else if strings.HasPrefix(response, "```") {
-			response = strings.TrimPrefix(response, "```")
+		if after, ok := strings.CutPrefix(response, "```json"); ok {
+			response = after
+		} else if after, ok := strings.CutPrefix(response, "```"); ok {
+			response = after
 		}
 		response = strings.TrimSuffix(response, "```")
 		response = strings.TrimSpace(response)

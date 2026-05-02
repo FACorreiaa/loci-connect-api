@@ -226,7 +226,7 @@ func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, 
 
 	// Use squirrel or build query dynamically
 	var setClauses []string
-	var args []interface{}
+	var args []any
 	argID := 1 // Argument counter for placeholders ($1, $2, ...)
 
 	// Check each field in params. If not nil, add to SET clause and args slice.

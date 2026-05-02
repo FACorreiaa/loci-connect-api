@@ -582,7 +582,7 @@ func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, 
 		WHERE l.is_public = true
 	`
 
-	var args []interface{}
+	var args []any
 	argIndex := 1
 	_ = category
 	_ = theme
