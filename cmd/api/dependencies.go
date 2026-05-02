@@ -252,6 +252,9 @@ func (d *Dependencies) initHandlers() error {
 
 // Cleanup closes all resources
 func (d *Dependencies) Cleanup() {
+	if closer, ok := d.ChatService.(interface{ Close() }); ok {
+		closer.Close()
+	}
 	if d.DB != nil {
 		d.DB.Close()
 	}

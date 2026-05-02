@@ -148,11 +148,6 @@ type itineraryRow struct {
 	UpdatedAt              time.Time  `db:"updated_at"`
 }
 
-// countRow is used for count queries
-type countRow struct {
-	Count int `db:"count"`
-}
-
 // GetUserRecentInteractions fetches recent interactions grouped by city
 func (r *RepositoryImpl) GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error) {
 	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetUserRecentInteractions", trace.WithAttributes(

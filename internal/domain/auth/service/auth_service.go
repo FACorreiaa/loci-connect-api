@@ -264,11 +264,13 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	}
 
 	if s.emailService != nil {
-		go func(ctx context.Context, email, name, token string) {
+		emailCtx, cancel := backgroundEmailContext(ctx)
+		go func(ctx context.Context, cancel context.CancelFunc, email, name, token string) {
+			defer cancel()
 			if err := s.emailService.SendPasswordResetEmail(email, name, token); err != nil {
 				s.logger.WarnContext(ctx, "failed to send password reset email", slog.Any("error", err))
 			}
-		}(ctx, user.Email, user.DisplayName, resetToken)
+		}(emailCtx, cancel, user.Email, user.DisplayName, resetToken)
 	}
 
 	return nil
@@ -358,11 +360,13 @@ func (s *AuthService) VerifyEmail(ctx context.Context, verificationToken string)
 
 	if s.emailService != nil {
 		if user, err := s.repo.GetUserByID(ctx, userToken.UserID); err == nil {
-			go func(ctx context.Context, email, name string) {
+			emailCtx, cancel := backgroundEmailContext(ctx)
+			go func(ctx context.Context, cancel context.CancelFunc, email, name string) {
+				defer cancel()
 				if err := s.emailService.SendWelcomeEmail(email, name); err != nil {
 					s.logger.WarnContext(ctx, "failed to send welcome email", slog.Any("error", err))
 				}
-			}(ctx, user.Email, user.DisplayName)
+			}(emailCtx, cancel, user.Email, user.DisplayName)
 		}
 	}
 
@@ -419,13 +423,19 @@ func (s *AuthService) sendEmailVerification(ctx context.Context, user *repositor
 	}
 
 	if s.emailService != nil {
-		go func(ctx context.Context, email, name, verificationToken string) {
+		emailCtx, cancel := backgroundEmailContext(ctx)
+		go func(ctx context.Context, cancel context.CancelFunc, email, name, verificationToken string) {
+			defer cancel()
 			if err := s.emailService.SendVerificationEmail(email, name, verificationToken); err != nil {
 				s.logger.WarnContext(ctx, "failed to send verification email", slog.Any("error", err))
 			}
-		}(ctx, user.Email, user.DisplayName, token)
+		}(emailCtx, cancel, user.Email, user.DisplayName, token)
 	}
 	return nil
+}
+
+func backgroundEmailContext(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(parent), 30*time.Second)
 }
 
 func hashToken(token string) string {

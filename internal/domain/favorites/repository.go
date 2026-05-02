@@ -33,30 +33,6 @@ func NewRepository(db *pgxpool.Pool, logger *slog.Logger) Repository {
 	}
 }
 
-// getTableName returns the appropriate table based on content type
-func getTableName(contentType string) string {
-	switch contentType {
-	case "hotel":
-		return "user_favorite_hotels"
-	case "restaurant":
-		return "user_favorite_restaurants"
-	default:
-		return "user_favorite_pois"
-	}
-}
-
-// getItemColumn returns the item ID column name based on content type
-func getItemColumn(contentType string) string {
-	switch contentType {
-	case "hotel":
-		return "hotel_id"
-	case "restaurant":
-		return "restaurant_id"
-	default:
-		return "poi_id"
-	}
-}
-
 // AddFavorite adds an item to favorites
 func (r *RepositoryImpl) AddFavorite(ctx context.Context, fav *locitypes.FavoriteItem) (*locitypes.FavoriteItem, error) {
 	l := r.logger.With(slog.String("method", "AddFavorite"))

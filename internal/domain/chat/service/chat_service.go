@@ -129,6 +129,7 @@ type ServiceImpl struct {
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
+	deadLetterCancel context.CancelFunc
 	intentClassifier IntentClassifier
 }
 
@@ -158,6 +159,8 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		log.Fatalf("Failed to create embedding service: %v", err) // Terminate if initialization fails
 	}
 
+	deadLetterCtx, deadLetterCancel := context.WithCancel(context.Background())
+
 	// Initialize RAG service
 	service := &ServiceImpl{
 		logger:             logger,
@@ -175,17 +178,11 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		cache:              cache.New(5*time.Minute, 10*time.Minute),
 		model:              model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
+		deadLetterCancel:   deadLetterCancel,
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
 	}
-	go service.processDeadLetterQueue()
+	go service.processDeadLetterQueue(deadLetterCtx)
 	return service
-}
-
-// processDeadLetterQueue drains any stream events that could not be delivered and logs them.
-func (l *ServiceImpl) processDeadLetterQueue() {
-	for event := range l.deadLetterCh {
-		l.logger.Warn("stream event routed to dead letter queue", slog.String("event_id", event.EventID), slog.String("type", event.Type), slog.String("error", event.Error))
-	}
 }
 
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context
@@ -1187,69 +1184,6 @@ If no city is mentioned, use empty string for city.
 	}
 
 	return parsed.City, parsed.Message, nil
-}
-
-// TODO For robustness, send unprocessed events to a dead letter queue (e.g., a separate channel or database table) for later analysis:
-// if !l.sendEvent(ctx, eventCh, event) {
-//     l.logger.ErrorContext(ctx, "Sending to dead letter queue", slog.Any("event", event))
-//     // Save to a persistent store
-// }
-
-func (l *ServiceImpl) sendEvent(ctx context.Context, ch chan<- locitypes.StreamEvent, event locitypes.StreamEvent, retries int) bool {
-	for i := 0; i < retries; i++ {
-		if event.EventID == "" {
-			event.EventID = uuid.New().String()
-		}
-		if event.Timestamp.IsZero() {
-			event.Timestamp = time.Now()
-		}
-
-		select {
-		case <-ctx.Done():
-			l.logger.WarnContext(ctx, "Context cancelled, not sending stream event", slog.String("eventType", event.Type))
-			l.deadLetterCh <- event // Send to dead letter queue
-			return false
-		default:
-			// Protect against panic from sending to closed channel
-			sent := false
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						l.logger.WarnContext(ctx, "Recovered from panic sending to channel (likely closed)",
-							slog.String("eventType", event.Type),
-							slog.Any("panic", r))
-					}
-				}()
-
-				select {
-				case ch <- event:
-					// Successfully sent
-					sent = true
-				case <-ctx.Done():
-					l.logger.WarnContext(ctx, "Context cancelled while trying to send stream event",
-						slog.String("eventType", event.Type),
-						slog.Any("context_err", ctx.Err()))
-					l.deadLetterCh <- event // Send to dead letter queue
-				case <-time.After(2 * time.Second): // Use a reasonable timeout
-					l.logger.WarnContext(ctx, "Dropped stream event due to slow consumer or blocked channel (timeout)",
-						slog.String("eventType", event.Type))
-					l.deadLetterCh <- event // Send to dead letter queue
-					// Continue to retry after backoff
-				}
-			}()
-
-			// Return true immediately on successful send
-			if sent {
-				return true
-			}
-
-			if ctx.Err() != nil {
-				return false
-			}
-		}
-		time.Sleep(100 * time.Millisecond) // Backoff before retry
-	}
-	return false
 }
 
 func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error) {
@@ -2654,14 +2588,12 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				slog.Duration("backoff", backoff),
 				slog.Any("error", err))
 
-			select {
-			case <-ctx.Done():
+			if !sleepWithContext(ctx, backoff) {
 				return // Context canceled
-			case <-time.After(backoff):
-				backoff *= 2
-				if backoff > maxRetryDelay {
-					backoff = maxRetryDelay
-				}
+			}
+			backoff *= 2
+			if backoff > maxRetryDelay {
+				backoff = maxRetryDelay
 			}
 
 			iter, err = l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
@@ -2759,6 +2691,18 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("part_type", partType),
 			slog.String("cache_key", cacheKey),
 			slog.Int("response_length", fullResponse.Len()))
+	}
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
 

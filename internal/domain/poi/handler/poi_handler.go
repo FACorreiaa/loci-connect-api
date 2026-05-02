@@ -2,10 +2,12 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
+	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
@@ -77,27 +79,20 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 }
 
 func (h *POIHandler) GetPOI(ctx context.Context, req *connect.Request[poiv1.GetPOIRequest]) (*connect.Response[poiv1.GetPOIResponse], error) {
-	// Service GetPOI seems to be GetItinerary?
-	// poi_service.go has GetItinerary.
-	// But it does NOT seem to have GetPOIDetails(id)?
-	// Reading poi_service.go again...
-	// It has `AddPoiToFavourites`, `GetFavouritePOIs...`
-	// It has `GetPOIsByCityID`.
-	// Does it have `GetPOI(id)`?
-	// It has `GenerateEmbeddingForPOI(id)`.
-	// It seems missing specific `GetPOI(id)`?
-	// Maybe `s.poiRepository.GetPOI(id)` exists but not exposed in Service interface?
-	// I'll check interface.
+	poiID, err := uuid.Parse(req.Msg.PoiId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid POI ID"))
+	}
 
-	// Interface:
-	// AddPoiToFavourites
-	// RemovePoiFromFavourites
-	// GetFavouritePOIsByUserID
-	// SearchPOIs
-	// etc.
-	// NO "GetPOI(id)".
+	poi, err := h.service.GetPOI(ctx, poiID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if poi == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("POI not found"))
+	}
 
-	// So I cannot implement GetPOI handler method without service support.
-	// I will return Unimplemented for now or use Search with ID filter if possible?
-	return nil, connect.NewError(connect.CodeUnimplemented, nil)
+	return connect.NewResponse(&poiv1.GetPOIResponse{
+		Poi: presenter.ToPOIProto(poi),
+	}), nil
 }

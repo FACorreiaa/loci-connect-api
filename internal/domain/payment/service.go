@@ -20,7 +20,10 @@ import (
 type Service interface {
 	CreatePayment(ctx context.Context, req *CreatePaymentParams) (*CreatePaymentResult, error)
 	GetPayment(ctx context.Context, paymentID string) (*Payment, error)
+	GetUserPayments(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]Payment, int, error)
 	RefundPayment(ctx context.Context, paymentID string, amountCents int64) (*Refund, error)
+	GetInvoice(ctx context.Context, invoiceID string) (*Invoice, error)
+	GetUserInvoices(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]Invoice, int, error)
 
 	CreateSubscription(ctx context.Context, req *CreateSubscriptionParams) (*CreateSubscriptionResult, error)
 	CancelSubscription(ctx context.Context, subscriptionID string, cancelAtPeriodEnd bool) error
@@ -105,6 +108,19 @@ type SubscriptionWithUsage struct {
 
 // Implementation
 
+func paginationBounds(page, pageSize int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return pageSize, (page - 1) * pageSize
+}
+
 func (s *service) CreatePayment(ctx context.Context, req *CreatePaymentParams) (*CreatePaymentResult, error) {
 	// Call Stripe
 	params := &stripe.PaymentIntentParams{
@@ -177,6 +193,11 @@ func (s *service) GetPayment(ctx context.Context, paymentID string) (*Payment, e
 	return s.repo.GetPaymentByID(ctx, uid)
 }
 
+func (s *service) GetUserPayments(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]Payment, int, error) {
+	limit, offset := paginationBounds(page, pageSize)
+	return s.repo.GetUserPayments(ctx, userID, limit, offset)
+}
+
 func (s *service) RefundPayment(ctx context.Context, paymentID string, amountCents int64) (*Refund, error) {
 	// 1. Get Payment from DB
 	pUID, err := uuid.Parse(paymentID)
@@ -220,6 +241,19 @@ func (s *service) RefundPayment(ctx context.Context, paymentID string, amountCen
 
 	// Update payment status if full refund? Webhook handles this usually.
 	return refundRecord, nil
+}
+
+func (s *service) GetInvoice(ctx context.Context, invoiceID string) (*Invoice, error) {
+	uid, err := uuid.Parse(invoiceID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid invoice id")
+	}
+	return s.repo.GetInvoiceByID(ctx, uid)
+}
+
+func (s *service) GetUserInvoices(ctx context.Context, userID uuid.UUID, page, pageSize int) ([]Invoice, int, error) {
+	limit, offset := paginationBounds(page, pageSize)
+	return s.repo.GetUserInvoices(ctx, userID, limit, offset)
 }
 
 // Subscriptions

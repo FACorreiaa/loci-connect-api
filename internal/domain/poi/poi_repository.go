@@ -45,6 +45,7 @@ type Repository interface {
 	FindLLMPOIByName(ctx context.Context, name string) (uuid.UUID, error)
 	GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 	GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.POIDetailedInfo, int, error)
+	GetPOIByID(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error)
 	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 
 	// POI details
@@ -610,6 +611,81 @@ func (r *RepositoryImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) 
 
 	r.logger.Info("POIs retrieved successfully by city ID", slog.String("cityID", cityID.String()), slog.Int("count", len(pois)))
 	return pois, nil
+}
+
+func (r *RepositoryImpl) GetPOIByID(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			COALESCE(description, '') AS description,
+			ST_X(location) AS longitude,
+			ST_Y(location) AS latitude,
+			COALESCE(category, '') AS category,
+			COALESCE(address, '') AS address,
+			COALESCE(website, '') AS website,
+			COALESCE(phone_number, '') AS phone_number,
+			opening_hours,
+			COALESCE(price_level::text, '') AS price_level,
+			COALESCE(average_rating, 0) AS rating,
+			city_id,
+			COALESCE(tags, '{}') AS tags,
+			COALESCE(images, '{}') AS images,
+			created_at
+		FROM points_of_interest
+		WHERE id = $1
+	`
+
+	type poiByIDRow struct {
+		ID           uuid.UUID         `db:"id"`
+		Name         string            `db:"name"`
+		Description  string            `db:"description"`
+		Longitude    float64           `db:"longitude"`
+		Latitude     float64           `db:"latitude"`
+		Category     string            `db:"category"`
+		Address      string            `db:"address"`
+		Website      string            `db:"website"`
+		PhoneNumber  string            `db:"phone_number"`
+		OpeningHours map[string]string `db:"opening_hours"`
+		PriceLevel   string            `db:"price_level"`
+		Rating       float64           `db:"rating"`
+		CityID       uuid.UUID         `db:"city_id"`
+		Tags         []string          `db:"tags"`
+		Images       []string          `db:"images"`
+		CreatedAt    time.Time         `db:"created_at"`
+	}
+
+	rows, err := r.pgpool.Query(ctx, query, poiID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query POI by ID: %w", err)
+	}
+
+	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiByIDRow])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to collect POI by ID: %w", err)
+	}
+
+	return &locitypes.POIDetailedInfo{
+		ID:           row.ID,
+		Name:         row.Name,
+		Description:  row.Description,
+		Longitude:    row.Longitude,
+		Latitude:     row.Latitude,
+		Category:     row.Category,
+		Address:      row.Address,
+		Website:      row.Website,
+		PhoneNumber:  row.PhoneNumber,
+		OpeningHours: row.OpeningHours,
+		PriceLevel:   row.PriceLevel,
+		Rating:       row.Rating,
+		CityID:       row.CityID,
+		Tags:         row.Tags,
+		Images:       row.Images,
+		CreatedAt:    row.CreatedAt,
+	}, nil
 }
 
 func (r *RepositoryImpl) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*locitypes.POIDetailedInfo, error) {

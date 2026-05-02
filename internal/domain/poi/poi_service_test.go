@@ -223,6 +223,14 @@ func (m *MockPOIRepository) GetPOIsByCityID(ctx context.Context, cityID uuid.UUI
 	return args.Get(0).([]locitypes.POIDetailedInfo), args.Error(1)
 }
 
+func (m *MockPOIRepository) GetPOIByID(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
+	args := m.Called(ctx, poiID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*locitypes.POIDetailedInfo), args.Error(1)
+}
+
 func (m *MockPOIRepository) FindPOIDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) (*locitypes.POIDetailedInfo, error) {
 	args := m.Called(ctx, cityID, lat, lon, tolerance)
 	if args.Get(0) == nil {

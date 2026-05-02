@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +31,7 @@ type Service interface {
 	RemovePoiFromFavourites(ctx context.Context, userID, poiID uuid.UUID, isLLMGenerated bool) error
 	GetFavouritePOIsByUserID(ctx context.Context, userID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 	GetFavouritePOIsByUserIDPaginated(ctx context.Context, userID uuid.UUID, limit, offset int) ([]locitypes.POIDetailedInfo, int, error)
+	GetPOI(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error)
 	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 
 	// SearchPOIs Traditional search
@@ -176,6 +176,15 @@ func (s *ServiceImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]
 		return nil, err
 	}
 	return pois, nil
+}
+
+func (s *ServiceImpl) GetPOI(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
+	poi, err := s.poiRepository.GetPOIByID(ctx, poiID)
+	if err != nil {
+		s.logger.Error("failed to get POI by ID", "error", err)
+		return nil, err
+	}
+	return poi, nil
 }
 
 func (s *ServiceImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error) {
@@ -1786,80 +1795,4 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context,
 		Prompt:     prompt,
 		Response:   cleanTxt,
 	}
-}
-
-func cleanLLMResponse(responseText string) string {
-	cleaned := strings.TrimSpace(responseText)
-
-	if strings.HasPrefix(cleaned, "```json") {
-		cleaned = strings.TrimPrefix(cleaned, "```json")
-		cleaned = strings.TrimSuffix(cleaned, "```")
-		cleaned = strings.TrimSpace(cleaned)
-	} else if strings.HasPrefix(cleaned, "```") {
-		cleaned = strings.TrimPrefix(cleaned, "```")
-		cleaned = strings.TrimSuffix(cleaned, "```")
-		cleaned = strings.TrimSpace(cleaned)
-	}
-
-	cleaned = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(cleaned, "$1")
-	return cleaned
-}
-
-func cleanJSONResponse(response string) string {
-	response = strings.TrimSpace(response)
-
-	if strings.HasPrefix(response, "```json") {
-		response = strings.TrimPrefix(response, "```json")
-	} else if strings.HasPrefix(response, "```") {
-		response = strings.TrimPrefix(response, "```")
-	}
-
-	response = strings.TrimSuffix(response, "```")
-	response = strings.TrimSpace(response)
-
-	firstBrace := strings.Index(response, "{")
-	if firstBrace == -1 {
-		return response
-	}
-
-	braceCount := 0
-	lastValidBrace := -1
-loop:
-	for i := firstBrace; i < len(response); i++ {
-		switch response[i] {
-		case '{':
-			braceCount++
-		case '}':
-			braceCount--
-			if braceCount == 0 {
-				lastValidBrace = i
-				break loop
-			}
-		}
-	}
-
-	if braceCount != 0 {
-		lastBrace := strings.LastIndex(response, "}")
-		if lastBrace == -1 || lastBrace <= firstBrace {
-			return response
-		}
-		lastValidBrace = lastBrace
-	}
-
-	if lastValidBrace == -1 {
-		return response
-	}
-
-	jsonPortion := response[firstBrace : lastValidBrace+1]
-	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
-	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
-
-	return strings.TrimSpace(jsonPortion)
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

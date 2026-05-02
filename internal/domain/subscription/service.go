@@ -3,10 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"os"
-	"strconv"
 
 	"github.com/google/uuid"
 )
@@ -80,25 +77,4 @@ func (s *service) CheckRateLimit(ctx context.Context, userID uuid.UUID, email st
 
 func (s *service) RecordUsage(ctx context.Context, userID uuid.UUID) error {
 	return s.repo.IncrementUsage(ctx, userID)
-}
-
-func getPlatformFeePercent() float64 {
-	defaultFee := 30.0
-	feeStr := os.Getenv("PLATFORM_FEE_PERCENT")
-	if feeStr == "" {
-		return defaultFee
-	}
-
-	fee, err := strconv.ParseFloat(feeStr, 64)
-	if err != nil {
-		fmt.Printf("[WARN] Invalid PLATFORM_FEE_PERCENT value: %s, using default %.1f%%", feeStr, defaultFee)
-		return defaultFee
-	}
-
-	if fee < 0 || fee > 100 {
-		fmt.Printf("[WARN] PLATFORM_FEE_PERCENT out of range (0-100): %.1f, using default %.1f%%", fee, defaultFee)
-		return defaultFee
-	}
-
-	return fee
 }
