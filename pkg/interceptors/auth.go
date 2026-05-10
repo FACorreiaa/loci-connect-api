@@ -172,15 +172,6 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, error) {
 	return claims, nil
 }
 
-// MustGetClaimsFromContext retrieves claims or panics (use in service with service interceptor)
-func MustGetClaimsFromContext(ctx context.Context) *Claims {
-	claims, err := GetClaimsFromContext(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return claims
-}
-
 // GetUserIDFromContext extracts user ID from context (backward compatibility)
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDKey).(string)
