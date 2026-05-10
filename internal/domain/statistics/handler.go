@@ -242,13 +242,20 @@ func (h *Handler) GetSystemAnalytics(
 ) (*connect.Response[statisticsv1.GetSystemAnalyticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetSystemAnalytics"))
 
+	// Require an authenticated admin caller.
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if claims.Role != "admin" {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin role required"))
+	}
+
 	// Get user ID from context - should verify admin role
 	userID, ok := getUserIDFromContext(ctx)
 	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-
-	// TODO: Add admin role check here
 
 	// Get aggregate statistics
 	systemUserID := uuid.MustParse("00000000-0000-0000-0000-000000000000")
