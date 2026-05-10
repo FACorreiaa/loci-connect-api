@@ -1188,7 +1188,7 @@ If no city is mentioned, use empty string for city.
 }
 
 func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error) {
-	eventCh := make(chan locitypes.StreamEvent)
+	eventCh := make(chan locitypes.StreamEvent, 100)
 	cc := common.ChatContext{
 		Ctx:          ctx,
 		UserID:       userID,
