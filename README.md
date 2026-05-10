@@ -123,7 +123,57 @@ Whether you're a tourist on a tight schedule or a local looking for something ne
 
 ## 🧪 Getting Started
 
-> 🔧 _Instructions for local setup coming soon._
+### Prerequisites
+
+- Go 1.25+
+- PostgreSQL 16+ with the `postgis` and `vector` extensions enabled
+- [`buf`](https://buf.build/docs/installation) (only needed if regenerating proto stubs)
+
+### 1. Configure environment
+
+Copy `.env.example` to `.env` (or export the variables directly). The minimum required to boot:
+
+| Variable | Purpose |
+|---|---|
+| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE` | PostgreSQL connection |
+| `JWT_SECRET` | HMAC secret for access/refresh tokens |
+| `GEMINI_API_KEY` | Gemini LLM access |
+| `SERVER_HOST`, `SERVER_PORT` | HTTP listen address (default `0.0.0.0:8000`) |
+
+Optional but commonly needed:
+
+| Variable | Purpose |
+|---|---|
+| `BASE_URL`, `FRONTEND_URL`, `OAUTH_CALLBACK_URL` | Public URLs for links and OAuth redirects |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` / `APPLE_CLIENT_ID`, `APPLE_KEY_ID`, `APPLE_SECRET`, `APPLE_TEAM_ID` | OAuth providers |
+| `STRIPE_TEST_API_KEY`, `STRIPE_WEBHOOK_SECRET` | Payments + Stripe webhook |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `FROM_EMAIL`, `FROM_NAME` | Mailer |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SID` | Phone verification |
+| `METRICS_ENABLED`, `METRICS_PORT` | Prometheus exporter |
+| `PPROF_ENABLED`, `PPROF_PORT` | pprof endpoints |
+| `ADMIN_EMAIL` | Bootstrap admin user |
+
+### 2. Run migrations
+
+Migrations are embedded in the binary and applied automatically on startup via `goose` (`pkg/db/postgres.go`). The migration files live in `pkg/db/migrations/`. To run them outside the server, install `goose` and point it at that directory.
+
+### 3. Start the server
+
+```bash
+make run                 # plain go run
+# or
+make dev                 # hot reload (requires `air`)
+# or
+make docker-compose-up   # full stack with Postgres + monitoring
+```
+
+Health check: `curl http://localhost:8000/health`.
+
+### 4. Regenerate proto code (optional)
+
+```bash
+make generate            # buf generate + go mod tidy + go mod vendor
+```
 
 ## 🤝 Contributing
 
