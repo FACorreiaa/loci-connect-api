@@ -34,6 +34,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 )
 
 const (
@@ -763,7 +764,7 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	resultCh := make(chan locitypes.POIDetailedInfo, 1)
 	var wg sync.WaitGroup
 
-	wg.Go(func() {
+	concurrency.Go(&wg, l.logger, func() {
 		l.getPOIDetailedInfos(ctx, city, lat, lon, userID, resultCh, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
 	})
 

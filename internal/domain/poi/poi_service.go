@@ -15,6 +15,7 @@ import (
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/otel"
@@ -948,7 +949,7 @@ func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID,
 	resultCh := make(chan locitypes.GenAIResponse, 1)
 	// func (s *ServiceImpl) generatePOIsFromgenerativeAI...
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	concurrency.Go(&wg, s.logger, func() {
 		s.getGeneralPOIByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 			Temperature:     genai.Ptr[float32](0.7),
 			MaxOutputTokens: 16384,
@@ -1397,7 +1398,7 @@ func (s *ServiceImpl) generateRestaurantsFromLLM(ctx context.Context, userID uui
 	resultCh := make(chan locitypes.GenAIResponse, 1)
 	// func (s *ServiceImpl) generateRestaurantsFromgenerativeAI...
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	concurrency.Go(&wg, s.logger, func() {
 		s.getGeneralRestaurantByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 			Temperature:     genai.Ptr[float32](0.7),
 			MaxOutputTokens: 16384,
@@ -1498,7 +1499,7 @@ func (s *ServiceImpl) generateActivitiesFromLLM(ctx context.Context, userID uuid
 	resultCh := make(chan locitypes.GenAIResponse, 1)
 	// func (s *ServiceImpl) generateActivitiesFromgenerativeAI...
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	concurrency.Go(&wg, s.logger, func() {
 		s.getGeneralActivitiesByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 			Temperature:     genai.Ptr[float32](0.7),
 			MaxOutputTokens: 16384,
@@ -1599,7 +1600,7 @@ func (s *ServiceImpl) generateHotelsFromLLM(ctx context.Context, userID uuid.UUI
 	resultCh := make(chan locitypes.GenAIResponse, 1)
 	// func (s *ServiceImpl) generateHotelsFromgenerativeAI...
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	concurrency.Go(&wg, s.logger, func() {
 		s.getGeneralHotelsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 			Temperature:     genai.Ptr[float32](0.7),
 			MaxOutputTokens: 16384,
@@ -1700,7 +1701,7 @@ func (s *ServiceImpl) generateAttractionsFromLLM(ctx context.Context, userID uui
 	resultCh := make(chan locitypes.GenAIResponse, 1)
 	// func (s *ServiceImpl) generateAttractionsFromgenerativeAI...
 	var wg sync.WaitGroup
-	wg.Go(func() {
+	concurrency.Go(&wg, s.logger, func() {
 		s.getGeneralAttractionsByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
 			Temperature:     genai.Ptr[float32](0.7),
 			MaxOutputTokens: 16384,
