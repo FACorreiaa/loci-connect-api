@@ -14,6 +14,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/servicetest"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 func TestAuthHandler_Register_Success(t *testing.T) {
@@ -262,6 +263,158 @@ func TestAuthHandler_ErrorMappings(t *testing.T) {
 	}))
 	if connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("expected not found, got %v", connect.CodeOf(err))
+	}
+}
+
+func TestAuthHandler_ChangePassword_Success(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	current := "Str0ng!Pass"
+	hashed := servicetest.MustHash(t, current)
+	user := servicetest.AddUser(repo, t, "changepass-rpc@example.com", true, hashed)
+	repo.Sessions["session-token"] = &repository.UserSession{
+		ID:        user.ID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	resp, err := handler.ChangePassword(ctx, connect.NewRequest(&auth.ChangePasswordRequest{
+		OldPassword: current,
+		NewPassword: "NewPass!2",
+	}))
+	if err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	if resp.Msg == nil || !resp.Msg.Success {
+		t.Fatalf("expected success response, got %#v", resp.Msg)
+	}
+	if repo.Users[user.Email].HashedPassword == hashed {
+		t.Fatalf("password hash should change")
+	}
+	if len(repo.Sessions) != 0 {
+		t.Fatalf("sessions should be invalidated, got %d", len(repo.Sessions))
+	}
+}
+
+func TestAuthHandler_ChangePassword_WrongCurrent(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	hashed := servicetest.MustHash(t, "Str0ng!Pass")
+	user := servicetest.AddUser(repo, t, "wrongpass@example.com", true, hashed)
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	_, err := handler.ChangePassword(ctx, connect.NewRequest(&auth.ChangePasswordRequest{
+		OldPassword: "WrongPass!1",
+		NewPassword: "NewPass!2",
+	}))
+	if err == nil {
+		t.Fatalf("expected error for wrong current password")
+	}
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("expected unauthenticated, got %v", connect.CodeOf(err))
+	}
+	if repo.Users[user.Email].HashedPassword != hashed {
+		t.Fatalf("password should not change")
+	}
+}
+
+func TestAuthHandler_ChangePassword_MissingClaims(t *testing.T) {
+	svc, _, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	_, err := handler.ChangePassword(context.Background(), connect.NewRequest(&auth.ChangePasswordRequest{
+		OldPassword: "Str0ng!Pass",
+		NewPassword: "NewPass!2",
+	}))
+	if err == nil {
+		t.Fatalf("expected error when claims are missing")
+	}
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("expected unauthenticated, got %v", connect.CodeOf(err))
+	}
+}
+
+func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	password := "Str0ng!Pass"
+	hashed := servicetest.MustHash(t, password)
+	user := servicetest.AddUser(repo, t, "changeemail-rpc@example.com", true, hashed)
+	verified := time.Now()
+	user.EmailVerifiedAt = &verified
+	repo.Sessions["session-token"] = &repository.UserSession{
+		ID:        user.ID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	resp, err := handler.ChangeEmail(ctx, connect.NewRequest(&auth.ChangeEmailRequest{
+		Password: password,
+		NewEmail: "new-rpc@example.com",
+	}))
+	if err != nil {
+		t.Fatalf("ChangeEmail: %v", err)
+	}
+	if resp.Msg == nil || !resp.Msg.Success {
+		t.Fatalf("expected success response, got %#v", resp.Msg)
+	}
+	if _, ok := repo.Users["new-rpc@example.com"]; !ok {
+		t.Fatalf("user should be reindexed under new email")
+	}
+	if _, ok := repo.Users["changeemail-rpc@example.com"]; ok {
+		t.Fatalf("old email key should be removed")
+	}
+	if updated := repo.Users["new-rpc@example.com"]; updated.EmailVerifiedAt != nil {
+		t.Fatalf("email_verified_at should be cleared after change")
+	}
+	if len(repo.Sessions) != 0 {
+		t.Fatalf("sessions should be invalidated, got %d", len(repo.Sessions))
+	}
+}
+
+func TestAuthHandler_ChangeEmail_AlreadyTaken(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	password := "Str0ng!Pass"
+	hashed := servicetest.MustHash(t, password)
+	caller := servicetest.AddUser(repo, t, "caller@example.com", true, hashed)
+	servicetest.AddUser(repo, t, "taken@example.com", true, servicetest.MustHash(t, "Other!Pass1"))
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: caller.ID.String()})
+	_, err := handler.ChangeEmail(ctx, connect.NewRequest(&auth.ChangeEmailRequest{
+		Password: password,
+		NewEmail: "taken@example.com",
+	}))
+	if err == nil {
+		t.Fatalf("expected error when email is taken")
+	}
+	if connect.CodeOf(err) != connect.CodeAlreadyExists {
+		t.Fatalf("expected already exists, got %v", connect.CodeOf(err))
+	}
+	if _, ok := repo.Users["caller@example.com"]; !ok {
+		t.Fatalf("caller email should be unchanged")
+	}
+}
+
+func TestAuthHandler_ChangeEmail_MissingClaims(t *testing.T) {
+	svc, _, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc)
+
+	_, err := handler.ChangeEmail(context.Background(), connect.NewRequest(&auth.ChangeEmailRequest{
+		Password: "Str0ng!Pass",
+		NewEmail: "new@example.com",
+	}))
+	if err == nil {
+		t.Fatalf("expected error when claims are missing")
+	}
+	if connect.CodeOf(err) != connect.CodeUnauthenticated {
+		t.Fatalf("expected unauthenticated, got %v", connect.CodeOf(err))
 	}
 }
 

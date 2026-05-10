@@ -340,6 +340,53 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 	return nil
 }
 
+// ChangeEmail changes the email for an authenticated user after verifying their
+// current password. The new email is collision-checked against existing users
+// and refresh-token sessions are invalidated on success.
+func (s *AuthService) ChangeEmail(ctx context.Context, userID, currentPassword, newEmail string) error {
+	if userID == "" {
+		return fmt.Errorf("user id required")
+	}
+	if newEmail == "" {
+		return fmt.Errorf("new email required")
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+
+	user, err := s.repo.GetUserByID(ctx, userUUID)
+	if err != nil {
+		return err
+	}
+
+	if !ComparePassword(user.HashedPassword, currentPassword) {
+		return common.ErrInvalidCredentials
+	}
+
+	// No-op if the email is unchanged.
+	if user.Email == newEmail {
+		return nil
+	}
+
+	// Collision-check: reject if another user already owns this email.
+	if existing, err := s.repo.GetUserByEmail(ctx, newEmail); err == nil {
+		if existing.ID != user.ID {
+			return common.ErrUserAlreadyExists
+		}
+	} else if !errors.Is(err, common.ErrUserNotFound) {
+		return err
+	}
+
+	if err := s.repo.UpdateEmail(ctx, userUUID, newEmail); err != nil {
+		return err
+	}
+
+	_ = s.repo.DeleteAllUserSessions(ctx, userUUID)
+	return nil
+}
+
 // VerifyEmail validates the verification token.
 func (s *AuthService) VerifyEmail(ctx context.Context, verificationToken string) (uuid.UUID, error) {
 	if verificationToken == "" {

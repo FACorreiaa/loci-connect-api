@@ -69,6 +69,7 @@ type AuthRepository interface {
 
 	VerifyEmail(ctx context.Context, userID uuid.UUID) error
 	UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error
+	UpdateEmail(ctx context.Context, userID uuid.UUID, email string) error
 
 	CreateOrUpdateOAuthIdentity(ctx context.Context, providerName, providerUserID string, userID uuid.UUID, accessToken, refreshToken *string) error
 	GetUserByOAuthIdentity(ctx context.Context, providerName, providerUserID string) (*User, error)

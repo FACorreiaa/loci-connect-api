@@ -172,6 +172,20 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, error) {
 	return claims, nil
 }
 
+// ContextWithClaims returns a copy of ctx that carries the provided claims.
+// It is intended for tests and internal call sites that need to simulate an
+// authenticated request without exercising the full JWT interceptor.
+func ContextWithClaims(ctx context.Context, claims *Claims) context.Context {
+	if claims == nil {
+		return ctx
+	}
+	ctx = context.WithValue(ctx, claimsKey, claims)
+	if claims.UserID != "" {
+		ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
+	}
+	return ctx
+}
+
 // GetUserIDFromContext extracts user ID from context (backward compatibility)
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(UserIDKey).(string)

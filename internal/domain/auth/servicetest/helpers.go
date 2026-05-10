@@ -226,6 +226,19 @@ func (m *MockAuthRepo) UpdatePassword(_ context.Context, userID uuid.UUID, hashe
 	return common.ErrUserNotFound
 }
 
+func (m *MockAuthRepo) UpdateEmail(_ context.Context, userID uuid.UUID, email string) error {
+	for oldEmail, user := range m.Users {
+		if user.ID == userID {
+			user.Email = email
+			user.EmailVerifiedAt = nil
+			delete(m.Users, oldEmail)
+			m.Users[email] = user
+			return nil
+		}
+	}
+	return common.ErrUserNotFound
+}
+
 func (m *MockAuthRepo) CreateOrUpdateOAuthIdentity(_ context.Context, _, _ string, _ uuid.UUID, _, _ *string) error {
 	return nil
 }

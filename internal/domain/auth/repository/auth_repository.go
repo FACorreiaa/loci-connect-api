@@ -273,6 +273,14 @@ func (r *PostgresAuthRepository) UpdatePassword(ctx context.Context, userID uuid
 	return err
 }
 
+// UpdateEmail updates a user's email and resets the email verification timestamp.
+// The caller is responsible for collision-checking before invoking this method.
+func (r *PostgresAuthRepository) UpdateEmail(ctx context.Context, userID uuid.UUID, email string) error {
+	query := `UPDATE users SET email = $1, email_verified_at = NULL, updated_at = $2 WHERE id = $3`
+	_, err := r.pgpool.Exec(ctx, query, email, time.Now(), userID)
+	return err
+}
+
 // CreateOrUpdateOAuthIdentity creates or updates an OAuth identity
 func (r *PostgresAuthRepository) CreateOrUpdateOAuthIdentity(ctx context.Context, providerName, providerUserID string, userID uuid.UUID, accessToken, refreshToken *string) error {
 	query := `

@@ -12,6 +12,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/presenter"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 // AuthHandler implements the AuthService Connect handlers.
@@ -99,20 +100,50 @@ func (h *AuthHandler) ValidateSession(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(presenter.ValidateSessionResponse(claims)), nil
 }
 
-// ChangePassword is not yet implemented.
-func (h *AuthHandler) ChangePassword(_ context.Context, _ *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[commonpb.Response], error) {
-	return nil, connect.NewError(
-		connect.CodeUnimplemented,
-		errors.New("change password is not implemented"),
-	)
+// ChangePassword updates the caller's password after verifying their current one.
+func (h *AuthHandler) ChangePassword(ctx context.Context, req *connect.Request[auth.ChangePasswordRequest]) (*connect.Response[commonpb.Response], error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	if req.Msg.OldPassword == "" || req.Msg.NewPassword == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("old password and new password are required"))
+	}
+
+	if err := h.service.ChangePassword(ctx, claims.UserID, req.Msg.OldPassword, req.Msg.NewPassword); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	msg := "Password changed successfully"
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
 }
 
-// ChangeEmail is not yet implemented.
-func (h *AuthHandler) ChangeEmail(_ context.Context, _ *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[commonpb.Response], error) {
-	return nil, connect.NewError(
-		connect.CodeUnimplemented,
-		errors.New("change email is not implemented"),
-	)
+// ChangeEmail updates the caller's email after verifying their current password.
+func (h *AuthHandler) ChangeEmail(ctx context.Context, req *connect.Request[auth.ChangeEmailRequest]) (*connect.Response[commonpb.Response], error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	if req.Msg.NewEmail == "" || req.Msg.Password == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("password and new email are required"))
+	}
+
+	if err := h.service.ChangeEmail(ctx, claims.UserID, req.Msg.Password, req.Msg.NewEmail); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	// TODO: trigger an email-change verification once a dedicated mailer template
+	// (e.g. SendEmailChangeConfirmation) is added to service.EmailSender.
+	msg := "Email changed successfully"
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
 }
 
 // ForgotPassword initiates the password reset flow.
