@@ -22,6 +22,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 )
 
 var _ Repository = (*RepositoryImpl)(nil)
@@ -195,75 +196,57 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 	))
 	defer span.End()
 
-	var err error
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to start transaction")
-		return uuid.Nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			err = tx.Rollback(ctx)
-			panic(p)
-		}
-		if err != nil {
-			if rbErr := tx.Rollback(ctx); rbErr != nil {
-				r.logger.ErrorContext(ctx, "Transaction rollback failed after error", "original_error", err, "rollback_error", rbErr)
-				span.RecordError(fmt.Errorf("transaction rollback failed: %v (original error: %w)", rbErr, err))
-			}
-		}
-	}()
-
-	interactionQuery := `
+	var interactionID uuid.UUID
+	err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
+		var err error
+		interactionQuery := `
         INSERT INTO llm_interactions (
             user_id, session_id, prompt, response, model_name, latency_ms, city_name
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id
     `
-	var interactionID uuid.UUID
-	err = tx.QueryRow(ctx, interactionQuery,
-		interaction.UserID,
-		interaction.SessionID,
-		interaction.Prompt,
-		interaction.ResponseText,
-		interaction.ModelUsed,
-		interaction.LatencyMs,
-		interaction.CityName,
-	).Scan(&interactionID)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to insert llm_interaction")
-		return uuid.Nil, fmt.Errorf("failed to insert llm_interaction: %w", err)
-	}
-	span.SetAttributes(attribute.String("llm_interaction.id", interactionID.String()))
-
-	var cityID uuid.UUID
-	if interaction.CityName != "" {
-		cityQuery := `SELECT id FROM cities WHERE name = $1 LIMIT 1`
-		err = tx.QueryRow(ctx, cityQuery, interaction.CityName).Scan(&cityID)
+		err = tx.QueryRow(ctx, interactionQuery,
+			interaction.UserID,
+			interaction.SessionID,
+			interaction.Prompt,
+			interaction.ResponseText,
+			interaction.ModelUsed,
+			interaction.LatencyMs,
+			interaction.CityName,
+		).Scan(&interactionID)
 		if err != nil {
-			if err == pgx.ErrNoRows {
-				r.logger.WarnContext(ctx, "City not found in database, itinerary creation will be skipped", "city_name", interaction.CityName, "interaction_id", interactionID.String())
-				span.AddEvent("City not found in database", trace.WithAttributes(attribute.String("city.name", interaction.CityName)))
-				// err is pgx.ErrNoRows, so cityID remains uuid.Nil, processing continues correctly. Clear err.
-				err = nil
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Failed to insert llm_interaction")
+			return fmt.Errorf("failed to insert llm_interaction: %w", err)
+		}
+		span.SetAttributes(attribute.String("llm_interaction.id", interactionID.String()))
+
+		var cityID uuid.UUID
+		if interaction.CityName != "" {
+			cityQuery := `SELECT id FROM cities WHERE name = $1 LIMIT 1`
+			err = tx.QueryRow(ctx, cityQuery, interaction.CityName).Scan(&cityID)
+			if err != nil {
+				if err == pgx.ErrNoRows {
+					r.logger.WarnContext(ctx, "City not found in database, itinerary creation will be skipped", "city_name", interaction.CityName, "interaction_id", interactionID.String())
+					span.AddEvent("City not found in database", trace.WithAttributes(attribute.String("city.name", interaction.CityName)))
+					// err is pgx.ErrNoRows, so cityID remains uuid.Nil, processing continues correctly. Clear err.
+					err = nil
+				} else {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "Failed to get city_id")
+					return fmt.Errorf("failed to get city_id for city '%s': %w", interaction.CityName, err)
+				}
 			} else {
-				span.RecordError(err)
-				span.SetStatus(codes.Error, "Failed to get city_id")
-				return interactionID, fmt.Errorf("failed to get city_id for city '%s': %w", interaction.CityName, err)
+				span.SetAttributes(attribute.String("city.id", cityID.String()))
 			}
 		} else {
-			span.SetAttributes(attribute.String("city.id", cityID.String()))
+			r.logger.InfoContext(ctx, "interaction.CityName is empty, cannot determine city_id. Itinerary creation will be skipped.", "interaction_id", interactionID.String())
+			span.AddEvent("interaction.CityName is empty")
 		}
-	} else {
-		r.logger.InfoContext(ctx, "interaction.CityName is empty, cannot determine city_id. Itinerary creation will be skipped.", "interaction_id", interactionID.String())
-		span.AddEvent("interaction.CityName is empty")
-	}
 
-	var itineraryID uuid.UUID
-	if cityID != uuid.Nil {
-		itineraryQuery := `
+		var itineraryID uuid.UUID
+		if cityID != uuid.Nil {
+			itineraryQuery := `
 	        INSERT INTO itineraries (user_id, city_id, source_llm_interaction_id)
 	        VALUES ($1, $2, $3)
 	        ON CONFLICT (user_id, city_id) DO UPDATE SET
@@ -271,37 +254,37 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 	            source_llm_interaction_id = EXCLUDED.source_llm_interaction_id
 	        RETURNING id
 	    `
-		err = tx.QueryRow(ctx, itineraryQuery, interaction.UserID, cityID, interactionID).Scan(&itineraryID)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Failed to insert or update itinerary")
-			return interactionID, fmt.Errorf("failed to insert or update itinerary: %w", err)
-		}
-		span.SetAttributes(attribute.String("itinerary.id", itineraryID.String()))
-	}
-
-	if itineraryID != uuid.Nil {
-		var pois []locitypes.POIDetailedInfo
-		// Only parse POIs for itinerary/general responses, skip for domain-specific responses
-		if strings.Contains(interaction.Prompt, "Unified Chat - Domain: dining") ||
-			strings.Contains(interaction.Prompt, "Unified Chat - Domain: accommodation") ||
-			strings.Contains(interaction.Prompt, "Unified Chat - Domain: activities") {
-			// Skip POI parsing for domain-specific responses that don't contain POIs
-			r.logger.DebugContext(ctx, "Skipping POI parsing for domain-specific response", "interaction_id", interactionID.String())
-			span.AddEvent("Skipped POI parsing for domain-specific response")
-		} else {
-			pois, err = parsePOIsFromResponse(interaction.ResponseText, r.logger)
+			err = tx.QueryRow(ctx, itineraryQuery, interaction.UserID, cityID, interactionID).Scan(&itineraryID)
 			if err != nil {
 				span.RecordError(err)
-				span.SetStatus(codes.Error, "Failed to parse POIs from response")
-				return interactionID, fmt.Errorf("failed to parse POIs from response: %w", err)
+				span.SetStatus(codes.Error, "Failed to insert or update itinerary")
+				return fmt.Errorf("failed to insert or update itinerary: %w", err)
 			}
+			span.SetAttributes(attribute.String("itinerary.id", itineraryID.String()))
 		}
-		span.SetAttributes(attribute.Int("parsed_pois.count", len(pois)))
 
-		if len(pois) > 0 {
-			poiBatch := &pgx.Batch{}
-			itineraryPoiInsertQuery := `
+		if itineraryID != uuid.Nil {
+			var pois []locitypes.POIDetailedInfo
+			// Only parse POIs for itinerary/general responses, skip for domain-specific responses
+			if strings.Contains(interaction.Prompt, "Unified Chat - Domain: dining") ||
+				strings.Contains(interaction.Prompt, "Unified Chat - Domain: accommodation") ||
+				strings.Contains(interaction.Prompt, "Unified Chat - Domain: activities") {
+				// Skip POI parsing for domain-specific responses that don't contain POIs
+				r.logger.DebugContext(ctx, "Skipping POI parsing for domain-specific response", "interaction_id", interactionID.String())
+				span.AddEvent("Skipped POI parsing for domain-specific response")
+			} else {
+				pois, err = parsePOIsFromResponse(interaction.ResponseText, r.logger)
+				if err != nil {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "Failed to parse POIs from response")
+					return fmt.Errorf("failed to parse POIs from response: %w", err)
+				}
+			}
+			span.SetAttributes(attribute.Int("parsed_pois.count", len(pois)))
+
+			if len(pois) > 0 {
+				poiBatch := &pgx.Batch{}
+				itineraryPoiInsertQuery := `
 	            INSERT INTO itinerary_pois (itinerary_id, poi_id, order_index, ai_description)
 	            VALUES ($1, $2, $3, $4)
 	            ON CONFLICT (itinerary_id, poi_id) DO UPDATE SET
@@ -309,56 +292,57 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 	                ai_description = EXCLUDED.ai_description,
 	                updated_at = NOW()
 	        `
-			for i, POIDetailedInfoFromLlm := range pois {
-				var poiDBID uuid.UUID
-				poiDBID, err = r.GetOrCreatePOI(ctx, tx, POIDetailedInfoFromLlm, cityID, interactionID)
-				if err != nil {
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "Failed to get or create POI")
-					return interactionID, fmt.Errorf("failed to get or create POI '%s': %w", POIDetailedInfoFromLlm.Name, err)
-				}
-				poiBatch.Queue(itineraryPoiInsertQuery, itineraryID, poiDBID, i, POIDetailedInfoFromLlm.DescriptionPOI) // Assumes locitypes.POIDetailedInfo has DescriptionPOI
-			}
-
-			if poiBatch.Len() > 0 {
-				br := tx.SendBatch(ctx, poiBatch)
-				for i := 0; i < poiBatch.Len(); i++ {
-					_, execErr := br.Exec()
-					if execErr != nil {
-						// Consider how to handle partial failures. Log and continue, or return error?
-						err = fmt.Errorf("failed to insert itinerary_poi in batch (operation %d of %d for itinerary %s): %w", i+1, poiBatch.Len(), itineraryID.String(), execErr)
-						if closeErr := br.Close(); closeErr != nil {
-							r.logger.ErrorContext(ctx, "Failed to close batch for itinerary_pois after an exec error", "close_error", closeErr, "original_batch_error", err)
-						}
+				for i, POIDetailedInfoFromLlm := range pois {
+					var poiDBID uuid.UUID
+					poiDBID, err = r.GetOrCreatePOI(ctx, tx, POIDetailedInfoFromLlm, cityID, interactionID)
+					if err != nil {
 						span.RecordError(err)
-						span.SetStatus(codes.Error, "Failed to insert itinerary_poi in batch")
-						return interactionID, err
+						span.SetStatus(codes.Error, "Failed to get or create POI")
+						return fmt.Errorf("failed to get or create POI '%s': %w", POIDetailedInfoFromLlm.Name, err)
 					}
+					poiBatch.Queue(itineraryPoiInsertQuery, itineraryID, poiDBID, i, POIDetailedInfoFromLlm.DescriptionPOI) // Assumes locitypes.POIDetailedInfo has DescriptionPOI
 				}
-				err = br.Close()
-				if err != nil {
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "Failed to close batch for itinerary_pois")
-					return interactionID, fmt.Errorf("failed to close batch for itinerary_pois: %w", err)
+
+				if poiBatch.Len() > 0 {
+					br := tx.SendBatch(ctx, poiBatch)
+					for i := 0; i < poiBatch.Len(); i++ {
+						_, execErr := br.Exec()
+						if execErr != nil {
+							// Consider how to handle partial failures. Log and continue, or return error?
+							err = fmt.Errorf("failed to insert itinerary_poi in batch (operation %d of %d for itinerary %s): %w", i+1, poiBatch.Len(), itineraryID.String(), execErr)
+							if closeErr := br.Close(); closeErr != nil {
+								r.logger.ErrorContext(ctx, "Failed to close batch for itinerary_pois after an exec error", "close_error", closeErr, "original_batch_error", err)
+							}
+							span.RecordError(err)
+							span.SetStatus(codes.Error, "Failed to insert itinerary_poi in batch")
+							return err
+						}
+					}
+					err = br.Close()
+					if err != nil {
+						span.RecordError(err)
+						span.SetStatus(codes.Error, "Failed to close batch for itinerary_pois")
+						return fmt.Errorf("failed to close batch for itinerary_pois: %w", err)
+					}
+					span.SetAttributes(attribute.Int("itinerary_pois.inserted_or_updated.count", poiBatch.Len()))
 				}
-				span.SetAttributes(attribute.Int("itinerary_pois.inserted_or_updated.count", poiBatch.Len()))
+			}
+		} else {
+			if cityID != uuid.Nil {
+				r.logger.WarnContext(ctx, "ItineraryID is Nil despite valid CityID, indicating itinerary insert/update issue.", "city_id", cityID.String(), "interaction_id", interactionID.String())
+				span.AddEvent("ItineraryID is Nil despite valid CityID.")
+			} else {
+				r.logger.InfoContext(ctx, "Skipping itinerary_pois: itineraryID is Nil (likely city not found or CityName empty).", "interaction_id", interactionID.String())
+				span.AddEvent("Skipping itinerary_pois: itineraryID is Nil.")
 			}
 		}
-	} else {
-		if cityID != uuid.Nil {
-			r.logger.WarnContext(ctx, "ItineraryID is Nil despite valid CityID, indicating itinerary insert/update issue.", "city_id", cityID.String(), "interaction_id", interactionID.String())
-			span.AddEvent("ItineraryID is Nil despite valid CityID.")
-		} else {
-			r.logger.InfoContext(ctx, "Skipping itinerary_pois: itineraryID is Nil (likely city not found or CityName empty).", "interaction_id", interactionID.String())
-			span.AddEvent("Skipping itinerary_pois: itineraryID is Nil.")
-		}
-	}
 
-	err = tx.Commit(ctx)
+		return nil
+	})
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to commit transaction")
-		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
+		span.SetStatus(codes.Error, "Failed to save interaction")
+		return uuid.Nil, err
 	}
 
 	span.SetStatus(codes.Ok, "Interaction and related entities saved successfully")

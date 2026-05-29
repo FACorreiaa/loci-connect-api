@@ -68,15 +68,19 @@ All Tier-1 items shipped. `go build ./...`, `go vet`, and `go test ./internal/do
 - **Verify:** stream a forced error; client receives a stable code; existing chat integration test
   passes.
 
-### T2-2 · Extract a `withTx` transaction helper
+### T2-2 · Extract a `withTx` transaction helper  🟡 partially done (2026-05-30)
 - **Problem:** Fragile deferred `recover()`/`panic(p)` rollback pattern.
 - **Files:** `internal/domain/chat/repository/chat_repository.go:206-208` (and similar tx blocks
   across repositories — grep `BeginTx`/`tx.Rollback`).
-- **Approach:** `func withTx(ctx, pool, fn func(pgx.Tx) error) error` that begins, runs `fn`, commits,
-  and rolls back on error — no panic-as-control-flow. Migrate `SaveInteraction` first, then other tx
-  users.
+- **Done:** Added `pkg/db.WithTx(ctx, TxBeginner, func(pgx.Tx) error) error` — begins, runs fn,
+  commits; rolls back + joins error on fn error; rolls back + re-raises on panic (panics never
+  swallowed). Unit-tested 4 paths (commit / rollback / begin-error / panic) with `pgxmock` in
+  `pkg/db/tx_test.go`. Migrated `SaveInteraction` — the recover()/panic() block is gone; on error it
+  now correctly returns `uuid.Nil` (was returning a rolled-back ID). Build/vet/tests green.
+- **Remaining:** adopt `WithTx` in the other ~12 tx sites (`poi_repository.go`, `user_repository.go`,
+  `profile_repository.go`, other `chat_repository.go` blocks). Mechanical; do incrementally. The
+  Begin-only sites (profiles/user) need a `Begin`-based overload or to switch to `BeginTx`.
 - **Effort:** M · **Risk:** medium (transaction semantics — test rollback paths).
-- **Verify:** unit test the helper (commit + rollback); repository tests pass.
 
 ### T2-3 · Split `ContinueSessionStreamed` (283L)
 - **Files:** `internal/domain/chat/service/chat_service.go:1308`
