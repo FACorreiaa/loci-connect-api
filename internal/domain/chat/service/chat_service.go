@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/url"
 	"regexp"
@@ -147,17 +146,17 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	logger *slog.Logger,
 	apiKey string,
 	model string,
-) *ServiceImpl {
+) (*ServiceImpl, error) {
 	ctx := context.Background()
 	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to create Gemini chat client: %w", err)
 	}
 
 	// Initialize embedding service
 	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, model, logger)
 	if err != nil {
-		log.Fatalf("Failed to create embedding service: %v", err) // Terminate if initialization fails
+		return nil, fmt.Errorf("failed to create embedding service: %w", err)
 	}
 
 	deadLetterCtx, deadLetterCancel := context.WithCancel(context.Background())
@@ -183,7 +182,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
 	}
 	go service.processDeadLetterQueue(deadLetterCtx)
-	return service
+	return service, nil
 }
 
 // getPersonalizedPOIWithSemanticContext creates an enhanced prompt with semantic POI context

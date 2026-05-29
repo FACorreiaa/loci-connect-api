@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 func TestAuthHandler_Register_Success(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, tokens, emails := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
 		return &service.TokenPair{
@@ -64,7 +65,7 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 }
 
 func TestAuthHandler_Register_InvalidInput(t *testing.T) {
-	handler := NewAuthHandler(nil)
+	handler := NewAuthHandler(nil, slog.Default())
 
 	_, err := handler.Register(context.Background(), connect.NewRequest(&auth.RegisterRequest{}))
 	if err == nil {
@@ -78,7 +79,7 @@ func TestAuthHandler_Register_InvalidInput(t *testing.T) {
 func TestAuthHandler_Login_Success(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, tokens, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	hashed := servicetest.MustHash(t, "Str0ng!Pass")
 	user := servicetest.AddUser(repo, t, "rpc-login@example.com", true, hashed)
@@ -111,7 +112,7 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	hashed := servicetest.MustHash(t, "Str0ng!Pass")
 	servicetest.AddUser(repo, t, "badlogin@example.com", true, hashed)
@@ -131,7 +132,7 @@ func TestAuthHandler_Login_InvalidCredentials(t *testing.T) {
 func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, tokens, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	user, err := repo.CreateUser(ctx, "refresh@example.com", "rpc", "hashed", "RPC User")
 	if err != nil {
@@ -182,7 +183,7 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 func TestAuthHandler_ValidateSession(t *testing.T) {
 	ctx := context.Background()
 	svc, _, tokens, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	tokens.AccessFunc = func(token string) (*service.Claims, error) {
 		if token != "access-token" {
@@ -217,7 +218,7 @@ func TestAuthHandler_ValidateSession(t *testing.T) {
 func TestAuthHandler_Logout(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	user := servicetest.AddUser(repo, t, "logout-rpc@example.com", true, "hashed")
 	repo.Sessions[hashTestToken("refresh-token")] = &repository.UserSession{
@@ -243,7 +244,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 func TestAuthHandler_ErrorMappings(t *testing.T) {
 	ctx := context.Background()
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	// Inactive account triggers permission denied.
 	user := servicetest.AddUser(repo, t, "inactive@example.com", false, servicetest.MustHash(t, "Str0ng!Pass"))
@@ -268,7 +269,7 @@ func TestAuthHandler_ErrorMappings(t *testing.T) {
 
 func TestAuthHandler_ChangePassword_Success(t *testing.T) {
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	current := "Str0ng!Pass"
 	hashed := servicetest.MustHash(t, current)
@@ -300,7 +301,7 @@ func TestAuthHandler_ChangePassword_Success(t *testing.T) {
 
 func TestAuthHandler_ChangePassword_WrongCurrent(t *testing.T) {
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	hashed := servicetest.MustHash(t, "Str0ng!Pass")
 	user := servicetest.AddUser(repo, t, "wrongpass@example.com", true, hashed)
@@ -323,7 +324,7 @@ func TestAuthHandler_ChangePassword_WrongCurrent(t *testing.T) {
 
 func TestAuthHandler_ChangePassword_MissingClaims(t *testing.T) {
 	svc, _, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	_, err := handler.ChangePassword(context.Background(), connect.NewRequest(&auth.ChangePasswordRequest{
 		OldPassword: "Str0ng!Pass",
@@ -339,7 +340,7 @@ func TestAuthHandler_ChangePassword_MissingClaims(t *testing.T) {
 
 func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	password := "Str0ng!Pass"
 	hashed := servicetest.MustHash(t, password)
@@ -379,7 +380,7 @@ func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
 
 func TestAuthHandler_ChangeEmail_AlreadyTaken(t *testing.T) {
 	svc, repo, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	password := "Str0ng!Pass"
 	hashed := servicetest.MustHash(t, password)
@@ -404,7 +405,7 @@ func TestAuthHandler_ChangeEmail_AlreadyTaken(t *testing.T) {
 
 func TestAuthHandler_ChangeEmail_MissingClaims(t *testing.T) {
 	svc, _, _, _ := servicetest.NewTestAuthService()
-	handler := NewAuthHandler(svc)
+	handler := NewAuthHandler(svc, slog.Default())
 
 	_, err := handler.ChangeEmail(context.Background(), connect.NewRequest(&auth.ChangeEmailRequest{
 		Password: "Str0ng!Pass",

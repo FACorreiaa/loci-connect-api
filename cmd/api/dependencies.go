@@ -194,7 +194,7 @@ func (d *Dependencies) initServices() error {
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Logger)
-	d.ChatService = chatservice.NewLlmInteractiontService(
+	chatSvc, err := chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,
 		d.ProfileSvc,
@@ -208,6 +208,10 @@ func (d *Dependencies) initServices() error {
 		d.Config.Gemini.APIKey,
 		d.Config.Gemini.Model,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize chat service: %w", err)
+	}
+	d.ChatService = chatSvc
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
@@ -233,7 +237,7 @@ func (d *Dependencies) initServices() error {
 
 // initHandlers initializes all handler dependencies
 func (d *Dependencies) initHandlers() error {
-	d.AuthHandler = handler.NewAuthHandler(d.AuthService)
+	d.AuthHandler = handler.NewAuthHandler(d.AuthService, d.Logger)
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)

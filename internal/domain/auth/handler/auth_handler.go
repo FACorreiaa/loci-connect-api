@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	"connectrpc.com/connect"
 	auth "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
@@ -19,12 +20,14 @@ import (
 type AuthHandler struct {
 	authconnect.UnimplementedAuthServiceHandler
 	service *service.AuthService
+	logger  *slog.Logger
 }
 
 // NewAuthHandler constructs a new handler.
-func NewAuthHandler(svc *service.AuthService) *AuthHandler {
+func NewAuthHandler(svc *service.AuthService, logger *slog.Logger) *AuthHandler {
 	return &AuthHandler{
 		service: svc,
+		logger:  logger,
 	}
 }
 

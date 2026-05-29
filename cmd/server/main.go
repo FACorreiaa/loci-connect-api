@@ -15,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/FACorreiaa/loci-connect-api/cmd/api"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"google.golang.org/genai"
 )
@@ -56,7 +57,7 @@ func main() {
 
 	// Start pprof server if enabled
 	if cfg.Profiling.Enabled {
-		go startPprofServer(cfg, logger)
+		concurrency.Run(logger, func() { startPprofServer(cfg, logger) })
 	}
 
 	// Setup router

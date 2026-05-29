@@ -88,8 +88,7 @@ func NewServiceImpl(
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("GEMINI_MODEL")
-	fmt.Println("Model: \n", model)
-	fmt.Println("API Key: \n", apiKey)
+	logger.Debug("initializing POI AI client", slog.String("model", model))
 	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
@@ -1029,7 +1028,7 @@ func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context,
 		return
 	}
 
-	fmt.Println(cleanTxt)
+	s.logger.DebugContext(ctx, "generated POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
@@ -1483,7 +1482,7 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context,
 		return
 	}
 
-	fmt.Println(cleanTxt)
+	s.logger.DebugContext(ctx, "generated POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
@@ -1584,7 +1583,7 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context,
 		return
 	}
 
-	fmt.Println(cleanTxt)
+	s.logger.DebugContext(ctx, "generated POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
@@ -1685,7 +1684,7 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context,
 		return
 	}
 
-	fmt.Println(cleanTxt)
+	s.logger.DebugContext(ctx, "generated POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
@@ -1786,7 +1785,7 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context,
 		return
 	}
 
-	fmt.Println(cleanTxt)
+	s.logger.DebugContext(ctx, "generated POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))
 	span.SetStatus(codes.Ok, "General POIs generated successfully")
