@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -116,12 +117,7 @@ func NewRepository(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 }
 
 func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error) {
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-
-	// Validate coordinates
+	// Validate coordinates before opening a transaction
 	if poi.Latitude < -90 || poi.Latitude > 90 || poi.Longitude < -180 || poi.Longitude > 180 {
 		return uuid.Nil, fmt.Errorf("invalid coordinates: lat=%f, lon=%f", poi.Latitude, poi.Longitude)
 	}
@@ -137,18 +133,16 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
         ) RETURNING id
     `
 	var id uuid.UUID
-	if err := tx.QueryRow(ctx, query,
-		poi.Name, poi.DescriptionPOI, poi.Longitude, poi.Latitude, cityID,
-		poi.Category, "loci_ai", poi.DescriptionPOI,
-	).Scan(&id); err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+	if err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, query,
+			poi.Name, poi.DescriptionPOI, poi.Longitude, poi.Latitude, cityID,
+			poi.Category, "loci_ai", poi.DescriptionPOI,
+		).Scan(&id); err != nil {
+			return fmt.Errorf("failed to insert POI: %w", err)
 		}
-		return uuid.Nil, fmt.Errorf("failed to insert POI: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil
+	}); err != nil {
+		return uuid.Nil, err
 	}
 	// Log the successful insertion
 	r.logger.Info("POI saved successfully", slog.String("name", poi.Name), slog.String("id", id.String()))
@@ -820,17 +814,10 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
 	}
 
 	// Start a transaction to ensure both tables are updated atomically
-	tx, err := r.pgpool.Begin(ctx)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to begin transaction")
-		return uuid.Nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
 	poiID := uuid.New()
-
-	// Insert into poi_details table
-	POIDetailedInfosQuery := `
+	if err := db.WithTxBegin(ctx, r.pgpool, func(tx pgx.Tx) error {
+		// Insert into poi_details table
+		POIDetailedInfosQuery := `
         INSERT INTO poi_details (
             id, city_id, name, description, latitude, longitude, location,
             address, website, phone_number, opening_hours, price_range, category,
@@ -840,65 +827,58 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
             $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
         )
     `
-	_, err = tx.Exec(ctx, POIDetailedInfosQuery,
-		poiID, cityID, poi.Name, poi.Description, poi.Latitude, poi.Longitude,
-		poi.Longitude, poi.Latitude, // lon, lat for ST_MakePoint
-		poi.Address, poi.Website, poi.PhoneNumber, poi.OpeningHours,
-		poi.PriceRange, poi.Category, poi.Tags, poi.Images, poi.Rating,
-		func() any {
-			if poi.LlmInteractionID == uuid.Nil {
-				return nil
+		if _, err := tx.Exec(ctx, POIDetailedInfosQuery,
+			poiID, cityID, poi.Name, poi.Description, poi.Latitude, poi.Longitude,
+			poi.Longitude, poi.Latitude, // lon, lat for ST_MakePoint
+			poi.Address, poi.Website, poi.PhoneNumber, poi.OpeningHours,
+			poi.PriceRange, poi.Category, poi.Tags, poi.Images, poi.Rating,
+			func() any {
+				if poi.LlmInteractionID == uuid.Nil {
+					return nil
+				}
+				return poi.LlmInteractionID
+			}(),
+		); err != nil {
+			r.logger.ErrorContext(ctx, "Failed to save POI details",
+				slog.Any("error", err),
+				slog.String("poi_name", poi.Name),
+				slog.String("poi_id", poiID.String()))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Failed to save poi_details")
+			return fmt.Errorf("failed to save poi_details: %w", err)
+		}
+
+		// Convert price_range to price_level for points_of_interest
+		var priceLevel *int
+		if poi.PriceRange != "" {
+			switch poi.PriceRange {
+			case "€", "$", "free", "Free", "1":
+				level := 1
+				priceLevel = &level
+			case "€€", "$$", "budget", "Budget", "2":
+				level := 2
+				priceLevel = &level
+			case "€€€", "$$$", "moderate", "Moderate", "3":
+				level := 3
+				priceLevel = &level
+			case "€€€€", "$$$$", "expensive", "Expensive", "4":
+				level := 4
+				priceLevel = &level
+			case "luxury", "Luxury", "premium", "Premium", "5":
+				level := 5
+				priceLevel = &level
+			default:
+				r.logger.WarnContext(ctx, "Unknown price range",
+					slog.String("price_range", poi.PriceRange),
+					slog.String("poi_name", poi.Name))
+				// Default to level 2 (budget) for unknown price ranges
+				level := 2
+				priceLevel = &level
 			}
-			return poi.LlmInteractionID
-		}(),
-	)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
-		r.logger.ErrorContext(ctx, "Failed to save POI details",
-			slog.Any("error", err),
-			slog.String("poi_name", poi.Name),
-			slog.String("poi_id", poiID.String()),
-			slog.String("city_id", func() string {
-				return "null"
-			}()))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to save poi_details")
-		return uuid.Nil, fmt.Errorf("failed to save poi_details: %w", err)
-	}
 
-	// Convert price_range to price_level for points_of_interest
-	var priceLevel *int
-	if poi.PriceRange != "" {
-		switch poi.PriceRange {
-		case "€", "$", "free", "Free", "1":
-			level := 1
-			priceLevel = &level
-		case "€€", "$$", "budget", "Budget", "2":
-			level := 2
-			priceLevel = &level
-		case "€€€", "$$$", "moderate", "Moderate", "3":
-			level := 3
-			priceLevel = &level
-		case "€€€€", "$$$$", "expensive", "Expensive", "4":
-			level := 4
-			priceLevel = &level
-		case "luxury", "Luxury", "premium", "Premium", "5":
-			level := 5
-			priceLevel = &level
-		default:
-			r.logger.WarnContext(ctx, "Unknown price range",
-				slog.String("price_range", poi.PriceRange),
-				slog.String("poi_name", poi.Name))
-			// Default to level 2 (budget) for unknown price ranges
-			level := 2
-			priceLevel = &level
-		}
-	}
-
-	// Insert into points_of_interest table
-	poisQuery := `
+		// Insert into points_of_interest table
+		poisQuery := `
         INSERT INTO points_of_interest (
             id, name, description, location, city_id, address, poi_type,
             website, phone_number, opening_hours, category, price_level,
@@ -908,40 +888,25 @@ func (r *RepositoryImpl) SavePOIDetails(ctx context.Context, poi locitypes.POIDe
             $9, $10, $11, $12, $13, $14, $15, $16, $17
         )
     `
-	_, err = tx.Exec(ctx, poisQuery,
-		poiID, poi.Name, poi.Description,
-		poi.Longitude, poi.Latitude, // lon, lat for ST_MakePoint
-		cityID, poi.Address, poi.Category,
-		poi.Website, poi.PhoneNumber, poi.OpeningHours,
-		poi.Category, priceLevel, poi.Rating,
-		"loci_ai", poi.Description, poi.Tags,
-	)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			r.logger.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+		if _, err := tx.Exec(ctx, poisQuery,
+			poiID, poi.Name, poi.Description,
+			poi.Longitude, poi.Latitude, // lon, lat for ST_MakePoint
+			cityID, poi.Address, poi.Category,
+			poi.Website, poi.PhoneNumber, poi.OpeningHours,
+			poi.Category, priceLevel, poi.Rating,
+			"loci_ai", poi.Description, poi.Tags,
+		); err != nil {
+			r.logger.ErrorContext(ctx, "Failed to save POI to points_of_interest",
+				slog.Any("error", err),
+				slog.String("poi_name", poi.Name),
+				slog.String("poi_id", poiID.String()))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Failed to save POI to points_of_interest")
+			return fmt.Errorf("failed to save points_of_interest: %w", err)
 		}
-		r.logger.ErrorContext(ctx, "Failed to save POI to points_of_interest",
-			slog.Any("error", err),
-			slog.String("poi_name", poi.Name),
-			slog.String("poi_id", poiID.String()),
-			slog.String("city_id", func() string {
-				return "null"
-			}()))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to save POI to points_of_interest")
-		return uuid.Nil, fmt.Errorf("failed to save points_of_interest: %w", err)
-	}
-
-	// Commit the transaction
-	err = tx.Commit(ctx)
-	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to commit POI transaction",
-			slog.Any("error", err),
-			slog.String("poi_name", poi.Name),
-			slog.String("poi_id", poiID.String()))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to commit transaction")
-		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil
+	}); err != nil {
+		return uuid.Nil, err
 	}
 
 	r.logger.InfoContext(ctx, "Successfully saved POI to database",
