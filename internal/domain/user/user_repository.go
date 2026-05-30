@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -478,89 +480,62 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 	l := r.logger.With(slog.String("method", "DeactivateUser"), slog.String("userID", userID.String()))
 	l.DebugContext(ctx, "Deactivating user")
 
-	// Begin a transaction
-	tx, err := r.pgpool.Begin(ctx)
-	if err != nil {
-		l.ErrorContext(ctx, "Failed to begin transaction", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB transaction failed")
-		return fmt.Errorf("database error beginning transaction: %w", err)
-	}
-
-	// First, check if the user exists and is active
-	var isActive bool
-	err = tx.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+	// alreadyInactive is set inside the tx when the user exists but is not active,
+	// so we can return nil after the (no-op) commit instead of erroring.
+	var alreadyInactive bool
+	if err := db.WithTxBegin(ctx, r.pgpool, func(tx pgx.Tx) error {
+		// First, check if the user exists and is active
+		var isActive bool
+		if err := tx.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&isActive); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				l.WarnContext(ctx, "Attempted to deactivate non-existent user")
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "User not found")
+				return fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
 			}
-			l.WarnContext(ctx, "Attempted to deactivate non-existent user")
+			l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
 			span.RecordError(err)
-			span.SetStatus(codes.Error, "User not found")
-			return fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
+			span.SetStatus(codes.Error, "DB query failed")
+			return fmt.Errorf("database error checking user status: %w", err)
 		}
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
+
+		if !isActive {
+			alreadyInactive = true
+			return nil
 		}
-		l.ErrorContext(ctx, "Failed to check user active status", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB query failed")
-		return fmt.Errorf("database error checking user status: %w", err)
+
+		// Deactivate the user
+		if _, err := tx.Exec(ctx, "UPDATE users SET is_active = FALSE, updated_at = $1 WHERE id = $2", time.Now(), userID); err != nil {
+			l.ErrorContext(ctx, "Failed to deactivate user", slog.Any("error", err))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "DB UPDATE failed")
+			return fmt.Errorf("database error deactivating user: %w", err)
+		}
+
+		// Invalidate all refresh tokens
+		if _, err := tx.Exec(ctx, "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL", time.Now(), userID); err != nil {
+			l.ErrorContext(ctx, "Failed to invalidate refresh tokens", slog.Any("error", err))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "DB UPDATE failed")
+			return fmt.Errorf("database error invalidating refresh tokens: %w", err)
+		}
+
+		// Invalidate all sessions
+		if _, err := tx.Exec(ctx, "UPDATE sessions SET invalidated_at = $1 WHERE user_id = $2 AND invalidated_at IS NULL", time.Now(), userID); err != nil {
+			l.ErrorContext(ctx, "Failed to invalidate sessions", slog.Any("error", err))
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "DB UPDATE failed")
+			return fmt.Errorf("database error invalidating sessions: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
-	if !isActive {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
+	if alreadyInactive {
 		l.InfoContext(ctx, "User is already inactive")
 		span.SetStatus(codes.Ok, "User already inactive")
 		return nil
-	}
-
-	// Deactivate the user
-	_, err = tx.Exec(ctx, "UPDATE users SET is_active = FALSE, updated_at = $1 WHERE id = $2", time.Now(), userID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-		l.ErrorContext(ctx, "Failed to deactivate user", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB UPDATE failed")
-		return fmt.Errorf("database error deactivating user: %w", err)
-	}
-
-	// Invalidate all refresh tokens
-	_, err = tx.Exec(ctx, "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL", time.Now(), userID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-		l.ErrorContext(ctx, "Failed to invalidate refresh tokens", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB UPDATE failed")
-		return fmt.Errorf("database error invalidating refresh tokens: %w", err)
-	}
-
-	// Invalidate all sessions
-	_, err = tx.Exec(ctx, "UPDATE sessions SET invalidated_at = $1 WHERE user_id = $2 AND invalidated_at IS NULL", time.Now(), userID)
-	if err != nil {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-		l.ErrorContext(ctx, "Failed to invalidate sessions", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB UPDATE failed")
-		return fmt.Errorf("database error invalidating sessions: %w", err)
-	}
-
-	// Commit the transaction
-	err = tx.Commit(ctx)
-	if err != nil {
-		l.ErrorContext(ctx, "Failed to commit transaction", slog.Any("error", err))
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "DB transaction commit failed")
-		return fmt.Errorf("database error committing transaction: %w", err)
 	}
 
 	l.InfoContext(ctx, "User deactivated successfully")
