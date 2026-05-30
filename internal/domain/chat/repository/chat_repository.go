@@ -502,49 +502,38 @@ func (r *RepositoryImpl) AddChatToBookmark(ctx context.Context, itinerary *locit
 	))
 	defer span.End()
 
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to start transaction")
-		return uuid.Nil, fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-	}()
-
-	query := `
+	var savedItineraryID uuid.UUID
+	err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
+		query := `
 		INSERT INTO user_saved_itineraries (
 			user_id, source_llm_interaction_id, session_id, primary_city_id, title, description,
 			markdown_content, tags, estimated_duration_days, estimated_cost_level, is_public
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id
 	`
-	var savedItineraryID uuid.UUID
-	err = tx.QueryRow(ctx, query,
-		itinerary.UserID,
-		itinerary.SourceLlmInteractionID,
-		itinerary.SessionID,
-		itinerary.PrimaryCityID,
-		itinerary.Title,
-		itinerary.Description,
-		itinerary.MarkdownContent,
-		itinerary.Tags,
-		itinerary.EstimatedDurationDays,
-		itinerary.EstimatedCostLevel,
-		itinerary.IsPublic,
-	).Scan(&savedItineraryID)
+		if err := tx.QueryRow(ctx, query,
+			itinerary.UserID,
+			itinerary.SourceLlmInteractionID,
+			itinerary.SessionID,
+			itinerary.PrimaryCityID,
+			itinerary.Title,
+			itinerary.Description,
+			itinerary.MarkdownContent,
+			itinerary.Tags,
+			itinerary.EstimatedDurationDays,
+			itinerary.EstimatedCostLevel,
+			itinerary.IsPublic,
+		).Scan(&savedItineraryID); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Failed to insert itinerary")
+			return fmt.Errorf("failed to insert user_saved_itineraries: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to insert itinerary")
-		return uuid.Nil, fmt.Errorf("failed to insert user_saved_itineraries: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to commit transaction")
-		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
+		span.SetStatus(codes.Error, "Failed to save bookmark")
+		return uuid.Nil, err
 	}
 
 	// Debug: Log what was saved for debugging bookmark removal issues
@@ -714,33 +703,22 @@ func (r *RepositoryImpl) RemoveChatFromBookmark(ctx context.Context, userID, iti
 	))
 	defer span.End()
 
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to start transaction")
-		return fmt.Errorf("failed to start transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-	}()
-
-	query := `
+	err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
+		query := `
 		DELETE FROM user_saved_itineraries
 		WHERE id = $1 AND user_id = $2
 	`
-	_, err = tx.Exec(ctx, query, itineraryID, userID)
+		if _, err := tx.Exec(ctx, query, itineraryID, userID); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "Failed to delete itinerary")
+			return fmt.Errorf("failed to delete user_saved_itinerary with ID %s: %w", itineraryID, err)
+		}
+		return nil
+	})
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to delete itinerary")
-		return fmt.Errorf("failed to delete user_saved_itinerary with ID %s: %w", itineraryID, err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "Failed to commit transaction")
-		return fmt.Errorf("failed to commit transaction: %w", err)
+		span.SetStatus(codes.Error, "Failed to remove bookmark")
+		return err
 	}
 
 	span.SetStatus(codes.Ok, "Itinerary removed successfully")
@@ -831,17 +809,6 @@ func (r *RepositoryImpl) GetBookmarkedItineraries(ctx context.Context, userID uu
 
 // sessions
 func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.ChatSession) error {
-	tx, err := r.pgpool.Begin(ctx)
-	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to begin transaction for session creation", slog.Any("error", err))
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-	}()
-
 	query := `
         INSERT INTO chat_sessions (
             id, user_id, profile_id, city_name, current_itinerary, conversation_history, session_context,
@@ -864,16 +831,15 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.Ch
 		return fmt.Errorf("failed to marshal context: %w", err)
 	}
 
-	_, err = tx.Exec(ctx, query, session.ID, session.UserID, session.ProfileID, session.CityName,
-		itineraryJSON, historyJSON, contextJSON, session.CreatedAt, session.UpdatedAt, session.ExpiresAt, session.Status)
-	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to create session", slog.Any("error", err))
-		return fmt.Errorf("failed to create session: %w", err)
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		r.logger.ErrorContext(ctx, "Failed to commit session creation transaction", slog.Any("error", err))
-		return fmt.Errorf("failed to commit session creation: %w", err)
+	if err := db.WithTxBegin(ctx, r.pgpool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, query, session.ID, session.UserID, session.ProfileID, session.CityName,
+			itineraryJSON, historyJSON, contextJSON, session.CreatedAt, session.UpdatedAt, session.ExpiresAt, session.Status); err != nil {
+			r.logger.ErrorContext(ctx, "Failed to create session", slog.Any("error", err))
+			return fmt.Errorf("failed to create session: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	return nil
