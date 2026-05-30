@@ -68,7 +68,7 @@ All Tier-1 items shipped. `go build ./...`, `go vet`, and `go test ./internal/do
 - **Verify:** stream a forced error; client receives a stable code; existing chat integration test
   passes.
 
-### T2-2 · Extract a `withTx` transaction helper  🟡 partially done (2026-05-30)
+### T2-2 · Extract a `withTx` transaction helper  🟢 mostly done (2026-05-30)
 - **Problem:** Fragile deferred `recover()`/`panic(p)` rollback pattern.
 - **Files:** `internal/domain/chat/repository/chat_repository.go:206-208` (and similar tx blocks
   across repositories — grep `BeginTx`/`tx.Rollback`).
@@ -77,20 +77,22 @@ All Tier-1 items shipped. `go build ./...`, `go vet`, and `go test ./internal/do
   swallowed). Unit-tested 4 paths (commit / rollback / begin-error / panic) with `pgxmock` in
   `pkg/db/tx_test.go`. Migrated `SaveInteraction` — the recover()/panic() block is gone; on error it
   now correctly returns `uuid.Nil` (was returning a rolled-back ID). Build/vet/tests green.
-- **Actually committed (2026-05-30, CORRECTED):** added `WithTxBegin` + shared `runTx` for Begin-only
-  pools, and migrated the **chat** repository tx sites onto the helper (real commits `d1cc7e4`,
-  `7962a1c`). One chat site, `CreateSession` (`chat_repository.go:829`), may still use raw `Begin` —
-  verify with `grep -c 'r.pgpool.Begin' internal/domain/chat/repository/chat_repository.go`.
-  ⚠️ A previous version of this entry falsely claimed poi (`SavePoi`, `SavePOIDetailedInfos`) and user
-  (`DeactivateUser`) were migrated under commits `abc9f3e` / `5d1f9e2` / `6f2e3c9`. **Those commit
-  hashes do not exist and those migrations were never applied** — a tool-output failure fabricated the
-  success messages. poi, user, and profile tx sites are ALL still pending.
-  Verify reality: `grep -rc 'r.pgpool.Begin' internal/domain/{poi,user,profiles}` → all > 0.
-- **Deferred to T2-4 (by design):** 4 remaining tx sites live inside large monster functions already
-  slated for splitting — `poi.SaveLlmPoisToDatabase` (batch), `profiles.CreateSearchProfile` (228L),
-  `profiles.UpdateSearchProfile` (164L), and the third `profile_repository.go` tx function. Wrapping a
-  200-line body in a closure adds nesting and hurts readability right before it gets decomposed.
-  Adopt `WithTx`/`WithTxBegin` as part of each function's T2-4 split instead of double-handling.
+- **Migrated (2026-05-30, all verified against `git log` + build/vet/test):** added `WithTxBegin` +
+  shared `runTx` for Begin-only pools, then converted these sites:
+  - chat — `SaveInteraction`, `AddChatToBookmark`, `RemoveChatFromBookmark`, `CreateSession`,
+    `SaveSinglePOI` (commits `d1cc7e4`, `7962a1c`). `grep r.pgpool.Begin` in the chat repo = 0.
+  - poi — `SavePoi`, `SavePOIDetailedInfos` (commit `2e81a4c`). `SavePoi` validation moved before the
+    tx (was leaking a tx on invalid input).
+  - user — `DeactivateUser` (commit `7512c32`). 7 hand-rolled rollback branches removed.
+- **History note:** an earlier version of this entry claimed poi/user were done under commits
+  `abc9f3e` / `5d1f9e2` / `6f2e3c9`. Those hashes never existed (tool-output failure fabricated the
+  success). The poi/user work above was then actually done and committed; the real hashes are listed.
+- **Deferred to T2-4 (by design):** 4 tx sites live inside large monster functions already slated for
+  splitting — `poi.SaveLlmPoisToDatabase` (batch), `profiles.CreateSearchProfile` (228L),
+  `profiles.UpdateSearchProfile` (164L), `profiles.SetDefaultSearchProfile`. Wrapping a 150–220-line
+  body in a closure adds nesting right before it gets decomposed; adopt `WithTx`/`WithTxBegin` as part
+  of each function's T2-4 split instead of double-handling. Verify remaining:
+  `grep -rc 'r.pgpool.Begin' internal/domain/{poi,profiles}`.
 - **Effort:** M · **Risk:** medium (transaction semantics — test rollback paths).
 
 ### T2-3 · Split `ContinueSessionStreamed` (283L)
