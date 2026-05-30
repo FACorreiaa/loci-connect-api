@@ -77,9 +77,17 @@ All Tier-1 items shipped. `go build ./...`, `go vet`, and `go test ./internal/do
   swallowed). Unit-tested 4 paths (commit / rollback / begin-error / panic) with `pgxmock` in
   `pkg/db/tx_test.go`. Migrated `SaveInteraction` — the recover()/panic() block is gone; on error it
   now correctly returns `uuid.Nil` (was returning a rolled-back ID). Build/vet/tests green.
-- **Remaining:** adopt `WithTx` in the other ~12 tx sites (`poi_repository.go`, `user_repository.go`,
-  `profile_repository.go`, other `chat_repository.go` blocks). Mechanical; do incrementally. The
-  Begin-only sites (profiles/user) need a `Begin`-based overload or to switch to `BeginTx`.
+- **Sweep done (2026-05-30):** added `WithTxBegin` + shared `runTx` for Begin-only pools, then
+  migrated all 8 small/medium tx sites:
+  - chat: `SaveInteraction`, `AddChatToBookmark`, `RemoveChatFromBookmark`, `CreateSession`,
+    `SaveSinglePOI` (commits `d1cc7e4`, `6f2e3c9`)
+  - poi: `SavePoi`, `SavePOIDetailedInfos` (commit `abc9f3e`)
+  - user: `DeactivateUser` (commit `5d1f9e2`)
+- **Deferred to T2-4 (by design):** 4 remaining tx sites live inside large monster functions already
+  slated for splitting — `poi.SaveLlmPoisToDatabase` (batch), `profiles.CreateSearchProfile` (228L),
+  `profiles.UpdateSearchProfile` (164L), and the third `profile_repository.go` tx function. Wrapping a
+  200-line body in a closure adds nesting and hurts readability right before it gets decomposed.
+  Adopt `WithTx`/`WithTxBegin` as part of each function's T2-4 split instead of double-handling.
 - **Effort:** M · **Risk:** medium (transaction semantics — test rollback paths).
 
 ### T2-3 · Split `ContinueSessionStreamed` (283L)
