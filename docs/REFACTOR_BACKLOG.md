@@ -79,8 +79,9 @@ All Tier-1 items shipped. `go build ./...`, `go vet`, and `go test ./internal/do
   now correctly returns `uuid.Nil` (was returning a rolled-back ID). Build/vet/tests green.
 - **Migrated (2026-05-30, all verified against `git log` + build/vet/test):** added `WithTxBegin` +
   shared `runTx` for Begin-only pools, then converted these sites:
-  - chat — `SaveInteraction`, `AddChatToBookmark`, `RemoveChatFromBookmark`, `CreateSession`,
-    `SaveSinglePOI` (commits `d1cc7e4`, `7962a1c`). `grep r.pgpool.Begin` in the chat repo = 0.
+  - chat — `SaveInteraction`, `AddChatToBookmark`, `RemoveChatFromBookmark`, `CreateSession`
+    (commits `d1cc7e4`, `7962a1c`), and `SaveSinglePOI` (commit `022d57f`). `grep r.pgpool.Begin` in
+    the chat repo = 0 (5 `WithTx`/`WithTxBegin` sites).
   - poi — `SavePoi`, `SavePOIDetailedInfos` (commit `2e81a4c`). `SavePoi` validation moved before the
     tx (was leaking a tx on invalid input).
   - user — `DeactivateUser` (commit `7512c32`). 7 hand-rolled rollback branches removed.
