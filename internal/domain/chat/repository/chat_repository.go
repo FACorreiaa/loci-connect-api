@@ -1447,16 +1447,6 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDet
 		return uuid.Nil, err
 	}
 
-	tx, err := r.pgpool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			r.logger.WarnContext(ctx, "failed to rollback transaction", slog.Any("error", rollbackErr))
-		}
-	}()
-
 	// If poi.ID is already set (e.g., from LLM or previous step), use it. Otherwise, generate new.
 	recordID := poi.ID
 	if recordID == uuid.Nil {
@@ -1479,26 +1469,25 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDet
     `
 
 	var returnedID uuid.UUID
-	err = tx.QueryRow(ctx, query,
-		recordID,           // $1: id
-		userID,             // $2: user_id
-		cityID,             // $3: city_id
-		llmInteractionID,   // $4: llm_interaction_id
-		poi.Name,           // $5: name
-		poi.Latitude,       // $6: latitude column value
-		poi.Longitude,      // $7: longitude column value (also used as X in ST_MakePoint)
-		poi.Category,       // $8: category
-		poi.DescriptionPOI, // $9: description_poi
-	).Scan(&returnedID)
-	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to insert llm_suggested_poi", slog.Any("error", err), slog.String("query", query), slog.String("name", poi.Name))
-		span.RecordError(err)
-		return uuid.Nil, fmt.Errorf("failed to save llm_suggested_poi: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		span.RecordError(err)
-		return uuid.Nil, fmt.Errorf("failed to commit transaction: %w", err)
+	if err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, query,
+			recordID,           // $1: id
+			userID,             // $2: user_id
+			cityID,             // $3: city_id
+			llmInteractionID,   // $4: llm_interaction_id
+			poi.Name,           // $5: name
+			poi.Latitude,       // $6: latitude column value
+			poi.Longitude,      // $7: longitude column value (also used as X in ST_MakePoint)
+			poi.Category,       // $8: category
+			poi.DescriptionPOI, // $9: description_poi
+		).Scan(&returnedID); err != nil {
+			r.logger.ErrorContext(ctx, "Failed to insert llm_suggested_poi", slog.Any("error", err), slog.String("query", query), slog.String("name", poi.Name))
+			span.RecordError(err)
+			return fmt.Errorf("failed to save llm_suggested_poi: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return uuid.Nil, err
 	}
 
 	r.logger.Info("LLM Suggested POI saved successfully", slog.String("id", returnedID.String()))
