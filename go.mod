@@ -7,7 +7,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
-	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208143303-85fff446c095
+	github.com/FACorreiaa/go-genai-sdk v1.0.0
 	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -144,7 +144,3 @@ require (
 )
 
 replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto
-
-// TEMPORARY: point at local SDK worktree to test nearby retry/backoff fix.
-// Remove before merge and pin a tagged go-genai-sdk release instead.
-replace github.com/FACorreiaa/go-genai-sdk => ../llm-sdk-nearme
