@@ -1585,6 +1585,14 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
 	cleanedResponse := common.CleanJSONResponse(responseText)
 
+	// An empty result (e.g. a bare "null" or a "[section]\nnull" blob) carries
+	// no POIs. Return quietly instead of running every parse strategy and
+	// logging a spurious WARN.
+	if cleanedResponse == "" {
+		logger.Debug("parsePOIsFromResponse: empty or null response, no POIs to parse")
+		return []locitypes.POIDetailedInfo{}, nil
+	}
+
 	// Debug logging to see the actual cleaned response
 	logger.Debug("parsePOIsFromResponse: Cleaned response debug",
 		"originalLength", len(responseText),

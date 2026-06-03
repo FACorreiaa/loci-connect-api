@@ -905,38 +905,13 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 	s.logger.InfoContext(ctx, "No POIs found in database, falling back to LLM generation")
 	span.AddEvent("database_miss_fallback_to_llm")
 
-	genAIResponse, err := s.generatePOIsFromLLM(ctx, userID, lat, lon, distance)
+	// generateAndEnrichPOIs handles the re-prompt loop and returns an empty
+	// (non-nil-error) slice when the model produces nothing usable, so an
+	// empty result is surfaced honestly instead of masked as success.
+	enrichedPOIs, err := s.generateAndEnrichPOIs(ctx, userID, lat, lon, distance)
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-
-	enrichedPOIs := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
-	for i := range enrichedPOIs {
-		enrichedPOIs[i].Source = "llm_suggested_pois"
-	}
-
-	if len(enrichedPOIs) > 0 {
-		interaction := &locitypes.LlmInteraction{
-			UserID:    userID,
-			ModelName: genAIResponse.ModelName,
-			Prompt:    genAIResponse.Prompt,
-			Response:  genAIResponse.Response,
-			Latitude:  &lat,
-			Longitude: &lon,
-			Distance:  &distance,
-		}
-
-		llmInteractionID, err := s.poiRepository.SaveLlmInteraction(ctx, interaction)
-		if err != nil {
-			s.logger.ErrorContext(ctx, "Failed to save LLM interaction", slog.Any("error", err))
-			return nil, err
-		}
-
-		// Synchronous save to ensure POIs are available immediately
-		if err := s.poiRepository.SaveLlmPoisToDatabase(ctx, userID, enrichedPOIs, genAIResponse, llmInteractionID); err != nil {
-			s.logger.WarnContext(ctx, "Failed to save LLM POIs to database", slog.Any("error", err))
-		}
 	}
 
 	s.cache.Set(cacheKey, enrichedPOIs, cache.DefaultExpiration)
@@ -944,13 +919,18 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 	return enrichedPOIs, nil
 }
 
-func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64) (*locitypes.GenAIResponse, error) {
+func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, strict bool) (*locitypes.GenAIResponse, error) {
 	resultCh := make(chan locitypes.GenAIResponse, 1)
-	// func (s *ServiceImpl) generatePOIsFromgenerativeAI...
+	// A higher temperature on the strict retry nudges the model off a previous
+	// degenerate (null/empty) completion.
+	temperature := float32(0.7)
+	if strict {
+		temperature = 0.9
+	}
 	var wg sync.WaitGroup
 	concurrency.Go(&wg, s.logger, func() {
-		s.getGeneralPOIByDistance(ctx, userID, lat, lon, distance, resultCh, &genai.GenerateContentConfig{
-			Temperature:     genai.Ptr[float32](0.7),
+		s.getGeneralPOIByDistance(ctx, userID, lat, lon, distance, strict, resultCh, &genai.GenerateContentConfig{
+			Temperature:     genai.Ptr[float32](temperature),
 			MaxOutputTokens: 16384,
 		})
 	})
@@ -967,6 +947,7 @@ func (s *ServiceImpl) generatePOIsFromLLM(ctx context.Context, userID uuid.UUID,
 func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context,
 	userID uuid.UUID,
 	lat, lon, distance float64,
+	strict bool,
 	resultCh chan<- locitypes.GenAIResponse,
 	config *genai.GenerateContentConfig,
 ) {
@@ -978,8 +959,8 @@ func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context,
 
 	defer span.End()
 
-	prompt := getGeneralPOIByDistance(lat, lon, distance)
-	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
+	prompt := getGeneralPOIByDistancePrompt(lat, lon, distance, strict)
+	span.SetAttributes(attribute.Int("prompt.length", len(prompt)), attribute.Bool("prompt.strict", strict))
 
 	if s.aiClient == nil {
 		err := fmt.Errorf("AI client is not available - check API key configuration")

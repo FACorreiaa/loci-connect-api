@@ -8,7 +8,6 @@ require (
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
 	github.com/FACorreiaa/go-genai-sdk v0.0.0-20251208143303-85fff446c095
-	github.com/FACorreiaa/go-poi-au-suggestions v0.0.0-20250830093125-122af8ca55fe
 	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -45,7 +44,6 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
-	github.com/FACorreiaa/loci-proto v0.0.0-20250731141643-c3f8c7dc36c9 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -131,7 +129,6 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.64.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
 	golang.org/x/image v0.18.0 // indirect
@@ -147,3 +144,7 @@ require (
 )
 
 replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto
+
+// TEMPORARY: point at local SDK worktree to test nearby retry/backoff fix.
+// Remove before merge and pin a tagged go-genai-sdk release instead.
+replace github.com/FACorreiaa/go-genai-sdk => ../llm-sdk-nearme

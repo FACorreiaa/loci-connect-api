@@ -92,8 +92,14 @@ func getAttractionsNeabyPrompt(userLocation locitypes.UserLocation) string {
     `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
 }
 
-func getGeneralPOIByDistance(lat, lon, distance float64) string {
+func getGeneralPOIByDistancePrompt(lat, lon, distance float64, strict bool) string {
 	radiusKm := distance / 1000
+
+	strictNote := ""
+	if strict {
+		strictNote = "\n\nRETRY INSTRUCTION: A previous attempt returned no results. You MUST return at least 5 real, well-known points of interest. Never return null or an empty array. If the exact coordinates fall on a rural or sparsely populated spot, include notable POIs from the nearest town(s) that still fall within the radius."
+	}
+
 	return fmt.Sprintf(`You are a travel assistant generating points of interest for a user at a SPECIFIC location.
 
 CRITICAL REQUIREMENTS:
@@ -101,6 +107,7 @@ CRITICAL REQUIREMENTS:
 - Search radius: %.1f kilometers (%.0f meters)
 - ONLY include POIs that are WITHIN this radius from the user's coordinates
 - Calculate the approximate distance from the user's coordinates before including each POI
+- NEVER return null. If you truly cannot find anything, return {"points_of_interest": []} — but you should almost always be able to find several real places near a populated area.
 
 First, identify what town/city is at coordinates (%.4f, %.4f) and find POIs there and in immediate surroundings within %.1f km.
 
@@ -119,9 +126,9 @@ Return STRICTLY as JSON:
   ]
 }
 
-IMPORTANT: Every POI latitude/longitude MUST be within %.1f km of (%.6f, %.6f). Do not include popular POIs from other cities.`,
+IMPORTANT: Every POI latitude/longitude MUST be within %.1f km of (%.6f, %.6f). Do not include popular POIs from other cities.%s`,
 		lat, lon, radiusKm, distance,
 		lat, lon, radiusKm,
 		radiusKm, lat, radiusKm, lon,
-		radiusKm, lat, lon)
+		radiusKm, lat, lon, strictNote)
 }

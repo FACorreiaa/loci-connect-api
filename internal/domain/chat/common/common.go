@@ -221,8 +221,25 @@ func UniqueStringSlice(slice []string) []string {
 	return result
 }
 
+// sectionTagPattern matches a leading streaming section marker such as
+// "[nearby_pois]\n" that the consolidation step prepends to each response part.
+var sectionTagPattern = regexp.MustCompile(`^\s*\[[a-z_]+\]\s*`)
+
 func CleanJSONResponse(response string) string {
 	response = strings.TrimSpace(response)
+
+	// Strip a leading section tag (e.g. "[nearby_pois]\n") left by stream
+	// consolidation; without this the tag breaks JSON parsing downstream.
+	response = sectionTagPattern.ReplaceAllString(response, "")
+	response = strings.TrimSpace(response)
+
+	// A bare "null", empty array, or empty object carries no POI data. Return
+	// an empty string so callers treat it as "no data" instead of failing to
+	// parse (the LLM returning the literal token "null" is the common case).
+	switch response {
+	case "", "null", "[]", "{}":
+		return ""
+	}
 
 	// Remove markdown code blocks (```json or ```)
 	// Use regex to remove everything before and after code blocks
