@@ -30,6 +30,11 @@ type Review struct {
 	IsPublished bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+
+	// Enrichment (joined): reviewer + reviewed POI display info.
+	ReviewerName   string
+	ReviewerAvatar string
+	POIName        string
 }
 
 type Repository interface {
@@ -50,13 +55,23 @@ func NewRepository(db *pgxpool.Pool, logger *slog.Logger) Repository {
 	return &repository{db: db, logger: logger.With(slog.String("component", "review-repository"))}
 }
 
-const reviewCols = `id, user_id, poi_id, rating, title, content, image_urls,
-	visit_date, helpful, unhelpful, is_verified, is_published, created_at, updated_at`
+// selectReview joins the reviewer (users) and the reviewed POI for display
+// enrichment. Callers add a WHERE on the `r` alias.
+const selectReview = `
+	SELECT r.id, r.user_id, r.poi_id, r.rating, r.title, r.content, r.image_urls,
+	       r.visit_date, r.helpful, r.unhelpful, r.is_verified, r.is_published, r.created_at, r.updated_at,
+	       COALESCE(NULLIF(u.username, ''), u.display_name, '') AS reviewer_name,
+	       COALESCE(u.profile_image_url, '') AS reviewer_avatar,
+	       COALESCE(p.name, '') AS poi_name
+	FROM reviews r
+	JOIN users u ON u.id = r.user_id
+	LEFT JOIN points_of_interest p ON p.id = r.poi_id`
 
 func scanReview(row pgx.Row) (*Review, error) {
 	var r Review
 	err := row.Scan(&r.ID, &r.UserID, &r.POIID, &r.Rating, &r.Title, &r.Content, &r.Photos,
-		&r.VisitDate, &r.Helpful, &r.Unhelpful, &r.IsVerified, &r.IsPublished, &r.CreatedAt, &r.UpdatedAt)
+		&r.VisitDate, &r.Helpful, &r.Unhelpful, &r.IsVerified, &r.IsPublished, &r.CreatedAt, &r.UpdatedAt,
+		&r.ReviewerName, &r.ReviewerAvatar, &r.POIName)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +92,7 @@ func (repo *repository) Create(ctx context.Context, r *Review) error {
 }
 
 func (repo *repository) GetByID(ctx context.Context, id uuid.UUID) (*Review, error) {
-	r, err := scanReview(repo.db.QueryRow(ctx, `SELECT `+reviewCols+` FROM reviews WHERE id = $1`, id))
+	r, err := scanReview(repo.db.QueryRow(ctx, selectReview+` WHERE r.id = $1`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -89,11 +104,11 @@ func (repo *repository) listBy(ctx context.Context, where string, arg uuid.UUID,
 		limit = 20
 	}
 	var total int
-	if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM reviews WHERE `+where+` AND is_published = true`, arg).Scan(&total); err != nil {
+	if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM reviews r WHERE `+where+` AND r.is_published = true`, arg).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := repo.db.Query(ctx,
-		`SELECT `+reviewCols+` FROM reviews WHERE `+where+` AND is_published = true ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		selectReview+` WHERE `+where+` AND r.is_published = true ORDER BY r.created_at DESC LIMIT $2 OFFSET $3`,
 		arg, limit, offset)
 	if err != nil {
 		return nil, 0, err
@@ -111,11 +126,11 @@ func (repo *repository) listBy(ctx context.Context, where string, arg uuid.UUID,
 }
 
 func (repo *repository) ListByPOI(ctx context.Context, poiID uuid.UUID, limit, offset int) ([]*Review, int, error) {
-	return repo.listBy(ctx, "poi_id = $1", poiID, limit, offset)
+	return repo.listBy(ctx, "r.poi_id = $1", poiID, limit, offset)
 }
 
 func (repo *repository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error) {
-	return repo.listBy(ctx, "user_id = $1", userID, limit, offset)
+	return repo.listBy(ctx, "r.user_id = $1", userID, limit, offset)
 }
 
 func (repo *repository) Delete(ctx context.Context, reviewID, userID uuid.UUID) error {

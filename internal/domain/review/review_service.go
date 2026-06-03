@@ -60,7 +60,8 @@ func (s *service) CreateReview(ctx context.Context, in CreateReviewInput) (*Revi
 	if err := s.repo.Create(ctx, r); err != nil {
 		return nil, err
 	}
-	return r, nil
+	// Re-fetch so the returned review carries the joined reviewer/POI display info.
+	return s.repo.GetByID(ctx, r.ID)
 }
 
 func (s *service) GetReview(ctx context.Context, id uuid.UUID) (*Review, error) {

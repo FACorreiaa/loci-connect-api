@@ -26,7 +26,8 @@ func seedUser(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	t.Helper()
 	id := uuid.New()
 	_, err := pool.Exec(context.Background(),
-		"INSERT INTO users (id, email) VALUES ($1, $2)", id, "rev-"+id.String()+"@example.com")
+		"INSERT INTO users (id, email, username) VALUES ($1, $2, $3)",
+		id, "rev-"+id.String()+"@example.com", "revuser-"+id.String()[:8])
 	require.NoError(t, err)
 	return id
 }
@@ -60,6 +61,9 @@ func TestReviewRepo_CRUD_Helpful_Integration(t *testing.T) {
 	assert.Equal(t, 5, got.Rating)
 	assert.Equal(t, "Loved it", got.Content)
 	assert.Equal(t, []string{"a.jpg"}, got.Photos)
+	// Enrichment from the users + points_of_interest joins.
+	assert.Equal(t, "Rev POI", got.POIName)
+	assert.NotEmpty(t, got.ReviewerName)
 
 	list, total, err := repo.ListByPOI(ctx, poiID, 10, 0)
 	require.NoError(t, err)

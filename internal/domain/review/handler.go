@@ -219,6 +219,14 @@ func toProtoReview(r *Review) *reviewv1.Review {
 		UpdatedAt:    timestamppb.New(r.UpdatedAt),
 		HelpfulCount: int32(r.Helpful),
 		IsVerified:   r.IsVerified,
+		// Enrichment: POI name (content_name) + reviewer display info.
+		ContentName: r.POIName,
+		Reviewer: &reviewv1.ReviewerInfo{
+			UserId:      r.UserID.String(),
+			DisplayName: r.ReviewerName,
+			AvatarUrl:   r.ReviewerAvatar,
+			IsVerified:  r.IsVerified,
+		},
 	}
 	if r.VisitDate != nil {
 		p.VisitDate = timestamppb.New(*r.VisitDate)
