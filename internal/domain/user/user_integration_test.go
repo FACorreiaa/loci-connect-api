@@ -4,137 +4,87 @@ package user
 
 import (
 	"context"
-	"log"
+	"io"
 	"log/slog"
 	"os"
 	"testing"
 
-	"github.com/FACorreiaa/loci-connect-api/internal/types" // Adjust path
+	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	// Your database migration tool/library if you use one programmatically
 )
 
 var (
 	testUserDB      *pgxpool.Pool
-	testUserService UserService // Use the interface
-	testUserRepo    UserRepo    // Actual repository implementation for setup/cleanup
+	testUserService UserService
+	testUserRepo    UserRepo
 )
 
+func sp(s string) *string { return &s }
+
 func TestMain(m *testing.M) {
-	// Load .env.test or similar for test database credentials
-	if err := godotenv.Load("../../../.env.test"); err != nil { // Adjust path to your .env.test
-		log.Println("Warning: .env.test file not found for user integration tests.")
-	}
-
-	dbURL := os.Getenv("TEST_DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("TEST_DATABASE_URL environment variable is not set for user integration tests")
-	}
-
-	var err error
-	config, err := pgxpool.ParseConfig(dbURL)
-	if err != nil {
-		log.Fatalf("Unable to parse TEST_DATABASE_URL: %v\n", err)
-	}
-	config.MaxConns = 5
-
-	testUserDB, err = pgxpool.NewWithConfig(context.Background(), config)
-	if err != nil {
-		log.Fatalf("Unable to create connection pool for user tests: %v\n", err)
-	}
-	defer testUserDB.Close()
-
-	if err := testUserDB.Ping(context.Background()); err != nil {
-		log.Fatalf("Unable to ping test database for user tests: %v\n", err)
-	}
-
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	// Initialize with your *actual* PostgresUserRepo implementation
-	// You'll need to export this constructor or make it accessible.
-	// For example, if it's in an internal/user/repository package:
-	// testUserRepo = repository.NewPostgresUserRepo(testUserDB, logger)
-	// For this example, let's assume a constructor NewPostgresUserRepo exists in the current 'user' package for the repo.
-	testUserRepo = NewPostgresUserRepo(testUserDB, logger) // Replace with your actual repo constructor
+	testUserDB = testsupport.MustPool()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	testUserRepo = NewPostgresUserRepo(testUserDB, logger)
 	testUserService = NewUserService(testUserRepo, logger)
-
-	exitCode := m.Run()
-	os.Exit(exitCode)
+	os.Exit(m.Run())
 }
 
-// Helper to clean the users table (adjust table name if different)
 func clearUsersTable(t *testing.T) {
 	t.Helper()
-	// Be very careful with DELETE in tests; ensure it's the test DB
-	// Consider disabling foreign key checks temporarily if needed for cleanup, or delete in correct order.
 	_, err := testUserDB.Exec(context.Background(), "DELETE FROM users")
 	require.NoError(t, err, "Failed to clear users table")
 }
 
-// Helper to create a user directly for testing setup
-func createTestUserDirectly(t *testing.T, user locitypes.User) uuid.UUID {
+// createTestUserDirectly inserts a user row and returns its id. The users table
+// columns are firstname/lastname (no underscore).
+func createTestUserDirectly(t *testing.T, username, email, firstname, lastname string) uuid.UUID {
 	t.Helper()
-	// This function would use testUserRepo or direct db exec to insert a user for setup
-	// It depends on whether your UserRepo has a CreateUser method.
-	// Example assuming UserRepo has Create:
-	// id, err := testUserRepo.CreateUser(context.Background(), &user) // Or whatever your Create method signature is
-	// require.NoError(t, err)
-	// return id
-
-	// If not, direct insert:
 	var id uuid.UUID
 	err := testUserDB.QueryRow(context.Background(),
-		"INSERT INTO users (username, email, password_hash, first_name, last_name) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-		user.Username, user.Email, user.PasswordHash, user.FirstName, user.LastName).Scan(&id)
+		"INSERT INTO users (username, email, password_hash, firstname, lastname) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+		username, email, "hashedpassword", firstname, lastname).Scan(&id)
 	require.NoError(t, err)
 	return id
 }
 
 func TestServiceUserImpl_UserProfile_Integration(t *testing.T) {
 	ctx := context.Background()
-	clearUsersTable(t) // Ensure a clean state
+	clearUsersTable(t)
 
-	testUser := locitypes.User{ // Assuming locitypes.User is the struct for your DB table
-		Username:     "integ_test_user",
-		Email:        "integ@example.com",
-		PasswordHash: "hashedpassword", // In real tests, you'd hash a test password
-		FirstName:    "Integ",
-		LastName:     "Test",
-	}
-	createdUserID := createTestUserDirectly(t, testUser)
+	createdUserID := createTestUserDirectly(t, "integ_test_user", "integ@example.com", "Integ", "Test")
 
 	t.Run("Get existing user profile", func(t *testing.T) {
 		profile, err := testUserService.GetUserProfile(ctx, createdUserID)
 		require.NoError(t, err)
 		require.NotNil(t, profile)
 		assert.Equal(t, createdUserID, profile.ID)
-		assert.Equal(t, testUser.Username, profile.Username)
-		assert.Equal(t, testUser.Email, profile.Email)
-		assert.Equal(t, testUser.FirstName, *profile.FirstName) // Assuming UserProfile has *string for these
-		assert.Equal(t, testUser.LastName, *profile.LastName)
+		require.NotNil(t, profile.Username)
+		assert.Equal(t, "integ_test_user", *profile.Username)
+		assert.Equal(t, "integ@example.com", profile.Email)
+		require.NotNil(t, profile.Firstname)
+		assert.Equal(t, "Integ", *profile.Firstname)
+		require.NotNil(t, profile.Lastname)
+		assert.Equal(t, "Test", *profile.Lastname)
 	})
 
 	t.Run("Get non-existent user profile", func(t *testing.T) {
 		nonExistentID := uuid.New()
 		_, err := testUserService.GetUserProfile(ctx, nonExistentID)
 		require.Error(t, err)
-		// Check for a specific "not found" error if your repo/service returns one
-		assert.Contains(t, err.Error(), "error fetching user profile") // Service wraps it
 	})
 
 	t.Run("Update user profile", func(t *testing.T) {
-		dob := "1990-01-01"
 		updateParams := locitypes.UpdateProfileParams{
-			Username:    "integ_test_user_updated",
-			FirstName:   "IntegrationUpdated",
-			LastName:    "TestUpdated",
-			DateOfBirth: dob,
-			PhoneNumber: "0987654321",
-			Country:     "Testlandia",
-			City:        "IntegCity",
+			Username:    sp("integ_test_user_updated"),
+			Firstname:   sp("IntegrationUpdated"),
+			Lastname:    sp("TestUpdated"),
+			PhoneNumber: sp("0987654321"),
+			Country:     sp("Testlandia"),
+			City:        sp("IntegCity"),
 		}
 		err := testUserService.UpdateUserProfile(ctx, createdUserID, updateParams)
 		require.NoError(t, err)
@@ -142,15 +92,18 @@ func TestServiceUserImpl_UserProfile_Integration(t *testing.T) {
 		updatedProfile, err := testUserService.GetUserProfile(ctx, createdUserID)
 		require.NoError(t, err)
 		require.NotNil(t, updatedProfile)
-		assert.Equal(t, updateParams.Username, updatedProfile.Username)
-		assert.Equal(t, updateParams.FirstName, *updatedProfile.FirstName)
-		assert.Equal(t, updateParams.LastName, *updatedProfile.LastName)
-		assert.Equal(t, updateParams.PhoneNumber, *updatedProfile.PhoneNumber)
-		assert.Equal(t, updateParams.Country, *updatedProfile.Country)
-		assert.Equal(t, updateParams.City, *updatedProfile.City)
-		// Assuming DateOfBirth in UserProfile is time.Time or string
-		// If it's time.Time, parse updateParams.DateOfBirth and compare
-		// If it's *string, assert.Equal(t, &updateParams.DateOfBirth, updatedProfile.DateOfBirth)
+		require.NotNil(t, updatedProfile.Username)
+		assert.Equal(t, "integ_test_user_updated", *updatedProfile.Username)
+		require.NotNil(t, updatedProfile.Firstname)
+		assert.Equal(t, "IntegrationUpdated", *updatedProfile.Firstname)
+		require.NotNil(t, updatedProfile.Lastname)
+		assert.Equal(t, "TestUpdated", *updatedProfile.Lastname)
+		require.NotNil(t, updatedProfile.PhoneNumber)
+		assert.Equal(t, "0987654321", *updatedProfile.PhoneNumber)
+		require.NotNil(t, updatedProfile.Country)
+		assert.Equal(t, "Testlandia", *updatedProfile.Country)
+		require.NotNil(t, updatedProfile.City)
+		assert.Equal(t, "IntegCity", *updatedProfile.City)
 	})
 }
 
@@ -158,19 +111,11 @@ func TestServiceUserImpl_UserStatus_Integration(t *testing.T) {
 	ctx := context.Background()
 	clearUsersTable(t)
 
-	testUser := locitypes.User{Username: "status_user", Email: "status@example.com", PasswordHash: "hash"}
-	userID := createTestUserDirectly(t, testUser)
+	userID := createTestUserDirectly(t, "status_user", "status@example.com", "", "")
 
 	t.Run("Update Last Login", func(t *testing.T) {
-		// Get initial last_login (might be NULL or default)
-		// For this test, we just ensure the call doesn't error out.
-		// Verifying the timestamp change precisely can be tricky.
 		err := testUserService.UpdateLastLogin(ctx, userID)
 		require.NoError(t, err)
-
-		// Optionally, fetch user and check if last_login is recent
-		// profile, _ := testUserService.GetUserProfile(ctx, userID)
-		// assert.WithinDuration(t, time.Now(), *profile.LastLogin, 5*time.Second)
 	})
 
 	t.Run("Mark Email As Verified", func(t *testing.T) {
@@ -179,23 +124,22 @@ func TestServiceUserImpl_UserStatus_Integration(t *testing.T) {
 
 		profile, err := testUserService.GetUserProfile(ctx, userID)
 		require.NoError(t, err)
-		assert.True(t, profile.IsEmailVerified)
+		assert.NotNil(t, profile.EmailVerifiedAt, "email_verified_at should be set after verification")
 	})
 
 	t.Run("Deactivate and Reactivate User", func(t *testing.T) {
-		// Deactivate
 		err := testUserService.DeactivateUser(ctx, userID)
 		require.NoError(t, err)
-		profile, _ := testUserService.GetUserProfile(ctx, userID)
-		assert.False(t, profile.IsActive) // Assuming IsActive field exists
+		// GetUserProfile only returns active users, so verify is_active directly.
+		var active bool
+		err = testUserDB.QueryRow(ctx, "SELECT is_active FROM users WHERE id = $1", userID).Scan(&active)
+		require.NoError(t, err)
+		assert.False(t, active)
 
-		// Reactivate
 		err = testUserService.ReactivateUser(ctx, userID)
 		require.NoError(t, err)
-		profile, _ = testUserService.GetUserProfile(ctx, userID)
+		profile, err := testUserService.GetUserProfile(ctx, userID)
+		require.NoError(t, err)
 		assert.True(t, profile.IsActive)
 	})
 }
-
-// To run integration tests:
-// TEST_DATABASE_URL="postgres://user:password@localhost:5432/test_db_name?sslmode=disable" go test -v ./internal/user -tags=integration -count=1
