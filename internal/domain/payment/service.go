@@ -341,6 +341,26 @@ func (s *service) CancelSubscription(ctx context.Context, subscriptionID string,
 	// Webhook will update DB status
 }
 
+// planFromStripeItems maps the first subscription item's billing interval to a
+// subscription_plan_type enum value (free / premium_monthly / premium_annual).
+func planFromStripeItems(items *stripe.SubscriptionItemList) string {
+	if items == nil || len(items.Data) == 0 || items.Data[0].Price == nil {
+		return "free"
+	}
+	recurring := items.Data[0].Price.Recurring
+	if recurring == nil {
+		return "free"
+	}
+	switch recurring.Interval {
+	case stripe.PriceRecurringIntervalMonth:
+		return "premium_monthly"
+	case stripe.PriceRecurringIntervalYear:
+		return "premium_annual"
+	default:
+		return "free"
+	}
+}
+
 func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) error {
 	switch event.Type {
 	case "payment_intent.succeeded":
@@ -384,20 +404,10 @@ func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) er
 			trialEnd = &t
 		}
 
-		planName := "free"
-		if len(stripeSub.Items.Data) > 0 {
-			// Ideally map Price ID to Plan Name stored in DB or config
-			// For now, using Price ID or nickname
-			if stripeSub.Items.Data[0].Price != nil {
-				// Simplification: Using valid ENUM value if possible, else default to free or similar?
-				// DB has enum subscription_plan_type? Let's check schema/migration.
-				// Schema says `subscription_plan_type` DEFAULT 'free'. It's likely an ENUM.
-				// I should be careful. If I put 'price_123', pg might error if it enforces ENUM.
-				// For now, hardcoding 'pro' if not free, or just 'active'.
-				// Let's assume 'pro' for paid plans for this migration snippet.
-				planName = "pro"
-			}
-		}
+		// Map the Stripe price's billing interval to our subscription_plan_type
+		// enum (free / premium_monthly / premium_annual). Writing an invalid
+		// value (the old hardcoded "pro") fails the enum constraint.
+		planName := planFromStripeItems(stripeSub.Items)
 
 		sub := &Subscription{
 			UserID:                 uid,

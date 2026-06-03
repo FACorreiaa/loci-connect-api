@@ -96,7 +96,9 @@ func TestProcessStripeEvent_SubscriptionCreated(t *testing.T) {
 		"created":  time.Now().Unix(),
 		"metadata": map[string]string{"user_id": userID.String()},
 		"items": map[string]any{
-			"data": []map[string]any{{"price": map[string]any{"id": "price_1"}}},
+			"data": []map[string]any{
+				{"price": map[string]any{"id": "price_1", "recurring": map[string]any{"interval": "month"}}},
+			},
 		},
 	})
 
@@ -113,8 +115,8 @@ func TestProcessStripeEvent_SubscriptionCreated(t *testing.T) {
 	if got.Status != "active" {
 		t.Errorf("status: got %s want active", got.Status)
 	}
-	if got.Plan != "pro" {
-		t.Errorf("plan: got %s want pro (priced item)", got.Plan)
+	if got.Plan != "premium_monthly" {
+		t.Errorf("plan: got %s want premium_monthly (monthly price)", got.Plan)
 	}
 	if got.ExternalSubscriptionID == nil || *got.ExternalSubscriptionID != "sub_123" {
 		t.Errorf("external sub id: got %v want sub_123", got.ExternalSubscriptionID)
@@ -170,5 +172,46 @@ func TestProcessStripeEvent_UnhandledTypeNoop(t *testing.T) {
 	}
 	if len(repo.upserted) != 0 {
 		t.Fatalf("unhandled type must not upsert, got %d", len(repo.upserted))
+	}
+}
+
+func subEventWithInterval(t *testing.T, userID uuid.UUID, interval string) stripe.Event {
+	t.Helper()
+	return subEvent(t, "customer.subscription.created", map[string]any{
+		"id":       "sub_" + interval,
+		"status":   "active",
+		"created":  time.Now().Unix(),
+		"metadata": map[string]string{"user_id": userID.String()},
+		"items": map[string]any{
+			"data": []map[string]any{
+				{"price": map[string]any{"id": "price_1", "recurring": map[string]any{"interval": interval}}},
+			},
+		},
+	})
+}
+
+func TestProcessStripeEvent_PlanFromInterval(t *testing.T) {
+	cases := map[string]string{
+		"month": "premium_monthly",
+		"year":  "premium_annual",
+		"week":  "free", // unsupported interval falls back
+	}
+	for interval, wantPlan := range cases {
+		t.Run(interval, func(t *testing.T) {
+			repo := &fakePaymentRepo{}
+			svc := newTestService(repo)
+			userID := uuid.New()
+
+			ev := subEventWithInterval(t, userID, interval)
+			if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+				t.Fatalf("ProcessStripeEvent: %v", err)
+			}
+			if len(repo.upserted) != 1 {
+				t.Fatalf("expected 1 upsert, got %d", len(repo.upserted))
+			}
+			if got := repo.upserted[0].Plan; got != wantPlan {
+				t.Errorf("interval %q: plan = %q, want %q", interval, got, wantPlan)
+			}
+		})
 	}
 }
