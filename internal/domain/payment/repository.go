@@ -344,15 +344,17 @@ func (r *repository) GetSubscriptionByStripeID(ctx context.Context, stripeSubID 
 }
 
 func (r *repository) GetSubscriptionByUserID(ctx context.Context, userID uuid.UUID) (*Subscription, error) {
+	// Note: the subscriptions table has no external_customer_id column, so it is
+	// intentionally not selected here (selecting it fails with SQLSTATE 42703).
 	query := `
-		SELECT id, user_id, plan, status, start_date, end_date, trial_end_date, 
-		       external_provider, external_subscription_id, external_customer_id, created_at, updated_at
+		SELECT id, user_id, plan, status, start_date, end_date, trial_end_date,
+		       external_provider, external_subscription_id, created_at, updated_at
 		FROM subscriptions WHERE user_id = $1
 	`
 	var s Subscription
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&s.ID, &s.UserID, &s.Plan, &s.Status, &s.StartDate, &s.EndDate, &s.TrialEndDate,
-		&s.ExternalProvider, &s.ExternalSubscriptionID, &s.ExternalCustomerID, &s.CreatedAt, &s.UpdatedAt,
+		&s.ExternalProvider, &s.ExternalSubscriptionID, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
