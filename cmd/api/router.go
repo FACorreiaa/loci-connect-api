@@ -19,10 +19,11 @@ import (
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/review/reviewv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
@@ -245,6 +246,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		listPath, listHandler := listv1connect.NewListServiceHandler(deps.ListHandler, opts)
 		mux.Handle(listPath, listHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", listPath)
+	}
+
+	if deps.ReviewHandler != nil {
+		reviewPath, reviewHandler := reviewv1connect.NewReviewServiceHandler(deps.ReviewHandler, opts)
+		mux.Handle(reviewPath, reviewHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", reviewPath)
 	}
 
 	if deps.CustomAuthHandler != nil {

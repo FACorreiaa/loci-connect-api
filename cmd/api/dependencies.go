@@ -28,6 +28,7 @@ import (
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
+	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
@@ -62,6 +63,7 @@ type Dependencies struct {
 	UsageRepo      subscription.Repository
 	PaymentRepo    payment.Repository
 	FavoritesRepo  favorites.Repository
+	ReviewRepo     reviewdomain.Repository
 
 	// Services
 	TokenManager        service.TokenManager
@@ -80,6 +82,7 @@ type Dependencies struct {
 	PaymentService      payment.Service
 	OAuthService        *customauthservice.OAuthService
 	PhoneService        *customauthservice.PhoneService
+	ReviewSvc           reviewdomain.Service
 
 	// Handlers
 	AuthHandler       *handler.AuthHandler
@@ -99,6 +102,7 @@ type Dependencies struct {
 	ShareHandler      *share.Handler
 	POIHandler        *poihandler.POIHandler
 	CustomAuthHandler *customauthhandler.CustomAuthHandler
+	ReviewHandler     *reviewdomain.Handler
 }
 
 // InitDependencies initializes all application dependencies
@@ -174,6 +178,7 @@ func (d *Dependencies) initRepositories() error {
 	d.UsageRepo = subscription.NewRepository(d.DB.Pool)
 	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
 	d.FavoritesRepo = favorites.NewRepository(d.DB.Pool, d.Logger)
+	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -236,6 +241,7 @@ func (d *Dependencies) initServices() error {
 	// are absent: OAuth registers no providers, phone reports disabled.
 	d.OAuthService = customauthservice.NewOAuthService(customauthservice.LoadOAuthConfigFromEnv())
 	d.PhoneService = customauthservice.NewPhoneService(customauthservice.LoadTwilioConfigFromEnv())
+	d.ReviewSvc = reviewdomain.NewService(d.ReviewRepo, d.Logger)
 
 	// Handlers
 	d.PaymentHandler = payment.NewPaymentServiceHandler(d.PaymentService, d.UserRepo, d.Logger)
@@ -266,6 +272,7 @@ func (d *Dependencies) initHandlers() error {
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
+	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
