@@ -13,6 +13,7 @@ import (
 
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -57,7 +58,7 @@ func (h *ListHandler) CreateList(ctx context.Context, req *connect.Request[listp
 	}
 	l, err := h.service.CreateTopLevelList(ctx, userID, req.Msg.Name, req.Msg.Description, cityID, req.Msg.IsItinerary, req.Msg.IsPublic)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	return connect.NewResponse(&listpb.CreateListResponse{Success: true, List: toProtoList(l)}), nil
 }
@@ -69,7 +70,7 @@ func (h *ListHandler) GetLists(ctx context.Context, req *connect.Request[listpb.
 	}
 	lists, err := h.service.GetUserLists(ctx, userID, false)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	out := make([]*listpb.ListWithItems, 0, len(lists))
 	for _, l := range lists {
@@ -89,7 +90,7 @@ func (h *ListHandler) GetList(ctx context.Context, req *connect.Request[listpb.G
 	}
 	lwi, err := h.service.GetListDetails(ctx, listID, userID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	if lwi == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("list not found"))
@@ -129,7 +130,7 @@ func (h *ListHandler) UpdateList(ctx context.Context, req *connect.Request[listp
 	}
 	l, err := h.service.UpdateListDetails(ctx, listID, userID, params)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	return connect.NewResponse(&listpb.UpdateListResponse{Success: true, List: toProtoList(l)}), nil
 }
@@ -144,7 +145,7 @@ func (h *ListHandler) DeleteList(ctx context.Context, req *connect.Request[listp
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid list id"))
 	}
 	if err := h.service.DeleteUserList(ctx, listID, userID); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	return connect.NewResponse(&listpb.DeleteListResponse{Success: true}), nil
 }

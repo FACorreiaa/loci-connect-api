@@ -12,6 +12,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 )
 
 type POIHandler struct {
@@ -69,7 +70,7 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 	}
 
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 
 	return connect.NewResponse(&poiv1.SearchPOIResponse{
@@ -86,7 +87,7 @@ func (h *POIHandler) GetPOI(ctx context.Context, req *connect.Request[poiv1.GetP
 
 	poi, err := h.service.GetPOI(ctx, poiID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, apierr.ToConnect(err)
 	}
 	if poi == nil {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("POI not found"))
