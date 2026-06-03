@@ -1,4 +1,4 @@
-.PHONY: help generate build run test clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine
+.PHONY: help generate build run test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine
 
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -19,6 +19,16 @@ test: ## Run tests
 
 test-coverage: test ## Run tests with coverage report
 	go tool cover -html=coverage.out
+
+# Integration & e2e tests spin an ephemeral Postgres (PostGIS + TimescaleDB +
+# pgvector) via testcontainers-go, so they require a running Docker daemon.
+# Override the image with TEST_POSTGRES_IMAGE if needed. Serialized (-p 1) so the
+# per-package containers don't contend.
+test-integration: ## Run integration tests (requires Docker)
+	go test -tags=integration -p 1 -count=1 ./...
+
+test-e2e: ## Run end-to-end server tests (requires Docker)
+	go test -tags=e2e -p 1 -count=1 ./cmd/api/...
 
 clean: ## Clean build artifacts
 	rm -rf bin/

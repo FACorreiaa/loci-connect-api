@@ -111,3 +111,28 @@ jobs:
 
       - name: Run race detector
         run: go test -race ./...
+
+  integration:
+    runs-on: ubuntu-latest
+    needs:
+      - proto
+      - test
+    env:
+      GO_VERSION: "1.25.4"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # ubuntu-latest runners include a running Docker daemon, which
+      # testcontainers-go uses to spin the ephemeral Postgres image.
+      - name: Run integration tests
+        run: make test-integration
+
+      - name: Run end-to-end tests
+        run: make test-e2e
