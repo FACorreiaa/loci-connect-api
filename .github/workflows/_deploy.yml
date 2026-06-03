@@ -1,0 +1,115 @@
+name: _deploy
+
+# Reusable deploy pipeline: build + push the API and Postgres images to GHCR,
+# then deploy to the VPS over SSH. Called by deploy.yml (release tags) and
+# cd.yml (auto-deploy on green CI).
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        description: "Docker tag to publish/deploy"
+        required: true
+        type: string
+      git_ref:
+        description: "Git ref/sha to build (defaults to the calling ref)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      api_image: ${{ steps.meta.outputs.api_image }}
+      pg_image: ${{ steps.meta.outputs.pg_image }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Compute lowercase image names
+        id: meta
+        run: |
+          owner_repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "api_image=${REGISTRY}/${owner_repo}" >> "$GITHUB_OUTPUT"
+          echo "pg_image=${REGISTRY}/${owner_repo}-postgres" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.api_image }}:${{ inputs.image_tag }}
+            ${{ steps.meta.outputs.api_image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Postgres image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./postgres.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.pg_image }}:${{ inputs.image_tag }}
+            ${{ steps.meta.outputs.pg_image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          source: "docker-compose.prod.yaml"
+          target: "${{ secrets.VPS_APP_DIR }}"
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_APP_DIR }}"
+            export API_IMAGE="${{ needs.build.outputs.api_image }}:${{ inputs.image_tag }}"
+            export POSTGRES_IMAGE="${{ needs.build.outputs.pg_image }}:${{ inputs.image_tag }}"
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml up -d
+            docker image prune -f

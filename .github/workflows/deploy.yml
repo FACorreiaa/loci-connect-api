@@ -1,0 +1,21 @@
+name: Deploy (release)
+
+# Explicit release deploy on a version tag, or manual dispatch.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to build & deploy"
+        required: false
+        default: ""
+
+jobs:
+  release:
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      # Tag push -> the tag name; manual dispatch -> the branch/ref name.
+      image_tag: ${{ github.ref_name }}
+      git_ref: ${{ github.event.inputs.ref }}

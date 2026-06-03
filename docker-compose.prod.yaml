@@ -1,0 +1,59 @@
+# Production stack for a single VPS: Go API + self-hosted Postgres
+# (PostGIS + TimescaleDB + pgvector). Both images are prebuilt in CI and pulled
+# here, so the VPS never compiles anything.
+#
+# Usage on the VPS:
+#   1. Put a populated `.env` next to this file (see .env.prod.example).
+#   2. docker login ghcr.io   (once, with a read:packages token)
+#   3. docker compose -f docker-compose.prod.yaml pull
+#   4. docker compose -f docker-compose.prod.yaml up -d
+#
+# The API runs migrations automatically on boot (InitDependencies -> RunMigrations).
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-ghcr.io/facorreia/loci-connect-api-postgres:latest}
+    platform: linux/amd64 # postgis/postgis base is amd64-only
+    container_name: loci-postgres
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks: [loci-net]
+    # No host port published: the DB is only reachable on the internal network.
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/facorreia/loci-connect-api:latest}
+    container_name: loci-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      # Bind to all interfaces inside the container (cfg default is localhost).
+      SERVER_HOST: 0.0.0.0
+      # Talk to the postgres service over the compose network.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+    ports:
+      # Bind to loopback only; terminate TLS with nginx/Caddy in front.
+      - "127.0.0.1:8080:8080"
+    networks: [loci-net]
+
+volumes:
+  postgres-data:
+
+networks:
+  loci-net:
+    driver: bridge

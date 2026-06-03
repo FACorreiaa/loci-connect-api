@@ -1,0 +1,19 @@
+name: CD (auto-deploy main)
+
+# Continuous deploy: when the CI workflow finishes successfully on main,
+# build the images at that commit and deploy to the VPS. A broken main never
+# deploys because this only runs on CI success.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  auto-deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    uses: ./.github/workflows/_deploy.yml
+    secrets: inherit
+    with:
+      image_tag: ${{ github.event.workflow_run.head_sha }}
+      git_ref: ${{ github.event.workflow_run.head_sha }}
