@@ -13,6 +13,8 @@ import (
 	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	customauthhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/handler"
+	customauthservice "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/service"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
@@ -22,6 +24,7 @@ import (
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
+	poihandler "github.com/FACorreiaa/loci-connect-api/internal/domain/poi/handler"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
@@ -75,6 +78,8 @@ type Dependencies struct {
 	TagsSvc             tagshandler.Service
 	SubscriptionService subscription.Service
 	PaymentService      payment.Service
+	OAuthService        *customauthservice.OAuthService
+	PhoneService        *customauthservice.PhoneService
 
 	// Handlers
 	AuthHandler       *handler.AuthHandler
@@ -82,6 +87,7 @@ type Dependencies struct {
 	ProfileHandler    *profilehandler.ProfileHandler
 	DiscoverHandler   *discoverdomain.Handler
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
+	ListHandler       *itineraryhandler.ListHandler
 	StatisticsHandler *statistics.Handler
 	RecentsHandler    *recents.Handler
 	UserHandler       *userhandler.UserHandler
@@ -91,6 +97,8 @@ type Dependencies struct {
 	FavoritesHandler  *favorites.Handler
 	ExportHandler     *export.Handler
 	ShareHandler      *share.Handler
+	POIHandler        *poihandler.POIHandler
+	CustomAuthHandler *customauthhandler.CustomAuthHandler
 }
 
 // InitDependencies initializes all application dependencies
@@ -224,6 +232,11 @@ func (d *Dependencies) initServices() error {
 	// Using STRIPE_API_KEY from environment
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, os.Getenv("STRIPE_API_KEY"))
 
+	// Custom auth (OAuth + phone). Both degrade gracefully when their env vars
+	// are absent: OAuth registers no providers, phone reports disabled.
+	d.OAuthService = customauthservice.NewOAuthService(customauthservice.LoadOAuthConfigFromEnv())
+	d.PhoneService = customauthservice.NewPhoneService(customauthservice.LoadTwilioConfigFromEnv())
+
 	// Handlers
 	d.PaymentHandler = payment.NewPaymentServiceHandler(d.PaymentService, d.UserRepo, d.Logger)
 
@@ -242,6 +255,7 @@ func (d *Dependencies) initHandlers() error {
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
+	d.ListHandler = itineraryhandler.NewListHandler(d.ListSvc, d.Logger)
 	d.StatisticsHandler = statistics.NewHandler(d.StatisticsSvc, d.Logger)
 	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
@@ -250,6 +264,8 @@ func (d *Dependencies) initHandlers() error {
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL)
+	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
+	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.Logger.Info("handlers initialized")
 	return nil
 }

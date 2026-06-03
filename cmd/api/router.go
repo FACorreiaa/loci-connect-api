@@ -12,11 +12,14 @@ import (
 	"connectrpc.com/validate"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
 	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
@@ -54,6 +57,11 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		// Public statistics endpoint
 		statisticsv1connect.StatisticsServiceGetMainPageStatisticsProcedure,
 		statisticsv1connect.StatisticsServiceStreamMainPageStatisticsProcedure,
+		// Custom auth flows happen before a session exists
+		customauthconnect.CustomAuthServiceGetOAuthURLProcedure,
+		customauthconnect.CustomAuthServiceOAuthCallbackProcedure,
+		customauthconnect.CustomAuthServiceSendPhoneVerificationProcedure,
+		customauthconnect.CustomAuthServiceVerifyPhoneProcedure,
 	}
 
 	tracer := otel.GetTracerProvider().Tracer("loci/api")
@@ -225,6 +233,24 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		// Register OG meta HTTP handler for social sharing
 		mux.Handle("/share/", deps.ShareHandler.OGMetaHandler())
 		deps.Logger.Info("registered OG meta handler", "path", "/share/")
+	}
+
+	if deps.POIHandler != nil {
+		poiPath, poiHandler := poiconnect.NewPOIServiceHandler(deps.POIHandler, opts)
+		mux.Handle(poiPath, poiHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", poiPath)
+	}
+
+	if deps.ListHandler != nil {
+		listPath, listHandler := listv1connect.NewListServiceHandler(deps.ListHandler, opts)
+		mux.Handle(listPath, listHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", listPath)
+	}
+
+	if deps.CustomAuthHandler != nil {
+		customAuthPath, customAuthHandler := customauthconnect.NewCustomAuthServiceHandler(deps.CustomAuthHandler, opts)
+		mux.Handle(customAuthPath, customAuthHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", customAuthPath)
 	}
 
 	deps.Logger.Info("Connect RPC routes configured")
