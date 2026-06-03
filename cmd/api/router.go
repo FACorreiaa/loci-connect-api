@@ -106,8 +106,12 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	// Register health and metrics routes
 	registerUtilityRoutes(mux, deps)
 
+	allowedOrigins := deps.Config.Server.AllowedOrigins
+	if len(allowedOrigins) == 0 {
+		allowedOrigins = []string{"http://localhost:3000"}
+	}
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"},           // Restricted to localhost for development
+		AllowedOrigins:   allowedOrigins,                              // From ALLOWED_ORIGINS (comma-separated)
 		AllowedMethods:   c.AllowedMethods(),                          // ["GET", "POST", "OPTIONS"]
 		AllowedHeaders:   append(c.AllowedHeaders(), "Authorization"), // Adds "Authorization" for safety
 		ExposedHeaders:   c.ExposedHeaders(),                          // ["Grpc-Status", "Grpc-Message", "Grpc-Status-Details-Bin"]

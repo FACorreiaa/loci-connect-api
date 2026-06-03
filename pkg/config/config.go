@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	// Load environment variables from .env files when present.
 	_ "github.com/joho/godotenv"
@@ -31,6 +32,8 @@ type ServerConfig struct {
 	BaseURL            string
 	RateLimitPerSecond int
 	RateLimitBurst     int
+	// AllowedOrigins are the CORS origins permitted for browser clients.
+	AllowedOrigins []string
 }
 
 type DatabaseConfig struct {
@@ -66,6 +69,7 @@ func Load() (*Config, error) {
 			BaseURL:            getEnv("BASE_URL", "http://localhost:8080"),
 			RateLimitPerSecond: getEnvAsInt("SERVER_RATE_LIMIT_PER_SECOND", 100),
 			RateLimitBurst:     getEnvAsInt("SERVER_RATE_LIMIT_BURST", 200),
+			AllowedOrigins:     getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -101,7 +105,34 @@ func Load() (*Config, error) {
 		return nil, errors.New("GEMINI_MODEL is required")
 	}
 
+	if cfg.Auth.JWTSecret == "" {
+		return nil, errors.New("JWT_SECRET is required")
+	}
+	// In production, refuse to boot with the insecure default secret.
+	if getEnv("APP_ENV", "development") == "production" && cfg.Auth.JWTSecret == "changeme" {
+		return nil, errors.New("JWT_SECRET must not be the default value in production")
+	}
+
 	return cfg, nil
+}
+
+// getEnvAsSlice reads a comma-separated env var into a string slice.
+func getEnvAsSlice(key string, defaultValue []string) []string {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return defaultValue
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return defaultValue
+	}
+	return out
 }
 
 // DSN returns the database connection string
