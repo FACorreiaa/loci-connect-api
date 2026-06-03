@@ -64,6 +64,7 @@ type Dependencies struct {
 	PaymentRepo    payment.Repository
 	FavoritesRepo  favorites.Repository
 	ReviewRepo     reviewdomain.Repository
+	ShareRepo      share.Repository
 
 	// Services
 	TokenManager        service.TokenManager
@@ -179,6 +180,7 @@ func (d *Dependencies) initRepositories() error {
 	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
 	d.FavoritesRepo = favorites.NewRepository(d.DB.Pool, d.Logger)
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
+	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -269,7 +271,7 @@ func (d *Dependencies) initHandlers() error {
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
-	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL)
+	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)

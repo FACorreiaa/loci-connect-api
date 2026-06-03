@@ -21,19 +21,12 @@ func (h *Handler) OGMetaHandler() http.Handler {
 			return
 		}
 
-		h.sharesMux.RLock()
-		entry, exists := h.shares[code]
-		h.sharesMux.RUnlock()
-
-		if !exists {
+		// Resolve + bump the view count from the persistent store.
+		entry, err := h.repo.IncrementView(r.Context(), code)
+		if err != nil {
 			http.Error(w, "Share not found", http.StatusNotFound)
 			return
 		}
-
-		// Increment view count
-		h.sharesMux.Lock()
-		entry.ViewCount++
-		h.sharesMux.Unlock()
 
 		// Generate HTML with OG meta tags
 		ogHTML := generateOGHTML(entry, h.baseURL, code)
@@ -44,8 +37,8 @@ func (h *Handler) OGMetaHandler() http.Handler {
 }
 
 // generateOGHTML creates HTML with Open Graph meta tags for social sharing
-func generateOGHTML(entry *shareEntry, baseURL, code string) string {
-	contentType := getContentTypeName(entry.ContentType)
+func generateOGHTML(entry *Share, baseURL, code string) string {
+	contentType := getContentTypeName(sharev1.ShareContentType(entry.ContentType))
 	canonicalURL := fmt.Sprintf("%s/share/%s", baseURL, code)
 
 	// Use a default image if none provided
