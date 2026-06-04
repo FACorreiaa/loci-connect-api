@@ -131,6 +131,18 @@ func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[revie
 	}), nil
 }
 
+func (h *Handler) GetRecentReviews(ctx context.Context, req *connect.Request[reviewv1.GetRecentReviewsRequest]) (*connect.Response[reviewv1.GetRecentReviewsResponse], error) {
+	limit, offset := pageBounds(req.Msg.Pagination)
+	list, total, err := h.service.ListRecentReviews(ctx, limit, offset)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.GetRecentReviewsResponse{
+		Reviews:    toProtoReviews(list),
+		Pagination: pageMeta(total, limit, offset),
+	}), nil
+}
+
 func (h *Handler) DeleteReview(ctx context.Context, req *connect.Request[reviewv1.DeleteReviewRequest]) (*connect.Response[reviewv1.DeleteReviewResponse], error) {
 	userID, err := ctxUser(ctx)
 	if err != nil {

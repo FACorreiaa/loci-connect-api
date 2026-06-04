@@ -42,6 +42,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*Review, error)
 	ListByPOI(ctx context.Context, poiID uuid.UUID, limit, offset int) ([]*Review, int, error)
 	ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error)
+	ListRecent(ctx context.Context, limit, offset int) ([]*Review, int, error)
 	Delete(ctx context.Context, reviewID, userID uuid.UUID) error
 	SetHelpful(ctx context.Context, userID, reviewID uuid.UUID, isHelpful bool) (int, error)
 }
@@ -131,6 +132,33 @@ func (repo *repository) ListByPOI(ctx context.Context, poiID uuid.UUID, limit, o
 
 func (repo *repository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error) {
 	return repo.listBy(ctx, "r.user_id = $1", userID, limit, offset)
+}
+
+// ListRecent returns the most recent published reviews across all content.
+func (repo *repository) ListRecent(ctx context.Context, limit, offset int) ([]*Review, int, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	var total int
+	if err := repo.db.QueryRow(ctx, `SELECT COUNT(*) FROM reviews r WHERE r.is_published = true`).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := repo.db.Query(ctx,
+		selectReview+` WHERE r.is_published = true ORDER BY r.created_at DESC LIMIT $1 OFFSET $2`,
+		limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []*Review
+	for rows.Next() {
+		r, err := scanReview(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, r)
+	}
+	return out, total, rows.Err()
 }
 
 func (repo *repository) Delete(ctx context.Context, reviewID, userID uuid.UUID) error {

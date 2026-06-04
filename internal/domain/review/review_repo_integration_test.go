@@ -92,3 +92,21 @@ func TestReviewRepo_CRUD_Helpful_Integration(t *testing.T) {
 	// Delete by a non-owner / missing row returns ErrNotFound.
 	require.ErrorIs(t, repo.Delete(ctx, uuid.New(), author), ErrNotFound)
 }
+
+func TestReviewRepo_ListRecent_Integration(t *testing.T) {
+	repo, pool := newRepo(t)
+	ctx := context.Background()
+
+	u1, u2 := seedUser(t, pool), seedUser(t, pool)
+	p1, p2 := seedPOI(t, pool), seedPOI(t, pool)
+	require.NoError(t, repo.Create(ctx, &Review{UserID: u1, POIID: p1, Rating: 4, Content: "first"}))
+	require.NoError(t, repo.Create(ctx, &Review{UserID: u2, POIID: p2, Rating: 5, Content: "second"}))
+
+	list, total, err := repo.ListRecent(ctx, 10, 0)
+	require.NoError(t, err)
+	assert.Equal(t, 2, total)
+	require.Len(t, list, 2)
+	// Newest first, and enriched with POI name.
+	assert.Equal(t, "second", list[0].Content)
+	assert.Equal(t, "Rev POI", list[0].POIName)
+}

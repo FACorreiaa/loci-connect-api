@@ -28,6 +28,7 @@ type Service interface {
 	GetReview(ctx context.Context, id uuid.UUID) (*Review, error)
 	ListPOIReviews(ctx context.Context, poiID uuid.UUID, limit, offset int) ([]*Review, int, error)
 	ListUserReviews(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error)
+	ListRecentReviews(ctx context.Context, limit, offset int) ([]*Review, int, error)
 	DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error
 	LikeReview(ctx context.Context, userID, reviewID uuid.UUID, isLike bool) (int, error)
 }
@@ -74,6 +75,10 @@ func (s *service) ListPOIReviews(ctx context.Context, poiID uuid.UUID, limit, of
 
 func (s *service) ListUserReviews(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error) {
 	return s.repo.ListByUser(ctx, userID, limit, offset)
+}
+
+func (s *service) ListRecentReviews(ctx context.Context, limit, offset int) ([]*Review, int, error) {
+	return s.repo.ListRecent(ctx, limit, offset)
 }
 
 func (s *service) DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error {
