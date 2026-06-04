@@ -131,3 +131,83 @@ func TestE2E_RegisterLoginAndAuthInterceptor(t *testing.T) {
 			"valid token must pass the auth interceptor, got %v", err)
 	}
 }
+
+// registerAndLogin creates a fresh user and returns its access + refresh tokens.
+func registerAndLogin(t *testing.T, ctx context.Context, authClient authconnect.AuthServiceClient) (access, refresh string) {
+	t.Helper()
+	email := fmt.Sprintf("e2e-%s@example.com", uuid.NewString())
+	const password = "Sup3rStr0ngP@ss!"
+	_, err := authClient.Register(ctx, connect.NewRequest(&authpb.RegisterRequest{
+		Email: email, Username: "e2e" + uuid.NewString()[:8], Password: password,
+	}))
+	require.NoError(t, err, "register")
+	loginResp, err := authClient.Login(ctx, connect.NewRequest(&authpb.LoginRequest{
+		Email: email, Password: password,
+	}))
+	require.NoError(t, err, "login")
+	access = loginResp.Msg.GetAccessToken()
+	refresh = loginResp.Msg.GetRefreshToken()
+	require.NotEmpty(t, access, "access token")
+	require.NotEmpty(t, refresh, "refresh token")
+	return access, refresh
+}
+
+// authPasses returns true if a protected RPC with the given token is NOT
+// rejected by the auth interceptor (it may still fail for other reasons).
+func authPasses(ctx context.Context, userClient userconnect.UserServiceClient, token string) bool {
+	req := connect.NewRequest(&userpb.GetUserProfileRequest{})
+	if token != "" {
+		req.Header().Set("Authorization", "Bearer "+token)
+	}
+	_, err := userClient.GetUserProfile(ctx, req)
+	return err == nil || connect.CodeOf(err) != connect.CodeUnauthenticated
+}
+
+// TestE2E_AuthLifecycle exercises the full token lifecycle that the flaky
+// "login -> navigate -> disconnected" reports hinge on: a fresh access token
+// works, refresh rotates the token pair, the new access token works, and the
+// OLD refresh token is rejected after rotation (so any client retry with a
+// stale refresh token is a hard logout — the behaviour to design around).
+func TestE2E_AuthLifecycle(t *testing.T) {
+	baseURL, cleanup := bootServer(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	authClient := authconnect.NewAuthServiceClient(httpClient, baseURL)
+	userClient := userconnect.NewUserServiceClient(httpClient, baseURL)
+
+	access1, refresh1 := registerAndLogin(t, ctx, authClient)
+
+	// 1. Fresh access token passes auth.
+	assert.True(t, authPasses(ctx, userClient, access1), "fresh access token should pass auth")
+
+	// 2. Refresh rotates the pair.
+	refreshResp, err := authClient.RefreshToken(ctx, connect.NewRequest(&authpb.RefreshTokenRequest{
+		RefreshToken: refresh1,
+	}))
+	require.NoError(t, err, "refresh with a valid refresh token should succeed")
+	access2 := refreshResp.Msg.GetAccessToken()
+	refresh2 := refreshResp.Msg.GetRefreshToken()
+	require.NotEmpty(t, access2, "refreshed access token")
+	require.NotEmpty(t, refresh2, "refreshed refresh token")
+	assert.NotEqual(t, refresh1, refresh2, "refresh token should rotate")
+
+	// 3. New access token passes auth.
+	assert.True(t, authPasses(ctx, userClient, access2), "refreshed access token should pass auth")
+
+	// 4. The OLD refresh token is now dead (its session was deleted on rotation).
+	_, err = authClient.RefreshToken(ctx, connect.NewRequest(&authpb.RefreshTokenRequest{
+		RefreshToken: refresh1,
+	}))
+	require.Error(t, err, "a rotated/old refresh token must be rejected")
+
+	// 5. The new refresh token still works (single rotation forward).
+	_, err = authClient.RefreshToken(ctx, connect.NewRequest(&authpb.RefreshTokenRequest{
+		RefreshToken: refresh2,
+	}))
+	require.NoError(t, err, "the current refresh token should still refresh")
+
+	// 6. A garbage token is rejected.
+	assert.False(t, authPasses(ctx, userClient, "not-a-jwt"), "garbage token must be Unauthenticated")
+}
