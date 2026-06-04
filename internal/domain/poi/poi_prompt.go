@@ -2,94 +2,58 @@ package poi
 
 import (
 	"fmt"
-
-	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func getRestaurantsNearbyPrompt(userLocation locitypes.UserLocation) string {
-	if userLocation.SearchRadiusKm == 0 {
-		userLocation.SearchRadiusKm = 5.0
+// domainNearbyPrompt builds a location prompt for a specific POI domain. It
+// uses the same JSON contract the workers parse ("points_of_interest" with
+// description_poi), converts the distance (meters) to km, and forbids null —
+// the previous per-domain prompts emitted a mismatched key and treated the
+// meter distance as km, so the LLM fallback always returned nothing.
+func domainNearbyPrompt(domainNoun, categoryHint string, lat, lon, distance float64) string {
+	radiusKm := distance / 1000
+	if radiusKm <= 0 {
+		radiusKm = 5.0
 	}
-	return fmt.Sprintf(`
-        Generate a list of up to 10 restaurants within %.2f km of coordinates %.2f, %.2f.
-        Include a variety of restaurant categories to provide diverse options.
-        The result must be in JSON format:
-        {
-            "restaurants": [
-                {
-                    "name": "Restaurant Name",
-                    "latitude": <float>,
-                    "longitude": <float>,
-                    "category": "Restaurant|Bar|Cafe",
-                    "description": "Brief description of the restaurant and its proximity to the user's location."
-                }
-            ]
-        }
-    `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
+	return fmt.Sprintf(`You are a travel assistant generating %s for a user at a SPECIFIC location.
+
+CRITICAL REQUIREMENTS:
+- User's EXACT location: latitude %.6f, longitude %.6f
+- Search radius: %.1f kilometers
+- ONLY include places WITHIN this radius from the user's coordinates
+- NEVER return null. If you truly cannot find anything, return {"points_of_interest": []} — but you should almost always find several near a populated area.
+
+Generate up to 10 diverse %s.
+
+Return STRICTLY as JSON:
+{
+  "points_of_interest": [
+    {
+      "name": "Place Name",
+      "latitude": <float within %.1f km of %.6f>,
+      "longitude": <float within %.1f km of %.6f>,
+      "category": "%s",
+      "description_poi": "2-3 sentence description of this specific place."
+    }
+  ]
+}`,
+		domainNoun, lat, lon, radiusKm, domainNoun,
+		radiusKm, lat, radiusKm, lon, categoryHint)
 }
 
-func getHotelsNeabyPrompt(userLocation locitypes.UserLocation) string {
-	return fmt.Sprintf(`
-        Generate a list of maximum 10 hotels nearby the coordinates %0.2f , %0.2f.
-        the hotels can be around %0.2f km radius from the user's location or if nothing provided, use the default radius of 5km.
-        The hotels should be relevant to the user's interest.
-        The result should be in the following JSON format:
-        {
-            "hotels": [
-                {
-                    "name": "Name of the Hotel",
-                    "latitude": <float>,
-                    "longitude": <float>,
-                    "category": "Primary category (e.g., Hotel, Hostel, Guesthouse)",
-                    "description": "A brief description of this hotel and why it's relevant to the user's interest."
-                }
-            ]
-        }
-    `, userLocation.UserLat, userLocation.UserLon, userLocation.SearchRadiusKm)
+func getRestaurantsNearbyPrompt(lat, lon, distance float64) string {
+	return domainNearbyPrompt("restaurants, bars, and cafes", "Restaurant, Bar, or Cafe", lat, lon, distance)
 }
 
-func getActivitiesNearbyPrompt(userLocation locitypes.UserLocation) string {
-	if userLocation.SearchRadiusKm == 0 {
-		userLocation.SearchRadiusKm = 5.0
-	}
-	return fmt.Sprintf(`
-        Generate a list of up to 10 open air activities people can do within %.2f km of coordinates %.2f, %.2f.
-        Include a variety of restaurant categories to provide diverse options.
-        The result must be in JSON format:
-        {
-            "activities": [
-                {
-                    "name": "Activity Name",
-                    "latitude": <float>,
-                    "longitude": <float>,
-                    "category": "category where it belong",
-                    "description": "Brief description of the activity and its proximity to the user's location."
-                }
-            ]
-        }
-    `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
+func getHotelsNeabyPrompt(lat, lon, distance float64) string {
+	return domainNearbyPrompt("hotels and places to stay", "Hotel, Hostel, or Guesthouse", lat, lon, distance)
 }
 
-func getAttractionsNeabyPrompt(userLocation locitypes.UserLocation) string {
-	if userLocation.SearchRadiusKm == 0 {
-		userLocation.SearchRadiusKm = 5.0
-	}
-	return fmt.Sprintf(`
-        Generate a list of up to 10 attractions people can do within %.2f km of coordinates %.2f, %.2f.
-        Include a variety of restaurant categories to provide diverse options.
-        The result must be in JSON format:
-        {
-            "attractions": [
-                {
-                    "name": "Attractions Name",
-                    "latitude": <float>,
-                    "longitude": <float>,
-                    "category": "category where it belong",
-                    "description": "Brief description of the attractions and its proximity to the user's location."
-                }
-            ]
-        }
-    `, userLocation.SearchRadiusKm, userLocation.UserLat, userLocation.UserLon)
+func getActivitiesNearbyPrompt(lat, lon, distance float64) string {
+	return domainNearbyPrompt("activities and things to do", "Activity category (e.g. Outdoor, Sport, Tour)", lat, lon, distance)
+}
+
+func getAttractionsNeabyPrompt(lat, lon, distance float64) string {
+	return domainNearbyPrompt("attractions and sights", "Attraction category (e.g. Museum, Landmark, Park)", lat, lon, distance)
 }
 
 func getGeneralPOIByDistancePrompt(lat, lon, distance float64, strict bool) string {

@@ -1097,15 +1097,13 @@ func (s *ServiceImpl) GetNearbyRestaurants(ctx context.Context, userID uuid.UUID
 	s.logger.InfoContext(ctx, "No restaurants found in database, falling back to LLM generation")
 
 	// Generate restaurants using LLM with domain-specific prompt
-	genAIResponse, err := s.generateRestaurantsFromLLM(ctx, userID, lat, lon, distance, cuisineType, priceRange)
+	enrichedRestaurants, err := s.enrichLLMWithRetry(ctx, lat, lon, distance, "restaurants",
+		func() (*locitypes.GenAIResponse, error) {
+			return s.generateRestaurantsFromLLM(ctx, userID, lat, lon, distance, cuisineType, priceRange)
+		})
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-
-	enrichedRestaurants := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
-	for i := range enrichedRestaurants {
-		enrichedRestaurants[i].Source = "llm_suggested_pois"
 	}
 
 	s.cache.Set(cacheKey, enrichedRestaurants, cache.DefaultExpiration)
@@ -1153,15 +1151,13 @@ func (s *ServiceImpl) GetNearbyActivities(ctx context.Context, userID uuid.UUID,
 	s.logger.InfoContext(ctx, "No activities found in database, falling back to LLM generation")
 
 	// Generate activities using LLM with domain-specific prompt
-	genAIResponse, err := s.generateActivitiesFromLLM(ctx, userID, lat, lon, distance, activityType, duration)
+	enrichedActivities, err := s.enrichLLMWithRetry(ctx, lat, lon, distance, "activities",
+		func() (*locitypes.GenAIResponse, error) {
+			return s.generateActivitiesFromLLM(ctx, userID, lat, lon, distance, activityType, duration)
+		})
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-
-	enrichedActivities := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
-	for i := range enrichedActivities {
-		enrichedActivities[i].Source = "llm_suggested_pois"
 	}
 
 	s.cache.Set(cacheKey, enrichedActivities, cache.DefaultExpiration)
@@ -1209,15 +1205,13 @@ func (s *ServiceImpl) GetNearbyHotels(ctx context.Context, userID uuid.UUID, lat
 	s.logger.InfoContext(ctx, "No hotels found in database, falling back to LLM generation")
 
 	// Generate hotels using LLM with domain-specific prompt
-	genAIResponse, err := s.generateHotelsFromLLM(ctx, userID, lat, lon, distance, starRating, amenities)
+	enrichedHotels, err := s.enrichLLMWithRetry(ctx, lat, lon, distance, "hotels",
+		func() (*locitypes.GenAIResponse, error) {
+			return s.generateHotelsFromLLM(ctx, userID, lat, lon, distance, starRating, amenities)
+		})
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-
-	enrichedHotels := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
-	for i := range enrichedHotels {
-		enrichedHotels[i].Source = "llm_suggested_pois"
 	}
 
 	s.cache.Set(cacheKey, enrichedHotels, cache.DefaultExpiration)
@@ -1265,15 +1259,13 @@ func (s *ServiceImpl) GetNearbyAttractions(ctx context.Context, userID uuid.UUID
 	s.logger.InfoContext(ctx, "No attractions found in database, falling back to LLM generation")
 
 	// Generate attractions using LLM with domain-specific prompt
-	genAIResponse, err := s.generateAttractionsFromLLM(ctx, userID, lat, lon, distance, attractionType, isOutdoor)
+	enrichedAttractions, err := s.enrichLLMWithRetry(ctx, lat, lon, distance, "attractions",
+		func() (*locitypes.GenAIResponse, error) {
+			return s.generateAttractionsFromLLM(ctx, userID, lat, lon, distance, attractionType, isOutdoor)
+		})
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
-	}
-
-	enrichedAttractions := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
-	for i := range enrichedAttractions {
-		enrichedAttractions[i].Source = "llm_suggested_pois"
 	}
 
 	s.cache.Set(cacheKey, enrichedAttractions, cache.DefaultExpiration)
@@ -1408,12 +1400,7 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context,
 
 	defer span.End()
 
-	userLocation := locitypes.UserLocation{
-		UserLat:        lat,
-		UserLon:        lon,
-		SearchRadiusKm: distance,
-	}
-	prompt := getRestaurantsNearbyPrompt(userLocation)
+	prompt := getRestaurantsNearbyPrompt(lat, lon, distance)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	if s.aiClient == nil {
@@ -1509,12 +1496,7 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context,
 
 	defer span.End()
 
-	userLocation := locitypes.UserLocation{
-		UserLat:        lat,
-		UserLon:        lon,
-		SearchRadiusKm: distance,
-	}
-	prompt := getActivitiesNearbyPrompt(userLocation)
+	prompt := getActivitiesNearbyPrompt(lat, lon, distance)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	if s.aiClient == nil {
@@ -1610,12 +1592,7 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context,
 
 	defer span.End()
 
-	userLocation := locitypes.UserLocation{
-		UserLat:        lat,
-		UserLon:        lon,
-		SearchRadiusKm: distance,
-	}
-	prompt := getHotelsNeabyPrompt(userLocation)
+	prompt := getHotelsNeabyPrompt(lat, lon, distance)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	if s.aiClient == nil {
@@ -1711,12 +1688,7 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context,
 
 	defer span.End()
 
-	userLocation := locitypes.UserLocation{
-		UserLat:        lat,
-		UserLon:        lon,
-		SearchRadiusKm: distance,
-	}
-	prompt := getAttractionsNeabyPrompt(userLocation)
+	prompt := getAttractionsNeabyPrompt(lat, lon, distance)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	if s.aiClient == nil {

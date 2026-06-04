@@ -57,6 +57,44 @@ func (s *ServiceImpl) generateAndEnrichPOIs(ctx context.Context, userID uuid.UUI
 	return []locitypes.POIDetailedInfo{}, nil
 }
 
+// enrichLLMWithRetry runs an LLM POI generation closure, enriches/filters the
+// result by radius, and retries once if the model yields nothing usable.
+// Returns an empty slice with a nil error if still empty, so callers surface an
+// honest "no results" instead of the old silent "null = success". Caching and
+// any persistence stay with the caller (domain cache keys differ).
+func (s *ServiceImpl) enrichLLMWithRetry(
+	ctx context.Context,
+	lat, lon, distance float64,
+	domain string,
+	gen func() (*locitypes.GenAIResponse, error),
+) ([]locitypes.POIDetailedInfo, error) {
+	for attempt := 1; attempt <= maxLLMPOIAttempts; attempt++ {
+		genAIResponse, err := gen()
+		if err != nil {
+			return nil, err
+		}
+
+		enriched := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
+		for i := range enriched {
+			enriched[i].Source = "llm_suggested_pois"
+		}
+		if len(enriched) > 0 {
+			return enriched, nil
+		}
+
+		s.logger.WarnContext(ctx, "LLM produced no usable POIs",
+			slog.String("domain", domain),
+			slog.Int("attempt", attempt),
+			slog.Int("max_attempts", maxLLMPOIAttempts),
+			slog.Int("raw_count", len(genAIResponse.GeneralPOI)),
+			slog.Float64("distance_m", distance))
+	}
+
+	s.logger.InfoContext(ctx, "LLM produced no POIs after retries; returning empty result",
+		slog.String("domain", domain), slog.Float64("distance_m", distance))
+	return []locitypes.POIDetailedInfo{}, nil
+}
+
 // persistLLMPOIs records the LLM interaction and saves the generated POIs.
 // Persistence failures are logged but non-fatal: the POIs are still returned to
 // the caller so a transient DB hiccup doesn't blank out a good result.
