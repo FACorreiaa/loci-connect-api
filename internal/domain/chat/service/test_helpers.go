@@ -4,59 +4,54 @@ import (
 	"context"
 	"iter"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"google.golang.org/genai"
 )
 
-// TestLLMClient wraps the mock to satisfy the concrete type requirement
+// TestLLMClient wraps the mock to satisfy the ChatClient interface.
 type TestLLMClient struct {
-	GenerateContentStreamWithCacheFn func(ctx context.Context, prompt string, config *genai.GenerateContentConfig, cacheKey string) (iter.Seq2[*genai.GenerateContentResponse, error], error)
-	GenerateContentStreamFn          func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error)
-	GenerateResponseFn               func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
-	GenerateContentFn                func(ctx context.Context, prompt, apiKey string, config *genai.GenerateContentConfig) (string, error)
-	ModelFn                          func() string
+	GenerateFn       func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
+	GenerateTextFn   func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (string, error)
+	GenerateStreamFn func(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error)
+	ModelFn          func() string
+	CloseFn          func() error
 }
 
-// StartChatSession implements genai_sdk.ChatClient.
 func (t *TestLLMClient) StartChatSession(ctx context.Context, config *genai.GenerateContentConfig) (*generativeAI.ChatSession, error) {
 	panic("unimplemented")
 }
 
-func (t *TestLLMClient) GenerateContentStreamWithCache(
+func (t *TestLLMClient) Generate(
 	ctx context.Context,
 	prompt string,
 	config *genai.GenerateContentConfig,
-	cacheKey string,
-) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
-	if t.GenerateContentStreamWithCacheFn != nil {
-		return t.GenerateContentStreamWithCacheFn(ctx, prompt, config, cacheKey)
+) (*genai.GenerateContentResponse, error) {
+	if t.GenerateFn != nil {
+		return t.GenerateFn(ctx, prompt, config)
 	}
 	return nil, nil
 }
 
-func (t *TestLLMClient) GenerateContentStream(
+func (t *TestLLMClient) GenerateText(
 	ctx context.Context,
 	prompt string,
 	config *genai.GenerateContentConfig,
-) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
-	if t.GenerateContentStreamFn != nil {
-		return t.GenerateContentStreamFn(ctx, prompt, config)
-	}
-	return nil, nil
-}
-
-func (t *TestLLMClient) GenerateResponse(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
-	if t.GenerateResponseFn != nil {
-		return t.GenerateResponseFn(ctx, prompt, config)
-	}
-	return nil, nil
-}
-
-func (t *TestLLMClient) GenerateContent(ctx context.Context, prompt, apiKey string, config *genai.GenerateContentConfig) (string, error) {
-	if t.GenerateContentFn != nil {
-		return t.GenerateContentFn(ctx, prompt, apiKey, config)
+) (string, error) {
+	if t.GenerateTextFn != nil {
+		return t.GenerateTextFn(ctx, prompt, config)
 	}
 	return "", nil
+}
+
+func (t *TestLLMClient) GenerateStream(
+	ctx context.Context,
+	prompt string,
+	config *genai.GenerateContentConfig,
+) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+	if t.GenerateStreamFn != nil {
+		return t.GenerateStreamFn(ctx, prompt, config)
+	}
+	return nil, nil
 }
 
 func (t *TestLLMClient) Model() string {
@@ -64,6 +59,13 @@ func (t *TestLLMClient) Model() string {
 		return t.ModelFn()
 	}
 	return ""
+}
+
+func (t *TestLLMClient) Close() error {
+	if t.CloseFn != nil {
+		return t.CloseFn()
+	}
+	return nil
 }
 
 var _ generativeAI.ChatClient = (*TestLLMClient)(nil)

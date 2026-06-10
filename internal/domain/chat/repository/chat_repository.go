@@ -20,6 +20,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
@@ -1583,7 +1584,7 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _
 // }
 
 func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
-	cleanedResponse := common.CleanJSONResponse(responseText)
+	cleanedResponse := generativeAI.CleanJSON(responseText)
 
 	// An empty result (e.g. a bare "null" or a "[section]\nnull" blob) carries
 	// no POIs. Return quietly instead of running every parse strategy and

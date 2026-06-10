@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"regexp"
 	"strings"
 	"time"
 
@@ -219,114 +218,6 @@ func UniqueStringSlice(slice []string) []string {
 	}
 
 	return result
-}
-
-// sectionTagPattern matches a leading streaming section marker such as
-// "[nearby_pois]\n" that the consolidation step prepends to each response part.
-var sectionTagPattern = regexp.MustCompile(`^\s*\[[a-z_]+\]\s*`)
-
-func CleanJSONResponse(response string) string {
-	response = strings.TrimSpace(response)
-
-	// Strip a leading section tag (e.g. "[nearby_pois]\n") left by stream
-	// consolidation; without this the tag breaks JSON parsing downstream.
-	response = sectionTagPattern.ReplaceAllString(response, "")
-	response = strings.TrimSpace(response)
-
-	// A bare "null", empty array, or empty object carries no POI data. Return
-	// an empty string so callers treat it as "no data" instead of failing to
-	// parse (the LLM returning the literal token "null" is the common case).
-	switch response {
-	case "", "null", "[]", "{}":
-		return ""
-	}
-
-	// Remove markdown code blocks (```json or ```)
-	// Use regex to remove everything before and after code blocks
-	codeBlockPattern := regexp.MustCompile("(?s)```(?:json)?\\s*([\\s\\S]*?)```")
-	if matches := codeBlockPattern.FindStringSubmatch(response); len(matches) > 1 {
-		response = matches[1]
-		response = strings.TrimSpace(response)
-	} else {
-		// Fallback to prefix/suffix removal
-		if after, ok := strings.CutPrefix(response, "```json"); ok {
-			response = after
-		} else if after, ok := strings.CutPrefix(response, "```"); ok {
-			response = after
-		}
-		response = strings.TrimSuffix(response, "```")
-		response = strings.TrimSpace(response)
-	}
-
-	// Find the first { and last balanced }
-	firstBrace := strings.Index(response, "{")
-	if firstBrace == -1 {
-		return response
-	}
-
-	// Count braces to find the matching closing brace
-	braceCount := 0
-	lastValidBrace := -1
-	inString := false
-	escapeNext := false
-
-	for i := firstBrace; i < len(response); i++ {
-		char := response[i]
-
-		// Handle string escaping
-		if escapeNext {
-			escapeNext = false
-			continue
-		}
-		if char == '\\' {
-			escapeNext = true
-			continue
-		}
-
-		// Track if we're inside a string
-		if char == '"' {
-			inString = !inString
-			continue
-		}
-
-		// Only count braces outside of strings
-		if !inString {
-			switch char {
-			case '{':
-				braceCount++
-			case '}':
-				braceCount--
-				if braceCount == 0 {
-					lastValidBrace = i
-					break
-				}
-			}
-		}
-	}
-
-	// If braces are unbalanced, try to find the last }
-	if braceCount != 0 {
-		lastBrace := strings.LastIndex(response, "}")
-		if lastBrace == -1 || lastBrace <= firstBrace {
-			return response
-		}
-		lastValidBrace = lastBrace
-	}
-
-	if lastValidBrace == -1 {
-		return response
-	}
-
-	// Extract just the JSON portion
-	jsonPortion := response[firstBrace : lastValidBrace+1]
-
-	// Remove any remaining backticks
-	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
-
-	// Remove trailing commas before closing braces/brackets
-	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
-
-	return strings.TrimSpace(jsonPortion)
 }
 
 type ChatContext struct {

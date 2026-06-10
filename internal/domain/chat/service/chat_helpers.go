@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -149,7 +150,7 @@ func (l *ServiceImpl) handleGeneralPoisFromResponse(ctx context.Context, content
 	var poiData struct {
 		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
-	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &poiData); err != nil {
+	if err := json.Unmarshal([]byte(generativeAI.CleanJSON(content)), &poiData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse general POIs from unified response", slog.Any("error", err))
 		return
 	}
@@ -169,7 +170,7 @@ func (l *ServiceImpl) handleItineraryFromResponse(
 		OverallDescription string                      `json:"overall_description"`
 		PointsOfInterest   []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
-	if err := json.Unmarshal([]byte(CleanJSONResponse(content)), &itineraryData); err != nil {
+	if err := json.Unmarshal([]byte(generativeAI.CleanJSON(content)), &itineraryData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse itinerary from unified response", slog.Any("error", err))
 		return
 	}
@@ -185,7 +186,7 @@ func (l *ServiceImpl) handleHotelsFromResponse(ctx context.Context, content stri
 	var hotelData struct {
 		Hotels []locitypes.HotelDetailedInfo `json:"hotels"`
 	}
-	clean := CleanJSONResponse(content)
+	clean := generativeAI.CleanJSON(content)
 	if err := json.Unmarshal([]byte(clean), &hotelData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse hotels from unified response", slog.Any("error", err))
 		return
@@ -207,7 +208,7 @@ func (l *ServiceImpl) handleRestaurantsFromResponse(ctx context.Context, content
 	var restaurantData struct {
 		Restaurants []locitypes.RestaurantDetailedInfo `json:"restaurants"`
 	}
-	clean := CleanJSONResponse(content)
+	clean := generativeAI.CleanJSON(content)
 	if err := json.Unmarshal([]byte(clean), &restaurantData); err != nil {
 		l.logger.ErrorContext(ctx, "Failed to parse restaurants from unified response", slog.Any("error", err), slog.String("cleaned_response", clean))
 		return
@@ -250,32 +251,4 @@ func CleanLLMResponse(responseText string) string {
 	cleaned = regexp.MustCompile(`,(\s*[}\]])`).ReplaceAllString(cleaned, "$1")
 
 	return cleaned
-}
-
-// CleanJSONResponse performs advanced cleaning of LLM JSON responses.
-// It handles markdown code blocks, extracts valid JSON by brace counting,
-// and removes extraneous content before/after the JSON object.
-// Use this for more robust JSON extraction from LLM responses.
-func CleanJSONResponse(response string) string {
-	response = strings.TrimSpace(response)
-
-	// Remove markdown code block markers
-	if after, ok := strings.CutPrefix(response, "```json"); ok {
-		response = after
-	} else if after, ok := strings.CutPrefix(response, "```"); ok {
-		response = after
-	}
-	response = strings.TrimSuffix(response, "```")
-	response = strings.TrimSpace(response)
-
-	// Find the first '{' and the last '}'
-	start := strings.Index(response, "{")
-	end := strings.LastIndex(response, "}")
-
-	if start == -1 || end == -1 || end < start {
-		return "" // No JSON object found
-	}
-
-	// Extract the potential JSON object
-	return response[start : end+1]
 }

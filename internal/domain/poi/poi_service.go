@@ -12,7 +12,7 @@ import (
 
 	"google.golang.org/genai"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -88,6 +88,10 @@ func NewServiceImpl(
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	model := os.Getenv("GEMINI_MODEL")
+	embeddingModel := os.Getenv("GEMINI_EMBEDDING_MODEL")
+	if embeddingModel == "" {
+		embeddingModel = "gemini-embedding-exp-03-07"
+	}
 	logger.Debug("initializing POI AI client", slog.String("model", model))
 	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
 	if err != nil {
@@ -97,7 +101,7 @@ func NewServiceImpl(
 	}
 
 	if embeddingService == nil {
-		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, model, logger)
+		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, embeddingModel, logger)
 		if err != nil {
 			logger.Error("Failed to initialize embedding client", slog.Any("error", err))
 		}
@@ -546,7 +550,7 @@ Generate 5-10 relevant results.`, query, cityName)
 		slog.String("city", cityName))
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, &genai.GenerateContentConfig{
+	response, err := s.aiClient.Generate(ctx, prompt, &genai.GenerateContentConfig{
 		Temperature: genai.Ptr[float32](0.7),
 	})
 	latencyMs := time.Since(startTime).Milliseconds()
@@ -971,7 +975,7 @@ func (s *ServiceImpl) getGeneralPOIByDistance(ctx context.Context,
 	}
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := s.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
@@ -1412,7 +1416,7 @@ func (s *ServiceImpl) getGeneralRestaurantByDistance(ctx context.Context,
 	}
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := s.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
@@ -1508,7 +1512,7 @@ func (s *ServiceImpl) getGeneralActivitiesByDistance(ctx context.Context,
 	}
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := s.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
@@ -1604,7 +1608,7 @@ func (s *ServiceImpl) getGeneralHotelsByDistance(ctx context.Context,
 	}
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := s.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
@@ -1700,7 +1704,7 @@ func (s *ServiceImpl) getGeneralAttractionsByDistance(ctx context.Context,
 	}
 
 	startTime := time.Now()
-	response, err := s.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := s.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 

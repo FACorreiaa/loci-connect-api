@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"google.golang.org/genai"
 )
 
@@ -30,7 +30,7 @@ func TestNearbyLLMReturnsPOIs(t *testing.T) {
 	const lat, lon, distance = 41.48395992358889, -8.776363031387108, 25000.0
 	prompt := getGeneralPOIByDistancePrompt(lat, lon, distance, false)
 
-	resp, err := client.GenerateResponse(ctx, prompt, &genai.GenerateContentConfig{
+	resp, err := client.Generate(ctx, prompt, &genai.GenerateContentConfig{
 		Temperature:     genai.Ptr[float32](0.7),
 		MaxOutputTokens: 16384,
 	})
@@ -95,7 +95,7 @@ func TestDomainNearbyPromptsReturnPOIs(t *testing.T) {
 
 	for domain, prompt := range cases {
 		t.Run(domain, func(t *testing.T) {
-			resp, err := client.GenerateResponse(ctx, prompt, &genai.GenerateContentConfig{
+			resp, err := client.Generate(ctx, prompt, &genai.GenerateContentConfig{
 				Temperature:     genai.Ptr[float32](0.7),
 				MaxOutputTokens: 16384,
 			})

@@ -222,6 +222,7 @@ func (d *Dependencies) initServices() error {
 		d.Logger,
 		d.Config.Gemini.APIKey,
 		d.Config.Gemini.Model,
+		d.Config.Gemini.EmbeddingModel,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)

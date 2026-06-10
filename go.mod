@@ -7,7 +7,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
-	github.com/FACorreiaa/go-genai-sdk v1.0.0
+	github.com/FACorreiaa/go-genai-sdk/v2 v2.0.0
 	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -32,7 +32,7 @@ require (
 	golang.org/x/crypto v0.48.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/time v0.14.0
-	google.golang.org/genai v1.39.0
+	google.golang.org/genai v1.59.0
 	google.golang.org/protobuf v1.36.11
 )
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -29,7 +30,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 		prompt := getCityDescriptionPrompt(cityName)
 		span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
-		response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+		response, err := l.aiClient.Generate(ctx, prompt, config)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to generate city data")
@@ -53,7 +54,7 @@ func (l *ServiceImpl) GenerateCityDataWorker(ctx context.Context, wg *sync.WaitG
 		}
 		span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-		cleanTxt := CleanJSONResponse(txt)
+		cleanTxt := generativeAI.CleanJSON(txt)
 		var cityDataFromAI struct {
 			CityName        string  `json:"city_name"`
 			StateProvince   *string `json:"state_province"` // Use pointer for nullable string
@@ -108,7 +109,7 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.Wai
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	startTime := time.Now()
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := l.aiClient.Generate(ctx, prompt, config)
 	latencyMs := int(time.Since(startTime).Milliseconds())
 	span.SetAttributes(attribute.Int("response.latency_ms", latencyMs))
 
@@ -135,7 +136,7 @@ func (l *ServiceImpl) GenerateGeneralPOIWorker(ctx context.Context, wg *sync.Wai
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := CleanJSONResponse(txt)
+	cleanTxt := generativeAI.CleanJSON(txt)
 	var poiData struct {
 		PointsOfInterest []locitypes.POIDetailedInfo `json:"points_of_interest"`
 	}
@@ -169,7 +170,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 	prompt := getPersonalizedPOI(interestNames, cityName, tagsPromptPart, userPrefs)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := l.aiClient.Generate(ctx, prompt, config)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate personalized itinerary")
@@ -193,7 +194,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorker(ctx context.Context, wg *syn
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := CleanJSONResponse(txt)
+	cleanTxt := generativeAI.CleanJSON(txt)
 	var itineraryData struct {
 		ItineraryName      string                      `json:"itinerary_name"`
 		OverallDescription string                      `json:"overall_description"`
@@ -267,7 +268,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 	prompt := l.getPersonalizedPOIWithSemanticContext(interestNames, cityName, tagsPromptPart, userPrefs, semanticPOIs)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := l.aiClient.Generate(ctx, prompt, config)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate semantic-enhanced personalized itinerary")
@@ -291,7 +292,7 @@ func (l *ServiceImpl) GeneratePersonalisedPOIWorkerWithSemantics(ctx context.Con
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := CleanJSONResponse(txt)
+	cleanTxt := generativeAI.CleanJSON(txt)
 	var itineraryData struct {
 		ItineraryName      string                      `json:"itinerary_name"`
 		OverallDescription string                      `json:"overall_description"`

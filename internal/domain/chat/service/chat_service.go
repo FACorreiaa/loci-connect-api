@@ -23,7 +23,7 @@ import (
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/lib"
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
@@ -38,33 +38,7 @@ import (
 
 const (
 	defaultTemperature = 0.5
-	// Retry configuration for LLM calls
-	maxLLMRetries  = 3
-	baseRetryDelay = 1 * time.Second
-	maxRetryDelay  = 30 * time.Second
 )
-
-// isRetryableLLMError checks if the error is transient and should be retried.
-func isRetryableLLMError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	// Rate limits and quota exceeded
-	if strings.Contains(errStr, "429") ||
-		strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
-		strings.Contains(errStr, "quota") {
-		return true
-	}
-	// Transient server errors
-	if strings.Contains(errStr, "500") ||
-		strings.Contains(errStr, "503") ||
-		strings.Contains(errStr, "INTERNAL") ||
-		strings.Contains(errStr, "UNAVAILABLE") {
-		return true
-	}
-	return false
-}
 
 type ChatSession struct {
 	History []genai.Chat
@@ -146,6 +120,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	logger *slog.Logger,
 	apiKey string,
 	model string,
+	embeddingModel string,
 ) (*ServiceImpl, error) {
 	ctx := context.Background()
 	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
@@ -154,7 +129,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	}
 
 	// Initialize embedding service
-	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, model, logger)
+	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, embeddingModel, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create embedding service: %w", err)
 	}
@@ -428,7 +403,7 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	prompt := l.getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData, domain)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := l.aiClient.Generate(ctx, prompt, config)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "AI generation failed")
@@ -455,7 +430,7 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	}
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
 
-	cleanTxt := CleanJSONResponse(txt)
+	cleanTxt := generativeAI.CleanJSON(txt)
 	var itineraryData locitypes.AIItineraryResponse
 	if err := json.Unmarshal([]byte(cleanTxt), &itineraryData); err != nil {
 		span.RecordError(err)
@@ -622,7 +597,7 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context,
 
 	prompt := getPOIDetailsPrompt(city, lat, lon)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, config)
+	response, err := l.aiClient.Generate(ctx, prompt, config)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to generate POI details")
@@ -646,7 +621,7 @@ func (l *ServiceImpl) getPOIDetailedInfos(ctx context.Context,
 	}
 
 	span.SetAttributes(attribute.Int("response.length", len(txt)))
-	cleanTxt := CleanJSONResponse(txt)
+	cleanTxt := generativeAI.CleanJSON(txt)
 	var detailedInfo locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanTxt), &detailedInfo); err != nil {
 		span.RecordError(err)
@@ -817,7 +792,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 	prompt := generatedContinuedConversationPrompt(poiName, cityName)
 
 	// Generate LLM response
-	response, err := l.aiClient.GenerateContent(ctx, prompt, "", nil)
+	response, err := l.aiClient.GenerateText(ctx, prompt, nil)
 	if err != nil {
 		span.RecordError(err)
 		return locitypes.POIDetailedInfo{}, fmt.Errorf("failed to generate POI data: %w", err)
@@ -838,7 +813,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 	}
 	span.SetAttributes(attribute.String("generativeAI.interaction_id.for_poi_data", savedLlmInteractionID.String()))
 
-	cleanResponse := CleanJSONResponse(response)
+	cleanResponse := generativeAI.CleanJSON(response)
 	var poiData locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanResponse), &poiData); err != nil || poiData.Name == "" {
 		l.logger.WarnContext(ctx, "LLM returned invalid or empty POI data",
@@ -1147,7 +1122,7 @@ Examples:
 If no city is mentioned, use empty string for city.
 `, message)
 
-	response, err := l.aiClient.GenerateResponse(ctx, prompt, &genai.GenerateContentConfig{
+	response, err := l.aiClient.Generate(ctx, prompt, &genai.GenerateContentConfig{
 		Temperature: genai.Ptr[float32](0.1), // Low temperature for consistent parsing
 	})
 	if err != nil {
@@ -1169,7 +1144,7 @@ If no city is mentioned, use empty string for city.
 		return "", "", fmt.Errorf("empty response from AI parser")
 	}
 
-	cleanResponse := CleanJSONResponse(responseText.String())
+	cleanResponse := generativeAI.CleanJSON(responseText.String())
 	var parsed struct {
 		City    string `json:"city"`
 		Message string `json:"message"`
@@ -1604,7 +1579,7 @@ func (l *ServiceImpl) generatePOIDataStream(
 	startTime := time.Now()
 
 	var responseTextBuilder strings.Builder
-	iter, err := l.aiClient.GenerateContentStream(ctx, prompt, config)
+	iter, err := l.aiClient.GenerateStream(ctx, prompt, config)
 	if err != nil {
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 			Type:      locitypes.EventTypeError,
@@ -1690,7 +1665,7 @@ func (l *ServiceImpl) generatePOIDataStream(
 	}
 
 	// Parse response
-	cleanJSON := CleanJSONResponse(fullText)
+	cleanJSON := generativeAI.CleanJSON(fullText)
 	var poiData locitypes.POIDetailedInfo
 	if err := json.Unmarshal([]byte(cleanJSON), &poiData); err != nil || poiData.Name == "" {
 		l.logger.WarnContext(ctx, "Invalid POI data from LLM", slog.String("response", fullText), slog.Any("error", err))
@@ -2562,50 +2537,16 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("cache_key", cacheKey))
 	}
 
-	// Step 2: Cache miss or no cache key - call LLM
+	// Step 2: Cache miss or no cache key - call LLM (SDK retries stream init)
 	l.logger.InfoContext(ctx, "Calling LLM for streaming",
 		slog.String("part_type", partType),
 		slog.String("cache_key", cacheKey),
 		slog.Int("prompt_length", len(prompt)))
 
-	// Step 2: Cache miss or no cache key - call LLM
-	l.logger.InfoContext(ctx, "Calling LLM for streaming",
-		slog.String("part_type", partType),
-		slog.String("cache_key", cacheKey),
-		slog.Int("prompt_length", len(prompt)))
-
-	iter, err := l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
-
-	// Retry loop with exponential backoff
-	if err != nil && isRetryableLLMError(err) {
-		backoff := baseRetryDelay
-		for attempt := range maxLLMRetries {
-			l.logger.WarnContext(ctx, "LLM call failed, retrying",
-				slog.String("part_type", partType),
-				slog.Int("attempt", attempt+1),
-				slog.Duration("backoff", backoff),
-				slog.Any("error", err))
-
-			if !sleepWithContext(ctx, backoff) {
-				return // Context canceled
-			}
-			backoff *= 2
-			if backoff > maxRetryDelay {
-				backoff = maxRetryDelay
-			}
-
-			iter, err = l.aiClient.GenerateContentStreamWithCache(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)}, cacheKey)
-			if err == nil {
-				break
-			}
-			if !isRetryableLLMError(err) {
-				break
-			}
-		}
-	}
+	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
 
 	if err != nil {
-		l.logger.ErrorContext(ctx, "LLM call failed after retries",
+		l.logger.ErrorContext(ctx, "LLM stream call failed",
 			slog.String("part_type", partType),
 			slog.Any("error", err))
 		if ctx.Err() == nil {
@@ -2689,18 +2630,6 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("part_type", partType),
 			slog.String("cache_key", cacheKey),
 			slog.Int("response_length", fullResponse.Len()))
-	}
-}
-
-func sleepWithContext(ctx context.Context, delay time.Duration) bool {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return false
-	case <-timer.C:
-		return true
 	}
 }
 

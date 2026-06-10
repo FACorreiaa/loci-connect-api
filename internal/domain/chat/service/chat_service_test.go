@@ -2,12 +2,14 @@ package service
 
 import (
 	"context"
+	"iter"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/mock"
-	"google.golang.org/genai" // For genai.GenerateContentConfig
+	"google.golang.org/genai"
 )
 
 // --- Mocks for Dependencies ---
@@ -21,17 +23,45 @@ type MockAIClient struct {
 // For now, assuming direct use of *generativeAI.AIClient struct type.
 // To make this more testable, ServiceImpl should ideally depend on an interface for AIClient.
 // Let's define a minimal interface that AIClient should satisfy for our service's needs:
-type AIClientInterface interface {
-	GenerateResponse(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error)
-	// Add other methods used by ServiceImpl if any, e.g., StartChatSession
-}
+var _ generativeAI.ChatClient = (*MockAIClient)(nil)
 
-func (m *MockAIClient) GenerateResponse(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+func (m *MockAIClient) Generate(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 	args := m.Called(ctx, prompt, config)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*genai.GenerateContentResponse), args.Error(1)
+}
+
+func (m *MockAIClient) GenerateText(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (string, error) {
+	args := m.Called(ctx, prompt, config)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAIClient) GenerateStream(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+	args := m.Called(ctx, prompt, config)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(iter.Seq2[*genai.GenerateContentResponse, error]), args.Error(1)
+}
+
+func (m *MockAIClient) Model() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockAIClient) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockAIClient) StartChatSession(ctx context.Context, config *genai.GenerateContentConfig) (*generativeAI.ChatSession, error) {
+	args := m.Called(ctx, config)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*generativeAI.ChatSession), args.Error(1)
 }
 
 // Mock Repositories (Example for POIRepository, create similar for others)

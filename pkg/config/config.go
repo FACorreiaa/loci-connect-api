@@ -22,8 +22,9 @@ type Config struct {
 }
 
 type GeminiConfig struct {
-	APIKey string
-	Model  string
+	APIKey         string
+	Model          string
+	EmbeddingModel string
 }
 
 type ServerConfig struct {
@@ -92,8 +93,9 @@ func Load() (*Config, error) {
 			Port:    getEnvAsInt("PPROF_PORT", 6060),
 		},
 		Gemini: GeminiConfig{
-			APIKey: getEnv("GEMINI_API_KEY", ""),
-			Model:  getEnv("GEMINI_MODEL", ""),
+			APIKey:         getEnv("GEMINI_API_KEY", ""),
+			Model:          getEnv("GEMINI_MODEL", ""),
+			EmbeddingModel: getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-exp-03-07"),
 		},
 	}
 
