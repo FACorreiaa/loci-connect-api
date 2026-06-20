@@ -8,9 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	ErrQuotaExceeded = errors.New("daily request quota exceeded")
-)
+var ErrQuotaExceeded = errors.New("daily request quota exceeded")
 
 type Tier string
 

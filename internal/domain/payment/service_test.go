@@ -24,12 +24,15 @@ func (f *fakePaymentRepo) CreatePayment(context.Context, *Payment) error { retur
 func (f *fakePaymentRepo) GetPaymentByID(context.Context, uuid.UUID) (*Payment, error) {
 	return nil, nil
 }
+
 func (f *fakePaymentRepo) GetPaymentByExternalID(context.Context, string) (*Payment, error) {
 	return nil, nil
 }
+
 func (f *fakePaymentRepo) UpdatePaymentStatus(context.Context, uuid.UUID, string, *string) error {
 	return nil
 }
+
 func (f *fakePaymentRepo) GetUserPayments(context.Context, uuid.UUID, int, int) ([]Payment, int, error) {
 	return nil, 0, nil
 }
@@ -37,9 +40,11 @@ func (f *fakePaymentRepo) CreateInvoice(context.Context, *Invoice) error { retur
 func (f *fakePaymentRepo) GetInvoiceByID(context.Context, uuid.UUID) (*Invoice, error) {
 	return nil, nil
 }
+
 func (f *fakePaymentRepo) GetUserInvoices(context.Context, uuid.UUID, int, int) ([]Invoice, int, error) {
 	return nil, 0, nil
 }
+
 func (f *fakePaymentRepo) LinkPaymentToInvoice(context.Context, uuid.UUID, uuid.UUID) error {
 	return nil
 }
@@ -47,19 +52,24 @@ func (f *fakePaymentRepo) CreateRefund(context.Context, *Refund) error { return 
 func (f *fakePaymentRepo) GetTotalRefundedAmount(context.Context, uuid.UUID) (int64, error) {
 	return 0, nil
 }
+
 func (f *fakePaymentRepo) RecordWebhookEvent(_ context.Context, eventID, _ string) error {
 	f.webhookSeen = append(f.webhookSeen, eventID)
 	return nil
 }
+
 func (f *fakePaymentRepo) GetSubscriptionByStripeID(context.Context, string) (*Subscription, error) {
 	return nil, nil
 }
+
 func (f *fakePaymentRepo) GetSubscriptionByUserID(context.Context, uuid.UUID) (*Subscription, error) {
 	return nil, nil
 }
+
 func (f *fakePaymentRepo) UpdateSubscriptionStatus(context.Context, uuid.UUID, string, *time.Time, *time.Time) error {
 	return nil
 }
+
 func (f *fakePaymentRepo) UpsertSubscription(_ context.Context, sub *Subscription) error {
 	if f.upsertErr != nil {
 		return f.upsertErr

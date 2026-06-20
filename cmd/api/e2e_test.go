@@ -39,11 +39,11 @@ func bootServer(t *testing.T) (string, func()) {
 			BaseURL: "http://localhost:8080",
 			// Non-zero so the rate-limit interceptor is constructed (the router
 			// only builds it when both knobs are > 0); high enough not to trip.
-			RateLimitPerSecond: 10000,
-			RateLimitBurst:         10000,
-			DefaultRPCTimeout:      30 * time.Second,
-			ChatRPCTimeout:         3 * time.Minute,
-			ChatStreamMaxTimeout:   10 * time.Minute,
+			RateLimitPerSecond:   10000,
+			RateLimitBurst:       10000,
+			DefaultRPCTimeout:    30 * time.Second,
+			ChatRPCTimeout:       3 * time.Minute,
+			ChatStreamMaxTimeout: 10 * time.Minute,
 		},
 		Database: config.DatabaseConfig{
 			Host:     host,

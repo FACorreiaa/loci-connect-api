@@ -42,19 +42,19 @@ type GeminiConfig struct {
 }
 
 type ServerConfig struct {
-	Host               string
-	Port               int
-	BaseURL            string
-	RateLimitPerSecond int
-	RateLimitBurst     int
-	IPRateLimitPerSecond   int
-	IPRateLimitBurst       int
-	IPRateLimitMaxEntries  int
+	Host                    string
+	Port                    int
+	BaseURL                 string
+	RateLimitPerSecond      int
+	RateLimitBurst          int
+	IPRateLimitPerSecond    int
+	IPRateLimitBurst        int
+	IPRateLimitMaxEntries   int
 	UserRateLimitPerSecond  int
 	UserRateLimitBurst      int
 	UserRateLimitMaxEntries int
-	DefaultRPCTimeout  time.Duration
-	ChatRPCTimeout     time.Duration
+	DefaultRPCTimeout       time.Duration
+	ChatRPCTimeout          time.Duration
 	// ChatStreamMaxTimeout caps client-requested deadlines on streaming RPCs.
 	ChatStreamMaxTimeout time.Duration
 	// AllowedOrigins are the CORS origins permitted for browser clients.
@@ -93,9 +93,9 @@ type ProfilingConfig struct {
 func Load() (*Config, error) {
 	cfg := &Config{
 		Server: ServerConfig{
-			Host:                 getEnv("SERVER_HOST", "localhost"),
-			Port:                 getEnvAsInt("SERVER_PORT", 8080),
-			BaseURL:              getEnv("BASE_URL", "http://localhost:8080"),
+			Host:                    getEnv("SERVER_HOST", "localhost"),
+			Port:                    getEnvAsInt("SERVER_PORT", 8080),
+			BaseURL:                 getEnv("BASE_URL", "http://localhost:8080"),
 			RateLimitPerSecond:      getEnvAsInt("SERVER_RATE_LIMIT_PER_SECOND", 100),
 			RateLimitBurst:          getEnvAsInt("SERVER_RATE_LIMIT_BURST", 200),
 			IPRateLimitPerSecond:    getEnvAsInt("SERVER_IP_RATE_LIMIT_PER_SECOND", 30),
@@ -104,10 +104,10 @@ func Load() (*Config, error) {
 			UserRateLimitPerSecond:  getEnvAsInt("SERVER_USER_RATE_LIMIT_PER_SECOND", 20),
 			UserRateLimitBurst:      getEnvAsInt("SERVER_USER_RATE_LIMIT_BURST", 40),
 			UserRateLimitMaxEntries: getEnvAsInt("SERVER_USER_RATE_LIMIT_MAX_ENTRIES", 10_000),
-			DefaultRPCTimeout:      getEnvAsDurationSeconds("DEFAULT_RPC_TIMEOUT_SEC", 30*time.Second),
-			ChatRPCTimeout:         getEnvAsDurationSeconds("CHAT_RPC_TIMEOUT_SEC", 3*time.Minute),
-			ChatStreamMaxTimeout:   getEnvAsDurationSeconds("CHAT_STREAM_MAX_TIMEOUT_SEC", 10*time.Minute),
-			AllowedOrigins:       getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
+			DefaultRPCTimeout:       getEnvAsDurationSeconds("DEFAULT_RPC_TIMEOUT_SEC", 30*time.Second),
+			ChatRPCTimeout:          getEnvAsDurationSeconds("CHAT_RPC_TIMEOUT_SEC", 3*time.Minute),
+			ChatStreamMaxTimeout:    getEnvAsDurationSeconds("CHAT_STREAM_MAX_TIMEOUT_SEC", 10*time.Minute),
+			AllowedOrigins:          getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
 		},
 		Database: DatabaseConfig{
 			Host:            getEnv("DB_HOST", "localhost"),

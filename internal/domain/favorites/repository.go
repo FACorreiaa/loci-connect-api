@@ -73,7 +73,6 @@ func (r *RepositoryImpl) AddFavorite(ctx context.Context, fav *locitypes.Favorit
 		fav.Category,
 		fav.AddedAt,
 	).Scan(&fav.ID, &fav.AddedAt)
-
 	if err != nil {
 		l.ErrorContext(ctx, "failed to add favorite", slog.Any("error", err))
 		return nil, err

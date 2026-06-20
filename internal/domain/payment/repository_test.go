@@ -91,8 +91,10 @@ func TestGetUserPayments_Pagination(t *testing.T) {
 	userID := insertUser(t, pool)
 
 	for i := 0; i < 3; i++ {
-		p := &Payment{UserID: userID, Provider: "stripe", Type: "one_time",
-			Amount: int64(100 * (i + 1)), Currency: "usd", Status: "succeeded"}
+		p := &Payment{
+			UserID: userID, Provider: "stripe", Type: "one_time",
+			Amount: int64(100 * (i + 1)), Currency: "usd", Status: "succeeded",
+		}
 		require.NoError(t, repo.CreatePayment(ctx, p))
 	}
 

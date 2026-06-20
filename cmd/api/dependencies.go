@@ -45,8 +45,8 @@ import (
 
 // Dependencies holds all application dependencies
 type Dependencies struct {
-	Config *config.Config
-	DB     *db.DB
+	Config   *config.Config
+	DB       *db.DB
 	Logger   *slog.Logger
 	AppCache cachestore.Store
 
@@ -269,7 +269,6 @@ func (d *Dependencies) initServices() error {
 
 	// Needs imports and struct fields.
 	// Since replace_file_content is single block, I will use multi_replace for this file.
-
 }
 
 // initHandlers initializes all handler dependencies

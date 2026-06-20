@@ -17,8 +17,8 @@ import (
 
 var (
 	trailingCommaBeforeBraceRE = regexp.MustCompile(`,(\s*[}\]])`)
-	replacePOIRE                = regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`)
-	nearbyDistanceRE            = regexp.MustCompile(`within\s+(\d+(?:\.\d+)?)\s*(?:kilometers?|km)`)
+	replacePOIRE               = regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`)
+	nearbyDistanceRE           = regexp.MustCompile(`within\s+(\d+(?:\.\d+)?)\s*(?:kilometers?|km)`)
 )
 
 func generatePOICacheKey(city string, lat, lon, distance float64, userID uuid.UUID) string {

@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	chatpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
+	chatpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )

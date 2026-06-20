@@ -83,7 +83,7 @@ func TestUserRateLimitInterceptor_LimitsAuthenticatedUser(t *testing.T) {
 	req := connect.NewRequest(&emptypb.Empty{})
 
 	ctx := ContextWithClaims(context.Background(), &Claims{
-		UserID: "user-42",
+		UserID:           "user-42",
 		RegisteredClaims: jwt.RegisteredClaims{},
 	})
 

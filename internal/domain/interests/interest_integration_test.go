@@ -50,7 +50,7 @@ func createTestUserForInterestTests(t *testing.T) uuid.UUID {
 }
 
 func sp(s string) *string { return &s }
-func bp(b bool) *bool      { return &b }
+func bp(b bool) *bool     { return &b }
 
 func TestInterestsService_CreateInterest_Integration(t *testing.T) {
 	ctx := context.Background()

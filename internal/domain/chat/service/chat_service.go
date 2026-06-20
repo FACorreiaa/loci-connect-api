@@ -1946,7 +1946,6 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	return nil
 }
 
-
 // ensureItineraryExists initializes the session's CurrentItinerary if it's nil
 func (l *ServiceImpl) ensureItineraryExists(session *locitypes.ChatSession) {
 	if session.CurrentItinerary == nil {
@@ -2064,7 +2063,6 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 	defer release()
 
 	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
-
 	if err != nil {
 		l.logger.ErrorContext(ctx, "LLM stream call failed",
 			slog.String("part_type", partType),
