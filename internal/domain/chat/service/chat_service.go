@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/patrickmn/go-cache"
 
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -33,8 +30,18 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
+	"github.com/FACorreiaa/loci-connect-api/pkg/gemini"
 )
+
+func (l *ServiceImpl) acquireLLMSlot(ctx context.Context) (func(), error) {
+	if l == nil {
+		return func() {}, nil
+	}
+	return l.llmSem.Acquire(ctx)
+}
 
 const (
 	defaultTemperature = 0.5
@@ -98,13 +105,14 @@ type ServiceImpl struct {
 	poiRepo            poi.Repository
 	poiSvc             poi.Service // POI service for nearby queries with cache + DB + LLM fallback
 	listSvc            itinerarylist.Service
-	cache              *cache.Cache
+	cache              cachestore.Store
 	model              string
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
 	deadLetterCancel context.CancelFunc
 	intentClassifier IntentClassifier
+	llmSem           *concurrency.LLMSemaphore
 }
 
 // NewLlmInteractiontService creates a new user service instance.
@@ -118,18 +126,18 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	poiSvc poi.Service,
 	listSvc itinerarylist.Service,
 	logger *slog.Logger,
-	apiKey string,
-	model string,
-	embeddingModel string,
+	geminiCfg config.GeminiConfig,
+	llmSem *concurrency.LLMSemaphore,
+	appCache cachestore.Store,
 ) (*ServiceImpl, error) {
 	ctx := context.Background()
-	aiClient, err := generativeAI.NewGeminiChatClient(ctx, apiKey, model)
+	aiClient, err := gemini.NewChatClient(ctx, geminiCfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini chat client: %w", err)
 	}
 
 	// Initialize embedding service
-	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, apiKey, embeddingModel, logger)
+	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, geminiCfg.APIKey, geminiCfg.EmbeddingModel, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create embedding service: %w", err)
 	}
@@ -150,11 +158,12 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		poiRepo:            poiRepo,
 		poiSvc:             poiSvc,
 		listSvc:            listSvc,
-		cache:              cache.New(5*time.Minute, 10*time.Minute),
-		model:              model,
+		cache:              appCache,
+		model:              geminiCfg.Model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
 		deadLetterCancel:   deadLetterCancel,
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
+		llmSem:             llmSem,
 	}
 	go service.processDeadLetterQueue(deadLetterCtx)
 	return service, nil
@@ -698,7 +707,8 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 			l.logger.InfoContext(ctx, "Cache hit for POI details", slog.String("cache_key", cacheKey))
 			span.AddEvent("Cache hit")
 			span.SetStatus(codes.Ok, "POI details served from cache")
-			return p, nil
+			copy := *p
+			return &copy, nil
 		}
 	}
 
@@ -724,7 +734,8 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	}
 	if p != nil {
 		p.City = city
-		l.cache.Set(cacheKey, p, cache.DefaultExpiration)
+		cached := *p
+		l.cache.Set(cacheKey, &cached, cachestore.DefaultGeoTTL)
 		l.logger.InfoContext(ctx, "Database hit for POI details", slog.String("cache_key", cacheKey))
 		span.AddEvent("Database hit")
 		span.SetStatus(codes.Ok, "POI details served from database")
@@ -772,7 +783,8 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 	}
 
 	// Store in cache
-	l.cache.Set(cacheKey, poiResult, cache.DefaultExpiration)
+	cachedResult := *poiResult
+	l.cache.Set(cacheKey, &cachedResult, cachestore.DefaultGeoTTL)
 	l.logger.DebugContext(ctx, "Stored POI details in cache", slog.String("cache_key", cacheKey))
 	span.AddEvent("Stored in cache")
 
@@ -1122,6 +1134,12 @@ Examples:
 If no city is mentioned, use empty string for city.
 `, message)
 
+	release, err := l.acquireLLMSlot(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("LLM capacity exceeded: %w", err)
+	}
+	defer release()
+
 	response, err := l.aiClient.Generate(ctx, prompt, &genai.GenerateContentConfig{
 		Temperature: genai.Ptr[float32](0.1), // Low temperature for consistent parsing
 	})
@@ -1400,7 +1418,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 
 	case "replace_poi":
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Replacing Point of Interest..."}, 3)
-		if matches := regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`).FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
+		if matches := replacePOIRE.FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
 			oldPOI := matches[1]
 			newPOIName := matches[2]
 			for i, p := range session.CurrentItinerary.AIItineraryResponse.PointsOfInterest {
@@ -1427,7 +1445,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 
 	default: // modify_itinerary
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Updating itinerary..."}, 3)
-		if matches := regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`).FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
+		if matches := replacePOIRE.FindStringSubmatch(strings.ToLower(message)); len(matches) == 3 {
 			oldPOI := matches[1]
 			newPOIName := matches[2]
 			for i, p := range session.CurrentItinerary.AIItineraryResponse.PointsOfInterest {
@@ -1889,9 +1907,21 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 
 	rawResponses, err := l.orchestrateLLMStreams(&cc)
 	if err != nil {
+		hasContent := false
+		for _, part := range rawResponses {
+			if strings.TrimSpace(part) != "" {
+				hasContent = true
+				break
+			}
+		}
+		if !hasContent {
+			span.RecordError(err)
+			l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
+			return err
+		}
+		l.logger.WarnContext(ctx, "Some streaming workers failed; continuing with partial or cache-hydrated responses",
+			slog.Any("error", err))
 		span.RecordError(err)
-		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-		return err
 	}
 
 	data, err := l.aggregateAndParse(&cc, rawResponses)
@@ -1916,531 +1946,6 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	return nil
 }
 
-// ProcessUnifiedChatMessageStream handles unified chat with optimized streaming based on Google GenAI patterns
-//func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) error {
-//	startTime := time.Now() // Track when processing starts
-//	ctx, span := otel.Tracer("LlmInteractionService").Start(cc.Ctx, "ProcessUnifiedChatMessageStream", trace.WithAttributes(
-//		attribute.String("message", cc.Message),
-//	))
-//	defer span.End()
-//
-//	// Extract city and clean message
-//	extractedCity, cleanedMessage, err := l.extractCityFromMessage(ctx, cc.Message)
-//	if err != nil {
-//		span.RecordError(err)
-//		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-//		return fmt.Errorf("failed to parse message: %w", err)
-//	}
-//	if extractedCity != "" {
-//		cc.CityName = extractedCity
-//	}
-//	span.SetAttributes(attribute.String("extracted.city", cc.CityName), attribute.String("cleaned.message", cleanedMessage))
-//
-//	// Detect domain
-//	domainDetector := &locitypes.DomainDetector{}
-//	domain := domainDetector.DetectDomain(ctx, cleanedMessage)
-//	span.SetAttributes(attribute.String("detected.domain", string(domain)))
-//
-//	// Step 3: Fetch user data
-//	_, searchProfile, _, err := l.FetchUserData(ctx, cc.UserID, cc.ProfileID)
-//	if err != nil {
-//		span.RecordError(err)
-//		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-//		return fmt.Errorf("failed to fetch user data: %w", err)
-//	}
-//	basePreferences := getUserPreferencesPrompt(searchProfile)
-//
-//	// Use default location if not provided
-//	var lat, lon float64
-//	if cc.UserLocation == nil && searchProfile.UserLatitude != nil && searchProfile.UserLongitude != nil {
-//		cc.UserLocation = &locitypes.UserLocation{
-//			UserLat: *searchProfile.UserLatitude,
-//			UserLon: *searchProfile.UserLongitude,
-//		}
-//	}
-//	if cc.UserLocation != nil {
-//		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-//	}
-//
-//	// Step 4: Cache Integration - Generate cache key based on session parameters
-//	sessionID := uuid.New()
-//
-//	// Initialize session
-//	session := locitypes.ChatSession{
-//		ID:        sessionID,
-//		UserID:    cc.UserID,
-//		ProfileID: cc.ProfileID,
-//		CityName:  cc.CityName,
-//		ConversationHistory: []locitypes.ConversationMessage{
-//			{Role: "user", Content: cc.Message, Timestamp: time.Now()},
-//		},
-//		SessionContext: locitypes.SessionContext{
-//			CityName:            cc.CityName,
-//			ConversationSummary: fmt.Sprintf("Trip plan for %s", cc.CityName),
-//		},
-//		CreatedAt: time.Now(),
-//		UpdatedAt: time.Now(),
-//		ExpiresAt: time.Now().Add(24 * time.Hour),
-//		Status:    "active",
-//	}
-//	if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
-//		span.RecordError(err)
-//		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-//		return fmt.Errorf("failed to create session: %w", err)
-//	}
-//
-//	// Generate cache key based on session parameters
-//	cacheKeyData := map[string]interface{}{
-//		"user_id":     cc.UserID.String(),
-//		"profile_id":  cc.ProfileID.String(),
-//		"city":        normalizeCacheComponent(cc.CityName),
-//		"message":     normalizeCacheComponent(cleanedMessage),
-//		"domain":      string(domain),
-//		"preferences": basePreferences,
-//	}
-//	cacheKeyBytes, err := json.Marshal(cacheKeyData)
-//	if err != nil {
-//		l.logger.ErrorContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
-//		// Use a fallback cache key
-//		cacheKeyBytes = []byte(fmt.Sprintf("fallback_%s_%s", cleanedMessage, cc.CityName))
-//	}
-//	hash := md5.Sum(cacheKeyBytes)
-//	cacheKey := hex.EncodeToString(hash[:])
-//
-//	// Step 5: Fan-in Fan-out Setup
-//	var wg sync.WaitGroup
-//
-//	l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
-//		Type: locitypes.EventTypeStart,
-//		Data: map[string]interface{}{
-//			"domain":     string(domain),
-//			"city":       cc.CityName,
-//			"session_id": sessionID.String(),
-//			"cache_key":  cacheKey,
-//		},
-//	}, 3)
-//
-//	// Step 5: Collect responses for saving interaction
-//	responses := make(map[string]*strings.Builder)
-//	partCacheKeys := make(map[string]string)
-//	responsesMutex := sync.Mutex{}
-//
-//	// Modified sendEventWithResponse to capture responses
-//	sendEventWithResponse := func(event locitypes.StreamEvent) {
-//		if event.Type == locitypes.EventTypeChunk {
-//			responsesMutex.Lock()
-//			if data, ok := event.Data.(map[string]interface{}); ok {
-//				if partType, exists := data["part"].(string); exists {
-//					if chunk, chunkExists := data["chunk"].(string); chunkExists {
-//						if responses[partType] == nil {
-//							responses[partType] = &strings.Builder{}
-//						}
-//						responses[partType].WriteString(chunk)
-//					}
-//				}
-//			}
-//			responsesMutex.Unlock()
-//		}
-//		l.sendEvent(ctx, cc.EventCh, event, 3)
-//	}
-//
-//	// Step 6: Spawn streaming workers based on domain with cache support
-//	switch domain {
-//	case locitypes.DomainItinerary, locitypes.DomainGeneral:
-//		wg.Add(3)
-//
-//		// Worker 1: Stream City Data with cache
-//		go func() {
-//			defer wg.Done()
-//			prompt := getCityDataPrompt(cc.CityName)
-//			partCacheKey := cacheKey + "_city_data"
-//			responsesMutex.Lock()
-//			partCacheKeys["city_data"] = partCacheKey
-//			responsesMutex.Unlock()
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "city_data", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//		// Worker 2: Stream General POIs with cache
-//		go func() {
-//			defer wg.Done()
-//			prompt := getGeneralPOIPrompt(cc.CityName)
-//			partCacheKey := cacheKey + "_general_pois"
-//			responsesMutex.Lock()
-//			partCacheKeys["general_pois"] = partCacheKey
-//			responsesMutex.Unlock()
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "general_pois", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//		// Worker 3: Stream Personalized Itinerary with cache
-//		go func() {
-//			defer wg.Done()
-//			prompt := getPersonalizedItineraryPrompt(cc.CityName, basePreferences)
-//			partCacheKey := cacheKey + "_itinerary"
-//			responsesMutex.Lock()
-//			partCacheKeys["itinerary"] = partCacheKey
-//			responsesMutex.Unlock()
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "itinerary", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//	case locitypes.DomainAccommodation:
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			prompt := getAccommodationPrompt(cc.CityName, lat, lon, basePreferences)
-//			partCacheKey := cacheKey + "_hotels"
-//			partCacheKeys["hotels"] = partCacheKey
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//	case locitypes.DomainDining:
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			prompt := getDiningPrompt(cc.CityName, lat, lon, basePreferences)
-//			partCacheKey := cacheKey + "_restaurants"
-//			partCacheKeys["restaurants"] = partCacheKey
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//	case locitypes.DomainActivities:
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			prompt := getActivitiesPrompt(cc.CityName, lat, lon, basePreferences)
-//			partCacheKey := cacheKey + "_activities"
-//			partCacheKeys["activities"] = partCacheKey
-//			l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, domain, partCacheKey)
-//		}()
-//
-//	default:
-//		sendEventWithResponse(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: fmt.Sprintf("unhandled domain: %s", domain)})
-//		return fmt.Errorf("unhandled domain type: %s", domain)
-//	}
-//
-//	// Step 7: Wait for all workers to complete synchronously
-//	// IMPORTANT: This must block until workers finish so the RPC stream stays open
-//	wg.Wait()
-//	l.logger.InfoContext(ctx, "All streaming workers completed")
-//
-//	// Only process completion if context is still active
-//	if ctx.Err() == nil {
-//		// Build complete data from collected responses
-//		responsesMutex.Lock()
-//
-//		// If any expected parts are missing, try to hydrate from cache
-//		for part, key := range partCacheKeys {
-//			if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
-//				if cached, found := l.cache.Get(key); found {
-//					if cachedText, ok := cached.(string); ok && cachedText != "" {
-//						l.logger.InfoContext(ctx, "Hydrated missing response part from cache",
-//							slog.String("part_type", part), slog.String("cache_key", key))
-//						b := &strings.Builder{}
-//						b.WriteString(cachedText)
-//						responses[part] = b
-//					}
-//				}
-//			}
-//		}
-//
-//		completeData := map[string]interface{}{
-//			"session_id": sessionID.String(),
-//		}
-//		cityDataContent := ""
-//		var fullResponseBuilder strings.Builder
-//
-//		// Parse and add each response part as structured JSON
-//		for partType, builder := range responses {
-//			if builder != nil && builder.Len() > 0 {
-//				content := builder.String()
-//				fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
-//
-//				if partType == "city_data" {
-//					cityDataContent = content
-//				}
-//
-//				// Extract JSON from markdown code blocks if present
-//				content = extractJSONFromMarkdown(content)
-//
-//				// Try to parse as JSON
-//				var parsedJSON interface{}
-//				if err := json.Unmarshal([]byte(content), &parsedJSON); err == nil {
-//					switch partType {
-//					case "city_data":
-//						completeData["general_city_data"] = parsedJSON
-//					case "general_pois":
-//						completeData["points_of_interest"] = parsedJSON
-//					case "itinerary":
-//						completeData["itinerary_response"] = parsedJSON
-//					case "hotels":
-//						completeData["accommodation_response"] = parsedJSON
-//					case "restaurants":
-//						completeData["dining_response"] = parsedJSON
-//					case "activities":
-//						completeData["activities_response"] = parsedJSON
-//					default:
-//						completeData[partType] = parsedJSON
-//					}
-//				} else {
-//					// If parsing fails, store as string
-//					l.logger.WarnContext(ctx, "Failed to parse JSON from response part",
-//						slog.String("part_type", partType), slog.Any("error", err))
-//					completeData[partType+"_raw"] = content
-//				}
-//			}
-//		}
-//		responsesMutex.Unlock()
-//
-//		// Save city data and get cityID BEFORE sending itinerary event
-//		var cityID uuid.UUID
-//		if cityDataContent != "" {
-//			if parsedCityData, parseErr := l.parseCityDataFromResponse(ctx, cityDataContent); parseErr == nil && parsedCityData != nil {
-//				if savedCityID, handleErr := l.HandleCityData(ctx, *parsedCityData); handleErr == nil {
-//					cityID = savedCityID
-//					l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
-//				}
-//			}
-//		}
-//		// Fallback: try to get existing city from database, or create it
-//		if cityID == uuid.Nil && cc.CityName != "" {
-//			existingCity, err := l.cityRepo.FindCityByNameAndCountry(ctx, cc.CityName, "Unknown")
-//			if err != nil || existingCity == nil {
-//				// City doesn't exist, create a minimal entry to allow POI saving
-//				l.logger.InfoContext(ctx, "City not found in database, creating minimal entry",
-//					slog.String("city_name", cc.CityName))
-//				cityDetail := locitypes.CityDetail{
-//					Name:          cc.CityName,
-//					Country:       "Unknown", // Use consistent default to avoid duplicates
-//					StateProvince: "Unknown", // Use consistent default to avoid duplicates
-//				}
-//				cityID, err = l.cityRepo.SaveCity(ctx, cityDetail)
-//				if err != nil {
-//					l.logger.WarnContext(ctx, "Failed to create city entry",
-//						slog.String("city", cc.CityName),
-//						slog.Any("error", err))
-//					cityID = uuid.Nil
-//				} else {
-//					l.logger.InfoContext(ctx, "Successfully created city entry",
-//						slog.String("city", cc.CityName),
-//						slog.String("city_id", cityID.String()))
-//				}
-//			} else {
-//				cityID = existingCity.ID
-//				l.logger.InfoContext(ctx, "Found existing city",
-//					slog.String("city", cc.CityName),
-//					slog.String("city_id", cityID.String()))
-//			}
-//		}
-//
-//		// Save interaction and get llmInteractionID BEFORE sending itinerary event
-//		fullResponse := fullResponseBuilder.String()
-//		if fullResponse == "" {
-//			fullResponse = fmt.Sprintf("Processed %s request for %s", domain, cc.CityName)
-//		}
-//		interaction := locitypes.LlmInteraction{
-//			ID:           uuid.New(),
-//			SessionID:    sessionID,
-//			UserID:       cc.UserID,
-//			ProfileID:    cc.ProfileID,
-//			CityName:     cc.CityName,
-//			Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", domain, cleanedMessage),
-//			ResponseText: fullResponse,
-//			ModelUsed:    model,
-//			LatencyMs:    int(time.Since(startTime).Milliseconds()),
-//			Timestamp:    startTime,
-//		}
-//		savedInteractionID, saveErr := l.llmInteractionRepo.SaveInteraction(ctx, interaction)
-//		if saveErr != nil {
-//			l.logger.WarnContext(ctx, "Failed to save interaction before sending event", slog.Any("error", saveErr))
-//			savedInteractionID = uuid.Nil
-//		} else {
-//			l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedInteractionID.String()))
-//		}
-//
-//		// Build AiCityResponse struct with database IDs
-//		itineraryData := locitypes.AiCityResponse{
-//			SessionID: sessionID,
-//		}
-//
-//		// Populate structured data if available
-//		if generalCityData, ok := completeData["general_city_data"]; ok {
-//			if cityData, parseOk := generalCityData.(map[string]interface{}); parseOk {
-//				// Try to unmarshal into GeneralCityData struct
-//				if jsonBytes, err := json.Marshal(cityData); err == nil {
-//					if err := json.Unmarshal(jsonBytes, &itineraryData.GeneralCityData); err != nil {
-//						l.logger.WarnContext(ctx, "failed to unmarshal general city data", slog.Any("error", err))
-//					}
-//				}
-//			}
-//		}
-//		if pois, ok := completeData["points_of_interest"]; ok {
-//			// Handle cases where the response is nested, e.g., {"points_of_interest": [...]}
-//			if poisMap, ok := pois.(map[string]interface{}); ok {
-//				if poisArr, ok := poisMap["points_of_interest"].([]interface{}); ok {
-//					if jsonBytes, err := json.Marshal(poisArr); err == nil {
-//						if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
-//							l.logger.WarnContext(ctx, "failed to unmarshal nested points of interest", slog.Any("error", err))
-//						}
-//					}
-//				}
-//			} else if poisArr, parseOk := pois.([]interface{}); parseOk { // Handle flat array response
-//				if jsonBytes, err := json.Marshal(poisArr); err == nil {
-//					if err := json.Unmarshal(jsonBytes, &itineraryData.PointsOfInterest); err != nil {
-//						l.logger.WarnContext(ctx, "failed to unmarshal points of interest", slog.Any("error", err))
-//					}
-//				}
-//			}
-//		}
-//		if itinResp, ok := completeData["itinerary_response"]; ok {
-//			if itinData, parseOk := itinResp.(map[string]interface{}); parseOk {
-//				if jsonBytes, err := json.Marshal(itinData); err == nil {
-//					if err := json.Unmarshal(jsonBytes, &itineraryData.AIItineraryResponse); err != nil {
-//						l.logger.WarnContext(ctx, "failed to unmarshal itinerary response", slog.Any("error", err))
-//					}
-//				}
-//			}
-//		}
-//		if hotelsResp, ok := completeData["accommodation_response"]; ok {
-//			if hotelsData, parseOk := hotelsResp.(map[string]interface{}); parseOk {
-//				if hotelsArr, hasHotels := hotelsData["hotels"]; hasHotels {
-//					if jsonBytes, err := json.Marshal(hotelsArr); err == nil {
-//						if err := json.Unmarshal(jsonBytes, &itineraryData.Hotels); err != nil {
-//							l.logger.WarnContext(ctx, "failed to unmarshal hotels", slog.Any("error", err))
-//						}
-//					}
-//				}
-//			}
-//		}
-//		if restaurantsResp, ok := completeData["dining_response"]; ok {
-//			if restaurantsData, parseOk := restaurantsResp.(map[string]interface{}); parseOk {
-//				if restaurantsArr, hasRestaurants := restaurantsData["restaurants"]; hasRestaurants {
-//					if jsonBytes, err := json.Marshal(restaurantsArr); err == nil {
-//						if err := json.Unmarshal(jsonBytes, &itineraryData.Restaurants); err != nil {
-//							l.logger.WarnContext(ctx, "failed to unmarshal restaurants", slog.Any("error", err))
-//						}
-//					}
-//				}
-//			}
-//		}
-//		if activitiesResp, ok := completeData["activities_response"]; ok {
-//			if activitiesData, parseOk := activitiesResp.(map[string]interface{}); parseOk {
-//				if activitiesArr, hasActivities := activitiesData["activities"]; hasActivities {
-//					if jsonBytes, err := json.Marshal(activitiesArr); err == nil {
-//						if err := json.Unmarshal(jsonBytes, &itineraryData.Activities); err != nil {
-//							l.logger.WarnContext(ctx, "failed to unmarshal activities", slog.Any("error", err))
-//						}
-//					}
-//				}
-//			}
-//		}
-//
-//		// Set cityID and llmInteractionID on POIs
-//		if cityID != uuid.Nil {
-//			for i := range itineraryData.PointsOfInterest {
-//				itineraryData.PointsOfInterest[i].CityID = cityID
-//				if savedInteractionID != uuid.Nil {
-//					itineraryData.PointsOfInterest[i].LlmInteractionID = savedInteractionID
-//				}
-//			}
-//			for i := range itineraryData.AIItineraryResponse.PointsOfInterest {
-//				itineraryData.AIItineraryResponse.PointsOfInterest[i].CityID = cityID
-//				if savedInteractionID != uuid.Nil {
-//					itineraryData.AIItineraryResponse.PointsOfInterest[i].LlmInteractionID = savedInteractionID
-//				}
-//			}
-//			for i := range itineraryData.AIItineraryResponse.Restaurants {
-//				itineraryData.AIItineraryResponse.Restaurants[i].CityID = cityID
-//				if savedInteractionID != uuid.Nil {
-//					itineraryData.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedInteractionID
-//				}
-//			}
-//		}
-//
-//		// Consolidate POIs and surface them on both itinerary and top-level fields
-//		allPOIs := make([]locitypes.POIDetailedInfo, 0)
-//		seenIDs := make(map[string]bool)
-//
-//		addUniquePOI := func(pois []locitypes.POIDetailedInfo) {
-//			for _, poi := range pois {
-//				key := poi.ID.String()
-//				if key == "00000000-0000-0000-0000-000000000000" {
-//					key = poi.Name
-//				}
-//				if !seenIDs[key] {
-//					seenIDs[key] = true
-//					allPOIs = append(allPOIs, poi)
-//				}
-//			}
-//		}
-//
-//		addUniquePOI(itineraryData.AIItineraryResponse.PointsOfInterest)
-//		addUniquePOI(itineraryData.PointsOfInterest)
-//		addUniquePOI(itineraryData.AIItineraryResponse.Restaurants)
-//		addUniquePOI(convertHotelsToPOIs(itineraryData.Hotels))
-//		addUniquePOI(itineraryData.Activities)
-//
-//		itineraryData.AIItineraryResponse.PointsOfInterest = allPOIs
-//		itineraryData.PointsOfInterest = allPOIs
-//
-//		l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs into AIItineraryResponse",
-//			slog.Int("total_unique_pois", len(allPOIs)),
-//			slog.Int("from_top_level", len(itineraryData.PointsOfInterest)),
-//			slog.Int("from_nested", len(itineraryData.AIItineraryResponse.PointsOfInterest)))
-//
-//		// Send EventTypeItinerary with proper IDs
-//		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
-//			Type: locitypes.EventTypeItinerary,
-//			Data: itineraryData,
-//		}, 3)
-//
-//		// Update session with the initial itinerary data so it persists for future ContinueChat calls
-//		session.CurrentItinerary = &itineraryData
-//		session.UpdatedAt = time.Now()
-//		if updateErr := l.llmInteractionRepo.UpdateSession(ctx, session); updateErr != nil {
-//			l.logger.WarnContext(ctx, "Failed to update session with initial itinerary", slog.Any("error", updateErr))
-//		} else {
-//			l.logger.InfoContext(ctx, "Successfully saved initial itinerary to session",
-//				slog.Int("poi_count", len(itineraryData.AIItineraryResponse.PointsOfInterest)),
-//				slog.Int("top_level_pois", len(itineraryData.PointsOfInterest)))
-//		}
-//
-//		// Determine route type based on domain
-//		var routeType string
-//		var baseURL string
-//		switch domain {
-//		case locitypes.DomainAccommodation:
-//			routeType = "hotels"
-//			baseURL = "/hotels"
-//		case locitypes.DomainDining:
-//			routeType = "restaurants"
-//			baseURL = "/restaurants"
-//		case locitypes.DomainActivities:
-//			routeType = "activities"
-//			baseURL = "/activities"
-//		default:
-//			routeType = "itinerary"
-//			baseURL = "/itinerary"
-//		}
-//
-//		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
-//			Type: locitypes.EventTypeComplete,
-//			Data: map[string]interface{}{"session_id": sessionID.String()},
-//			Navigation: &locitypes.NavigationData{
-//				URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, sessionID.String(), url.QueryEscape(cc.CityName), routeType),
-//				RouteType: routeType,
-//				QueryParams: map[string]string{
-//					"sessionId": sessionID.String(),
-//					"cityName":  cc.CityName,
-//					"domain":    routeType,
-//				},
-//			},
-//		}, 3)
-//	}
-//	// Note: Do NOT close eventCh here - the handler owns the channel and will close it via defer
-//	l.logger.InfoContext(ctx, "Completion processing finished, event channel will be closed by handler")
-//
-//	span.SetStatus(codes.Ok, "Unified chat stream processed successfully")
-//	return nil
-//}
 
 // ensureItineraryExists initializes the session's CurrentItinerary if it's nil
 func (l *ServiceImpl) ensureItineraryExists(session *locitypes.ChatSession) {
@@ -2494,8 +1999,8 @@ func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseConte
 	return &generalCity, nil
 }
 
-// streamWorkerWithResponseAndCache handles streaming for a single worker with response capture and cache support
-func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) {
+// streamWorkerWithResponseAndCache handles streaming for a single worker with response capture and cache support.
+func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) error {
 	// Step 1: Check cache first if cacheKey is provided
 	if cacheKey != "" {
 		if cached, found := l.cache.Get(cacheKey); found {
@@ -2508,7 +2013,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				chunkSize := 100 // characters per chunk
 				for i := 0; i < len(cachedText); i += chunkSize {
 					if ctx.Err() != nil {
-						return // Stop if context is canceled
+						return ctx.Err()
 					}
 
 					end := min(i+chunkSize, len(cachedText))
@@ -2528,7 +2033,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					// Small delay to simulate streaming
 					time.Sleep(10 * time.Millisecond)
 				}
-				return
+				return nil
 			}
 		}
 
@@ -2542,6 +2047,21 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 		slog.String("part_type", partType),
 		slog.String("cache_key", cacheKey),
 		slog.Int("prompt_length", len(prompt)))
+
+	release, err := l.acquireLLMSlot(ctx)
+	if err != nil {
+		l.logger.ErrorContext(ctx, "LLM capacity exceeded",
+			slog.String("part_type", partType),
+			slog.Any("error", err))
+		if ctx.Err() == nil {
+			sendEvent(locitypes.StreamEvent{
+				Type:  locitypes.EventTypeError,
+				Error: "We are experiencing high traffic. Please try again in a minute.",
+			})
+		}
+		return err
+	}
+	defer release()
 
 	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
 
@@ -2561,7 +2081,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				Error: errorMsg,
 			})
 		}
-		return
+		return fmt.Errorf("%s worker failed: %w", partType, err)
 	}
 	// Step 3: Stream response and collect full text for caching
 	var fullResponse strings.Builder
@@ -2571,7 +2091,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			l.logger.WarnContext(ctx, "Context canceled during streaming",
 				slog.String("part_type", partType),
 				slog.Int("chunks_received", chunkCount))
-			return // Stop if context is canceled
+			return ctx.Err()
 		}
 		if err != nil {
 			l.logger.ErrorContext(ctx, "Streaming error from LLM",
@@ -2583,7 +2103,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					Error: fmt.Sprintf("%s streaming error: %v", partType, err),
 				})
 			}
-			return
+			return fmt.Errorf("%s streaming error: %w", partType, err)
 		}
 		for _, cand := range resp.Candidates {
 			if cand.Content != nil {
@@ -2625,12 +2145,13 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 
 	// Step 4: Save full response to cache if cacheKey is provided
 	if cacheKey != "" && fullResponse.Len() > 0 {
-		l.cache.Set(cacheKey, fullResponse.String(), cache.DefaultExpiration)
+		l.cache.Set(cacheKey, fullResponse.String(), 0)
 		l.logger.InfoContext(ctx, "Saved LLM response to cache",
 			slog.String("part_type", partType),
 			slog.String("cache_key", cacheKey),
 			slog.Int("response_length", fullResponse.Len()))
 	}
+	return nil
 }
 
 // convertRestaurantsToPOIs lifts restaurant-specific details into the generic POI shape

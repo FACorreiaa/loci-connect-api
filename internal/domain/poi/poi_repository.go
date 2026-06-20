@@ -2690,19 +2690,15 @@ func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.
 		}
 	}() // Rollback on error
 
-	stmt, err := tx.Prepare(ctx, "insert_llm_poi", `
+	const insertLLMPOIQuery = `
         INSERT INTO llm_suggested_pois (id, user_id, llm_interaction_id, name, latitude, longitude, category, description_poi, distance, location)
         VALUES ($1, $2, $3, $4::TEXT, $5, $6, $7, $8, $9, ST_SetSRID(ST_MakePoint($6, $5), 4326))
         ON CONFLICT (name, latitude, longitude) DO NOTHING
-    `)
-	if err != nil {
-		l.ErrorContext(ctx, "Failed to prepare statement for LLM POI insertion", slog.Any("error", err))
-		span.RecordError(err)
-		return fmt.Errorf("failed to prepare statement: %w", err)
-	}
+    `
 
+	batch := &pgx.Batch{}
+	validCount := 0
 	for _, poi := range pois {
-		// Validate POI data
 		if poi.Name == "" {
 			l.WarnContext(ctx, "POI has empty or nil name, skipping", slog.String("poi_name", poi.Name))
 			continue
@@ -2712,8 +2708,7 @@ func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.
 			continue
 		}
 
-		// Log parameter values for debugging
-		l.DebugContext(ctx, "Inserting POI",
+		l.DebugContext(ctx, "Queueing POI batch insert",
 			slog.String("poi_name", poi.Name),
 			slog.Float64("latitude", poi.Latitude),
 			slog.Float64("longitude", poi.Longitude),
@@ -2721,11 +2716,23 @@ func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.
 			slog.String("description", poi.Description),
 			slog.Float64("distance", poi.Distance))
 
-		_, err := tx.Exec(ctx, stmt.Name, poi.ID, userID, llmInteractionID, poi.Name, poi.Latitude, poi.Longitude, poi.Category, poi.Description, poi.Distance)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to insert LLM POI", slog.Any("error", err), slog.String("poi_name", poi.Name))
+		batch.Queue(insertLLMPOIQuery, poi.ID, userID, llmInteractionID, poi.Name, poi.Latitude, poi.Longitude, poi.Category, poi.Description, poi.Distance)
+		validCount++
+	}
+
+	if validCount == 0 {
+		l.InfoContext(ctx, "No valid LLM POIs to insert after validation")
+		return nil
+	}
+
+	br := tx.SendBatch(ctx, batch)
+	defer br.Close()
+
+	for i := 0; i < validCount; i++ {
+		if _, err := br.Exec(); err != nil {
+			l.ErrorContext(ctx, "Failed to execute LLM POI batch insert", slog.Any("error", err), slog.Int("batch_index", i))
 			span.RecordError(err)
-			return fmt.Errorf("failed to insert LLM POI: %w", err)
+			return fmt.Errorf("failed to insert LLM POI at batch index %d: %w", i, err)
 		}
 	}
 

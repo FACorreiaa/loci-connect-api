@@ -116,9 +116,10 @@ func (h *ChatHandler) StreamChat(
 
 	eventCh := make(chan locitypes.StreamEvent, 100)
 
-	// Create a detached context for LLM processing that won't be cancelled
-	// when the RPC stream ends. Use a reasonable timeout for LLM operations.
-	llmCtx, llmCancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	// Propagate trace/request IDs from the RPC context, but detach client cancel
+	// so LLM work can finish after disconnect. Handler timeout (CHAT_RPC_TIMEOUT_SEC,
+	// default 3m) bounds preparation; workers use a separate 5m deadline.
+	llmCtx, llmCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute)
 
 	cc := common.ChatContext{
 		Ctx:          llmCtx,

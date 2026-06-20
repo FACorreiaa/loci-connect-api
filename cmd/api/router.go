@@ -75,22 +75,42 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		)
 		rateLimiter = interceptors.NewRateLimitInterceptor(limiter)
 	}
+	ipRateLimiter := interceptors.NewIPRateLimitInterceptor(
+		deps.Config.Server.IPRateLimitPerSecond,
+		deps.Config.Server.IPRateLimitBurst,
+		deps.Config.Server.IPRateLimitMaxEntries,
+	)
+	userRateLimiter := interceptors.NewUserRateLimitInterceptor(
+		deps.Config.Server.UserRateLimitPerSecond,
+		deps.Config.Server.UserRateLimitBurst,
+		deps.Config.Server.UserRateLimitMaxEntries,
+	)
 
 	requestIDInterceptor := interceptors.NewRequestIDInterceptor("X-Request-ID")
 	tracingInterceptor := interceptors.NewTracingInterceptor(tracer)
 	validationInterceptor := validate.NewInterceptor()
 	subscriptionInterceptor := subscription.NewRateLimitInterceptor(deps.SubscriptionService)
+	authInterceptor := interceptors.NewAuthInterceptor(jwtSecret, publicProcedures...)
+	timeoutInterceptor := interceptors.NewTimeoutInterceptor(interceptors.TimeoutConfig{
+		Default:   deps.Config.Server.DefaultRPCTimeout,
+		Chat:      deps.Config.Server.ChatRPCTimeout,
+		StreamMax: deps.Config.Server.ChatStreamMaxTimeout,
+	})
 
-	// Setup interceptor chain
+	// Auth must run before subscription quota so JWT claims are in context.
+	// IP limits run before auth; per-user limits run after auth.
 	interceptorChain := connect.WithInterceptors(
 		requestIDInterceptor,
 		tracingInterceptor,
 		validationInterceptor,
+		timeoutInterceptor,
 		rateLimiter,
-		subscriptionInterceptor,
+		ipRateLimiter,
 		interceptors.NewRecoveryInterceptor(deps.Logger),
 		interceptors.NewLoggingInterceptor(deps.Logger),
-		interceptors.NewAuthInterceptor(jwtSecret, publicProcedures...),
+		authInterceptor,
+		userRateLimiter,
+		subscriptionInterceptor,
 		observability.NewMetricsInterceptor(),
 	)
 
@@ -323,8 +343,15 @@ func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 	})
 	deps.Logger.Info("registered health details", "path", "/health/details")
 
-	// Readiness check endpoint
+	// Readiness check endpoint — verifies DB connectivity before accepting traffic.
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, _ *http.Request) {
+		if err := deps.DB.Health(); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			if _, writeErr := w.Write([]byte("database unavailable")); writeErr != nil {
+				deps.Logger.Error("failed to write readiness response", slog.Any("error", writeErr))
+			}
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("ready")); err != nil {
 			deps.Logger.Error("failed to write readiness response", slog.Any("error", err))

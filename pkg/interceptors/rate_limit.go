@@ -2,7 +2,6 @@ package interceptors
 
 import (
 	"context"
-	"errors"
 
 	"connectrpc.com/connect"
 	"golang.org/x/time/rate"
@@ -21,13 +20,14 @@ func NewRateLimitInterceptor(limiter *rate.Limiter) *RateLimitInterceptor {
 // WrapUnary implements connect.Interceptor.
 func (i *RateLimitInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if i == nil || i.limiter == nil || i.limiter.Allow() {
+		if i == nil || i.limiter == nil {
 			return next(ctx, req)
 		}
-		return nil, connect.NewError(
-			connect.CodeResourceExhausted,
-			errors.New("rate limit exceeded"),
-		)
+		if allowed, retryAfter := allowWithRetry(i.limiter); allowed {
+			return next(ctx, req)
+		} else {
+			return nil, newRateLimitError(retryAfter)
+		}
 	}
 }
 
@@ -41,12 +41,13 @@ func (i *RateLimitInterceptor) WrapStreamingClient(next connect.StreamingClientF
 // WrapStreamingHandler implements connect.Interceptor.
 func (i *RateLimitInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		if i == nil || i.limiter == nil || i.limiter.Allow() {
+		if i == nil || i.limiter == nil {
 			return next(ctx, conn)
 		}
-		return connect.NewError(
-			connect.CodeResourceExhausted,
-			errors.New("rate limit exceeded"),
-		)
+		allowed, retryAfter := allowWithRetry(i.limiter)
+		if allowed {
+			return next(ctx, conn)
+		}
+		return newRateLimitError(retryAfter)
 	}
 }

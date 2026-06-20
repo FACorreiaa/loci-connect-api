@@ -40,7 +40,10 @@ func bootServer(t *testing.T) (string, func()) {
 			// Non-zero so the rate-limit interceptor is constructed (the router
 			// only builds it when both knobs are > 0); high enough not to trip.
 			RateLimitPerSecond: 10000,
-			RateLimitBurst:     10000,
+			RateLimitBurst:         10000,
+			DefaultRPCTimeout:      30 * time.Second,
+			ChatRPCTimeout:         3 * time.Minute,
+			ChatStreamMaxTimeout:   10 * time.Minute,
 		},
 		Database: config.DatabaseConfig{
 			Host:     host,
@@ -57,7 +60,12 @@ func bootServer(t *testing.T) (string, func()) {
 		Observability: config.ObservabilityConfig{MetricsEnabled: false},
 		// Dummy Gemini creds: genai.NewClient only builds a client (no network),
 		// so InitDependencies boots; the e2e flow never calls LLM endpoints.
-		Gemini: config.GeminiConfig{APIKey: "e2e-dummy-key", Model: "gemini-1.5-flash"},
+		Gemini: config.GeminiConfig{
+			APIKey:         "e2e-dummy-key",
+			Model:          "gemini-1.5-flash",
+			EmbeddingModel: "gemini-embedding-exp-03-07",
+			MaxRetries:     3,
+		},
 	}
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))

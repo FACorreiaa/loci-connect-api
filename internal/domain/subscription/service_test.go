@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +16,10 @@ import (
 type fakeUsageRepo struct {
 	usage     int
 	usageErr  error
+	plan      string
+	planErr   error
 	getCalls  int
+	planCalls int
 	incCalls  int
 	incErr    error
 	lastIncID uuid.UUID
@@ -24,6 +28,14 @@ type fakeUsageRepo struct {
 func (f *fakeUsageRepo) GetDailyUsage(_ context.Context, _ uuid.UUID) (int, error) {
 	f.getCalls++
 	return f.usage, f.usageErr
+}
+
+func (f *fakeUsageRepo) GetUserPlan(_ context.Context, _ uuid.UUID) (string, error) {
+	f.planCalls++
+	if f.plan == "" {
+		return "free", f.planErr
+	}
+	return f.plan, f.planErr
 }
 
 func (f *fakeUsageRepo) IncrementUsage(_ context.Context, id uuid.UUID) error {
@@ -101,6 +113,55 @@ func TestRecordUsage(t *testing.T) {
 	}
 	if repo.lastIncID != id {
 		t.Fatalf("increment used wrong id: got %s want %s", repo.lastIncID, id)
+	}
+}
+
+func TestCheckRateLimit_PremiumPlanHighLimit(t *testing.T) {
+	repo := &fakeUsageRepo{usage: 100, plan: "premium_monthly"}
+	svc := NewService(repo, testLogger(), "admin@example.com")
+
+	if err := svc.CheckRateLimit(context.Background(), uuid.New(), "user@example.com"); err != nil {
+		t.Fatalf("premium usage under unlimited cap should pass, got %v", err)
+	}
+}
+
+func TestCheckRateLimit_PaidPlanTenPerDay(t *testing.T) {
+	repo := &fakeUsageRepo{usage: 10, plan: "paid"}
+	svc := NewService(repo, testLogger(), "admin@example.com")
+
+	err := svc.CheckRateLimit(context.Background(), uuid.New(), "user@example.com")
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("paid plan at 10 requests should be quota exceeded, got %v", err)
+	}
+}
+
+func TestDailyLimitForPlan(t *testing.T) {
+	if got := dailyLimitForPlan("free"); got != 5 {
+		t.Fatalf("free limit = %d, want 5", got)
+	}
+	if got := dailyLimitForPlan("paid"); got != 10 {
+		t.Fatalf("paid limit = %d, want 10", got)
+	}
+	if got := dailyLimitForPlan("premium_monthly"); got != unlimitedDailyRequests {
+		t.Fatalf("premium limit = %d, want unlimited", got)
+	}
+}
+
+func TestEffectivePlan(t *testing.T) {
+	future := time.Now().Add(24 * time.Hour)
+	past := time.Now().Add(-24 * time.Hour)
+
+	if got := effectivePlan("premium_monthly", "active", nil); got != "premium_monthly" {
+		t.Fatalf("active plan = %q", got)
+	}
+	if got := effectivePlan("premium_monthly", "canceled", &future); got != "premium_monthly" {
+		t.Fatalf("canceled with future end = %q", got)
+	}
+	if got := effectivePlan("premium_monthly", "canceled", &past); got != string(TierFree) {
+		t.Fatalf("canceled with past end = %q, want free", got)
+	}
+	if got := effectivePlan("premium_monthly", "expired", nil); got != string(TierFree) {
+		t.Fatalf("expired plan = %q, want free", got)
 	}
 }
 

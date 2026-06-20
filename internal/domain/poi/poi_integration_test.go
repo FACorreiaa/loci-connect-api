@@ -4,6 +4,7 @@ package poi
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -11,6 +12,8 @@ import (
 
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +45,24 @@ func TestMain(m *testing.M) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	realRepo := NewRepository(testDB, logger)
 	cityRepo := cityrepo.NewCityRepository(testDB, logger)
-	testService = NewServiceImpl(realRepo, nil, cityRepo, stubDiscover{}, logger)
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		apiKey = "test-key"
+	}
+	model := os.Getenv("GEMINI_MODEL")
+	if model == "" {
+		model = "gemini-1.5-flash"
+	}
+	appCache, err := cachestore.New(cachestore.Config{}, logger)
+	if err != nil {
+		panic(fmt.Sprintf("failed to init test cache: %v", err))
+	}
+	testService = NewServiceImpl(realRepo, nil, cityRepo, stubDiscover{}, config.GeminiConfig{
+		APIKey:         apiKey,
+		Model:          model,
+		EmbeddingModel: "gemini-embedding-exp-03-07",
+		MaxRetries:     3,
+	}, nil, appCache, logger)
 	os.Exit(m.Run())
 }
 

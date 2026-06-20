@@ -55,20 +55,26 @@ func (s *service) CheckRateLimit(ctx context.Context, userID uuid.UUID, email st
 	// For MVP efficiently: We can assume Free unless proven otherwise.
 	// Let's check DB usage first as that's always needed.
 
+	plan, err := s.repo.GetUserPlan(ctx, userID)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to get subscription plan", "error", err)
+		return err
+	}
+
 	usage, err := s.repo.GetDailyUsage(ctx, userID)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "failed to get usage", "error", err)
-		return err // Fail safe or fail open? Fail safe for now.
+		return err
 	}
 
-	// Hardcoded limits for MVP until we wire up full subscription reading
-	limit := 5 // Free tier default
-
-	// If we had tier info, we'd switch here.
-	// For now, let's enforce 5.
-	// Real implementation needs to read subscription.
-
+	limit := dailyLimitForPlan(plan)
 	if usage >= limit {
+		s.logger.InfoContext(ctx, "daily quota exceeded",
+			"user_id", userID,
+			"plan", plan,
+			"usage", usage,
+			"limit", limit,
+		)
 		return ErrQuotaExceeded
 	}
 

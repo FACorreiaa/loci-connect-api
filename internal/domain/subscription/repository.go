@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,6 +24,7 @@ var _ PgxPool = (*pgxpool.Pool)(nil)
 type Repository interface {
 	GetDailyUsage(ctx context.Context, userID uuid.UUID) (int, error)
 	IncrementUsage(ctx context.Context, userID uuid.UUID) error
+	GetUserPlan(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
 type repository struct {
@@ -48,6 +50,24 @@ func (r *repository) GetDailyUsage(ctx context.Context, userID uuid.UUID) (int, 
 		return 0, fmt.Errorf("failed to get daily usage: %w", err)
 	}
 	return count, nil
+}
+
+func (r *repository) GetUserPlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	var plan, status string
+	var endDate *time.Time
+	query := `
+		SELECT plan::text, status::text, end_date
+		FROM subscriptions
+		WHERE user_id = $1
+	`
+	err := r.pgpool.QueryRow(ctx, query, userID).Scan(&plan, &status, &endDate)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return string(TierFree), nil
+		}
+		return "", fmt.Errorf("failed to get user plan: %w", err)
+	}
+	return effectivePlan(plan, status, endDate), nil
 }
 
 func (r *repository) IncrementUsage(ctx context.Context, userID uuid.UUID) error {

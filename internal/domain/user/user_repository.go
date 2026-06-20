@@ -316,6 +316,18 @@ func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, 
 		argID++
 		span.SetAttributes(attribute.Bool("update.badges", true))
 	}
+	if params.Theme != nil {
+		setClauses = append(setClauses, fmt.Sprintf("theme = $%d", argID))
+		args = append(args, *params.Theme)
+		argID++
+		span.SetAttributes(attribute.Bool("update.theme", true))
+	}
+	if params.Language != nil {
+		setClauses = append(setClauses, fmt.Sprintf("language = $%d", argID))
+		args = append(args, *params.Language)
+		argID++
+		span.SetAttributes(attribute.Bool("update.language", true))
+	}
 
 	// If no fields were provided to update, return early (or error?)
 	if len(setClauses) == 0 {

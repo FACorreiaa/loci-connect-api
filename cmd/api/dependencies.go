@@ -36,6 +36,8 @@ import (
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
@@ -45,7 +47,8 @@ import (
 type Dependencies struct {
 	Config *config.Config
 	DB     *db.DB
-	Logger *slog.Logger
+	Logger   *slog.Logger
+	AppCache cachestore.Store
 
 	// Repositories
 	AuthRepo       repository.AuthRepository
@@ -142,10 +145,10 @@ func InitDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, e
 func (d *Dependencies) initDatabase() error {
 	database, err := db.New(db.Config{
 		DSN:             d.Config.Database.DSN(),
-		MaxConns:        25,
-		MinConns:        5,
-		MaxConnLifetime: 5 * time.Minute,
-		MaxConnIdleTime: 10 * time.Minute,
+		MaxConns:        d.Config.Database.MaxConns,
+		MinConns:        d.Config.Database.MinConns,
+		MaxConnLifetime: d.Config.Database.MaxConnLifetime,
+		MaxConnIdleTime: d.Config.Database.MaxConnIdleTime,
 	}, d.Logger)
 	if err != nil {
 		return err
@@ -208,7 +211,19 @@ func (d *Dependencies) initServices() error {
 
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
-	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Logger)
+	llmSem := concurrency.NewLLMSemaphore(d.Config.Gemini.MaxConcurrentCalls)
+	appCache, err := cachestore.New(cachestore.Config{
+		RedisURL:   d.Config.Cache.RedisURL,
+		KeyPrefix:  d.Config.Cache.KeyPrefix,
+		LLMTTL:     d.Config.Cache.LLMTTL,
+		GeoTTL:     d.Config.Cache.GeoTTL,
+		CleanupTTL: d.Config.Cache.CleanupTTL,
+	}, d.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize cache: %w", err)
+	}
+	d.AppCache = appCache
+	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.Gemini, llmSem, appCache, d.Logger)
 	chatSvc, err := chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,
@@ -220,9 +235,9 @@ func (d *Dependencies) initServices() error {
 		d.POISvc,
 		d.ListSvc,
 		d.Logger,
-		d.Config.Gemini.APIKey,
-		d.Config.Gemini.Model,
-		d.Config.Gemini.EmbeddingModel,
+		d.Config.Gemini,
+		llmSem,
+		appCache,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
@@ -284,6 +299,11 @@ func (d *Dependencies) initHandlers() error {
 func (d *Dependencies) Cleanup() {
 	if closer, ok := d.ChatService.(interface{ Close() }); ok {
 		closer.Close()
+	}
+	if d.AppCache != nil {
+		if err := d.AppCache.Close(); err != nil {
+			d.Logger.Warn("failed to close cache", slog.Any("error", err))
+		}
 	}
 	if d.DB != nil {
 		d.DB.Close()
