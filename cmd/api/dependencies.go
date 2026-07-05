@@ -251,7 +251,10 @@ func (d *Dependencies) initServices() error {
 	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
 	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
 	d.TagsSvc = tagrepo.NewtagsService(d.TagRepo, d.Logger)
-	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail)
+	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail, subscription.Limits{
+		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
+		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
+	})
 	// Using STRIPE_API_KEY from environment
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, os.Getenv("STRIPE_API_KEY"))
 

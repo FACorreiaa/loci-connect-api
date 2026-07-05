@@ -5,12 +5,19 @@ This document outlines the implementation strategy for the new pricing tiers and
 
 ## Tiers & Limits
 
-| Tier | Limits | Model | Lists Limit | Features |
-|------|--------|-------|-------------|----------|
-| **Admin** (`loci122025@gmail.com`) | Unlimited | Best Available | Unlimited | All |
-| **Free** | 5 requests/day | `gemini-1.5-flash` (Fast/Cheap) | 5 lists (Basic info) | Basic Search |
-| **Paid** | 10 requests/day | `gemini-1.5-pro` (Balanced) | 5 lists (Slower/Less info) | Basic Search |
-| **Premium** | Unlimited | `gemini-1.5-pro` (Best) | Unlimited | Multi-city, Deep info |
+Two public tiers. "Pro" is the marketing name for both `premium_monthly` and
+`premium_annual` plan values; Pro is sold as unlimited but carries a hidden
+fair-use cap. Limits are env-configurable (`FREE_DAILY_LLM_LIMIT`, default 10;
+`PRO_DAILY_LLM_LIMIT`, default 300).
+
+| Tier | Limits | Notes |
+|------|--------|-------|
+| **Admin** (`ADMIN_EMAIL` env) | Unlimited | Quota bypass |
+| **Free** | 10 LLM requests/day | Metered on chat RPCs only (StartChat, ContinueChat, StreamChat) |
+| **Pro** (`premium_monthly` / `premium_annual`) | "Unlimited" — hidden fair-use cap 300/day | Fair-use denial shows retry copy, never an upgrade CTA |
+
+Historic tier table (superseded): free 5/day, paid 10/day, premium unlimited.
+The `paid`/`explorer` plan strings never existed in the DB enum and were removed.
 
 ## Implementation Strategy
 

@@ -17,6 +17,7 @@ type Config struct {
 	Server        ServerConfig
 	Database      DatabaseConfig
 	Auth          AuthConfig
+	Subscription  SubscriptionConfig
 	Cache         CacheConfig
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
@@ -79,6 +80,13 @@ type AuthConfig struct {
 	AdminEmail string
 }
 
+// SubscriptionConfig holds daily LLM request quotas per plan tier.
+// ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
+type SubscriptionConfig struct {
+	FreeDailyLLMLimit int
+	ProDailyLLMLimit  int
+}
+
 type ObservabilityConfig struct {
 	MetricsEnabled bool
 	MetricsPort    int
@@ -124,6 +132,10 @@ func Load() (*Config, error) {
 		Auth: AuthConfig{
 			JWTSecret:  getEnv("JWT_SECRET", "changeme"),
 			AdminEmail: getEnv("ADMIN_EMAIL", ""),
+		},
+		Subscription: SubscriptionConfig{
+			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
+			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 300),
 		},
 		Cache: CacheConfig{
 			RedisURL:   getEnv("REDIS_URL", ""),

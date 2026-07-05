@@ -17,21 +17,20 @@ import (
 )
 
 type recordingSubscriptionService struct {
-	checkCalled bool
-	checkUserID uuid.UUID
-	checkEmail  string
+	consumeCalled bool
+	consumeUserID uuid.UUID
+	consumeEmail  string
+	consumeErr    error
 }
 
-func (s *recordingSubscriptionService) CheckRateLimit(_ context.Context, userID uuid.UUID, email string) error {
-	s.checkCalled = true
-	s.checkUserID = userID
-	s.checkEmail = email
-	return nil
+func (s *recordingSubscriptionService) ConsumeQuota(_ context.Context, userID uuid.UUID, email string) error {
+	s.consumeCalled = true
+	s.consumeUserID = userID
+	s.consumeEmail = email
+	return s.consumeErr
 }
 
-func (s *recordingSubscriptionService) RecordUsage(_ context.Context, _ uuid.UUID) error {
-	return nil
-}
+func (s *recordingSubscriptionService) InvalidatePlan(_ uuid.UUID) {}
 
 func signTestJWT(t *testing.T, secret []byte, userID uuid.UUID, email string) string {
 	t.Helper()
@@ -78,14 +77,14 @@ func TestInterceptorChain_AuthBeforeSubscriptionQuota(t *testing.T) {
 	if _, err := client.StartChat(context.Background(), req); err != nil {
 		t.Fatalf("StartChat error: %v", err)
 	}
-	if !subSvc.checkCalled {
-		t.Fatal("expected subscription CheckRateLimit to run with authenticated user")
+	if !subSvc.consumeCalled {
+		t.Fatal("expected subscription ConsumeQuota to run with authenticated user")
 	}
-	if subSvc.checkUserID != userID {
-		t.Fatalf("check user id = %s, want %s", subSvc.checkUserID, userID)
+	if subSvc.consumeUserID != userID {
+		t.Fatalf("consume user id = %s, want %s", subSvc.consumeUserID, userID)
 	}
-	if subSvc.checkEmail != email {
-		t.Fatalf("check email = %q, want %q", subSvc.checkEmail, email)
+	if subSvc.consumeEmail != email {
+		t.Fatalf("consume email = %q, want %q", subSvc.consumeEmail, email)
 	}
 }
 
@@ -117,7 +116,76 @@ func TestInterceptorChain_SubscriptionBeforeAuthReturnsUnauthenticated(t *testin
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("expected Unauthenticated with wrong order, got %v (%v)", connect.CodeOf(err), err)
 	}
-	if subSvc.checkCalled {
-		t.Fatal("CheckRateLimit should not run when claims are missing from context")
+	if subSvc.consumeCalled {
+		t.Fatal("ConsumeQuota should not run when claims are missing from context")
+	}
+}
+
+// streamChatHandler serves the real server-streaming StreamChat procedure
+// through the auth + quota interceptors, guarding against the pre-fix bug
+// where StreamChat bypassed the daily quota entirely.
+func streamChatHandler(secret []byte, subSvc subscription.Service) http.Handler {
+	return connect.NewServerStreamHandler(
+		chatconnect.ChatServiceStreamChatProcedure,
+		func(ctx context.Context, _ *connect.Request[chatpb.ChatRequest], stream *connect.ServerStream[chatpb.StreamEvent]) error {
+			return stream.Send(&chatpb.StreamEvent{})
+		},
+		connect.WithInterceptors(
+			interceptors.NewAuthInterceptor(secret),
+			subscription.NewRateLimitInterceptor(subSvc),
+		),
+	)
+}
+
+func TestInterceptorChain_StreamChatConsumesQuota(t *testing.T) {
+	secret := []byte("test-secret")
+	userID := uuid.New()
+	subSvc := &recordingSubscriptionService{}
+
+	srv := httptest.NewServer(streamChatHandler(secret, subSvc))
+	defer srv.Close()
+
+	client := chatconnect.NewChatServiceClient(http.DefaultClient, srv.URL)
+	req := connect.NewRequest(&chatpb.ChatRequest{})
+	req.Header().Set("Authorization", "Bearer "+signTestJWT(t, secret, userID, "traveler@example.com"))
+
+	stream, err := client.StreamChat(context.Background(), req)
+	if err != nil {
+		t.Fatalf("StreamChat error: %v", err)
+	}
+	for stream.Receive() {
+	}
+	if err := stream.Err(); err != nil {
+		t.Fatalf("StreamChat stream error: %v", err)
+	}
+	if !subSvc.consumeCalled {
+		t.Fatal("expected ConsumeQuota to run for StreamChat (streaming bypass regression)")
+	}
+	if subSvc.consumeUserID != userID {
+		t.Fatalf("consume user id = %s, want %s", subSvc.consumeUserID, userID)
+	}
+}
+
+func TestInterceptorChain_StreamChatQuotaDenialReachesClient(t *testing.T) {
+	secret := []byte("test-secret")
+	subSvc := &recordingSubscriptionService{
+		consumeErr: &subscription.QuotaExceededError{Plan: subscription.PlanFree, Limit: 10},
+	}
+
+	srv := httptest.NewServer(streamChatHandler(secret, subSvc))
+	defer srv.Close()
+
+	client := chatconnect.NewChatServiceClient(http.DefaultClient, srv.URL)
+	req := connect.NewRequest(&chatpb.ChatRequest{})
+	req.Header().Set("Authorization", "Bearer "+signTestJWT(t, secret, uuid.New(), "traveler@example.com"))
+
+	stream, err := client.StreamChat(context.Background(), req)
+	if err == nil {
+		for stream.Receive() {
+		}
+		err = stream.Err()
+	}
+	if connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("expected ResourceExhausted for exhausted stream quota, got %v (%v)", connect.CodeOf(err), err)
 	}
 }

@@ -65,6 +65,24 @@ var (
 		},
 		[]string{"procedure"},
 	)
+
+	// QuotaConsumedTotal tracks daily LLM request quota consumptions by plan.
+	QuotaConsumedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_quota_consumed_total",
+			Help: "Daily LLM request quota consumptions by subscription plan",
+		},
+		[]string{"plan"},
+	)
+
+	// QuotaDenialsTotal tracks daily LLM request quota denials by plan.
+	QuotaDenialsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_quota_denials_total",
+			Help: "Daily LLM request quota denials by subscription plan",
+		},
+		[]string{"plan"},
+	)
 )
 
 // MetricsInterceptor collects Prometheus metrics for unary and streaming RPCs.
