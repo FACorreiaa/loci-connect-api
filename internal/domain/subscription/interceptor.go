@@ -85,7 +85,7 @@ func (i *RateLimitInterceptor) consumeQuota(ctx context.Context) error {
 	var quotaErr *QuotaExceededError
 	if errors.As(err, &quotaErr) {
 		cerr := connect.NewError(connect.CodeResourceExhausted, err)
-		if isProPlan(quotaErr.Plan) {
+		if IsProPlan(quotaErr.Plan) {
 			cerr.Meta().Set(QuotaReasonHeader, QuotaReasonFairUse)
 		} else {
 			cerr.Meta().Set(QuotaReasonHeader, QuotaReasonFreeDaily)

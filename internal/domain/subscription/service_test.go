@@ -133,7 +133,7 @@ func TestConsumeQuota_ProPlanFairUseCap(t *testing.T) {
 		t.Fatalf("pro at 300/300 should be denied, got %v", err)
 	}
 	var quotaErr *QuotaExceededError
-	if !errors.As(err, &quotaErr) || !isProPlan(quotaErr.Plan) {
+	if !errors.As(err, &quotaErr) || !IsProPlan(quotaErr.Plan) {
 		t.Fatalf("expected pro-plan quota error, got %v", err)
 	}
 }

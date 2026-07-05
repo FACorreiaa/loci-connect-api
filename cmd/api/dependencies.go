@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -255,8 +254,12 @@ func (d *Dependencies) initServices() error {
 		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
 	})
-	// Using STRIPE_API_KEY from environment
-	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, os.Getenv("STRIPE_API_KEY"))
+	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
+		APIKey:         d.Config.Stripe.APIKey,
+		PriceIDMonthly: d.Config.Stripe.PriceIDMonthly,
+		PriceIDAnnual:  d.Config.Stripe.PriceIDAnnual,
+		FreeDailyLimit: d.Config.Subscription.FreeDailyLLMLimit,
+	})
 
 	// Custom auth (OAuth + phone). Both degrade gracefully when their env vars
 	// are absent: OAuth registers no providers, phone reports disabled.

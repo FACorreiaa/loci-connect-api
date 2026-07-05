@@ -119,7 +119,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 
 	// Register Webhooks
 	if deps.PaymentService != nil {
-		mux.Handle("/webhooks/stripe", payment.WebhookHandler(deps.PaymentService, deps.Logger))
+		mux.Handle("/webhooks/stripe", payment.WebhookHandler(deps.PaymentService, deps.Logger, deps.Config.Stripe.WebhookSecret))
 		deps.Logger.Info("registered webhook", "path", "/webhooks/stripe")
 	}
 

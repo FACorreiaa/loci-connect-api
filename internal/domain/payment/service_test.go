@@ -9,15 +9,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v81"
 )
 
 // fakePaymentRepo is an in-memory Repository. Only the methods exercised by
 // ProcessStripeEvent capture state; the rest satisfy the interface.
 type fakePaymentRepo struct {
-	upserted    []*Subscription
-	upsertErr   error
-	webhookSeen []string
+	upserted        []*Subscription
+	upsertErr       error
+	webhookSeen     []string
+	linkedCustomers map[uuid.UUID]string
+	customerToUser  map[string]uuid.UUID
+	subscription    *Subscription
+	dailyUsage      int
 }
 
 func (f *fakePaymentRepo) CreatePayment(context.Context, *Payment) error { return nil }
@@ -54,6 +59,12 @@ func (f *fakePaymentRepo) GetTotalRefundedAmount(context.Context, uuid.UUID) (in
 }
 
 func (f *fakePaymentRepo) RecordWebhookEvent(_ context.Context, eventID, _ string) error {
+	for _, seen := range f.webhookSeen {
+		if seen == eventID {
+			// Mirror the DB unique constraint on webhook_events.event_id.
+			return &pgconn.PgError{Code: "23505"}
+		}
+	}
 	f.webhookSeen = append(f.webhookSeen, eventID)
 	return nil
 }
@@ -63,7 +74,23 @@ func (f *fakePaymentRepo) GetSubscriptionByStripeID(context.Context, string) (*S
 }
 
 func (f *fakePaymentRepo) GetSubscriptionByUserID(context.Context, uuid.UUID) (*Subscription, error) {
-	return nil, nil
+	return f.subscription, nil
+}
+
+func (f *fakePaymentRepo) GetUserIDByStripeCustomerID(_ context.Context, customerID string) (uuid.UUID, error) {
+	return f.customerToUser[customerID], nil
+}
+
+func (f *fakePaymentRepo) SetStripeCustomerID(_ context.Context, userID uuid.UUID, customerID string) error {
+	if f.linkedCustomers == nil {
+		f.linkedCustomers = map[uuid.UUID]string{}
+	}
+	f.linkedCustomers[userID] = customerID
+	return nil
+}
+
+func (f *fakePaymentRepo) GetDailyUsage(context.Context, uuid.UUID) (int, error) {
+	return f.dailyUsage, nil
 }
 
 func (f *fakePaymentRepo) UpdateSubscriptionStatus(context.Context, uuid.UUID, string, *time.Time, *time.Time) error {
@@ -78,8 +105,33 @@ func (f *fakePaymentRepo) UpsertSubscription(_ context.Context, sub *Subscriptio
 	return nil
 }
 
+// recordingInvalidator captures plan-cache invalidations.
+type recordingInvalidator struct {
+	invalidated []uuid.UUID
+}
+
+func (r *recordingInvalidator) InvalidatePlan(userID uuid.UUID) {
+	r.invalidated = append(r.invalidated, userID)
+}
+
 func newTestService(repo Repository) Service {
-	return NewService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)), "sk_test_dummy")
+	svc, _ := newTestServiceWithInvalidator(repo)
+	return svc
+}
+
+func newTestServiceWithInvalidator(repo Repository) (Service, *recordingInvalidator) {
+	inv := &recordingInvalidator{}
+	var quota QuotaReader
+	if q, ok := repo.(QuotaReader); ok {
+		quota = q
+	}
+	svc := NewService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)), quota, inv, StripeConfig{
+		APIKey:         "sk_test_dummy",
+		PriceIDMonthly: "price_monthly",
+		PriceIDAnnual:  "price_annual",
+		FreeDailyLimit: 10,
+	})
+	return svc, inv
 }
 
 func subEvent(t *testing.T, eventType string, sub map[string]any) stripe.Event {
@@ -223,5 +275,149 @@ func TestProcessStripeEvent_PlanFromInterval(t *testing.T) {
 				t.Errorf("interval %q: plan = %q, want %q", interval, got, wantPlan)
 			}
 		})
+	}
+}
+
+func TestProcessStripeEvent_DuplicateEventProcessedOnce(t *testing.T) {
+	repo := &fakePaymentRepo{}
+	svc := newTestService(repo)
+	userID := uuid.New()
+
+	ev := subEventWithInterval(t, userID, "month")
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("first delivery: %v", err)
+	}
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("replayed delivery should be a no-op, got %v", err)
+	}
+	if len(repo.upserted) != 1 {
+		t.Fatalf("replayed event must not re-upsert, got %d upserts", len(repo.upserted))
+	}
+	if len(repo.webhookSeen) != 1 {
+		t.Fatalf("expected 1 recorded webhook event, got %d", len(repo.webhookSeen))
+	}
+}
+
+func TestProcessStripeEvent_CheckoutCompletedLinksCustomer(t *testing.T) {
+	repo := &fakePaymentRepo{}
+	svc, inv := newTestServiceWithInvalidator(repo)
+	userID := uuid.New()
+
+	ev := subEvent(t, "checkout.session.completed", map[string]any{
+		"id":                  "cs_test_1",
+		"client_reference_id": userID.String(),
+		"customer":            map[string]any{"id": "cus_123"},
+	})
+
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("ProcessStripeEvent: %v", err)
+	}
+	if got := repo.linkedCustomers[userID]; got != "cus_123" {
+		t.Fatalf("linked customer = %q, want cus_123", got)
+	}
+	if len(inv.invalidated) != 1 || inv.invalidated[0] != userID {
+		t.Fatalf("expected plan invalidation for %s, got %v", userID, inv.invalidated)
+	}
+}
+
+func TestProcessStripeEvent_ResolvesUserByCustomerFallback(t *testing.T) {
+	userID := uuid.New()
+	repo := &fakePaymentRepo{customerToUser: map[string]uuid.UUID{"cus_999": userID}}
+	svc := newTestService(repo)
+
+	// No metadata user_id, but the customer was linked earlier by
+	// checkout.session.completed.
+	ev := subEvent(t, "customer.subscription.updated", map[string]any{
+		"id":       "sub_fallback",
+		"status":   "active",
+		"created":  time.Now().Unix(),
+		"customer": map[string]any{"id": "cus_999"},
+		"items": map[string]any{
+			"data": []map[string]any{
+				{"price": map[string]any{"id": "price_1", "recurring": map[string]any{"interval": "month"}}},
+			},
+		},
+	})
+
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("ProcessStripeEvent: %v", err)
+	}
+	if len(repo.upserted) != 1 {
+		t.Fatalf("expected 1 upsert via customer fallback, got %d", len(repo.upserted))
+	}
+	if repo.upserted[0].UserID != userID {
+		t.Fatalf("user id = %s, want %s", repo.upserted[0].UserID, userID)
+	}
+	if repo.upserted[0].ExternalCustomerID == nil || *repo.upserted[0].ExternalCustomerID != "cus_999" {
+		t.Fatalf("external customer id = %v, want cus_999", repo.upserted[0].ExternalCustomerID)
+	}
+}
+
+func TestProcessStripeEvent_SubscriptionUpsertInvalidatesPlan(t *testing.T) {
+	repo := &fakePaymentRepo{}
+	svc, inv := newTestServiceWithInvalidator(repo)
+	userID := uuid.New()
+
+	ev := subEventWithInterval(t, userID, "month")
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("ProcessStripeEvent: %v", err)
+	}
+	if len(inv.invalidated) != 1 || inv.invalidated[0] != userID {
+		t.Fatalf("expected plan invalidation for %s, got %v", userID, inv.invalidated)
+	}
+}
+
+func TestMapStripeStatus(t *testing.T) {
+	cases := map[stripe.SubscriptionStatus]string{
+		stripe.SubscriptionStatusActive:            "active",
+		stripe.SubscriptionStatusTrialing:          "trialing",
+		stripe.SubscriptionStatusPastDue:           "past_due",
+		stripe.SubscriptionStatusCanceled:          "canceled",
+		stripe.SubscriptionStatusIncomplete:        "expired",
+		stripe.SubscriptionStatusIncompleteExpired: "expired",
+		stripe.SubscriptionStatusUnpaid:            "expired",
+	}
+	for in, want := range cases {
+		if got := mapStripeStatus(in); got != want {
+			t.Errorf("mapStripeStatus(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestGetSubscription_FreeDefaultsWithRealUsage(t *testing.T) {
+	repo := &fakePaymentRepo{dailyUsage: 7}
+	svc := newTestService(repo)
+
+	got, err := svc.GetSubscription(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("GetSubscription: %v", err)
+	}
+	if got.Subscription.Plan != "free" {
+		t.Fatalf("plan = %q, want free", got.Subscription.Plan)
+	}
+	if got.RequestsToday != 7 {
+		t.Fatalf("requests today = %d, want 7 (real usage, not placeholder)", got.RequestsToday)
+	}
+	if got.RequestsLimit != 10 {
+		t.Fatalf("requests limit = %d, want configured free limit 10", got.RequestsLimit)
+	}
+}
+
+func TestGetSubscription_ProHidesFairUseCap(t *testing.T) {
+	repo := &fakePaymentRepo{
+		dailyUsage:   42,
+		subscription: &Subscription{UserID: uuid.New(), Plan: "premium_monthly", Status: "active"},
+	}
+	svc := newTestService(repo)
+
+	got, err := svc.GetSubscription(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("GetSubscription: %v", err)
+	}
+	if got.RequestsLimit != UnlimitedLimit {
+		t.Fatalf("pro requests limit = %d, want %d (unlimited sentinel)", got.RequestsLimit, UnlimitedLimit)
+	}
+	if got.RequestsToday != 42 {
+		t.Fatalf("requests today = %d, want 42", got.RequestsToday)
 	}
 }

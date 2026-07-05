@@ -27,13 +27,14 @@ func DefaultLimits() Limits {
 // Unknown values (including legacy strings that never existed in the DB enum)
 // deliberately fall back to the free limit. See docs/pricing.md.
 func (l Limits) dailyLimitForPlan(plan string) int {
-	if isProPlan(plan) {
+	if IsProPlan(plan) {
 		return l.ProDaily
 	}
 	return l.FreeDaily
 }
 
-func isProPlan(plan string) bool {
+// IsProPlan reports whether the plan is one of the paid "Pro" enum values.
+func IsProPlan(plan string) bool {
 	return plan == PlanPremiumMonthly || plan == PlanPremiumAnnual
 }
 

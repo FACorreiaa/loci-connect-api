@@ -18,6 +18,7 @@ type Config struct {
 	Database      DatabaseConfig
 	Auth          AuthConfig
 	Subscription  SubscriptionConfig
+	Stripe        StripeConfig
 	Cache         CacheConfig
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
@@ -87,6 +88,14 @@ type SubscriptionConfig struct {
 	ProDailyLLMLimit  int
 }
 
+// StripeConfig holds Stripe API credentials and the two Pro price IDs.
+type StripeConfig struct {
+	APIKey         string
+	WebhookSecret  string
+	PriceIDMonthly string
+	PriceIDAnnual  string
+}
+
 type ObservabilityConfig struct {
 	MetricsEnabled bool
 	MetricsPort    int
@@ -136,6 +145,12 @@ func Load() (*Config, error) {
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
 			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 300),
+		},
+		Stripe: StripeConfig{
+			APIKey:         getEnv("STRIPE_API_KEY", ""),
+			WebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
+			PriceIDMonthly: getEnv("STRIPE_PRICE_ID_MONTHLY", ""),
+			PriceIDAnnual:  getEnv("STRIPE_PRICE_ID_ANNUAL", ""),
 		},
 		Cache: CacheConfig{
 			RedisURL:   getEnv("REDIS_URL", ""),
