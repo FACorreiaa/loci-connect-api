@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/cmd/api"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"google.golang.org/genai"
 )
 
@@ -46,6 +47,21 @@ func main() {
 		logger.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+
+	// Tracing must be installed before the router captures the global
+	// tracer provider. No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+	shutdownTracing, err := observability.InitTracing(context.Background(), "loci-connect-api", logger)
+	if err != nil {
+		logger.Error("failed to initialize tracing", "error", err)
+		os.Exit(1)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(ctx); err != nil {
+			logger.Warn("tracing shutdown failed", "error", err)
+		}
+	}()
 
 	// Initialize dependencies
 	deps, err := api.InitDependencies(cfg, logger)

@@ -83,6 +83,32 @@ var (
 		},
 		[]string{"plan"},
 	)
+
+	// CheckoutSessionsCreatedTotal tracks Stripe Checkout sessions created.
+	CheckoutSessionsCreatedTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "loci_checkout_sessions_created_total",
+			Help: "Total Stripe Checkout sessions created",
+		},
+	)
+
+	// WebhookEventsTotal tracks processed Stripe webhook events by type/outcome.
+	WebhookEventsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_webhook_events_total",
+			Help: "Stripe webhook events by type and processing outcome",
+		},
+		[]string{"type", "status"},
+	)
+
+	// WebhookDuplicatesTotal tracks replayed webhook deliveries skipped by
+	// the idempotency gate.
+	WebhookDuplicatesTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "loci_webhook_duplicates_total",
+			Help: "Stripe webhook deliveries skipped as already processed",
+		},
+	)
 )
 
 // MetricsInterceptor collects Prometheus metrics for unary and streaming RPCs.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	subquota "github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v81"
@@ -437,11 +438,22 @@ func (s *service) invalidatePlan(userID uuid.UUID) {
 }
 
 func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) error {
+	err := s.processStripeEvent(ctx, event)
+	status := "ok"
+	if err != nil {
+		status = "error"
+	}
+	observability.WebhookEventsTotal.WithLabelValues(string(event.Type), status).Inc()
+	return err
+}
+
+func (s *service) processStripeEvent(ctx context.Context, event stripe.Event) error {
 	// Idempotency gate: the unique event_id makes replayed webhook deliveries
 	// no-ops before any state is touched.
 	if err := s.repo.RecordWebhookEvent(ctx, event.ID, string(event.Type)); err != nil {
 		if isUniqueViolation(err) {
 			s.logger.Info("skipping already-processed webhook event", "id", event.ID, "type", event.Type)
+			observability.WebhookDuplicatesTotal.Inc()
 			return nil
 		}
 		return fmt.Errorf("failed to record webhook event: %w", err)
@@ -601,6 +613,7 @@ func (s *service) CreateCheckoutSession(ctx context.Context, req *CreateCheckout
 	if err != nil {
 		return nil, fmt.Errorf("failed to create checkout session: %w", err)
 	}
+	observability.CheckoutSessionsCreatedTotal.Inc()
 
 	return &CreateCheckoutSessionResult{
 		SessionID: session.ID,
