@@ -41,6 +41,10 @@ type GeminiConfig struct {
 	MaxRetries         int
 	RetryBaseDelay     time.Duration
 	RetryMaxDelay      time.Duration
+	// GenerateTimeout caps a single non-streaming LLM call (including retries).
+	GenerateTimeout time.Duration
+	// StreamTimeout caps a full streaming LLM call from start to last chunk.
+	StreamTimeout time.Duration
 }
 
 type ServerConfig struct {
@@ -175,6 +179,8 @@ func Load() (*Config, error) {
 			MaxRetries:         getEnvAsInt("GEMINI_MAX_RETRIES", 3),
 			RetryBaseDelay:     getEnvAsDurationMillis("GEMINI_RETRY_BASE_DELAY_MS", 500*time.Millisecond),
 			RetryMaxDelay:      getEnvAsDurationMillis("GEMINI_RETRY_MAX_DELAY_MS", 8*time.Second),
+			GenerateTimeout:    getEnvAsDurationSeconds("GEMINI_GENERATE_TIMEOUT_SEC", 30*time.Second),
+			StreamTimeout:      getEnvAsDurationSeconds("GEMINI_STREAM_TIMEOUT_SEC", 2*time.Minute),
 		},
 	}
 
@@ -196,6 +202,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.Server.DefaultRPCTimeout <= 0 || cfg.Server.ChatRPCTimeout <= 0 {
 		return nil, errors.New("RPC timeout values must be positive")
+	}
+	if cfg.Gemini.GenerateTimeout <= 0 || cfg.Gemini.StreamTimeout <= 0 {
+		return nil, errors.New("GEMINI timeout values must be positive")
 	}
 
 	if cfg.Auth.JWTSecret == "" {

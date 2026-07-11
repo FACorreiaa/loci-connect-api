@@ -107,6 +107,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		rateLimiter,
 		ipRateLimiter,
 		interceptors.NewRecoveryInterceptor(deps.Logger),
+		interceptors.NewLLMErrorInterceptor(),
 		interceptors.NewLoggingInterceptor(deps.Logger),
 		authInterceptor,
 		userRateLimiter,
