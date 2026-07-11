@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
@@ -65,6 +66,7 @@ type Dependencies struct {
 	UsageRepo      subscription.Repository
 	PaymentRepo    payment.Repository
 	FavoritesRepo  favorites.Repository
+	APIKeyRepo     apikey.Repository
 	ReviewRepo     reviewdomain.Repository
 	ShareRepo      share.Repository
 
@@ -82,6 +84,7 @@ type Dependencies struct {
 	InterestSvc         interestrepo.Service
 	TagsSvc             tagshandler.Service
 	SubscriptionService subscription.Service
+	APIKeyService       apikey.Service
 	PaymentService      payment.Service
 	OAuthService        *customauthservice.OAuthService
 	PhoneService        *customauthservice.PhoneService
@@ -101,6 +104,7 @@ type Dependencies struct {
 	TagsHandler       *tagshandler.TagsHandler
 	PaymentHandler    paymentv1connect.PaymentServiceHandler
 	FavoritesHandler  *favorites.Handler
+	APIKeyHandler     *apikey.Handler
 	ExportHandler     *export.Handler
 	ShareHandler      *share.Handler
 	POIHandler        *poihandler.POIHandler
@@ -181,6 +185,7 @@ func (d *Dependencies) initRepositories() error {
 	d.UsageRepo = subscription.NewRepository(d.DB.Pool)
 	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
 	d.FavoritesRepo = favorites.NewRepository(d.DB.Pool, d.Logger)
+	d.APIKeyRepo = apikey.NewRepository(d.DB.Pool)
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 
@@ -254,6 +259,7 @@ func (d *Dependencies) initServices() error {
 		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
 	})
+	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
 		APIKey:         d.Config.Stripe.APIKey,
 		PriceIDMonthly: d.Config.Stripe.PriceIDMonthly,
@@ -291,6 +297,7 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
+	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)

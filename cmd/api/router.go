@@ -10,6 +10,7 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
@@ -242,6 +243,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		favoritesPath, favoritesHandler := favoritesv1connect.NewFavoritesServiceHandler(deps.FavoritesHandler, opts)
 		mux.Handle(favoritesPath, favoritesHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", favoritesPath)
+	}
+
+	if deps.APIKeyHandler != nil {
+		apikeyPath, apikeyHandler := apikeyv1connect.NewApiKeyServiceHandler(deps.APIKeyHandler, opts)
+		mux.Handle(apikeyPath, apikeyHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", apikeyPath)
 	}
 
 	if deps.ExportHandler != nil {
