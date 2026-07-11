@@ -2087,16 +2087,16 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
             ) AS distance_meters,
             CASE
-                WHEN embedding IS NOT NULL THEN 1 - (embedding <=> $6::vector)
+                WHEN embedding IS NOT NULL THEN 1 - (embedding <=> $5::vector)
                 ELSE 0
             END AS similarity_score,
             -- Hybrid score: weighted combination of spatial proximity and semantic similarity
             CASE
                 WHEN embedding IS NOT NULL THEN
-                    (1 - $5) * (1 / (1 + ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000)) +
-                    $5 * (1 - (embedding <=> $6::vector))
+                    (1 - $4) * (1 / (1 + ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000)) +
+                    $4 * (1 - (embedding <=> $5::vector))
                 ELSE
-                    (1 - $5) * (1 / (1 + ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000))
+                    (1 - $4) * (1 / (1 + ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000))
             END AS hybrid_score
         FROM points_of_interest
         WHERE ST_DWithin(
@@ -2110,19 +2110,15 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
 		filter.Location.Longitude, // $1
 		filter.Location.Latitude,  // $2
 		filter.Radius * 1000,      // $3 (convert km to meters)
+		semanticWeight,            // $4
+		embeddingStr,              // $5
 	}
 
 	// Add category filter if provided
-	argIndex := 4
 	if filter.Category != "" {
-		query += fmt.Sprintf(` AND poi_type = $%d`, argIndex)
+		query += ` AND poi_type = $6`
 		args = append(args, filter.Category)
-		_ = argIndex + 1 // argIndex incremented but not used after this point
 	}
-
-	// Add semantic weight and embedding (adjust indexes based on whether category was added)
-	args = append(args, semanticWeight) // semantic weight
-	args = append(args, embeddingStr)   // embedding
 
 	// Order by hybrid score (descending)
 	query += ` ORDER BY hybrid_score DESC`
