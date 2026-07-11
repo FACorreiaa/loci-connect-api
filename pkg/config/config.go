@@ -172,9 +172,11 @@ func Load() (*Config, error) {
 			Port:    getEnvAsInt("PPROF_PORT", 6060),
 		},
 		Gemini: GeminiConfig{
-			APIKey:             getEnv("GEMINI_API_KEY", ""),
-			Model:              getEnv("GEMINI_MODEL", ""),
-			EmbeddingModel:     getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-exp-03-07"),
+			APIKey: getEnv("GEMINI_API_KEY", ""),
+			Model:  getEnv("GEMINI_MODEL", ""),
+			// gemini-embedding-001 is the GA embedding model; the old
+			// experimental gemini-embedding-exp-03-07 returns 404 upstream.
+			EmbeddingModel:     getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"),
 			MaxConcurrentCalls: getEnvAsInt("GEMINI_MAX_CONCURRENT_CALLS", 10),
 			MaxRetries:         getEnvAsInt("GEMINI_MAX_RETRIES", 3),
 			RetryBaseDelay:     getEnvAsDurationMillis("GEMINI_RETRY_BASE_DELAY_MS", 500*time.Millisecond),
