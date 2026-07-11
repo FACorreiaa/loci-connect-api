@@ -7,7 +7,7 @@ require (
 	connectrpc.com/connect v1.19.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
-	github.com/FACorreiaa/go-genai-sdk/v2 v2.0.0
+	github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0
 	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/alicebob/miniredis/v2 v2.38.0
@@ -159,3 +159,8 @@ require (
 )
 
 replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto
+
+// TEMPORARY: consume the local SDK until go-genai-sdk v2.1.0 (embedding
+// retry) is pushed to GitHub. On release: push the v2.1.0 tag, then drop
+// this replace and run `go mod tidy`.
+replace github.com/FACorreiaa/go-genai-sdk/v2 => ../llm-sdk
