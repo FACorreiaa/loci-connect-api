@@ -11,13 +11,14 @@ require (
 	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/alicebob/miniredis/v2 v2.38.0
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.4.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/johnfercher/maroto/v2 v2.3.3
 	github.com/joho/godotenv v1.5.1
 	github.com/markbates/goth v1.82.0
+	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/pashagolub/pgxmock/v4 v4.9.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20250424160509-463d218d4745
@@ -76,6 +77,7 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
@@ -123,6 +125,8 @@ require (
 	github.com/prometheus/common v0.67.4 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
@@ -130,6 +134,7 @@ require (
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
+	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect

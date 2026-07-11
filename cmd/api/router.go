@@ -36,6 +36,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
@@ -123,6 +124,18 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	if deps.PaymentService != nil {
 		mux.Handle("/webhooks/stripe", payment.WebhookHandler(deps.PaymentService, deps.Logger, deps.Config.Stripe.WebhookSecret))
 		deps.Logger.Info("registered webhook", "path", "/webhooks/stripe")
+	}
+
+	// Model Context Protocol endpoint (API-key auth, outside the Connect
+	// interceptor chain — see internal/mcp).
+	if deps.APIKeyService != nil && deps.POISvc != nil {
+		mux.Handle(locimcp.Path, locimcp.Handler(locimcp.Deps{
+			POIService:    deps.POISvc,
+			APIKeyService: deps.APIKeyService,
+			Subscription:  deps.SubscriptionService,
+			Logger:        deps.Logger,
+		}))
+		deps.Logger.Info("registered MCP endpoint", "path", locimcp.Path)
 	}
 
 	// Register health and metrics routes
