@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
+	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
@@ -28,6 +29,7 @@ var Version = "dev"
 type Deps struct {
 	POIService    poi.Service
 	ListService   itinerarylist.Service
+	ChatService   chatservice.LlmInteractiontService
 	APIKeyService apikey.Service
 	Subscription  subscription.Service
 	Logger        *slog.Logger
@@ -42,6 +44,9 @@ func Handler(deps Deps) http.Handler {
 	registerPOITools(server, deps)
 	registerItineraryTools(server, deps)
 	registerListTools(server, deps)
+	if deps.ChatService != nil && deps.Subscription != nil {
+		registerChatTools(server, deps)
+	}
 
 	streamable := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server

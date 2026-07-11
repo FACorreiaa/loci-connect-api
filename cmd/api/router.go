@@ -132,6 +132,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		mux.Handle(locimcp.Path, locimcp.Handler(locimcp.Deps{
 			POIService:    deps.POISvc,
 			ListService:   deps.ListSvc,
+			ChatService:   deps.ChatService,
 			APIKeyService: deps.APIKeyService,
 			Subscription:  deps.SubscriptionService,
 			Logger:        deps.Logger,

@@ -45,6 +45,9 @@ type Service interface {
 	// ConsumeQuota atomically spends one daily LLM request for the user.
 	// Returns *QuotaExceededError when the plan's daily limit is reached.
 	ConsumeQuota(ctx context.Context, userID uuid.UUID, email string) error
+	// EffectivePlan returns the user's current plan (cached), already
+	// downgraded to free when a subscription is inactive or expired.
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
 	PlanInvalidator
 }
 
@@ -112,6 +115,12 @@ func (s *service) ConsumeQuota(ctx context.Context, userID uuid.UUID, email stri
 
 	observability.QuotaConsumedTotal.WithLabelValues(plan).Inc()
 	return nil
+}
+
+// EffectivePlan exposes the cached plan lookup for channels (MCP) that gate
+// features by tier rather than by quota.
+func (s *service) EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	return s.userPlan(ctx, userID)
 }
 
 // userPlan returns the user's effective plan, cached for planCacheTTL to

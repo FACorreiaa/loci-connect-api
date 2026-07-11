@@ -21,6 +21,10 @@ func (s *stubService) ConsumeQuota(_ context.Context, _ uuid.UUID, _ string) err
 
 func (s *stubService) InvalidatePlan(_ uuid.UUID) {}
 
+func (s *stubService) EffectivePlan(_ context.Context, _ uuid.UUID) (string, error) {
+	return PlanFree, nil
+}
+
 func TestIsMeteredProcedure(t *testing.T) {
 	cases := map[string]bool{
 		"/loci.chat.ChatService/StartChat":               true,
