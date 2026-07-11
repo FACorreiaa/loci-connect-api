@@ -45,7 +45,7 @@ func (s *ServiceImpl) SearchPOIsSemantic(ctx context.Context, query string, limi
 	}
 
 	// Generate embedding for the query
-	queryEmbedding, err := s.embeddingService.GenerateQueryEmbedding(ctx, query)
+	queryEmbedding, err := s.embedQueryMetered(ctx, query)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to generate query embedding",
 			slog.Any("error", err),
@@ -96,7 +96,7 @@ func (s *ServiceImpl) SearchPOIsSemanticByCity(ctx context.Context, query string
 	}
 
 	// Generate embedding for the query
-	queryEmbedding, err := s.embeddingService.GenerateQueryEmbedding(ctx, query)
+	queryEmbedding, err := s.embedQueryMetered(ctx, query)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to generate query embedding",
 			slog.Any("error", err),
@@ -432,7 +432,7 @@ func (s *ServiceImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.POI
 	}
 
 	// Generate embedding for the query
-	queryEmbedding, err := s.embeddingService.GenerateQueryEmbedding(ctx, query)
+	queryEmbedding, err := s.embedQueryMetered(ctx, query)
 	if err != nil {
 		l.ErrorContext(ctx, "Failed to generate query embedding",
 			slog.Any("error", err),

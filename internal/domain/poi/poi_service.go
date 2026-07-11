@@ -9,6 +9,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -125,12 +126,27 @@ func (s *ServiceImpl) generateWithLLMSlot(
 	prompt string,
 	config *genai.GenerateContentConfig,
 ) (*genai.GenerateContentResponse, error) {
+	// Quota-armed channels (MCP API keys) pay here — right before the LLM
+	// call — so cache and database hits stay free. Web RPCs never arm the
+	// context and are unaffected.
+	if err := subscription.ConsumeQuotaFromContext(ctx); err != nil {
+		return nil, err
+	}
 	release, err := s.acquireLLMSlot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("LLM capacity exceeded: %w", err)
 	}
 	defer release()
 	return s.aiClient.Generate(ctx, prompt, config)
+}
+
+// embedQueryMetered generates a query embedding, charging quota-armed
+// channels (MCP) for the provider call while leaving web RPCs unmetered.
+func (s *ServiceImpl) embedQueryMetered(ctx context.Context, query string) ([]float32, error) {
+	if err := subscription.ConsumeQuotaFromContext(ctx); err != nil {
+		return nil, err
+	}
+	return s.embeddingService.GenerateQueryEmbedding(ctx, query)
 }
 
 func (s *ServiceImpl) GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error) {
