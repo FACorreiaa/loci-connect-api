@@ -131,6 +131,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	if deps.APIKeyService != nil && deps.POISvc != nil {
 		mux.Handle(locimcp.Path, locimcp.Handler(locimcp.Deps{
 			POIService:    deps.POISvc,
+			ListService:   deps.ListSvc,
 			APIKeyService: deps.APIKeyService,
 			Subscription:  deps.SubscriptionService,
 			Logger:        deps.Logger,

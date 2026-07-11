@@ -11,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
+	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 )
@@ -26,6 +27,7 @@ var Version = "dev"
 // Deps are the service-layer dependencies MCP tools call into.
 type Deps struct {
 	POIService    poi.Service
+	ListService   itinerarylist.Service
 	APIKeyService apikey.Service
 	Subscription  subscription.Service
 	Logger        *slog.Logger
@@ -38,6 +40,8 @@ func Handler(deps Deps) http.Handler {
 		Version: Version,
 	}, nil)
 	registerPOITools(server, deps)
+	registerItineraryTools(server, deps)
+	registerListTools(server, deps)
 
 	streamable := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
