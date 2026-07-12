@@ -159,8 +159,3 @@ require (
 )
 
 replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto
-
-// TEMPORARY: consume the local SDK until go-genai-sdk v2.1.0 (embedding
-// retry) is pushed to GitHub. On release: push the v2.1.0 tag, then drop
-// this replace and run `go mod tidy`.
-replace github.com/FACorreiaa/go-genai-sdk/v2 => ../llm-sdk
