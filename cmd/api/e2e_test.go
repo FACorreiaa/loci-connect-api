@@ -52,6 +52,10 @@ func bootServer(t *testing.T) (string, func()) {
 			Password: "postgres",
 			Database: "loci_test",
 			SSLMode:  "disable",
+			// pgxpool rejects MaxConns < 1; the hand-built config skips
+			// config.Load's defaults, so set the pool sizing explicitly.
+			MaxConns: 10,
+			MinConns: 2,
 		},
 		Auth: config.AuthConfig{
 			JWTSecret:  "e2e-test-jwt-secret-0123456789abcdef",
