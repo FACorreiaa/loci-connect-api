@@ -30,6 +30,10 @@ func (s *recordingSubscriptionService) ConsumeQuota(_ context.Context, userID uu
 	return s.consumeErr
 }
 
+func (s *recordingSubscriptionService) EffectivePlan(_ context.Context, _ uuid.UUID) (string, error) {
+	return subscription.PlanFree, nil
+}
+
 func (s *recordingSubscriptionService) InvalidatePlan(_ uuid.UUID) {}
 
 func signTestJWT(t *testing.T, secret []byte, userID uuid.UUID, email string) string {
