@@ -363,6 +363,8 @@ type UpdateProfileParams struct {
 	Location        *string                `protobuf:"bytes,12,opt,name=location,proto3,oneof" json:"location,omitempty"`
 	Interests       []string               `protobuf:"bytes,13,rep,name=interests,proto3" json:"interests,omitempty"`
 	Badges          []string               `protobuf:"bytes,14,rep,name=badges,proto3" json:"badges,omitempty"`
+	Theme           *string                `protobuf:"bytes,15,opt,name=theme,proto3,oneof" json:"theme,omitempty"`
+	Language        *string                `protobuf:"bytes,16,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -493,6 +495,20 @@ func (x *UpdateProfileParams) GetBadges() []string {
 		return x.Badges
 	}
 	return nil
+}
+
+func (x *UpdateProfileParams) GetTheme() string {
+	if x != nil && x.Theme != nil {
+		return *x.Theme
+	}
+	return ""
+}
+
+func (x *UpdateProfileParams) GetLanguage() string {
+	if x != nil && x.Language != nil {
+		return *x.Language
+	}
+	return ""
 }
 
 // GetUserProfileRequest for retrieving user profile
@@ -701,7 +717,7 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x12_email_verified_atB\x10\n" +
 	"\x0e_last_login_atB\b\n" +
 	"\x06_themeB\v\n" +
-	"\t_language\"\xf8\x06\n" +
+	"\t_language\"\xac\b\n" +
 	"\x13UpdateProfileParams\x12?\n" +
 	"\busername\x18\x01 \x01(\tB\x1e\xbaH\x1b\xd8\x01\x01r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x00R\busername\x88\x01\x01\x12H\n" +
 	"\fphone_number\x18\x02 \x01(\tB \xbaH\x1d\xd8\x01\x01r\x18\x10\x01\x1822\x12^\\+?[1-9]\\d{1,14}$H\x01R\vphoneNumber\x88\x01\x01\x12%\n" +
@@ -725,7 +741,10 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\tinterests\x18\r \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x102\"\x06r\x04\x10\x01\x18dR\tinterests\x12(\n" +
 	"\x06badges\x18\x0e \x03(\tB\x10\xbaH\r\x92\x01\n" +
-	"\x10d\"\x06r\x04\x10\x01\x18dR\x06badgesB\v\n" +
+	"\x10d\"\x06r\x04\x10\x01\x18dR\x06badges\x12T\n" +
+	"\x05theme\x18\x0f \x01(\tB9\xbaH6\xd8\x01\x01r1\x10\x03\x1822+^(classic|modern|loci):(light|dark|system)$H\fR\x05theme\x88\x01\x01\x12E\n" +
+	"\blanguage\x18\x10 \x01(\tB$\xbaH!\xd8\x01\x01r\x1c\x10\x02\x18\n" +
+	"2\x16^[a-z]{2}(-[A-Z]{2})?$H\rR\blanguage\x88\x01\x01B\v\n" +
 	"\t_usernameB\x0f\n" +
 	"\r_phone_numberB\b\n" +
 	"\x06_emailB\x0f\n" +
@@ -740,7 +759,9 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\b_countryB\f\n" +
 	"\n" +
 	"_about_youB\v\n" +
-	"\t_location\"O\n" +
+	"\t_locationB\b\n" +
+	"\x06_themeB\v\n" +
+	"\t_language\"O\n" +
 	"\x15GetUserProfileRequest\x12*\n" +
 	"\auser_id\x18\x01 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01B\n" +
 	"\n" +

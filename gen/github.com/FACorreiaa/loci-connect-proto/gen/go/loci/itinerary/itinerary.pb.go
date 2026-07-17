@@ -1558,6 +1558,141 @@ func (x *GetUserItinerariesResponse) GetPagination() *common.PaginationMetadata 
 	return nil
 }
 
+// GetItineraryRequest for retrieving a single itinerary
+type GetItineraryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItineraryId   string                 `protobuf:"bytes,1,opt,name=itinerary_id,json=itineraryId,proto3" json:"itinerary_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetItineraryRequest) Reset() {
+	*x = GetItineraryRequest{}
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetItineraryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetItineraryRequest) ProtoMessage() {}
+
+func (x *GetItineraryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetItineraryRequest.ProtoReflect.Descriptor instead.
+func (*GetItineraryRequest) Descriptor() ([]byte, []int) {
+	return file_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetItineraryRequest) GetItineraryId() string {
+	if x != nil {
+		return x.ItineraryId
+	}
+	return ""
+}
+
+// GetItineraryResponse for itinerary retrieval
+type GetItineraryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Itinerary     *UserSavedItinerary    `protobuf:"bytes,1,opt,name=itinerary,proto3" json:"itinerary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetItineraryResponse) Reset() {
+	*x = GetItineraryResponse{}
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetItineraryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetItineraryResponse) ProtoMessage() {}
+
+func (x *GetItineraryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetItineraryResponse.ProtoReflect.Descriptor instead.
+func (*GetItineraryResponse) Descriptor() ([]byte, []int) {
+	return file_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetItineraryResponse) GetItinerary() *UserSavedItinerary {
+	if x != nil {
+		return x.Itinerary
+	}
+	return nil
+}
+
+// DeleteBookmarkRequest for removing a bookmarked itinerary
+type DeleteBookmarkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItineraryId   string                 `protobuf:"bytes,1,opt,name=itinerary_id,json=itineraryId,proto3" json:"itinerary_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBookmarkRequest) Reset() {
+	*x = DeleteBookmarkRequest{}
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBookmarkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBookmarkRequest) ProtoMessage() {}
+
+func (x *DeleteBookmarkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_itinerary_itinerary_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBookmarkRequest.ProtoReflect.Descriptor instead.
+func (*DeleteBookmarkRequest) Descriptor() ([]byte, []int) {
+	return file_loci_itinerary_itinerary_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DeleteBookmarkRequest) GetItineraryId() string {
+	if x != nil {
+		return x.ItineraryId
+	}
+	return ""
+}
+
 var File_loci_itinerary_itinerary_proto protoreflect.FileDescriptor
 
 const file_loci_itinerary_itinerary_proto_rawDesc = "" +
@@ -1804,13 +1939,19 @@ const file_loci_itinerary_itinerary_proto_rawDesc = "" +
 	"\vitineraries\x18\x01 \x03(\v2\".loci.itinerary.UserSavedItineraryR\vitineraries\x12?\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1f.loci.common.PaginationMetadataR\n" +
-	"pagination*\x92\x01\n" +
+	"pagination\"C\n" +
+	"\x13GetItineraryRequest\x12,\n" +
+	"\fitinerary_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\vitineraryId\"X\n" +
+	"\x14GetItineraryResponse\x12@\n" +
+	"\titinerary\x18\x01 \x01(\v2\".loci.itinerary.UserSavedItineraryR\titinerary\"E\n" +
+	"\x15DeleteBookmarkRequest\x12,\n" +
+	"\fitinerary_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\vitineraryId*\x92\x01\n" +
 	"\vContentType\x12\x1c\n" +
 	"\x18CONTENT_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10CONTENT_TYPE_POI\x10\x01\x12\x1b\n" +
 	"\x17CONTENT_TYPE_RESTAURANT\x10\x02\x12\x16\n" +
 	"\x12CONTENT_TYPE_HOTEL\x10\x03\x12\x1a\n" +
-	"\x16CONTENT_TYPE_ITINERARY\x10\x042\xef\x05\n" +
+	"\x16CONTENT_TYPE_ITINERARY\x10\x042\x9a\a\n" +
 	"\x10ItineraryService\x12F\n" +
 	"\n" +
 	"CreateList\x12!.loci.itinerary.CreateListRequest\x1a\x15.loci.common.Response\x12F\n" +
@@ -1820,9 +1961,11 @@ const file_loci_itinerary_itinerary_proto_rawDesc = "" +
 	"\fGetUserLists\x12#.loci.itinerary.GetUserListsRequest\x1a$.loci.itinerary.GetUserListsResponse\x12H\n" +
 	"\vAddListItem\x12\".loci.itinerary.AddListItemRequest\x1a\x15.loci.common.Response\x12N\n" +
 	"\x0eUpdateListItem\x12%.loci.itinerary.UpdateListItemRequest\x1a\x15.loci.common.Response\x12k\n" +
-	"\x12GetUserItineraries\x12).loci.itinerary.GetUserItinerariesRequest\x1a*.loci.itinerary.GetUserItinerariesResponse\x12P\n" +
+	"\x12GetUserItineraries\x12).loci.itinerary.GetUserItinerariesRequest\x1a*.loci.itinerary.GetUserItinerariesResponse\x12Y\n" +
+	"\fGetItinerary\x12#.loci.itinerary.GetItineraryRequest\x1a$.loci.itinerary.GetItineraryResponse\x12P\n" +
 	"\x0fUpdateItinerary\x12&.loci.itinerary.UpdateItineraryRequest\x1a\x15.loci.common.Response\x12K\n" +
-	"\x11BookmarkItinerary\x12\x1f.loci.itinerary.BookmarkRequest\x1a\x15.loci.common.ResponseBJZHgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary;itineraryb\x06proto3"
+	"\x11BookmarkItinerary\x12\x1f.loci.itinerary.BookmarkRequest\x1a\x15.loci.common.Response\x12N\n" +
+	"\x0eDeleteBookmark\x12%.loci.itinerary.DeleteBookmarkRequest\x1a\x15.loci.common.ResponseBJZHgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary;itineraryb\x06proto3"
 
 var (
 	file_loci_itinerary_itinerary_proto_rawDescOnce sync.Once
@@ -1837,7 +1980,7 @@ func file_loci_itinerary_itinerary_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_itinerary_itinerary_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_itinerary_itinerary_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_loci_itinerary_itinerary_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_loci_itinerary_itinerary_proto_goTypes = []any{
 	(ContentType)(0),                   // 0: loci.itinerary.ContentType
 	(*List)(nil),                       // 1: loci.itinerary.List
@@ -1857,64 +2000,72 @@ var file_loci_itinerary_itinerary_proto_goTypes = []any{
 	(*GetUserListsResponse)(nil),       // 15: loci.itinerary.GetUserListsResponse
 	(*GetUserItinerariesRequest)(nil),  // 16: loci.itinerary.GetUserItinerariesRequest
 	(*GetUserItinerariesResponse)(nil), // 17: loci.itinerary.GetUserItinerariesResponse
-	(*timestamppb.Timestamp)(nil),      // 18: google.protobuf.Timestamp
-	(*poi.POIDetailedInfo)(nil),        // 19: loci.poi.POIDetailedInfo
-	(*poi.RestaurantDetailedInfo)(nil), // 20: loci.poi.RestaurantDetailedInfo
-	(*poi.HotelDetailedInfo)(nil),      // 21: loci.poi.HotelDetailedInfo
-	(*common.PaginationRequest)(nil),   // 22: loci.common.PaginationRequest
-	(*common.PaginationMetadata)(nil),  // 23: loci.common.PaginationMetadata
-	(*common.Response)(nil),            // 24: loci.common.Response
+	(*GetItineraryRequest)(nil),        // 18: loci.itinerary.GetItineraryRequest
+	(*GetItineraryResponse)(nil),       // 19: loci.itinerary.GetItineraryResponse
+	(*DeleteBookmarkRequest)(nil),      // 20: loci.itinerary.DeleteBookmarkRequest
+	(*timestamppb.Timestamp)(nil),      // 21: google.protobuf.Timestamp
+	(*poi.POIDetailedInfo)(nil),        // 22: loci.poi.POIDetailedInfo
+	(*poi.RestaurantDetailedInfo)(nil), // 23: loci.poi.RestaurantDetailedInfo
+	(*poi.HotelDetailedInfo)(nil),      // 24: loci.poi.HotelDetailedInfo
+	(*common.PaginationRequest)(nil),   // 25: loci.common.PaginationRequest
+	(*common.PaginationMetadata)(nil),  // 26: loci.common.PaginationMetadata
+	(*common.Response)(nil),            // 27: loci.common.Response
 }
 var file_loci_itinerary_itinerary_proto_depIdxs = []int32{
-	18, // 0: loci.itinerary.List.created_at:type_name -> google.protobuf.Timestamp
-	18, // 1: loci.itinerary.List.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 0: loci.itinerary.List.created_at:type_name -> google.protobuf.Timestamp
+	21, // 1: loci.itinerary.List.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: loci.itinerary.ListItem.content_type:type_name -> loci.itinerary.ContentType
-	18, // 3: loci.itinerary.ListItem.time_slot:type_name -> google.protobuf.Timestamp
-	18, // 4: loci.itinerary.ListItem.created_at:type_name -> google.protobuf.Timestamp
-	18, // 5: loci.itinerary.ListItem.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 3: loci.itinerary.ListItem.time_slot:type_name -> google.protobuf.Timestamp
+	21, // 4: loci.itinerary.ListItem.created_at:type_name -> google.protobuf.Timestamp
+	21, // 5: loci.itinerary.ListItem.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 6: loci.itinerary.ListItemWithContent.list_item:type_name -> loci.itinerary.ListItem
-	19, // 7: loci.itinerary.ListItemWithContent.poi:type_name -> loci.poi.POIDetailedInfo
-	20, // 8: loci.itinerary.ListItemWithContent.restaurant:type_name -> loci.poi.RestaurantDetailedInfo
-	21, // 9: loci.itinerary.ListItemWithContent.hotel:type_name -> loci.poi.HotelDetailedInfo
+	22, // 7: loci.itinerary.ListItemWithContent.poi:type_name -> loci.poi.POIDetailedInfo
+	23, // 8: loci.itinerary.ListItemWithContent.restaurant:type_name -> loci.poi.RestaurantDetailedInfo
+	24, // 9: loci.itinerary.ListItemWithContent.hotel:type_name -> loci.poi.HotelDetailedInfo
 	5,  // 10: loci.itinerary.ListItemWithContent.itinerary:type_name -> loci.itinerary.UserSavedItinerary
 	1,  // 11: loci.itinerary.ListWithDetailedItems.list:type_name -> loci.itinerary.List
 	3,  // 12: loci.itinerary.ListWithDetailedItems.items:type_name -> loci.itinerary.ListItemWithContent
-	18, // 13: loci.itinerary.UserSavedItinerary.created_at:type_name -> google.protobuf.Timestamp
-	18, // 14: loci.itinerary.UserSavedItinerary.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 13: loci.itinerary.UserSavedItinerary.created_at:type_name -> google.protobuf.Timestamp
+	21, // 14: loci.itinerary.UserSavedItinerary.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 15: loci.itinerary.AddListItemRequest.content_type:type_name -> loci.itinerary.ContentType
-	18, // 16: loci.itinerary.AddListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
+	21, // 16: loci.itinerary.AddListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
 	0,  // 17: loci.itinerary.UpdateListItemRequest.content_type:type_name -> loci.itinerary.ContentType
-	18, // 18: loci.itinerary.UpdateListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
+	21, // 18: loci.itinerary.UpdateListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
 	4,  // 19: loci.itinerary.GetListResponse.list:type_name -> loci.itinerary.ListWithDetailedItems
-	22, // 20: loci.itinerary.GetUserListsRequest.pagination:type_name -> loci.common.PaginationRequest
+	25, // 20: loci.itinerary.GetUserListsRequest.pagination:type_name -> loci.common.PaginationRequest
 	1,  // 21: loci.itinerary.GetUserListsResponse.lists:type_name -> loci.itinerary.List
-	23, // 22: loci.itinerary.GetUserListsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	22, // 23: loci.itinerary.GetUserItinerariesRequest.pagination:type_name -> loci.common.PaginationRequest
+	26, // 22: loci.itinerary.GetUserListsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	25, // 23: loci.itinerary.GetUserItinerariesRequest.pagination:type_name -> loci.common.PaginationRequest
 	5,  // 24: loci.itinerary.GetUserItinerariesResponse.itineraries:type_name -> loci.itinerary.UserSavedItinerary
-	23, // 25: loci.itinerary.GetUserItinerariesResponse.pagination:type_name -> loci.common.PaginationMetadata
-	6,  // 26: loci.itinerary.ItineraryService.CreateList:input_type -> loci.itinerary.CreateListRequest
-	7,  // 27: loci.itinerary.ItineraryService.UpdateList:input_type -> loci.itinerary.UpdateListRequest
-	12, // 28: loci.itinerary.ItineraryService.GetList:input_type -> loci.itinerary.GetListRequest
-	14, // 29: loci.itinerary.ItineraryService.GetUserLists:input_type -> loci.itinerary.GetUserListsRequest
-	8,  // 30: loci.itinerary.ItineraryService.AddListItem:input_type -> loci.itinerary.AddListItemRequest
-	9,  // 31: loci.itinerary.ItineraryService.UpdateListItem:input_type -> loci.itinerary.UpdateListItemRequest
-	16, // 32: loci.itinerary.ItineraryService.GetUserItineraries:input_type -> loci.itinerary.GetUserItinerariesRequest
-	10, // 33: loci.itinerary.ItineraryService.UpdateItinerary:input_type -> loci.itinerary.UpdateItineraryRequest
-	11, // 34: loci.itinerary.ItineraryService.BookmarkItinerary:input_type -> loci.itinerary.BookmarkRequest
-	24, // 35: loci.itinerary.ItineraryService.CreateList:output_type -> loci.common.Response
-	24, // 36: loci.itinerary.ItineraryService.UpdateList:output_type -> loci.common.Response
-	13, // 37: loci.itinerary.ItineraryService.GetList:output_type -> loci.itinerary.GetListResponse
-	15, // 38: loci.itinerary.ItineraryService.GetUserLists:output_type -> loci.itinerary.GetUserListsResponse
-	24, // 39: loci.itinerary.ItineraryService.AddListItem:output_type -> loci.common.Response
-	24, // 40: loci.itinerary.ItineraryService.UpdateListItem:output_type -> loci.common.Response
-	17, // 41: loci.itinerary.ItineraryService.GetUserItineraries:output_type -> loci.itinerary.GetUserItinerariesResponse
-	24, // 42: loci.itinerary.ItineraryService.UpdateItinerary:output_type -> loci.common.Response
-	24, // 43: loci.itinerary.ItineraryService.BookmarkItinerary:output_type -> loci.common.Response
-	35, // [35:44] is the sub-list for method output_type
-	26, // [26:35] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	26, // 25: loci.itinerary.GetUserItinerariesResponse.pagination:type_name -> loci.common.PaginationMetadata
+	5,  // 26: loci.itinerary.GetItineraryResponse.itinerary:type_name -> loci.itinerary.UserSavedItinerary
+	6,  // 27: loci.itinerary.ItineraryService.CreateList:input_type -> loci.itinerary.CreateListRequest
+	7,  // 28: loci.itinerary.ItineraryService.UpdateList:input_type -> loci.itinerary.UpdateListRequest
+	12, // 29: loci.itinerary.ItineraryService.GetList:input_type -> loci.itinerary.GetListRequest
+	14, // 30: loci.itinerary.ItineraryService.GetUserLists:input_type -> loci.itinerary.GetUserListsRequest
+	8,  // 31: loci.itinerary.ItineraryService.AddListItem:input_type -> loci.itinerary.AddListItemRequest
+	9,  // 32: loci.itinerary.ItineraryService.UpdateListItem:input_type -> loci.itinerary.UpdateListItemRequest
+	16, // 33: loci.itinerary.ItineraryService.GetUserItineraries:input_type -> loci.itinerary.GetUserItinerariesRequest
+	18, // 34: loci.itinerary.ItineraryService.GetItinerary:input_type -> loci.itinerary.GetItineraryRequest
+	10, // 35: loci.itinerary.ItineraryService.UpdateItinerary:input_type -> loci.itinerary.UpdateItineraryRequest
+	11, // 36: loci.itinerary.ItineraryService.BookmarkItinerary:input_type -> loci.itinerary.BookmarkRequest
+	20, // 37: loci.itinerary.ItineraryService.DeleteBookmark:input_type -> loci.itinerary.DeleteBookmarkRequest
+	27, // 38: loci.itinerary.ItineraryService.CreateList:output_type -> loci.common.Response
+	27, // 39: loci.itinerary.ItineraryService.UpdateList:output_type -> loci.common.Response
+	13, // 40: loci.itinerary.ItineraryService.GetList:output_type -> loci.itinerary.GetListResponse
+	15, // 41: loci.itinerary.ItineraryService.GetUserLists:output_type -> loci.itinerary.GetUserListsResponse
+	27, // 42: loci.itinerary.ItineraryService.AddListItem:output_type -> loci.common.Response
+	27, // 43: loci.itinerary.ItineraryService.UpdateListItem:output_type -> loci.common.Response
+	17, // 44: loci.itinerary.ItineraryService.GetUserItineraries:output_type -> loci.itinerary.GetUserItinerariesResponse
+	19, // 45: loci.itinerary.ItineraryService.GetItinerary:output_type -> loci.itinerary.GetItineraryResponse
+	27, // 46: loci.itinerary.ItineraryService.UpdateItinerary:output_type -> loci.common.Response
+	27, // 47: loci.itinerary.ItineraryService.BookmarkItinerary:output_type -> loci.common.Response
+	27, // 48: loci.itinerary.ItineraryService.DeleteBookmark:output_type -> loci.common.Response
+	38, // [38:49] is the sub-list for method output_type
+	27, // [27:38] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_loci_itinerary_itinerary_proto_init() }
@@ -1941,7 +2092,7 @@ func file_loci_itinerary_itinerary_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_itinerary_itinerary_proto_rawDesc), len(file_loci_itinerary_itinerary_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

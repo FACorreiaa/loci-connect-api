@@ -48,16 +48,32 @@ const (
 	// FavoritesServiceGetFavoritesCountProcedure is the fully-qualified name of the FavoritesService's
 	// GetFavoritesCount RPC.
 	FavoritesServiceGetFavoritesCountProcedure = "/loci.favorites.v1.FavoritesService/GetFavoritesCount"
+	// FavoritesServiceGetHotelDetailsProcedure is the fully-qualified name of the FavoritesService's
+	// GetHotelDetails RPC.
+	FavoritesServiceGetHotelDetailsProcedure = "/loci.favorites.v1.FavoritesService/GetHotelDetails"
+	// FavoritesServiceGetRestaurantDetailsProcedure is the fully-qualified name of the
+	// FavoritesService's GetRestaurantDetails RPC.
+	FavoritesServiceGetRestaurantDetailsProcedure = "/loci.favorites.v1.FavoritesService/GetRestaurantDetails"
+	// FavoritesServiceGetNearbyHotelsProcedure is the fully-qualified name of the FavoritesService's
+	// GetNearbyHotels RPC.
+	FavoritesServiceGetNearbyHotelsProcedure = "/loci.favorites.v1.FavoritesService/GetNearbyHotels"
+	// FavoritesServiceGetNearbyRestaurantsProcedure is the fully-qualified name of the
+	// FavoritesService's GetNearbyRestaurants RPC.
+	FavoritesServiceGetNearbyRestaurantsProcedure = "/loci.favorites.v1.FavoritesService/GetNearbyRestaurants"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	favoritesServiceServiceDescriptor                   = v1.File_loci_favorites_v1_favorites_proto.Services().ByName("FavoritesService")
-	favoritesServiceAddToFavoritesMethodDescriptor      = favoritesServiceServiceDescriptor.Methods().ByName("AddToFavorites")
-	favoritesServiceRemoveFromFavoritesMethodDescriptor = favoritesServiceServiceDescriptor.Methods().ByName("RemoveFromFavorites")
-	favoritesServiceGetFavoritesMethodDescriptor        = favoritesServiceServiceDescriptor.Methods().ByName("GetFavorites")
-	favoritesServiceIsFavoritedMethodDescriptor         = favoritesServiceServiceDescriptor.Methods().ByName("IsFavorited")
-	favoritesServiceGetFavoritesCountMethodDescriptor   = favoritesServiceServiceDescriptor.Methods().ByName("GetFavoritesCount")
+	favoritesServiceServiceDescriptor                    = v1.File_loci_favorites_v1_favorites_proto.Services().ByName("FavoritesService")
+	favoritesServiceAddToFavoritesMethodDescriptor       = favoritesServiceServiceDescriptor.Methods().ByName("AddToFavorites")
+	favoritesServiceRemoveFromFavoritesMethodDescriptor  = favoritesServiceServiceDescriptor.Methods().ByName("RemoveFromFavorites")
+	favoritesServiceGetFavoritesMethodDescriptor         = favoritesServiceServiceDescriptor.Methods().ByName("GetFavorites")
+	favoritesServiceIsFavoritedMethodDescriptor          = favoritesServiceServiceDescriptor.Methods().ByName("IsFavorited")
+	favoritesServiceGetFavoritesCountMethodDescriptor    = favoritesServiceServiceDescriptor.Methods().ByName("GetFavoritesCount")
+	favoritesServiceGetHotelDetailsMethodDescriptor      = favoritesServiceServiceDescriptor.Methods().ByName("GetHotelDetails")
+	favoritesServiceGetRestaurantDetailsMethodDescriptor = favoritesServiceServiceDescriptor.Methods().ByName("GetRestaurantDetails")
+	favoritesServiceGetNearbyHotelsMethodDescriptor      = favoritesServiceServiceDescriptor.Methods().ByName("GetNearbyHotels")
+	favoritesServiceGetNearbyRestaurantsMethodDescriptor = favoritesServiceServiceDescriptor.Methods().ByName("GetNearbyRestaurants")
 )
 
 // FavoritesServiceClient is a client for the loci.favorites.v1.FavoritesService service.
@@ -72,6 +88,14 @@ type FavoritesServiceClient interface {
 	IsFavorited(context.Context, *connect.Request[v1.IsFavoritedRequest]) (*connect.Response[v1.IsFavoritedResponse], error)
 	// Get favorites count
 	GetFavoritesCount(context.Context, *connect.Request[v1.GetFavoritesCountRequest]) (*connect.Response[v1.GetFavoritesCountResponse], error)
+	// Get hotel details
+	GetHotelDetails(context.Context, *connect.Request[v1.GetHotelDetailsRequest]) (*connect.Response[v1.GetHotelDetailsResponse], error)
+	// Get restaurant details
+	GetRestaurantDetails(context.Context, *connect.Request[v1.GetRestaurantDetailsRequest]) (*connect.Response[v1.GetRestaurantDetailsResponse], error)
+	// Get nearby hotels
+	GetNearbyHotels(context.Context, *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error)
+	// Get nearby restaurants
+	GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error)
 }
 
 // NewFavoritesServiceClient constructs a client for the loci.favorites.v1.FavoritesService service.
@@ -114,16 +138,44 @@ func NewFavoritesServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(favoritesServiceGetFavoritesCountMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getHotelDetails: connect.NewClient[v1.GetHotelDetailsRequest, v1.GetHotelDetailsResponse](
+			httpClient,
+			baseURL+FavoritesServiceGetHotelDetailsProcedure,
+			connect.WithSchema(favoritesServiceGetHotelDetailsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getRestaurantDetails: connect.NewClient[v1.GetRestaurantDetailsRequest, v1.GetRestaurantDetailsResponse](
+			httpClient,
+			baseURL+FavoritesServiceGetRestaurantDetailsProcedure,
+			connect.WithSchema(favoritesServiceGetRestaurantDetailsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getNearbyHotels: connect.NewClient[v1.GetNearbyHotelsRequest, v1.GetNearbyHotelsResponse](
+			httpClient,
+			baseURL+FavoritesServiceGetNearbyHotelsProcedure,
+			connect.WithSchema(favoritesServiceGetNearbyHotelsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getNearbyRestaurants: connect.NewClient[v1.GetNearbyRestaurantsRequest, v1.GetNearbyRestaurantsResponse](
+			httpClient,
+			baseURL+FavoritesServiceGetNearbyRestaurantsProcedure,
+			connect.WithSchema(favoritesServiceGetNearbyRestaurantsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // favoritesServiceClient implements FavoritesServiceClient.
 type favoritesServiceClient struct {
-	addToFavorites      *connect.Client[v1.AddToFavoritesRequest, v1.AddToFavoritesResponse]
-	removeFromFavorites *connect.Client[v1.RemoveFromFavoritesRequest, v1.RemoveFromFavoritesResponse]
-	getFavorites        *connect.Client[v1.GetFavoritesRequest, v1.GetFavoritesResponse]
-	isFavorited         *connect.Client[v1.IsFavoritedRequest, v1.IsFavoritedResponse]
-	getFavoritesCount   *connect.Client[v1.GetFavoritesCountRequest, v1.GetFavoritesCountResponse]
+	addToFavorites       *connect.Client[v1.AddToFavoritesRequest, v1.AddToFavoritesResponse]
+	removeFromFavorites  *connect.Client[v1.RemoveFromFavoritesRequest, v1.RemoveFromFavoritesResponse]
+	getFavorites         *connect.Client[v1.GetFavoritesRequest, v1.GetFavoritesResponse]
+	isFavorited          *connect.Client[v1.IsFavoritedRequest, v1.IsFavoritedResponse]
+	getFavoritesCount    *connect.Client[v1.GetFavoritesCountRequest, v1.GetFavoritesCountResponse]
+	getHotelDetails      *connect.Client[v1.GetHotelDetailsRequest, v1.GetHotelDetailsResponse]
+	getRestaurantDetails *connect.Client[v1.GetRestaurantDetailsRequest, v1.GetRestaurantDetailsResponse]
+	getNearbyHotels      *connect.Client[v1.GetNearbyHotelsRequest, v1.GetNearbyHotelsResponse]
+	getNearbyRestaurants *connect.Client[v1.GetNearbyRestaurantsRequest, v1.GetNearbyRestaurantsResponse]
 }
 
 // AddToFavorites calls loci.favorites.v1.FavoritesService.AddToFavorites.
@@ -151,6 +203,26 @@ func (c *favoritesServiceClient) GetFavoritesCount(ctx context.Context, req *con
 	return c.getFavoritesCount.CallUnary(ctx, req)
 }
 
+// GetHotelDetails calls loci.favorites.v1.FavoritesService.GetHotelDetails.
+func (c *favoritesServiceClient) GetHotelDetails(ctx context.Context, req *connect.Request[v1.GetHotelDetailsRequest]) (*connect.Response[v1.GetHotelDetailsResponse], error) {
+	return c.getHotelDetails.CallUnary(ctx, req)
+}
+
+// GetRestaurantDetails calls loci.favorites.v1.FavoritesService.GetRestaurantDetails.
+func (c *favoritesServiceClient) GetRestaurantDetails(ctx context.Context, req *connect.Request[v1.GetRestaurantDetailsRequest]) (*connect.Response[v1.GetRestaurantDetailsResponse], error) {
+	return c.getRestaurantDetails.CallUnary(ctx, req)
+}
+
+// GetNearbyHotels calls loci.favorites.v1.FavoritesService.GetNearbyHotels.
+func (c *favoritesServiceClient) GetNearbyHotels(ctx context.Context, req *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error) {
+	return c.getNearbyHotels.CallUnary(ctx, req)
+}
+
+// GetNearbyRestaurants calls loci.favorites.v1.FavoritesService.GetNearbyRestaurants.
+func (c *favoritesServiceClient) GetNearbyRestaurants(ctx context.Context, req *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error) {
+	return c.getNearbyRestaurants.CallUnary(ctx, req)
+}
+
 // FavoritesServiceHandler is an implementation of the loci.favorites.v1.FavoritesService service.
 type FavoritesServiceHandler interface {
 	// Add an item to favorites
@@ -163,6 +235,14 @@ type FavoritesServiceHandler interface {
 	IsFavorited(context.Context, *connect.Request[v1.IsFavoritedRequest]) (*connect.Response[v1.IsFavoritedResponse], error)
 	// Get favorites count
 	GetFavoritesCount(context.Context, *connect.Request[v1.GetFavoritesCountRequest]) (*connect.Response[v1.GetFavoritesCountResponse], error)
+	// Get hotel details
+	GetHotelDetails(context.Context, *connect.Request[v1.GetHotelDetailsRequest]) (*connect.Response[v1.GetHotelDetailsResponse], error)
+	// Get restaurant details
+	GetRestaurantDetails(context.Context, *connect.Request[v1.GetRestaurantDetailsRequest]) (*connect.Response[v1.GetRestaurantDetailsResponse], error)
+	// Get nearby hotels
+	GetNearbyHotels(context.Context, *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error)
+	// Get nearby restaurants
+	GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error)
 }
 
 // NewFavoritesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -201,6 +281,30 @@ func NewFavoritesServiceHandler(svc FavoritesServiceHandler, opts ...connect.Han
 		connect.WithSchema(favoritesServiceGetFavoritesCountMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	favoritesServiceGetHotelDetailsHandler := connect.NewUnaryHandler(
+		FavoritesServiceGetHotelDetailsProcedure,
+		svc.GetHotelDetails,
+		connect.WithSchema(favoritesServiceGetHotelDetailsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	favoritesServiceGetRestaurantDetailsHandler := connect.NewUnaryHandler(
+		FavoritesServiceGetRestaurantDetailsProcedure,
+		svc.GetRestaurantDetails,
+		connect.WithSchema(favoritesServiceGetRestaurantDetailsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	favoritesServiceGetNearbyHotelsHandler := connect.NewUnaryHandler(
+		FavoritesServiceGetNearbyHotelsProcedure,
+		svc.GetNearbyHotels,
+		connect.WithSchema(favoritesServiceGetNearbyHotelsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	favoritesServiceGetNearbyRestaurantsHandler := connect.NewUnaryHandler(
+		FavoritesServiceGetNearbyRestaurantsProcedure,
+		svc.GetNearbyRestaurants,
+		connect.WithSchema(favoritesServiceGetNearbyRestaurantsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.favorites.v1.FavoritesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FavoritesServiceAddToFavoritesProcedure:
@@ -213,6 +317,14 @@ func NewFavoritesServiceHandler(svc FavoritesServiceHandler, opts ...connect.Han
 			favoritesServiceIsFavoritedHandler.ServeHTTP(w, r)
 		case FavoritesServiceGetFavoritesCountProcedure:
 			favoritesServiceGetFavoritesCountHandler.ServeHTTP(w, r)
+		case FavoritesServiceGetHotelDetailsProcedure:
+			favoritesServiceGetHotelDetailsHandler.ServeHTTP(w, r)
+		case FavoritesServiceGetRestaurantDetailsProcedure:
+			favoritesServiceGetRestaurantDetailsHandler.ServeHTTP(w, r)
+		case FavoritesServiceGetNearbyHotelsProcedure:
+			favoritesServiceGetNearbyHotelsHandler.ServeHTTP(w, r)
+		case FavoritesServiceGetNearbyRestaurantsProcedure:
+			favoritesServiceGetNearbyRestaurantsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -240,4 +352,20 @@ func (UnimplementedFavoritesServiceHandler) IsFavorited(context.Context, *connec
 
 func (UnimplementedFavoritesServiceHandler) GetFavoritesCount(context.Context, *connect.Request[v1.GetFavoritesCountRequest]) (*connect.Response[v1.GetFavoritesCountResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetFavoritesCount is not implemented"))
+}
+
+func (UnimplementedFavoritesServiceHandler) GetHotelDetails(context.Context, *connect.Request[v1.GetHotelDetailsRequest]) (*connect.Response[v1.GetHotelDetailsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetHotelDetails is not implemented"))
+}
+
+func (UnimplementedFavoritesServiceHandler) GetRestaurantDetails(context.Context, *connect.Request[v1.GetRestaurantDetailsRequest]) (*connect.Response[v1.GetRestaurantDetailsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetRestaurantDetails is not implemented"))
+}
+
+func (UnimplementedFavoritesServiceHandler) GetNearbyHotels(context.Context, *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetNearbyHotels is not implemented"))
+}
+
+func (UnimplementedFavoritesServiceHandler) GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetNearbyRestaurants is not implemented"))
 }
