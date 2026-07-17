@@ -37,27 +37,69 @@ const (
 	// ProfileServiceGetUserPreferenceProfilesProcedure is the fully-qualified name of the
 	// ProfileService's GetUserPreferenceProfiles RPC.
 	ProfileServiceGetUserPreferenceProfilesProcedure = "/loci.profile.ProfileService/GetUserPreferenceProfiles"
+	// ProfileServiceGetUserPreferenceProfileProcedure is the fully-qualified name of the
+	// ProfileService's GetUserPreferenceProfile RPC.
+	ProfileServiceGetUserPreferenceProfileProcedure = "/loci.profile.ProfileService/GetUserPreferenceProfile"
 	// ProfileServiceCreateUserPreferenceProfileProcedure is the fully-qualified name of the
 	// ProfileService's CreateUserPreferenceProfile RPC.
 	ProfileServiceCreateUserPreferenceProfileProcedure = "/loci.profile.ProfileService/CreateUserPreferenceProfile"
 	// ProfileServiceUpdateUserPreferenceProfileProcedure is the fully-qualified name of the
 	// ProfileService's UpdateUserPreferenceProfile RPC.
 	ProfileServiceUpdateUserPreferenceProfileProcedure = "/loci.profile.ProfileService/UpdateUserPreferenceProfile"
+	// ProfileServiceDeleteUserPreferenceProfileProcedure is the fully-qualified name of the
+	// ProfileService's DeleteUserPreferenceProfile RPC.
+	ProfileServiceDeleteUserPreferenceProfileProcedure = "/loci.profile.ProfileService/DeleteUserPreferenceProfile"
+	// ProfileServiceSetDefaultProfileProcedure is the fully-qualified name of the ProfileService's
+	// SetDefaultProfile RPC.
+	ProfileServiceSetDefaultProfileProcedure = "/loci.profile.ProfileService/SetDefaultProfile"
+	// ProfileServiceGetAccommodationPreferencesProcedure is the fully-qualified name of the
+	// ProfileService's GetAccommodationPreferences RPC.
+	ProfileServiceGetAccommodationPreferencesProcedure = "/loci.profile.ProfileService/GetAccommodationPreferences"
+	// ProfileServiceGetDiningPreferencesProcedure is the fully-qualified name of the ProfileService's
+	// GetDiningPreferences RPC.
+	ProfileServiceGetDiningPreferencesProcedure = "/loci.profile.ProfileService/GetDiningPreferences"
+	// ProfileServiceGetActivityPreferencesProcedure is the fully-qualified name of the ProfileService's
+	// GetActivityPreferences RPC.
+	ProfileServiceGetActivityPreferencesProcedure = "/loci.profile.ProfileService/GetActivityPreferences"
+	// ProfileServiceGetItineraryPreferencesProcedure is the fully-qualified name of the
+	// ProfileService's GetItineraryPreferences RPC.
+	ProfileServiceGetItineraryPreferencesProcedure = "/loci.profile.ProfileService/GetItineraryPreferences"
+	// ProfileServiceGetCombinedFiltersProcedure is the fully-qualified name of the ProfileService's
+	// GetCombinedFilters RPC.
+	ProfileServiceGetCombinedFiltersProcedure = "/loci.profile.ProfileService/GetCombinedFilters"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
 	profileServiceServiceDescriptor                           = profile.File_loci_profile_profile_proto.Services().ByName("ProfileService")
 	profileServiceGetUserPreferenceProfilesMethodDescriptor   = profileServiceServiceDescriptor.Methods().ByName("GetUserPreferenceProfiles")
+	profileServiceGetUserPreferenceProfileMethodDescriptor    = profileServiceServiceDescriptor.Methods().ByName("GetUserPreferenceProfile")
 	profileServiceCreateUserPreferenceProfileMethodDescriptor = profileServiceServiceDescriptor.Methods().ByName("CreateUserPreferenceProfile")
 	profileServiceUpdateUserPreferenceProfileMethodDescriptor = profileServiceServiceDescriptor.Methods().ByName("UpdateUserPreferenceProfile")
+	profileServiceDeleteUserPreferenceProfileMethodDescriptor = profileServiceServiceDescriptor.Methods().ByName("DeleteUserPreferenceProfile")
+	profileServiceSetDefaultProfileMethodDescriptor           = profileServiceServiceDescriptor.Methods().ByName("SetDefaultProfile")
+	profileServiceGetAccommodationPreferencesMethodDescriptor = profileServiceServiceDescriptor.Methods().ByName("GetAccommodationPreferences")
+	profileServiceGetDiningPreferencesMethodDescriptor        = profileServiceServiceDescriptor.Methods().ByName("GetDiningPreferences")
+	profileServiceGetActivityPreferencesMethodDescriptor      = profileServiceServiceDescriptor.Methods().ByName("GetActivityPreferences")
+	profileServiceGetItineraryPreferencesMethodDescriptor     = profileServiceServiceDescriptor.Methods().ByName("GetItineraryPreferences")
+	profileServiceGetCombinedFiltersMethodDescriptor          = profileServiceServiceDescriptor.Methods().ByName("GetCombinedFilters")
 )
 
 // ProfileServiceClient is a client for the loci.profile.ProfileService service.
 type ProfileServiceClient interface {
+	// Core profile operations
 	GetUserPreferenceProfiles(context.Context, *connect.Request[profile.GetUserPreferenceProfilesRequest]) (*connect.Response[profile.GetUserPreferenceProfilesResponse], error)
+	GetUserPreferenceProfile(context.Context, *connect.Request[profile.GetUserPreferenceProfileRequest]) (*connect.Response[profile.GetUserPreferenceProfileResponse], error)
 	CreateUserPreferenceProfile(context.Context, *connect.Request[profile.CreateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
 	UpdateUserPreferenceProfile(context.Context, *connect.Request[profile.UpdateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
+	DeleteUserPreferenceProfile(context.Context, *connect.Request[profile.DeleteUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
+	SetDefaultProfile(context.Context, *connect.Request[profile.SetDefaultProfileRequest]) (*connect.Response[common.Response], error)
+	// Domain-specific preference queries
+	GetAccommodationPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.AccommodationPreferencesResponse], error)
+	GetDiningPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.DiningPreferencesResponse], error)
+	GetActivityPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ActivityPreferencesResponse], error)
+	GetItineraryPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ItineraryPreferencesResponse], error)
+	GetCombinedFilters(context.Context, *connect.Request[profile.GetCombinedFiltersRequest]) (*connect.Response[profile.CombinedFiltersResponse], error)
 }
 
 // NewProfileServiceClient constructs a client for the loci.profile.ProfileService service. By
@@ -76,6 +118,12 @@ func NewProfileServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(profileServiceGetUserPreferenceProfilesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getUserPreferenceProfile: connect.NewClient[profile.GetUserPreferenceProfileRequest, profile.GetUserPreferenceProfileResponse](
+			httpClient,
+			baseURL+ProfileServiceGetUserPreferenceProfileProcedure,
+			connect.WithSchema(profileServiceGetUserPreferenceProfileMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		createUserPreferenceProfile: connect.NewClient[profile.CreateUserPreferenceProfileRequest, common.Response](
 			httpClient,
 			baseURL+ProfileServiceCreateUserPreferenceProfileProcedure,
@@ -88,19 +136,74 @@ func NewProfileServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(profileServiceUpdateUserPreferenceProfileMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		deleteUserPreferenceProfile: connect.NewClient[profile.DeleteUserPreferenceProfileRequest, common.Response](
+			httpClient,
+			baseURL+ProfileServiceDeleteUserPreferenceProfileProcedure,
+			connect.WithSchema(profileServiceDeleteUserPreferenceProfileMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setDefaultProfile: connect.NewClient[profile.SetDefaultProfileRequest, common.Response](
+			httpClient,
+			baseURL+ProfileServiceSetDefaultProfileProcedure,
+			connect.WithSchema(profileServiceSetDefaultProfileMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getAccommodationPreferences: connect.NewClient[profile.GetDomainPreferencesRequest, profile.AccommodationPreferencesResponse](
+			httpClient,
+			baseURL+ProfileServiceGetAccommodationPreferencesProcedure,
+			connect.WithSchema(profileServiceGetAccommodationPreferencesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getDiningPreferences: connect.NewClient[profile.GetDomainPreferencesRequest, profile.DiningPreferencesResponse](
+			httpClient,
+			baseURL+ProfileServiceGetDiningPreferencesProcedure,
+			connect.WithSchema(profileServiceGetDiningPreferencesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getActivityPreferences: connect.NewClient[profile.GetDomainPreferencesRequest, profile.ActivityPreferencesResponse](
+			httpClient,
+			baseURL+ProfileServiceGetActivityPreferencesProcedure,
+			connect.WithSchema(profileServiceGetActivityPreferencesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getItineraryPreferences: connect.NewClient[profile.GetDomainPreferencesRequest, profile.ItineraryPreferencesResponse](
+			httpClient,
+			baseURL+ProfileServiceGetItineraryPreferencesProcedure,
+			connect.WithSchema(profileServiceGetItineraryPreferencesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getCombinedFilters: connect.NewClient[profile.GetCombinedFiltersRequest, profile.CombinedFiltersResponse](
+			httpClient,
+			baseURL+ProfileServiceGetCombinedFiltersProcedure,
+			connect.WithSchema(profileServiceGetCombinedFiltersMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // profileServiceClient implements ProfileServiceClient.
 type profileServiceClient struct {
 	getUserPreferenceProfiles   *connect.Client[profile.GetUserPreferenceProfilesRequest, profile.GetUserPreferenceProfilesResponse]
+	getUserPreferenceProfile    *connect.Client[profile.GetUserPreferenceProfileRequest, profile.GetUserPreferenceProfileResponse]
 	createUserPreferenceProfile *connect.Client[profile.CreateUserPreferenceProfileRequest, common.Response]
 	updateUserPreferenceProfile *connect.Client[profile.UpdateUserPreferenceProfileRequest, common.Response]
+	deleteUserPreferenceProfile *connect.Client[profile.DeleteUserPreferenceProfileRequest, common.Response]
+	setDefaultProfile           *connect.Client[profile.SetDefaultProfileRequest, common.Response]
+	getAccommodationPreferences *connect.Client[profile.GetDomainPreferencesRequest, profile.AccommodationPreferencesResponse]
+	getDiningPreferences        *connect.Client[profile.GetDomainPreferencesRequest, profile.DiningPreferencesResponse]
+	getActivityPreferences      *connect.Client[profile.GetDomainPreferencesRequest, profile.ActivityPreferencesResponse]
+	getItineraryPreferences     *connect.Client[profile.GetDomainPreferencesRequest, profile.ItineraryPreferencesResponse]
+	getCombinedFilters          *connect.Client[profile.GetCombinedFiltersRequest, profile.CombinedFiltersResponse]
 }
 
 // GetUserPreferenceProfiles calls loci.profile.ProfileService.GetUserPreferenceProfiles.
 func (c *profileServiceClient) GetUserPreferenceProfiles(ctx context.Context, req *connect.Request[profile.GetUserPreferenceProfilesRequest]) (*connect.Response[profile.GetUserPreferenceProfilesResponse], error) {
 	return c.getUserPreferenceProfiles.CallUnary(ctx, req)
+}
+
+// GetUserPreferenceProfile calls loci.profile.ProfileService.GetUserPreferenceProfile.
+func (c *profileServiceClient) GetUserPreferenceProfile(ctx context.Context, req *connect.Request[profile.GetUserPreferenceProfileRequest]) (*connect.Response[profile.GetUserPreferenceProfileResponse], error) {
+	return c.getUserPreferenceProfile.CallUnary(ctx, req)
 }
 
 // CreateUserPreferenceProfile calls loci.profile.ProfileService.CreateUserPreferenceProfile.
@@ -113,11 +216,56 @@ func (c *profileServiceClient) UpdateUserPreferenceProfile(ctx context.Context, 
 	return c.updateUserPreferenceProfile.CallUnary(ctx, req)
 }
 
+// DeleteUserPreferenceProfile calls loci.profile.ProfileService.DeleteUserPreferenceProfile.
+func (c *profileServiceClient) DeleteUserPreferenceProfile(ctx context.Context, req *connect.Request[profile.DeleteUserPreferenceProfileRequest]) (*connect.Response[common.Response], error) {
+	return c.deleteUserPreferenceProfile.CallUnary(ctx, req)
+}
+
+// SetDefaultProfile calls loci.profile.ProfileService.SetDefaultProfile.
+func (c *profileServiceClient) SetDefaultProfile(ctx context.Context, req *connect.Request[profile.SetDefaultProfileRequest]) (*connect.Response[common.Response], error) {
+	return c.setDefaultProfile.CallUnary(ctx, req)
+}
+
+// GetAccommodationPreferences calls loci.profile.ProfileService.GetAccommodationPreferences.
+func (c *profileServiceClient) GetAccommodationPreferences(ctx context.Context, req *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.AccommodationPreferencesResponse], error) {
+	return c.getAccommodationPreferences.CallUnary(ctx, req)
+}
+
+// GetDiningPreferences calls loci.profile.ProfileService.GetDiningPreferences.
+func (c *profileServiceClient) GetDiningPreferences(ctx context.Context, req *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.DiningPreferencesResponse], error) {
+	return c.getDiningPreferences.CallUnary(ctx, req)
+}
+
+// GetActivityPreferences calls loci.profile.ProfileService.GetActivityPreferences.
+func (c *profileServiceClient) GetActivityPreferences(ctx context.Context, req *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ActivityPreferencesResponse], error) {
+	return c.getActivityPreferences.CallUnary(ctx, req)
+}
+
+// GetItineraryPreferences calls loci.profile.ProfileService.GetItineraryPreferences.
+func (c *profileServiceClient) GetItineraryPreferences(ctx context.Context, req *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ItineraryPreferencesResponse], error) {
+	return c.getItineraryPreferences.CallUnary(ctx, req)
+}
+
+// GetCombinedFilters calls loci.profile.ProfileService.GetCombinedFilters.
+func (c *profileServiceClient) GetCombinedFilters(ctx context.Context, req *connect.Request[profile.GetCombinedFiltersRequest]) (*connect.Response[profile.CombinedFiltersResponse], error) {
+	return c.getCombinedFilters.CallUnary(ctx, req)
+}
+
 // ProfileServiceHandler is an implementation of the loci.profile.ProfileService service.
 type ProfileServiceHandler interface {
+	// Core profile operations
 	GetUserPreferenceProfiles(context.Context, *connect.Request[profile.GetUserPreferenceProfilesRequest]) (*connect.Response[profile.GetUserPreferenceProfilesResponse], error)
+	GetUserPreferenceProfile(context.Context, *connect.Request[profile.GetUserPreferenceProfileRequest]) (*connect.Response[profile.GetUserPreferenceProfileResponse], error)
 	CreateUserPreferenceProfile(context.Context, *connect.Request[profile.CreateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
 	UpdateUserPreferenceProfile(context.Context, *connect.Request[profile.UpdateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
+	DeleteUserPreferenceProfile(context.Context, *connect.Request[profile.DeleteUserPreferenceProfileRequest]) (*connect.Response[common.Response], error)
+	SetDefaultProfile(context.Context, *connect.Request[profile.SetDefaultProfileRequest]) (*connect.Response[common.Response], error)
+	// Domain-specific preference queries
+	GetAccommodationPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.AccommodationPreferencesResponse], error)
+	GetDiningPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.DiningPreferencesResponse], error)
+	GetActivityPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ActivityPreferencesResponse], error)
+	GetItineraryPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ItineraryPreferencesResponse], error)
+	GetCombinedFilters(context.Context, *connect.Request[profile.GetCombinedFiltersRequest]) (*connect.Response[profile.CombinedFiltersResponse], error)
 }
 
 // NewProfileServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -132,6 +280,12 @@ func NewProfileServiceHandler(svc ProfileServiceHandler, opts ...connect.Handler
 		connect.WithSchema(profileServiceGetUserPreferenceProfilesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	profileServiceGetUserPreferenceProfileHandler := connect.NewUnaryHandler(
+		ProfileServiceGetUserPreferenceProfileProcedure,
+		svc.GetUserPreferenceProfile,
+		connect.WithSchema(profileServiceGetUserPreferenceProfileMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	profileServiceCreateUserPreferenceProfileHandler := connect.NewUnaryHandler(
 		ProfileServiceCreateUserPreferenceProfileProcedure,
 		svc.CreateUserPreferenceProfile,
@@ -144,14 +298,72 @@ func NewProfileServiceHandler(svc ProfileServiceHandler, opts ...connect.Handler
 		connect.WithSchema(profileServiceUpdateUserPreferenceProfileMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	profileServiceDeleteUserPreferenceProfileHandler := connect.NewUnaryHandler(
+		ProfileServiceDeleteUserPreferenceProfileProcedure,
+		svc.DeleteUserPreferenceProfile,
+		connect.WithSchema(profileServiceDeleteUserPreferenceProfileMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceSetDefaultProfileHandler := connect.NewUnaryHandler(
+		ProfileServiceSetDefaultProfileProcedure,
+		svc.SetDefaultProfile,
+		connect.WithSchema(profileServiceSetDefaultProfileMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceGetAccommodationPreferencesHandler := connect.NewUnaryHandler(
+		ProfileServiceGetAccommodationPreferencesProcedure,
+		svc.GetAccommodationPreferences,
+		connect.WithSchema(profileServiceGetAccommodationPreferencesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceGetDiningPreferencesHandler := connect.NewUnaryHandler(
+		ProfileServiceGetDiningPreferencesProcedure,
+		svc.GetDiningPreferences,
+		connect.WithSchema(profileServiceGetDiningPreferencesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceGetActivityPreferencesHandler := connect.NewUnaryHandler(
+		ProfileServiceGetActivityPreferencesProcedure,
+		svc.GetActivityPreferences,
+		connect.WithSchema(profileServiceGetActivityPreferencesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceGetItineraryPreferencesHandler := connect.NewUnaryHandler(
+		ProfileServiceGetItineraryPreferencesProcedure,
+		svc.GetItineraryPreferences,
+		connect.WithSchema(profileServiceGetItineraryPreferencesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	profileServiceGetCombinedFiltersHandler := connect.NewUnaryHandler(
+		ProfileServiceGetCombinedFiltersProcedure,
+		svc.GetCombinedFilters,
+		connect.WithSchema(profileServiceGetCombinedFiltersMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.profile.ProfileService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ProfileServiceGetUserPreferenceProfilesProcedure:
 			profileServiceGetUserPreferenceProfilesHandler.ServeHTTP(w, r)
+		case ProfileServiceGetUserPreferenceProfileProcedure:
+			profileServiceGetUserPreferenceProfileHandler.ServeHTTP(w, r)
 		case ProfileServiceCreateUserPreferenceProfileProcedure:
 			profileServiceCreateUserPreferenceProfileHandler.ServeHTTP(w, r)
 		case ProfileServiceUpdateUserPreferenceProfileProcedure:
 			profileServiceUpdateUserPreferenceProfileHandler.ServeHTTP(w, r)
+		case ProfileServiceDeleteUserPreferenceProfileProcedure:
+			profileServiceDeleteUserPreferenceProfileHandler.ServeHTTP(w, r)
+		case ProfileServiceSetDefaultProfileProcedure:
+			profileServiceSetDefaultProfileHandler.ServeHTTP(w, r)
+		case ProfileServiceGetAccommodationPreferencesProcedure:
+			profileServiceGetAccommodationPreferencesHandler.ServeHTTP(w, r)
+		case ProfileServiceGetDiningPreferencesProcedure:
+			profileServiceGetDiningPreferencesHandler.ServeHTTP(w, r)
+		case ProfileServiceGetActivityPreferencesProcedure:
+			profileServiceGetActivityPreferencesHandler.ServeHTTP(w, r)
+		case ProfileServiceGetItineraryPreferencesProcedure:
+			profileServiceGetItineraryPreferencesHandler.ServeHTTP(w, r)
+		case ProfileServiceGetCombinedFiltersProcedure:
+			profileServiceGetCombinedFiltersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -165,10 +377,42 @@ func (UnimplementedProfileServiceHandler) GetUserPreferenceProfiles(context.Cont
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetUserPreferenceProfiles is not implemented"))
 }
 
+func (UnimplementedProfileServiceHandler) GetUserPreferenceProfile(context.Context, *connect.Request[profile.GetUserPreferenceProfileRequest]) (*connect.Response[profile.GetUserPreferenceProfileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetUserPreferenceProfile is not implemented"))
+}
+
 func (UnimplementedProfileServiceHandler) CreateUserPreferenceProfile(context.Context, *connect.Request[profile.CreateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.CreateUserPreferenceProfile is not implemented"))
 }
 
 func (UnimplementedProfileServiceHandler) UpdateUserPreferenceProfile(context.Context, *connect.Request[profile.UpdateUserPreferenceProfileRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.UpdateUserPreferenceProfile is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) DeleteUserPreferenceProfile(context.Context, *connect.Request[profile.DeleteUserPreferenceProfileRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.DeleteUserPreferenceProfile is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) SetDefaultProfile(context.Context, *connect.Request[profile.SetDefaultProfileRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.SetDefaultProfile is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) GetAccommodationPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.AccommodationPreferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetAccommodationPreferences is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) GetDiningPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.DiningPreferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetDiningPreferences is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) GetActivityPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ActivityPreferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetActivityPreferences is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) GetItineraryPreferences(context.Context, *connect.Request[profile.GetDomainPreferencesRequest]) (*connect.Response[profile.ItineraryPreferencesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetItineraryPreferences is not implemented"))
+}
+
+func (UnimplementedProfileServiceHandler) GetCombinedFilters(context.Context, *connect.Request[profile.GetCombinedFiltersRequest]) (*connect.Response[profile.CombinedFiltersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.profile.ProfileService.GetCombinedFilters is not implemented"))
 }

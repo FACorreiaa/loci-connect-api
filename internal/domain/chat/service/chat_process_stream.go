@@ -8,16 +8,17 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 )
 
 // prepareChatContext handles extracting city, intent detection, fetching user profile,
@@ -105,29 +106,28 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 
 	// Helper to parse part robustly
 	parsePart := func(key string, target any, nestedKey string) {
-		if str, ok := rawResponses[key]; ok {
-			clean := extractJSONFromMarkdown(str)
-			var parsed any
-			if err := json.Unmarshal([]byte(clean), &parsed); err != nil {
+		str, ok := rawResponses[key]
+		if !ok {
+			return
+		}
+		clean := extractJSONFromMarkdown(str)
+		if nestedKey != "" {
+			var envelope map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(clean), &envelope); err != nil {
 				l.logger.WarnContext(ctx, "failed to unmarshal raw", "key", key, "err", err)
 				return
 			}
-			// Handle nested or flat structures
-			if m, ok := parsed.(map[string]any); ok && nestedKey != "" {
-				if nested, exists := m[nestedKey]; exists {
-					if jsonBytes, err := json.Marshal(nested); err == nil {
-						if err := json.Unmarshal(jsonBytes, target); err != nil {
-							l.logger.WarnContext(ctx, "failed to unmarshal nested", "key", key, "err", err)
-						}
-					}
-				}
-			} else {
-				if jsonBytes, err := json.Marshal(parsed); err == nil {
-					if err := json.Unmarshal(jsonBytes, target); err != nil {
-						l.logger.WarnContext(ctx, "failed to unmarshal", "key", key, "err", err)
-					}
-				}
+			nested, exists := envelope[nestedKey]
+			if !exists {
+				return
 			}
+			if err := json.Unmarshal(nested, target); err != nil {
+				l.logger.WarnContext(ctx, "failed to unmarshal nested", "key", key, "err", err)
+			}
+			return
+		}
+		if err := json.Unmarshal([]byte(clean), target); err != nil {
+			l.logger.WarnContext(ctx, "failed to unmarshal", "key", key, "err", err)
 		}
 	}
 
@@ -179,10 +179,9 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 // orchestrateLLMStreams manages the fan-out concurrency to LLM workers.
 func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]string, error) {
 	ctx := cc.Ctx
-	var wg sync.WaitGroup
 
-	// Create a detached context for LLM workers - they MUST complete even if client disconnects
-	// This prevents partial JSON responses when the user navigates away
+	// workerCtx survives client disconnect so in-flight work can finish and events can flush.
+	// gctx (from errgroup) cancels sibling workers when any worker returns an error.
 	workerCtx, cancelWorker := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
 	defer cancelWorker()
 
@@ -225,157 +224,69 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 		l.sendEvent(workerCtx, cc.EventCh, event, 3)
 	}
 
+	g, gctx := errgroup.WithContext(workerCtx)
+
+	runStreamWorker := func(partType, prompt, partCacheKey string) {
+		g.Go(func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					l.logger.ErrorContext(gctx, "stream worker panicked",
+						slog.String("part_type", partType),
+						slog.Any("recover", r))
+					err = fmt.Errorf("%s worker panic: %v", partType, r)
+				}
+			}()
+			responsesMutex.Lock()
+			partCacheKeys[partType] = partCacheKey
+			responsesMutex.Unlock()
+			return l.streamWorkerWithResponseAndCache(gctx, prompt, partType, sendEventWithResponse, cc.Domain, partCacheKey)
+		})
+	}
+
 	// Spawn workers based on Domain
 	switch cc.Domain {
 	case locitypes.DomainItinerary, locitypes.DomainGeneral:
-		wg.Go(func() {
-			prompt := getCityDataPrompt(cc.CityName)
-			partCacheKey := cc.CacheKey + "_city_data"
-			responsesMutex.Lock()
-			partCacheKeys["city_data"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-		wg.Go(func() {
-			prompt := getGeneralPOIPrompt(cc.CityName)
-			partCacheKey := cc.CacheKey + "_general_pois"
-			responsesMutex.Lock()
-			partCacheKeys["general_pois"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "general_pois", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-		wg.Go(func() {
-			prompt := getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_itinerary"
-			responsesMutex.Lock()
-			partCacheKeys["itinerary"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "itinerary", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-
-		// // Added Hotels Worker
-		// wg.Go(func() {
-		// 	var lat, lon float64
-		// 	if cc.UserLocation != nil {
-		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		// 	}
-		// 	prompt := getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-		// 	partCacheKey := cc.CacheKey + "_hotels"
-		// 	responsesMutex.Lock()
-		// 	partCacheKeys["hotels"] = partCacheKey
-		// 	responsesMutex.Unlock()
-		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
-		// })
-
-		// // Added Restaurants Worker
-		// wg.Go(func() {
-		// 	var lat, lon float64
-		// 	if cc.UserLocation != nil {
-		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		// 	}
-		// 	prompt := getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-		// 	partCacheKey := cc.CacheKey + "_restaurants"
-		// 	responsesMutex.Lock()
-		// 	partCacheKeys["restaurants"] = partCacheKey
-		// 	responsesMutex.Unlock()
-		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
-		// })
-
-		// // Added Activities Worker
-		// wg.Go(func() {
-		// 	var lat, lon float64
-		// 	if cc.UserLocation != nil {
-		// 		lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		// 	}
-		// 	prompt := getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-		// 	partCacheKey := cc.CacheKey + "_activities"
-		// 	responsesMutex.Lock()
-		// 	partCacheKeys["activities"] = partCacheKey
-		// 	responsesMutex.Unlock()
-		// 	l.streamWorkerWithResponseAndCache(ctx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
-		// })
+		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
+		runStreamWorker("general_pois", getGeneralPOIPrompt(cc.CityName), cc.CacheKey+"_general_pois")
+		runStreamWorker("itinerary", getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences), cc.CacheKey+"_itinerary")
 	case locitypes.DomainAccommodation:
-		// Spawn city_data worker
-		wg.Go(func() {
-			prompt := getCityDataPrompt(cc.CityName)
-			partCacheKey := cc.CacheKey + "_city_data"
-			responsesMutex.Lock()
-			partCacheKeys["city_data"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-		// Spawn hotels worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_hotels"
-			responsesMutex.Lock()
-			partCacheKeys["hotels"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "hotels", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
+		var lat, lon float64
+		if cc.UserLocation != nil {
+			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		}
+		runStreamWorker("hotels", getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_hotels")
 	case locitypes.DomainDining:
-		// Spawn city_data worker
-		wg.Go(func() {
-			prompt := getCityDataPrompt(cc.CityName)
-			partCacheKey := cc.CacheKey + "_city_data"
-			responsesMutex.Lock()
-			partCacheKeys["city_data"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-		// Spawn restaurants worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_restaurants"
-			responsesMutex.Lock()
-			partCacheKeys["restaurants"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "restaurants", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
+		var lat, lon float64
+		if cc.UserLocation != nil {
+			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		}
+		runStreamWorker("restaurants", getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_restaurants")
 	case locitypes.DomainActivities:
-		// Spawn city_data worker
-		wg.Go(func() {
-			prompt := getCityDataPrompt(cc.CityName)
-			partCacheKey := cc.CacheKey + "_city_data"
-			responsesMutex.Lock()
-			partCacheKeys["city_data"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "city_data", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
-		// Spawn activities worker
-		wg.Go(func() {
-			var lat, lon float64
-			if cc.UserLocation != nil {
-				lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-			}
-			prompt := getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences)
-			partCacheKey := cc.CacheKey + "_activities"
-			responsesMutex.Lock()
-			partCacheKeys["activities"] = partCacheKey
-			responsesMutex.Unlock()
-			l.streamWorkerWithResponseAndCache(workerCtx, prompt, "activities", sendEventWithResponse, cc.Domain, partCacheKey)
-		})
+		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
+		var lat, lon float64
+		if cc.UserLocation != nil {
+			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
+		}
+		runStreamWorker("activities", getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_activities")
 	case locitypes.DomainNearby:
-		// Handle location-based "nearme" queries using PostGIS database queries
-		wg.Go(func() {
-			l.handleNearbyDomain(workerCtx, cc, sendEventWithResponse, &responsesMutex, responses, partCacheKeys)
+		g.Go(func() (err error) {
+			defer func() {
+				if r := recover(); r != nil {
+					l.logger.ErrorContext(gctx, "nearby worker panicked", slog.Any("recover", r))
+					err = fmt.Errorf("nearby worker panic: %v", r)
+				}
+			}()
+			return l.handleNearbyDomain(gctx, cc, sendEventWithResponse, &responsesMutex, responses, partCacheKeys)
 		})
 	default:
 		return nil, fmt.Errorf("unhandled domain type: %s", cc.Domain)
 	}
 
-	wg.Wait()
-	l.logger.InfoContext(ctx, "All streaming workers completed")
+	waitErr := g.Wait()
 
-	// Hydrate missing parts from cache
+	// Best-effort hydration even when workers fail or siblings were canceled.
 	responsesMutex.Lock()
 	for part, key := range partCacheKeys {
 		if builder, ok := responses[part]; !ok || builder == nil || builder.Len() == 0 {
@@ -392,11 +303,15 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	}
 	responsesMutex.Unlock()
 
-	// Convert builders to strings for the next phase
 	finalResponses := make(map[string]string)
 	for k, v := range responses {
 		finalResponses[k] = v.String()
 	}
+
+	if waitErr != nil {
+		return finalResponses, waitErr
+	}
+	l.logger.InfoContext(ctx, "All streaming workers completed")
 	return finalResponses, nil
 }
 
@@ -645,7 +560,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 	responsesMutex *sync.Mutex,
 	responses map[string]*strings.Builder,
 	partCacheKeys map[string]string,
-) {
+) error {
 	// Extract location from user location
 	var lat, lon, distance float64
 	if cc.UserLocation != nil {
@@ -654,8 +569,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 
 		// Try to parse distance from message using regex
 		// Format: "within X kilometers" or "within X km"
-		distanceRegex := regexp.MustCompile(`within\s+(\d+(?:\.\d+)?)\s*(?:kilometers?|km)`)
-		if matches := distanceRegex.FindStringSubmatch(strings.ToLower(cc.Message)); len(matches) > 1 {
+		if matches := nearbyDistanceRE.FindStringSubmatch(strings.ToLower(cc.Message)); len(matches) > 1 {
 			if parsedDist, err := strconv.ParseFloat(matches[1], 64); err == nil {
 				distance = parsedDist * 1000 // Convert km to meters for PostGIS
 			}
@@ -672,7 +586,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		})
-		return
+		return nil
 	}
 
 	l.logger.InfoContext(ctx, "Handling nearby domain query",
@@ -708,7 +622,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		})
-		return
+		return fmt.Errorf("query nearby POIs: %w", err)
 	}
 
 	l.logger.InfoContext(ctx, "Found nearby POIs",
@@ -744,11 +658,17 @@ func (l *ServiceImpl) handleNearbyDomain(
 	if responses["nearby_pois"] == nil {
 		responses["nearby_pois"] = &strings.Builder{}
 	}
-	// Marshal POIs to JSON for storage
-	poisJSON, _ := json.Marshal(pois)
+	poisJSON, err := json.Marshal(pois)
+	if err != nil {
+		responsesMutex.Unlock()
+		return fmt.Errorf("marshal nearby POIs: %w", err)
+	}
+	nearbyCacheKey := cc.CacheKey + "_nearby_pois"
 	responses["nearby_pois"].WriteString(string(poisJSON))
-	partCacheKeys["nearby_pois"] = cc.CacheKey + "_nearby_pois"
+	partCacheKeys["nearby_pois"] = nearbyCacheKey
 	responsesMutex.Unlock()
+
+	l.cache.Set(nearbyCacheKey, string(poisJSON), cachestore.DefaultGeoTTL)
 
 	// Send the POIs as a structured event
 	sendEventWithResponse(locitypes.StreamEvent{
@@ -765,4 +685,5 @@ func (l *ServiceImpl) handleNearbyDomain(
 
 	l.logger.InfoContext(ctx, "Successfully streamed nearby POIs",
 		slog.Int("poi_count", len(pois)))
+	return nil
 }

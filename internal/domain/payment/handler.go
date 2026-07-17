@@ -306,13 +306,14 @@ func (h *paymentHandler) CreateCheckoutSession(ctx context.Context, req *connect
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to fetch user"))
 	}
 
+	// Mode from the request is intentionally ignored: checkout is
+	// subscription-only; arbitrary one-time payment sessions are not offered.
 	result, err := h.service.CreateCheckoutSession(ctx, &CreateCheckoutSessionParams{
 		UserID:     userID,
 		Email:      user.Email,
 		PriceID:    req.Msg.PriceId,
 		SuccessURL: req.Msg.SuccessUrl,
 		CancelURL:  req.Msg.CancelUrl,
-		Mode:       req.Msg.Mode,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

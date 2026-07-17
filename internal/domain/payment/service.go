@@ -3,11 +3,15 @@ package payment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	subquota "github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	stripe "github.com/stripe/stripe-go/v81"
 	portalsession "github.com/stripe/stripe-go/v81/billingportal/session"
 	checkoutsession "github.com/stripe/stripe-go/v81/checkout/session"
@@ -35,16 +39,42 @@ type Service interface {
 	CreateCustomerPortalSession(ctx context.Context, userID uuid.UUID, returnURL string) (*CustomerPortalResult, error)
 }
 
-type service struct {
-	repo   Repository
-	logger *slog.Logger
+// QuotaReader exposes today's LLM usage for subscription reporting.
+type QuotaReader interface {
+	GetDailyUsage(ctx context.Context, userID uuid.UUID) (int, error)
 }
 
-func NewService(repo Repository, logger *slog.Logger, stripeKey string) Service {
-	stripe.Key = stripeKey
+// PlanInvalidator evicts a user's cached plan after a webhook-driven
+// entitlement change so upgrades take effect immediately.
+type PlanInvalidator interface {
+	InvalidatePlan(userID uuid.UUID)
+}
+
+// StripeConfig carries the Stripe wiring and quota display values the
+// payment service needs.
+type StripeConfig struct {
+	APIKey         string
+	PriceIDMonthly string
+	PriceIDAnnual  string
+	FreeDailyLimit int
+}
+
+type service struct {
+	repo        Repository
+	logger      *slog.Logger
+	quota       QuotaReader
+	invalidator PlanInvalidator
+	cfg         StripeConfig
+}
+
+func NewService(repo Repository, logger *slog.Logger, quota QuotaReader, invalidator PlanInvalidator, cfg StripeConfig) Service {
+	stripe.Key = cfg.APIKey
 	return &service{
-		repo:   repo,
-		logger: logger,
+		repo:        repo,
+		logger:      logger,
+		quota:       quota,
+		invalidator: invalidator,
+		cfg:         cfg,
 	}
 }
 
@@ -85,7 +115,6 @@ type CreateCheckoutSessionParams struct {
 	PriceID    string
 	SuccessURL string
 	CancelURL  string
-	Mode       string // "subscription" or "payment"
 }
 
 type CreateCheckoutSessionResult struct {
@@ -361,11 +390,101 @@ func planFromStripeItems(items *stripe.SubscriptionItemList) string {
 	}
 }
 
+// mapStripeStatus maps Stripe subscription statuses onto the DB
+// subscription_status enum (active, trialing, past_due, canceled, expired).
+// Writing an unmapped Stripe status (incomplete, unpaid, paused, ...) would
+// violate the enum constraint; those all mean "not entitled", i.e. expired.
+func mapStripeStatus(status stripe.SubscriptionStatus) string {
+	switch status {
+	case stripe.SubscriptionStatusActive:
+		return "active"
+	case stripe.SubscriptionStatusTrialing:
+		return "trialing"
+	case stripe.SubscriptionStatusPastDue:
+		return "past_due"
+	case stripe.SubscriptionStatusCanceled:
+		return "canceled"
+	default:
+		return "expired"
+	}
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// resolveSubscriptionUser finds the local user for a Stripe subscription:
+// metadata user_id first (set on SubscriptionData at checkout), then the
+// customer link recorded by checkout.session.completed.
+func (s *service) resolveSubscriptionUser(ctx context.Context, stripeSub *stripe.Subscription) (uuid.UUID, error) {
+	if userIDStr := stripeSub.Metadata["user_id"]; userIDStr != "" {
+		uid, err := uuid.Parse(userIDStr)
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("invalid user_id in metadata: %w", err)
+		}
+		return uid, nil
+	}
+	if stripeSub.Customer != nil && stripeSub.Customer.ID != "" {
+		return s.repo.GetUserIDByStripeCustomerID(ctx, stripeSub.Customer.ID)
+	}
+	return uuid.Nil, nil
+}
+
+func (s *service) invalidatePlan(userID uuid.UUID) {
+	if s.invalidator != nil {
+		s.invalidator.InvalidatePlan(userID)
+	}
+}
+
 func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) error {
+	err := s.processStripeEvent(ctx, event)
+	status := "ok"
+	if err != nil {
+		status = "error"
+	}
+	observability.WebhookEventsTotal.WithLabelValues(string(event.Type), status).Inc()
+	return err
+}
+
+func (s *service) processStripeEvent(ctx context.Context, event stripe.Event) error {
+	// Idempotency gate: the unique event_id makes replayed webhook deliveries
+	// no-ops before any state is touched.
+	if err := s.repo.RecordWebhookEvent(ctx, event.ID, string(event.Type)); err != nil {
+		if isUniqueViolation(err) {
+			s.logger.Info("skipping already-processed webhook event", "id", event.ID, "type", event.Type)
+			observability.WebhookDuplicatesTotal.Inc()
+			return nil
+		}
+		return fmt.Errorf("failed to record webhook event: %w", err)
+	}
+
 	switch event.Type {
 	case "payment_intent.succeeded":
 		// Handle one-time payments if needed
 		s.logger.Info("Payment succeeded", "id", event.ID)
+
+	case "checkout.session.completed":
+		// Fallback user<->customer linker: even if the subscription event
+		// races or lacks metadata, the checkout session always carries our
+		// client_reference_id and the Stripe customer.
+		var sess stripe.CheckoutSession
+		if err := json.Unmarshal(event.Data.Raw, &sess); err != nil {
+			return fmt.Errorf("error parsing checkout session event: %w", err)
+		}
+		if sess.ClientReferenceID == "" || sess.Customer == nil || sess.Customer.ID == "" {
+			s.logger.Warn("checkout session missing client_reference_id or customer", "session", sess.ID)
+			return nil
+		}
+		uid, err := uuid.Parse(sess.ClientReferenceID)
+		if err != nil {
+			return fmt.Errorf("invalid client_reference_id: %w", err)
+		}
+		if err := s.repo.SetStripeCustomerID(ctx, uid, sess.Customer.ID); err != nil {
+			return fmt.Errorf("failed to link stripe customer: %w", err)
+		}
+		s.invalidatePlan(uid)
+		s.logger.Info("Linked Stripe customer", "user_id", uid, "customer", sess.Customer.ID)
 
 	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		var stripeSub stripe.Subscription
@@ -373,19 +492,16 @@ func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) er
 			return fmt.Errorf("error parsing subscription event: %w", err)
 		}
 
-		userIDStr := stripeSub.Metadata["user_id"]
-		if userIDStr == "" {
-			s.logger.Warn("Subscription event missing user_id metadata", "stripe_id", stripeSub.ID)
+		uid, err := s.resolveSubscriptionUser(ctx, &stripeSub)
+		if err != nil {
+			return err
+		}
+		if uid == uuid.Nil {
+			s.logger.Warn("Subscription event has no resolvable user", "stripe_id", stripeSub.ID)
 			return nil // Can't link to user
 		}
-		uid, err := uuid.Parse(userIDStr)
-		if err != nil {
-			return fmt.Errorf("invalid user_id in metadata: %w", err)
-		}
 
-		// Map status
-		internalStatus := string(stripeSub.Status)
-		// Adjust mapping if needed
+		internalStatus := mapStripeStatus(stripeSub.Status)
 
 		// Map dates
 		startDate := time.Unix(stripeSub.Created, 0)
@@ -419,11 +535,15 @@ func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) er
 			ExternalProvider:       "stripe",
 			ExternalSubscriptionID: &stripeSub.ID,
 		}
+		if stripeSub.Customer != nil && stripeSub.Customer.ID != "" {
+			sub.ExternalCustomerID = &stripeSub.Customer.ID
+		}
 
 		if err := s.repo.UpsertSubscription(ctx, sub); err != nil {
 			return fmt.Errorf("failed to upsert subscription: %w", err)
 		}
-		s.logger.Info("Subscription processed", "user_id", uid, "status", internalStatus)
+		s.invalidatePlan(uid)
+		s.logger.Info("Subscription processed", "user_id", uid, "status", internalStatus, "plan", planName)
 
 	case "invoice.payment_succeeded":
 		var inv stripe.Invoice
@@ -444,29 +564,47 @@ func (s *service) ProcessStripeEvent(ctx context.Context, event stripe.Event) er
 	return nil
 }
 
-// CreateCheckoutSession creates a Stripe Checkout Session for subscription or payment
+// allowedPrice restricts checkout to the configured Pro prices so clients
+// cannot pass arbitrary price IDs. When no prices are configured (local dev
+// without Stripe setup), validation is skipped with a warning.
+func (s *service) allowedPrice(priceID string) bool {
+	if s.cfg.PriceIDMonthly == "" && s.cfg.PriceIDAnnual == "" {
+		s.logger.Warn("no Stripe price IDs configured; skipping price validation")
+		return priceID != ""
+	}
+	return priceID == s.cfg.PriceIDMonthly || priceID == s.cfg.PriceIDAnnual
+}
+
+// CreateCheckoutSession creates a Stripe Checkout Session for the Pro subscription
 func (s *service) CreateCheckoutSession(ctx context.Context, req *CreateCheckoutSessionParams) (*CreateCheckoutSessionResult, error) {
+	if !s.allowedPrice(req.PriceID) {
+		return nil, fmt.Errorf("unknown price id")
+	}
+
 	// Get or create customer
 	customerID, err := s.getOrCreateStripeCustomer(req.Email, req.UserID.String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get/create customer: %w", err)
 	}
 
-	mode := stripe.CheckoutSessionModeSubscription
-	if req.Mode == "payment" {
-		mode = stripe.CheckoutSessionModePayment
-	}
-
 	params := &stripe.CheckoutSessionParams{
-		Customer:   stripe.String(customerID),
-		Mode:       stripe.String(string(mode)),
-		SuccessURL: stripe.String(req.SuccessURL),
-		CancelURL:  stripe.String(req.CancelURL),
+		Customer:          stripe.String(customerID),
+		ClientReferenceID: stripe.String(req.UserID.String()),
+		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		SuccessURL:        stripe.String(req.SuccessURL),
+		CancelURL:         stripe.String(req.CancelURL),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
 				Price:    stripe.String(req.PriceID),
 				Quantity: stripe.Int64(1),
 			},
+		},
+		// Metadata on SubscriptionData propagates to the subscription object,
+		// which is what customer.subscription.* webhooks carry. Session-level
+		// metadata alone never reaches those events, which left paying users
+		// unlinked and never upgraded.
+		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+			Metadata: map[string]string{"user_id": req.UserID.String()},
 		},
 	}
 	params.AddMetadata("user_id", req.UserID.String())
@@ -475,6 +613,7 @@ func (s *service) CreateCheckoutSession(ctx context.Context, req *CreateCheckout
 	if err != nil {
 		return nil, fmt.Errorf("failed to create checkout session: %w", err)
 	}
+	observability.CheckoutSessionsCreatedTotal.Inc()
 
 	return &CreateCheckoutSessionResult{
 		SessionID: session.ID,
@@ -510,6 +649,10 @@ func (s *service) CreateCustomerPortalSession(ctx context.Context, userID uuid.U
 	}, nil
 }
 
+// UnlimitedLimit is the sentinel the client renders as "unlimited"; the Pro
+// fair-use cap is deliberately never exposed here.
+const UnlimitedLimit = int32(-1)
+
 // GetSubscription retrieves the current user's subscription with usage stats
 func (s *service) GetSubscription(ctx context.Context, userID uuid.UUID) (*SubscriptionWithUsage, error) {
 	sub, err := s.repo.GetSubscriptionByUserID(ctx, userID)
@@ -518,36 +661,35 @@ func (s *service) GetSubscription(ctx context.Context, userID uuid.UUID) (*Subsc
 	}
 
 	if sub == nil {
-		// Return default free tier
-		return &SubscriptionWithUsage{
-			Subscription: &Subscription{
-				UserID: userID,
-				Plan:   "free",
-				Status: "active",
-			},
-			RequestsToday:       0,
-			RequestsLimit:       5,
-			SavedLocations:      0,
-			SavedLocationsLimit: 10,
-		}, nil
+		// Default free tier
+		sub = &Subscription{
+			UserID: userID,
+			Plan:   subquota.PlanFree,
+			Status: "active",
+		}
 	}
 
-	// Get limits based on plan
-	reqLimit := int32(5)
+	var requestsToday int32
+	if s.quota != nil {
+		usage, err := s.quota.GetDailyUsage(ctx, userID)
+		if err != nil {
+			// Usage display is best-effort; don't fail the whole page over it.
+			s.logger.Warn("failed to read daily usage", "error", err, "user_id", userID)
+		} else {
+			requestsToday = int32(usage)
+		}
+	}
+
+	reqLimit := int32(s.cfg.FreeDailyLimit)
 	locLimit := int32(10)
-	switch sub.Plan {
-	case "paid", "explorer":
-		reqLimit = 999999 // unlimited
-		locLimit = 100
-	case "premium", "pro":
-		reqLimit = 999999
-		locLimit = 999999
+	if subquota.IsProPlan(sub.Plan) {
+		reqLimit = UnlimitedLimit
+		locLimit = UnlimitedLimit
 	}
 
-	// TODO: Get actual usage from user_daily_usage table
 	return &SubscriptionWithUsage{
 		Subscription:        sub,
-		RequestsToday:       0, // Placeholder - implement usage tracking
+		RequestsToday:       requestsToday,
 		RequestsLimit:       reqLimit,
 		SavedLocations:      0,
 		SavedLocationsLimit: locLimit,

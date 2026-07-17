@@ -1457,6 +1457,615 @@ func (x *GetUserPreferenceProfilesResponse) GetProfiles() []*UserPreferenceProfi
 	return nil
 }
 
+// GetUserPreferenceProfile request/response
+type GetUserPreferenceProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserPreferenceProfileRequest) Reset() {
+	*x = GetUserPreferenceProfileRequest{}
+	mi := &file_loci_profile_profile_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserPreferenceProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserPreferenceProfileRequest) ProtoMessage() {}
+
+func (x *GetUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetUserPreferenceProfileRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+type GetUserPreferenceProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *UserPreferenceProfile `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUserPreferenceProfileResponse) Reset() {
+	*x = GetUserPreferenceProfileResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUserPreferenceProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUserPreferenceProfileResponse) ProtoMessage() {}
+
+func (x *GetUserPreferenceProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUserPreferenceProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetUserPreferenceProfileResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetUserPreferenceProfileResponse) GetProfile() *UserPreferenceProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+// DeleteUserPreferenceProfile request
+type DeleteUserPreferenceProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteUserPreferenceProfileRequest) Reset() {
+	*x = DeleteUserPreferenceProfileRequest{}
+	mi := &file_loci_profile_profile_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteUserPreferenceProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteUserPreferenceProfileRequest) ProtoMessage() {}
+
+func (x *DeleteUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
+func (*DeleteUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DeleteUserPreferenceProfileRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+// SetDefaultProfile request
+type SetDefaultProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetDefaultProfileRequest) Reset() {
+	*x = SetDefaultProfileRequest{}
+	mi := &file_loci_profile_profile_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetDefaultProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetDefaultProfileRequest) ProtoMessage() {}
+
+func (x *SetDefaultProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetDefaultProfileRequest.ProtoReflect.Descriptor instead.
+func (*SetDefaultProfileRequest) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SetDefaultProfileRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+// Domain preference requests/responses
+type GetDomainPreferencesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDomainPreferencesRequest) Reset() {
+	*x = GetDomainPreferencesRequest{}
+	mi := &file_loci_profile_profile_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDomainPreferencesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDomainPreferencesRequest) ProtoMessage() {}
+
+func (x *GetDomainPreferencesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDomainPreferencesRequest.ProtoReflect.Descriptor instead.
+func (*GetDomainPreferencesRequest) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetDomainPreferencesRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+type AccommodationPreferencesResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Success       bool                      `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                    `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Preferences   *AccommodationPreferences `protobuf:"bytes,3,opt,name=preferences,proto3" json:"preferences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccommodationPreferencesResponse) Reset() {
+	*x = AccommodationPreferencesResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccommodationPreferencesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccommodationPreferencesResponse) ProtoMessage() {}
+
+func (x *AccommodationPreferencesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccommodationPreferencesResponse.ProtoReflect.Descriptor instead.
+func (*AccommodationPreferencesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AccommodationPreferencesResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *AccommodationPreferencesResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AccommodationPreferencesResponse) GetPreferences() *AccommodationPreferences {
+	if x != nil {
+		return x.Preferences
+	}
+	return nil
+}
+
+type DiningPreferencesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Preferences   *DiningPreferences     `protobuf:"bytes,3,opt,name=preferences,proto3" json:"preferences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiningPreferencesResponse) Reset() {
+	*x = DiningPreferencesResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiningPreferencesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiningPreferencesResponse) ProtoMessage() {}
+
+func (x *DiningPreferencesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiningPreferencesResponse.ProtoReflect.Descriptor instead.
+func (*DiningPreferencesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *DiningPreferencesResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DiningPreferencesResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *DiningPreferencesResponse) GetPreferences() *DiningPreferences {
+	if x != nil {
+		return x.Preferences
+	}
+	return nil
+}
+
+type ActivityPreferencesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Preferences   *ActivityPreferences   `protobuf:"bytes,3,opt,name=preferences,proto3" json:"preferences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActivityPreferencesResponse) Reset() {
+	*x = ActivityPreferencesResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActivityPreferencesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActivityPreferencesResponse) ProtoMessage() {}
+
+func (x *ActivityPreferencesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActivityPreferencesResponse.ProtoReflect.Descriptor instead.
+func (*ActivityPreferencesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ActivityPreferencesResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ActivityPreferencesResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ActivityPreferencesResponse) GetPreferences() *ActivityPreferences {
+	if x != nil {
+		return x.Preferences
+	}
+	return nil
+}
+
+type ItineraryPreferencesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Preferences   *ItineraryPreferences  `protobuf:"bytes,3,opt,name=preferences,proto3" json:"preferences,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItineraryPreferencesResponse) Reset() {
+	*x = ItineraryPreferencesResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItineraryPreferencesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItineraryPreferencesResponse) ProtoMessage() {}
+
+func (x *ItineraryPreferencesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItineraryPreferencesResponse.ProtoReflect.Descriptor instead.
+func (*ItineraryPreferencesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ItineraryPreferencesResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ItineraryPreferencesResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ItineraryPreferencesResponse) GetPreferences() *ItineraryPreferences {
+	if x != nil {
+		return x.Preferences
+	}
+	return nil
+}
+
+// Combined filters for a domain
+type GetCombinedFiltersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProfileId     string                 `protobuf:"bytes,1,opt,name=profile_id,json=profileId,proto3" json:"profile_id,omitempty"`
+	Domain        *string                `protobuf:"bytes,2,opt,name=domain,proto3,oneof" json:"domain,omitempty"` // general, accommodation, dining, activities, itinerary
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCombinedFiltersRequest) Reset() {
+	*x = GetCombinedFiltersRequest{}
+	mi := &file_loci_profile_profile_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCombinedFiltersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCombinedFiltersRequest) ProtoMessage() {}
+
+func (x *GetCombinedFiltersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCombinedFiltersRequest.ProtoReflect.Descriptor instead.
+func (*GetCombinedFiltersRequest) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetCombinedFiltersRequest) GetProfileId() string {
+	if x != nil {
+		return x.ProfileId
+	}
+	return ""
+}
+
+func (x *GetCombinedFiltersRequest) GetDomain() string {
+	if x != nil && x.Domain != nil {
+		return *x.Domain
+	}
+	return ""
+}
+
+type CombinedFiltersResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Success       bool                      `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                    `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Profile       *UserPreferenceProfile    `protobuf:"bytes,3,opt,name=profile,proto3" json:"profile,omitempty"`
+	Accommodation *AccommodationPreferences `protobuf:"bytes,4,opt,name=accommodation,proto3,oneof" json:"accommodation,omitempty"`
+	Dining        *DiningPreferences        `protobuf:"bytes,5,opt,name=dining,proto3,oneof" json:"dining,omitempty"`
+	Activity      *ActivityPreferences      `protobuf:"bytes,6,opt,name=activity,proto3,oneof" json:"activity,omitempty"`
+	Itinerary     *ItineraryPreferences     `protobuf:"bytes,7,opt,name=itinerary,proto3,oneof" json:"itinerary,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CombinedFiltersResponse) Reset() {
+	*x = CombinedFiltersResponse{}
+	mi := &file_loci_profile_profile_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CombinedFiltersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CombinedFiltersResponse) ProtoMessage() {}
+
+func (x *CombinedFiltersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CombinedFiltersResponse.ProtoReflect.Descriptor instead.
+func (*CombinedFiltersResponse) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *CombinedFiltersResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CombinedFiltersResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *CombinedFiltersResponse) GetProfile() *UserPreferenceProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *CombinedFiltersResponse) GetAccommodation() *AccommodationPreferences {
+	if x != nil {
+		return x.Accommodation
+	}
+	return nil
+}
+
+func (x *CombinedFiltersResponse) GetDining() *DiningPreferences {
+	if x != nil {
+		return x.Dining
+	}
+	return nil
+}
+
+func (x *CombinedFiltersResponse) GetActivity() *ActivityPreferences {
+	if x != nil {
+		return x.Activity
+	}
+	return nil
+}
+
+func (x *CombinedFiltersResponse) GetItinerary() *ItineraryPreferences {
+	if x != nil {
+		return x.Itinerary
+	}
+	return nil
+}
+
 var File_loci_profile_profile_proto protoreflect.FileDescriptor
 
 const file_loci_profile_profile_proto_rawDesc = "" +
@@ -1697,7 +2306,55 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\n" +
 	"\b_user_id\"d\n" +
 	"!GetUserPreferenceProfilesResponse\x12?\n" +
-	"\bprofiles\x18\x01 \x03(\v2#.loci.profile.UserPreferenceProfileR\bprofiles*y\n" +
+	"\bprofiles\x18\x01 \x03(\v2#.loci.profile.UserPreferenceProfileR\bprofiles\"K\n" +
+	"\x1fGetUserPreferenceProfileRequest\x12(\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\"a\n" +
+	" GetUserPreferenceProfileResponse\x12=\n" +
+	"\aprofile\x18\x01 \x01(\v2#.loci.profile.UserPreferenceProfileR\aprofile\"N\n" +
+	"\"DeleteUserPreferenceProfileRequest\x12(\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\"D\n" +
+	"\x18SetDefaultProfileRequest\x12(\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\"G\n" +
+	"\x1bGetDomainPreferencesRequest\x12(\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\"\xa0\x01\n" +
+	" AccommodationPreferencesResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12H\n" +
+	"\vpreferences\x18\x03 \x01(\v2&.loci.profile.AccommodationPreferencesR\vpreferences\"\x92\x01\n" +
+	"\x19DiningPreferencesResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12A\n" +
+	"\vpreferences\x18\x03 \x01(\v2\x1f.loci.profile.DiningPreferencesR\vpreferences\"\x96\x01\n" +
+	"\x1bActivityPreferencesResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12C\n" +
+	"\vpreferences\x18\x03 \x01(\v2!.loci.profile.ActivityPreferencesR\vpreferences\"\x98\x01\n" +
+	"\x1cItineraryPreferencesResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12D\n" +
+	"\vpreferences\x18\x03 \x01(\v2\".loci.profile.ItineraryPreferencesR\vpreferences\"m\n" +
+	"\x19GetCombinedFiltersRequest\x12(\n" +
+	"\n" +
+	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\x12\x1b\n" +
+	"\x06domain\x18\x02 \x01(\tH\x00R\x06domain\x88\x01\x01B\t\n" +
+	"\a_domain\"\xe0\x03\n" +
+	"\x17CombinedFiltersResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12=\n" +
+	"\aprofile\x18\x03 \x01(\v2#.loci.profile.UserPreferenceProfileR\aprofile\x12Q\n" +
+	"\raccommodation\x18\x04 \x01(\v2&.loci.profile.AccommodationPreferencesH\x00R\raccommodation\x88\x01\x01\x12<\n" +
+	"\x06dining\x18\x05 \x01(\v2\x1f.loci.profile.DiningPreferencesH\x01R\x06dining\x88\x01\x01\x12B\n" +
+	"\bactivity\x18\x06 \x01(\v2!.loci.profile.ActivityPreferencesH\x02R\bactivity\x88\x01\x01\x12E\n" +
+	"\titinerary\x18\a \x01(\v2\".loci.profile.ItineraryPreferencesH\x03R\titinerary\x88\x01\x01B\x10\n" +
+	"\x0e_accommodationB\t\n" +
+	"\a_diningB\v\n" +
+	"\t_activityB\f\n" +
+	"\n" +
+	"_itinerary*y\n" +
 	"\rDayPreference\x12\x1e\n" +
 	"\x1aDAY_PREFERENCE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12DAY_PREFERENCE_ANY\x10\x01\x12\x16\n" +
@@ -1715,11 +2372,19 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x18TRANSPORT_PREFERENCE_ANY\x10\x01\x12\x1d\n" +
 	"\x19TRANSPORT_PREFERENCE_WALK\x10\x02\x12\x1f\n" +
 	"\x1bTRANSPORT_PREFERENCE_PUBLIC\x10\x03\x12\x1c\n" +
-	"\x18TRANSPORT_PREFERENCE_CAR\x10\x042\xde\x02\n" +
+	"\x18TRANSPORT_PREFERENCE_CAR\x10\x042\xc3\t\n" +
 	"\x0eProfileService\x12|\n" +
-	"\x19GetUserPreferenceProfiles\x12..loci.profile.GetUserPreferenceProfilesRequest\x1a/.loci.profile.GetUserPreferenceProfilesResponse\x12f\n" +
+	"\x19GetUserPreferenceProfiles\x12..loci.profile.GetUserPreferenceProfilesRequest\x1a/.loci.profile.GetUserPreferenceProfilesResponse\x12y\n" +
+	"\x18GetUserPreferenceProfile\x12-.loci.profile.GetUserPreferenceProfileRequest\x1a..loci.profile.GetUserPreferenceProfileResponse\x12f\n" +
 	"\x1bCreateUserPreferenceProfile\x120.loci.profile.CreateUserPreferenceProfileRequest\x1a\x15.loci.common.Response\x12f\n" +
-	"\x1bUpdateUserPreferenceProfile\x120.loci.profile.UpdateUserPreferenceProfileRequest\x1a\x15.loci.common.ResponseBFZDgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile;profileb\x06proto3"
+	"\x1bUpdateUserPreferenceProfile\x120.loci.profile.UpdateUserPreferenceProfileRequest\x1a\x15.loci.common.Response\x12f\n" +
+	"\x1bDeleteUserPreferenceProfile\x120.loci.profile.DeleteUserPreferenceProfileRequest\x1a\x15.loci.common.Response\x12R\n" +
+	"\x11SetDefaultProfile\x12&.loci.profile.SetDefaultProfileRequest\x1a\x15.loci.common.Response\x12x\n" +
+	"\x1bGetAccommodationPreferences\x12).loci.profile.GetDomainPreferencesRequest\x1a..loci.profile.AccommodationPreferencesResponse\x12j\n" +
+	"\x14GetDiningPreferences\x12).loci.profile.GetDomainPreferencesRequest\x1a'.loci.profile.DiningPreferencesResponse\x12n\n" +
+	"\x16GetActivityPreferences\x12).loci.profile.GetDomainPreferencesRequest\x1a).loci.profile.ActivityPreferencesResponse\x12p\n" +
+	"\x17GetItineraryPreferences\x12).loci.profile.GetDomainPreferencesRequest\x1a*.loci.profile.ItineraryPreferencesResponse\x12d\n" +
+	"\x12GetCombinedFilters\x12'.loci.profile.GetCombinedFiltersRequest\x1a%.loci.profile.CombinedFiltersResponseBFZDgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile;profileb\x06proto3"
 
 var (
 	file_loci_profile_profile_proto_rawDescOnce sync.Once
@@ -1734,7 +2399,7 @@ func file_loci_profile_profile_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_profile_profile_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_loci_profile_profile_proto_goTypes = []any{
 	(DayPreference)(0),                         // 0: loci.profile.DayPreference
 	(SearchPace)(0),                            // 1: loci.profile.SearchPace
@@ -1748,35 +2413,46 @@ var file_loci_profile_profile_proto_goTypes = []any{
 	(*UpdateUserPreferenceProfileRequest)(nil), // 9: loci.profile.UpdateUserPreferenceProfileRequest
 	(*GetUserPreferenceProfilesRequest)(nil),   // 10: loci.profile.GetUserPreferenceProfilesRequest
 	(*GetUserPreferenceProfilesResponse)(nil),  // 11: loci.profile.GetUserPreferenceProfilesResponse
-	(*common.RangeFilter)(nil),                 // 12: loci.common.RangeFilter
-	(*timestamppb.Timestamp)(nil),              // 13: google.protobuf.Timestamp
-	(*interest.Interest)(nil),                  // 14: loci.interest.Interest
-	(*interest.Tags)(nil),                      // 15: loci.interest.Tags
-	(*common.Response)(nil),                    // 16: loci.common.Response
+	(*GetUserPreferenceProfileRequest)(nil),    // 12: loci.profile.GetUserPreferenceProfileRequest
+	(*GetUserPreferenceProfileResponse)(nil),   // 13: loci.profile.GetUserPreferenceProfileResponse
+	(*DeleteUserPreferenceProfileRequest)(nil), // 14: loci.profile.DeleteUserPreferenceProfileRequest
+	(*SetDefaultProfileRequest)(nil),           // 15: loci.profile.SetDefaultProfileRequest
+	(*GetDomainPreferencesRequest)(nil),        // 16: loci.profile.GetDomainPreferencesRequest
+	(*AccommodationPreferencesResponse)(nil),   // 17: loci.profile.AccommodationPreferencesResponse
+	(*DiningPreferencesResponse)(nil),          // 18: loci.profile.DiningPreferencesResponse
+	(*ActivityPreferencesResponse)(nil),        // 19: loci.profile.ActivityPreferencesResponse
+	(*ItineraryPreferencesResponse)(nil),       // 20: loci.profile.ItineraryPreferencesResponse
+	(*GetCombinedFiltersRequest)(nil),          // 21: loci.profile.GetCombinedFiltersRequest
+	(*CombinedFiltersResponse)(nil),            // 22: loci.profile.CombinedFiltersResponse
+	(*common.RangeFilter)(nil),                 // 23: loci.common.RangeFilter
+	(*timestamppb.Timestamp)(nil),              // 24: google.protobuf.Timestamp
+	(*interest.Interest)(nil),                  // 25: loci.interest.Interest
+	(*interest.Tags)(nil),                      // 26: loci.interest.Tags
+	(*common.Response)(nil),                    // 27: loci.common.Response
 }
 var file_loci_profile_profile_proto_depIdxs = []int32{
-	12, // 0: loci.profile.AccommodationPreferences.star_rating:type_name -> loci.common.RangeFilter
-	12, // 1: loci.profile.AccommodationPreferences.price_range_per_night:type_name -> loci.common.RangeFilter
-	13, // 2: loci.profile.AccommodationPreferences.created_at:type_name -> google.protobuf.Timestamp
-	13, // 3: loci.profile.AccommodationPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	12, // 4: loci.profile.DiningPreferences.price_range_per_person:type_name -> loci.common.RangeFilter
-	13, // 5: loci.profile.DiningPreferences.created_at:type_name -> google.protobuf.Timestamp
-	13, // 6: loci.profile.DiningPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 7: loci.profile.ActivityPreferences.created_at:type_name -> google.protobuf.Timestamp
-	13, // 8: loci.profile.ActivityPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 9: loci.profile.ItineraryPreferences.created_at:type_name -> google.protobuf.Timestamp
-	13, // 10: loci.profile.ItineraryPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	23, // 0: loci.profile.AccommodationPreferences.star_rating:type_name -> loci.common.RangeFilter
+	23, // 1: loci.profile.AccommodationPreferences.price_range_per_night:type_name -> loci.common.RangeFilter
+	24, // 2: loci.profile.AccommodationPreferences.created_at:type_name -> google.protobuf.Timestamp
+	24, // 3: loci.profile.AccommodationPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	23, // 4: loci.profile.DiningPreferences.price_range_per_person:type_name -> loci.common.RangeFilter
+	24, // 5: loci.profile.DiningPreferences.created_at:type_name -> google.protobuf.Timestamp
+	24, // 6: loci.profile.DiningPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	24, // 7: loci.profile.ActivityPreferences.created_at:type_name -> google.protobuf.Timestamp
+	24, // 8: loci.profile.ActivityPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	24, // 9: loci.profile.ItineraryPreferences.created_at:type_name -> google.protobuf.Timestamp
+	24, // 10: loci.profile.ItineraryPreferences.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 11: loci.profile.UserPreferenceProfile.preferred_time:type_name -> loci.profile.DayPreference
 	1,  // 12: loci.profile.UserPreferenceProfile.preferred_pace:type_name -> loci.profile.SearchPace
 	2,  // 13: loci.profile.UserPreferenceProfile.preferred_transport:type_name -> loci.profile.TransportPreference
-	14, // 14: loci.profile.UserPreferenceProfile.interests:type_name -> loci.interest.Interest
-	15, // 15: loci.profile.UserPreferenceProfile.tags:type_name -> loci.interest.Tags
+	25, // 14: loci.profile.UserPreferenceProfile.interests:type_name -> loci.interest.Interest
+	26, // 15: loci.profile.UserPreferenceProfile.tags:type_name -> loci.interest.Tags
 	3,  // 16: loci.profile.UserPreferenceProfile.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
 	4,  // 17: loci.profile.UserPreferenceProfile.dining_preferences:type_name -> loci.profile.DiningPreferences
 	5,  // 18: loci.profile.UserPreferenceProfile.activity_preferences:type_name -> loci.profile.ActivityPreferences
 	6,  // 19: loci.profile.UserPreferenceProfile.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
-	13, // 20: loci.profile.UserPreferenceProfile.created_at:type_name -> google.protobuf.Timestamp
-	13, // 21: loci.profile.UserPreferenceProfile.updated_at:type_name -> google.protobuf.Timestamp
+	24, // 20: loci.profile.UserPreferenceProfile.created_at:type_name -> google.protobuf.Timestamp
+	24, // 21: loci.profile.UserPreferenceProfile.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 22: loci.profile.CreateUserPreferenceProfileRequest.preferred_time:type_name -> loci.profile.DayPreference
 	1,  // 23: loci.profile.CreateUserPreferenceProfileRequest.preferred_pace:type_name -> loci.profile.SearchPace
 	2,  // 24: loci.profile.CreateUserPreferenceProfileRequest.preferred_transport:type_name -> loci.profile.TransportPreference
@@ -1792,17 +2468,43 @@ var file_loci_profile_profile_proto_depIdxs = []int32{
 	5,  // 34: loci.profile.UpdateUserPreferenceProfileRequest.activity_preferences:type_name -> loci.profile.ActivityPreferences
 	6,  // 35: loci.profile.UpdateUserPreferenceProfileRequest.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
 	7,  // 36: loci.profile.GetUserPreferenceProfilesResponse.profiles:type_name -> loci.profile.UserPreferenceProfile
-	10, // 37: loci.profile.ProfileService.GetUserPreferenceProfiles:input_type -> loci.profile.GetUserPreferenceProfilesRequest
-	8,  // 38: loci.profile.ProfileService.CreateUserPreferenceProfile:input_type -> loci.profile.CreateUserPreferenceProfileRequest
-	9,  // 39: loci.profile.ProfileService.UpdateUserPreferenceProfile:input_type -> loci.profile.UpdateUserPreferenceProfileRequest
-	11, // 40: loci.profile.ProfileService.GetUserPreferenceProfiles:output_type -> loci.profile.GetUserPreferenceProfilesResponse
-	16, // 41: loci.profile.ProfileService.CreateUserPreferenceProfile:output_type -> loci.common.Response
-	16, // 42: loci.profile.ProfileService.UpdateUserPreferenceProfile:output_type -> loci.common.Response
-	40, // [40:43] is the sub-list for method output_type
-	37, // [37:40] is the sub-list for method input_type
-	37, // [37:37] is the sub-list for extension type_name
-	37, // [37:37] is the sub-list for extension extendee
-	0,  // [0:37] is the sub-list for field type_name
+	7,  // 37: loci.profile.GetUserPreferenceProfileResponse.profile:type_name -> loci.profile.UserPreferenceProfile
+	3,  // 38: loci.profile.AccommodationPreferencesResponse.preferences:type_name -> loci.profile.AccommodationPreferences
+	4,  // 39: loci.profile.DiningPreferencesResponse.preferences:type_name -> loci.profile.DiningPreferences
+	5,  // 40: loci.profile.ActivityPreferencesResponse.preferences:type_name -> loci.profile.ActivityPreferences
+	6,  // 41: loci.profile.ItineraryPreferencesResponse.preferences:type_name -> loci.profile.ItineraryPreferences
+	7,  // 42: loci.profile.CombinedFiltersResponse.profile:type_name -> loci.profile.UserPreferenceProfile
+	3,  // 43: loci.profile.CombinedFiltersResponse.accommodation:type_name -> loci.profile.AccommodationPreferences
+	4,  // 44: loci.profile.CombinedFiltersResponse.dining:type_name -> loci.profile.DiningPreferences
+	5,  // 45: loci.profile.CombinedFiltersResponse.activity:type_name -> loci.profile.ActivityPreferences
+	6,  // 46: loci.profile.CombinedFiltersResponse.itinerary:type_name -> loci.profile.ItineraryPreferences
+	10, // 47: loci.profile.ProfileService.GetUserPreferenceProfiles:input_type -> loci.profile.GetUserPreferenceProfilesRequest
+	12, // 48: loci.profile.ProfileService.GetUserPreferenceProfile:input_type -> loci.profile.GetUserPreferenceProfileRequest
+	8,  // 49: loci.profile.ProfileService.CreateUserPreferenceProfile:input_type -> loci.profile.CreateUserPreferenceProfileRequest
+	9,  // 50: loci.profile.ProfileService.UpdateUserPreferenceProfile:input_type -> loci.profile.UpdateUserPreferenceProfileRequest
+	14, // 51: loci.profile.ProfileService.DeleteUserPreferenceProfile:input_type -> loci.profile.DeleteUserPreferenceProfileRequest
+	15, // 52: loci.profile.ProfileService.SetDefaultProfile:input_type -> loci.profile.SetDefaultProfileRequest
+	16, // 53: loci.profile.ProfileService.GetAccommodationPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	16, // 54: loci.profile.ProfileService.GetDiningPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	16, // 55: loci.profile.ProfileService.GetActivityPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	16, // 56: loci.profile.ProfileService.GetItineraryPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	21, // 57: loci.profile.ProfileService.GetCombinedFilters:input_type -> loci.profile.GetCombinedFiltersRequest
+	11, // 58: loci.profile.ProfileService.GetUserPreferenceProfiles:output_type -> loci.profile.GetUserPreferenceProfilesResponse
+	13, // 59: loci.profile.ProfileService.GetUserPreferenceProfile:output_type -> loci.profile.GetUserPreferenceProfileResponse
+	27, // 60: loci.profile.ProfileService.CreateUserPreferenceProfile:output_type -> loci.common.Response
+	27, // 61: loci.profile.ProfileService.UpdateUserPreferenceProfile:output_type -> loci.common.Response
+	27, // 62: loci.profile.ProfileService.DeleteUserPreferenceProfile:output_type -> loci.common.Response
+	27, // 63: loci.profile.ProfileService.SetDefaultProfile:output_type -> loci.common.Response
+	17, // 64: loci.profile.ProfileService.GetAccommodationPreferences:output_type -> loci.profile.AccommodationPreferencesResponse
+	18, // 65: loci.profile.ProfileService.GetDiningPreferences:output_type -> loci.profile.DiningPreferencesResponse
+	19, // 66: loci.profile.ProfileService.GetActivityPreferences:output_type -> loci.profile.ActivityPreferencesResponse
+	20, // 67: loci.profile.ProfileService.GetItineraryPreferences:output_type -> loci.profile.ItineraryPreferencesResponse
+	22, // 68: loci.profile.ProfileService.GetCombinedFilters:output_type -> loci.profile.CombinedFiltersResponse
+	58, // [58:69] is the sub-list for method output_type
+	47, // [47:58] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_loci_profile_profile_proto_init() }
@@ -1818,13 +2520,15 @@ func file_loci_profile_profile_proto_init() {
 	file_loci_profile_profile_proto_msgTypes[5].OneofWrappers = []any{}
 	file_loci_profile_profile_proto_msgTypes[6].OneofWrappers = []any{}
 	file_loci_profile_profile_proto_msgTypes[7].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[18].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[19].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_profile_profile_proto_rawDesc), len(file_loci_profile_profile_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   9,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

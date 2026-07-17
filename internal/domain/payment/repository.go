@@ -50,8 +50,12 @@ type Repository interface {
 	// Subscriptions (mapping logic)
 	GetSubscriptionByStripeID(ctx context.Context, stripeSubID string) (*Subscription, error)
 	GetSubscriptionByUserID(ctx context.Context, userID uuid.UUID) (*Subscription, error)
+	GetUserIDByStripeCustomerID(ctx context.Context, customerID string) (uuid.UUID, error)
 	UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID, status string, start, end *time.Time) error
 	UpsertSubscription(ctx context.Context, sub *Subscription) error
+	// SetStripeCustomerID links a user to a Stripe customer, creating a free
+	// subscription row if none exists yet (checkout.session.completed fallback).
+	SetStripeCustomerID(ctx context.Context, userID uuid.UUID, customerID string) error
 }
 
 type repository struct {
@@ -344,17 +348,17 @@ func (r *repository) GetSubscriptionByStripeID(ctx context.Context, stripeSubID 
 }
 
 func (r *repository) GetSubscriptionByUserID(ctx context.Context, userID uuid.UUID) (*Subscription, error) {
-	// Note: the subscriptions table has no external_customer_id column, so it is
-	// intentionally not selected here (selecting it fails with SQLSTATE 42703).
 	query := `
 		SELECT id, user_id, plan, status, start_date, end_date, trial_end_date,
-		       external_provider, external_subscription_id, created_at, updated_at
+		       external_provider, external_subscription_id, external_customer_id,
+		       created_at, updated_at
 		FROM subscriptions WHERE user_id = $1
 	`
 	var s Subscription
 	err := r.db.QueryRow(ctx, query, userID).Scan(
 		&s.ID, &s.UserID, &s.Plan, &s.Status, &s.StartDate, &s.EndDate, &s.TrialEndDate,
-		&s.ExternalProvider, &s.ExternalSubscriptionID, &s.CreatedAt, &s.UpdatedAt,
+		&s.ExternalProvider, &s.ExternalSubscriptionID, &s.ExternalCustomerID,
+		&s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -365,6 +369,35 @@ func (r *repository) GetSubscriptionByUserID(ctx context.Context, userID uuid.UU
 	return &s, nil
 }
 
+func (r *repository) GetUserIDByStripeCustomerID(ctx context.Context, customerID string) (uuid.UUID, error) {
+	var userID uuid.UUID
+	query := `SELECT user_id FROM subscriptions WHERE external_customer_id = $1`
+	err := r.db.QueryRow(ctx, query, customerID).Scan(&userID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return uuid.Nil, nil
+		}
+		return uuid.Nil, err
+	}
+	return userID, nil
+}
+
+func (r *repository) SetStripeCustomerID(ctx context.Context, userID uuid.UUID, customerID string) error {
+	query := `
+        INSERT INTO subscriptions (
+            id, user_id, plan, status, start_date, external_provider,
+            external_customer_id, created_at, updated_at
+        ) VALUES (
+            $1, $2, 'free', 'active', NOW(), 'stripe', $3, NOW(), NOW()
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+            external_customer_id = EXCLUDED.external_customer_id,
+            updated_at = NOW()
+    `
+	_, err := r.db.Exec(ctx, query, uuid.New(), userID, customerID)
+	return err
+}
+
 func (r *repository) UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID, status string, start, end *time.Time) error {
 	// Only updating needed fields
 	query := `UPDATE subscriptions SET status = $1, start_date = COALESCE($2, start_date), end_date = $3, updated_at = NOW() WHERE id = $4`
@@ -373,12 +406,15 @@ func (r *repository) UpdateSubscriptionStatus(ctx context.Context, id uuid.UUID,
 }
 
 func (r *repository) UpsertSubscription(ctx context.Context, sub *Subscription) error {
+	// external_customer_id keeps its previous value when the incoming event
+	// carries none, so a later metadata-less event cannot unlink the customer.
 	query := `
         INSERT INTO subscriptions (
-            id, user_id, plan, status, start_date, end_date, trial_end_date, 
-            external_provider, external_subscription_id, created_at, updated_at
+            id, user_id, plan, status, start_date, end_date, trial_end_date,
+            external_provider, external_subscription_id, external_customer_id,
+            created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()
         )
         ON CONFLICT (user_id) DO UPDATE SET
             plan = EXCLUDED.plan,
@@ -388,6 +424,7 @@ func (r *repository) UpsertSubscription(ctx context.Context, sub *Subscription) 
             trial_end_date = EXCLUDED.trial_end_date,
             external_provider = EXCLUDED.external_provider,
             external_subscription_id = EXCLUDED.external_subscription_id,
+            external_customer_id = COALESCE(EXCLUDED.external_customer_id, subscriptions.external_customer_id),
             updated_at = NOW()
     `
 	if sub.ID == uuid.Nil {
@@ -395,7 +432,7 @@ func (r *repository) UpsertSubscription(ctx context.Context, sub *Subscription) 
 	}
 	_, err := r.db.Exec(ctx, query,
 		sub.ID, sub.UserID, sub.Plan, sub.Status, sub.StartDate, sub.EndDate, sub.TrialEndDate,
-		sub.ExternalProvider, sub.ExternalSubscriptionID,
+		sub.ExternalProvider, sub.ExternalSubscriptionID, sub.ExternalCustomerID,
 	)
 	return err
 }

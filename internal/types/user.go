@@ -62,4 +62,6 @@ type UpdateProfileParams struct {
 	Location        *string   `json:"location,omitempty"`
 	Interests       *[]string `json:"interests,omitempty"`
 	Badges          *[]string `json:"badges,omitempty"`
+	Theme           *string   `json:"theme,omitempty"`
+	Language        *string   `json:"language,omitempty"`
 }

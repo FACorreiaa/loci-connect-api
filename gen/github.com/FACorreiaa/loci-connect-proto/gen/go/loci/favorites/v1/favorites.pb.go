@@ -849,6 +849,1336 @@ func (x *GetFavoritesCountResponse) GetCount() int32 {
 	return 0
 }
 
+type HotelDetails struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	City             string                 `protobuf:"bytes,3,opt,name=city,proto3" json:"city,omitempty"`
+	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Latitude         float64                `protobuf:"fixed64,5,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude        float64                `protobuf:"fixed64,6,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	Address          string                 `protobuf:"bytes,7,opt,name=address,proto3" json:"address,omitempty"`
+	Category         string                 `protobuf:"bytes,8,opt,name=category,proto3" json:"category,omitempty"`
+	Rating           float64                `protobuf:"fixed64,9,opt,name=rating,proto3" json:"rating,omitempty"`
+	StarRating       string                 `protobuf:"bytes,10,opt,name=star_rating,json=starRating,proto3" json:"star_rating,omitempty"`
+	PriceRange       string                 `protobuf:"bytes,11,opt,name=price_range,json=priceRange,proto3" json:"price_range,omitempty"`
+	Amenities        []string               `protobuf:"bytes,12,rep,name=amenities,proto3" json:"amenities,omitempty"`
+	Images           []string               `protobuf:"bytes,13,rep,name=images,proto3" json:"images,omitempty"`
+	Phone            string                 `protobuf:"bytes,14,opt,name=phone,proto3" json:"phone,omitempty"`
+	Website          string                 `protobuf:"bytes,15,opt,name=website,proto3" json:"website,omitempty"`
+	LlmInteractionId string                 `protobuf:"bytes,16,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Extended fields for detail page
+	CheckIn           string              `protobuf:"bytes,18,opt,name=check_in,json=checkIn,proto3" json:"check_in,omitempty"`
+	CheckOut          string              `protobuf:"bytes,19,opt,name=check_out,json=checkOut,proto3" json:"check_out,omitempty"`
+	PricePerNight     string              `protobuf:"bytes,20,opt,name=price_per_night,json=pricePerNight,proto3" json:"price_per_night,omitempty"`
+	ReviewCount       int32               `protobuf:"varint,21,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	Features          []string            `protobuf:"bytes,22,rep,name=features,proto3" json:"features,omitempty"`
+	Rooms             []*HotelRoom        `protobuf:"bytes,23,rep,name=rooms,proto3" json:"rooms,omitempty"`
+	NearbyAttractions []*NearbyAttraction `protobuf:"bytes,24,rep,name=nearby_attractions,json=nearbyAttractions,proto3" json:"nearby_attractions,omitempty"`
+	Contact           *HotelContact       `protobuf:"bytes,25,opt,name=contact,proto3" json:"contact,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *HotelDetails) Reset() {
+	*x = HotelDetails{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HotelDetails) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HotelDetails) ProtoMessage() {}
+
+func (x *HotelDetails) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HotelDetails.ProtoReflect.Descriptor instead.
+func (*HotelDetails) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *HotelDetails) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetCity() string {
+	if x != nil {
+		return x.City
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetLatitude() float64 {
+	if x != nil {
+		return x.Latitude
+	}
+	return 0
+}
+
+func (x *HotelDetails) GetLongitude() float64 {
+	if x != nil {
+		return x.Longitude
+	}
+	return 0
+}
+
+func (x *HotelDetails) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetRating() float64 {
+	if x != nil {
+		return x.Rating
+	}
+	return 0
+}
+
+func (x *HotelDetails) GetStarRating() string {
+	if x != nil {
+		return x.StarRating
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetPriceRange() string {
+	if x != nil {
+		return x.PriceRange
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetAmenities() []string {
+	if x != nil {
+		return x.Amenities
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetImages() []string {
+	if x != nil {
+		return x.Images
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetWebsite() string {
+	if x != nil {
+		return x.Website
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetLlmInteractionId() string {
+	if x != nil {
+		return x.LlmInteractionId
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetCheckIn() string {
+	if x != nil {
+		return x.CheckIn
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetCheckOut() string {
+	if x != nil {
+		return x.CheckOut
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetPricePerNight() string {
+	if x != nil {
+		return x.PricePerNight
+	}
+	return ""
+}
+
+func (x *HotelDetails) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+func (x *HotelDetails) GetFeatures() []string {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetRooms() []*HotelRoom {
+	if x != nil {
+		return x.Rooms
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetNearbyAttractions() []*NearbyAttraction {
+	if x != nil {
+		return x.NearbyAttractions
+	}
+	return nil
+}
+
+func (x *HotelDetails) GetContact() *HotelContact {
+	if x != nil {
+		return x.Contact
+	}
+	return nil
+}
+
+type HotelRoom struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Price         string                 `protobuf:"bytes,3,opt,name=price,proto3" json:"price,omitempty"`
+	Size          string                 `protobuf:"bytes,4,opt,name=size,proto3" json:"size,omitempty"`
+	Capacity      string                 `protobuf:"bytes,5,opt,name=capacity,proto3" json:"capacity,omitempty"`
+	Amenities     []string               `protobuf:"bytes,6,rep,name=amenities,proto3" json:"amenities,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HotelRoom) Reset() {
+	*x = HotelRoom{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HotelRoom) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HotelRoom) ProtoMessage() {}
+
+func (x *HotelRoom) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HotelRoom.ProtoReflect.Descriptor instead.
+func (*HotelRoom) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *HotelRoom) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *HotelRoom) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *HotelRoom) GetPrice() string {
+	if x != nil {
+		return x.Price
+	}
+	return ""
+}
+
+func (x *HotelRoom) GetSize() string {
+	if x != nil {
+		return x.Size
+	}
+	return ""
+}
+
+func (x *HotelRoom) GetCapacity() string {
+	if x != nil {
+		return x.Capacity
+	}
+	return ""
+}
+
+func (x *HotelRoom) GetAmenities() []string {
+	if x != nil {
+		return x.Amenities
+	}
+	return nil
+}
+
+type NearbyAttraction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Distance      string                 `protobuf:"bytes,3,opt,name=distance,proto3" json:"distance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NearbyAttraction) Reset() {
+	*x = NearbyAttraction{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NearbyAttraction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NearbyAttraction) ProtoMessage() {}
+
+func (x *NearbyAttraction) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NearbyAttraction.ProtoReflect.Descriptor instead.
+func (*NearbyAttraction) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *NearbyAttraction) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *NearbyAttraction) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *NearbyAttraction) GetDistance() string {
+	if x != nil {
+		return x.Distance
+	}
+	return ""
+}
+
+type HotelContact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phone         string                 `protobuf:"bytes,1,opt,name=phone,proto3" json:"phone,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Website       string                 `protobuf:"bytes,3,opt,name=website,proto3" json:"website,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HotelContact) Reset() {
+	*x = HotelContact{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HotelContact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HotelContact) ProtoMessage() {}
+
+func (x *HotelContact) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HotelContact.ProtoReflect.Descriptor instead.
+func (*HotelContact) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *HotelContact) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *HotelContact) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *HotelContact) GetWebsite() string {
+	if x != nil {
+		return x.Website
+	}
+	return ""
+}
+
+type GetHotelDetailsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HotelId       string                 `protobuf:"bytes,1,opt,name=hotel_id,json=hotelId,proto3" json:"hotel_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHotelDetailsRequest) Reset() {
+	*x = GetHotelDetailsRequest{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHotelDetailsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHotelDetailsRequest) ProtoMessage() {}
+
+func (x *GetHotelDetailsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHotelDetailsRequest.ProtoReflect.Descriptor instead.
+func (*GetHotelDetailsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetHotelDetailsRequest) GetHotelId() string {
+	if x != nil {
+		return x.HotelId
+	}
+	return ""
+}
+
+type GetHotelDetailsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Hotel         *HotelDetails          `protobuf:"bytes,3,opt,name=hotel,proto3" json:"hotel,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHotelDetailsResponse) Reset() {
+	*x = GetHotelDetailsResponse{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHotelDetailsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHotelDetailsResponse) ProtoMessage() {}
+
+func (x *GetHotelDetailsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHotelDetailsResponse.ProtoReflect.Descriptor instead.
+func (*GetHotelDetailsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetHotelDetailsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GetHotelDetailsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *GetHotelDetailsResponse) GetHotel() *HotelDetails {
+	if x != nil {
+		return x.Hotel
+	}
+	return nil
+}
+
+type GetNearbyHotelsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Latitude      float64                `protobuf:"fixed64,1,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude     float64                `protobuf:"fixed64,2,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	RadiusKm      float64                `protobuf:"fixed64,3,opt,name=radius_km,json=radiusKm,proto3" json:"radius_km,omitempty"` // Optional, default 5km
+	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`                        // Optional, default 20
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNearbyHotelsRequest) Reset() {
+	*x = GetNearbyHotelsRequest{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNearbyHotelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNearbyHotelsRequest) ProtoMessage() {}
+
+func (x *GetNearbyHotelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNearbyHotelsRequest.ProtoReflect.Descriptor instead.
+func (*GetNearbyHotelsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetNearbyHotelsRequest) GetLatitude() float64 {
+	if x != nil {
+		return x.Latitude
+	}
+	return 0
+}
+
+func (x *GetNearbyHotelsRequest) GetLongitude() float64 {
+	if x != nil {
+		return x.Longitude
+	}
+	return 0
+}
+
+func (x *GetNearbyHotelsRequest) GetRadiusKm() float64 {
+	if x != nil {
+		return x.RadiusKm
+	}
+	return 0
+}
+
+func (x *GetNearbyHotelsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetNearbyHotelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Hotels        []*HotelDetails        `protobuf:"bytes,1,rep,name=hotels,proto3" json:"hotels,omitempty"`
+	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNearbyHotelsResponse) Reset() {
+	*x = GetNearbyHotelsResponse{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNearbyHotelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNearbyHotelsResponse) ProtoMessage() {}
+
+func (x *GetNearbyHotelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNearbyHotelsResponse.ProtoReflect.Descriptor instead.
+func (*GetNearbyHotelsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetNearbyHotelsResponse) GetHotels() []*HotelDetails {
+	if x != nil {
+		return x.Hotels
+	}
+	return nil
+}
+
+func (x *GetNearbyHotelsResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+type RestaurantDetails struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	City             string                 `protobuf:"bytes,3,opt,name=city,proto3" json:"city,omitempty"`
+	Description      string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Latitude         float64                `protobuf:"fixed64,5,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude        float64                `protobuf:"fixed64,6,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	Address          string                 `protobuf:"bytes,7,opt,name=address,proto3" json:"address,omitempty"`
+	Category         string                 `protobuf:"bytes,8,opt,name=category,proto3" json:"category,omitempty"`
+	Rating           float64                `protobuf:"fixed64,9,opt,name=rating,proto3" json:"rating,omitempty"`
+	CuisineType      string                 `protobuf:"bytes,10,opt,name=cuisine_type,json=cuisineType,proto3" json:"cuisine_type,omitempty"`
+	PriceRange       string                 `protobuf:"bytes,11,opt,name=price_range,json=priceRange,proto3" json:"price_range,omitempty"`
+	Tags             []string               `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty"`
+	Images           []string               `protobuf:"bytes,13,rep,name=images,proto3" json:"images,omitempty"`
+	Phone            string                 `protobuf:"bytes,14,opt,name=phone,proto3" json:"phone,omitempty"`
+	Website          string                 `protobuf:"bytes,15,opt,name=website,proto3" json:"website,omitempty"`
+	LlmInteractionId string                 `protobuf:"bytes,16,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Extended fields for detail page
+	ReviewCount         int32              `protobuf:"varint,18,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	IsOpen              bool               `protobuf:"varint,19,opt,name=is_open,json=isOpen,proto3" json:"is_open,omitempty"`
+	ReservationRequired bool               `protobuf:"varint,20,opt,name=reservation_required,json=reservationRequired,proto3" json:"reservation_required,omitempty"`
+	AcceptsCards        bool               `protobuf:"varint,21,opt,name=accepts_cards,json=acceptsCards,proto3" json:"accepts_cards,omitempty"`
+	Features            []string           `protobuf:"bytes,22,rep,name=features,proto3" json:"features,omitempty"`
+	Specialties         []string           `protobuf:"bytes,23,rep,name=specialties,proto3" json:"specialties,omitempty"`
+	Languages           []string           `protobuf:"bytes,24,rep,name=languages,proto3" json:"languages,omitempty"`
+	AveragePrice        string             `protobuf:"bytes,25,opt,name=average_price,json=averagePrice,proto3" json:"average_price,omitempty"`
+	Menu                *RestaurantMenu    `protobuf:"bytes,26,opt,name=menu,proto3" json:"menu,omitempty"`
+	Hours               map[string]string  `protobuf:"bytes,27,rep,name=hours,proto3" json:"hours,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Contact             *RestaurantContact `protobuf:"bytes,28,opt,name=contact,proto3" json:"contact,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RestaurantDetails) Reset() {
+	*x = RestaurantDetails{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestaurantDetails) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestaurantDetails) ProtoMessage() {}
+
+func (x *RestaurantDetails) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestaurantDetails.ProtoReflect.Descriptor instead.
+func (*RestaurantDetails) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RestaurantDetails) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetCity() string {
+	if x != nil {
+		return x.City
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetLatitude() float64 {
+	if x != nil {
+		return x.Latitude
+	}
+	return 0
+}
+
+func (x *RestaurantDetails) GetLongitude() float64 {
+	if x != nil {
+		return x.Longitude
+	}
+	return 0
+}
+
+func (x *RestaurantDetails) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetRating() float64 {
+	if x != nil {
+		return x.Rating
+	}
+	return 0
+}
+
+func (x *RestaurantDetails) GetCuisineType() string {
+	if x != nil {
+		return x.CuisineType
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetPriceRange() string {
+	if x != nil {
+		return x.PriceRange
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetImages() []string {
+	if x != nil {
+		return x.Images
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetWebsite() string {
+	if x != nil {
+		return x.Website
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetLlmInteractionId() string {
+	if x != nil {
+		return x.LlmInteractionId
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetReviewCount() int32 {
+	if x != nil {
+		return x.ReviewCount
+	}
+	return 0
+}
+
+func (x *RestaurantDetails) GetIsOpen() bool {
+	if x != nil {
+		return x.IsOpen
+	}
+	return false
+}
+
+func (x *RestaurantDetails) GetReservationRequired() bool {
+	if x != nil {
+		return x.ReservationRequired
+	}
+	return false
+}
+
+func (x *RestaurantDetails) GetAcceptsCards() bool {
+	if x != nil {
+		return x.AcceptsCards
+	}
+	return false
+}
+
+func (x *RestaurantDetails) GetFeatures() []string {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetSpecialties() []string {
+	if x != nil {
+		return x.Specialties
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetLanguages() []string {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetAveragePrice() string {
+	if x != nil {
+		return x.AveragePrice
+	}
+	return ""
+}
+
+func (x *RestaurantDetails) GetMenu() *RestaurantMenu {
+	if x != nil {
+		return x.Menu
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetHours() map[string]string {
+	if x != nil {
+		return x.Hours
+	}
+	return nil
+}
+
+func (x *RestaurantDetails) GetContact() *RestaurantContact {
+	if x != nil {
+		return x.Contact
+	}
+	return nil
+}
+
+type MenuItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Price         string                 `protobuf:"bytes,3,opt,name=price,proto3" json:"price,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MenuItem) Reset() {
+	*x = MenuItem{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MenuItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MenuItem) ProtoMessage() {}
+
+func (x *MenuItem) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MenuItem.ProtoReflect.Descriptor instead.
+func (*MenuItem) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *MenuItem) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MenuItem) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *MenuItem) GetPrice() string {
+	if x != nil {
+		return x.Price
+	}
+	return ""
+}
+
+type RestaurantMenu struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Starters      []*MenuItem            `protobuf:"bytes,1,rep,name=starters,proto3" json:"starters,omitempty"`
+	Mains         []*MenuItem            `protobuf:"bytes,2,rep,name=mains,proto3" json:"mains,omitempty"`
+	Desserts      []*MenuItem            `protobuf:"bytes,3,rep,name=desserts,proto3" json:"desserts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestaurantMenu) Reset() {
+	*x = RestaurantMenu{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestaurantMenu) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestaurantMenu) ProtoMessage() {}
+
+func (x *RestaurantMenu) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestaurantMenu.ProtoReflect.Descriptor instead.
+func (*RestaurantMenu) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *RestaurantMenu) GetStarters() []*MenuItem {
+	if x != nil {
+		return x.Starters
+	}
+	return nil
+}
+
+func (x *RestaurantMenu) GetMains() []*MenuItem {
+	if x != nil {
+		return x.Mains
+	}
+	return nil
+}
+
+func (x *RestaurantMenu) GetDesserts() []*MenuItem {
+	if x != nil {
+		return x.Desserts
+	}
+	return nil
+}
+
+type RestaurantContact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phone         string                 `protobuf:"bytes,1,opt,name=phone,proto3" json:"phone,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Website       string                 `protobuf:"bytes,3,opt,name=website,proto3" json:"website,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RestaurantContact) Reset() {
+	*x = RestaurantContact{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RestaurantContact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestaurantContact) ProtoMessage() {}
+
+func (x *RestaurantContact) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestaurantContact.ProtoReflect.Descriptor instead.
+func (*RestaurantContact) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RestaurantContact) GetPhone() string {
+	if x != nil {
+		return x.Phone
+	}
+	return ""
+}
+
+func (x *RestaurantContact) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *RestaurantContact) GetWebsite() string {
+	if x != nil {
+		return x.Website
+	}
+	return ""
+}
+
+type GetRestaurantDetailsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RestaurantId  string                 `protobuf:"bytes,1,opt,name=restaurant_id,json=restaurantId,proto3" json:"restaurant_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRestaurantDetailsRequest) Reset() {
+	*x = GetRestaurantDetailsRequest{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRestaurantDetailsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRestaurantDetailsRequest) ProtoMessage() {}
+
+func (x *GetRestaurantDetailsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRestaurantDetailsRequest.ProtoReflect.Descriptor instead.
+func (*GetRestaurantDetailsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetRestaurantDetailsRequest) GetRestaurantId() string {
+	if x != nil {
+		return x.RestaurantId
+	}
+	return ""
+}
+
+type GetRestaurantDetailsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Restaurant    *RestaurantDetails     `protobuf:"bytes,3,opt,name=restaurant,proto3" json:"restaurant,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRestaurantDetailsResponse) Reset() {
+	*x = GetRestaurantDetailsResponse{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRestaurantDetailsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRestaurantDetailsResponse) ProtoMessage() {}
+
+func (x *GetRestaurantDetailsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRestaurantDetailsResponse.ProtoReflect.Descriptor instead.
+func (*GetRestaurantDetailsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetRestaurantDetailsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *GetRestaurantDetailsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *GetRestaurantDetailsResponse) GetRestaurant() *RestaurantDetails {
+	if x != nil {
+		return x.Restaurant
+	}
+	return nil
+}
+
+type GetNearbyRestaurantsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Latitude      float64                `protobuf:"fixed64,1,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude     float64                `protobuf:"fixed64,2,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	RadiusKm      float64                `protobuf:"fixed64,3,opt,name=radius_km,json=radiusKm,proto3" json:"radius_km,omitempty"` // Optional, default 5km
+	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`                        // Optional, default 20
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNearbyRestaurantsRequest) Reset() {
+	*x = GetNearbyRestaurantsRequest{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNearbyRestaurantsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNearbyRestaurantsRequest) ProtoMessage() {}
+
+func (x *GetNearbyRestaurantsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNearbyRestaurantsRequest.ProtoReflect.Descriptor instead.
+func (*GetNearbyRestaurantsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetNearbyRestaurantsRequest) GetLatitude() float64 {
+	if x != nil {
+		return x.Latitude
+	}
+	return 0
+}
+
+func (x *GetNearbyRestaurantsRequest) GetLongitude() float64 {
+	if x != nil {
+		return x.Longitude
+	}
+	return 0
+}
+
+func (x *GetNearbyRestaurantsRequest) GetRadiusKm() float64 {
+	if x != nil {
+		return x.RadiusKm
+	}
+	return 0
+}
+
+func (x *GetNearbyRestaurantsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetNearbyRestaurantsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Restaurants   []*RestaurantDetails   `protobuf:"bytes,1,rep,name=restaurants,proto3" json:"restaurants,omitempty"`
+	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNearbyRestaurantsResponse) Reset() {
+	*x = GetNearbyRestaurantsResponse{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNearbyRestaurantsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNearbyRestaurantsResponse) ProtoMessage() {}
+
+func (x *GetNearbyRestaurantsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNearbyRestaurantsResponse.ProtoReflect.Descriptor instead.
+func (*GetNearbyRestaurantsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *GetNearbyRestaurantsResponse) GetRestaurants() []*RestaurantDetails {
+	if x != nil {
+		return x.Restaurants
+	}
+	return nil
+}
+
+func (x *GetNearbyRestaurantsResponse) GetTotalCount() int32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
 var File_loci_favorites_v1_favorites_proto protoreflect.FileDescriptor
 
 const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
@@ -913,19 +2243,148 @@ const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\x12A\n" +
 	"\fcontent_type\x18\x02 \x01(\x0e2\x1e.loci.favorites.v1.ContentTypeR\vcontentType\"1\n" +
 	"\x19GetFavoritesCountResponse\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\x05R\x05count*\x92\x01\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count\"\xe3\x06\n" +
+	"\fHotelDetails\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04city\x18\x03 \x01(\tR\x04city\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1a\n" +
+	"\blatitude\x18\x05 \x01(\x01R\blatitude\x12\x1c\n" +
+	"\tlongitude\x18\x06 \x01(\x01R\tlongitude\x12\x18\n" +
+	"\aaddress\x18\a \x01(\tR\aaddress\x12\x1a\n" +
+	"\bcategory\x18\b \x01(\tR\bcategory\x12\x16\n" +
+	"\x06rating\x18\t \x01(\x01R\x06rating\x12\x1f\n" +
+	"\vstar_rating\x18\n" +
+	" \x01(\tR\n" +
+	"starRating\x12\x1f\n" +
+	"\vprice_range\x18\v \x01(\tR\n" +
+	"priceRange\x12\x1c\n" +
+	"\tamenities\x18\f \x03(\tR\tamenities\x12\x16\n" +
+	"\x06images\x18\r \x03(\tR\x06images\x12\x14\n" +
+	"\x05phone\x18\x0e \x01(\tR\x05phone\x12\x18\n" +
+	"\awebsite\x18\x0f \x01(\tR\awebsite\x12,\n" +
+	"\x12llm_interaction_id\x18\x10 \x01(\tR\x10llmInteractionId\x129\n" +
+	"\n" +
+	"created_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x19\n" +
+	"\bcheck_in\x18\x12 \x01(\tR\acheckIn\x12\x1b\n" +
+	"\tcheck_out\x18\x13 \x01(\tR\bcheckOut\x12&\n" +
+	"\x0fprice_per_night\x18\x14 \x01(\tR\rpricePerNight\x12!\n" +
+	"\freview_count\x18\x15 \x01(\x05R\vreviewCount\x12\x1a\n" +
+	"\bfeatures\x18\x16 \x03(\tR\bfeatures\x122\n" +
+	"\x05rooms\x18\x17 \x03(\v2\x1c.loci.favorites.v1.HotelRoomR\x05rooms\x12R\n" +
+	"\x12nearby_attractions\x18\x18 \x03(\v2#.loci.favorites.v1.NearbyAttractionR\x11nearbyAttractions\x129\n" +
+	"\acontact\x18\x19 \x01(\v2\x1f.loci.favorites.v1.HotelContactR\acontact\"\xa5\x01\n" +
+	"\tHotelRoom\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
+	"\x05price\x18\x03 \x01(\tR\x05price\x12\x12\n" +
+	"\x04size\x18\x04 \x01(\tR\x04size\x12\x1a\n" +
+	"\bcapacity\x18\x05 \x01(\tR\bcapacity\x12\x1c\n" +
+	"\tamenities\x18\x06 \x03(\tR\tamenities\"V\n" +
+	"\x10NearbyAttraction\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
+	"\bdistance\x18\x03 \x01(\tR\bdistance\"T\n" +
+	"\fHotelContact\x12\x14\n" +
+	"\x05phone\x18\x01 \x01(\tR\x05phone\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x18\n" +
+	"\awebsite\x18\x03 \x01(\tR\awebsite\"<\n" +
+	"\x16GetHotelDetailsRequest\x12\"\n" +
+	"\bhotel_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\ahotelId\"\x84\x01\n" +
+	"\x17GetHotelDetailsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x125\n" +
+	"\x05hotel\x18\x03 \x01(\v2\x1f.loci.favorites.v1.HotelDetailsR\x05hotel\"\x85\x01\n" +
+	"\x16GetNearbyHotelsRequest\x12\x1a\n" +
+	"\blatitude\x18\x01 \x01(\x01R\blatitude\x12\x1c\n" +
+	"\tlongitude\x18\x02 \x01(\x01R\tlongitude\x12\x1b\n" +
+	"\tradius_km\x18\x03 \x01(\x01R\bradiusKm\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"s\n" +
+	"\x17GetNearbyHotelsResponse\x127\n" +
+	"\x06hotels\x18\x01 \x03(\v2\x1f.loci.favorites.v1.HotelDetailsR\x06hotels\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x05R\n" +
+	"totalCount\"\x8b\b\n" +
+	"\x11RestaurantDetails\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
+	"\x04city\x18\x03 \x01(\tR\x04city\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x1a\n" +
+	"\blatitude\x18\x05 \x01(\x01R\blatitude\x12\x1c\n" +
+	"\tlongitude\x18\x06 \x01(\x01R\tlongitude\x12\x18\n" +
+	"\aaddress\x18\a \x01(\tR\aaddress\x12\x1a\n" +
+	"\bcategory\x18\b \x01(\tR\bcategory\x12\x16\n" +
+	"\x06rating\x18\t \x01(\x01R\x06rating\x12!\n" +
+	"\fcuisine_type\x18\n" +
+	" \x01(\tR\vcuisineType\x12\x1f\n" +
+	"\vprice_range\x18\v \x01(\tR\n" +
+	"priceRange\x12\x12\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\x12\x16\n" +
+	"\x06images\x18\r \x03(\tR\x06images\x12\x14\n" +
+	"\x05phone\x18\x0e \x01(\tR\x05phone\x12\x18\n" +
+	"\awebsite\x18\x0f \x01(\tR\awebsite\x12,\n" +
+	"\x12llm_interaction_id\x18\x10 \x01(\tR\x10llmInteractionId\x129\n" +
+	"\n" +
+	"created_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12!\n" +
+	"\freview_count\x18\x12 \x01(\x05R\vreviewCount\x12\x17\n" +
+	"\ais_open\x18\x13 \x01(\bR\x06isOpen\x121\n" +
+	"\x14reservation_required\x18\x14 \x01(\bR\x13reservationRequired\x12#\n" +
+	"\raccepts_cards\x18\x15 \x01(\bR\facceptsCards\x12\x1a\n" +
+	"\bfeatures\x18\x16 \x03(\tR\bfeatures\x12 \n" +
+	"\vspecialties\x18\x17 \x03(\tR\vspecialties\x12\x1c\n" +
+	"\tlanguages\x18\x18 \x03(\tR\tlanguages\x12#\n" +
+	"\raverage_price\x18\x19 \x01(\tR\faveragePrice\x125\n" +
+	"\x04menu\x18\x1a \x01(\v2!.loci.favorites.v1.RestaurantMenuR\x04menu\x12E\n" +
+	"\x05hours\x18\x1b \x03(\v2/.loci.favorites.v1.RestaurantDetails.HoursEntryR\x05hours\x12>\n" +
+	"\acontact\x18\x1c \x01(\v2$.loci.favorites.v1.RestaurantContactR\acontact\x1a8\n" +
+	"\n" +
+	"HoursEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"V\n" +
+	"\bMenuItem\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
+	"\x05price\x18\x03 \x01(\tR\x05price\"\xb5\x01\n" +
+	"\x0eRestaurantMenu\x127\n" +
+	"\bstarters\x18\x01 \x03(\v2\x1b.loci.favorites.v1.MenuItemR\bstarters\x121\n" +
+	"\x05mains\x18\x02 \x03(\v2\x1b.loci.favorites.v1.MenuItemR\x05mains\x127\n" +
+	"\bdesserts\x18\x03 \x03(\v2\x1b.loci.favorites.v1.MenuItemR\bdesserts\"Y\n" +
+	"\x11RestaurantContact\x12\x14\n" +
+	"\x05phone\x18\x01 \x01(\tR\x05phone\x12\x14\n" +
+	"\x05email\x18\x02 \x01(\tR\x05email\x12\x18\n" +
+	"\awebsite\x18\x03 \x01(\tR\awebsite\"K\n" +
+	"\x1bGetRestaurantDetailsRequest\x12,\n" +
+	"\rrestaurant_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\frestaurantId\"\x98\x01\n" +
+	"\x1cGetRestaurantDetailsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12D\n" +
+	"\n" +
+	"restaurant\x18\x03 \x01(\v2$.loci.favorites.v1.RestaurantDetailsR\n" +
+	"restaurant\"\x8a\x01\n" +
+	"\x1bGetNearbyRestaurantsRequest\x12\x1a\n" +
+	"\blatitude\x18\x01 \x01(\x01R\blatitude\x12\x1c\n" +
+	"\tlongitude\x18\x02 \x01(\x01R\tlongitude\x12\x1b\n" +
+	"\tradius_km\x18\x03 \x01(\x01R\bradiusKm\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"\x87\x01\n" +
+	"\x1cGetNearbyRestaurantsResponse\x12F\n" +
+	"\vrestaurants\x18\x01 \x03(\v2$.loci.favorites.v1.RestaurantDetailsR\vrestaurants\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\x05R\n" +
+	"totalCount*\x92\x01\n" +
 	"\vContentType\x12\x1c\n" +
 	"\x18CONTENT_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10CONTENT_TYPE_POI\x10\x01\x12\x16\n" +
 	"\x12CONTENT_TYPE_HOTEL\x10\x02\x12\x1b\n" +
 	"\x17CONTENT_TYPE_RESTAURANT\x10\x03\x12\x1a\n" +
-	"\x16CONTENT_TYPE_ITINERARY\x10\x042\x9e\x04\n" +
+	"\x16CONTENT_TYPE_ITINERARY\x10\x042\xe4\a\n" +
 	"\x10FavoritesService\x12e\n" +
 	"\x0eAddToFavorites\x12(.loci.favorites.v1.AddToFavoritesRequest\x1a).loci.favorites.v1.AddToFavoritesResponse\x12t\n" +
 	"\x13RemoveFromFavorites\x12-.loci.favorites.v1.RemoveFromFavoritesRequest\x1a..loci.favorites.v1.RemoveFromFavoritesResponse\x12_\n" +
 	"\fGetFavorites\x12&.loci.favorites.v1.GetFavoritesRequest\x1a'.loci.favorites.v1.GetFavoritesResponse\x12\\\n" +
 	"\vIsFavorited\x12%.loci.favorites.v1.IsFavoritedRequest\x1a&.loci.favorites.v1.IsFavoritedResponse\x12n\n" +
-	"\x11GetFavoritesCount\x12+.loci.favorites.v1.GetFavoritesCountRequest\x1a,.loci.favorites.v1.GetFavoritesCountResponseBOZMgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1;favoritesv1b\x06proto3"
+	"\x11GetFavoritesCount\x12+.loci.favorites.v1.GetFavoritesCountRequest\x1a,.loci.favorites.v1.GetFavoritesCountResponse\x12h\n" +
+	"\x0fGetHotelDetails\x12).loci.favorites.v1.GetHotelDetailsRequest\x1a*.loci.favorites.v1.GetHotelDetailsResponse\x12w\n" +
+	"\x14GetRestaurantDetails\x12..loci.favorites.v1.GetRestaurantDetailsRequest\x1a/.loci.favorites.v1.GetRestaurantDetailsResponse\x12h\n" +
+	"\x0fGetNearbyHotels\x12).loci.favorites.v1.GetNearbyHotelsRequest\x1a*.loci.favorites.v1.GetNearbyHotelsResponse\x12w\n" +
+	"\x14GetNearbyRestaurants\x12..loci.favorites.v1.GetNearbyRestaurantsRequest\x1a/.loci.favorites.v1.GetNearbyRestaurantsResponseBOZMgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1;favoritesv1b\x06proto3"
 
 var (
 	file_loci_favorites_v1_favorites_proto_rawDescOnce sync.Once
@@ -940,25 +2399,42 @@ func file_loci_favorites_v1_favorites_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_favorites_v1_favorites_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_favorites_v1_favorites_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_loci_favorites_v1_favorites_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_loci_favorites_v1_favorites_proto_goTypes = []any{
-	(ContentType)(0),                    // 0: loci.favorites.v1.ContentType
-	(*FavoriteItem)(nil),                // 1: loci.favorites.v1.FavoriteItem
-	(*AddToFavoritesRequest)(nil),       // 2: loci.favorites.v1.AddToFavoritesRequest
-	(*AddToFavoritesResponse)(nil),      // 3: loci.favorites.v1.AddToFavoritesResponse
-	(*RemoveFromFavoritesRequest)(nil),  // 4: loci.favorites.v1.RemoveFromFavoritesRequest
-	(*RemoveFromFavoritesResponse)(nil), // 5: loci.favorites.v1.RemoveFromFavoritesResponse
-	(*GetFavoritesRequest)(nil),         // 6: loci.favorites.v1.GetFavoritesRequest
-	(*GetFavoritesResponse)(nil),        // 7: loci.favorites.v1.GetFavoritesResponse
-	(*IsFavoritedRequest)(nil),          // 8: loci.favorites.v1.IsFavoritedRequest
-	(*IsFavoritedResponse)(nil),         // 9: loci.favorites.v1.IsFavoritedResponse
-	(*GetFavoritesCountRequest)(nil),    // 10: loci.favorites.v1.GetFavoritesCountRequest
-	(*GetFavoritesCountResponse)(nil),   // 11: loci.favorites.v1.GetFavoritesCountResponse
-	(*timestamppb.Timestamp)(nil),       // 12: google.protobuf.Timestamp
+	(ContentType)(0),                     // 0: loci.favorites.v1.ContentType
+	(*FavoriteItem)(nil),                 // 1: loci.favorites.v1.FavoriteItem
+	(*AddToFavoritesRequest)(nil),        // 2: loci.favorites.v1.AddToFavoritesRequest
+	(*AddToFavoritesResponse)(nil),       // 3: loci.favorites.v1.AddToFavoritesResponse
+	(*RemoveFromFavoritesRequest)(nil),   // 4: loci.favorites.v1.RemoveFromFavoritesRequest
+	(*RemoveFromFavoritesResponse)(nil),  // 5: loci.favorites.v1.RemoveFromFavoritesResponse
+	(*GetFavoritesRequest)(nil),          // 6: loci.favorites.v1.GetFavoritesRequest
+	(*GetFavoritesResponse)(nil),         // 7: loci.favorites.v1.GetFavoritesResponse
+	(*IsFavoritedRequest)(nil),           // 8: loci.favorites.v1.IsFavoritedRequest
+	(*IsFavoritedResponse)(nil),          // 9: loci.favorites.v1.IsFavoritedResponse
+	(*GetFavoritesCountRequest)(nil),     // 10: loci.favorites.v1.GetFavoritesCountRequest
+	(*GetFavoritesCountResponse)(nil),    // 11: loci.favorites.v1.GetFavoritesCountResponse
+	(*HotelDetails)(nil),                 // 12: loci.favorites.v1.HotelDetails
+	(*HotelRoom)(nil),                    // 13: loci.favorites.v1.HotelRoom
+	(*NearbyAttraction)(nil),             // 14: loci.favorites.v1.NearbyAttraction
+	(*HotelContact)(nil),                 // 15: loci.favorites.v1.HotelContact
+	(*GetHotelDetailsRequest)(nil),       // 16: loci.favorites.v1.GetHotelDetailsRequest
+	(*GetHotelDetailsResponse)(nil),      // 17: loci.favorites.v1.GetHotelDetailsResponse
+	(*GetNearbyHotelsRequest)(nil),       // 18: loci.favorites.v1.GetNearbyHotelsRequest
+	(*GetNearbyHotelsResponse)(nil),      // 19: loci.favorites.v1.GetNearbyHotelsResponse
+	(*RestaurantDetails)(nil),            // 20: loci.favorites.v1.RestaurantDetails
+	(*MenuItem)(nil),                     // 21: loci.favorites.v1.MenuItem
+	(*RestaurantMenu)(nil),               // 22: loci.favorites.v1.RestaurantMenu
+	(*RestaurantContact)(nil),            // 23: loci.favorites.v1.RestaurantContact
+	(*GetRestaurantDetailsRequest)(nil),  // 24: loci.favorites.v1.GetRestaurantDetailsRequest
+	(*GetRestaurantDetailsResponse)(nil), // 25: loci.favorites.v1.GetRestaurantDetailsResponse
+	(*GetNearbyRestaurantsRequest)(nil),  // 26: loci.favorites.v1.GetNearbyRestaurantsRequest
+	(*GetNearbyRestaurantsResponse)(nil), // 27: loci.favorites.v1.GetNearbyRestaurantsResponse
+	nil,                                  // 28: loci.favorites.v1.RestaurantDetails.HoursEntry
+	(*timestamppb.Timestamp)(nil),        // 29: google.protobuf.Timestamp
 }
 var file_loci_favorites_v1_favorites_proto_depIdxs = []int32{
 	0,  // 0: loci.favorites.v1.FavoriteItem.content_type:type_name -> loci.favorites.v1.ContentType
-	12, // 1: loci.favorites.v1.FavoriteItem.added_at:type_name -> google.protobuf.Timestamp
+	29, // 1: loci.favorites.v1.FavoriteItem.added_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: loci.favorites.v1.AddToFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
 	1,  // 3: loci.favorites.v1.AddToFavoritesResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
 	0,  // 4: loci.favorites.v1.RemoveFromFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
@@ -966,21 +2442,44 @@ var file_loci_favorites_v1_favorites_proto_depIdxs = []int32{
 	1,  // 6: loci.favorites.v1.GetFavoritesResponse.favorites:type_name -> loci.favorites.v1.FavoriteItem
 	0,  // 7: loci.favorites.v1.IsFavoritedRequest.content_type:type_name -> loci.favorites.v1.ContentType
 	0,  // 8: loci.favorites.v1.GetFavoritesCountRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	2,  // 9: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
-	4,  // 10: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
-	6,  // 11: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
-	8,  // 12: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
-	10, // 13: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
-	3,  // 14: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
-	5,  // 15: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
-	7,  // 16: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
-	9,  // 17: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
-	11, // 18: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
-	14, // [14:19] is the sub-list for method output_type
-	9,  // [9:14] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	29, // 9: loci.favorites.v1.HotelDetails.created_at:type_name -> google.protobuf.Timestamp
+	13, // 10: loci.favorites.v1.HotelDetails.rooms:type_name -> loci.favorites.v1.HotelRoom
+	14, // 11: loci.favorites.v1.HotelDetails.nearby_attractions:type_name -> loci.favorites.v1.NearbyAttraction
+	15, // 12: loci.favorites.v1.HotelDetails.contact:type_name -> loci.favorites.v1.HotelContact
+	12, // 13: loci.favorites.v1.GetHotelDetailsResponse.hotel:type_name -> loci.favorites.v1.HotelDetails
+	12, // 14: loci.favorites.v1.GetNearbyHotelsResponse.hotels:type_name -> loci.favorites.v1.HotelDetails
+	29, // 15: loci.favorites.v1.RestaurantDetails.created_at:type_name -> google.protobuf.Timestamp
+	22, // 16: loci.favorites.v1.RestaurantDetails.menu:type_name -> loci.favorites.v1.RestaurantMenu
+	28, // 17: loci.favorites.v1.RestaurantDetails.hours:type_name -> loci.favorites.v1.RestaurantDetails.HoursEntry
+	23, // 18: loci.favorites.v1.RestaurantDetails.contact:type_name -> loci.favorites.v1.RestaurantContact
+	21, // 19: loci.favorites.v1.RestaurantMenu.starters:type_name -> loci.favorites.v1.MenuItem
+	21, // 20: loci.favorites.v1.RestaurantMenu.mains:type_name -> loci.favorites.v1.MenuItem
+	21, // 21: loci.favorites.v1.RestaurantMenu.desserts:type_name -> loci.favorites.v1.MenuItem
+	20, // 22: loci.favorites.v1.GetRestaurantDetailsResponse.restaurant:type_name -> loci.favorites.v1.RestaurantDetails
+	20, // 23: loci.favorites.v1.GetNearbyRestaurantsResponse.restaurants:type_name -> loci.favorites.v1.RestaurantDetails
+	2,  // 24: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
+	4,  // 25: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
+	6,  // 26: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
+	8,  // 27: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
+	10, // 28: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
+	16, // 29: loci.favorites.v1.FavoritesService.GetHotelDetails:input_type -> loci.favorites.v1.GetHotelDetailsRequest
+	24, // 30: loci.favorites.v1.FavoritesService.GetRestaurantDetails:input_type -> loci.favorites.v1.GetRestaurantDetailsRequest
+	18, // 31: loci.favorites.v1.FavoritesService.GetNearbyHotels:input_type -> loci.favorites.v1.GetNearbyHotelsRequest
+	26, // 32: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:input_type -> loci.favorites.v1.GetNearbyRestaurantsRequest
+	3,  // 33: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
+	5,  // 34: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
+	7,  // 35: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
+	9,  // 36: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
+	11, // 37: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
+	17, // 38: loci.favorites.v1.FavoritesService.GetHotelDetails:output_type -> loci.favorites.v1.GetHotelDetailsResponse
+	25, // 39: loci.favorites.v1.FavoritesService.GetRestaurantDetails:output_type -> loci.favorites.v1.GetRestaurantDetailsResponse
+	19, // 40: loci.favorites.v1.FavoritesService.GetNearbyHotels:output_type -> loci.favorites.v1.GetNearbyHotelsResponse
+	27, // 41: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:output_type -> loci.favorites.v1.GetNearbyRestaurantsResponse
+	33, // [33:42] is the sub-list for method output_type
+	24, // [24:33] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_loci_favorites_v1_favorites_proto_init() }
@@ -994,7 +2493,7 @@ func file_loci_favorites_v1_favorites_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_favorites_v1_favorites_proto_rawDesc), len(file_loci_favorites_v1_favorites_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

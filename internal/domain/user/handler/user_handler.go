@@ -206,6 +206,12 @@ func fromUpdateProto(p *userpb.UpdateProfileParams) locitypes.UpdateProfileParam
 	if len(p.Badges) > 0 {
 		params.Badges = &p.Badges
 	}
+	if p.Theme != nil {
+		params.Theme = p.Theme
+	}
+	if p.Language != nil {
+		params.Language = p.Language
+	}
 
 	return params
 }

@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+var trailingCommaBeforeBracketRE = regexp.MustCompile(`,(\s*[}\\]])`)
+
 func cleanLLMResponse(responseText string) string {
 	cleaned := strings.TrimSpace(responseText)
 
@@ -18,7 +20,7 @@ func cleanLLMResponse(responseText string) string {
 		cleaned = strings.TrimSpace(cleaned)
 	}
 
-	cleaned = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(cleaned, "$1")
+	cleaned = trailingCommaBeforeBracketRE.ReplaceAllString(cleaned, "$1")
 	return cleaned
 }
 
@@ -69,7 +71,7 @@ loop:
 
 	jsonPortion := response[firstBrace : lastValidBrace+1]
 	jsonPortion = strings.ReplaceAll(jsonPortion, "`", "")
-	jsonPortion = regexp.MustCompile(`,(\s*[}\\]])`).ReplaceAllString(jsonPortion, "$1")
+	jsonPortion = trailingCommaBeforeBracketRE.ReplaceAllString(jsonPortion, "$1")
 
 	return strings.TrimSpace(jsonPortion)
 }

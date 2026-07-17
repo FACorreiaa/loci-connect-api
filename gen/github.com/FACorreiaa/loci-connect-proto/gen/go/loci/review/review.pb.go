@@ -24,6 +24,68 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Type of content being reviewed
+type ReviewContentType int32
+
+const (
+	ReviewContentType_REVIEW_CONTENT_TYPE_UNSPECIFIED ReviewContentType = 0
+	ReviewContentType_REVIEW_CONTENT_TYPE_POI         ReviewContentType = 1 // Point of Interest
+	ReviewContentType_REVIEW_CONTENT_TYPE_HOTEL       ReviewContentType = 2 // Hotel
+	ReviewContentType_REVIEW_CONTENT_TYPE_RESTAURANT  ReviewContentType = 3 // Restaurant
+	ReviewContentType_REVIEW_CONTENT_TYPE_ACTIVITY    ReviewContentType = 4 // Activity/Attraction
+	ReviewContentType_REVIEW_CONTENT_TYPE_ITINERARY   ReviewContentType = 5 // User-created itinerary
+	ReviewContentType_REVIEW_CONTENT_TYPE_LIST        ReviewContentType = 6 // User-created list
+)
+
+// Enum value maps for ReviewContentType.
+var (
+	ReviewContentType_name = map[int32]string{
+		0: "REVIEW_CONTENT_TYPE_UNSPECIFIED",
+		1: "REVIEW_CONTENT_TYPE_POI",
+		2: "REVIEW_CONTENT_TYPE_HOTEL",
+		3: "REVIEW_CONTENT_TYPE_RESTAURANT",
+		4: "REVIEW_CONTENT_TYPE_ACTIVITY",
+		5: "REVIEW_CONTENT_TYPE_ITINERARY",
+		6: "REVIEW_CONTENT_TYPE_LIST",
+	}
+	ReviewContentType_value = map[string]int32{
+		"REVIEW_CONTENT_TYPE_UNSPECIFIED": 0,
+		"REVIEW_CONTENT_TYPE_POI":         1,
+		"REVIEW_CONTENT_TYPE_HOTEL":       2,
+		"REVIEW_CONTENT_TYPE_RESTAURANT":  3,
+		"REVIEW_CONTENT_TYPE_ACTIVITY":    4,
+		"REVIEW_CONTENT_TYPE_ITINERARY":   5,
+		"REVIEW_CONTENT_TYPE_LIST":        6,
+	}
+)
+
+func (x ReviewContentType) Enum() *ReviewContentType {
+	p := new(ReviewContentType)
+	*p = x
+	return p
+}
+
+func (x ReviewContentType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ReviewContentType) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_review_review_proto_enumTypes[0].Descriptor()
+}
+
+func (ReviewContentType) Type() protoreflect.EnumType {
+	return &file_loci_review_review_proto_enumTypes[0]
+}
+
+func (x ReviewContentType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ReviewContentType.Descriptor instead.
+func (ReviewContentType) EnumDescriptor() ([]byte, []int) {
+	return file_loci_review_review_proto_rawDescGZIP(), []int{0}
+}
+
 // Review status
 type ReviewStatus int32
 
@@ -67,11 +129,11 @@ func (x ReviewStatus) String() string {
 }
 
 func (ReviewStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_review_review_proto_enumTypes[0].Descriptor()
+	return file_loci_review_review_proto_enumTypes[1].Descriptor()
 }
 
 func (ReviewStatus) Type() protoreflect.EnumType {
-	return &file_loci_review_review_proto_enumTypes[0]
+	return &file_loci_review_review_proto_enumTypes[1]
 }
 
 func (x ReviewStatus) Number() protoreflect.EnumNumber {
@@ -80,7 +142,7 @@ func (x ReviewStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ReviewStatus.Descriptor instead.
 func (ReviewStatus) EnumDescriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{0}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{1}
 }
 
 type SortDirection int32
@@ -116,11 +178,11 @@ func (x SortDirection) String() string {
 }
 
 func (SortDirection) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_review_review_proto_enumTypes[1].Descriptor()
+	return file_loci_review_review_proto_enumTypes[2].Descriptor()
 }
 
 func (SortDirection) Type() protoreflect.EnumType {
-	return &file_loci_review_review_proto_enumTypes[1]
+	return &file_loci_review_review_proto_enumTypes[2]
 }
 
 func (x SortDirection) Number() protoreflect.EnumNumber {
@@ -129,7 +191,7 @@ func (x SortDirection) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SortDirection.Descriptor instead.
 func (SortDirection) EnumDescriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{1}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{2}
 }
 
 // Sort options for reviews
@@ -172,11 +234,11 @@ func (x ReviewSortBy) String() string {
 }
 
 func (ReviewSortBy) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_review_review_proto_enumTypes[2].Descriptor()
+	return file_loci_review_review_proto_enumTypes[3].Descriptor()
 }
 
 func (ReviewSortBy) Type() protoreflect.EnumType {
-	return &file_loci_review_review_proto_enumTypes[2]
+	return &file_loci_review_review_proto_enumTypes[3]
 }
 
 func (x ReviewSortBy) Number() protoreflect.EnumNumber {
@@ -185,7 +247,7 @@ func (x ReviewSortBy) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ReviewSortBy.Descriptor instead.
 func (ReviewSortBy) EnumDescriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{2}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{3}
 }
 
 // Core review entity
@@ -193,8 +255,8 @@ type Review struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	UserId    string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	PoiId     string                 `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"`
-	Rating    float64                `protobuf:"fixed64,4,opt,name=rating,proto3" json:"rating,omitempty"` // 1.0 - 5.0
+	PoiId     string                 `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id instead
+	Rating    float64                `protobuf:"fixed64,4,opt,name=rating,proto3" json:"rating,omitempty"`          // 1.0 - 5.0
 	Title     string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
 	Content   string                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
 	Photos    []string               `protobuf:"bytes,7,rep,name=photos,proto3" json:"photos,omitempty"` // Photo URLs
@@ -213,8 +275,12 @@ type Review struct {
 	Reviewer *ReviewerInfo `protobuf:"bytes,17,opt,name=reviewer,proto3" json:"reviewer,omitempty"`
 	// Response from business owner
 	BusinessResponse *BusinessResponse `protobuf:"bytes,18,opt,name=business_response,json=businessResponse,proto3" json:"business_response,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// NEW: Support for all content types (not just POIs)
+	ContentType   ReviewContentType `protobuf:"varint,19,opt,name=content_type,json=contentType,proto3,enum=loci.review.ReviewContentType" json:"content_type,omitempty"` // Type of content being reviewed
+	ContentId     string            `protobuf:"bytes,20,opt,name=content_id,json=contentId,proto3" json:"content_id,omitempty"`                                           // ID of content being reviewed
+	ContentName   string            `protobuf:"bytes,21,opt,name=content_name,json=contentName,proto3" json:"content_name,omitempty"`                                     // Name of content for display
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Review) Reset() {
@@ -371,6 +437,27 @@ func (x *Review) GetBusinessResponse() *BusinessResponse {
 		return x.BusinessResponse
 	}
 	return nil
+}
+
+func (x *Review) GetContentType() ReviewContentType {
+	if x != nil {
+		return x.ContentType
+	}
+	return ReviewContentType_REVIEW_CONTENT_TYPE_UNSPECIFIED
+}
+
+func (x *Review) GetContentId() string {
+	if x != nil {
+		return x.ContentId
+	}
+	return ""
+}
+
+func (x *Review) GetContentName() string {
+	if x != nil {
+		return x.ContentName
+	}
+	return ""
 }
 
 // Detailed aspects of a review
@@ -1410,16 +1497,20 @@ func (x *ReviewFilter) GetSortDirection() SortDirection {
 
 // Request/Response messages
 type CreateReviewRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	PoiId         string                 `protobuf:"bytes,2,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"`
-	Rating        float64                `protobuf:"fixed64,3,opt,name=rating,proto3" json:"rating,omitempty"`
-	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
-	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
-	PhotoUrls     []string               `protobuf:"bytes,6,rep,name=photo_urls,json=photoUrls,proto3" json:"photo_urls,omitempty"`
-	VisitDate     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=visit_date,json=visitDate,proto3" json:"visit_date,omitempty"`
-	Aspects       *ReviewAspects         `protobuf:"bytes,8,opt,name=aspects,proto3" json:"aspects,omitempty"`
-	Language      string                 `protobuf:"bytes,9,opt,name=language,proto3" json:"language,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	UserId    string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PoiId     string                 `protobuf:"bytes,2,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id
+	Rating    float64                `protobuf:"fixed64,3,opt,name=rating,proto3" json:"rating,omitempty"`
+	Title     string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
+	Content   string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
+	PhotoUrls []string               `protobuf:"bytes,6,rep,name=photo_urls,json=photoUrls,proto3" json:"photo_urls,omitempty"`
+	VisitDate *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=visit_date,json=visitDate,proto3" json:"visit_date,omitempty"`
+	Aspects   *ReviewAspects         `protobuf:"bytes,8,opt,name=aspects,proto3" json:"aspects,omitempty"`
+	Language  string                 `protobuf:"bytes,9,opt,name=language,proto3" json:"language,omitempty"`
+	// NEW: Support for all content types
+	ContentType   ReviewContentType `protobuf:"varint,10,opt,name=content_type,json=contentType,proto3,enum=loci.review.ReviewContentType" json:"content_type,omitempty"` // Type of content being reviewed
+	ContentId     string            `protobuf:"bytes,11,opt,name=content_id,json=contentId,proto3" json:"content_id,omitempty"`                                           // ID of content
+	ContentName   string            `protobuf:"bytes,12,opt,name=content_name,json=contentName,proto3" json:"content_name,omitempty"`                                     // Name of content for display
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1513,6 +1604,27 @@ func (x *CreateReviewRequest) GetAspects() *ReviewAspects {
 func (x *CreateReviewRequest) GetLanguage() string {
 	if x != nil {
 		return x.Language
+	}
+	return ""
+}
+
+func (x *CreateReviewRequest) GetContentType() ReviewContentType {
+	if x != nil {
+		return x.ContentType
+	}
+	return ReviewContentType_REVIEW_CONTENT_TYPE_UNSPECIFIED
+}
+
+func (x *CreateReviewRequest) GetContentId() string {
+	if x != nil {
+		return x.ContentId
+	}
+	return ""
+}
+
+func (x *CreateReviewRequest) GetContentName() string {
+	if x != nil {
+		return x.ContentName
 	}
 	return ""
 }
@@ -1689,6 +1801,240 @@ func (x *GetPOIReviewsResponse) GetStatistics() *ReviewStatistics {
 	return nil
 }
 
+// Global recent-reviews feed (across all content)
+type GetRecentReviewsRequest struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Pagination    *common.PaginationRequest `protobuf:"bytes,1,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Filter        *ReviewFilter             `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecentReviewsRequest) Reset() {
+	*x = GetRecentReviewsRequest{}
+	mi := &file_loci_review_review_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecentReviewsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecentReviewsRequest) ProtoMessage() {}
+
+func (x *GetRecentReviewsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_review_review_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecentReviewsRequest.ProtoReflect.Descriptor instead.
+func (*GetRecentReviewsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_review_review_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GetRecentReviewsRequest) GetPagination() *common.PaginationRequest {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *GetRecentReviewsRequest) GetFilter() *ReviewFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type GetRecentReviewsResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Reviews       []*Review                  `protobuf:"bytes,1,rep,name=reviews,proto3" json:"reviews,omitempty"`
+	Pagination    *common.PaginationMetadata `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetRecentReviewsResponse) Reset() {
+	*x = GetRecentReviewsResponse{}
+	mi := &file_loci_review_review_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetRecentReviewsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetRecentReviewsResponse) ProtoMessage() {}
+
+func (x *GetRecentReviewsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_review_review_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetRecentReviewsResponse.ProtoReflect.Descriptor instead.
+func (*GetRecentReviewsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_review_review_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetRecentReviewsResponse) GetReviews() []*Review {
+	if x != nil {
+		return x.Reviews
+	}
+	return nil
+}
+
+func (x *GetRecentReviewsResponse) GetPagination() *common.PaginationMetadata {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+// NEW: Generic request for any content type
+type GetContentReviewsRequest struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	ContentType   ReviewContentType         `protobuf:"varint,1,opt,name=content_type,json=contentType,proto3,enum=loci.review.ReviewContentType" json:"content_type,omitempty"`
+	ContentId     string                    `protobuf:"bytes,2,opt,name=content_id,json=contentId,proto3" json:"content_id,omitempty"`
+	Pagination    *common.PaginationRequest `protobuf:"bytes,3,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Filter        *ReviewFilter             `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetContentReviewsRequest) Reset() {
+	*x = GetContentReviewsRequest{}
+	mi := &file_loci_review_review_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContentReviewsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContentReviewsRequest) ProtoMessage() {}
+
+func (x *GetContentReviewsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_review_review_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContentReviewsRequest.ProtoReflect.Descriptor instead.
+func (*GetContentReviewsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_review_review_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetContentReviewsRequest) GetContentType() ReviewContentType {
+	if x != nil {
+		return x.ContentType
+	}
+	return ReviewContentType_REVIEW_CONTENT_TYPE_UNSPECIFIED
+}
+
+func (x *GetContentReviewsRequest) GetContentId() string {
+	if x != nil {
+		return x.ContentId
+	}
+	return ""
+}
+
+func (x *GetContentReviewsRequest) GetPagination() *common.PaginationRequest {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *GetContentReviewsRequest) GetFilter() *ReviewFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+type GetContentReviewsResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Reviews       []*Review                  `protobuf:"bytes,1,rep,name=reviews,proto3" json:"reviews,omitempty"`
+	Pagination    *common.PaginationMetadata `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
+	Statistics    *ReviewStatistics          `protobuf:"bytes,3,opt,name=statistics,proto3" json:"statistics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetContentReviewsResponse) Reset() {
+	*x = GetContentReviewsResponse{}
+	mi := &file_loci_review_review_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContentReviewsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContentReviewsResponse) ProtoMessage() {}
+
+func (x *GetContentReviewsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_review_review_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContentReviewsResponse.ProtoReflect.Descriptor instead.
+func (*GetContentReviewsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_review_review_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *GetContentReviewsResponse) GetReviews() []*Review {
+	if x != nil {
+		return x.Reviews
+	}
+	return nil
+}
+
+func (x *GetContentReviewsResponse) GetPagination() *common.PaginationMetadata {
+	if x != nil {
+		return x.Pagination
+	}
+	return nil
+}
+
+func (x *GetContentReviewsResponse) GetStatistics() *ReviewStatistics {
+	if x != nil {
+		return x.Statistics
+	}
+	return nil
+}
+
 type GetReviewRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ReviewId      string                 `protobuf:"bytes,1,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
@@ -1699,7 +2045,7 @@ type GetReviewRequest struct {
 
 func (x *GetReviewRequest) Reset() {
 	*x = GetReviewRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[17]
+	mi := &file_loci_review_review_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1711,7 +2057,7 @@ func (x *GetReviewRequest) String() string {
 func (*GetReviewRequest) ProtoMessage() {}
 
 func (x *GetReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[17]
+	mi := &file_loci_review_review_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1724,7 +2070,7 @@ func (x *GetReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewRequest.ProtoReflect.Descriptor instead.
 func (*GetReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{17}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *GetReviewRequest) GetReviewId() string {
@@ -1752,7 +2098,7 @@ type GetReviewResponse struct {
 
 func (x *GetReviewResponse) Reset() {
 	*x = GetReviewResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[18]
+	mi := &file_loci_review_review_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1764,7 +2110,7 @@ func (x *GetReviewResponse) String() string {
 func (*GetReviewResponse) ProtoMessage() {}
 
 func (x *GetReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[18]
+	mi := &file_loci_review_review_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1777,7 +2123,7 @@ func (x *GetReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewResponse.ProtoReflect.Descriptor instead.
 func (*GetReviewResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{18}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GetReviewResponse) GetReview() *Review {
@@ -1817,7 +2163,7 @@ type UpdateReviewRequest struct {
 
 func (x *UpdateReviewRequest) Reset() {
 	*x = UpdateReviewRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[19]
+	mi := &file_loci_review_review_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1829,7 +2175,7 @@ func (x *UpdateReviewRequest) String() string {
 func (*UpdateReviewRequest) ProtoMessage() {}
 
 func (x *UpdateReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[19]
+	mi := &file_loci_review_review_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1842,7 +2188,7 @@ func (x *UpdateReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReviewRequest.ProtoReflect.Descriptor instead.
 func (*UpdateReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{19}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateReviewRequest) GetUserId() string {
@@ -1911,7 +2257,7 @@ type UpdateReviewResponse struct {
 
 func (x *UpdateReviewResponse) Reset() {
 	*x = UpdateReviewResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[20]
+	mi := &file_loci_review_review_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2269,7 @@ func (x *UpdateReviewResponse) String() string {
 func (*UpdateReviewResponse) ProtoMessage() {}
 
 func (x *UpdateReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[20]
+	mi := &file_loci_review_review_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2282,7 @@ func (x *UpdateReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateReviewResponse.ProtoReflect.Descriptor instead.
 func (*UpdateReviewResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{20}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UpdateReviewResponse) GetResponse() *common.Response {
@@ -1963,7 +2309,7 @@ type DeleteReviewRequest struct {
 
 func (x *DeleteReviewRequest) Reset() {
 	*x = DeleteReviewRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[21]
+	mi := &file_loci_review_review_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1975,7 +2321,7 @@ func (x *DeleteReviewRequest) String() string {
 func (*DeleteReviewRequest) ProtoMessage() {}
 
 func (x *DeleteReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[21]
+	mi := &file_loci_review_review_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1988,7 +2334,7 @@ func (x *DeleteReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewRequest.ProtoReflect.Descriptor instead.
 func (*DeleteReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{21}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *DeleteReviewRequest) GetUserId() string {
@@ -2014,7 +2360,7 @@ type DeleteReviewResponse struct {
 
 func (x *DeleteReviewResponse) Reset() {
 	*x = DeleteReviewResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[22]
+	mi := &file_loci_review_review_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2026,7 +2372,7 @@ func (x *DeleteReviewResponse) String() string {
 func (*DeleteReviewResponse) ProtoMessage() {}
 
 func (x *DeleteReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[22]
+	mi := &file_loci_review_review_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2039,7 +2385,7 @@ func (x *DeleteReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewResponse.ProtoReflect.Descriptor instead.
 func (*DeleteReviewResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{22}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *DeleteReviewResponse) GetResponse() *common.Response {
@@ -2060,7 +2406,7 @@ type GetUserReviewsRequest struct {
 
 func (x *GetUserReviewsRequest) Reset() {
 	*x = GetUserReviewsRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[23]
+	mi := &file_loci_review_review_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2072,7 +2418,7 @@ func (x *GetUserReviewsRequest) String() string {
 func (*GetUserReviewsRequest) ProtoMessage() {}
 
 func (x *GetUserReviewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[23]
+	mi := &file_loci_review_review_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2085,7 +2431,7 @@ func (x *GetUserReviewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserReviewsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserReviewsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{23}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetUserReviewsRequest) GetUserId() string {
@@ -2120,7 +2466,7 @@ type GetUserReviewsResponse struct {
 
 func (x *GetUserReviewsResponse) Reset() {
 	*x = GetUserReviewsResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[24]
+	mi := &file_loci_review_review_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2132,7 +2478,7 @@ func (x *GetUserReviewsResponse) String() string {
 func (*GetUserReviewsResponse) ProtoMessage() {}
 
 func (x *GetUserReviewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[24]
+	mi := &file_loci_review_review_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2145,7 +2491,7 @@ func (x *GetUserReviewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserReviewsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserReviewsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{24}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetUserReviewsResponse) GetReviews() []*Review {
@@ -2182,7 +2528,7 @@ type UserReviewStatistics struct {
 
 func (x *UserReviewStatistics) Reset() {
 	*x = UserReviewStatistics{}
-	mi := &file_loci_review_review_proto_msgTypes[25]
+	mi := &file_loci_review_review_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2194,7 +2540,7 @@ func (x *UserReviewStatistics) String() string {
 func (*UserReviewStatistics) ProtoMessage() {}
 
 func (x *UserReviewStatistics) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[25]
+	mi := &file_loci_review_review_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2207,7 +2553,7 @@ func (x *UserReviewStatistics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserReviewStatistics.ProtoReflect.Descriptor instead.
 func (*UserReviewStatistics) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{25}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *UserReviewStatistics) GetTotalReviews() int32 {
@@ -2256,7 +2602,7 @@ type LikeReviewRequest struct {
 
 func (x *LikeReviewRequest) Reset() {
 	*x = LikeReviewRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[26]
+	mi := &file_loci_review_review_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2268,7 +2614,7 @@ func (x *LikeReviewRequest) String() string {
 func (*LikeReviewRequest) ProtoMessage() {}
 
 func (x *LikeReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[26]
+	mi := &file_loci_review_review_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2281,7 +2627,7 @@ func (x *LikeReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LikeReviewRequest.ProtoReflect.Descriptor instead.
 func (*LikeReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{26}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *LikeReviewRequest) GetUserId() string {
@@ -2315,7 +2661,7 @@ type LikeReviewResponse struct {
 
 func (x *LikeReviewResponse) Reset() {
 	*x = LikeReviewResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[27]
+	mi := &file_loci_review_review_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2327,7 +2673,7 @@ func (x *LikeReviewResponse) String() string {
 func (*LikeReviewResponse) ProtoMessage() {}
 
 func (x *LikeReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[27]
+	mi := &file_loci_review_review_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2340,7 +2686,7 @@ func (x *LikeReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LikeReviewResponse.ProtoReflect.Descriptor instead.
 func (*LikeReviewResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{27}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *LikeReviewResponse) GetResponse() *common.Response {
@@ -2369,7 +2715,7 @@ type ReportReviewRequest struct {
 
 func (x *ReportReviewRequest) Reset() {
 	*x = ReportReviewRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[28]
+	mi := &file_loci_review_review_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2381,7 +2727,7 @@ func (x *ReportReviewRequest) String() string {
 func (*ReportReviewRequest) ProtoMessage() {}
 
 func (x *ReportReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[28]
+	mi := &file_loci_review_review_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2394,7 +2740,7 @@ func (x *ReportReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportReviewRequest.ProtoReflect.Descriptor instead.
 func (*ReportReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{28}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ReportReviewRequest) GetUserId() string {
@@ -2434,7 +2780,7 @@ type ReportReviewResponse struct {
 
 func (x *ReportReviewResponse) Reset() {
 	*x = ReportReviewResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[29]
+	mi := &file_loci_review_review_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2446,7 +2792,7 @@ func (x *ReportReviewResponse) String() string {
 func (*ReportReviewResponse) ProtoMessage() {}
 
 func (x *ReportReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[29]
+	mi := &file_loci_review_review_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2459,7 +2805,7 @@ func (x *ReportReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportReviewResponse.ProtoReflect.Descriptor instead.
 func (*ReportReviewResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{29}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ReportReviewResponse) GetResponse() *common.Response {
@@ -2480,7 +2826,7 @@ type GetReviewStatisticsRequest struct {
 
 func (x *GetReviewStatisticsRequest) Reset() {
 	*x = GetReviewStatisticsRequest{}
-	mi := &file_loci_review_review_proto_msgTypes[30]
+	mi := &file_loci_review_review_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2492,7 +2838,7 @@ func (x *GetReviewStatisticsRequest) String() string {
 func (*GetReviewStatisticsRequest) ProtoMessage() {}
 
 func (x *GetReviewStatisticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[30]
+	mi := &file_loci_review_review_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2505,7 +2851,7 @@ func (x *GetReviewStatisticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewStatisticsRequest.ProtoReflect.Descriptor instead.
 func (*GetReviewStatisticsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{30}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetReviewStatisticsRequest) GetPoiId() string {
@@ -2538,7 +2884,7 @@ type GetReviewStatisticsResponse struct {
 
 func (x *GetReviewStatisticsResponse) Reset() {
 	*x = GetReviewStatisticsResponse{}
-	mi := &file_loci_review_review_proto_msgTypes[31]
+	mi := &file_loci_review_review_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2550,7 +2896,7 @@ func (x *GetReviewStatisticsResponse) String() string {
 func (*GetReviewStatisticsResponse) ProtoMessage() {}
 
 func (x *GetReviewStatisticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_review_review_proto_msgTypes[31]
+	mi := &file_loci_review_review_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2563,7 +2909,7 @@ func (x *GetReviewStatisticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewStatisticsResponse.ProtoReflect.Descriptor instead.
 func (*GetReviewStatisticsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_review_review_proto_rawDescGZIP(), []int{31}
+	return file_loci_review_review_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetReviewStatisticsResponse) GetStatistics() *ReviewStatistics {
@@ -2577,7 +2923,7 @@ var File_loci_review_review_proto protoreflect.FileDescriptor
 
 const file_loci_review_review_proto_rawDesc = "" +
 	"\n" +
-	"\x18loci/review/review.proto\x12\vloci.review\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\x81\a\n" +
+	"\x18loci/review/review.proto\x12\vloci.review\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\x9b\b\n" +
 	"\x06Review\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12 \n" +
@@ -2606,7 +2952,11 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"2\x16^[a-z]{2}(-[A-Z]{2})?$R\blanguage\x124\n" +
 	"\aaspects\x18\x10 \x01(\v2\x1a.loci.review.ReviewAspectsR\aaspects\x125\n" +
 	"\breviewer\x18\x11 \x01(\v2\x19.loci.review.ReviewerInfoR\breviewer\x12J\n" +
-	"\x11business_response\x18\x12 \x01(\v2\x1d.loci.review.BusinessResponseR\x10businessResponse\"\x8f\x05\n" +
+	"\x11business_response\x18\x12 \x01(\v2\x1d.loci.review.BusinessResponseR\x10businessResponse\x12A\n" +
+	"\fcontent_type\x18\x13 \x01(\x0e2\x1e.loci.review.ReviewContentTypeR\vcontentType\x12(\n" +
+	"\n" +
+	"content_id\x18\x14 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tcontentId\x12+\n" +
+	"\fcontent_name\x18\x15 \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\vcontentName\"\x8f\x05\n" +
 	"\rReviewAspects\x12>\n" +
 	"\x0eservice_rating\x18\x01 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\rserviceRating\x12>\n" +
 	"\x0equality_rating\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\rqualityRating\x12:\n" +
@@ -2711,7 +3061,7 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\bkeywords\x18\a \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x14\"\x06r\x04\x10\x01\x18dR\bkeywords\x122\n" +
 	"\asort_by\x18\b \x01(\x0e2\x19.loci.review.ReviewSortByR\x06sortBy\x12A\n" +
-	"\x0esort_direction\x18\t \x01(\x0e2\x1a.loci.review.SortDirectionR\rsortDirection\"\xb9\x03\n" +
+	"\x0esort_direction\x18\t \x01(\x0e2\x1a.loci.review.SortDirectionR\rsortDirection\"\xd3\x04\n" +
 	"\x13CreateReviewRequest\x12\"\n" +
 	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12 \n" +
 	"\x06poi_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x05poiId\x12/\n" +
@@ -2728,7 +3078,12 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"visit_date\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tvisitDate\x124\n" +
 	"\aaspects\x18\b \x01(\v2\x1a.loci.review.ReviewAspectsR\aaspects\x12=\n" +
 	"\blanguage\x18\t \x01(\tB!\xbaH\x1er\x1c\x10\x02\x18\n" +
-	"2\x16^[a-z]{2}(-[A-Z]{2})?$R\blanguage\"v\n" +
+	"2\x16^[a-z]{2}(-[A-Z]{2})?$R\blanguage\x12A\n" +
+	"\fcontent_type\x18\n" +
+	" \x01(\x0e2\x1e.loci.review.ReviewContentTypeR\vcontentType\x12(\n" +
+	"\n" +
+	"content_id\x18\v \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tcontentId\x12+\n" +
+	"\fcontent_name\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\vcontentName\"v\n" +
 	"\x14CreateReviewResponse\x121\n" +
 	"\bresponse\x18\x01 \x01(\v2\x15.loci.common.ResponseR\bresponse\x12+\n" +
 	"\x06review\x18\x02 \x01(\v2\x13.loci.review.ReviewR\x06review\"\xab\x01\n" +
@@ -2739,6 +3094,32 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"pagination\x121\n" +
 	"\x06filter\x18\x03 \x01(\v2\x19.loci.review.ReviewFilterR\x06filter\"\xc6\x01\n" +
 	"\x15GetPOIReviewsResponse\x12-\n" +
+	"\areviews\x18\x01 \x03(\v2\x13.loci.review.ReviewR\areviews\x12?\n" +
+	"\n" +
+	"pagination\x18\x02 \x01(\v2\x1f.loci.common.PaginationMetadataR\n" +
+	"pagination\x12=\n" +
+	"\n" +
+	"statistics\x18\x03 \x01(\v2\x1d.loci.review.ReviewStatisticsR\n" +
+	"statistics\"\x8c\x01\n" +
+	"\x17GetRecentReviewsRequest\x12>\n" +
+	"\n" +
+	"pagination\x18\x01 \x01(\v2\x1e.loci.common.PaginationRequestR\n" +
+	"pagination\x121\n" +
+	"\x06filter\x18\x02 \x01(\v2\x19.loci.review.ReviewFilterR\x06filter\"\x8a\x01\n" +
+	"\x18GetRecentReviewsResponse\x12-\n" +
+	"\areviews\x18\x01 \x03(\v2\x13.loci.review.ReviewR\areviews\x12?\n" +
+	"\n" +
+	"pagination\x18\x02 \x01(\v2\x1f.loci.common.PaginationMetadataR\n" +
+	"pagination\"\x84\x02\n" +
+	"\x18GetContentReviewsRequest\x12K\n" +
+	"\fcontent_type\x18\x01 \x01(\x0e2\x1e.loci.review.ReviewContentTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontentType\x12(\n" +
+	"\n" +
+	"content_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tcontentId\x12>\n" +
+	"\n" +
+	"pagination\x18\x03 \x01(\v2\x1e.loci.common.PaginationRequestR\n" +
+	"pagination\x121\n" +
+	"\x06filter\x18\x04 \x01(\v2\x19.loci.review.ReviewFilterR\x06filter\"\xca\x01\n" +
+	"\x19GetContentReviewsResponse\x12-\n" +
 	"\areviews\x18\x01 \x03(\v2\x13.loci.review.ReviewR\areviews\x12?\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1f.loci.common.PaginationMetadataR\n" +
@@ -2820,7 +3201,15 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\x1bGetReviewStatisticsResponse\x12=\n" +
 	"\n" +
 	"statistics\x18\x01 \x01(\v2\x1d.loci.review.ReviewStatisticsR\n" +
-	"statistics*\xb5\x01\n" +
+	"statistics*\xfb\x01\n" +
+	"\x11ReviewContentType\x12#\n" +
+	"\x1fREVIEW_CONTENT_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17REVIEW_CONTENT_TYPE_POI\x10\x01\x12\x1d\n" +
+	"\x19REVIEW_CONTENT_TYPE_HOTEL\x10\x02\x12\"\n" +
+	"\x1eREVIEW_CONTENT_TYPE_RESTAURANT\x10\x03\x12 \n" +
+	"\x1cREVIEW_CONTENT_TYPE_ACTIVITY\x10\x04\x12!\n" +
+	"\x1dREVIEW_CONTENT_TYPE_ITINERARY\x10\x05\x12\x1c\n" +
+	"\x18REVIEW_CONTENT_TYPE_LIST\x10\x06*\xb5\x01\n" +
 	"\fReviewStatus\x12\x1d\n" +
 	"\x19REVIEW_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15REVIEW_STATUS_PENDING\x10\x01\x12\x1b\n" +
@@ -2837,10 +3226,11 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\x13REVIEW_SORT_BY_DATE\x10\x01\x12\x19\n" +
 	"\x15REVIEW_SORT_BY_RATING\x10\x02\x12\x1a\n" +
 	"\x16REVIEW_SORT_BY_HELPFUL\x10\x03\x12\x1c\n" +
-	"\x18REVIEW_SORT_BY_RELEVANCE\x10\x042\x9b\x06\n" +
+	"\x18REVIEW_SORT_BY_RELEVANCE\x10\x042\xe0\a\n" +
 	"\rReviewService\x12S\n" +
 	"\fCreateReview\x12 .loci.review.CreateReviewRequest\x1a!.loci.review.CreateReviewResponse\x12V\n" +
-	"\rGetPOIReviews\x12!.loci.review.GetPOIReviewsRequest\x1a\".loci.review.GetPOIReviewsResponse\x12J\n" +
+	"\rGetPOIReviews\x12!.loci.review.GetPOIReviewsRequest\x1a\".loci.review.GetPOIReviewsResponse\x12b\n" +
+	"\x11GetContentReviews\x12%.loci.review.GetContentReviewsRequest\x1a&.loci.review.GetContentReviewsResponse\x12J\n" +
 	"\tGetReview\x12\x1d.loci.review.GetReviewRequest\x1a\x1e.loci.review.GetReviewResponse\x12S\n" +
 	"\fUpdateReview\x12 .loci.review.UpdateReviewRequest\x1a!.loci.review.UpdateReviewResponse\x12S\n" +
 	"\fDeleteReview\x12 .loci.review.DeleteReviewRequest\x1a!.loci.review.DeleteReviewResponse\x12Y\n" +
@@ -2848,7 +3238,8 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\n" +
 	"LikeReview\x12\x1e.loci.review.LikeReviewRequest\x1a\x1f.loci.review.LikeReviewResponse\x12S\n" +
 	"\fReportReview\x12 .loci.review.ReportReviewRequest\x1a!.loci.review.ReportReviewResponse\x12h\n" +
-	"\x13GetReviewStatistics\x12'.loci.review.GetReviewStatisticsRequest\x1a(.loci.review.GetReviewStatisticsResponseBFZDgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/review;reviewv1b\x06proto3"
+	"\x13GetReviewStatistics\x12'.loci.review.GetReviewStatisticsRequest\x1a(.loci.review.GetReviewStatisticsResponse\x12_\n" +
+	"\x10GetRecentReviews\x12$.loci.review.GetRecentReviewsRequest\x1a%.loci.review.GetRecentReviewsResponseBFZDgithub.com/FACorreiaa/loci-connect-proto/gen/go/loci/review;reviewv1b\x06proto3"
 
 var (
 	file_loci_review_review_proto_rawDescOnce sync.Once
@@ -2862,117 +3253,138 @@ func file_loci_review_review_proto_rawDescGZIP() []byte {
 	return file_loci_review_review_proto_rawDescData
 }
 
-var file_loci_review_review_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_loci_review_review_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_loci_review_review_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_loci_review_review_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_loci_review_review_proto_goTypes = []any{
-	(ReviewStatus)(0),                   // 0: loci.review.ReviewStatus
-	(SortDirection)(0),                  // 1: loci.review.SortDirection
-	(ReviewSortBy)(0),                   // 2: loci.review.ReviewSortBy
-	(*Review)(nil),                      // 3: loci.review.Review
-	(*ReviewAspects)(nil),               // 4: loci.review.ReviewAspects
-	(*ReviewerInfo)(nil),                // 5: loci.review.ReviewerInfo
-	(*BusinessResponse)(nil),            // 6: loci.review.BusinessResponse
-	(*ReviewStatistics)(nil),            // 7: loci.review.ReviewStatistics
-	(*RatingBreakdown)(nil),             // 8: loci.review.RatingBreakdown
-	(*ReviewAspectAverages)(nil),        // 9: loci.review.ReviewAspectAverages
-	(*RecentReviewTrends)(nil),          // 10: loci.review.RecentReviewTrends
-	(*MonthlyReviewData)(nil),           // 11: loci.review.MonthlyReviewData
-	(*ReviewTag)(nil),                   // 12: loci.review.ReviewTag
-	(*LanguageDistribution)(nil),        // 13: loci.review.LanguageDistribution
-	(*LanguageCount)(nil),               // 14: loci.review.LanguageCount
-	(*ReviewFilter)(nil),                // 15: loci.review.ReviewFilter
-	(*CreateReviewRequest)(nil),         // 16: loci.review.CreateReviewRequest
-	(*CreateReviewResponse)(nil),        // 17: loci.review.CreateReviewResponse
-	(*GetPOIReviewsRequest)(nil),        // 18: loci.review.GetPOIReviewsRequest
-	(*GetPOIReviewsResponse)(nil),       // 19: loci.review.GetPOIReviewsResponse
-	(*GetReviewRequest)(nil),            // 20: loci.review.GetReviewRequest
-	(*GetReviewResponse)(nil),           // 21: loci.review.GetReviewResponse
-	(*UpdateReviewRequest)(nil),         // 22: loci.review.UpdateReviewRequest
-	(*UpdateReviewResponse)(nil),        // 23: loci.review.UpdateReviewResponse
-	(*DeleteReviewRequest)(nil),         // 24: loci.review.DeleteReviewRequest
-	(*DeleteReviewResponse)(nil),        // 25: loci.review.DeleteReviewResponse
-	(*GetUserReviewsRequest)(nil),       // 26: loci.review.GetUserReviewsRequest
-	(*GetUserReviewsResponse)(nil),      // 27: loci.review.GetUserReviewsResponse
-	(*UserReviewStatistics)(nil),        // 28: loci.review.UserReviewStatistics
-	(*LikeReviewRequest)(nil),           // 29: loci.review.LikeReviewRequest
-	(*LikeReviewResponse)(nil),          // 30: loci.review.LikeReviewResponse
-	(*ReportReviewRequest)(nil),         // 31: loci.review.ReportReviewRequest
-	(*ReportReviewResponse)(nil),        // 32: loci.review.ReportReviewResponse
-	(*GetReviewStatisticsRequest)(nil),  // 33: loci.review.GetReviewStatisticsRequest
-	(*GetReviewStatisticsResponse)(nil), // 34: loci.review.GetReviewStatisticsResponse
-	(*timestamppb.Timestamp)(nil),       // 35: google.protobuf.Timestamp
-	(*common.Response)(nil),             // 36: loci.common.Response
-	(*common.PaginationRequest)(nil),    // 37: loci.common.PaginationRequest
-	(*common.PaginationMetadata)(nil),   // 38: loci.common.PaginationMetadata
+	(ReviewContentType)(0),              // 0: loci.review.ReviewContentType
+	(ReviewStatus)(0),                   // 1: loci.review.ReviewStatus
+	(SortDirection)(0),                  // 2: loci.review.SortDirection
+	(ReviewSortBy)(0),                   // 3: loci.review.ReviewSortBy
+	(*Review)(nil),                      // 4: loci.review.Review
+	(*ReviewAspects)(nil),               // 5: loci.review.ReviewAspects
+	(*ReviewerInfo)(nil),                // 6: loci.review.ReviewerInfo
+	(*BusinessResponse)(nil),            // 7: loci.review.BusinessResponse
+	(*ReviewStatistics)(nil),            // 8: loci.review.ReviewStatistics
+	(*RatingBreakdown)(nil),             // 9: loci.review.RatingBreakdown
+	(*ReviewAspectAverages)(nil),        // 10: loci.review.ReviewAspectAverages
+	(*RecentReviewTrends)(nil),          // 11: loci.review.RecentReviewTrends
+	(*MonthlyReviewData)(nil),           // 12: loci.review.MonthlyReviewData
+	(*ReviewTag)(nil),                   // 13: loci.review.ReviewTag
+	(*LanguageDistribution)(nil),        // 14: loci.review.LanguageDistribution
+	(*LanguageCount)(nil),               // 15: loci.review.LanguageCount
+	(*ReviewFilter)(nil),                // 16: loci.review.ReviewFilter
+	(*CreateReviewRequest)(nil),         // 17: loci.review.CreateReviewRequest
+	(*CreateReviewResponse)(nil),        // 18: loci.review.CreateReviewResponse
+	(*GetPOIReviewsRequest)(nil),        // 19: loci.review.GetPOIReviewsRequest
+	(*GetPOIReviewsResponse)(nil),       // 20: loci.review.GetPOIReviewsResponse
+	(*GetRecentReviewsRequest)(nil),     // 21: loci.review.GetRecentReviewsRequest
+	(*GetRecentReviewsResponse)(nil),    // 22: loci.review.GetRecentReviewsResponse
+	(*GetContentReviewsRequest)(nil),    // 23: loci.review.GetContentReviewsRequest
+	(*GetContentReviewsResponse)(nil),   // 24: loci.review.GetContentReviewsResponse
+	(*GetReviewRequest)(nil),            // 25: loci.review.GetReviewRequest
+	(*GetReviewResponse)(nil),           // 26: loci.review.GetReviewResponse
+	(*UpdateReviewRequest)(nil),         // 27: loci.review.UpdateReviewRequest
+	(*UpdateReviewResponse)(nil),        // 28: loci.review.UpdateReviewResponse
+	(*DeleteReviewRequest)(nil),         // 29: loci.review.DeleteReviewRequest
+	(*DeleteReviewResponse)(nil),        // 30: loci.review.DeleteReviewResponse
+	(*GetUserReviewsRequest)(nil),       // 31: loci.review.GetUserReviewsRequest
+	(*GetUserReviewsResponse)(nil),      // 32: loci.review.GetUserReviewsResponse
+	(*UserReviewStatistics)(nil),        // 33: loci.review.UserReviewStatistics
+	(*LikeReviewRequest)(nil),           // 34: loci.review.LikeReviewRequest
+	(*LikeReviewResponse)(nil),          // 35: loci.review.LikeReviewResponse
+	(*ReportReviewRequest)(nil),         // 36: loci.review.ReportReviewRequest
+	(*ReportReviewResponse)(nil),        // 37: loci.review.ReportReviewResponse
+	(*GetReviewStatisticsRequest)(nil),  // 38: loci.review.GetReviewStatisticsRequest
+	(*GetReviewStatisticsResponse)(nil), // 39: loci.review.GetReviewStatisticsResponse
+	(*timestamppb.Timestamp)(nil),       // 40: google.protobuf.Timestamp
+	(*common.Response)(nil),             // 41: loci.common.Response
+	(*common.PaginationRequest)(nil),    // 42: loci.common.PaginationRequest
+	(*common.PaginationMetadata)(nil),   // 43: loci.common.PaginationMetadata
 }
 var file_loci_review_review_proto_depIdxs = []int32{
-	0,  // 0: loci.review.Review.status:type_name -> loci.review.ReviewStatus
-	35, // 1: loci.review.Review.visit_date:type_name -> google.protobuf.Timestamp
-	35, // 2: loci.review.Review.created_at:type_name -> google.protobuf.Timestamp
-	35, // 3: loci.review.Review.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 4: loci.review.Review.aspects:type_name -> loci.review.ReviewAspects
-	5,  // 5: loci.review.Review.reviewer:type_name -> loci.review.ReviewerInfo
-	6,  // 6: loci.review.Review.business_response:type_name -> loci.review.BusinessResponse
-	35, // 7: loci.review.ReviewerInfo.member_since:type_name -> google.protobuf.Timestamp
-	35, // 8: loci.review.BusinessResponse.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 9: loci.review.ReviewStatistics.rating_breakdown:type_name -> loci.review.RatingBreakdown
-	9,  // 10: loci.review.ReviewStatistics.aspect_averages:type_name -> loci.review.ReviewAspectAverages
-	10, // 11: loci.review.ReviewStatistics.trends:type_name -> loci.review.RecentReviewTrends
-	12, // 12: loci.review.ReviewStatistics.tags:type_name -> loci.review.ReviewTag
-	13, // 13: loci.review.ReviewStatistics.language_distribution:type_name -> loci.review.LanguageDistribution
-	35, // 14: loci.review.ReviewStatistics.last_updated:type_name -> google.protobuf.Timestamp
-	11, // 15: loci.review.RecentReviewTrends.monthly_data:type_name -> loci.review.MonthlyReviewData
-	14, // 16: loci.review.LanguageDistribution.languages:type_name -> loci.review.LanguageCount
-	35, // 17: loci.review.ReviewFilter.start_date:type_name -> google.protobuf.Timestamp
-	35, // 18: loci.review.ReviewFilter.end_date:type_name -> google.protobuf.Timestamp
-	2,  // 19: loci.review.ReviewFilter.sort_by:type_name -> loci.review.ReviewSortBy
-	1,  // 20: loci.review.ReviewFilter.sort_direction:type_name -> loci.review.SortDirection
-	35, // 21: loci.review.CreateReviewRequest.visit_date:type_name -> google.protobuf.Timestamp
-	4,  // 22: loci.review.CreateReviewRequest.aspects:type_name -> loci.review.ReviewAspects
-	36, // 23: loci.review.CreateReviewResponse.response:type_name -> loci.common.Response
-	3,  // 24: loci.review.CreateReviewResponse.review:type_name -> loci.review.Review
-	37, // 25: loci.review.GetPOIReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
-	15, // 26: loci.review.GetPOIReviewsRequest.filter:type_name -> loci.review.ReviewFilter
-	3,  // 27: loci.review.GetPOIReviewsResponse.reviews:type_name -> loci.review.Review
-	38, // 28: loci.review.GetPOIReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	7,  // 29: loci.review.GetPOIReviewsResponse.statistics:type_name -> loci.review.ReviewStatistics
-	3,  // 30: loci.review.GetReviewResponse.review:type_name -> loci.review.Review
-	35, // 31: loci.review.UpdateReviewRequest.visit_date:type_name -> google.protobuf.Timestamp
-	4,  // 32: loci.review.UpdateReviewRequest.aspects:type_name -> loci.review.ReviewAspects
-	36, // 33: loci.review.UpdateReviewResponse.response:type_name -> loci.common.Response
-	3,  // 34: loci.review.UpdateReviewResponse.review:type_name -> loci.review.Review
-	36, // 35: loci.review.DeleteReviewResponse.response:type_name -> loci.common.Response
-	37, // 36: loci.review.GetUserReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
-	15, // 37: loci.review.GetUserReviewsRequest.filter:type_name -> loci.review.ReviewFilter
-	3,  // 38: loci.review.GetUserReviewsResponse.reviews:type_name -> loci.review.Review
-	38, // 39: loci.review.GetUserReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	28, // 40: loci.review.GetUserReviewsResponse.statistics:type_name -> loci.review.UserReviewStatistics
-	36, // 41: loci.review.LikeReviewResponse.response:type_name -> loci.common.Response
-	36, // 42: loci.review.ReportReviewResponse.response:type_name -> loci.common.Response
-	7,  // 43: loci.review.GetReviewStatisticsResponse.statistics:type_name -> loci.review.ReviewStatistics
-	16, // 44: loci.review.ReviewService.CreateReview:input_type -> loci.review.CreateReviewRequest
-	18, // 45: loci.review.ReviewService.GetPOIReviews:input_type -> loci.review.GetPOIReviewsRequest
-	20, // 46: loci.review.ReviewService.GetReview:input_type -> loci.review.GetReviewRequest
-	22, // 47: loci.review.ReviewService.UpdateReview:input_type -> loci.review.UpdateReviewRequest
-	24, // 48: loci.review.ReviewService.DeleteReview:input_type -> loci.review.DeleteReviewRequest
-	26, // 49: loci.review.ReviewService.GetUserReviews:input_type -> loci.review.GetUserReviewsRequest
-	29, // 50: loci.review.ReviewService.LikeReview:input_type -> loci.review.LikeReviewRequest
-	31, // 51: loci.review.ReviewService.ReportReview:input_type -> loci.review.ReportReviewRequest
-	33, // 52: loci.review.ReviewService.GetReviewStatistics:input_type -> loci.review.GetReviewStatisticsRequest
-	17, // 53: loci.review.ReviewService.CreateReview:output_type -> loci.review.CreateReviewResponse
-	19, // 54: loci.review.ReviewService.GetPOIReviews:output_type -> loci.review.GetPOIReviewsResponse
-	21, // 55: loci.review.ReviewService.GetReview:output_type -> loci.review.GetReviewResponse
-	23, // 56: loci.review.ReviewService.UpdateReview:output_type -> loci.review.UpdateReviewResponse
-	25, // 57: loci.review.ReviewService.DeleteReview:output_type -> loci.review.DeleteReviewResponse
-	27, // 58: loci.review.ReviewService.GetUserReviews:output_type -> loci.review.GetUserReviewsResponse
-	30, // 59: loci.review.ReviewService.LikeReview:output_type -> loci.review.LikeReviewResponse
-	32, // 60: loci.review.ReviewService.ReportReview:output_type -> loci.review.ReportReviewResponse
-	34, // 61: loci.review.ReviewService.GetReviewStatistics:output_type -> loci.review.GetReviewStatisticsResponse
-	53, // [53:62] is the sub-list for method output_type
-	44, // [44:53] is the sub-list for method input_type
-	44, // [44:44] is the sub-list for extension type_name
-	44, // [44:44] is the sub-list for extension extendee
-	0,  // [0:44] is the sub-list for field type_name
+	1,  // 0: loci.review.Review.status:type_name -> loci.review.ReviewStatus
+	40, // 1: loci.review.Review.visit_date:type_name -> google.protobuf.Timestamp
+	40, // 2: loci.review.Review.created_at:type_name -> google.protobuf.Timestamp
+	40, // 3: loci.review.Review.updated_at:type_name -> google.protobuf.Timestamp
+	5,  // 4: loci.review.Review.aspects:type_name -> loci.review.ReviewAspects
+	6,  // 5: loci.review.Review.reviewer:type_name -> loci.review.ReviewerInfo
+	7,  // 6: loci.review.Review.business_response:type_name -> loci.review.BusinessResponse
+	0,  // 7: loci.review.Review.content_type:type_name -> loci.review.ReviewContentType
+	40, // 8: loci.review.ReviewerInfo.member_since:type_name -> google.protobuf.Timestamp
+	40, // 9: loci.review.BusinessResponse.created_at:type_name -> google.protobuf.Timestamp
+	9,  // 10: loci.review.ReviewStatistics.rating_breakdown:type_name -> loci.review.RatingBreakdown
+	10, // 11: loci.review.ReviewStatistics.aspect_averages:type_name -> loci.review.ReviewAspectAverages
+	11, // 12: loci.review.ReviewStatistics.trends:type_name -> loci.review.RecentReviewTrends
+	13, // 13: loci.review.ReviewStatistics.tags:type_name -> loci.review.ReviewTag
+	14, // 14: loci.review.ReviewStatistics.language_distribution:type_name -> loci.review.LanguageDistribution
+	40, // 15: loci.review.ReviewStatistics.last_updated:type_name -> google.protobuf.Timestamp
+	12, // 16: loci.review.RecentReviewTrends.monthly_data:type_name -> loci.review.MonthlyReviewData
+	15, // 17: loci.review.LanguageDistribution.languages:type_name -> loci.review.LanguageCount
+	40, // 18: loci.review.ReviewFilter.start_date:type_name -> google.protobuf.Timestamp
+	40, // 19: loci.review.ReviewFilter.end_date:type_name -> google.protobuf.Timestamp
+	3,  // 20: loci.review.ReviewFilter.sort_by:type_name -> loci.review.ReviewSortBy
+	2,  // 21: loci.review.ReviewFilter.sort_direction:type_name -> loci.review.SortDirection
+	40, // 22: loci.review.CreateReviewRequest.visit_date:type_name -> google.protobuf.Timestamp
+	5,  // 23: loci.review.CreateReviewRequest.aspects:type_name -> loci.review.ReviewAspects
+	0,  // 24: loci.review.CreateReviewRequest.content_type:type_name -> loci.review.ReviewContentType
+	41, // 25: loci.review.CreateReviewResponse.response:type_name -> loci.common.Response
+	4,  // 26: loci.review.CreateReviewResponse.review:type_name -> loci.review.Review
+	42, // 27: loci.review.GetPOIReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
+	16, // 28: loci.review.GetPOIReviewsRequest.filter:type_name -> loci.review.ReviewFilter
+	4,  // 29: loci.review.GetPOIReviewsResponse.reviews:type_name -> loci.review.Review
+	43, // 30: loci.review.GetPOIReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	8,  // 31: loci.review.GetPOIReviewsResponse.statistics:type_name -> loci.review.ReviewStatistics
+	42, // 32: loci.review.GetRecentReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
+	16, // 33: loci.review.GetRecentReviewsRequest.filter:type_name -> loci.review.ReviewFilter
+	4,  // 34: loci.review.GetRecentReviewsResponse.reviews:type_name -> loci.review.Review
+	43, // 35: loci.review.GetRecentReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	0,  // 36: loci.review.GetContentReviewsRequest.content_type:type_name -> loci.review.ReviewContentType
+	42, // 37: loci.review.GetContentReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
+	16, // 38: loci.review.GetContentReviewsRequest.filter:type_name -> loci.review.ReviewFilter
+	4,  // 39: loci.review.GetContentReviewsResponse.reviews:type_name -> loci.review.Review
+	43, // 40: loci.review.GetContentReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	8,  // 41: loci.review.GetContentReviewsResponse.statistics:type_name -> loci.review.ReviewStatistics
+	4,  // 42: loci.review.GetReviewResponse.review:type_name -> loci.review.Review
+	40, // 43: loci.review.UpdateReviewRequest.visit_date:type_name -> google.protobuf.Timestamp
+	5,  // 44: loci.review.UpdateReviewRequest.aspects:type_name -> loci.review.ReviewAspects
+	41, // 45: loci.review.UpdateReviewResponse.response:type_name -> loci.common.Response
+	4,  // 46: loci.review.UpdateReviewResponse.review:type_name -> loci.review.Review
+	41, // 47: loci.review.DeleteReviewResponse.response:type_name -> loci.common.Response
+	42, // 48: loci.review.GetUserReviewsRequest.pagination:type_name -> loci.common.PaginationRequest
+	16, // 49: loci.review.GetUserReviewsRequest.filter:type_name -> loci.review.ReviewFilter
+	4,  // 50: loci.review.GetUserReviewsResponse.reviews:type_name -> loci.review.Review
+	43, // 51: loci.review.GetUserReviewsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	33, // 52: loci.review.GetUserReviewsResponse.statistics:type_name -> loci.review.UserReviewStatistics
+	41, // 53: loci.review.LikeReviewResponse.response:type_name -> loci.common.Response
+	41, // 54: loci.review.ReportReviewResponse.response:type_name -> loci.common.Response
+	8,  // 55: loci.review.GetReviewStatisticsResponse.statistics:type_name -> loci.review.ReviewStatistics
+	17, // 56: loci.review.ReviewService.CreateReview:input_type -> loci.review.CreateReviewRequest
+	19, // 57: loci.review.ReviewService.GetPOIReviews:input_type -> loci.review.GetPOIReviewsRequest
+	23, // 58: loci.review.ReviewService.GetContentReviews:input_type -> loci.review.GetContentReviewsRequest
+	25, // 59: loci.review.ReviewService.GetReview:input_type -> loci.review.GetReviewRequest
+	27, // 60: loci.review.ReviewService.UpdateReview:input_type -> loci.review.UpdateReviewRequest
+	29, // 61: loci.review.ReviewService.DeleteReview:input_type -> loci.review.DeleteReviewRequest
+	31, // 62: loci.review.ReviewService.GetUserReviews:input_type -> loci.review.GetUserReviewsRequest
+	34, // 63: loci.review.ReviewService.LikeReview:input_type -> loci.review.LikeReviewRequest
+	36, // 64: loci.review.ReviewService.ReportReview:input_type -> loci.review.ReportReviewRequest
+	38, // 65: loci.review.ReviewService.GetReviewStatistics:input_type -> loci.review.GetReviewStatisticsRequest
+	21, // 66: loci.review.ReviewService.GetRecentReviews:input_type -> loci.review.GetRecentReviewsRequest
+	18, // 67: loci.review.ReviewService.CreateReview:output_type -> loci.review.CreateReviewResponse
+	20, // 68: loci.review.ReviewService.GetPOIReviews:output_type -> loci.review.GetPOIReviewsResponse
+	24, // 69: loci.review.ReviewService.GetContentReviews:output_type -> loci.review.GetContentReviewsResponse
+	26, // 70: loci.review.ReviewService.GetReview:output_type -> loci.review.GetReviewResponse
+	28, // 71: loci.review.ReviewService.UpdateReview:output_type -> loci.review.UpdateReviewResponse
+	30, // 72: loci.review.ReviewService.DeleteReview:output_type -> loci.review.DeleteReviewResponse
+	32, // 73: loci.review.ReviewService.GetUserReviews:output_type -> loci.review.GetUserReviewsResponse
+	35, // 74: loci.review.ReviewService.LikeReview:output_type -> loci.review.LikeReviewResponse
+	37, // 75: loci.review.ReviewService.ReportReview:output_type -> loci.review.ReportReviewResponse
+	39, // 76: loci.review.ReviewService.GetReviewStatistics:output_type -> loci.review.GetReviewStatisticsResponse
+	22, // 77: loci.review.ReviewService.GetRecentReviews:output_type -> loci.review.GetRecentReviewsResponse
+	67, // [67:78] is the sub-list for method output_type
+	56, // [56:67] is the sub-list for method input_type
+	56, // [56:56] is the sub-list for extension type_name
+	56, // [56:56] is the sub-list for extension extendee
+	0,  // [0:56] is the sub-list for field type_name
 }
 
 func init() { file_loci_review_review_proto_init() }
@@ -2985,8 +3397,8 @@ func file_loci_review_review_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_review_review_proto_rawDesc), len(file_loci_review_review_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   32,
+			NumEnums:      4,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

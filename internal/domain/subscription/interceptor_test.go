@@ -10,32 +10,35 @@ import (
 	"github.com/google/uuid"
 )
 
-// stubService lets interceptor tests drive checkLimit outcomes directly.
+// stubService lets interceptor tests drive consumeQuota outcomes directly.
 type stubService struct {
-	checkErr  error
-	recordErr error
+	consumeErr error
 }
 
-func (s *stubService) CheckRateLimit(_ context.Context, _ uuid.UUID, _ string) error {
-	return s.checkErr
+func (s *stubService) ConsumeQuota(_ context.Context, _ uuid.UUID, _ string) error {
+	return s.consumeErr
 }
 
-func (s *stubService) RecordUsage(_ context.Context, _ uuid.UUID) error {
-	return s.recordErr
+func (s *stubService) InvalidatePlan(_ uuid.UUID) {}
+
+func (s *stubService) EffectivePlan(_ context.Context, _ uuid.UUID) (string, error) {
+	return PlanFree, nil
 }
 
-func TestIsChatProcedure(t *testing.T) {
+func TestIsMeteredProcedure(t *testing.T) {
 	cases := map[string]bool{
 		"/loci.chat.ChatService/StartChat":               true,
 		"/loci.chat.ChatService/ContinueChat":            true,
-		"/loci.chat.ChatService/ContinueSessionStreamed": true,
+		"/loci.chat.ChatService/StreamChat":              true,
+		"/loci.chat.ChatService/GetChatSession":          false,
+		"/loci.chat.ChatService/ContinueSessionStreamed": false, // no such RPC in the proto
 		"/loci.user.UserService/GetUser":                 false,
-		"/loci.poi.POIService/SavePoi":                   false,
+		"/loci.poi.POIService/SearchPOI":                 false,
 		"":                                               false,
 	}
 	for proc, want := range cases {
-		if got := isChatProcedure(proc); got != want {
-			t.Errorf("isChatProcedure(%q) = %v, want %v", proc, got, want)
+		if got := isMeteredProcedure(proc); got != want {
+			t.Errorf("isMeteredProcedure(%q) = %v, want %v", proc, got, want)
 		}
 	}
 }
@@ -77,36 +80,65 @@ func TestExtractEmail(t *testing.T) {
 	}
 }
 
-func TestCheckLimit_Unauthenticated(t *testing.T) {
+func TestConsumeQuota_Unauthenticated(t *testing.T) {
 	i := NewRateLimitInterceptor(&stubService{})
-	err := i.checkLimit(context.Background())
+	err := i.consumeQuota(context.Background())
 	if connect.CodeOf(err) != connect.CodeUnauthenticated {
 		t.Fatalf("expected Unauthenticated, got %v (%v)", connect.CodeOf(err), err)
 	}
 }
 
-func TestCheckLimit_QuotaExceededMapsToResourceExhausted(t *testing.T) {
+func TestConsumeQuota_FreeDenialMapsToResourceExhaustedWithReason(t *testing.T) {
 	ctx, _ := ctxWithUser(t, "user@example.com")
-	i := NewRateLimitInterceptor(&stubService{checkErr: ErrQuotaExceeded})
-	err := i.checkLimit(ctx)
+	i := NewRateLimitInterceptor(&stubService{
+		consumeErr: &QuotaExceededError{Plan: PlanFree, Limit: 10},
+	})
+
+	err := i.consumeQuota(ctx)
 	if connect.CodeOf(err) != connect.CodeResourceExhausted {
 		t.Fatalf("expected ResourceExhausted, got %v (%v)", connect.CodeOf(err), err)
 	}
+	var cerr *connect.Error
+	if !errors.As(err, &cerr) {
+		t.Fatalf("expected *connect.Error, got %T", err)
+	}
+	if got := cerr.Meta().Get(QuotaReasonHeader); got != QuotaReasonFreeDaily {
+		t.Fatalf("quota reason = %q, want %q", got, QuotaReasonFreeDaily)
+	}
 }
 
-func TestCheckLimit_OtherErrorMapsToInternal(t *testing.T) {
+func TestConsumeQuota_ProDenialCarriesFairUseReason(t *testing.T) {
 	ctx, _ := ctxWithUser(t, "user@example.com")
-	i := NewRateLimitInterceptor(&stubService{checkErr: errors.New("boom")})
-	err := i.checkLimit(ctx)
+	i := NewRateLimitInterceptor(&stubService{
+		consumeErr: &QuotaExceededError{Plan: PlanPremiumMonthly, Limit: 300},
+	})
+
+	err := i.consumeQuota(ctx)
+	if connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("expected ResourceExhausted, got %v (%v)", connect.CodeOf(err), err)
+	}
+	var cerr *connect.Error
+	if !errors.As(err, &cerr) {
+		t.Fatalf("expected *connect.Error, got %T", err)
+	}
+	if got := cerr.Meta().Get(QuotaReasonHeader); got != QuotaReasonFairUse {
+		t.Fatalf("quota reason = %q, want %q", got, QuotaReasonFairUse)
+	}
+}
+
+func TestConsumeQuota_OtherErrorMapsToInternal(t *testing.T) {
+	ctx, _ := ctxWithUser(t, "user@example.com")
+	i := NewRateLimitInterceptor(&stubService{consumeErr: errors.New("boom")})
+	err := i.consumeQuota(ctx)
 	if connect.CodeOf(err) != connect.CodeInternal {
 		t.Fatalf("expected Internal, got %v (%v)", connect.CodeOf(err), err)
 	}
 }
 
-func TestCheckLimit_Pass(t *testing.T) {
+func TestConsumeQuota_Pass(t *testing.T) {
 	ctx, _ := ctxWithUser(t, "user@example.com")
 	i := NewRateLimitInterceptor(&stubService{})
-	if err := i.checkLimit(ctx); err != nil {
-		t.Fatalf("checkLimit should pass, got %v", err)
+	if err := i.consumeQuota(ctx); err != nil {
+		t.Fatalf("consumeQuota should pass, got %v", err)
 	}
 }

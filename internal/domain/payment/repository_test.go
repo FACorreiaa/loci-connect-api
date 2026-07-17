@@ -91,8 +91,10 @@ func TestGetUserPayments_Pagination(t *testing.T) {
 	userID := insertUser(t, pool)
 
 	for i := 0; i < 3; i++ {
-		p := &Payment{UserID: userID, Provider: "stripe", Type: "one_time",
-			Amount: int64(100 * (i + 1)), Currency: "usd", Status: "succeeded"}
+		p := &Payment{
+			UserID: userID, Provider: "stripe", Type: "one_time",
+			Amount: int64(100 * (i + 1)), Currency: "usd", Status: "succeeded",
+		}
 		require.NoError(t, repo.CreatePayment(ctx, p))
 	}
 
@@ -170,4 +172,67 @@ func TestUpsertSubscription_InsertThenUpdate(t *testing.T) {
 	assert.Equal(t, "premium_monthly", got.Plan, "upsert should update plan in place")
 	require.NotNil(t, got.ExternalSubscriptionID)
 	assert.Equal(t, "sub_upgraded", *got.ExternalSubscriptionID)
+}
+
+func TestUpsertSubscription_CustomerIDRoundTripAndSticky(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+
+	sub := &Subscription{
+		UserID:                 userID,
+		Plan:                   "premium_monthly",
+		Status:                 "active",
+		StartDate:              time.Now(),
+		ExternalProvider:       "stripe",
+		ExternalSubscriptionID: strptr("sub_1"),
+		ExternalCustomerID:     strptr("cus_abc"),
+	}
+	require.NoError(t, repo.UpsertSubscription(ctx, sub))
+
+	got, err := repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	require.NotNil(t, got.ExternalCustomerID)
+	assert.Equal(t, "cus_abc", *got.ExternalCustomerID)
+
+	// A later event without a customer must not unlink the stored customer.
+	sub2 := &Subscription{
+		UserID:                 userID,
+		Plan:                   "premium_monthly",
+		Status:                 "canceled",
+		StartDate:              time.Now(),
+		ExternalProvider:       "stripe",
+		ExternalSubscriptionID: strptr("sub_1"),
+	}
+	require.NoError(t, repo.UpsertSubscription(ctx, sub2))
+
+	got, err = repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	require.NotNil(t, got.ExternalCustomerID, "customer link must survive metadata-less events")
+	assert.Equal(t, "cus_abc", *got.ExternalCustomerID)
+	assert.Equal(t, "canceled", got.Status)
+}
+
+func TestSetStripeCustomerID_CreatesRowAndResolvesUser(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+
+	// No subscription row yet: linker must create a free/active one.
+	require.NoError(t, repo.SetStripeCustomerID(ctx, userID, "cus_link"))
+
+	got, err := repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "free", got.Plan)
+	require.NotNil(t, got.ExternalCustomerID)
+	assert.Equal(t, "cus_link", *got.ExternalCustomerID)
+
+	resolved, err := repo.GetUserIDByStripeCustomerID(ctx, "cus_link")
+	require.NoError(t, err)
+	assert.Equal(t, userID, resolved)
+
+	unknown, err := repo.GetUserIDByStripeCustomerID(ctx, "cus_missing")
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Nil, unknown)
 }

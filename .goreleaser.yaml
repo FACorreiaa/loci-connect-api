@@ -1,0 +1,56 @@
+# GoReleaser config for the loci-mcp stdio proxy binary.
+# Released independently of the API server via mcp-v* tags (see
+# .github/workflows/release-mcp.yml), so it never collides with the
+# v*.*.* API deploy pipeline.
+version: 2
+
+project_name: loci-mcp
+
+builds:
+  - id: loci-mcp
+    main: ./cmd/loci-mcp
+    binary: loci-mcp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: loci-mcp
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "loci-mcp_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: FACorreiaa
+    name: loci-connect-api
+  name_template: "loci-mcp {{ .Version }}"
+  header: |
+    ## loci-mcp {{ .Version }}
+
+    Local stdio proxy for Loci's hosted MCP endpoint. Set `LOCI_API_KEY`
+    (create one in Loci → Settings → API Keys) and run `loci-mcp`.
+
+changelog:
+  use: github
+  filters:
+    # Only surface changes that touch the MCP proxy.
+    include:
+      - "^feat(mcp)"
+      - "^fix(mcp)"

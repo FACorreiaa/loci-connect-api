@@ -55,12 +55,18 @@ const (
 	// ItineraryServiceGetUserItinerariesProcedure is the fully-qualified name of the ItineraryService's
 	// GetUserItineraries RPC.
 	ItineraryServiceGetUserItinerariesProcedure = "/loci.itinerary.ItineraryService/GetUserItineraries"
+	// ItineraryServiceGetItineraryProcedure is the fully-qualified name of the ItineraryService's
+	// GetItinerary RPC.
+	ItineraryServiceGetItineraryProcedure = "/loci.itinerary.ItineraryService/GetItinerary"
 	// ItineraryServiceUpdateItineraryProcedure is the fully-qualified name of the ItineraryService's
 	// UpdateItinerary RPC.
 	ItineraryServiceUpdateItineraryProcedure = "/loci.itinerary.ItineraryService/UpdateItinerary"
 	// ItineraryServiceBookmarkItineraryProcedure is the fully-qualified name of the ItineraryService's
 	// BookmarkItinerary RPC.
 	ItineraryServiceBookmarkItineraryProcedure = "/loci.itinerary.ItineraryService/BookmarkItinerary"
+	// ItineraryServiceDeleteBookmarkProcedure is the fully-qualified name of the ItineraryService's
+	// DeleteBookmark RPC.
+	ItineraryServiceDeleteBookmarkProcedure = "/loci.itinerary.ItineraryService/DeleteBookmark"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -73,8 +79,10 @@ var (
 	itineraryServiceAddListItemMethodDescriptor        = itineraryServiceServiceDescriptor.Methods().ByName("AddListItem")
 	itineraryServiceUpdateListItemMethodDescriptor     = itineraryServiceServiceDescriptor.Methods().ByName("UpdateListItem")
 	itineraryServiceGetUserItinerariesMethodDescriptor = itineraryServiceServiceDescriptor.Methods().ByName("GetUserItineraries")
+	itineraryServiceGetItineraryMethodDescriptor       = itineraryServiceServiceDescriptor.Methods().ByName("GetItinerary")
 	itineraryServiceUpdateItineraryMethodDescriptor    = itineraryServiceServiceDescriptor.Methods().ByName("UpdateItinerary")
 	itineraryServiceBookmarkItineraryMethodDescriptor  = itineraryServiceServiceDescriptor.Methods().ByName("BookmarkItinerary")
+	itineraryServiceDeleteBookmarkMethodDescriptor     = itineraryServiceServiceDescriptor.Methods().ByName("DeleteBookmark")
 )
 
 // ItineraryServiceClient is a client for the loci.itinerary.ItineraryService service.
@@ -86,8 +94,10 @@ type ItineraryServiceClient interface {
 	AddListItem(context.Context, *connect.Request[itinerary.AddListItemRequest]) (*connect.Response[common.Response], error)
 	UpdateListItem(context.Context, *connect.Request[itinerary.UpdateListItemRequest]) (*connect.Response[common.Response], error)
 	GetUserItineraries(context.Context, *connect.Request[itinerary.GetUserItinerariesRequest]) (*connect.Response[itinerary.GetUserItinerariesResponse], error)
+	GetItinerary(context.Context, *connect.Request[itinerary.GetItineraryRequest]) (*connect.Response[itinerary.GetItineraryResponse], error)
 	UpdateItinerary(context.Context, *connect.Request[itinerary.UpdateItineraryRequest]) (*connect.Response[common.Response], error)
 	BookmarkItinerary(context.Context, *connect.Request[itinerary.BookmarkRequest]) (*connect.Response[common.Response], error)
+	DeleteBookmark(context.Context, *connect.Request[itinerary.DeleteBookmarkRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewItineraryServiceClient constructs a client for the loci.itinerary.ItineraryService service. By
@@ -142,6 +152,12 @@ func NewItineraryServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(itineraryServiceGetUserItinerariesMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getItinerary: connect.NewClient[itinerary.GetItineraryRequest, itinerary.GetItineraryResponse](
+			httpClient,
+			baseURL+ItineraryServiceGetItineraryProcedure,
+			connect.WithSchema(itineraryServiceGetItineraryMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		updateItinerary: connect.NewClient[itinerary.UpdateItineraryRequest, common.Response](
 			httpClient,
 			baseURL+ItineraryServiceUpdateItineraryProcedure,
@@ -152,6 +168,12 @@ func NewItineraryServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			httpClient,
 			baseURL+ItineraryServiceBookmarkItineraryProcedure,
 			connect.WithSchema(itineraryServiceBookmarkItineraryMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		deleteBookmark: connect.NewClient[itinerary.DeleteBookmarkRequest, common.Response](
+			httpClient,
+			baseURL+ItineraryServiceDeleteBookmarkProcedure,
+			connect.WithSchema(itineraryServiceDeleteBookmarkMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -166,8 +188,10 @@ type itineraryServiceClient struct {
 	addListItem        *connect.Client[itinerary.AddListItemRequest, common.Response]
 	updateListItem     *connect.Client[itinerary.UpdateListItemRequest, common.Response]
 	getUserItineraries *connect.Client[itinerary.GetUserItinerariesRequest, itinerary.GetUserItinerariesResponse]
+	getItinerary       *connect.Client[itinerary.GetItineraryRequest, itinerary.GetItineraryResponse]
 	updateItinerary    *connect.Client[itinerary.UpdateItineraryRequest, common.Response]
 	bookmarkItinerary  *connect.Client[itinerary.BookmarkRequest, common.Response]
+	deleteBookmark     *connect.Client[itinerary.DeleteBookmarkRequest, common.Response]
 }
 
 // CreateList calls loci.itinerary.ItineraryService.CreateList.
@@ -205,6 +229,11 @@ func (c *itineraryServiceClient) GetUserItineraries(ctx context.Context, req *co
 	return c.getUserItineraries.CallUnary(ctx, req)
 }
 
+// GetItinerary calls loci.itinerary.ItineraryService.GetItinerary.
+func (c *itineraryServiceClient) GetItinerary(ctx context.Context, req *connect.Request[itinerary.GetItineraryRequest]) (*connect.Response[itinerary.GetItineraryResponse], error) {
+	return c.getItinerary.CallUnary(ctx, req)
+}
+
 // UpdateItinerary calls loci.itinerary.ItineraryService.UpdateItinerary.
 func (c *itineraryServiceClient) UpdateItinerary(ctx context.Context, req *connect.Request[itinerary.UpdateItineraryRequest]) (*connect.Response[common.Response], error) {
 	return c.updateItinerary.CallUnary(ctx, req)
@@ -213,6 +242,11 @@ func (c *itineraryServiceClient) UpdateItinerary(ctx context.Context, req *conne
 // BookmarkItinerary calls loci.itinerary.ItineraryService.BookmarkItinerary.
 func (c *itineraryServiceClient) BookmarkItinerary(ctx context.Context, req *connect.Request[itinerary.BookmarkRequest]) (*connect.Response[common.Response], error) {
 	return c.bookmarkItinerary.CallUnary(ctx, req)
+}
+
+// DeleteBookmark calls loci.itinerary.ItineraryService.DeleteBookmark.
+func (c *itineraryServiceClient) DeleteBookmark(ctx context.Context, req *connect.Request[itinerary.DeleteBookmarkRequest]) (*connect.Response[common.Response], error) {
+	return c.deleteBookmark.CallUnary(ctx, req)
 }
 
 // ItineraryServiceHandler is an implementation of the loci.itinerary.ItineraryService service.
@@ -224,8 +258,10 @@ type ItineraryServiceHandler interface {
 	AddListItem(context.Context, *connect.Request[itinerary.AddListItemRequest]) (*connect.Response[common.Response], error)
 	UpdateListItem(context.Context, *connect.Request[itinerary.UpdateListItemRequest]) (*connect.Response[common.Response], error)
 	GetUserItineraries(context.Context, *connect.Request[itinerary.GetUserItinerariesRequest]) (*connect.Response[itinerary.GetUserItinerariesResponse], error)
+	GetItinerary(context.Context, *connect.Request[itinerary.GetItineraryRequest]) (*connect.Response[itinerary.GetItineraryResponse], error)
 	UpdateItinerary(context.Context, *connect.Request[itinerary.UpdateItineraryRequest]) (*connect.Response[common.Response], error)
 	BookmarkItinerary(context.Context, *connect.Request[itinerary.BookmarkRequest]) (*connect.Response[common.Response], error)
+	DeleteBookmark(context.Context, *connect.Request[itinerary.DeleteBookmarkRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewItineraryServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -276,6 +312,12 @@ func NewItineraryServiceHandler(svc ItineraryServiceHandler, opts ...connect.Han
 		connect.WithSchema(itineraryServiceGetUserItinerariesMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	itineraryServiceGetItineraryHandler := connect.NewUnaryHandler(
+		ItineraryServiceGetItineraryProcedure,
+		svc.GetItinerary,
+		connect.WithSchema(itineraryServiceGetItineraryMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	itineraryServiceUpdateItineraryHandler := connect.NewUnaryHandler(
 		ItineraryServiceUpdateItineraryProcedure,
 		svc.UpdateItinerary,
@@ -286,6 +328,12 @@ func NewItineraryServiceHandler(svc ItineraryServiceHandler, opts ...connect.Han
 		ItineraryServiceBookmarkItineraryProcedure,
 		svc.BookmarkItinerary,
 		connect.WithSchema(itineraryServiceBookmarkItineraryMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	itineraryServiceDeleteBookmarkHandler := connect.NewUnaryHandler(
+		ItineraryServiceDeleteBookmarkProcedure,
+		svc.DeleteBookmark,
+		connect.WithSchema(itineraryServiceDeleteBookmarkMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/loci.itinerary.ItineraryService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -304,10 +352,14 @@ func NewItineraryServiceHandler(svc ItineraryServiceHandler, opts ...connect.Han
 			itineraryServiceUpdateListItemHandler.ServeHTTP(w, r)
 		case ItineraryServiceGetUserItinerariesProcedure:
 			itineraryServiceGetUserItinerariesHandler.ServeHTTP(w, r)
+		case ItineraryServiceGetItineraryProcedure:
+			itineraryServiceGetItineraryHandler.ServeHTTP(w, r)
 		case ItineraryServiceUpdateItineraryProcedure:
 			itineraryServiceUpdateItineraryHandler.ServeHTTP(w, r)
 		case ItineraryServiceBookmarkItineraryProcedure:
 			itineraryServiceBookmarkItineraryHandler.ServeHTTP(w, r)
+		case ItineraryServiceDeleteBookmarkProcedure:
+			itineraryServiceDeleteBookmarkHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -345,10 +397,18 @@ func (UnimplementedItineraryServiceHandler) GetUserItineraries(context.Context, 
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.itinerary.ItineraryService.GetUserItineraries is not implemented"))
 }
 
+func (UnimplementedItineraryServiceHandler) GetItinerary(context.Context, *connect.Request[itinerary.GetItineraryRequest]) (*connect.Response[itinerary.GetItineraryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.itinerary.ItineraryService.GetItinerary is not implemented"))
+}
+
 func (UnimplementedItineraryServiceHandler) UpdateItinerary(context.Context, *connect.Request[itinerary.UpdateItineraryRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.itinerary.ItineraryService.UpdateItinerary is not implemented"))
 }
 
 func (UnimplementedItineraryServiceHandler) BookmarkItinerary(context.Context, *connect.Request[itinerary.BookmarkRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.itinerary.ItineraryService.BookmarkItinerary is not implemented"))
+}
+
+func (UnimplementedItineraryServiceHandler) DeleteBookmark(context.Context, *connect.Request[itinerary.DeleteBookmarkRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.itinerary.ItineraryService.DeleteBookmark is not implemented"))
 }

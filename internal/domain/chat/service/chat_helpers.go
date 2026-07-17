@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"regexp"
 	"strings"
 
@@ -14,8 +15,17 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
+var (
+	trailingCommaBeforeBraceRE = regexp.MustCompile(`,(\s*[}\]])`)
+	replacePOIRE               = regexp.MustCompile(`replace\s+(.+?)\s+with\s+(.+?)(?:\s+in\s+my\s+itinerary)?`)
+	nearbyDistanceRE           = regexp.MustCompile(`within\s+(\d+(?:\.\d+)?)\s*(?:kilometers?|km)`)
+)
+
 func generatePOICacheKey(city string, lat, lon, distance float64, userID uuid.UUID) string {
-	return fmt.Sprintf("poi:%s:%f:%f:%f:%s", city, lat, lon, distance, userID.String())
+	roundedLat := math.Round(lat*10000) / 10000
+	roundedLon := math.Round(lon*10000) / 10000
+	roundedDistance := math.Round(distance / 1000)
+	return fmt.Sprintf("poi:%s:%.4f:%.4f:%.0f:%s", city, roundedLat, roundedLon, roundedDistance, userID.String())
 }
 
 // extractPOIName extracts the full POI name from the message
@@ -248,7 +258,7 @@ func CleanLLMResponse(responseText string) string {
 	}
 
 	// Remove trailing commas before closing braces/brackets (common LLM error)
-	cleaned = regexp.MustCompile(`,(\s*[}\]])`).ReplaceAllString(cleaned, "$1")
+	cleaned = trailingCommaBeforeBraceRE.ReplaceAllString(cleaned, "$1")
 
 	return cleaned
 }

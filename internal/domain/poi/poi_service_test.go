@@ -13,7 +13,26 @@ import (
 	"github.com/stretchr/testify/require"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types" // Ensure this path is correct
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 )
+
+func testGeminiConfig() config.GeminiConfig {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		apiKey = "test-key"
+	}
+	model := os.Getenv("GEMINI_MODEL")
+	if model == "" {
+		model = "gemini-1.5-flash"
+	}
+	return config.GeminiConfig{
+		APIKey:         apiKey,
+		Model:          model,
+		EmbeddingModel: "gemini-embedding-exp-03-07",
+		MaxRetries:     3,
+	}
+}
 
 type MockCityRepository struct {
 	mock.Mock
@@ -424,7 +443,8 @@ func setupPOIServiceTest() (*ServiceImpl, *MockPOIRepository, *MockCityRepositor
 	mockRepo := new(MockPOIRepository)
 	mockCityRepo := new(MockCityRepository)
 	embeddingService := stubEmbeddingClient{}
-	service := NewServiceImpl(mockRepo, embeddingService, mockCityRepo, stubDiscoverRepo{}, logger)
+	appCache, _ := cachestore.New(cachestore.Config{}, logger)
+	service := NewServiceImpl(mockRepo, embeddingService, mockCityRepo, stubDiscoverRepo{}, testGeminiConfig(), nil, appCache, logger)
 	return service, mockRepo, mockCityRepo
 }
 

@@ -72,6 +72,15 @@ func calculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
 	return distance
 }
 
+func clonePOISlice(pois []locitypes.POIDetailedInfo) []locitypes.POIDetailedInfo {
+	if pois == nil {
+		return nil
+	}
+	out := make([]locitypes.POIDetailedInfo, len(pois))
+	copy(out, pois)
+	return out
+}
+
 func generateFilteredPOICacheKey(lat, lon, distance float64, userID uuid.UUID) string {
 	// Round coordinates to 4 decimal places (~11m accuracy) to avoid cache misses
 	// from minor GPS fluctuations. Round distance to nearest km.

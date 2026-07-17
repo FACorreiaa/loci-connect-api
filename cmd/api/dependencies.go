@@ -3,9 +3,9 @@ package api
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
@@ -36,6 +36,8 @@ import (
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
@@ -43,9 +45,10 @@ import (
 
 // Dependencies holds all application dependencies
 type Dependencies struct {
-	Config *config.Config
-	DB     *db.DB
-	Logger *slog.Logger
+	Config   *config.Config
+	DB       *db.DB
+	Logger   *slog.Logger
+	AppCache cachestore.Store
 
 	// Repositories
 	AuthRepo       repository.AuthRepository
@@ -63,6 +66,7 @@ type Dependencies struct {
 	UsageRepo      subscription.Repository
 	PaymentRepo    payment.Repository
 	FavoritesRepo  favorites.Repository
+	APIKeyRepo     apikey.Repository
 	ReviewRepo     reviewdomain.Repository
 	ShareRepo      share.Repository
 
@@ -80,6 +84,7 @@ type Dependencies struct {
 	InterestSvc         interestrepo.Service
 	TagsSvc             tagshandler.Service
 	SubscriptionService subscription.Service
+	APIKeyService       apikey.Service
 	PaymentService      payment.Service
 	OAuthService        *customauthservice.OAuthService
 	PhoneService        *customauthservice.PhoneService
@@ -99,6 +104,7 @@ type Dependencies struct {
 	TagsHandler       *tagshandler.TagsHandler
 	PaymentHandler    paymentv1connect.PaymentServiceHandler
 	FavoritesHandler  *favorites.Handler
+	APIKeyHandler     *apikey.Handler
 	ExportHandler     *export.Handler
 	ShareHandler      *share.Handler
 	POIHandler        *poihandler.POIHandler
@@ -142,10 +148,10 @@ func InitDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, e
 func (d *Dependencies) initDatabase() error {
 	database, err := db.New(db.Config{
 		DSN:             d.Config.Database.DSN(),
-		MaxConns:        25,
-		MinConns:        5,
-		MaxConnLifetime: 5 * time.Minute,
-		MaxConnIdleTime: 10 * time.Minute,
+		MaxConns:        d.Config.Database.MaxConns,
+		MinConns:        d.Config.Database.MinConns,
+		MaxConnLifetime: d.Config.Database.MaxConnLifetime,
+		MaxConnIdleTime: d.Config.Database.MaxConnIdleTime,
 	}, d.Logger)
 	if err != nil {
 		return err
@@ -179,6 +185,7 @@ func (d *Dependencies) initRepositories() error {
 	d.UsageRepo = subscription.NewRepository(d.DB.Pool)
 	d.PaymentRepo = payment.NewRepository(d.DB.Pool)
 	d.FavoritesRepo = favorites.NewRepository(d.DB.Pool, d.Logger)
+	d.APIKeyRepo = apikey.NewRepository(d.DB.Pool)
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 
@@ -208,7 +215,19 @@ func (d *Dependencies) initServices() error {
 
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
-	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Logger)
+	llmSem := concurrency.NewLLMSemaphore(d.Config.Gemini.MaxConcurrentCalls)
+	appCache, err := cachestore.New(cachestore.Config{
+		RedisURL:   d.Config.Cache.RedisURL,
+		KeyPrefix:  d.Config.Cache.KeyPrefix,
+		LLMTTL:     d.Config.Cache.LLMTTL,
+		GeoTTL:     d.Config.Cache.GeoTTL,
+		CleanupTTL: d.Config.Cache.CleanupTTL,
+	}, d.Logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize cache: %w", err)
+	}
+	d.AppCache = appCache
+	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.Gemini, llmSem, appCache, d.Logger)
 	chatSvc, err := chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,
@@ -220,9 +239,9 @@ func (d *Dependencies) initServices() error {
 		d.POISvc,
 		d.ListSvc,
 		d.Logger,
-		d.Config.Gemini.APIKey,
-		d.Config.Gemini.Model,
-		d.Config.Gemini.EmbeddingModel,
+		d.Config.Gemini,
+		llmSem,
+		appCache,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
@@ -236,9 +255,17 @@ func (d *Dependencies) initServices() error {
 	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
 	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
 	d.TagsSvc = tagrepo.NewtagsService(d.TagRepo, d.Logger)
-	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail)
-	// Using STRIPE_API_KEY from environment
-	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, os.Getenv("STRIPE_API_KEY"))
+	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail, subscription.Limits{
+		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
+		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
+	})
+	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
+	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
+		APIKey:         d.Config.Stripe.APIKey,
+		PriceIDMonthly: d.Config.Stripe.PriceIDMonthly,
+		PriceIDAnnual:  d.Config.Stripe.PriceIDAnnual,
+		FreeDailyLimit: d.Config.Subscription.FreeDailyLLMLimit,
+	})
 
 	// Custom auth (OAuth + phone). Both degrade gracefully when their env vars
 	// are absent: OAuth registers no providers, phone reports disabled.
@@ -254,7 +281,6 @@ func (d *Dependencies) initServices() error {
 
 	// Needs imports and struct fields.
 	// Since replace_file_content is single block, I will use multi_replace for this file.
-
 }
 
 // initHandlers initializes all handler dependencies
@@ -271,6 +297,7 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
+	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
@@ -284,6 +311,11 @@ func (d *Dependencies) initHandlers() error {
 func (d *Dependencies) Cleanup() {
 	if closer, ok := d.ChatService.(interface{ Close() }); ok {
 		closer.Close()
+	}
+	if d.AppCache != nil {
+		if err := d.AppCache.Close(); err != nil {
+			d.Logger.Warn("failed to close cache", slog.Any("error", err))
+		}
 	}
 	if d.DB != nil {
 		d.DB.Close()

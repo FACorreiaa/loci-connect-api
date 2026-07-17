@@ -3,78 +3,168 @@ package subscription
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"sync"
+	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/google/uuid"
 )
 
-var (
-	ErrQuotaExceeded = errors.New("daily request quota exceeded")
-)
+// ErrQuotaExceeded is the sentinel matched via errors.Is; the concrete error
+// returned is *QuotaExceededError, which carries plan and limit details.
+var ErrQuotaExceeded = errors.New("daily request quota exceeded")
 
-type Tier string
+// QuotaExceededError reports which plan and limit produced a quota denial so
+// the interceptor can distinguish a free-tier denial (upgrade CTA) from a Pro
+// fair-use denial (no CTA).
+type QuotaExceededError struct {
+	Plan  string
+	Limit int
+}
+
+func (e *QuotaExceededError) Error() string {
+	return fmt.Sprintf("daily request quota exceeded (plan %s, limit %d)", e.Plan, e.Limit)
+}
+
+func (e *QuotaExceededError) Is(target error) bool { return target == ErrQuotaExceeded }
 
 const (
-	TierFree    Tier = "free"
-	TierPaid    Tier = "paid"
-	TierPremium Tier = "premium"
-	TierAdmin   Tier = "admin"
+	planCacheTTL        = 60 * time.Second
+	maxPlanCacheEntries = 10_000
 )
 
+// PlanInvalidator lets other domains (Stripe webhook processing) evict a
+// user's cached plan immediately after an entitlement change.
+type PlanInvalidator interface {
+	InvalidatePlan(userID uuid.UUID)
+}
+
 type Service interface {
-	CheckRateLimit(ctx context.Context, userID uuid.UUID, email string) error
-	RecordUsage(ctx context.Context, userID uuid.UUID) error
-	// GetUserTier would ideally come from DB or Claims.
-	// For MVP I might rely on Claims passed in context or DB lookup if needed.
+	// ConsumeQuota atomically spends one daily LLM request for the user.
+	// Returns *QuotaExceededError when the plan's daily limit is reached.
+	ConsumeQuota(ctx context.Context, userID uuid.UUID, email string) error
+	// EffectivePlan returns the user's current plan (cached), already
+	// downgraded to free when a subscription is inactive or expired.
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
+	PlanInvalidator
+}
+
+type planEntry struct {
+	plan    string
+	expires time.Time
 }
 
 type service struct {
 	repo       Repository
 	logger     *slog.Logger
 	adminEmail string
+	limits     Limits
+
+	mu        sync.Mutex
+	planCache map[uuid.UUID]planEntry
+	now       func() time.Time
 }
 
-func NewService(repo Repository, logger *slog.Logger, adminEmail string) Service {
+func NewService(repo Repository, logger *slog.Logger, adminEmail string, limits Limits) Service {
 	return &service{
 		repo:       repo,
 		logger:     logger,
 		adminEmail: adminEmail,
+		limits:     limits,
+		planCache:  make(map[uuid.UUID]planEntry),
+		now:        time.Now,
 	}
 }
 
-func (s *service) CheckRateLimit(ctx context.Context, userID uuid.UUID, email string) error {
-	// 1. Admin Bypass
-	if email == s.adminEmail {
+func (s *service) ConsumeQuota(ctx context.Context, userID uuid.UUID, email string) error {
+	if s.adminEmail != "" && email == s.adminEmail {
 		return nil
 	}
 
-	// 2. Determine Tier & Limit
-	// TODO: Fetch real tier from DB `subscriptions` table.
-	// For now, defaulting to Free tier as per MVP, unless we read it from context claims in Interceptor.
-	// But let's assume we can fetch it or pass it.
-	// For MVP efficiently: We can assume Free unless proven otherwise.
-	// Let's check DB usage first as that's always needed.
-
-	usage, err := s.repo.GetDailyUsage(ctx, userID)
+	plan, err := s.userPlan(ctx, userID)
 	if err != nil {
-		s.logger.ErrorContext(ctx, "failed to get usage", "error", err)
-		return err // Fail safe or fail open? Fail safe for now.
+		s.logger.ErrorContext(ctx, "failed to get subscription plan", "error", err, "user_id", userID)
+		return err
 	}
 
-	// Hardcoded limits for MVP until we wire up full subscription reading
-	limit := 5 // Free tier default
-
-	// If we had tier info, we'd switch here.
-	// For now, let's enforce 5.
-	// Real implementation needs to read subscription.
-
-	if usage >= limit {
-		return ErrQuotaExceeded
+	limit := s.limits.dailyLimitForPlan(plan)
+	if limit <= 0 {
+		// A zero/negative configured limit disables the tier entirely; the
+		// upsert below cannot express this because a first-of-day insert
+		// always succeeds.
+		observability.QuotaDenialsTotal.WithLabelValues(plan).Inc()
+		return &QuotaExceededError{Plan: plan, Limit: limit}
 	}
 
+	allowed, _, err := s.repo.TryIncrementUsage(ctx, userID, limit)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "failed to consume daily quota", "error", err, "user_id", userID)
+		return err
+	}
+	if !allowed {
+		s.logger.InfoContext(ctx, "daily quota exceeded",
+			"user_id", userID,
+			"plan", plan,
+			"limit", limit,
+		)
+		observability.QuotaDenialsTotal.WithLabelValues(plan).Inc()
+		return &QuotaExceededError{Plan: plan, Limit: limit}
+	}
+
+	observability.QuotaConsumedTotal.WithLabelValues(plan).Inc()
 	return nil
 }
 
-func (s *service) RecordUsage(ctx context.Context, userID uuid.UUID) error {
-	return s.repo.IncrementUsage(ctx, userID)
+// EffectivePlan exposes the cached plan lookup for channels (MCP) that gate
+// features by tier rather than by quota.
+func (s *service) EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	return s.userPlan(ctx, userID)
+}
+
+// userPlan returns the user's effective plan, cached for planCacheTTL to
+// avoid a subscriptions lookup on every LLM request. Webhook-driven plan
+// changes call InvalidatePlan so upgrades take effect immediately.
+func (s *service) userPlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	s.mu.Lock()
+	entry, ok := s.planCache[userID]
+	if ok && s.now().Before(entry.expires) {
+		s.mu.Unlock()
+		return entry.plan, nil
+	}
+	s.mu.Unlock()
+
+	plan, err := s.repo.GetUserPlan(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	s.mu.Lock()
+	if len(s.planCache) >= maxPlanCacheEntries {
+		s.evictExpiredLocked()
+	}
+	s.planCache[userID] = planEntry{plan: plan, expires: s.now().Add(planCacheTTL)}
+	s.mu.Unlock()
+	return plan, nil
+}
+
+// evictExpiredLocked drops stale entries; if everything is still live it
+// clears the map rather than growing without bound. Callers hold s.mu.
+func (s *service) evictExpiredLocked() {
+	now := s.now()
+	for id, entry := range s.planCache {
+		if !now.Before(entry.expires) {
+			delete(s.planCache, id)
+		}
+	}
+	if len(s.planCache) >= maxPlanCacheEntries {
+		s.planCache = make(map[uuid.UUID]planEntry)
+	}
+}
+
+func (s *service) InvalidatePlan(userID uuid.UUID) {
+	s.mu.Lock()
+	delete(s.planCache, userID)
+	s.mu.Unlock()
 }

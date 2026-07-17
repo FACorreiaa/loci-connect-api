@@ -26,7 +26,30 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 )
 
-var _ Repository = (*RepositoryImpl)(nil)
+var (
+	_ Repository = (*RepositoryImpl)(nil)
+
+	responsePrefixPatterns = []string{
+		`\[itinerary\]\s*`,
+		`\[city_data\]\s*`,
+		`\[restaurants\]\s*`,
+		`\[hotels\]\s*`,
+		`\[activities\]\s*`,
+		`\[pois\]\s*`,
+		`\[general_pois\]\s*`,
+		`\[personalized_pois\]\s*`,
+	}
+	responsePrefixREs = compileResponsePrefixREs()
+	jsonMarkdownRE    = regexp.MustCompile("(?s)```json\\s*(.*)\\s*```")
+)
+
+func compileResponsePrefixREs() []*regexp.Regexp {
+	res := make([]*regexp.Regexp, len(responsePrefixPatterns))
+	for i, pattern := range responsePrefixPatterns {
+		res[i] = regexp.MustCompile(`(?i)^` + pattern)
+	}
+	return res
+}
 
 // PgxPool abstracts pgxpool.Pool for testing.
 type PgxPool interface {
@@ -1167,24 +1190,12 @@ func formatResponseForDisplay(response, cityName string) string {
 	cleanedResponse := response
 
 	// Remove common LLM response prefixes
-	prefixPatterns := []string{
-		`\[itinerary\]\s*`,
-		`\[city_data\]\s*`,
-		`\[restaurants\]\s*`,
-		`\[hotels\]\s*`,
-		`\[activities\]\s*`,
-		`\[pois\]\s*`,
-		`\[general_pois\]\s*`,
-		`\[personalized_pois\]\s*`,
-	}
-
-	for _, pattern := range prefixPatterns {
-		re := regexp.MustCompile(`(?i)^` + pattern)
+	for _, re := range responsePrefixREs {
 		cleanedResponse = re.ReplaceAllString(cleanedResponse, "")
 	}
 
 	// Remove markdown code blocks if present
-	cleanedResponse = regexp.MustCompile("(?s)```json\\s*(.*)\\s*```").ReplaceAllString(cleanedResponse, "$1")
+	cleanedResponse = jsonMarkdownRE.ReplaceAllString(cleanedResponse, "$1")
 	cleanedResponse = strings.TrimSpace(cleanedResponse)
 
 	// First, check if cleaned response is valid JSON

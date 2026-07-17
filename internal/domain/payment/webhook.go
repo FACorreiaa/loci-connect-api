@@ -4,13 +4,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/stripe/stripe-go/v81/webhook"
 )
 
-// WebhookHandler handles incoming Stripe webhooks
-func WebhookHandler(service Service, logger *slog.Logger) http.HandlerFunc {
+// WebhookHandler handles incoming Stripe webhooks. The endpoint secret comes
+// from config (STRIPE_WEBHOOK_SECRET) via the caller.
+func WebhookHandler(service Service, logger *slog.Logger, endpointSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const MaxBodyBytes = int64(65536)
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
@@ -21,19 +21,14 @@ func WebhookHandler(service Service, logger *slog.Logger) http.HandlerFunc {
 			return
 		}
 
-		// Verify signature
-		// In real app, load secret from config. For now getting from env for simplicity in this file scope or passed in.
-		// It's better to pass it in. I'll stick to os.Getenv("STRIPE_WEBHOOK_SECRET") as per user snippet.
-		endpointSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
 		signatureHeader := r.Header.Get("Stripe-Signature")
 		event, err := webhook.ConstructEvent(payload, signatureHeader, endpointSecret)
 		if err != nil {
 			logger.Error("Error verifying webhook signature", "error", err)
-			w.WriteHeader(http.StatusBadRequest) // Return 400 or...
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		// Handle the event
 		if err := service.ProcessStripeEvent(r.Context(), event); err != nil {
 			logger.Error("Failed to process event", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
