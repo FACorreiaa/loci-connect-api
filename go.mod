@@ -3,12 +3,12 @@ module github.com/FACorreiaa/loci-connect-api
 go 1.25.4
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20251209175733-2a1774d88802.1
-	connectrpc.com/connect v1.19.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260709200747-435963d16310.1
+	connectrpc.com/connect v1.20.0
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
 	github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0
-	github.com/FACorreiaa/loci-connect-proto v0.0.0-20251215202521-989eba36f688
+	github.com/FACorreiaa/loci-connect-proto v0.1.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -157,5 +157,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto
