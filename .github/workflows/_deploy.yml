@@ -113,3 +113,37 @@ jobs:
             docker compose -f docker-compose.prod.yaml pull
             docker compose -f docker-compose.prod.yaml up -d
             docker image prune -f
+
+  # k3s/ArgoCD delivery: commit the freshly-pushed image tag into loci-infra;
+  # ArgoCD sees the git change and rolls the Deployment. Self-gating — it
+  # skips cleanly until the INFRA_PAT secret exists, so it's safe to merge now
+  # and runs alongside the compose deploy during the VPS→k3s cutover.
+  bump-infra:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump loci-infra image tag
+        env:
+          INFRA_PAT: ${{ secrets.INFRA_PAT }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "${INFRA_PAT}" ]; then
+            echo "INFRA_PAT not set — skipping ArgoCD image bump. Add the repo secret to enable k3s delivery."
+            exit 0
+          fi
+          if ! command -v yq >/dev/null 2>&1; then
+            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+            sudo chmod +x /usr/local/bin/yq
+          fi
+          git clone --depth 1 "https://x-access-token:${INFRA_PAT}@github.com/FACorreiaa/loci-infra.git"
+          cd loci-infra
+          yq -i ".image.tag = \"${IMAGE_TAG}\"" charts/loci-api/values.yaml
+          git config user.name "loci-ci"
+          git config user.email "ci@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "image tag already ${IMAGE_TAG} — nothing to commit."
+            exit 0
+          fi
+          git commit -am "deploy: loci-api ${IMAGE_TAG}"
+          git push
