@@ -6,13 +6,6 @@ version: 2
 
 project_name: loci-mcp
 
-# The release is cut from mcp-v* tags in this shared repo. Tell GoReleaser to
-# strip the "mcp-" prefix so "mcp-v0.1.0" parses as semver 0.1.0 (otherwise it
-# fails with "invalid semantic version").
-monorepo:
-  tag_prefix: mcp-
-  dir: .
-
 builds:
   - id: loci-mcp
     main: ./cmd/loci-mcp

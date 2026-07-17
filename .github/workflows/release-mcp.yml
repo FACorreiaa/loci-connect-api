@@ -22,10 +22,29 @@ jobs:
         with:
           go-version: "1.25.4"
 
+      - name: Derive version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#mcp-}" >> "$GITHUB_OUTPUT"
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          # Build + archive only. Free GoReleaser can't parse the "mcp-" tag
+          # prefix as semver (monorepo tag_prefix is a Pro feature), so we feed
+          # it the stripped version via GORELEASER_CURRENT_TAG and publish the
+          # release ourselves against the real mcp-v* tag (below). Skipping
+          # validate avoids the HEAD-tag/override mismatch check.
+          args: release --clean --skip=publish,validate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.ver.outputs.version }}
+
+      - name: Publish release on the mcp-v* tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz dist/*.zip dist/checksums.txt \
+            --title "loci-mcp ${{ steps.ver.outputs.version }}" \
+            --notes "Local stdio proxy for Loci's hosted MCP endpoint. Create an API key in Loci → Settings → API Keys, set LOCI_API_KEY, and run loci-mcp."
