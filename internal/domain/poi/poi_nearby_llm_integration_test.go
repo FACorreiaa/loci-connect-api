@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
@@ -35,6 +36,9 @@ func TestNearbyLLMReturnsPOIs(t *testing.T) {
 		MaxOutputTokens: 16384,
 	})
 	if err != nil {
+		if isGeminiKeyUnusable(err) {
+			t.Skipf("GEMINI_API_KEY present but not usable, skipping real-LLM test: %v", err)
+		}
 		t.Fatalf("GenerateResponse error: %v", err)
 	}
 
@@ -100,6 +104,9 @@ func TestDomainNearbyPromptsReturnPOIs(t *testing.T) {
 				MaxOutputTokens: 16384,
 			})
 			if err != nil {
+				if isGeminiKeyUnusable(err) {
+					t.Skipf("%s: GEMINI_API_KEY present but not usable, skipping: %v", domain, err)
+				}
 				t.Fatalf("GenerateResponse error: %v", err)
 			}
 			var txt string
@@ -127,4 +134,19 @@ func TestDomainNearbyPromptsReturnPOIs(t *testing.T) {
 			t.Logf("%s: %d POIs (first: %q)", domain, len(poiData.PointsOfInterest), poiData.PointsOfInterest[0].Name)
 		})
 	}
+}
+
+// isGeminiKeyUnusable reports whether a Generate error is an auth/key problem
+// rather than a genuine prompt failure. CI must set a non-empty GEMINI_API_KEY
+// (config.Load refuses to boot without one) but that placeholder isn't a real
+// Gemini key, so these live-LLM tests skip instead of failing the build.
+func isGeminiKeyUnusable(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "API_KEY_INVALID") ||
+		strings.Contains(s, "API key not valid") ||
+		strings.Contains(s, "PERMISSION_DENIED") ||
+		strings.Contains(s, "API key expired")
 }
