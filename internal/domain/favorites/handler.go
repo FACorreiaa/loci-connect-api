@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	favoritesv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
@@ -18,15 +21,37 @@ import (
 // Handler implements the FavoritesService
 type Handler struct {
 	favoritesv1connect.UnimplementedFavoritesServiceHandler
-	repo   Repository
-	logger *slog.Logger
+	repo      Repository
+	plans     PlanChecker
+	listItems ListItemCounter
+	prefs     preference.Recorder
+	logger    *slog.Logger
 }
 
-// NewHandler creates a new favorites handler
-func NewHandler(repo Repository, logger *slog.Logger) *Handler {
+// PlanChecker is the subset of subscription.Service needed for freemium gates.
+type PlanChecker interface {
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+// ListItemCounter tallies list saves so favorites share the free-tier place cap.
+type ListItemCounter interface {
+	CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+// NewHandler creates a new favorites handler. Optional deps may be nil.
+func NewHandler(
+	repo Repository,
+	logger *slog.Logger,
+	plans PlanChecker,
+	prefs preference.Recorder,
+	listItems ListItemCounter,
+) *Handler {
 	return &Handler{
-		repo:   repo,
-		logger: logger.With(slog.String("component", "favorites-handler")),
+		repo:      repo,
+		plans:     plans,
+		prefs:     prefs,
+		listItems: listItems,
+		logger:    logger.With(slog.String("component", "favorites-handler")),
 	}
 }
 
@@ -79,6 +104,10 @@ func (h *Handler) AddToFavorites(
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 
+	if err := h.enforcePlaceLimit(ctx, userID); err != nil {
+		return nil, apierr.ToConnect(err)
+	}
+
 	// Parse item ID - could be name or UUID
 	itemID := req.Msg.ItemId
 	if itemID == "" {
@@ -103,6 +132,13 @@ func (h *Handler) AddToFavorites(
 	if err != nil {
 		l.ErrorContext(ctx, "failed to add favorite", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to add favorite"))
+	}
+
+	if h.prefs != nil {
+		h.prefs.Record(ctx, userID, preference.EventFavorited, preference.RecordOpts{
+			POIID:    itemID,
+			Metadata: map[string]any{"content_type": fav.ContentType, "name": fav.ItemName},
+		})
 	}
 
 	l.InfoContext(ctx, "added to favorites",
@@ -309,4 +345,26 @@ func (h *Handler) GetFavoritesCount(
 	return connect.NewResponse(&favoritesv1.GetFavoritesCountResponse{
 		Count: int32(count),
 	}), nil
+}
+
+func (h *Handler) enforcePlaceLimit(ctx context.Context, userID uuid.UUID) error {
+	if h.plans == nil {
+		return nil
+	}
+	plan, err := h.plans.EffectivePlan(ctx, userID)
+	if err != nil {
+		return err
+	}
+	n, err := h.repo.GetFavoritesCount(ctx, userID, "")
+	if err != nil {
+		return err
+	}
+	if h.listItems != nil {
+		items, lerr := h.listItems.CountUserListItems(ctx, userID)
+		if lerr != nil {
+			return lerr
+		}
+		n += items
+	}
+	return subscription.CheckPlaceAdd(plan, n)
 }

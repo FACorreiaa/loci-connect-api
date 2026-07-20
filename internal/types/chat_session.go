@@ -136,21 +136,6 @@ type ChatService interface {
 	EndSession(ctx context.Context, sessionID uuid.UUID) error
 }
 
-type StreamingChatEvent struct {
-	Timestamp        time.Time         `json:"timestamp"`  // Time of the event
-	EventID          string            `json:"event_id"`   // Unique identifier for the event
-	EventType        string            `json:"event_type"` // e.g., "session_started", "city_info", "general_pois", "personalized_poi_chunk", "final_itinerary", "error"
-	SessionID        uuid.UUID         `json:"session_id,omitempty"`
-	Message          string            `json:"message,omitempty"` // For general messages or errors
-	CityData         *GeneralCityData  `json:"city_data,omitempty"`
-	GeneralPOIs      []POIDetailedInfo `json:"general_pois,omitempty"`
-	PersonalizedPOIs []POIDetailedInfo `json:"personalized_pois,omitempty"` // Could send chunks or final list
-	Itinerary        *AiCityResponse   `json:"itinerary,omitempty"`         // Could be a partial or final one
-	Error            string            `json:"error_message,omitempty"`
-	IsFinal          bool              `json:"is_final,omitempty"` // Indicates the end of a sequence or the whole stream
-	// Add any other relevant data for different event types
-}
-
 type Intent struct {
 	Type           IntentType     `json:"type"`
 	Confidence     float64        `json:"confidence"`
@@ -231,6 +216,33 @@ const (
 	EventTypeRestaurants     = "restaurants"
 	EventTypeChunk           = "chunk" // For immediate text chunks (Google GenAI pattern)
 )
+
+// --- Typed stream payloads (Slice 1) ---
+// These give StreamEvent.Data a concrete shape per event type so the RPC handler
+// can map it onto the typed proto oneof instead of a JSON blob. Producers may set
+// Data to one of these structs; the handler also tolerates the legacy map shapes
+// via a JSON round-trip, so older emit sites keep working.
+
+// StreamStartData is the payload for EventTypeStart.
+type StreamStartData struct {
+	SessionID string `json:"session_id"`
+	Domain    string `json:"domain"`
+	City      string `json:"city"`
+}
+
+// StreamDomainListData is the payload for domain list events (hotels,
+// restaurants, activities, nearby). Hotels/restaurants are POI-adapted before
+// emit so the client renders a single POI card shape.
+type StreamDomainListData struct {
+	GeneralCityData GeneralCityData   `json:"general_city_data"`
+	POIs            []POIDetailedInfo `json:"points_of_interest"`
+	SessionID       string            `json:"session_id"`
+}
+
+// StreamChunkData is the payload for EventTypeChunk (incremental text token).
+type StreamChunkData struct {
+	Text string `json:"chunk"`
+}
 
 // StreamingResponse wraps the streaming channel and metadata
 type StreamingResponse struct {

@@ -40,6 +40,12 @@ const (
 	// UserServiceUpdateUserProfileProcedure is the fully-qualified name of the UserService's
 	// UpdateUserProfile RPC.
 	UserServiceUpdateUserProfileProcedure = "/loci.user.UserService/UpdateUserProfile"
+	// UserServiceExportUserDataProcedure is the fully-qualified name of the UserService's
+	// ExportUserData RPC.
+	UserServiceExportUserDataProcedure = "/loci.user.UserService/ExportUserData"
+	// UserServiceDeleteAccountProcedure is the fully-qualified name of the UserService's DeleteAccount
+	// RPC.
+	UserServiceDeleteAccountProcedure = "/loci.user.UserService/DeleteAccount"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -47,12 +53,17 @@ var (
 	userServiceServiceDescriptor                 = user.File_loci_user_user_proto.Services().ByName("UserService")
 	userServiceGetUserProfileMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("GetUserProfile")
 	userServiceUpdateUserProfileMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("UpdateUserProfile")
+	userServiceExportUserDataMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("ExportUserData")
+	userServiceDeleteAccountMethodDescriptor     = userServiceServiceDescriptor.Methods().ByName("DeleteAccount")
 )
 
 // UserServiceClient is a client for the loci.user.UserService service.
 type UserServiceClient interface {
 	GetUserProfile(context.Context, *connect.Request[user.GetUserProfileRequest]) (*connect.Response[user.GetUserProfileResponse], error)
 	UpdateUserProfile(context.Context, *connect.Request[user.UpdateUserProfileRequest]) (*connect.Response[common.Response], error)
+	// Data controls (GDPR-style self-service).
+	ExportUserData(context.Context, *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error)
+	DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewUserServiceClient constructs a client for the loci.user.UserService service. By default, it
@@ -77,6 +88,18 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceUpdateUserProfileMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		exportUserData: connect.NewClient[user.ExportUserDataRequest, user.ExportUserDataResponse](
+			httpClient,
+			baseURL+UserServiceExportUserDataProcedure,
+			connect.WithSchema(userServiceExportUserDataMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAccount: connect.NewClient[user.DeleteAccountRequest, common.Response](
+			httpClient,
+			baseURL+UserServiceDeleteAccountProcedure,
+			connect.WithSchema(userServiceDeleteAccountMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -84,6 +107,8 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type userServiceClient struct {
 	getUserProfile    *connect.Client[user.GetUserProfileRequest, user.GetUserProfileResponse]
 	updateUserProfile *connect.Client[user.UpdateUserProfileRequest, common.Response]
+	exportUserData    *connect.Client[user.ExportUserDataRequest, user.ExportUserDataResponse]
+	deleteAccount     *connect.Client[user.DeleteAccountRequest, common.Response]
 }
 
 // GetUserProfile calls loci.user.UserService.GetUserProfile.
@@ -96,10 +121,23 @@ func (c *userServiceClient) UpdateUserProfile(ctx context.Context, req *connect.
 	return c.updateUserProfile.CallUnary(ctx, req)
 }
 
+// ExportUserData calls loci.user.UserService.ExportUserData.
+func (c *userServiceClient) ExportUserData(ctx context.Context, req *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error) {
+	return c.exportUserData.CallUnary(ctx, req)
+}
+
+// DeleteAccount calls loci.user.UserService.DeleteAccount.
+func (c *userServiceClient) DeleteAccount(ctx context.Context, req *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error) {
+	return c.deleteAccount.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the loci.user.UserService service.
 type UserServiceHandler interface {
 	GetUserProfile(context.Context, *connect.Request[user.GetUserProfileRequest]) (*connect.Response[user.GetUserProfileResponse], error)
 	UpdateUserProfile(context.Context, *connect.Request[user.UpdateUserProfileRequest]) (*connect.Response[common.Response], error)
+	// Data controls (GDPR-style self-service).
+	ExportUserData(context.Context, *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error)
+	DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -120,12 +158,28 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceUpdateUserProfileMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceExportUserDataHandler := connect.NewUnaryHandler(
+		UserServiceExportUserDataProcedure,
+		svc.ExportUserData,
+		connect.WithSchema(userServiceExportUserDataMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceDeleteAccountHandler := connect.NewUnaryHandler(
+		UserServiceDeleteAccountProcedure,
+		svc.DeleteAccount,
+		connect.WithSchema(userServiceDeleteAccountMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.user.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetUserProfileProcedure:
 			userServiceGetUserProfileHandler.ServeHTTP(w, r)
 		case UserServiceUpdateUserProfileProcedure:
 			userServiceUpdateUserProfileHandler.ServeHTTP(w, r)
+		case UserServiceExportUserDataProcedure:
+			userServiceExportUserDataHandler.ServeHTTP(w, r)
+		case UserServiceDeleteAccountProcedure:
+			userServiceDeleteAccountHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -141,4 +195,12 @@ func (UnimplementedUserServiceHandler) GetUserProfile(context.Context, *connect.
 
 func (UnimplementedUserServiceHandler) UpdateUserProfile(context.Context, *connect.Request[user.UpdateUserProfileRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.UpdateUserProfile is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) ExportUserData(context.Context, *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.ExportUserData is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.DeleteAccount is not implemented"))
 }

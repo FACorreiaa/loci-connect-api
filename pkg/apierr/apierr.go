@@ -6,9 +6,11 @@ package apierr
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"connectrpc.com/connect"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -20,6 +22,15 @@ func ToConnect(err error) error {
 	}
 	if ce := new(connect.Error); errors.As(err, &ce) {
 		return err
+	}
+
+	var entitlement *subscription.EntitlementExceededError
+	if errors.As(err, &entitlement) {
+		ce := connect.NewError(connect.CodePermissionDenied, err)
+		ce.Meta().Set("x-loci-entitlement", entitlement.Feature)
+		ce.Meta().Set("x-loci-entitlement-limit", strconv.Itoa(entitlement.Limit))
+		ce.Meta().Set("x-loci-entitlement-used", strconv.Itoa(entitlement.Used))
+		return ce
 	}
 
 	switch {
@@ -37,6 +48,8 @@ func ToConnect(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, err)
 	case errors.Is(err, locitypes.ErrBadRequest):
 		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, subscription.ErrEntitlementExceeded):
+		return connect.NewError(connect.CodePermissionDenied, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

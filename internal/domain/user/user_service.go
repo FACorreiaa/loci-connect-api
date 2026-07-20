@@ -26,6 +26,9 @@ type UserService interface {
 	MarkEmailAsVerified(ctx context.Context, userID uuid.UUID) error
 	DeactivateUser(ctx context.Context, userID uuid.UUID) error
 	ReactivateUser(ctx context.Context, userID uuid.UUID) error
+
+	// DeleteAccount permanently deletes the user and cascaded data. Irreversible.
+	DeleteAccount(ctx context.Context, userID uuid.UUID) error
 }
 
 // ServiceUserImpl provides the implementation for UserService.
@@ -129,5 +132,14 @@ func (s *ServiceUserImpl) ReactivateUser(ctx context.Context, userID uuid.UUID) 
 	}
 
 	l.InfoContext(ctx, "User reactivated successfully")
+	return nil
+}
+
+// DeleteAccount permanently deletes the user and all cascaded data. The handler
+// gates this behind an explicit confirmation string.
+func (s *ServiceUserImpl) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+	if err := s.repo.DeleteUser(ctx, userID); err != nil {
+		return fmt.Errorf("delete account: %w", err)
+	}
 	return nil
 }

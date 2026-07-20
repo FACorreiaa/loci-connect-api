@@ -50,6 +50,10 @@ type UserRepo interface {
 
 	// ReactivateUser marks a user as active.
 	ReactivateUser(ctx context.Context, userID uuid.UUID) error
+
+	// DeleteUser permanently removes the user row. Owned data cascades via FK
+	// ON DELETE CASCADE (self-service account deletion). Irreversible.
+	DeleteUser(ctx context.Context, userID uuid.UUID) error
 }
 
 type PostgresUserRepo struct {
@@ -601,5 +605,18 @@ func (r *PostgresUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID)
 
 	l.InfoContext(ctx, "User reactivated successfully")
 	span.SetStatus(codes.Ok, "User reactivated")
+	return nil
+}
+
+// DeleteUser permanently removes the user and cascades owned data via FK
+// ON DELETE CASCADE. Irreversible — callers must confirm intent upstream.
+func (r *PostgresUserRepo) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	ct, err := r.pgpool.Exec(ctx, "DELETE FROM users WHERE id = $1", userID)
+	if err != nil {
+		return fmt.Errorf("delete user: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
+	}
 	return nil
 }

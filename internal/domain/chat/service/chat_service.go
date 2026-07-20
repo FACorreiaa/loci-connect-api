@@ -20,6 +20,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -96,6 +97,7 @@ type ServiceImpl struct {
 	poiRepo            poi.Repository
 	poiSvc             poi.Service // POI service for nearby queries with cache + DB + LLM fallback
 	listSvc            itinerarylist.Service
+	tripRepo           trip.Repository // auto-persist generated itineraries as editable trips
 	cache              cachestore.Store
 	model              string
 
@@ -116,6 +118,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	poiRepo poi.Repository,
 	poiSvc poi.Service,
 	listSvc itinerarylist.Service,
+	tripRepo trip.Repository,
 	logger *slog.Logger,
 	geminiCfg config.GeminiConfig,
 	llmSem *concurrency.LLMSemaphore,
@@ -149,6 +152,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		poiRepo:            poiRepo,
 		poiSvc:             poiSvc,
 		listSvc:            listSvc,
+		tripRepo:           tripRepo,
 		cache:              appCache,
 		model:              geminiCfg.Model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),

@@ -28,6 +28,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip/tripconnect"
 	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -281,6 +282,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		// Register OG meta HTTP handler for social sharing
 		mux.Handle("/share/", deps.ShareHandler.OGMetaHandler())
 		deps.Logger.Info("registered OG meta handler", "path", "/share/")
+	}
+
+	if deps.TripHandler != nil {
+		tripPath, tripHandler := tripconnect.NewTripServiceHandler(deps.TripHandler, opts)
+		mux.Handle(tripPath, tripHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", tripPath)
 	}
 
 	if deps.POIHandler != nil {

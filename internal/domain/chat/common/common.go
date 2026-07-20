@@ -232,6 +232,15 @@ type ChatContext struct {
 	UserLocation *locitypes.UserLocation
 	EventCh      chan<- locitypes.StreamEvent
 
+	// RequestedSessionID, when non-nil, asks the stream to resume/continue an
+	// existing session instead of minting a new one (client sends ChatRequest.session_id).
+	RequestedSessionID uuid.UUID
+	// ResumeToken, when set, requests replay of an interrupted stream; the client
+	// dedups by event_id so replays never double-emit.
+	ResumeToken string
+	// TripID binds this stream to a persisted TripDraft (Slice 2). Optional.
+	TripID uuid.UUID
+
 	// Derived/Generated fields populated during preparation
 	SessionID       uuid.UUID
 	Domain          locitypes.DomainType

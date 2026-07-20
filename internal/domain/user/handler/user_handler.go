@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -219,4 +221,66 @@ func fromUpdateProto(p *userpb.UpdateProfileParams) locitypes.UpdateProfileParam
 // ptrTo returns a pointer to the given value.
 func ptrTo[T any](v T) *T {
 	return &v
+}
+
+// ExportUserData returns a machine-readable copy of the caller's data (GDPR-style
+// self-service). Currently the user profile; extend as more owned data is surfaced.
+func (h *UserHandler) ExportUserData(
+	ctx context.Context,
+	_ *connect.Request[userpb.ExportUserDataRequest],
+) (*connect.Response[userpb.ExportUserDataResponse], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+	}
+
+	profile, err := h.service.GetUserProfile(ctx, userID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	payload := map[string]any{
+		"exported_at": time.Now().UTC().Format(time.RFC3339),
+		"profile":     profile,
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal export: %w", err))
+	}
+
+	return connect.NewResponse(&userpb.ExportUserDataResponse{
+		Data:        data,
+		ContentType: "application/json",
+		Filename:    "loci-data-export.json",
+	}), nil
+}
+
+// DeleteAccount permanently deletes the caller's account. Gated on an explicit
+// "DELETE" confirmation to guard against accidental calls. Irreversible.
+func (h *UserHandler) DeleteAccount(
+	ctx context.Context,
+	req *connect.Request[userpb.DeleteAccountRequest],
+) (*connect.Response[commonpb.Response], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if req.Msg.GetConfirmation() != "DELETE" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New(`confirmation must be "DELETE"`))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+	}
+
+	if err := h.service.DeleteAccount(ctx, userID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	msg := "account permanently deleted"
+	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
 }
