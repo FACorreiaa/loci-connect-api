@@ -47,7 +47,7 @@ func buildTripFromCityResponse(cc *common.ChatContext, data *locitypes.AiCityRes
 			POIID:      poi.ID.String(),
 			OrderIndex: int32(i % stopsPerDay),
 			Name:       poiName(poi),
-			Notes:      poi.DescriptionPOI,
+			Notes:      stopNotes(poi),
 		})
 	}
 	return t
@@ -58,4 +58,14 @@ func poiName(p locitypes.POIDetailedInfo) string {
 		return p.Name
 	}
 	return "Stop"
+}
+
+// stopNotes prefers the short TrustSignals "why this" rationale so the trip
+// editor can show a Why-this-stop chip without an extra POI fetch.
+func stopNotes(p locitypes.POIDetailedInfo) string {
+	_, _, rationale := locitypes.TrustSignals(p)
+	if rationale != "" {
+		return rationale
+	}
+	return p.DescriptionPOI
 }
