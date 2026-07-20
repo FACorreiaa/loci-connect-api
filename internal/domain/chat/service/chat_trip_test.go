@@ -16,7 +16,12 @@ func TestBuildTripFromCityResponse(t *testing.T) {
 	}
 	pois := make([]locitypes.POIDetailedInfo, 5)
 	for i := range pois {
-		pois[i] = locitypes.POIDetailedInfo{ID: uuid.New(), Name: "POI"}
+		pois[i] = locitypes.POIDetailedInfo{
+			ID:       uuid.New(),
+			Name:     "POI",
+			Category: "museum",
+			Rating:   4.5,
+		}
 	}
 	data := &locitypes.AiCityResponse{
 		AIItineraryResponse: locitypes.AIItineraryResponse{PointsOfInterest: pois},
@@ -45,6 +50,9 @@ func TestBuildTripFromCityResponse(t *testing.T) {
 	// Order indices reset per day.
 	if tr.Days[0].Stops[3].OrderIndex != 3 || tr.Days[1].Stops[0].OrderIndex != 0 {
 		t.Fatalf("order indices wrong")
+	}
+	if tr.Days[0].Stops[0].Notes == "" {
+		t.Fatal("expected TrustSignals rationale in stop notes")
 	}
 }
 
