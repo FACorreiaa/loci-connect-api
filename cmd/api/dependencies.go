@@ -221,7 +221,7 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
-	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, nil) // plans wired below after SubscriptionService
+	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, nil, nil, nil) // plans wired below after SubscriptionService
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	llmSem := concurrency.NewLLMSemaphore(d.Config.Gemini.MaxConcurrentCalls)
 	appCache, err := cachestore.New(cachestore.Config{
@@ -269,7 +269,7 @@ func (d *Dependencies) initServices() error {
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
 	})
 	// Freemium list/place caps need EffectivePlan — rebind with the live service.
-	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService)
+	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService, d.FavoritesRepo, d.PreferenceRecorder)
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
 		APIKey:         d.Config.Stripe.APIKey,
@@ -307,11 +307,11 @@ func (d *Dependencies) initHandlers() error {
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
-	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder)
+	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
 	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
-	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder)
+	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)

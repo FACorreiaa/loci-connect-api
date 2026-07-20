@@ -21,10 +21,11 @@ import (
 // Handler implements the FavoritesService
 type Handler struct {
 	favoritesv1connect.UnimplementedFavoritesServiceHandler
-	repo   Repository
-	plans  PlanChecker
-	prefs  preference.Recorder
-	logger *slog.Logger
+	repo      Repository
+	plans     PlanChecker
+	listItems ListItemCounter
+	prefs     preference.Recorder
+	logger    *slog.Logger
 }
 
 // PlanChecker is the subset of subscription.Service needed for freemium gates.
@@ -32,13 +33,25 @@ type PlanChecker interface {
 	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
-// NewHandler creates a new favorites handler. plans/prefs may be nil.
-func NewHandler(repo Repository, logger *slog.Logger, plans PlanChecker, prefs preference.Recorder) *Handler {
+// ListItemCounter tallies list saves so favorites share the free-tier place cap.
+type ListItemCounter interface {
+	CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error)
+}
+
+// NewHandler creates a new favorites handler. Optional deps may be nil.
+func NewHandler(
+	repo Repository,
+	logger *slog.Logger,
+	plans PlanChecker,
+	prefs preference.Recorder,
+	listItems ListItemCounter,
+) *Handler {
 	return &Handler{
-		repo:   repo,
-		plans:  plans,
-		prefs:  prefs,
-		logger: logger.With(slog.String("component", "favorites-handler")),
+		repo:      repo,
+		plans:     plans,
+		prefs:     prefs,
+		listItems: listItems,
+		logger:    logger.With(slog.String("component", "favorites-handler")),
 	}
 }
 
@@ -345,6 +358,13 @@ func (h *Handler) enforcePlaceLimit(ctx context.Context, userID uuid.UUID) error
 	n, err := h.repo.GetFavoritesCount(ctx, userID, "")
 	if err != nil {
 		return err
+	}
+	if h.listItems != nil {
+		items, lerr := h.listItems.CountUserListItems(ctx, userID)
+		if lerr != nil {
+			return lerr
+		}
+		n += items
 	}
 	return subscription.CheckPlaceAdd(plan, n)
 }

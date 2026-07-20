@@ -150,7 +150,7 @@ func (m *MockListRepository) SearchLists(ctx context.Context, searchTerm, catego
 func setupListServiceTest() (*ServiceImpl, *MockListRepository) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	mockRepo := new(MockListRepository)
-	service := NewServiceImpl(mockRepo, logger, nil)
+	service := NewServiceImpl(mockRepo, logger, nil, nil, nil)
 	return service, mockRepo
 }
 

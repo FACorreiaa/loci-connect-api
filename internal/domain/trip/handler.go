@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -21,13 +22,19 @@ type Handler struct {
 	repo    Repository
 	baseURL string
 	prefs   preference.Recorder
+	plans   PlanChecker
 }
 
-func NewHandler(repo Repository, baseURL string, prefs preference.Recorder) *Handler {
+// PlanChecker resolves effective subscription plan for export gating.
+type PlanChecker interface {
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+func NewHandler(repo Repository, baseURL string, prefs preference.Recorder, plans PlanChecker) *Handler {
 	if prefs == nil {
 		prefs = preference.NewRecorder(nil, nil)
 	}
-	return &Handler{repo: repo, baseURL: baseURL, prefs: prefs}
+	return &Handler{repo: repo, baseURL: baseURL, prefs: prefs, plans: plans}
 }
 
 func userID(ctx context.Context) (uuid.UUID, error) {
@@ -254,10 +261,24 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 			Filename:    safeFilename(t.Title) + ".ics",
 		}), nil
 	case tripv1.ExportFormat_EXPORT_FORMAT_PDF:
-		pdfData, err := buildTripPDF(t)
+		exportTrip := t
+		if h.plans != nil {
+			plan, perr := h.plans.EffectivePlan(ctx, uid)
+			if perr == nil && !subscription.IsProPlan(plan) && len(t.Days) > 1 {
+				// Free: Day 1 only (matches TripKit client soft-gate).
+				clone := *t
+				clone.Days = append([]TripDay(nil), t.Days[0])
+				exportTrip = &clone
+			}
+		}
+		pdfData, err := buildTripPDF(exportTrip)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("pdf: %w", err))
 		}
+		h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
+			TripID:   &id,
+			Metadata: map[string]any{"format": "pdf", "days": len(exportTrip.Days)},
+		})
 		return connect.NewResponse(&tripv1.ExportTripResponse{
 			Data:        pdfData,
 			ContentType: "application/pdf",

@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -53,6 +54,8 @@ type ServiceImpl struct {
 	logger         *slog.Logger
 	listRepository Repository
 	plans          PlanChecker
+	favorites      FavoriteCounter
+	prefs          preference.Recorder
 }
 
 // PlanChecker is the subset of subscription.Service needed for freemium gates.
@@ -60,13 +63,25 @@ type PlanChecker interface {
 	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
-// NewServiceImpl creates a new instance of ServiceImpl.
-// plans may be nil (limits skipped) — production always wires subscription.Service.
-func NewServiceImpl(repo Repository, logger *slog.Logger, plans PlanChecker) *ServiceImpl {
+// FavoriteCounter tallies favorites so list+favorite saves share one free-tier cap.
+type FavoriteCounter interface {
+	GetFavoritesCount(ctx context.Context, userID uuid.UUID, contentType string) (int, error)
+}
+
+// NewServiceImpl creates a ServiceImpl. Optional deps may be nil.
+func NewServiceImpl(
+	repo Repository,
+	logger *slog.Logger,
+	plans PlanChecker,
+	favorites FavoriteCounter,
+	prefs preference.Recorder,
+) *ServiceImpl {
 	return &ServiceImpl{
 		logger:         logger,
 		listRepository: repo,
 		plans:          plans,
+		favorites:      favorites,
+		prefs:          prefs,
 	}
 }
 
@@ -406,6 +421,13 @@ func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID,
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to add item to list")
 		return nil, fmt.Errorf("failed to add item to list: %w", err)
+	}
+
+	if s.prefs != nil {
+		s.prefs.Record(ctx, userID, preference.EventSaved, preference.RecordOpts{
+			POIID:    params.ItemID.String(),
+			Metadata: map[string]any{"list_id": listID.String(), "content_type": string(params.ContentType)},
+		})
 	}
 
 	l.InfoContext(ctx, "Item added to list successfully")
@@ -1046,6 +1068,13 @@ func (s *ServiceImpl) enforcePlaceLimit(ctx context.Context, userID uuid.UUID) e
 	n, err := s.listRepository.CountUserListItems(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("count places: %w", err)
+	}
+	if s.favorites != nil {
+		favs, ferr := s.favorites.GetFavoritesCount(ctx, userID, "")
+		if ferr != nil {
+			return fmt.Errorf("count favorites: %w", ferr)
+		}
+		n += favs
 	}
 	return subscription.CheckPlaceAdd(plan, n)
 }
