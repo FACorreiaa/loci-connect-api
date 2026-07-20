@@ -14,7 +14,8 @@ import (
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
-	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	discoverconnect 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
@@ -253,6 +254,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		paymentPath, paymentHandler := paymentv1connect.NewPaymentServiceHandler(deps.PaymentHandler, opts)
 		mux.Handle(paymentPath, paymentHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", paymentPath)
+	}
+
+	if deps.EntitlementHandler != nil {
+		entPath, entHandler := entitlementv1connect.NewEntitlementServiceHandler(deps.EntitlementHandler, opts)
+		mux.Handle(entPath, entHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", entPath)
 	}
 
 	if deps.FavoritesHandler != nil {

@@ -83,6 +83,11 @@ func (m *MockListRepository) GetUserLists(ctx context.Context, userID uuid.UUID,
 	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
+func (m *MockListRepository) CountUserLists(ctx context.Context, userID uuid.UUID) (int, error) {
+	args := m.Called(ctx, userID)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *MockListRepository) CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error) {
 	args := m.Called(ctx, userID)
 	return args.Int(0), args.Error(1)

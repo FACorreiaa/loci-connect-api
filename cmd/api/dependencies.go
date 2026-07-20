@@ -16,6 +16,7 @@ import (
 	customauthhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/handler"
 	customauthservice "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/service"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/entitlement"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
@@ -110,10 +111,11 @@ type Dependencies struct {
 	APIKeyHandler     *apikey.Handler
 	ExportHandler     *export.Handler
 	ShareHandler      *share.Handler
-	TripHandler       *trip.Handler
-	POIHandler        *poihandler.POIHandler
-	CustomAuthHandler *customauthhandler.CustomAuthHandler
-	ReviewHandler     *reviewdomain.Handler
+	TripHandler         *trip.Handler
+	POIHandler          *poihandler.POIHandler
+	CustomAuthHandler   *customauthhandler.CustomAuthHandler
+	ReviewHandler       *reviewdomain.Handler
+	EntitlementHandler  *entitlement.Handler
 
 	PreferenceRecorder preference.Recorder
 }
@@ -315,6 +317,7 @@ func (d *Dependencies) initHandlers() error {
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
+	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
