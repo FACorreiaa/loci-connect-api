@@ -9,6 +9,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -70,8 +71,9 @@ type ServiceImpl struct {
 	discoverRepo     interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
 	}
-	cache  cachestore.Store
-	llmSem *concurrency.LLMSemaphore
+	cache       cachestore.Store
+	llmSem      *concurrency.LLMSemaphore
+	prefVectors preference.VectorReader
 }
 
 func NewServiceImpl(
@@ -111,6 +113,13 @@ func NewServiceImpl(
 		cache:            appCache,
 		embeddingService: embeddingService,
 		llmSem:           llmSem,
+	}
+}
+
+// SetPreferenceVectors enables preference-aware semantic search blending.
+func (s *ServiceImpl) SetPreferenceVectors(r preference.VectorReader) {
+	if s != nil {
+		s.prefVectors = r
 	}
 }
 

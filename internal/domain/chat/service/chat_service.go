@@ -18,6 +18,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
@@ -100,6 +101,7 @@ type ServiceImpl struct {
 	tripRepo           trip.Repository // auto-persist generated itineraries as editable trips
 	cache              cachestore.Store
 	model              string
+	prefVectors        preference.VectorReader
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
@@ -162,4 +164,11 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	}
 	go service.processDeadLetterQueue(deadLetterCtx)
 	return service, nil
+}
+
+// SetPreferenceVectors enables preference-aware semantic POI ranking in chat.
+func (l *ServiceImpl) SetPreferenceVectors(r preference.VectorReader) {
+	if l != nil {
+		l.prefVectors = r
+	}
 }
