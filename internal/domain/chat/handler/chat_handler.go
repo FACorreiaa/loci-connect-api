@@ -40,7 +40,7 @@ func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger
 	return &ChatHandler{
 		resumeBuf: resumebuf.New(),
 		service:   llmInteractionService,
-		logger:  logger,
+		logger:    logger,
 	}
 }
 

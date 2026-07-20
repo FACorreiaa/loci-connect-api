@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultMaxEvents  = 500             // ring capacity per session
+	defaultMaxEvents  = 500              // ring capacity per session
 	defaultSessionTTL = 15 * time.Minute // idle sessions evicted after this
 )
 
@@ -27,12 +27,12 @@ type sessionBuf struct {
 
 // Buffer is a concurrency-safe collection of per-session event rings.
 type Buffer struct {
-	mu         sync.Mutex
-	sessions   map[string]*sessionBuf
-	maxEvents  int
-	ttl        time.Duration
-	now        func() time.Time
-	lastReap   time.Time
+	mu        sync.Mutex
+	sessions  map[string]*sessionBuf
+	maxEvents int
+	ttl       time.Duration
+	now       func() time.Time
+	lastReap  time.Time
 }
 
 // New returns a Buffer with default bounds.
