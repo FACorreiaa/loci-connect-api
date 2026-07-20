@@ -95,27 +95,27 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler       *handler.AuthHandler
-	ChatHandler       *chathandler.ChatHandler
-	ProfileHandler    *profilehandler.ProfileHandler
-	DiscoverHandler   *discoverdomain.Handler
-	ItineraryHandler  *itineraryhandler.ItineraryHandler
-	ListHandler       *itineraryhandler.ListHandler
-	StatisticsHandler *statistics.Handler
-	RecentsHandler    *recents.Handler
-	UserHandler       *userhandler.UserHandler
-	InterestHandler   *interesthandler.InterestHandler
-	TagsHandler       *tagshandler.TagsHandler
-	PaymentHandler    paymentv1connect.PaymentServiceHandler
-	FavoritesHandler  *favorites.Handler
-	APIKeyHandler     *apikey.Handler
-	ExportHandler     *export.Handler
-	ShareHandler      *share.Handler
-	TripHandler         *trip.Handler
-	POIHandler          *poihandler.POIHandler
-	CustomAuthHandler   *customauthhandler.CustomAuthHandler
-	ReviewHandler       *reviewdomain.Handler
-	EntitlementHandler  *entitlement.Handler
+	AuthHandler        *handler.AuthHandler
+	ChatHandler        *chathandler.ChatHandler
+	ProfileHandler     *profilehandler.ProfileHandler
+	DiscoverHandler    *discoverdomain.Handler
+	ItineraryHandler   *itineraryhandler.ItineraryHandler
+	ListHandler        *itineraryhandler.ListHandler
+	StatisticsHandler  *statistics.Handler
+	RecentsHandler     *recents.Handler
+	UserHandler        *userhandler.UserHandler
+	InterestHandler    *interesthandler.InterestHandler
+	TagsHandler        *tagshandler.TagsHandler
+	PaymentHandler     paymentv1connect.PaymentServiceHandler
+	FavoritesHandler   *favorites.Handler
+	APIKeyHandler      *apikey.Handler
+	ExportHandler      *export.Handler
+	ShareHandler       *share.Handler
+	TripHandler        *trip.Handler
+	POIHandler         *poihandler.POIHandler
+	CustomAuthHandler  *customauthhandler.CustomAuthHandler
+	ReviewHandler      *reviewdomain.Handler
+	EntitlementHandler *entitlement.Handler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore

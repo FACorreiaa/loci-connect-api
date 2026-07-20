@@ -93,13 +93,13 @@ func (h *Handler) GetEntitlements(
 
 	isPro := subscription.IsProPlan(plan)
 	out := &entitlementv1.Entitlements{
-		Plan:             plan,
-		ListsUsed:        int32(listsUsed),
-		ListsLimit:       int32(subscription.ListLimitForPlan(plan)),
-		PlacesSaved:      int32(placesSaved),
-		PlacesLimit:      int32(subscription.PlaceLimitForPlan(plan)),
-		AdvancedFilters:  isPro,
-		ExportFull:       isPro,
+		Plan:            plan,
+		ListsUsed:       int32(listsUsed),
+		ListsLimit:      int32(subscription.ListLimitForPlan(plan)),
+		PlacesSaved:     int32(placesSaved),
+		PlacesLimit:     int32(subscription.PlaceLimitForPlan(plan)),
+		AdvancedFilters: isPro,
+		ExportFull:      isPro,
 	}
 	return connect.NewResponse(out), nil
 }

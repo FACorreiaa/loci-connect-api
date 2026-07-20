@@ -66,7 +66,7 @@ func TestFoodiePrefsRankDiningOverMuseum(t *testing.T) {
 	if ranked[1].name != "restaurant" && ranked[1].name != "cafe" {
 		t.Fatalf("expected dining 1-2 after personalize, got %#v", ranked)
 	}
-	diningTop := ranked[0].sim+ranked[1].sim
+	diningTop := ranked[0].sim + ranked[1].sim
 	museumTop := 0.0
 	for _, s := range ranked {
 		if s.name == "museum" || s.name == "gallery" {
