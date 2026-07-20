@@ -20,7 +20,8 @@ RUN go mod download
 COPY . .
 
 # Build the application with optimizations
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server \
+ && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o preference-rerank ./cmd/preference-rerank
 
 # Runtime stage
 FROM alpine:latest
@@ -30,8 +31,9 @@ RUN apk --no-cache add ca-certificates tzdata wget
 
 WORKDIR /root/
 
-# Copy binary from builder
+# Copy binaries from builder
 COPY --from=builder /app/server .
+COPY --from=builder /app/preference-rerank .
 
 # Expose ports (API:8080, Metrics:9090, pprof:6060)
 EXPOSE 8080 9090 6060

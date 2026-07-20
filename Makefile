@@ -10,6 +10,10 @@ generate: ## Generate code from proto files and sync vendored protos
 
 build: ## Build the application
 	go build -o bin/server cmd/server/main.go
+	go build -o bin/preference-rerank cmd/preference-rerank/main.go
+
+preference-rerank: ## Recompute user preference vectors from feedback (-lookback=168h)
+	go run ./cmd/preference-rerank -lookback=168h
 
 run: ## Run the application
 	go run cmd/server/main.go

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -415,6 +416,7 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 		span.SetStatus(codes.Error, "Failed to generate query embedding")
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
+	queryEmbedding = preference.PersonalizeQuery(ctx, l.prefVectors, userID, queryEmbedding)
 
 	var pois []locitypes.POIDetailedInfo
 

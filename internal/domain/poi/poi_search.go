@@ -9,7 +9,9 @@ import (
 
 	"google.golang.org/genai"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,6 +56,7 @@ func (s *ServiceImpl) SearchPOIsSemantic(ctx context.Context, query string, limi
 		span.SetStatus(codes.Error, "Failed to generate query embedding")
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
+	queryEmbedding = s.personalizeEmbedding(ctx, queryEmbedding)
 
 	// Search for similar POIs
 	pois, err := s.poiRepository.FindSimilarPOIs(ctx, queryEmbedding, limit)
@@ -105,6 +108,7 @@ func (s *ServiceImpl) SearchPOIsSemanticByCity(ctx context.Context, query string
 		span.SetStatus(codes.Error, "Failed to generate query embedding")
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
+	queryEmbedding = s.personalizeEmbedding(ctx, queryEmbedding)
 
 	// Search for similar POIs in the specified city
 	pois, err := s.poiRepository.FindSimilarPOIsByCity(ctx, queryEmbedding, cityID, limit)
@@ -441,6 +445,7 @@ func (s *ServiceImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.POI
 		span.SetStatus(codes.Error, "Failed to generate query embedding")
 		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
+	queryEmbedding = s.personalizeEmbedding(ctx, queryEmbedding)
 
 	// Perform hybrid search
 	pois, err := s.poiRepository.SearchPOIsHybrid(ctx, filter, queryEmbedding, semanticWeight)
@@ -463,4 +468,16 @@ func (s *ServiceImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.POI
 	span.SetStatus(codes.Ok, "Hybrid search completed")
 
 	return pois, nil
+}
+
+func (s *ServiceImpl) personalizeEmbedding(ctx context.Context, query []float32) []float32 {
+	uidStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || uidStr == "" {
+		return query
+	}
+	uid, err := uuid.Parse(uidStr)
+	if err != nil {
+		return query
+	}
+	return preference.PersonalizeQuery(ctx, s.prefVectors, uid, query)
 }

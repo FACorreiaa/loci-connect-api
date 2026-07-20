@@ -14,7 +14,7 @@ import (
 	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
 	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
-	discoverconnect 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"

@@ -95,29 +95,30 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler       *handler.AuthHandler
-	ChatHandler       *chathandler.ChatHandler
-	ProfileHandler    *profilehandler.ProfileHandler
-	DiscoverHandler   *discoverdomain.Handler
-	ItineraryHandler  *itineraryhandler.ItineraryHandler
-	ListHandler       *itineraryhandler.ListHandler
-	StatisticsHandler *statistics.Handler
-	RecentsHandler    *recents.Handler
-	UserHandler       *userhandler.UserHandler
-	InterestHandler   *interesthandler.InterestHandler
-	TagsHandler       *tagshandler.TagsHandler
-	PaymentHandler    paymentv1connect.PaymentServiceHandler
-	FavoritesHandler  *favorites.Handler
-	APIKeyHandler     *apikey.Handler
-	ExportHandler     *export.Handler
-	ShareHandler      *share.Handler
-	TripHandler         *trip.Handler
-	POIHandler          *poihandler.POIHandler
-	CustomAuthHandler   *customauthhandler.CustomAuthHandler
-	ReviewHandler       *reviewdomain.Handler
-	EntitlementHandler  *entitlement.Handler
+	AuthHandler        *handler.AuthHandler
+	ChatHandler        *chathandler.ChatHandler
+	ProfileHandler     *profilehandler.ProfileHandler
+	DiscoverHandler    *discoverdomain.Handler
+	ItineraryHandler   *itineraryhandler.ItineraryHandler
+	ListHandler        *itineraryhandler.ListHandler
+	StatisticsHandler  *statistics.Handler
+	RecentsHandler     *recents.Handler
+	UserHandler        *userhandler.UserHandler
+	InterestHandler    *interesthandler.InterestHandler
+	TagsHandler        *tagshandler.TagsHandler
+	PaymentHandler     paymentv1connect.PaymentServiceHandler
+	FavoritesHandler   *favorites.Handler
+	APIKeyHandler      *apikey.Handler
+	ExportHandler      *export.Handler
+	ShareHandler       *share.Handler
+	TripHandler        *trip.Handler
+	POIHandler         *poihandler.POIHandler
+	CustomAuthHandler  *customauthhandler.CustomAuthHandler
+	ReviewHandler      *reviewdomain.Handler
+	EntitlementHandler *entitlement.Handler
 
 	PreferenceRecorder preference.Recorder
+	PreferenceVectors  preference.VectorStore
 }
 
 // InitDependencies initializes all application dependencies
@@ -198,6 +199,7 @@ func (d *Dependencies) initRepositories() error {
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
+	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -237,7 +239,9 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize cache: %w", err)
 	}
 	d.AppCache = appCache
-	d.POISvc = poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.Gemini, llmSem, appCache, d.Logger)
+	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.Gemini, llmSem, appCache, d.Logger)
+	poiSvc.SetPreferenceVectors(d.PreferenceVectors)
+	d.POISvc = poiSvc
 	chatSvc, err := chatservice.NewLlmInteractiontService(
 		d.InterestRepo,
 		d.ProfileRepo,
@@ -257,6 +261,7 @@ func (d *Dependencies) initServices() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
 	}
+	chatSvc.SetPreferenceVectors(d.PreferenceVectors)
 	d.ChatService = chatSvc
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
