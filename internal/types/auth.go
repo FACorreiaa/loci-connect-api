@@ -18,13 +18,10 @@ type UserAuth struct {
 	// DeletedAt *time.Time `json:"deleted_at,omitempty"`                         // Timestamp for soft deletes (if implemented).
 }
 
-// --- SECURITY WARNING ---
-// JwtSecretKey and JwtRefreshSecretKey should be loaded from secure configuration,
-// NOT hardcoded. These are placeholders only.
-var (
-	JwtSecretKey        = []byte("replace-with-secure-env-var")
-	JwtRefreshSecretKey = []byte("replace-with-different-secure-env-var")
-)
+// JWT secrets are loaded exclusively from configuration (config.Auth.JWTSecret),
+// which refuses to boot on empty/placeholder/short values. The previous hardcoded
+// placeholder byte slices were unused and have been removed to avoid any chance of
+// a signing path silently falling back to a known secret.
 
 // LoginRequest represents the expected JSON body for user login.
 type LoginRequest struct {

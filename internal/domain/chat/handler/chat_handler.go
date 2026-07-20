@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -14,10 +15,13 @@ import (
 
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/resumebuf"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
@@ -26,14 +30,16 @@ import (
 // ChatHandler implements the ChatServiceHandler interface.
 type ChatHandler struct {
 	chatconnect.UnimplementedChatServiceHandler
-	service service.LlmInteractiontService
-	logger  *slog.Logger
+	service   service.LlmInteractiontService
+	logger    *slog.Logger
+	resumeBuf *resumebuf.Buffer
 }
 
 // NewChatHandler creates a new ChatHandler.
 func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger *slog.Logger) *ChatHandler {
 	return &ChatHandler{
-		service: llmInteractionService,
+		resumeBuf: resumebuf.New(),
+		service:   llmInteractionService,
 		logger:  logger,
 	}
 }
@@ -121,14 +127,78 @@ func (h *ChatHandler) StreamChat(
 	// default 3m) bounds preparation; workers use a separate 5m deadline.
 	llmCtx, llmCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute)
 
+	// Resume/trip context from the request. session_id asks the server to
+	// continue an existing session rather than mint a new one.
+	var requestedSessionID uuid.UUID
+	if sid := req.Msg.GetSessionId(); sid != "" {
+		if parsed, perr := uuid.Parse(sid); perr == nil {
+			requestedSessionID = parsed
+		}
+	}
+	var tripID uuid.UUID
+	if tid := req.Msg.GetTripId(); tid != "" {
+		if parsed, perr := uuid.Parse(tid); perr == nil {
+			tripID = parsed
+		}
+	}
+
 	cc := common.ChatContext{
-		Ctx:          llmCtx,
-		UserID:       userID,
-		ProfileID:    profileID,
-		CityName:     cityName,
-		Message:      req.Msg.GetMessage(),
-		UserLocation: userLoc,
-		EventCh:      eventCh,
+		Ctx:                llmCtx,
+		UserID:             userID,
+		ProfileID:          profileID,
+		CityName:           cityName,
+		Message:            req.Msg.GetMessage(),
+		UserLocation:       userLoc,
+		EventCh:            eventCh,
+		RequestedSessionID: requestedSessionID,
+		ResumeToken:        req.Msg.GetResumeToken(),
+		TripID:             tripID,
+	}
+
+	// bufSessionID keys the resume buffer. Known up front for a resume/continue
+	// (client sent session_id); for a fresh stream it's captured from the start
+	// event below once the server mints the session.
+	bufSessionID := ""
+	if requestedSessionID != uuid.Nil {
+		bufSessionID = requestedSessionID.String()
+	}
+
+	// Resume path: replay what the client missed instead of re-running the LLM.
+	// The original generation goroutine keeps buffering after a disconnect, so the
+	// buffer holds events produced while the client was gone. On a buffer miss
+	// (evicted/unknown) we fall through to a fresh generation (session_id honored).
+	if h.resumeBuf != nil && cc.ResumeToken != "" && bufSessionID != "" {
+		if events, found := h.resumeBuf.Replay(bufSessionID, cc.ResumeToken); found {
+			llmCancel()
+			for _, ev := range events {
+				resp, mErr := h.mapEventToProto(ev)
+				if mErr != nil {
+					continue
+				}
+				if sErr := stream.Send(resp); sErr != nil {
+					return nil
+				}
+			}
+			h.logger.Info("resumed stream from buffer", "session_id", bufSessionID, "replayed", len(events))
+			return nil
+		}
+	}
+
+	// appendEvent records live events for future resume, capturing the minted
+	// session id from the start event when we didn't already know it.
+	appendEvent := func(ev locitypes.StreamEvent) {
+		if h.resumeBuf == nil {
+			return
+		}
+		if bufSessionID == "" && ev.Type == locitypes.EventTypeStart {
+			var sd locitypes.StreamStartData
+			if decodeData(ev.Data, &sd) && sd.SessionID != "" {
+				bufSessionID = sd.SessionID
+			}
+		}
+		if bufSessionID != "" {
+			h.resumeBuf.Append(bufSessionID, ev)
+		}
 	}
 
 	go func() {
@@ -153,6 +223,8 @@ func (h *ChatHandler) StreamChat(
 				return nil
 			}
 
+			appendEvent(event)
+
 			resp, err := h.mapEventToProto(event)
 			if err != nil {
 				h.logger.Error("Failed to map event", "error", err)
@@ -163,10 +235,10 @@ func (h *ChatHandler) StreamChat(
 				// Client disconnected - let goroutine finish processing
 				h.logger.Info("Client disconnected during streaming, LLM processing continues in background",
 					"error", err)
-				// Drain remaining events to allow graceful cleanup
+				// Keep buffering the rest so a reconnect can resume from the buffer.
 				go func() {
-					for range eventCh {
-						// Drain channel
+					for ev := range eventCh {
+						appendEvent(ev)
 					}
 				}()
 				return nil
@@ -180,10 +252,10 @@ func (h *ChatHandler) StreamChat(
 		case <-ctx.Done():
 			// RPC context cancelled (client disconnected) but LLM processing continues
 			h.logger.Info("Client disconnected, LLM processing continues in background")
-			// Drain eventCh to prevent goroutine block
+			// Keep buffering so a reconnect can resume from the buffer.
 			go func() {
-				for range eventCh {
-					// Drain channel
+				for ev := range eventCh {
+					appendEvent(ev)
 				}
 			}()
 			return nil
@@ -213,17 +285,17 @@ func (h *ChatHandler) toConnectError(err error) error {
 	}
 }
 
+// mapEventToProto translates an internal StreamEvent onto the typed proto
+// StreamEvent (event_type enum + payload oneof). It decodes event.Data through a
+// JSON round-trip so both the typed payload structs and legacy map shapes map
+// cleanly onto the concrete payload for each event type.
 func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.StreamEvent, error) {
 	resp := &chatv1.StreamEvent{
-		Type:      string(event.Type),
 		Message:   event.Message,
 		Timestamp: timestamppb.New(event.Timestamp),
 		EventId:   event.EventID,
 		IsFinal:   event.IsFinal,
-	}
-
-	if event.Error != "" {
-		resp.Error = &event.Error
+		EventType: eventTypeToProto(event.Type),
 	}
 
 	if event.Navigation != nil {
@@ -234,15 +306,208 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.Stre
 		}
 	}
 
-	if event.Data != nil {
-		dataBytes, err := json.Marshal(event.Data)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal event data: %w", err)
+	switch event.Type {
+	case locitypes.EventTypeError:
+		resp.Payload = &chatv1.StreamEvent_Error{Error: streamErrorFromEvent(event)}
+
+	case locitypes.EventTypeComplete:
+		cp := &chatv1.CompletePayload{}
+		var cr locitypes.AiCityResponse
+		if decodeData(event.Data, &cr) && cr.SessionID != uuid.Nil {
+			cp.SessionId = cr.SessionID.String()
+			cp.Result = presenter.ToAiCityResponse(&cr)
 		}
-		resp.Data = dataBytes
+		resp.Payload = &chatv1.StreamEvent_Complete{Complete: cp}
+
+	case locitypes.EventTypeStart:
+		var sd locitypes.StreamStartData
+		decodeData(event.Data, &sd)
+		resp.Payload = &chatv1.StreamEvent_Start{Start: &chatv1.StartPayload{
+			SessionId: sd.SessionID,
+			Domain:    domainToProto(sd.Domain),
+			CityName:  optString(sd.City),
+		}}
+
+	case locitypes.EventTypeItinerary:
+		var cr locitypes.AiCityResponse
+		if !decodeData(event.Data, &cr) {
+			return nil, fmt.Errorf("itinerary event %q: undecodable data", event.EventID)
+		}
+		resp.Payload = &chatv1.StreamEvent_Itinerary{Itinerary: &chatv1.ItineraryPayload{
+			CityResponse: presenter.ToAiCityResponse(&cr),
+		}}
+
+	case locitypes.EventTypeCityData:
+		var gcd locitypes.GeneralCityData
+		decodeData(event.Data, &gcd)
+		resp.Payload = &chatv1.StreamEvent_CityData{CityData: &chatv1.CityDataPayload{
+			GeneralCityData: presenter.ToGeneralCityData(gcd),
+		}}
+
+	case locitypes.EventTypeHotels:
+		pois, gcd, sid := decodeDomainList(event.Data)
+		resp.Payload = &chatv1.StreamEvent_Hotels{Hotels: &chatv1.HotelsPayload{
+			Pois: pois, GeneralCityData: gcd, SessionId: sid,
+		}}
+
+	case locitypes.EventTypeRestaurants:
+		pois, gcd, sid := decodeDomainList(event.Data)
+		resp.Payload = &chatv1.StreamEvent_Restaurants{Restaurants: &chatv1.RestaurantsPayload{
+			Pois: pois, GeneralCityData: gcd, SessionId: sid,
+		}}
+
+	case "activities":
+		pois, gcd, sid := decodeDomainList(event.Data)
+		resp.Payload = &chatv1.StreamEvent_Activities{Activities: &chatv1.ActivitiesPayload{
+			Activities: pois, GeneralCityData: gcd, SessionId: sid,
+		}}
+
+	case "nearby", locitypes.EventTypeGeneralPOI, locitypes.EventTypePersonalizedPOI:
+		pois, gcd, sid := decodeDomainList(event.Data)
+		resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
+			Pois: pois, GeneralCityData: gcd, SessionId: sid,
+		}}
+
+	case "poi_detail_complete":
+		var poi locitypes.POIDetailedInfo
+		if decodeData(event.Data, &poi) {
+			resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
+				Pois: presenter.ToPOIDetailedInfoSlice([]locitypes.POIDetailedInfo{poi}),
+			}}
+		} else {
+			resp.Payload = &chatv1.StreamEvent_Progress{Progress: progressPayload(event)}
+		}
+
+	case locitypes.EventTypeChunk, "poi_detail_chunk":
+		var cd locitypes.StreamChunkData
+		decodeData(event.Data, &cd)
+		resp.Payload = &chatv1.StreamEvent_Token{Token: &chatv1.TokenPayload{Text: cd.Text}}
+
+	default:
+		// progress + developer/status events (session_validated, intent_classified,
+		// domain_detected, prompt_generated, parsing_response, …) collapse to progress.
+		resp.Payload = &chatv1.StreamEvent_Progress{Progress: progressPayload(event)}
 	}
 
 	return resp, nil
+}
+
+// decodeData re-encodes a stream event's Data (a typed struct or a legacy map)
+// into target via JSON. Best-effort: false if Data is nil or does not decode.
+func decodeData(data any, target any) bool {
+	if data == nil {
+		return false
+	}
+	b, err := json.Marshal(data)
+	if err != nil {
+		return false
+	}
+	return json.Unmarshal(b, target) == nil
+}
+
+// decodeDomainList decodes a StreamDomainListData payload into proto POIs +
+// city context, tolerating the legacy map shape.
+func decodeDomainList(data any) ([]*poiv1.POIDetailedInfo, *cityv1.GeneralCityData, string) {
+	var d locitypes.StreamDomainListData
+	decodeData(data, &d)
+	return presenter.ToPOIDetailedInfoSlice(d.POIs), presenter.ToGeneralCityData(d.GeneralCityData), d.SessionID
+}
+
+func eventTypeToProto(t string) chatv1.StreamEventType {
+	switch t {
+	case locitypes.EventTypeStart:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_START
+	case locitypes.EventTypeChunk, "poi_detail_chunk":
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_TOKEN
+	case locitypes.EventTypeCityData:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_CITY_DATA
+	case locitypes.EventTypeItinerary:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ITINERARY
+	case locitypes.EventTypeHotels:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_HOTELS
+	case locitypes.EventTypeRestaurants:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_RESTAURANTS
+	case "activities":
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACTIVITIES
+	case "nearby", locitypes.EventTypeGeneralPOI, locitypes.EventTypePersonalizedPOI, "poi_detail_complete":
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_GENERAL_POIS
+	case locitypes.EventTypeError:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR
+	case locitypes.EventTypeComplete:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE
+	default:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
+	}
+}
+
+func domainToProto(d string) chatv1.DomainType {
+	switch strings.ToLower(d) {
+	case "accommodation":
+		return chatv1.DomainType_DOMAIN_TYPE_ACCOMMODATION
+	case "dining":
+		return chatv1.DomainType_DOMAIN_TYPE_DINING
+	case "activities":
+		return chatv1.DomainType_DOMAIN_TYPE_ACTIVITIES
+	case "itinerary":
+		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
+	case "transport":
+		return chatv1.DomainType_DOMAIN_TYPE_TRANSPORT
+	case "general", "nearby":
+		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
+	default:
+		return chatv1.DomainType_DOMAIN_TYPE_UNSPECIFIED
+	}
+}
+
+// progressPayload builds a ProgressPayload, preferring a "status" string from a
+// map-shaped Data when present, else falling back to the event type.
+func progressPayload(event locitypes.StreamEvent) *chatv1.ProgressPayload {
+	stage := event.Type
+	var m map[string]any
+	if decodeData(event.Data, &m) {
+		if s, ok := m["status"].(string); ok && s != "" {
+			stage = s
+		}
+	}
+	if stage == "" {
+		stage = "progress"
+	}
+	return &chatv1.ProgressPayload{Stage: stage}
+}
+
+// streamErrorFromEvent maps an error event onto a typed StreamError, classifying
+// capacity/quota conditions into retry hints.
+func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
+	msg := event.Error
+	if msg == "" {
+		msg = event.Message
+	}
+	if msg == "" {
+		msg = "An error occurred while processing your request."
+	}
+	se := &chatv1.StreamError{
+		UserMessage:  msg,
+		InternalCode: "stream_error",
+		Retryable:    false,
+	}
+	switch lower := strings.ToLower(msg); {
+	case strings.Contains(lower, "high traffic"), strings.Contains(lower, "capacity"):
+		se.InternalCode = "capacity"
+		se.Retryable = true
+		ra := int32(5000)
+		se.RetryAfterMs = &ra
+	case strings.Contains(lower, "quota"), strings.Contains(lower, "rate limit"):
+		se.InternalCode = "quota_exceeded"
+		se.Retryable = true
+	}
+	return se
+}
+
+func optString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (h *ChatHandler) ContinueChat(

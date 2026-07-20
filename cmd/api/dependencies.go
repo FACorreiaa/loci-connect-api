@@ -23,6 +23,7 @@ import (
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	poihandler "github.com/FACorreiaa/loci-connect-api/internal/domain/poi/handler"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
@@ -34,6 +35,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -69,6 +71,7 @@ type Dependencies struct {
 	APIKeyRepo     apikey.Repository
 	ReviewRepo     reviewdomain.Repository
 	ShareRepo      share.Repository
+	TripRepo       trip.Repository
 
 	// Services
 	TokenManager        service.TokenManager
@@ -107,9 +110,12 @@ type Dependencies struct {
 	APIKeyHandler     *apikey.Handler
 	ExportHandler     *export.Handler
 	ShareHandler      *share.Handler
+	TripHandler       *trip.Handler
 	POIHandler        *poihandler.POIHandler
 	CustomAuthHandler *customauthhandler.CustomAuthHandler
 	ReviewHandler     *reviewdomain.Handler
+
+	PreferenceRecorder preference.Recorder
 }
 
 // InitDependencies initializes all application dependencies
@@ -188,6 +194,8 @@ func (d *Dependencies) initRepositories() error {
 	d.APIKeyRepo = apikey.NewRepository(d.DB.Pool)
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
+	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger)
+	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -213,7 +221,7 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
-	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger)
+	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, nil) // plans wired below after SubscriptionService
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	llmSem := concurrency.NewLLMSemaphore(d.Config.Gemini.MaxConcurrentCalls)
 	appCache, err := cachestore.New(cachestore.Config{
@@ -238,6 +246,7 @@ func (d *Dependencies) initServices() error {
 		d.POIRepo,
 		d.POISvc,
 		d.ListSvc,
+		d.TripRepo,
 		d.Logger,
 		d.Config.Gemini,
 		llmSem,
@@ -259,6 +268,8 @@ func (d *Dependencies) initServices() error {
 		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
 	})
+	// Freemium list/place caps need EffectivePlan — rebind with the live service.
+	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService)
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
 		APIKey:         d.Config.Stripe.APIKey,
@@ -296,10 +307,11 @@ func (d *Dependencies) initHandlers() error {
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
-	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger)
+	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder)
 	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
+	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder)
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)

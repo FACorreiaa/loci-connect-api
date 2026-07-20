@@ -82,6 +82,18 @@ func (s *ServiceImpl) getNearbyByDomain(
 		return
 	}
 
+	// A JSON null or an absent key both unmarshal into a nil slice, whereas a real
+	// empty list ("[]") stays non-nil. Treat null/absent as an error instead of a
+	// silent empty-but-successful result, otherwise the caller caches "no POIs" for
+	// a location that actually just got a malformed model response.
+	if poiData.PointsOfInterest == nil {
+		err := fmt.Errorf("AI returned null or absent points_of_interest")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Null POI array from AI")
+		resultCh <- locitypes.GenAIResponse{Err: err}
+		return
+	}
+
 	s.logger.DebugContext(ctx, "generated nearby POI JSON response", slog.String("response", cleanTxt))
 
 	span.SetAttributes(attribute.Int("pois.count", len(poiData.PointsOfInterest)))

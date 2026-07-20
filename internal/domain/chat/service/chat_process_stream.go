@@ -55,27 +55,50 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 		}
 	}
 
-	// 4. Create Session
-	cc.SessionID = uuid.New()
-	session := locitypes.ChatSession{
-		ID:        cc.SessionID,
-		UserID:    cc.UserID,
-		ProfileID: cc.ProfileID,
-		CityName:  cc.CityName,
-		ConversationHistory: []locitypes.ConversationMessage{
-			{Role: "user", Content: cc.Message, Timestamp: time.Now()},
-		},
-		SessionContext: locitypes.SessionContext{
-			CityName:            cc.CityName,
-			ConversationSummary: fmt.Sprintf("Trip plan for %s", cc.CityName),
-		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(24 * time.Hour),
-		Status:    "active",
+	// 4. Resume or create session.
+	// When the client sends a session_id we resume that session (appending the new
+	// user turn) instead of always minting a new one — this is what makes real
+	// continuation possible. We only resume a session the caller actually owns.
+	if cc.RequestedSessionID != uuid.Nil {
+		existing, gErr := l.llmInteractionRepo.GetSession(ctx, cc.RequestedSessionID)
+		if gErr == nil && existing != nil && existing.UserID == cc.UserID {
+			cc.SessionID = existing.ID
+			if cc.CityName == "" {
+				cc.CityName = existing.CityName
+			}
+			if aErr := l.llmInteractionRepo.AddMessageToSession(ctx, cc.SessionID,
+				locitypes.ConversationMessage{Role: "user", Content: cc.Message, Timestamp: time.Now()}); aErr != nil {
+				l.logger.WarnContext(ctx, "failed to append message to resumed session",
+					slog.String("session_id", cc.SessionID.String()), slog.Any("error", aErr))
+			}
+		} else {
+			l.logger.InfoContext(ctx, "requested session not resumable, starting a new one",
+				slog.String("requested_session_id", cc.RequestedSessionID.String()), slog.Any("error", gErr))
+		}
 	}
-	if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
-		return fmt.Errorf("failed to create session: %w", err)
+
+	if cc.SessionID == uuid.Nil {
+		cc.SessionID = uuid.New()
+		session := locitypes.ChatSession{
+			ID:        cc.SessionID,
+			UserID:    cc.UserID,
+			ProfileID: cc.ProfileID,
+			CityName:  cc.CityName,
+			ConversationHistory: []locitypes.ConversationMessage{
+				{Role: "user", Content: cc.Message, Timestamp: time.Now()},
+			},
+			SessionContext: locitypes.SessionContext{
+				CityName:            cc.CityName,
+				ConversationSummary: fmt.Sprintf("Trip plan for %s", cc.CityName),
+			},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+			Status:    "active",
+		}
+		if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
+			return fmt.Errorf("failed to create session: %w", err)
+		}
 	}
 
 	// 5. Generate Cache Key
@@ -422,33 +445,33 @@ func (l *ServiceImpl) persistResults(
 	// Use context.Background() to bypass cancelled context - we MUST deliver this data
 	switch cc.Domain {
 	case locitypes.DomainAccommodation:
-		// Send hotels as pre-parsed data
+		// Send hotels as pre-parsed data (POI-adapted for a single client shape).
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeHotels,
-			Data: map[string]any{
-				"general_city_data": data.GeneralCityData,
-				"hotels":            data.Hotels,
-				"session_id":        cc.SessionID.String(),
+			Data: locitypes.StreamDomainListData{
+				GeneralCityData: data.GeneralCityData,
+				POIs:            convertHotelsToPOIs(data.Hotels),
+				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
 	case locitypes.DomainDining:
-		// Send restaurants as pre-parsed data
+		// Send restaurants as pre-parsed data (POI-adapted).
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeRestaurants,
-			Data: map[string]any{
-				"general_city_data": data.GeneralCityData,
-				"restaurants":       data.Restaurants,
-				"session_id":        cc.SessionID.String(),
+			Data: locitypes.StreamDomainListData{
+				GeneralCityData: data.GeneralCityData,
+				POIs:            convertRestaurantsToPOIs(data.Restaurants),
+				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
 	case locitypes.DomainActivities:
 		// Send activities as pre-parsed data
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type: "activities",
-			Data: map[string]any{
-				"general_city_data": data.GeneralCityData,
-				"activities":        data.Activities,
-				"session_id":        cc.SessionID.String(),
+			Data: locitypes.StreamDomainListData{
+				GeneralCityData: data.GeneralCityData,
+				POIs:            data.Activities,
+				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
 	case locitypes.DomainNearby:
@@ -476,6 +499,23 @@ func (l *ServiceImpl) persistResults(
 	l.logger.InfoContext(ctx, "Successfully saved initial itinerary to session",
 		slog.Int("poi_count", len(data.AIItineraryResponse.PointsOfInterest)),
 		slog.Int("top_level_pois", len(data.PointsOfInterest)))
+
+	// Auto-persist the generated itinerary as an editable TripDraft so it appears
+	// in /trips. Best-effort for itinerary/general domains — never fail the stream
+	// on a trip-save error. Persisted ID is stashed on cc.TripID so the completion
+	// event can deep-link the client to /trips/:id.
+	if l.tripRepo != nil && (cc.Domain == locitypes.DomainItinerary || cc.Domain == locitypes.DomainGeneral) {
+		if tr := buildTripFromCityResponse(cc, data); tr != nil {
+			saved, terr := l.tripRepo.SaveTrip(storageCtx, tr, 0)
+			if terr != nil {
+				l.logger.WarnContext(ctx, "auto trip persist failed", slog.Any("error", terr))
+			} else if saved != nil {
+				cc.TripID = saved.ID
+				l.logger.InfoContext(ctx, "auto-persisted trip from itinerary",
+					slog.String("trip_id", saved.ID.String()), slog.Int("days", len(saved.Days)))
+			}
+		}
+	}
 
 	// alternative
 	// Convert rawResponses to builders for compatibility with ProcessAndSaveUnifiedResponse
@@ -512,9 +552,15 @@ func (l *ServiceImpl) persistResults(
 }
 
 // sendCompletionEvent sends the completion event with navigation data.
+// When an itinerary was auto-persisted, prefer deep-linking to /trips/:id so
+// the client can offer an "Edit trip" CTA without a second lookup.
 func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 	var routeType string
 	var baseURL string
+	queryParams := map[string]string{
+		"sessionId": cc.SessionID.String(),
+		"cityName":  cc.CityName,
+	}
 
 	switch cc.Domain {
 	case locitypes.DomainAccommodation:
@@ -530,22 +576,36 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 		routeType = "nearme"
 		baseURL = "/nearme"
 	default:
-		routeType = "itinerary"
-		baseURL = "/itinerary"
+		if cc.TripID != uuid.Nil {
+			routeType = "trip"
+			baseURL = "/trips/" + cc.TripID.String()
+			queryParams["tripId"] = cc.TripID.String()
+			queryParams["domain"] = "trip"
+		} else {
+			routeType = "itinerary"
+			baseURL = "/itinerary"
+			queryParams["domain"] = "itinerary"
+		}
+	}
+	if _, ok := queryParams["domain"]; !ok {
+		queryParams["domain"] = routeType
+	}
+
+	navURL := fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s",
+		baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), queryParams["domain"])
+	if tripID, ok := queryParams["tripId"]; ok {
+		navURL = fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=trip&tripId=%s",
+			baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), tripID)
 	}
 
 	// Use context.Background() to bypass cancelled context - we MUST deliver this event
 	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeComplete,
-		Data: map[string]any{"session_id": cc.SessionID.String()},
+		Data: map[string]any{"session_id": cc.SessionID.String(), "trip_id": queryParams["tripId"]},
 		Navigation: &locitypes.NavigationData{
-			URL:       fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s", baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), routeType),
-			RouteType: routeType,
-			QueryParams: map[string]string{
-				"sessionId": cc.SessionID.String(),
-				"cityName":  cc.CityName,
-				"domain":    routeType,
-			},
+			URL:         navURL,
+			RouteType:   routeType,
+			QueryParams: queryParams,
 		},
 	}, 3)
 }
@@ -673,11 +733,10 @@ func (l *ServiceImpl) handleNearbyDomain(
 	// Send the POIs as a structured event
 	sendEventWithResponse(locitypes.StreamEvent{
 		Type: "nearby",
-		Data: map[string]any{
-			"general_city_data":  responseData.GeneralCityData,
-			"points_of_interest": pois,
-			"session_id":         cc.SessionID.String(),
-			"total_count":        len(pois),
+		Data: locitypes.StreamDomainListData{
+			GeneralCityData: responseData.GeneralCityData,
+			POIs:            pois,
+			SessionID:       cc.SessionID.String(),
 		},
 		Timestamp: time.Now(),
 		EventID:   uuid.New().String(),

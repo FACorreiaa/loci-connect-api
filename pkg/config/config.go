@@ -212,9 +212,15 @@ func Load() (*Config, error) {
 	if cfg.Auth.JWTSecret == "" {
 		return nil, errors.New("JWT_SECRET is required")
 	}
-	// In production, refuse to boot with the insecure default secret.
-	if getEnv("APP_ENV", "development") == "production" && cfg.Auth.JWTSecret == "changeme" {
-		return nil, errors.New("JWT_SECRET must not be the default value in production")
+	// Refuse to boot with a known-insecure placeholder secret in ANY environment.
+	// A weak secret in dev leaks into shared/staging deployments and forged tokens
+	// are indistinguishable from real ones, so this is not production-only.
+	switch cfg.Auth.JWTSecret {
+	case "changeme", "replace-with-secure-env-var", "replace-with-secure-refresh-env-var":
+		return nil, errors.New("JWT_SECRET must not be a default/placeholder value")
+	}
+	if len(cfg.Auth.JWTSecret) < 32 {
+		return nil, errors.New("JWT_SECRET must be at least 32 characters")
 	}
 
 	return cfg, nil

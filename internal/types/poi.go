@@ -136,3 +136,31 @@ type AddPoiRequest struct {
 	IsLlmPoi bool             `json:"is_llm_poi"`
 	POIData  *POIDetailedInfo `json:"poi_data,omitempty"` // Optional POI data for creating new POIs
 }
+
+// TrustSignals derives transparency metadata for a POI from field completeness
+// (Slice 3). uncertaintyScore is the fraction of key fields we couldn't verify;
+// missing lists them; rationale is a short human-readable "why this" note.
+func TrustSignals(p POIDetailedInfo) (uncertaintyScore float64, missing []string, rationale string) {
+	if len(p.OpeningHours) == 0 {
+		missing = append(missing, "hours")
+	}
+	if p.PriceLevel == "" && p.PriceRange == "" {
+		missing = append(missing, "price")
+	}
+	if p.Rating == 0 {
+		missing = append(missing, "rating")
+	}
+	if p.Address == "" {
+		missing = append(missing, "address")
+	}
+	const keyFields = 4
+	uncertaintyScore = float64(len(missing)) / keyFields
+
+	switch {
+	case p.Rating >= 4.0 && p.Category != "":
+		rationale = "Highly rated " + p.Category + " that fits your search."
+	case p.Category != "":
+		rationale = "A " + p.Category + " matching your preferences."
+	}
+	return uncertaintyScore, missing, rationale
+}

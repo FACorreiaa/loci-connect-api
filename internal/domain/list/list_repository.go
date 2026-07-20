@@ -92,6 +92,7 @@ type Repository interface {
 	DeleteListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) error
 	DeleteList(ctx context.Context, listID uuid.UUID) error
 	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error)
+	CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error)
 }
 
 func NewRepository(pgpool PgxPool, logger *slog.Logger) *RepositoryImpl {
@@ -372,6 +373,28 @@ func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isI
 	}
 
 	return lists, nil
+}
+
+// CountUserListItems returns how many items the user has across all owned lists.
+func (r *RepositoryImpl) CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error) {
+	const q = `
+		SELECT COUNT(*)::int
+		FROM list_items li
+		INNER JOIN lists l ON l.id = li.list_id
+		WHERE l.user_id = $1`
+	var n int
+	rows, err := r.pgpool.Query(ctx, q, userID)
+	if err != nil {
+		return 0, fmt.Errorf("count user list items: %w", err)
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return 0, rows.Err()
+	}
+	if err := rows.Scan(&n); err != nil {
+		return 0, fmt.Errorf("scan count: %w", err)
+	}
+	return n, nil
 }
 
 func mapListRow(row listRow) locitypes.List {

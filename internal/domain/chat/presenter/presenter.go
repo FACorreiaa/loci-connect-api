@@ -125,6 +125,14 @@ func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		resp.Source = proto.String(poi.Source)
 	}
 
+	// Trust/transparency signals (Slice 3).
+	score, missing, rationale := locitypes.TrustSignals(poi)
+	resp.UncertaintyScore = proto.Float64(score)
+	resp.MissingData = missing
+	if rationale != "" {
+		resp.RecommendationRationale = proto.String(rationale)
+	}
+
 	return resp
 }
 

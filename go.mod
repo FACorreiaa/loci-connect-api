@@ -8,7 +8,7 @@ require (
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
 	github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0
-	github.com/FACorreiaa/loci-connect-proto v0.1.0
+	github.com/FACorreiaa/loci-connect-proto v0.3.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -157,3 +157,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// TEMP dev replace (Slice 3) — drop + tag v0.4.0.
+replace github.com/FACorreiaa/loci-connect-proto => ../loci-connect-proto

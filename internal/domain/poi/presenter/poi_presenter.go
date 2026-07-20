@@ -26,7 +26,7 @@ func ToPOIProto(poi *locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		phone = poi.PhoneNumber
 	}
 
-	return &poiv1.POIDetailedInfo{
+	out := &poiv1.POIDetailedInfo{
 		Id:           poi.ID.String(),
 		Name:         poi.Name,
 		Description:  poi.Description,
@@ -43,6 +43,15 @@ func ToPOIProto(poi *locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		CreatedAt:    timestamppb.New(poi.CreatedAt),
 		// UpdatedAt:      timestamppb.New(poi.UpdatedAt),
 	}
+
+	// Trust/transparency signals (Slice 3).
+	score, missing, rationale := locitypes.TrustSignals(*poi)
+	out.UncertaintyScore = &score
+	out.MissingData = missing
+	if rationale != "" {
+		out.RecommendationRationale = &rationale
+	}
+	return out
 }
 
 func ToPOIProtos(pois []locitypes.POIDetailedInfo) []*poiv1.POIDetailedInfo {

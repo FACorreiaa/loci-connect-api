@@ -55,6 +55,11 @@ func (m *MockUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID) err
 	return args.Error(0)
 }
 
+func (m *MockUserRepo) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
 func (m *MockUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID) error {
 	args := m.Called(ctx, userID)
 	return args.Error(0)

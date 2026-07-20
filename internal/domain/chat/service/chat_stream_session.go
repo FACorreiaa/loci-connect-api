@@ -762,13 +762,13 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 						chunkCount++
 						fullResponse.WriteString(chunk)
 
-						// Log first few chunks for debugging
+						// Debug-only, and without a content preview: the chunk is
+						// user-influenced model output and must not land in Info logs.
 						if chunkCount <= 3 {
-							l.logger.InfoContext(ctx, "Received chunk from LLM",
+							l.logger.DebugContext(ctx, "Received chunk from LLM",
 								slog.String("part_type", partType),
 								slog.Int("chunk_number", chunkCount),
-								slog.Int("chunk_length", len(chunk)),
-								slog.String("chunk_preview", chunk[:min(100, len(chunk))]))
+								slog.Int("chunk_length", len(chunk)))
 						}
 
 						sendEvent(locitypes.StreamEvent{

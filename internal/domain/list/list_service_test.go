@@ -83,6 +83,11 @@ func (m *MockListRepository) GetUserLists(ctx context.Context, userID uuid.UUID,
 	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
+func (m *MockListRepository) CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error) {
+	args := m.Called(ctx, userID)
+	return args.Int(0), args.Error(1)
+}
+
 func (m *MockListRepository) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (locitypes.ListItem, error) {
 	args := m.Called(ctx, listID, itemID)
 	if args.Get(0) == nil {
@@ -145,7 +150,7 @@ func (m *MockListRepository) SearchLists(ctx context.Context, searchTerm, catego
 func setupListServiceTest() (*ServiceImpl, *MockListRepository) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	mockRepo := new(MockListRepository)
-	service := NewServiceImpl(mockRepo, logger)
+	service := NewServiceImpl(mockRepo, logger, nil)
 	return service, mockRepo
 }
 
