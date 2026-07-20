@@ -13,6 +13,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -283,6 +284,27 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 			Data:        pdfData,
 			ContentType: "application/pdf",
 			Filename:    safeFilename(t.Title) + ".pdf",
+		}), nil
+	case tripv1.ExportFormat_EXPORT_FORMAT_MARKDOWN:
+		if h.plans != nil {
+			plan, perr := h.plans.EffectivePlan(ctx, uid)
+			if perr == nil && !subscription.IsProPlan(plan) {
+				return nil, apierr.ToConnect(&subscription.EntitlementExceededError{
+					Feature: "export",
+					Limit:   0,
+					Used:    0,
+				})
+			}
+		}
+		md := buildTripMarkdown(t)
+		h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
+			TripID:   &id,
+			Metadata: map[string]any{"format": "markdown", "days": len(t.Days)},
+		})
+		return connect.NewResponse(&tripv1.ExportTripResponse{
+			Data:        []byte(md),
+			ContentType: "text/markdown; charset=utf-8",
+			Filename:    safeFilename(t.Title) + ".md",
 		}), nil
 	default:
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unsupported export format"))
