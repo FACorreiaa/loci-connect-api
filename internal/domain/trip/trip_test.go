@@ -49,6 +49,39 @@ func TestBuildICS(t *testing.T) {
 	}
 }
 
+func TestBuildTripMarkdown(t *testing.T) {
+	start := int32(12 * 60)
+	dur := int32(90)
+	trip := &Trip{
+		Title:    "Weekend in Lisbon",
+		CityName: "Lisbon",
+		Constraints: TripConstraint{
+			Pace:      paceModerate,
+			Mobility:  "walking",
+			Interests: []string{"food"},
+		},
+		Days: []TripDay{{
+			DayNumber: 1,
+			Stops: []TripStop{
+				{Name: "Time Out Market", StartMinute: &start, DurationMinutes: &dur, Notes: "Highly rated market."},
+			},
+		}},
+	}
+	md := buildTripMarkdown(trip)
+	for _, want := range []string{
+		"# Weekend in Lisbon",
+		"Lisbon",
+		"## Day 1",
+		"Time Out Market",
+		"Why this:",
+		"Highly rated market.",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("markdown missing %q\n%s", want, md)
+		}
+	}
+}
+
 func TestTripProtoRoundTrip(t *testing.T) {
 	uid := uuid.New()
 	now := time.Now().UTC().Truncate(time.Second)
