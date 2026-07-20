@@ -54,8 +54,14 @@ type POIDetailedInfo struct {
 	StarRating       *string                `protobuf:"bytes,25,opt,name=star_rating,json=starRating,proto3,oneof" json:"star_rating,omitempty"`    // For hotels
 	Amenities        string                 `protobuf:"bytes,26,opt,name=amenities,proto3" json:"amenities,omitempty"`
 	Source           *string                `protobuf:"bytes,27,opt,name=source,proto3,oneof" json:"source,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Trust/transparency (Slice 3). uncertainty_score is 0..1 (higher = the model
+	// was less sure); missing_data names fields that couldn't be verified (e.g.
+	// "hours", "price"); recommendation_rationale is a short "why this" note.
+	UncertaintyScore        *float64 `protobuf:"fixed64,28,opt,name=uncertainty_score,json=uncertaintyScore,proto3,oneof" json:"uncertainty_score,omitempty"`
+	MissingData             []string `protobuf:"bytes,29,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	RecommendationRationale *string  `protobuf:"bytes,30,opt,name=recommendation_rationale,json=recommendationRationale,proto3,oneof" json:"recommendation_rationale,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *POIDetailedInfo) Reset() {
@@ -273,6 +279,27 @@ func (x *POIDetailedInfo) GetAmenities() string {
 func (x *POIDetailedInfo) GetSource() string {
 	if x != nil && x.Source != nil {
 		return *x.Source
+	}
+	return ""
+}
+
+func (x *POIDetailedInfo) GetUncertaintyScore() float64 {
+	if x != nil && x.UncertaintyScore != nil {
+		return *x.UncertaintyScore
+	}
+	return 0
+}
+
+func (x *POIDetailedInfo) GetMissingData() []string {
+	if x != nil {
+		return x.MissingData
+	}
+	return nil
+}
+
+func (x *POIDetailedInfo) GetRecommendationRationale() string {
+	if x != nil && x.RecommendationRationale != nil {
+		return *x.RecommendationRationale
 	}
 	return ""
 }
@@ -1025,7 +1052,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\xdd\v\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\xe2\r\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1069,7 +1096,12 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"starRating\x88\x01\x01\x12(\n" +
 	"\tamenities\x18\x1a \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xd0\x0fR\tamenities\x12)\n" +
-	"\x06source\x18\x1b \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x06R\x06source\x88\x01\x01\x1a?\n" +
+	"\x06source\x18\x1b \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x06R\x06source\x88\x01\x01\x12L\n" +
+	"\x11uncertainty_score\x18\x1c \x01(\x01B\x1a\xbaH\x17\xd8\x01\x01\x12\x12\x19\x00\x00\x00\x00\x00\x00\xf0?)\x00\x00\x00\x00\x00\x00\x00\x00H\aR\x10uncertaintyScore\x88\x01\x01\x123\n" +
+	"\fmissing_data\x18\x1d \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x182R\vmissingData\x12M\n" +
+	"\x18recommendation_rationale\x18\x1e \x01(\tB\r\xbaH\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\bR\x17recommendationRationale\x88\x01\x01\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x12\n" +
@@ -1080,7 +1112,9 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\t_priorityB\x0f\n" +
 	"\r_cuisine_typeB\x0e\n" +
 	"\f_star_ratingB\t\n" +
-	"\a_source\"\xbb\x06\n" +
+	"\a_sourceB\x14\n" +
+	"\x12_uncertainty_scoreB\x1b\n" +
+	"\x19_recommendation_rationale\"\xbb\x06\n" +
 	"\x11HotelDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
