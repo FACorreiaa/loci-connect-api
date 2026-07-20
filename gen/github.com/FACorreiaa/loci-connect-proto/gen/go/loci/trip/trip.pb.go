@@ -85,6 +85,7 @@ const (
 	ExportFormat_EXPORT_FORMAT_UNSPECIFIED ExportFormat = 0
 	ExportFormat_EXPORT_FORMAT_ICS         ExportFormat = 1
 	ExportFormat_EXPORT_FORMAT_PDF         ExportFormat = 2
+	ExportFormat_EXPORT_FORMAT_MARKDOWN    ExportFormat = 3 // Premium — full itinerary as Markdown
 )
 
 // Enum value maps for ExportFormat.
@@ -93,11 +94,13 @@ var (
 		0: "EXPORT_FORMAT_UNSPECIFIED",
 		1: "EXPORT_FORMAT_ICS",
 		2: "EXPORT_FORMAT_PDF",
+		3: "EXPORT_FORMAT_MARKDOWN",
 	}
 	ExportFormat_value = map[string]int32{
 		"EXPORT_FORMAT_UNSPECIFIED": 0,
 		"EXPORT_FORMAT_ICS":         1,
 		"EXPORT_FORMAT_PDF":         2,
+		"EXPORT_FORMAT_MARKDOWN":    3,
 	}
 )
 
@@ -1420,11 +1423,12 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\x15TRIP_PACE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11TRIP_PACE_RELAXED\x10\x01\x12\x16\n" +
 	"\x12TRIP_PACE_MODERATE\x10\x02\x12\x14\n" +
-	"\x10TRIP_PACE_PACKED\x10\x03*[\n" +
+	"\x10TRIP_PACE_PACKED\x10\x03*w\n" +
 	"\fExportFormat\x12\x1d\n" +
 	"\x19EXPORT_FORMAT_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11EXPORT_FORMAT_ICS\x10\x01\x12\x15\n" +
-	"\x11EXPORT_FORMAT_PDF\x10\x022\x80\x05\n" +
+	"\x11EXPORT_FORMAT_PDF\x10\x02\x12\x1a\n" +
+	"\x16EXPORT_FORMAT_MARKDOWN\x10\x032\x80\x05\n" +
 	"\vTripService\x12<\n" +
 	"\bSaveTrip\x12\x1a.loci.trip.SaveTripRequest\x1a\x14.loci.trip.TripDraft\x12:\n" +
 	"\aGetTrip\x12\x19.loci.trip.GetTripRequest\x1a\x14.loci.trip.TripDraft\x12F\n" +
