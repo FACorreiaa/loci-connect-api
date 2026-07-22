@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -130,6 +131,19 @@ func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.P
 		})
 	}
 	if deps.Recommendation != nil && len(events) > 0 {
+		traces := make([]*recommendationv1.RecommendationTrace, 0, len(events))
+		for _, event := range events {
+			traces = append(traces, event.GetTrace())
+		}
+		if err := deps.Recommendation.IssueTraces(ctx, userID, traces); err != nil {
+			if deps.Logger != nil {
+				deps.Logger.ErrorContext(ctx, "failed to issue MCP recommendation attribution", slog.Any("error", err))
+			}
+			for index := range out.Results {
+				out.Results[index].RecommendationTrace = nil
+			}
+			return out
+		}
 		_, _ = deps.Recommendation.RecordEvents(ctx, connect.NewRequest(&recommendationv1.RecordEventsRequest{Events: events}))
 	}
 	return out

@@ -150,6 +150,70 @@ func (h *ListHandler) DeleteList(ctx context.Context, req *connect.Request[listp
 	return connect.NewResponse(&listpb.DeleteListResponse{Success: true}), nil
 }
 
+func (h *ListHandler) AddListItem(ctx context.Context, req *connect.Request[listpb.AddListItemRequest]) (*connect.Response[listpb.AddListItemResponse], error) {
+	userID, err := userFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	listID, err := uuid.Parse(req.Msg.GetListId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid list id"))
+	}
+	itemID, err := uuid.Parse(req.Msg.GetItemId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid item id"))
+	}
+	contentType, ok := contentTypeFromProto(req.Msg.GetContentType())
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("content type is required"))
+	}
+	params := locitypes.AddListItemRequest{
+		ItemID: itemID, ContentType: contentType, Position: int(req.Msg.GetPosition()), Notes: req.Msg.GetNotes(),
+		ItemAIDescription: req.Msg.GetItemAiDescription(), AttributedRecommendation: req.Msg.GetRecommendationTrace() != nil,
+	}
+	if req.Msg.GetDayNumber() > 0 {
+		day := int(req.Msg.GetDayNumber())
+		params.DayNumber = &day
+	}
+	if req.Msg.GetDurationMinutes() > 0 {
+		duration := int(req.Msg.GetDurationMinutes())
+		params.DurationMinutes = &duration
+	}
+	if req.Msg.GetTimeSlot() != nil && req.Msg.GetTimeSlot().CheckValid() == nil {
+		timeSlot := req.Msg.GetTimeSlot().AsTime()
+		params.TimeSlot = &timeSlot
+	}
+	if source := req.Msg.GetSourceLlmInteractionId(); source != "" {
+		parsed, parseErr := uuid.Parse(source)
+		if parseErr != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid source interaction id"))
+		}
+		params.SourceLlmInteractionID = &parsed
+	}
+	item, err := h.service.AddListItem(ctx, userID, listID, params)
+	if err != nil {
+		return nil, apierr.ToConnect(err)
+	}
+	protoItem := toProtoListItem(item)
+	protoItem.RecommendationTrace = req.Msg.GetRecommendationTrace()
+	return connect.NewResponse(&listpb.AddListItemResponse{Success: true, Message: "Added to list", Item: protoItem}), nil
+}
+
+func contentTypeFromProto(value listpb.ContentType) (locitypes.ContentType, bool) {
+	switch value {
+	case listpb.ContentType_CONTENT_TYPE_POI:
+		return locitypes.ContentTypePOI, true
+	case listpb.ContentType_CONTENT_TYPE_RESTAURANT:
+		return locitypes.ContentTypeRestaurant, true
+	case listpb.ContentType_CONTENT_TYPE_HOTEL:
+		return locitypes.ContentTypeHotel, true
+	case listpb.ContentType_CONTENT_TYPE_ITINERARY:
+		return locitypes.ContentTypeItinerary, true
+	default:
+		return "", false
+	}
+}
+
 // --- presenters ---
 
 func toProtoList(l *locitypes.List) *listpb.List {

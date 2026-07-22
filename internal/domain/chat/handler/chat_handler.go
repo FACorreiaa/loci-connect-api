@@ -35,14 +35,21 @@ type ChatHandler struct {
 	service   service.LlmInteractiontService
 	logger    *slog.Logger
 	resumeBuf *resumebuf.Buffer
+	issuer    AttributionIssuer
+}
+
+// AttributionIssuer persists the exact traces emitted to an authenticated user.
+type AttributionIssuer interface {
+	IssueTraces(context.Context, uuid.UUID, []*recommendationv1.RecommendationTrace) error
 }
 
 // NewChatHandler creates a new ChatHandler.
-func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger *slog.Logger) *ChatHandler {
+func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger *slog.Logger, issuer AttributionIssuer) *ChatHandler {
 	return &ChatHandler{
 		resumeBuf: resumebuf.New(),
 		service:   llmInteractionService,
 		logger:    logger,
+		issuer:    issuer,
 	}
 }
 
@@ -173,7 +180,7 @@ func (h *ChatHandler) StreamChat(
 		if events, found := h.resumeBuf.Replay(bufSessionID, cc.ResumeToken); found {
 			llmCancel()
 			for _, ev := range events {
-				resp, mErr := h.mapEventToProto(ev, userID)
+				resp, mErr := h.mapEventToProto(ctx, ev, userID)
 				if mErr != nil {
 					continue
 				}
@@ -227,7 +234,7 @@ func (h *ChatHandler) StreamChat(
 
 			appendEvent(event)
 
-			resp, err := h.mapEventToProto(event, userID)
+			resp, err := h.mapEventToProto(ctx, event, userID)
 			if err != nil {
 				h.logger.Error("Failed to map event", "error", err)
 				continue
@@ -291,7 +298,7 @@ func (h *ChatHandler) toConnectError(err error) error {
 // StreamEvent (event_type enum + payload oneof). It decodes event.Data through a
 // JSON round-trip so both the typed payload structs and legacy map shapes map
 // cleanly onto the concrete payload for each event type.
-func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent, userID uuid.UUID) (*chatv1.StreamEvent, error) {
+func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.StreamEvent, userID uuid.UUID) (*chatv1.StreamEvent, error) {
 	resp := &chatv1.StreamEvent{
 		Message:   event.Message,
 		Timestamp: timestamppb.New(event.Timestamp),
@@ -397,7 +404,49 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent, userID uuid.U
 		resp.Payload = &chatv1.StreamEvent_Progress{Progress: progressPayload(event)}
 	}
 
+	if h.issuer != nil {
+		traces := recommendationTraces(resp)
+		if len(traces) > 0 {
+			if err := h.issuer.IssueTraces(ctx, userID, traces); err != nil {
+				return nil, fmt.Errorf("issue recommendation attribution: %w", err)
+			}
+		}
+	}
 	return resp, nil
+}
+
+func recommendationTraces(event *chatv1.StreamEvent) []*recommendationv1.RecommendationTrace {
+	if event == nil {
+		return nil
+	}
+	var pois []*poiv1.POIDetailedInfo
+	switch {
+	case event.GetGeneralPois() != nil:
+		pois = event.GetGeneralPois().GetPois()
+	case event.GetHotels() != nil:
+		pois = event.GetHotels().GetPois()
+	case event.GetRestaurants() != nil:
+		pois = event.GetRestaurants().GetPois()
+	case event.GetActivities() != nil:
+		pois = event.GetActivities().GetActivities()
+	case event.GetItinerary() != nil:
+		response := event.GetItinerary().GetCityResponse()
+		if response != nil {
+			pois = append(pois, response.GetPointsOfInterest()...)
+			if itinerary := response.GetItineraryResponse(); itinerary != nil {
+				pois = append(pois, itinerary.GetPointsOfInterest()...)
+				pois = append(pois, itinerary.GetRestaurants()...)
+				pois = append(pois, itinerary.GetBars()...)
+			}
+		}
+	}
+	traces := make([]*recommendationv1.RecommendationTrace, 0, len(pois))
+	for _, poi := range pois {
+		if poi != nil && poi.GetRecommendationTrace() != nil {
+			traces = append(traces, poi.GetRecommendationTrace())
+		}
+	}
+	return traces
 }
 
 func attributeCityResponse(response *chatv1.AiCityResponse, event locitypes.StreamEvent, userID uuid.UUID) {

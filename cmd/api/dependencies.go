@@ -308,7 +308,8 @@ func (d *Dependencies) initServices() error {
 // initHandlers initializes all handler dependencies
 func (d *Dependencies) initHandlers() error {
 	d.AuthHandler = handler.NewAuthHandler(d.AuthService, d.Logger)
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger)
+	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
@@ -327,7 +328,6 @@ func (d *Dependencies) initHandlers() error {
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
-	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil

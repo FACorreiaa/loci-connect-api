@@ -94,15 +94,16 @@ type UpdateListRequest struct {
 }
 
 type AddListItemRequest struct {
-	ItemID                 uuid.UUID   `json:"item_id" validate:"required"`                                           // Generic ID for POI, Restaurant, Hotel, or Itinerary
-	ContentType            ContentType `json:"content_type" validate:"required,oneof=poi restaurant hotel itinerary"` // Type of content being added
-	Position               int         `json:"position" validate:"gte=0"`
-	Notes                  string      `json:"notes,omitempty" validate:"max=1000"`
-	DayNumber              *int        `json:"day_number,omitempty" validate:"omitempty,gt=0"`
-	TimeSlot               *time.Time  `json:"time_slot,omitempty"`
-	DurationMinutes        *int        `json:"duration_minutes,omitempty" validate:"omitempty,gt=0"`
-	SourceLlmInteractionID *uuid.UUID  `json:"source_llm_interaction_id,omitempty"` // Reference to the LLM interaction that generated this content
-	ItemAIDescription      string      `json:"item_ai_description,omitempty"`
+	ItemID                   uuid.UUID   `json:"item_id" validate:"required"`                                           // Generic ID for POI, Restaurant, Hotel, or Itinerary
+	ContentType              ContentType `json:"content_type" validate:"required,oneof=poi restaurant hotel itinerary"` // Type of content being added
+	Position                 int         `json:"position" validate:"gte=0"`
+	Notes                    string      `json:"notes,omitempty" validate:"max=1000"`
+	DayNumber                *int        `json:"day_number,omitempty" validate:"omitempty,gt=0"`
+	TimeSlot                 *time.Time  `json:"time_slot,omitempty"`
+	DurationMinutes          *int        `json:"duration_minutes,omitempty" validate:"omitempty,gt=0"`
+	SourceLlmInteractionID   *uuid.UUID  `json:"source_llm_interaction_id,omitempty"` // Reference to the LLM interaction that generated this content
+	ItemAIDescription        string      `json:"item_ai_description,omitempty"`
+	AttributedRecommendation bool        `json:"-"`
 }
 
 type UpdateListItemRequest struct {

@@ -196,7 +196,7 @@ func (h *Handler) ReorderStops(ctx context.Context, req *connect.Request[tripv1.
 		}
 		return errors.New("day not found in trip")
 	})
-	if err == nil {
+	if err == nil && !tripProtoHasRecommendationTrace(resp.Msg) {
 		if uid, uerr := userID(ctx); uerr == nil {
 			tid := uuid.MustParse(req.Msg.GetTripId())
 			h.prefs.Record(ctx, uid, preference.EventReordered, preference.RecordOpts{
@@ -316,17 +316,43 @@ func (h *Handler) recordStopSignal(ctx context.Context, tripID string, stop *tri
 	if err != nil || stop == nil {
 		return
 	}
+	if stop.GetRecommendationTrace() != nil {
+		return
+	}
 	id, err := uuid.Parse(tripID)
 	if err != nil {
 		return
 	}
 	metadata := map[string]any{"action": action}
-	if trace := stop.GetRecommendationTrace(); trace != nil {
-		metadata["run_id"] = trace.GetRunId()
-		metadata["algorithm_version"] = trace.GetAlgorithmVersion()
-		metadata["experiment_variant"] = trace.GetExperimentVariant()
-	}
 	h.prefs.Record(ctx, uid, event, preference.RecordOpts{POIID: stop.GetPoiId(), TripID: &id, Metadata: metadata})
+}
+
+func tripProtoHasRecommendationTrace(trip *tripv1.TripDraft) bool {
+	if trip == nil {
+		return false
+	}
+	for _, day := range trip.GetDays() {
+		for _, stop := range day.GetStops() {
+			if stop.GetRecommendationTrace() != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func tripHasRecommendationTrace(trip *Trip) bool {
+	if trip == nil {
+		return false
+	}
+	for _, day := range trip.Days {
+		for _, stop := range day.Stops {
+			if stop.RecommendationTrace != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.ExportTripRequest]) (*connect.Response[tripv1.ExportTripResponse], error) {
@@ -364,10 +390,12 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("pdf: %w", err))
 		}
-		h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
-			TripID:   &id,
-			Metadata: map[string]any{"format": "pdf", "days": len(exportTrip.Days)},
-		})
+		if !tripHasRecommendationTrace(t) {
+			h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
+				TripID:   &id,
+				Metadata: map[string]any{"format": "pdf", "days": len(exportTrip.Days)},
+			})
+		}
 		return connect.NewResponse(&tripv1.ExportTripResponse{
 			Data:        pdfData,
 			ContentType: "application/pdf",
@@ -385,10 +413,12 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 			}
 		}
 		md := buildTripMarkdown(t)
-		h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
-			TripID:   &id,
-			Metadata: map[string]any{"format": "markdown", "days": len(t.Days)},
-		})
+		if !tripHasRecommendationTrace(t) {
+			h.prefs.Record(ctx, uid, preference.EventExported, preference.RecordOpts{
+				TripID:   &id,
+				Metadata: map[string]any{"format": "markdown", "days": len(t.Days)},
+			})
+		}
 		return connect.NewResponse(&tripv1.ExportTripResponse{
 			Data:        []byte(md),
 			ContentType: "text/markdown; charset=utf-8",
