@@ -11,7 +11,6 @@ ENV GOTOOLCHAIN=auto
 
 # Copy go mod files
 COPY go.mod go.sum ./
-COPY gen/github.com/FACorreiaa/loci-connect-proto/go.mod gen/github.com/FACorreiaa/loci-connect-proto/
 
 # Download dependencies (Go will auto-download the required toolchain)
 RUN go mod download
