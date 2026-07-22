@@ -439,35 +439,55 @@ func (l *ServiceImpl) persistResults(
 			data.AIItineraryResponse.Restaurants[i].CityID = cityID
 			data.AIItineraryResponse.Restaurants[i].LlmInteractionID = savedID
 		}
+		for i := range data.AIItineraryResponse.Bars {
+			data.AIItineraryResponse.Bars[i].CityID = cityID
+			data.AIItineraryResponse.Bars[i].LlmInteractionID = savedID
+		}
+		for i := range data.Activities {
+			data.Activities[i].CityID = cityID
+			data.Activities[i].LlmInteractionID = savedID
+		}
+
+		data.PointsOfInterest = l.canonicalizePOIs(storageCtx, data.PointsOfInterest, cityID)
+		data.AIItineraryResponse.PointsOfInterest = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.PointsOfInterest, cityID)
+		data.AIItineraryResponse.Restaurants = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Restaurants, cityID)
+		data.AIItineraryResponse.Bars = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Bars, cityID)
+		data.Activities = l.canonicalizePOIs(storageCtx, data.Activities, cityID)
 	}
 
 	// Send domain-specific event with pre-parsed data
 	// Use context.Background() to bypass cancelled context - we MUST deliver this data
+	recommendationRunID := uuid.New().String()
 	switch cc.Domain {
 	case locitypes.DomainAccommodation:
 		// Send hotels as pre-parsed data (POI-adapted for a single client shape).
+		hotelPOIs := l.canonicalizePOIs(storageCtx, convertHotelsToPOIs(data.Hotels), cityID)
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
-			Type: locitypes.EventTypeHotels,
+			Type:    locitypes.EventTypeHotels,
+			EventID: recommendationRunID,
 			Data: locitypes.StreamDomainListData{
 				GeneralCityData: data.GeneralCityData,
-				POIs:            convertHotelsToPOIs(data.Hotels),
+				POIs:            hotelPOIs,
 				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
 	case locitypes.DomainDining:
 		// Send restaurants as pre-parsed data (POI-adapted).
+		restaurantPOIs := l.canonicalizePOIs(storageCtx, convertRestaurantsToPOIs(data.Restaurants), cityID)
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
-			Type: locitypes.EventTypeRestaurants,
+			Type:    locitypes.EventTypeRestaurants,
+			EventID: recommendationRunID,
 			Data: locitypes.StreamDomainListData{
 				GeneralCityData: data.GeneralCityData,
-				POIs:            convertRestaurantsToPOIs(data.Restaurants),
+				POIs:            restaurantPOIs,
 				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
 	case locitypes.DomainActivities:
 		// Send activities as pre-parsed data
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
-			Type: "activities",
+			Type:    "activities",
+			EventID: recommendationRunID,
 			Data: locitypes.StreamDomainListData{
 				GeneralCityData: data.GeneralCityData,
 				POIs:            data.Activities,
@@ -480,8 +500,9 @@ func (l *ServiceImpl) persistResults(
 	default:
 		// Send full itinerary for DomainItinerary/DomainGeneral
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
-			Type: locitypes.EventTypeItinerary,
-			Data: *data,
+			Type:    locitypes.EventTypeItinerary,
+			EventID: recommendationRunID,
+			Data:    *data,
 		}, 3)
 	}
 	// 4. Update Session
@@ -505,7 +526,7 @@ func (l *ServiceImpl) persistResults(
 	// on a trip-save error. Persisted ID is stashed on cc.TripID so the completion
 	// event can deep-link the client to /trips/:id.
 	if l.tripRepo != nil && (cc.Domain == locitypes.DomainItinerary || cc.Domain == locitypes.DomainGeneral) {
-		if tr := buildTripFromCityResponse(cc, data); tr != nil {
+		if tr := buildTripFromCityResponse(cc, data, recommendationRunID); tr != nil {
 			saved, terr := l.tripRepo.SaveTrip(storageCtx, tr, 0)
 			if terr != nil {
 				l.logger.WarnContext(ctx, "auto trip persist failed", slog.Any("error", terr))

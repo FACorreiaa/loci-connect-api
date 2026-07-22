@@ -28,3 +28,20 @@ func TestPersonalizeQuery(t *testing.T) {
 		t.Fatal("missing prefs should leave query alone")
 	}
 }
+
+func TestExperimentVariantIsStableAndHasControlHoldout(t *testing.T) {
+	control := 0
+	for index := 0; index < 1000; index++ {
+		uid := uuid.NewSHA1(uuid.NameSpaceOID, []byte{byte(index >> 8), byte(index)})
+		first := ExperimentVariant(uid)
+		if first != ExperimentVariant(uid) {
+			t.Fatal("variant assignment must be stable")
+		}
+		if first == "control" {
+			control++
+		}
+	}
+	if control < 70 || control > 130 {
+		t.Fatalf("expected approximately 10%% control, got %d/1000", control)
+	}
+}

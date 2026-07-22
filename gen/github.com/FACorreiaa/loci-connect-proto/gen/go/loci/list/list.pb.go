@@ -8,6 +8,7 @@ package listv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	recommendation "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -230,20 +231,21 @@ func (x *List) GetUpdatedAt() *timestamppb.Timestamp {
 
 // List item entity
 type ListItem struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	ListId                 string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	ItemId                 string                 `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	PoiId                  string                 `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // For backward compatibility with POI-only items
-	ContentType            ContentType            `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
-	Position               int32                  `protobuf:"varint,5,opt,name=position,proto3" json:"position,omitempty"`
-	Notes                  string                 `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
-	DayNumber              int32                  `protobuf:"varint,7,opt,name=day_number,json=dayNumber,proto3" json:"day_number,omitempty"`
-	TimeSlot               *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=time_slot,json=timeSlot,proto3" json:"time_slot,omitempty"`
-	Duration               int32                  `protobuf:"varint,9,opt,name=duration,proto3" json:"duration,omitempty"` // Duration in minutes
-	CreatedAt              *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt              *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	SourceLlmInteractionId string                 `protobuf:"bytes,12,opt,name=source_llm_interaction_id,json=sourceLlmInteractionId,proto3" json:"source_llm_interaction_id,omitempty"`
-	ItemAiDescription      string                 `protobuf:"bytes,13,opt,name=item_ai_description,json=itemAiDescription,proto3" json:"item_ai_description,omitempty"`
+	state                  protoimpl.MessageState              `protogen:"open.v1"`
+	ListId                 string                              `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ItemId                 string                              `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	PoiId                  string                              `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // For backward compatibility with POI-only items
+	ContentType            ContentType                         `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
+	Position               int32                               `protobuf:"varint,5,opt,name=position,proto3" json:"position,omitempty"`
+	Notes                  string                              `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
+	DayNumber              int32                               `protobuf:"varint,7,opt,name=day_number,json=dayNumber,proto3" json:"day_number,omitempty"`
+	TimeSlot               *timestamppb.Timestamp              `protobuf:"bytes,8,opt,name=time_slot,json=timeSlot,proto3" json:"time_slot,omitempty"`
+	Duration               int32                               `protobuf:"varint,9,opt,name=duration,proto3" json:"duration,omitempty"` // Duration in minutes
+	CreatedAt              *timestamppb.Timestamp              `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt              *timestamppb.Timestamp              `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SourceLlmInteractionId string                              `protobuf:"bytes,12,opt,name=source_llm_interaction_id,json=sourceLlmInteractionId,proto3" json:"source_llm_interaction_id,omitempty"`
+	ItemAiDescription      string                              `protobuf:"bytes,13,opt,name=item_ai_description,json=itemAiDescription,proto3" json:"item_ai_description,omitempty"`
+	RecommendationTrace    *recommendation.RecommendationTrace `protobuf:"bytes,14,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -367,6 +369,13 @@ func (x *ListItem) GetItemAiDescription() string {
 		return x.ItemAiDescription
 	}
 	return ""
+}
+
+func (x *ListItem) GetRecommendationTrace() *recommendation.RecommendationTrace {
+	if x != nil {
+		return x.RecommendationTrace
+	}
+	return nil
 }
 
 // List with its items
@@ -1720,18 +1729,19 @@ func (x *CreateItineraryResponse) GetItinerary() *List {
 
 // List item management
 type AddListItemRequest struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	UserId                 string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId                 string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	ItemId                 string                 `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	ContentType            ContentType            `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
-	Position               int32                  `protobuf:"varint,5,opt,name=position,proto3" json:"position,omitempty"`
-	Notes                  string                 `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
-	DayNumber              int32                  `protobuf:"varint,7,opt,name=day_number,json=dayNumber,proto3" json:"day_number,omitempty"`
-	TimeSlot               *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=time_slot,json=timeSlot,proto3" json:"time_slot,omitempty"`
-	DurationMinutes        int32                  `protobuf:"varint,9,opt,name=duration_minutes,json=durationMinutes,proto3" json:"duration_minutes,omitempty"`
-	SourceLlmInteractionId string                 `protobuf:"bytes,10,opt,name=source_llm_interaction_id,json=sourceLlmInteractionId,proto3" json:"source_llm_interaction_id,omitempty"`
-	ItemAiDescription      string                 `protobuf:"bytes,11,opt,name=item_ai_description,json=itemAiDescription,proto3" json:"item_ai_description,omitempty"`
+	state                  protoimpl.MessageState              `protogen:"open.v1"`
+	UserId                 string                              `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId                 string                              `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ItemId                 string                              `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	ContentType            ContentType                         `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
+	Position               int32                               `protobuf:"varint,5,opt,name=position,proto3" json:"position,omitempty"`
+	Notes                  string                              `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
+	DayNumber              int32                               `protobuf:"varint,7,opt,name=day_number,json=dayNumber,proto3" json:"day_number,omitempty"`
+	TimeSlot               *timestamppb.Timestamp              `protobuf:"bytes,8,opt,name=time_slot,json=timeSlot,proto3" json:"time_slot,omitempty"`
+	DurationMinutes        int32                               `protobuf:"varint,9,opt,name=duration_minutes,json=durationMinutes,proto3" json:"duration_minutes,omitempty"`
+	SourceLlmInteractionId string                              `protobuf:"bytes,10,opt,name=source_llm_interaction_id,json=sourceLlmInteractionId,proto3" json:"source_llm_interaction_id,omitempty"`
+	ItemAiDescription      string                              `protobuf:"bytes,11,opt,name=item_ai_description,json=itemAiDescription,proto3" json:"item_ai_description,omitempty"`
+	RecommendationTrace    *recommendation.RecommendationTrace `protobuf:"bytes,12,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1841,6 +1851,13 @@ func (x *AddListItemRequest) GetItemAiDescription() string {
 		return x.ItemAiDescription
 	}
 	return ""
+}
+
+func (x *AddListItemRequest) GetRecommendationTrace() *recommendation.RecommendationTrace {
+	if x != nil {
+		return x.RecommendationTrace
+	}
+	return nil
 }
 
 type AddListItemResponse struct {
@@ -3137,7 +3154,7 @@ var File_loci_list_list_proto protoreflect.FileDescriptor
 
 const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
-	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xcb\x04\n" +
+	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\x1a(loci/recommendation/recommendation.proto\"\xcb\x04\n" +
 	"\x04List\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +
@@ -3160,7 +3177,7 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\x88\x05\n" +
+	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\x83\x06\n" +
 	"\bListItem\x12\"\n" +
 	"\alist_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
 	"\aitem_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12 \n" +
@@ -3178,7 +3195,9 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\x12B\n" +
 	"\x19source_llm_interaction_id\x18\f \x01(\tB\a\xbaH\x04r\x02\x18dR\x16sourceLlmInteractionId\x128\n" +
-	"\x13item_ai_description\x18\r \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x11itemAiDescription\"_\n" +
+	"\x13item_ai_description\x18\r \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x11itemAiDescription\x12`\n" +
+	"\x14recommendation_trace\x18\x0e \x01(\v2(.loci.recommendation.RecommendationTraceH\x00R\x13recommendationTrace\x88\x01\x01B\x17\n" +
+	"\x15_recommendation_trace\"_\n" +
 	"\rListWithItems\x12#\n" +
 	"\x04list\x18\x01 \x01(\v2\x0f.loci.list.ListR\x04list\x12)\n" +
 	"\x05items\x18\x02 \x03(\v2\x13.loci.list.ListItemR\x05items\"\xa9\x02\n" +
@@ -3304,7 +3323,7 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\x17CreateItineraryResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12-\n" +
-	"\titinerary\x18\x03 \x01(\v2\x0f.loci.list.ListR\titinerary\"\x9d\x04\n" +
+	"\titinerary\x18\x03 \x01(\v2\x0f.loci.list.ListR\titinerary\"\x98\x05\n" +
 	"\x12AddListItemRequest\x12\"\n" +
 	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
@@ -3318,7 +3337,9 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\x10duration_minutes\x18\t \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0fdurationMinutes\x12B\n" +
 	"\x19source_llm_interaction_id\x18\n" +
 	" \x01(\tB\a\xbaH\x04r\x02\x18dR\x16sourceLlmInteractionId\x128\n" +
-	"\x13item_ai_description\x18\v \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x11itemAiDescription\"|\n" +
+	"\x13item_ai_description\x18\v \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x11itemAiDescription\x12`\n" +
+	"\x14recommendation_trace\x18\f \x01(\v2(.loci.recommendation.RecommendationTraceH\x00R\x13recommendationTrace\x88\x01\x01B\x17\n" +
+	"\x15_recommendation_trace\"|\n" +
 	"\x13AddListItemResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12'\n" +
@@ -3461,53 +3482,54 @@ func file_loci_list_list_proto_rawDescGZIP() []byte {
 var file_loci_list_list_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_loci_list_list_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_loci_list_list_proto_goTypes = []any{
-	(ContentType)(0),                   // 0: loci.list.ContentType
-	(*List)(nil),                       // 1: loci.list.List
-	(*ListItem)(nil),                   // 2: loci.list.ListItem
-	(*ListWithItems)(nil),              // 3: loci.list.ListWithItems
-	(*ListItemWithContent)(nil),        // 4: loci.list.ListItemWithContent
-	(*ListWithDetailedItems)(nil),      // 5: loci.list.ListWithDetailedItems
-	(*POIDetailedInfo)(nil),            // 6: loci.list.POIDetailedInfo
-	(*RestaurantDetailedInfo)(nil),     // 7: loci.list.RestaurantDetailedInfo
-	(*HotelDetailedInfo)(nil),          // 8: loci.list.HotelDetailedInfo
-	(*UserSavedItinerary)(nil),         // 9: loci.list.UserSavedItinerary
-	(*CreateListRequest)(nil),          // 10: loci.list.CreateListRequest
-	(*CreateListResponse)(nil),         // 11: loci.list.CreateListResponse
-	(*GetListsRequest)(nil),            // 12: loci.list.GetListsRequest
-	(*GetListsResponse)(nil),           // 13: loci.list.GetListsResponse
-	(*GetListRequest)(nil),             // 14: loci.list.GetListRequest
-	(*GetListResponse)(nil),            // 15: loci.list.GetListResponse
-	(*UpdateListRequest)(nil),          // 16: loci.list.UpdateListRequest
-	(*UpdateListResponse)(nil),         // 17: loci.list.UpdateListResponse
-	(*DeleteListRequest)(nil),          // 18: loci.list.DeleteListRequest
-	(*DeleteListResponse)(nil),         // 19: loci.list.DeleteListResponse
-	(*CreateItineraryRequest)(nil),     // 20: loci.list.CreateItineraryRequest
-	(*CreateItineraryResponse)(nil),    // 21: loci.list.CreateItineraryResponse
-	(*AddListItemRequest)(nil),         // 22: loci.list.AddListItemRequest
-	(*AddListItemResponse)(nil),        // 23: loci.list.AddListItemResponse
-	(*UpdateListItemRequest)(nil),      // 24: loci.list.UpdateListItemRequest
-	(*UpdateListItemResponse)(nil),     // 25: loci.list.UpdateListItemResponse
-	(*RemoveListItemRequest)(nil),      // 26: loci.list.RemoveListItemRequest
-	(*RemoveListItemResponse)(nil),     // 27: loci.list.RemoveListItemResponse
-	(*GetListItemsRequest)(nil),        // 28: loci.list.GetListItemsRequest
-	(*GetListItemsResponse)(nil),       // 29: loci.list.GetListItemsResponse
-	(*GetListRestaurantsRequest)(nil),  // 30: loci.list.GetListRestaurantsRequest
-	(*GetListRestaurantsResponse)(nil), // 31: loci.list.GetListRestaurantsResponse
-	(*GetListHotelsRequest)(nil),       // 32: loci.list.GetListHotelsRequest
-	(*GetListHotelsResponse)(nil),      // 33: loci.list.GetListHotelsResponse
-	(*GetListItinerariesRequest)(nil),  // 34: loci.list.GetListItinerariesRequest
-	(*GetListItinerariesResponse)(nil), // 35: loci.list.GetListItinerariesResponse
-	(*SavePublicListRequest)(nil),      // 36: loci.list.SavePublicListRequest
-	(*SavePublicListResponse)(nil),     // 37: loci.list.SavePublicListResponse
-	(*UnsaveListRequest)(nil),          // 38: loci.list.UnsaveListRequest
-	(*UnsaveListResponse)(nil),         // 39: loci.list.UnsaveListResponse
-	(*GetSavedListsRequest)(nil),       // 40: loci.list.GetSavedListsRequest
-	(*GetSavedListsResponse)(nil),      // 41: loci.list.GetSavedListsResponse
-	(*SearchPublicListsRequest)(nil),   // 42: loci.list.SearchPublicListsRequest
-	(*SearchPublicListsResponse)(nil),  // 43: loci.list.SearchPublicListsResponse
-	(*SearchMetadata)(nil),             // 44: loci.list.SearchMetadata
-	nil,                                // 45: loci.list.SearchMetadata.FiltersAppliedEntry
-	(*timestamppb.Timestamp)(nil),      // 46: google.protobuf.Timestamp
+	(ContentType)(0),                           // 0: loci.list.ContentType
+	(*List)(nil),                               // 1: loci.list.List
+	(*ListItem)(nil),                           // 2: loci.list.ListItem
+	(*ListWithItems)(nil),                      // 3: loci.list.ListWithItems
+	(*ListItemWithContent)(nil),                // 4: loci.list.ListItemWithContent
+	(*ListWithDetailedItems)(nil),              // 5: loci.list.ListWithDetailedItems
+	(*POIDetailedInfo)(nil),                    // 6: loci.list.POIDetailedInfo
+	(*RestaurantDetailedInfo)(nil),             // 7: loci.list.RestaurantDetailedInfo
+	(*HotelDetailedInfo)(nil),                  // 8: loci.list.HotelDetailedInfo
+	(*UserSavedItinerary)(nil),                 // 9: loci.list.UserSavedItinerary
+	(*CreateListRequest)(nil),                  // 10: loci.list.CreateListRequest
+	(*CreateListResponse)(nil),                 // 11: loci.list.CreateListResponse
+	(*GetListsRequest)(nil),                    // 12: loci.list.GetListsRequest
+	(*GetListsResponse)(nil),                   // 13: loci.list.GetListsResponse
+	(*GetListRequest)(nil),                     // 14: loci.list.GetListRequest
+	(*GetListResponse)(nil),                    // 15: loci.list.GetListResponse
+	(*UpdateListRequest)(nil),                  // 16: loci.list.UpdateListRequest
+	(*UpdateListResponse)(nil),                 // 17: loci.list.UpdateListResponse
+	(*DeleteListRequest)(nil),                  // 18: loci.list.DeleteListRequest
+	(*DeleteListResponse)(nil),                 // 19: loci.list.DeleteListResponse
+	(*CreateItineraryRequest)(nil),             // 20: loci.list.CreateItineraryRequest
+	(*CreateItineraryResponse)(nil),            // 21: loci.list.CreateItineraryResponse
+	(*AddListItemRequest)(nil),                 // 22: loci.list.AddListItemRequest
+	(*AddListItemResponse)(nil),                // 23: loci.list.AddListItemResponse
+	(*UpdateListItemRequest)(nil),              // 24: loci.list.UpdateListItemRequest
+	(*UpdateListItemResponse)(nil),             // 25: loci.list.UpdateListItemResponse
+	(*RemoveListItemRequest)(nil),              // 26: loci.list.RemoveListItemRequest
+	(*RemoveListItemResponse)(nil),             // 27: loci.list.RemoveListItemResponse
+	(*GetListItemsRequest)(nil),                // 28: loci.list.GetListItemsRequest
+	(*GetListItemsResponse)(nil),               // 29: loci.list.GetListItemsResponse
+	(*GetListRestaurantsRequest)(nil),          // 30: loci.list.GetListRestaurantsRequest
+	(*GetListRestaurantsResponse)(nil),         // 31: loci.list.GetListRestaurantsResponse
+	(*GetListHotelsRequest)(nil),               // 32: loci.list.GetListHotelsRequest
+	(*GetListHotelsResponse)(nil),              // 33: loci.list.GetListHotelsResponse
+	(*GetListItinerariesRequest)(nil),          // 34: loci.list.GetListItinerariesRequest
+	(*GetListItinerariesResponse)(nil),         // 35: loci.list.GetListItinerariesResponse
+	(*SavePublicListRequest)(nil),              // 36: loci.list.SavePublicListRequest
+	(*SavePublicListResponse)(nil),             // 37: loci.list.SavePublicListResponse
+	(*UnsaveListRequest)(nil),                  // 38: loci.list.UnsaveListRequest
+	(*UnsaveListResponse)(nil),                 // 39: loci.list.UnsaveListResponse
+	(*GetSavedListsRequest)(nil),               // 40: loci.list.GetSavedListsRequest
+	(*GetSavedListsResponse)(nil),              // 41: loci.list.GetSavedListsResponse
+	(*SearchPublicListsRequest)(nil),           // 42: loci.list.SearchPublicListsRequest
+	(*SearchPublicListsResponse)(nil),          // 43: loci.list.SearchPublicListsResponse
+	(*SearchMetadata)(nil),                     // 44: loci.list.SearchMetadata
+	nil,                                        // 45: loci.list.SearchMetadata.FiltersAppliedEntry
+	(*timestamppb.Timestamp)(nil),              // 46: google.protobuf.Timestamp
+	(*recommendation.RecommendationTrace)(nil), // 47: loci.recommendation.RecommendationTrace
 }
 var file_loci_list_list_proto_depIdxs = []int32{
 	46, // 0: loci.list.List.created_at:type_name -> google.protobuf.Timestamp
@@ -3516,78 +3538,80 @@ var file_loci_list_list_proto_depIdxs = []int32{
 	46, // 3: loci.list.ListItem.time_slot:type_name -> google.protobuf.Timestamp
 	46, // 4: loci.list.ListItem.created_at:type_name -> google.protobuf.Timestamp
 	46, // 5: loci.list.ListItem.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: loci.list.ListWithItems.list:type_name -> loci.list.List
-	2,  // 7: loci.list.ListWithItems.items:type_name -> loci.list.ListItem
-	2,  // 8: loci.list.ListItemWithContent.list_item:type_name -> loci.list.ListItem
-	6,  // 9: loci.list.ListItemWithContent.poi:type_name -> loci.list.POIDetailedInfo
-	7,  // 10: loci.list.ListItemWithContent.restaurant:type_name -> loci.list.RestaurantDetailedInfo
-	8,  // 11: loci.list.ListItemWithContent.hotel:type_name -> loci.list.HotelDetailedInfo
-	9,  // 12: loci.list.ListItemWithContent.itinerary:type_name -> loci.list.UserSavedItinerary
-	1,  // 13: loci.list.ListWithDetailedItems.list:type_name -> loci.list.List
-	4,  // 14: loci.list.ListWithDetailedItems.items:type_name -> loci.list.ListItemWithContent
-	6,  // 15: loci.list.RestaurantDetailedInfo.poi:type_name -> loci.list.POIDetailedInfo
-	6,  // 16: loci.list.HotelDetailedInfo.poi:type_name -> loci.list.POIDetailedInfo
-	46, // 17: loci.list.UserSavedItinerary.created_at:type_name -> google.protobuf.Timestamp
-	46, // 18: loci.list.UserSavedItinerary.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 19: loci.list.CreateListResponse.list:type_name -> loci.list.List
-	3,  // 20: loci.list.GetListsResponse.lists:type_name -> loci.list.ListWithItems
-	5,  // 21: loci.list.GetListResponse.list:type_name -> loci.list.ListWithDetailedItems
-	1,  // 22: loci.list.UpdateListResponse.list:type_name -> loci.list.List
-	1,  // 23: loci.list.CreateItineraryResponse.itinerary:type_name -> loci.list.List
-	0,  // 24: loci.list.AddListItemRequest.content_type:type_name -> loci.list.ContentType
-	46, // 25: loci.list.AddListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
-	2,  // 26: loci.list.AddListItemResponse.item:type_name -> loci.list.ListItem
-	0,  // 27: loci.list.UpdateListItemRequest.content_type:type_name -> loci.list.ContentType
-	46, // 28: loci.list.UpdateListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
-	2,  // 29: loci.list.UpdateListItemResponse.item:type_name -> loci.list.ListItem
-	0,  // 30: loci.list.RemoveListItemRequest.content_type:type_name -> loci.list.ContentType
-	4,  // 31: loci.list.GetListItemsResponse.items:type_name -> loci.list.ListItemWithContent
-	7,  // 32: loci.list.GetListRestaurantsResponse.restaurants:type_name -> loci.list.RestaurantDetailedInfo
-	8,  // 33: loci.list.GetListHotelsResponse.hotels:type_name -> loci.list.HotelDetailedInfo
-	9,  // 34: loci.list.GetListItinerariesResponse.itineraries:type_name -> loci.list.UserSavedItinerary
-	3,  // 35: loci.list.GetSavedListsResponse.lists:type_name -> loci.list.ListWithItems
-	3,  // 36: loci.list.SearchPublicListsResponse.lists:type_name -> loci.list.ListWithItems
-	44, // 37: loci.list.SearchPublicListsResponse.metadata:type_name -> loci.list.SearchMetadata
-	45, // 38: loci.list.SearchMetadata.filters_applied:type_name -> loci.list.SearchMetadata.FiltersAppliedEntry
-	10, // 39: loci.list.ListService.CreateList:input_type -> loci.list.CreateListRequest
-	12, // 40: loci.list.ListService.GetLists:input_type -> loci.list.GetListsRequest
-	14, // 41: loci.list.ListService.GetList:input_type -> loci.list.GetListRequest
-	16, // 42: loci.list.ListService.UpdateList:input_type -> loci.list.UpdateListRequest
-	18, // 43: loci.list.ListService.DeleteList:input_type -> loci.list.DeleteListRequest
-	20, // 44: loci.list.ListService.CreateItinerary:input_type -> loci.list.CreateItineraryRequest
-	22, // 45: loci.list.ListService.AddListItem:input_type -> loci.list.AddListItemRequest
-	24, // 46: loci.list.ListService.UpdateListItem:input_type -> loci.list.UpdateListItemRequest
-	26, // 47: loci.list.ListService.RemoveListItem:input_type -> loci.list.RemoveListItemRequest
-	28, // 48: loci.list.ListService.GetListItems:input_type -> loci.list.GetListItemsRequest
-	30, // 49: loci.list.ListService.GetListRestaurants:input_type -> loci.list.GetListRestaurantsRequest
-	32, // 50: loci.list.ListService.GetListHotels:input_type -> loci.list.GetListHotelsRequest
-	34, // 51: loci.list.ListService.GetListItineraries:input_type -> loci.list.GetListItinerariesRequest
-	36, // 52: loci.list.ListService.SavePublicList:input_type -> loci.list.SavePublicListRequest
-	38, // 53: loci.list.ListService.UnsaveList:input_type -> loci.list.UnsaveListRequest
-	40, // 54: loci.list.ListService.GetSavedLists:input_type -> loci.list.GetSavedListsRequest
-	42, // 55: loci.list.ListService.SearchPublicLists:input_type -> loci.list.SearchPublicListsRequest
-	11, // 56: loci.list.ListService.CreateList:output_type -> loci.list.CreateListResponse
-	13, // 57: loci.list.ListService.GetLists:output_type -> loci.list.GetListsResponse
-	15, // 58: loci.list.ListService.GetList:output_type -> loci.list.GetListResponse
-	17, // 59: loci.list.ListService.UpdateList:output_type -> loci.list.UpdateListResponse
-	19, // 60: loci.list.ListService.DeleteList:output_type -> loci.list.DeleteListResponse
-	21, // 61: loci.list.ListService.CreateItinerary:output_type -> loci.list.CreateItineraryResponse
-	23, // 62: loci.list.ListService.AddListItem:output_type -> loci.list.AddListItemResponse
-	25, // 63: loci.list.ListService.UpdateListItem:output_type -> loci.list.UpdateListItemResponse
-	27, // 64: loci.list.ListService.RemoveListItem:output_type -> loci.list.RemoveListItemResponse
-	29, // 65: loci.list.ListService.GetListItems:output_type -> loci.list.GetListItemsResponse
-	31, // 66: loci.list.ListService.GetListRestaurants:output_type -> loci.list.GetListRestaurantsResponse
-	33, // 67: loci.list.ListService.GetListHotels:output_type -> loci.list.GetListHotelsResponse
-	35, // 68: loci.list.ListService.GetListItineraries:output_type -> loci.list.GetListItinerariesResponse
-	37, // 69: loci.list.ListService.SavePublicList:output_type -> loci.list.SavePublicListResponse
-	39, // 70: loci.list.ListService.UnsaveList:output_type -> loci.list.UnsaveListResponse
-	41, // 71: loci.list.ListService.GetSavedLists:output_type -> loci.list.GetSavedListsResponse
-	43, // 72: loci.list.ListService.SearchPublicLists:output_type -> loci.list.SearchPublicListsResponse
-	56, // [56:73] is the sub-list for method output_type
-	39, // [39:56] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	47, // 6: loci.list.ListItem.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	1,  // 7: loci.list.ListWithItems.list:type_name -> loci.list.List
+	2,  // 8: loci.list.ListWithItems.items:type_name -> loci.list.ListItem
+	2,  // 9: loci.list.ListItemWithContent.list_item:type_name -> loci.list.ListItem
+	6,  // 10: loci.list.ListItemWithContent.poi:type_name -> loci.list.POIDetailedInfo
+	7,  // 11: loci.list.ListItemWithContent.restaurant:type_name -> loci.list.RestaurantDetailedInfo
+	8,  // 12: loci.list.ListItemWithContent.hotel:type_name -> loci.list.HotelDetailedInfo
+	9,  // 13: loci.list.ListItemWithContent.itinerary:type_name -> loci.list.UserSavedItinerary
+	1,  // 14: loci.list.ListWithDetailedItems.list:type_name -> loci.list.List
+	4,  // 15: loci.list.ListWithDetailedItems.items:type_name -> loci.list.ListItemWithContent
+	6,  // 16: loci.list.RestaurantDetailedInfo.poi:type_name -> loci.list.POIDetailedInfo
+	6,  // 17: loci.list.HotelDetailedInfo.poi:type_name -> loci.list.POIDetailedInfo
+	46, // 18: loci.list.UserSavedItinerary.created_at:type_name -> google.protobuf.Timestamp
+	46, // 19: loci.list.UserSavedItinerary.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 20: loci.list.CreateListResponse.list:type_name -> loci.list.List
+	3,  // 21: loci.list.GetListsResponse.lists:type_name -> loci.list.ListWithItems
+	5,  // 22: loci.list.GetListResponse.list:type_name -> loci.list.ListWithDetailedItems
+	1,  // 23: loci.list.UpdateListResponse.list:type_name -> loci.list.List
+	1,  // 24: loci.list.CreateItineraryResponse.itinerary:type_name -> loci.list.List
+	0,  // 25: loci.list.AddListItemRequest.content_type:type_name -> loci.list.ContentType
+	46, // 26: loci.list.AddListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
+	47, // 27: loci.list.AddListItemRequest.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	2,  // 28: loci.list.AddListItemResponse.item:type_name -> loci.list.ListItem
+	0,  // 29: loci.list.UpdateListItemRequest.content_type:type_name -> loci.list.ContentType
+	46, // 30: loci.list.UpdateListItemRequest.time_slot:type_name -> google.protobuf.Timestamp
+	2,  // 31: loci.list.UpdateListItemResponse.item:type_name -> loci.list.ListItem
+	0,  // 32: loci.list.RemoveListItemRequest.content_type:type_name -> loci.list.ContentType
+	4,  // 33: loci.list.GetListItemsResponse.items:type_name -> loci.list.ListItemWithContent
+	7,  // 34: loci.list.GetListRestaurantsResponse.restaurants:type_name -> loci.list.RestaurantDetailedInfo
+	8,  // 35: loci.list.GetListHotelsResponse.hotels:type_name -> loci.list.HotelDetailedInfo
+	9,  // 36: loci.list.GetListItinerariesResponse.itineraries:type_name -> loci.list.UserSavedItinerary
+	3,  // 37: loci.list.GetSavedListsResponse.lists:type_name -> loci.list.ListWithItems
+	3,  // 38: loci.list.SearchPublicListsResponse.lists:type_name -> loci.list.ListWithItems
+	44, // 39: loci.list.SearchPublicListsResponse.metadata:type_name -> loci.list.SearchMetadata
+	45, // 40: loci.list.SearchMetadata.filters_applied:type_name -> loci.list.SearchMetadata.FiltersAppliedEntry
+	10, // 41: loci.list.ListService.CreateList:input_type -> loci.list.CreateListRequest
+	12, // 42: loci.list.ListService.GetLists:input_type -> loci.list.GetListsRequest
+	14, // 43: loci.list.ListService.GetList:input_type -> loci.list.GetListRequest
+	16, // 44: loci.list.ListService.UpdateList:input_type -> loci.list.UpdateListRequest
+	18, // 45: loci.list.ListService.DeleteList:input_type -> loci.list.DeleteListRequest
+	20, // 46: loci.list.ListService.CreateItinerary:input_type -> loci.list.CreateItineraryRequest
+	22, // 47: loci.list.ListService.AddListItem:input_type -> loci.list.AddListItemRequest
+	24, // 48: loci.list.ListService.UpdateListItem:input_type -> loci.list.UpdateListItemRequest
+	26, // 49: loci.list.ListService.RemoveListItem:input_type -> loci.list.RemoveListItemRequest
+	28, // 50: loci.list.ListService.GetListItems:input_type -> loci.list.GetListItemsRequest
+	30, // 51: loci.list.ListService.GetListRestaurants:input_type -> loci.list.GetListRestaurantsRequest
+	32, // 52: loci.list.ListService.GetListHotels:input_type -> loci.list.GetListHotelsRequest
+	34, // 53: loci.list.ListService.GetListItineraries:input_type -> loci.list.GetListItinerariesRequest
+	36, // 54: loci.list.ListService.SavePublicList:input_type -> loci.list.SavePublicListRequest
+	38, // 55: loci.list.ListService.UnsaveList:input_type -> loci.list.UnsaveListRequest
+	40, // 56: loci.list.ListService.GetSavedLists:input_type -> loci.list.GetSavedListsRequest
+	42, // 57: loci.list.ListService.SearchPublicLists:input_type -> loci.list.SearchPublicListsRequest
+	11, // 58: loci.list.ListService.CreateList:output_type -> loci.list.CreateListResponse
+	13, // 59: loci.list.ListService.GetLists:output_type -> loci.list.GetListsResponse
+	15, // 60: loci.list.ListService.GetList:output_type -> loci.list.GetListResponse
+	17, // 61: loci.list.ListService.UpdateList:output_type -> loci.list.UpdateListResponse
+	19, // 62: loci.list.ListService.DeleteList:output_type -> loci.list.DeleteListResponse
+	21, // 63: loci.list.ListService.CreateItinerary:output_type -> loci.list.CreateItineraryResponse
+	23, // 64: loci.list.ListService.AddListItem:output_type -> loci.list.AddListItemResponse
+	25, // 65: loci.list.ListService.UpdateListItem:output_type -> loci.list.UpdateListItemResponse
+	27, // 66: loci.list.ListService.RemoveListItem:output_type -> loci.list.RemoveListItemResponse
+	29, // 67: loci.list.ListService.GetListItems:output_type -> loci.list.GetListItemsResponse
+	31, // 68: loci.list.ListService.GetListRestaurants:output_type -> loci.list.GetListRestaurantsResponse
+	33, // 69: loci.list.ListService.GetListHotels:output_type -> loci.list.GetListHotelsResponse
+	35, // 70: loci.list.ListService.GetListItineraries:output_type -> loci.list.GetListItinerariesResponse
+	37, // 71: loci.list.ListService.SavePublicList:output_type -> loci.list.SavePublicListResponse
+	39, // 72: loci.list.ListService.UnsaveList:output_type -> loci.list.UnsaveListResponse
+	41, // 73: loci.list.ListService.GetSavedLists:output_type -> loci.list.GetSavedListsResponse
+	43, // 74: loci.list.ListService.SearchPublicLists:output_type -> loci.list.SearchPublicListsResponse
+	58, // [58:75] is the sub-list for method output_type
+	41, // [41:58] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_loci_list_list_proto_init() }
@@ -3595,6 +3619,8 @@ func file_loci_list_list_proto_init() {
 	if File_loci_list_list_proto != nil {
 		return
 	}
+	file_loci_list_list_proto_msgTypes[1].OneofWrappers = []any{}
+	file_loci_list_list_proto_msgTypes[21].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

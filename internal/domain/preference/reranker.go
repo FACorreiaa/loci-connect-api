@@ -25,6 +25,8 @@ type Reranker struct {
 	logger *slog.Logger
 }
 
+const rerankerAdvisoryLockID int64 = 0x4c4f4349 // "LOCI"
+
 // NewReranker builds a preference re-rank job.
 func NewReranker(db *pgxpool.Pool, store VectorStore, logger *slog.Logger) *Reranker {
 	l := logger
@@ -45,6 +47,26 @@ func (r *Reranker) Run(ctx context.Context, lookback time.Duration) (RerankStats
 	if r.db == nil || r.store == nil {
 		return stats, fmt.Errorf("reranker not configured")
 	}
+	lockConn, err := r.db.Acquire(ctx)
+	if err != nil {
+		return stats, fmt.Errorf("acquire reranker lock connection: %w", err)
+	}
+	defer lockConn.Release()
+	var locked bool
+	if err := lockConn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, rerankerAdvisoryLockID).Scan(&locked); err != nil {
+		return stats, fmt.Errorf("acquire reranker advisory lock: %w", err)
+	}
+	if !locked {
+		r.logger.InfoContext(ctx, "preference rerank already running; skipping overlapping run")
+		return stats, nil
+	}
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := lockConn.Exec(unlockCtx, `SELECT pg_advisory_unlock($1)`, rerankerAdvisoryLockID); err != nil {
+			r.logger.WarnContext(unlockCtx, "failed to release reranker advisory lock", slog.Any("error", err))
+		}
+	}()
 
 	users, err := r.usersWithFeedback(ctx, lookback)
 	if err != nil {
@@ -72,10 +94,14 @@ func (r *Reranker) Run(ctx context.Context, lookback time.Duration) (RerankStats
 }
 
 func (r *Reranker) usersWithFeedback(ctx context.Context, lookback time.Duration) ([]uuid.UUID, error) {
-	query := `SELECT DISTINCT user_id FROM preference_feedback`
+	query := `
+		SELECT DISTINCT feedback.user_id
+		FROM preference_feedback feedback
+		LEFT JOIN personalization_settings settings ON settings.user_id = feedback.user_id
+		WHERE COALESCE(settings.personalization_enabled, TRUE)`
 	var args []any
 	if lookback > 0 {
-		query += ` WHERE created_at >= $1`
+		query += ` AND feedback.created_at >= $1`
 		args = append(args, time.Now().UTC().Add(-lookback))
 	}
 	rows, err := r.db.Query(ctx, query, args...)
@@ -110,7 +136,44 @@ func (r *Reranker) recomputeUser(ctx context.Context, userID uuid.UUID) (signals
 	if err := r.store.Upsert(ctx, userID, avg, count, lastAt); err != nil {
 		return len(vectors), false, err
 	}
+	if err := r.updateTasteTraits(ctx, userID); err != nil {
+		return len(vectors), false, err
+	}
 	return len(vectors), true, nil
+}
+
+func (r *Reranker) updateTasteTraits(ctx context.Context, userID uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin taste trait update: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+	if _, err := tx.Exec(ctx, `DELETE FROM user_taste_traits WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("clear taste traits: %w", err)
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO user_taste_traits (user_id, trait_key, label, score, confidence, evidence_count, updated_at)
+		SELECT
+			pf.user_id,
+			LOWER(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places')),
+			INITCAP(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places')),
+			GREATEST(-1, LEAST(1, SUM(pf.weight * CASE WHEN pf.event = 'skipped' THEN -1 ELSE 1 END) / GREATEST(COUNT(*), 1)))::double precision,
+			LEAST(1, COUNT(*)::double precision / 10),
+			COUNT(*)::integer,
+			NOW()
+		FROM preference_feedback pf
+		JOIN points_of_interest p ON p.id::text = pf.poi_id
+		WHERE pf.user_id = $1 AND pf.poi_id IS NOT NULL AND pf.poi_id <> ''
+		GROUP BY pf.user_id, LOWER(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places')),
+			INITCAP(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places'))
+		HAVING COUNT(*) >= 2`, userID)
+	if err != nil {
+		return fmt.Errorf("rebuild taste traits: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit taste traits: %w", err)
+	}
+	return nil
 }
 
 func (r *Reranker) loadWeightedEmbeddings(ctx context.Context, userID uuid.UUID) (

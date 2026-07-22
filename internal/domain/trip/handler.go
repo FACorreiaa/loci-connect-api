@@ -241,6 +241,94 @@ func (h *Handler) SetConstraint(ctx context.Context, req *connect.Request[tripv1
 	})
 }
 
+func (h *Handler) AddStop(ctx context.Context, req *connect.Request[tripv1.AddStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	dayID, err := uuid.Parse(req.Msg.GetDayId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid day ID"))
+	}
+	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
+		for index := range t.Days {
+			if t.Days[index].ID != dayID {
+				continue
+			}
+			stop := stopFromProto(req.Msg.GetStop())
+			stop.OrderIndex = int32(len(t.Days[index].Stops))
+			t.Days[index].Stops = append(t.Days[index].Stops, stop)
+			return nil
+		}
+		return errors.New("day not found in trip")
+	})
+	if err == nil {
+		h.recordStopSignal(ctx, req.Msg.GetTripId(), req.Msg.GetStop(), preference.EventSaved, "added_to_trip")
+	}
+	return resp, err
+}
+
+func (h *Handler) RemoveStop(ctx context.Context, req *connect.Request[tripv1.RemoveStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	var removed *tripv1.TripStop
+	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
+		for dayIndex := range t.Days {
+			for stopIndex := range t.Days[dayIndex].Stops {
+				stop := t.Days[dayIndex].Stops[stopIndex]
+				if stop.ID.String() != req.Msg.GetStopId() {
+					continue
+				}
+				removed = &tripv1.TripStop{PoiId: stop.POIID, RecommendationTrace: traceToProto(stop.RecommendationTrace)}
+				t.Days[dayIndex].Stops = append(t.Days[dayIndex].Stops[:stopIndex], t.Days[dayIndex].Stops[stopIndex+1:]...)
+				for index := range t.Days[dayIndex].Stops {
+					t.Days[dayIndex].Stops[index].OrderIndex = int32(index)
+				}
+				return nil
+			}
+		}
+		return errors.New("stop not found")
+	})
+	if err == nil && removed != nil {
+		h.recordStopSignal(ctx, req.Msg.GetTripId(), removed, preference.EventSkipped, "removed_from_trip")
+	}
+	return resp, err
+}
+
+func (h *Handler) ReplaceStop(ctx context.Context, req *connect.Request[tripv1.ReplaceStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
+		for dayIndex := range t.Days {
+			for stopIndex := range t.Days[dayIndex].Stops {
+				current := t.Days[dayIndex].Stops[stopIndex]
+				if current.ID.String() != req.Msg.GetStopId() {
+					continue
+				}
+				replacement := stopFromProto(req.Msg.GetReplacement())
+				replacement.OrderIndex = current.OrderIndex
+				t.Days[dayIndex].Stops[stopIndex] = replacement
+				return nil
+			}
+		}
+		return errors.New("stop not found")
+	})
+	if err == nil {
+		h.recordStopSignal(ctx, req.Msg.GetTripId(), req.Msg.GetReplacement(), preference.EventSaved, "replaced_trip_stop")
+	}
+	return resp, err
+}
+
+func (h *Handler) recordStopSignal(ctx context.Context, tripID string, stop *tripv1.TripStop, event, action string) {
+	uid, err := userID(ctx)
+	if err != nil || stop == nil {
+		return
+	}
+	id, err := uuid.Parse(tripID)
+	if err != nil {
+		return
+	}
+	metadata := map[string]any{"action": action}
+	if trace := stop.GetRecommendationTrace(); trace != nil {
+		metadata["run_id"] = trace.GetRunId()
+		metadata["algorithm_version"] = trace.GetAlgorithmVersion()
+		metadata["experiment_variant"] = trace.GetExperimentVariant()
+	}
+	h.prefs.Record(ctx, uid, event, preference.RecordOpts{POIID: stop.GetPoiId(), TripID: &id, Metadata: metadata})
+}
+
 func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.ExportTripRequest]) (*connect.Response[tripv1.ExportTripResponse], error) {
 	uid, err := userID(ctx)
 	if err != nil {

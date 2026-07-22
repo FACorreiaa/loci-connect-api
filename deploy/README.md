@@ -13,6 +13,7 @@ GitHub tag v* ──> Actions (build.yml=deploy.yml)
                    └─ ssh VPS: docker compose pull && up -d
 VPS
   ├─ loci-api       :8080 (bound to 127.0.0.1) ── put nginx/Caddy in front for TLS
+  ├─ loci-preference-rerank  recomputes taste vectors every 15 minutes
   └─ loci-postgres  internal network only, named volume postgres-data
 ```
 
@@ -82,6 +83,7 @@ api.your-domain.com {
 cd /opt/loci
 docker compose -f docker-compose.prod.yaml ps
 docker compose -f docker-compose.prod.yaml logs -f api
+docker compose -f docker-compose.prod.yaml logs -f preference-rerank
 curl -s localhost:8080/health            # -> ok
 ```
 

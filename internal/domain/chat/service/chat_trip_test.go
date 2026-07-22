@@ -27,7 +27,7 @@ func TestBuildTripFromCityResponse(t *testing.T) {
 		AIItineraryResponse: locitypes.AIItineraryResponse{PointsOfInterest: pois},
 	}
 
-	tr := buildTripFromCityResponse(cc, data)
+	tr := buildTripFromCityResponse(cc, data, "run-123")
 	if tr == nil {
 		t.Fatal("expected a trip")
 	}
@@ -54,14 +54,18 @@ func TestBuildTripFromCityResponse(t *testing.T) {
 	if tr.Days[0].Stops[0].Notes == "" {
 		t.Fatal("expected TrustSignals rationale in stop notes")
 	}
+	trace := tr.Days[0].Stops[0].RecommendationTrace
+	if trace == nil || trace.RunID != "run-123" || trace.ItemID != pois[0].ID.String() {
+		t.Fatalf("recommendation attribution missing from trip stop: %+v", trace)
+	}
 }
 
 func TestBuildTripFromCityResponse_Empty(t *testing.T) {
 	cc := &common.ChatContext{UserID: uuid.New(), SessionID: uuid.New()}
-	if tr := buildTripFromCityResponse(cc, &locitypes.AiCityResponse{}); tr != nil {
+	if tr := buildTripFromCityResponse(cc, &locitypes.AiCityResponse{}, "run"); tr != nil {
 		t.Fatal("expected nil for no POIs")
 	}
-	if tr := buildTripFromCityResponse(cc, nil); tr != nil {
+	if tr := buildTripFromCityResponse(cc, nil, "run"); tr != nil {
 		t.Fatal("expected nil for nil data")
 	}
 }

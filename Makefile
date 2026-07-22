@@ -12,7 +12,7 @@ build: ## Build the application
 	go build -o bin/server cmd/server/main.go
 	go build -o bin/preference-rerank cmd/preference-rerank/main.go
 
-preference-rerank: ## Recompute user preference vectors from feedback (-lookback=168h)
+preference-rerank: ## Backfill POI embeddings and recompute preference vectors (-lookback=168h)
 	go run ./cmd/preference-rerank -lookback=168h
 
 run: ## Run the application

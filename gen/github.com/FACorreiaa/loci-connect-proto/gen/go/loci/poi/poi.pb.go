@@ -9,6 +9,8 @@ package poi
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	common "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	place "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place"
+	recommendation "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -57,9 +59,11 @@ type POIDetailedInfo struct {
 	// Trust/transparency (Slice 3). uncertainty_score is 0..1 (higher = the model
 	// was less sure); missing_data names fields that couldn't be verified (e.g.
 	// "hours", "price"); recommendation_rationale is a short "why this" note.
-	UncertaintyScore        *float64 `protobuf:"fixed64,28,opt,name=uncertainty_score,json=uncertaintyScore,proto3,oneof" json:"uncertainty_score,omitempty"`
-	MissingData             []string `protobuf:"bytes,29,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
-	RecommendationRationale *string  `protobuf:"bytes,30,opt,name=recommendation_rationale,json=recommendationRationale,proto3,oneof" json:"recommendation_rationale,omitempty"`
+	UncertaintyScore        *float64                            `protobuf:"fixed64,28,opt,name=uncertainty_score,json=uncertaintyScore,proto3,oneof" json:"uncertainty_score,omitempty"`
+	MissingData             []string                            `protobuf:"bytes,29,rep,name=missing_data,json=missingData,proto3" json:"missing_data,omitempty"`
+	RecommendationRationale *string                             `protobuf:"bytes,30,opt,name=recommendation_rationale,json=recommendationRationale,proto3,oneof" json:"recommendation_rationale,omitempty"`
+	RecommendationTrace     *recommendation.RecommendationTrace `protobuf:"bytes,31,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
+	VerifiedFacts           *place.PlaceFacts                   `protobuf:"bytes,32,opt,name=verified_facts,json=verifiedFacts,proto3,oneof" json:"verified_facts,omitempty"`
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -304,27 +308,42 @@ func (x *POIDetailedInfo) GetRecommendationRationale() string {
 	return ""
 }
 
+func (x *POIDetailedInfo) GetRecommendationTrace() *recommendation.RecommendationTrace {
+	if x != nil {
+		return x.RecommendationTrace
+	}
+	return nil
+}
+
+func (x *POIDetailedInfo) GetVerifiedFacts() *place.PlaceFacts {
+	if x != nil {
+		return x.VerifiedFacts
+	}
+	return nil
+}
+
 // HotelDetailedInfo represents hotel-specific information
 type HotelDetailedInfo struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	City             string                 `protobuf:"bytes,2,opt,name=city,proto3" json:"city,omitempty"`
-	Name             string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Latitude         float64                `protobuf:"fixed64,4,opt,name=latitude,proto3" json:"latitude,omitempty"`
-	Longitude        float64                `protobuf:"fixed64,5,opt,name=longitude,proto3" json:"longitude,omitempty"`
-	Category         string                 `protobuf:"bytes,6,opt,name=category,proto3" json:"category,omitempty"`
-	Description      string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
-	Address          string                 `protobuf:"bytes,8,opt,name=address,proto3" json:"address,omitempty"`
-	PhoneNumber      *string                `protobuf:"bytes,9,opt,name=phone_number,json=phoneNumber,proto3,oneof" json:"phone_number,omitempty"`
-	Website          *string                `protobuf:"bytes,10,opt,name=website,proto3,oneof" json:"website,omitempty"`
-	OpeningHours     *string                `protobuf:"bytes,11,opt,name=opening_hours,json=openingHours,proto3,oneof" json:"opening_hours,omitempty"`
-	PriceRange       *string                `protobuf:"bytes,12,opt,name=price_range,json=priceRange,proto3,oneof" json:"price_range,omitempty"`
-	Rating           float64                `protobuf:"fixed64,13,opt,name=rating,proto3" json:"rating,omitempty"`
-	Tags             []string               `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
-	Images           []string               `protobuf:"bytes,15,rep,name=images,proto3" json:"images,omitempty"`
-	LlmInteractionId string                 `protobuf:"bytes,16,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state               protoimpl.MessageState              `protogen:"open.v1"`
+	Id                  string                              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	City                string                              `protobuf:"bytes,2,opt,name=city,proto3" json:"city,omitempty"`
+	Name                string                              `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Latitude            float64                             `protobuf:"fixed64,4,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude           float64                             `protobuf:"fixed64,5,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	Category            string                              `protobuf:"bytes,6,opt,name=category,proto3" json:"category,omitempty"`
+	Description         string                              `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	Address             string                              `protobuf:"bytes,8,opt,name=address,proto3" json:"address,omitempty"`
+	PhoneNumber         *string                             `protobuf:"bytes,9,opt,name=phone_number,json=phoneNumber,proto3,oneof" json:"phone_number,omitempty"`
+	Website             *string                             `protobuf:"bytes,10,opt,name=website,proto3,oneof" json:"website,omitempty"`
+	OpeningHours        *string                             `protobuf:"bytes,11,opt,name=opening_hours,json=openingHours,proto3,oneof" json:"opening_hours,omitempty"`
+	PriceRange          *string                             `protobuf:"bytes,12,opt,name=price_range,json=priceRange,proto3,oneof" json:"price_range,omitempty"`
+	Rating              float64                             `protobuf:"fixed64,13,opt,name=rating,proto3" json:"rating,omitempty"`
+	Tags                []string                            `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
+	Images              []string                            `protobuf:"bytes,15,rep,name=images,proto3" json:"images,omitempty"`
+	LlmInteractionId    string                              `protobuf:"bytes,16,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
+	RecommendationTrace *recommendation.RecommendationTrace `protobuf:"bytes,17,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *HotelDetailedInfo) Reset() {
@@ -469,28 +488,36 @@ func (x *HotelDetailedInfo) GetLlmInteractionId() string {
 	return ""
 }
 
+func (x *HotelDetailedInfo) GetRecommendationTrace() *recommendation.RecommendationTrace {
+	if x != nil {
+		return x.RecommendationTrace
+	}
+	return nil
+}
+
 // RestaurantDetailedInfo represents restaurant-specific information
 type RestaurantDetailedInfo struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	City             string                 `protobuf:"bytes,2,opt,name=city,proto3" json:"city,omitempty"`
-	Name             string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Latitude         float64                `protobuf:"fixed64,4,opt,name=latitude,proto3" json:"latitude,omitempty"`
-	Longitude        float64                `protobuf:"fixed64,5,opt,name=longitude,proto3" json:"longitude,omitempty"`
-	Category         string                 `protobuf:"bytes,6,opt,name=category,proto3" json:"category,omitempty"`
-	Description      string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
-	Address          *string                `protobuf:"bytes,8,opt,name=address,proto3,oneof" json:"address,omitempty"`
-	Website          *string                `protobuf:"bytes,9,opt,name=website,proto3,oneof" json:"website,omitempty"`
-	PhoneNumber      *string                `protobuf:"bytes,10,opt,name=phone_number,json=phoneNumber,proto3,oneof" json:"phone_number,omitempty"`
-	OpeningHours     *string                `protobuf:"bytes,11,opt,name=opening_hours,json=openingHours,proto3,oneof" json:"opening_hours,omitempty"`
-	PriceLevel       *string                `protobuf:"bytes,12,opt,name=price_level,json=priceLevel,proto3,oneof" json:"price_level,omitempty"`
-	CuisineType      *string                `protobuf:"bytes,13,opt,name=cuisine_type,json=cuisineType,proto3,oneof" json:"cuisine_type,omitempty"`
-	Tags             []string               `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
-	Images           []string               `protobuf:"bytes,15,rep,name=images,proto3" json:"images,omitempty"`
-	Rating           float64                `protobuf:"fixed64,16,opt,name=rating,proto3" json:"rating,omitempty"`
-	LlmInteractionId string                 `protobuf:"bytes,17,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state               protoimpl.MessageState              `protogen:"open.v1"`
+	Id                  string                              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	City                string                              `protobuf:"bytes,2,opt,name=city,proto3" json:"city,omitempty"`
+	Name                string                              `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Latitude            float64                             `protobuf:"fixed64,4,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude           float64                             `protobuf:"fixed64,5,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	Category            string                              `protobuf:"bytes,6,opt,name=category,proto3" json:"category,omitempty"`
+	Description         string                              `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	Address             *string                             `protobuf:"bytes,8,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	Website             *string                             `protobuf:"bytes,9,opt,name=website,proto3,oneof" json:"website,omitempty"`
+	PhoneNumber         *string                             `protobuf:"bytes,10,opt,name=phone_number,json=phoneNumber,proto3,oneof" json:"phone_number,omitempty"`
+	OpeningHours        *string                             `protobuf:"bytes,11,opt,name=opening_hours,json=openingHours,proto3,oneof" json:"opening_hours,omitempty"`
+	PriceLevel          *string                             `protobuf:"bytes,12,opt,name=price_level,json=priceLevel,proto3,oneof" json:"price_level,omitempty"`
+	CuisineType         *string                             `protobuf:"bytes,13,opt,name=cuisine_type,json=cuisineType,proto3,oneof" json:"cuisine_type,omitempty"`
+	Tags                []string                            `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
+	Images              []string                            `protobuf:"bytes,15,rep,name=images,proto3" json:"images,omitempty"`
+	Rating              float64                             `protobuf:"fixed64,16,opt,name=rating,proto3" json:"rating,omitempty"`
+	LlmInteractionId    string                              `protobuf:"bytes,17,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
+	RecommendationTrace *recommendation.RecommendationTrace `protobuf:"bytes,18,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *RestaurantDetailedInfo) Reset() {
@@ -640,6 +667,13 @@ func (x *RestaurantDetailedInfo) GetLlmInteractionId() string {
 		return x.LlmInteractionId
 	}
 	return ""
+}
+
+func (x *RestaurantDetailedInfo) GetRecommendationTrace() *recommendation.RecommendationTrace {
+	if x != nil {
+		return x.RecommendationTrace
+	}
+	return nil
 }
 
 // POIFilters for filtering POIs
@@ -1052,7 +1086,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\xe2\r\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xb4\x0f\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1101,7 +1135,10 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\fmissing_data\x18\x1d \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x14\"\x06r\x04\x10\x01\x182R\vmissingData\x12M\n" +
 	"\x18recommendation_rationale\x18\x1e \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\bR\x17recommendationRationale\x88\x01\x01\x1a?\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\bR\x17recommendationRationale\x88\x01\x01\x12`\n" +
+	"\x14recommendation_trace\x18\x1f \x01(\v2(.loci.recommendation.RecommendationTraceH\tR\x13recommendationTrace\x88\x01\x01\x12B\n" +
+	"\x0everified_facts\x18  \x01(\v2\x16.loci.place.PlaceFactsH\n" +
+	"R\rverifiedFacts\x88\x01\x01\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x12\n" +
@@ -1114,7 +1151,9 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\f_star_ratingB\t\n" +
 	"\a_sourceB\x14\n" +
 	"\x12_uncertainty_scoreB\x1b\n" +
-	"\x19_recommendation_rationale\"\xbb\x06\n" +
+	"\x19_recommendation_rationaleB\x17\n" +
+	"\x15_recommendation_traceB\x11\n" +
+	"\x0f_verified_facts\"\xb6\a\n" +
 	"\x11HotelDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1141,12 +1180,14 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x10\x1e\"\x06r\x04\x10\x01\x18dR\x04tags\x12,\n" +
 	"\x06images\x18\x0f \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x14\"\n" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x06images\x127\n" +
-	"\x12llm_interaction_id\x18\x10 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionIdB\x0f\n" +
+	"\x12llm_interaction_id\x18\x10 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionId\x12`\n" +
+	"\x14recommendation_trace\x18\x11 \x01(\v2(.loci.recommendation.RecommendationTraceH\x04R\x13recommendationTrace\x88\x01\x01B\x0f\n" +
 	"\r_phone_numberB\n" +
 	"\n" +
 	"\b_websiteB\x10\n" +
 	"\x0e_opening_hoursB\x0e\n" +
-	"\f_price_range\"\x9b\a\n" +
+	"\f_price_rangeB\x17\n" +
+	"\x15_recommendation_trace\"\x96\b\n" +
 	"\x16RestaurantDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1174,7 +1215,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x06images\x18\x0f \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x14\"\n" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x06images\x12/\n" +
 	"\x06rating\x18\x10 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\x00\x00R\x06rating\x127\n" +
-	"\x12llm_interaction_id\x18\x11 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionIdB\n" +
+	"\x12llm_interaction_id\x18\x11 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionId\x12`\n" +
+	"\x14recommendation_trace\x18\x12 \x01(\v2(.loci.recommendation.RecommendationTraceH\x06R\x13recommendationTrace\x88\x01\x01B\n" +
 	"\n" +
 	"\b_addressB\n" +
 	"\n" +
@@ -1182,7 +1224,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\r_phone_numberB\x10\n" +
 	"\x0e_opening_hoursB\x0e\n" +
 	"\f_price_levelB\x0f\n" +
-	"\r_cuisine_type\"\xbe\x01\n" +
+	"\r_cuisine_typeB\x17\n" +
+	"\x15_recommendation_trace\"\xbe\x01\n" +
 	"\n" +
 	"POIFilters\x12&\n" +
 	"\x04city\x18\x01 \x01(\tB\r\xbaH\n" +
@@ -1265,35 +1308,41 @@ func file_loci_poi_poi_proto_rawDescGZIP() []byte {
 
 var file_loci_poi_poi_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_loci_poi_poi_proto_goTypes = []any{
-	(*POIDetailedInfo)(nil),           // 0: loci.poi.POIDetailedInfo
-	(*HotelDetailedInfo)(nil),         // 1: loci.poi.HotelDetailedInfo
-	(*RestaurantDetailedInfo)(nil),    // 2: loci.poi.RestaurantDetailedInfo
-	(*POIFilters)(nil),                // 3: loci.poi.POIFilters
-	(*SearchPOIRequest)(nil),          // 4: loci.poi.SearchPOIRequest
-	(*SearchPOIResponse)(nil),         // 5: loci.poi.SearchPOIResponse
-	(*GetPOIRequest)(nil),             // 6: loci.poi.GetPOIRequest
-	(*GetPOIResponse)(nil),            // 7: loci.poi.GetPOIResponse
-	(*AddPoiRequest)(nil),             // 8: loci.poi.AddPoiRequest
-	nil,                               // 9: loci.poi.POIDetailedInfo.OpeningHoursEntry
-	(*timestamppb.Timestamp)(nil),     // 10: google.protobuf.Timestamp
-	(*common.PaginationMetadata)(nil), // 11: loci.common.PaginationMetadata
+	(*POIDetailedInfo)(nil),                    // 0: loci.poi.POIDetailedInfo
+	(*HotelDetailedInfo)(nil),                  // 1: loci.poi.HotelDetailedInfo
+	(*RestaurantDetailedInfo)(nil),             // 2: loci.poi.RestaurantDetailedInfo
+	(*POIFilters)(nil),                         // 3: loci.poi.POIFilters
+	(*SearchPOIRequest)(nil),                   // 4: loci.poi.SearchPOIRequest
+	(*SearchPOIResponse)(nil),                  // 5: loci.poi.SearchPOIResponse
+	(*GetPOIRequest)(nil),                      // 6: loci.poi.GetPOIRequest
+	(*GetPOIResponse)(nil),                     // 7: loci.poi.GetPOIResponse
+	(*AddPoiRequest)(nil),                      // 8: loci.poi.AddPoiRequest
+	nil,                                        // 9: loci.poi.POIDetailedInfo.OpeningHoursEntry
+	(*timestamppb.Timestamp)(nil),              // 10: google.protobuf.Timestamp
+	(*recommendation.RecommendationTrace)(nil), // 11: loci.recommendation.RecommendationTrace
+	(*place.PlaceFacts)(nil),                   // 12: loci.place.PlaceFacts
+	(*common.PaginationMetadata)(nil),          // 13: loci.common.PaginationMetadata
 }
 var file_loci_poi_poi_proto_depIdxs = []int32{
 	9,  // 0: loci.poi.POIDetailedInfo.opening_hours:type_name -> loci.poi.POIDetailedInfo.OpeningHoursEntry
 	10, // 1: loci.poi.POIDetailedInfo.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 2: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
-	11, // 3: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
-	0,  // 4: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
-	0,  // 5: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
-	4,  // 6: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
-	6,  // 7: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
-	5,  // 8: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
-	7,  // 9: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
-	8,  // [8:10] is the sub-list for method output_type
-	6,  // [6:8] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	11, // 2: loci.poi.POIDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	12, // 3: loci.poi.POIDetailedInfo.verified_facts:type_name -> loci.place.PlaceFacts
+	11, // 4: loci.poi.HotelDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	11, // 5: loci.poi.RestaurantDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	0,  // 6: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
+	13, // 7: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
+	0,  // 8: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
+	0,  // 9: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
+	4,  // 10: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
+	6,  // 11: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
+	5,  // 12: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
+	7,  // 13: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
+	12, // [12:14] is the sub-list for method output_type
+	10, // [10:12] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_loci_poi_poi_proto_init() }

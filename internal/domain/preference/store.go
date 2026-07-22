@@ -45,9 +45,11 @@ func (s *store) GetEmbedding(ctx context.Context, userID uuid.UUID) ([]float32, 
 	}
 	var raw string
 	err := s.db.QueryRow(ctx, `
-		SELECT embedding::text
-		FROM user_preference_vectors
-		WHERE user_id = $1`, userID).Scan(&raw)
+		SELECT vectors.embedding::text
+		FROM user_preference_vectors vectors
+		LEFT JOIN personalization_settings settings ON settings.user_id = vectors.user_id
+		WHERE vectors.user_id = $1
+		  AND COALESCE(settings.personalization_enabled, TRUE)`, userID).Scan(&raw)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, false, nil

@@ -24,13 +24,13 @@ func TestFindPoiByNameAndCity(t *testing.T) {
 	cityID := uuid.New()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '') AS category
-        FROM points_of_interest
-        WHERE name = $1 AND city_id = $2
-    `)).
+		SELECT id, city_id, name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '') AS category
+		FROM points_of_interest
+		WHERE name = $1 AND city_id = $2
+	`)).
 		WithArgs(name, cityID).
-		WillReturnRows(pgxmock.NewRows([]string{"name", "description", "lat", "lon", "category"}).
-			AddRow(name, "A park", 40.0, -73.0, "park"))
+		WillReturnRows(pgxmock.NewRows([]string{"id", "city_id", "name", "description", "lat", "lon", "category"}).
+			AddRow(uuid.New(), cityID, name, "A park", 40.0, -73.0, "park"))
 
 	repo := NewRepository(mock, slog.Default())
 
@@ -38,7 +38,7 @@ func TestFindPoiByNameAndCity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindPoiByNameAndCity: %v", err)
 	}
-	if poi == nil || poi.Name != name || poi.Category != "park" {
+	if poi == nil || poi.ID == uuid.Nil || poi.CityID != cityID || poi.Name != name || poi.Category != "park" {
 		t.Fatalf("unexpected poi: %+v", poi)
 	}
 

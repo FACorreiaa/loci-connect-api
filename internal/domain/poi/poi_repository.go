@@ -152,21 +152,23 @@ func (r *RepositoryImpl) SavePoi(ctx context.Context, poi locitypes.POIDetailedI
 
 func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
 	query := `
-        SELECT name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '') AS category
-        FROM points_of_interest
-        WHERE name = $1 AND city_id = $2
-    `
+		SELECT id, city_id, name, description, ST_Y(location) as lat, ST_X(location) as lon, COALESCE(poi_type, '') AS category
+		FROM points_of_interest
+		WHERE name = $1 AND city_id = $2
+	`
 	rows, err := r.pgpool.Query(ctx, query, name, cityID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find POI: %w", err)
 	}
 
 	type poiRow struct {
-		Name           string  `db:"name"`
-		DescriptionPOI string  `db:"description"`
-		Latitude       float64 `db:"lat"`
-		Longitude      float64 `db:"lon"`
-		Category       string  `db:"category"`
+		ID             uuid.UUID `db:"id"`
+		CityID         uuid.UUID `db:"city_id"`
+		Name           string    `db:"name"`
+		DescriptionPOI string    `db:"description"`
+		Latitude       float64   `db:"lat"`
+		Longitude      float64   `db:"lon"`
+		Category       string    `db:"category"`
 	}
 
 	poiDbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiRow])
@@ -184,6 +186,8 @@ func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, 
 		slog.String("cityID", cityID.String()))
 
 	return &locitypes.POIDetailedInfo{
+		ID:             poiDbRow.ID,
+		CityID:         poiDbRow.CityID,
 		Name:           poiDbRow.Name,
 		DescriptionPOI: poiDbRow.DescriptionPOI,
 		Latitude:       poiDbRow.Latitude,

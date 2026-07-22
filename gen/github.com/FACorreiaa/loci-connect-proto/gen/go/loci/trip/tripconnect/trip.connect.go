@@ -52,6 +52,12 @@ const (
 	// TripServiceSetConstraintProcedure is the fully-qualified name of the TripService's SetConstraint
 	// RPC.
 	TripServiceSetConstraintProcedure = "/loci.trip.TripService/SetConstraint"
+	// TripServiceAddStopProcedure is the fully-qualified name of the TripService's AddStop RPC.
+	TripServiceAddStopProcedure = "/loci.trip.TripService/AddStop"
+	// TripServiceRemoveStopProcedure is the fully-qualified name of the TripService's RemoveStop RPC.
+	TripServiceRemoveStopProcedure = "/loci.trip.TripService/RemoveStop"
+	// TripServiceReplaceStopProcedure is the fully-qualified name of the TripService's ReplaceStop RPC.
+	TripServiceReplaceStopProcedure = "/loci.trip.TripService/ReplaceStop"
 	// TripServiceExportTripProcedure is the fully-qualified name of the TripService's ExportTrip RPC.
 	TripServiceExportTripProcedure = "/loci.trip.TripService/ExportTrip"
 )
@@ -67,6 +73,9 @@ var (
 	tripServiceRenameStopMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("RenameStop")
 	tripServiceEditStopDurationMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("EditStopDuration")
 	tripServiceSetConstraintMethodDescriptor    = tripServiceServiceDescriptor.Methods().ByName("SetConstraint")
+	tripServiceAddStopMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("AddStop")
+	tripServiceRemoveStopMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("RemoveStop")
+	tripServiceReplaceStopMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("ReplaceStop")
 	tripServiceExportTripMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("ExportTrip")
 )
 
@@ -80,6 +89,9 @@ type TripServiceClient interface {
 	RenameStop(context.Context, *connect.Request[trip.RenameStopRequest]) (*connect.Response[trip.TripDraft], error)
 	EditStopDuration(context.Context, *connect.Request[trip.EditStopDurationRequest]) (*connect.Response[trip.TripDraft], error)
 	SetConstraint(context.Context, *connect.Request[trip.SetConstraintRequest]) (*connect.Response[trip.TripDraft], error)
+	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
+	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
+	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 }
 
@@ -141,6 +153,24 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceSetConstraintMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		addStop: connect.NewClient[trip.AddStopRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceAddStopProcedure,
+			connect.WithSchema(tripServiceAddStopMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		removeStop: connect.NewClient[trip.RemoveStopRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceRemoveStopProcedure,
+			connect.WithSchema(tripServiceRemoveStopMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		replaceStop: connect.NewClient[trip.ReplaceStopRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceReplaceStopProcedure,
+			connect.WithSchema(tripServiceReplaceStopMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		exportTrip: connect.NewClient[trip.ExportTripRequest, trip.ExportTripResponse](
 			httpClient,
 			baseURL+TripServiceExportTripProcedure,
@@ -160,6 +190,9 @@ type tripServiceClient struct {
 	renameStop       *connect.Client[trip.RenameStopRequest, trip.TripDraft]
 	editStopDuration *connect.Client[trip.EditStopDurationRequest, trip.TripDraft]
 	setConstraint    *connect.Client[trip.SetConstraintRequest, trip.TripDraft]
+	addStop          *connect.Client[trip.AddStopRequest, trip.TripDraft]
+	removeStop       *connect.Client[trip.RemoveStopRequest, trip.TripDraft]
+	replaceStop      *connect.Client[trip.ReplaceStopRequest, trip.TripDraft]
 	exportTrip       *connect.Client[trip.ExportTripRequest, trip.ExportTripResponse]
 }
 
@@ -203,6 +236,21 @@ func (c *tripServiceClient) SetConstraint(ctx context.Context, req *connect.Requ
 	return c.setConstraint.CallUnary(ctx, req)
 }
 
+// AddStop calls loci.trip.TripService.AddStop.
+func (c *tripServiceClient) AddStop(ctx context.Context, req *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.addStop.CallUnary(ctx, req)
+}
+
+// RemoveStop calls loci.trip.TripService.RemoveStop.
+func (c *tripServiceClient) RemoveStop(ctx context.Context, req *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.removeStop.CallUnary(ctx, req)
+}
+
+// ReplaceStop calls loci.trip.TripService.ReplaceStop.
+func (c *tripServiceClient) ReplaceStop(ctx context.Context, req *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.replaceStop.CallUnary(ctx, req)
+}
+
 // ExportTrip calls loci.trip.TripService.ExportTrip.
 func (c *tripServiceClient) ExportTrip(ctx context.Context, req *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error) {
 	return c.exportTrip.CallUnary(ctx, req)
@@ -218,6 +266,9 @@ type TripServiceHandler interface {
 	RenameStop(context.Context, *connect.Request[trip.RenameStopRequest]) (*connect.Response[trip.TripDraft], error)
 	EditStopDuration(context.Context, *connect.Request[trip.EditStopDurationRequest]) (*connect.Response[trip.TripDraft], error)
 	SetConstraint(context.Context, *connect.Request[trip.SetConstraintRequest]) (*connect.Response[trip.TripDraft], error)
+	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
+	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
+	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 }
 
@@ -275,6 +326,24 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceSetConstraintMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceAddStopHandler := connect.NewUnaryHandler(
+		TripServiceAddStopProcedure,
+		svc.AddStop,
+		connect.WithSchema(tripServiceAddStopMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceRemoveStopHandler := connect.NewUnaryHandler(
+		TripServiceRemoveStopProcedure,
+		svc.RemoveStop,
+		connect.WithSchema(tripServiceRemoveStopMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceReplaceStopHandler := connect.NewUnaryHandler(
+		TripServiceReplaceStopProcedure,
+		svc.ReplaceStop,
+		connect.WithSchema(tripServiceReplaceStopMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	tripServiceExportTripHandler := connect.NewUnaryHandler(
 		TripServiceExportTripProcedure,
 		svc.ExportTrip,
@@ -299,6 +368,12 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceEditStopDurationHandler.ServeHTTP(w, r)
 		case TripServiceSetConstraintProcedure:
 			tripServiceSetConstraintHandler.ServeHTTP(w, r)
+		case TripServiceAddStopProcedure:
+			tripServiceAddStopHandler.ServeHTTP(w, r)
+		case TripServiceRemoveStopProcedure:
+			tripServiceRemoveStopHandler.ServeHTTP(w, r)
+		case TripServiceReplaceStopProcedure:
+			tripServiceReplaceStopHandler.ServeHTTP(w, r)
 		case TripServiceExportTripProcedure:
 			tripServiceExportTripHandler.ServeHTTP(w, r)
 		default:
@@ -340,6 +415,18 @@ func (UnimplementedTripServiceHandler) EditStopDuration(context.Context, *connec
 
 func (UnimplementedTripServiceHandler) SetConstraint(context.Context, *connect.Request[trip.SetConstraintRequest]) (*connect.Response[trip.TripDraft], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SetConstraint is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.AddStop is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveStop is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ReplaceStop is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error) {

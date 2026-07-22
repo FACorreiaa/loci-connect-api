@@ -1,7 +1,10 @@
 package service
 
 import (
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -12,7 +15,7 @@ const stopsPerDay = 4
 // buildTripFromCityResponse converts a generated itinerary into an editable
 // TripDraft, segmenting the curated POIs into days. Returns nil when there is
 // nothing worth persisting. The user then edits/reorders via TripService.
-func buildTripFromCityResponse(cc *common.ChatContext, data *locitypes.AiCityResponse) *trip.Trip {
+func buildTripFromCityResponse(cc *common.ChatContext, data *locitypes.AiCityResponse, runID string) *trip.Trip {
 	if data == nil {
 		return nil
 	}
@@ -48,9 +51,32 @@ func buildTripFromCityResponse(cc *common.ChatContext, data *locitypes.AiCityRes
 			OrderIndex: int32(i % stopsPerDay),
 			Name:       poiName(poi),
 			Notes:      stopNotes(poi),
+			RecommendationTrace: recommendationTraceForTripStop(
+				cc, poi.ID.String(), int32(i), runID,
+			),
 		})
 	}
 	return t
+}
+
+func recommendationTraceForTripStop(
+	cc *common.ChatContext,
+	poiID string,
+	rank int32,
+	runID string,
+) *trip.RecommendationTrace {
+	if runID == "" || poiID == "" || poiID == "00000000-0000-0000-0000-000000000000" {
+		return nil
+	}
+	return &trip.RecommendationTrace{
+		RunID:             runID,
+		ItemID:            poiID,
+		Rank:              rank,
+		AlgorithmVersion:  "itinerary-gemini-v1",
+		ExperimentVariant: preference.ExperimentVariant(cc.UserID),
+		Surface:           int32(recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_TRIP),
+		Channel:           int32(recommendationv1.RecommendationChannel_RECOMMENDATION_CHANNEL_WEB),
+	}
 }
 
 func poiName(p locitypes.POIDetailedInfo) string {

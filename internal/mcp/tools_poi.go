@@ -4,12 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
+	"connectrpc.com/connect"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // maxToolResults caps list responses so a broad search does not flood the
@@ -21,17 +27,28 @@ const descriptionLimit = 300
 
 // POISummary is the compact POI representation returned by list tools.
 type POISummary struct {
-	ID          string  `json:"id,omitempty"`
-	Name        string  `json:"name"`
-	Category    string  `json:"category,omitempty"`
-	Description string  `json:"description,omitempty"`
-	Latitude    float64 `json:"latitude,omitempty"`
-	Longitude   float64 `json:"longitude,omitempty"`
-	Address     string  `json:"address,omitempty"`
-	Rating      float64 `json:"rating,omitempty"`
-	PriceRange  string  `json:"price_range,omitempty"`
-	DistanceM   float64 `json:"distance_meters,omitempty"`
-	City        string  `json:"city,omitempty"`
+	ID                  string                  `json:"id,omitempty"`
+	Name                string                  `json:"name"`
+	Category            string                  `json:"category,omitempty"`
+	Description         string                  `json:"description,omitempty"`
+	Latitude            float64                 `json:"latitude,omitempty"`
+	Longitude           float64                 `json:"longitude,omitempty"`
+	Address             string                  `json:"address,omitempty"`
+	Rating              float64                 `json:"rating,omitempty"`
+	PriceRange          string                  `json:"price_range,omitempty"`
+	DistanceM           float64                 `json:"distance_meters,omitempty"`
+	City                string                  `json:"city,omitempty"`
+	RecommendationTrace *MCPRecommendationTrace `json:"recommendation_trace,omitempty"`
+}
+
+// MCPRecommendationTrace is returned by recommendation tools and accepted by outcome tools.
+type MCPRecommendationTrace struct {
+	RunID             string `json:"run_id" jsonschema:"opaque recommendation run id"`
+	ItemID            string `json:"item_id" jsonschema:"recommended item id"`
+	Rank              int32  `json:"rank" jsonschema:"zero-based result rank"`
+	AlgorithmVersion  string `json:"algorithm_version" jsonschema:"ranking algorithm version"`
+	ExperimentVariant string `json:"experiment_variant" jsonschema:"experiment cohort"`
+	Surface           string `json:"surface" jsonschema:"discover or nearby"`
 }
 
 type poiListOutput struct {
@@ -88,6 +105,70 @@ func summarize(pois []locitypes.POIDetailedInfo) poiListOutput {
 	return out
 }
 
+func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.POIDetailedInfo, surface recommendationv1.RecommendationSurface) poiListOutput {
+	out := summarize(pois)
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return out
+	}
+	runID := uuid.NewString()
+	variant := preference.ExperimentVariant(userID)
+	events := make([]*recommendationv1.RecommendationEvent, 0, len(out.Results))
+	for index := range out.Results {
+		trace := &MCPRecommendationTrace{
+			RunID: runID, ItemID: out.Results[index].ID, Rank: int32(index),
+			AlgorithmVersion: "poi-hybrid-v1", ExperimentVariant: variant,
+			Surface: strings.ToLower(strings.TrimPrefix(surface.String(), "RECOMMENDATION_SURFACE_")),
+		}
+		out.Results[index].RecommendationTrace = trace
+		events = append(events, &recommendationv1.RecommendationEvent{
+			ClientEventId: uuid.NewString(),
+			EventType:     recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DELIVERED,
+			Trace:         traceToProto(trace, surface),
+			OccurredAt:    timestamppb.New(time.Now()),
+			PoiId:         stringPointer(out.Results[index].ID),
+		})
+	}
+	if deps.Recommendation != nil && len(events) > 0 {
+		_, _ = deps.Recommendation.RecordEvents(ctx, connect.NewRequest(&recommendationv1.RecordEventsRequest{Events: events}))
+	}
+	return out
+}
+
+func traceToProto(trace *MCPRecommendationTrace, surface recommendationv1.RecommendationSurface) *recommendationv1.RecommendationTrace {
+	if trace == nil {
+		return nil
+	}
+	return &recommendationv1.RecommendationTrace{
+		RunId: trace.RunID, ItemId: trace.ItemID, Rank: trace.Rank,
+		AlgorithmVersion: trace.AlgorithmVersion, ExperimentVariant: trace.ExperimentVariant,
+		Surface: surface, Channel: recommendationv1.RecommendationChannel_RECOMMENDATION_CHANNEL_MCP,
+	}
+}
+
+func stringPointer(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func recordMCPOutcome(ctx context.Context, deps Deps, trace *MCPRecommendationTrace, poiID string, eventType recommendationv1.RecommendationEventType) {
+	if deps.Recommendation == nil || trace == nil {
+		return
+	}
+	surface := recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER
+	if trace.Surface == "nearby" {
+		surface = recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY
+	}
+	_, _ = deps.Recommendation.RecordEvents(ctx, connect.NewRequest(&recommendationv1.RecordEventsRequest{
+		Events: []*recommendationv1.RecommendationEvent{{
+			ClientEventId: uuid.NewString(), EventType: eventType, Trace: traceToProto(trace, surface),
+			OccurredAt: timestamppb.Now(), PoiId: stringPointer(poiID),
+		}},
+	}))
+}
+
 type searchPOIsInput struct {
 	Query     string  `json:"query,omitempty" jsonschema:"free-text search, e.g. 'romantic rooftop bars'; empty lists POIs near the location"`
 	Latitude  float64 `json:"latitude" jsonschema:"search center latitude"`
@@ -139,7 +220,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 		if err != nil {
 			return nil, poiListOutput{}, toolError(err)
 		}
-		return nil, summarize(pois), nil
+		return nil, summarizeRecommendations(ctx, deps, pois, recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER), nil
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -188,6 +269,6 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 		if err != nil {
 			return nil, poiListOutput{}, toolError(err)
 		}
-		return nil, summarize(pois), nil
+		return nil, summarizeRecommendations(ctx, deps, pois, recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY), nil
 	})
 }
