@@ -9,6 +9,10 @@ on:
     types: [completed]
     branches: [main]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   auto-deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
