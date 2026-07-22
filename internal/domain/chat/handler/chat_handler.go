@@ -465,8 +465,8 @@ func attributePOIs(pois []*poiv1.POIDetailedInfo, event locitypes.StreamEvent, u
 	if event.EventID == "" {
 		return
 	}
-	surface, algorithm := attributionForEvent(event.Type)
 	variant := preference.ExperimentVariant(userID)
+	surface, algorithm := attributionForEvent(event.Type, variant)
 	for rank, poi := range pois {
 		if poi == nil || poi.GetId() == "" || poi.GetId() == uuid.Nil.String() {
 			continue
@@ -483,15 +483,21 @@ func attributePOIs(pois []*poiv1.POIDetailedInfo, event locitypes.StreamEvent, u
 	}
 }
 
-func attributionForEvent(eventType string) (recommendationv1.RecommendationSurface, string) {
+func attributionForEvent(eventType, variant string) (recommendationv1.RecommendationSurface, string) {
 	switch eventType {
 	case "nearby":
 		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY, "nearby-hybrid-v1"
 	case locitypes.EventTypeItinerary:
+		if variant != "control" {
+			return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_TRIP, "itinerary-preference-rerank-v1"
+		}
 		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_TRIP, "itinerary-gemini-v1"
 	case "poi_detail_complete":
 		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_PLACE, "place-detail-v1"
 	default:
+		if variant != "control" {
+			return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER, "discover-preference-rerank-v1"
+		}
 		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER, "discover-gemini-v1"
 	}
 }

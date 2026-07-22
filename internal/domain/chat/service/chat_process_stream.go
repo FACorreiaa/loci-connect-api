@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 )
@@ -46,6 +47,17 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 		return fmt.Errorf("failed to fetch user data: %w", err)
 	}
 	cc.BasePreferences = getUserPreferencesPrompt(searchProfile)
+	personalizationEnabled := preference.ExperimentVariant(cc.UserID) != "control"
+	if settings, ok := l.prefVectors.(preference.SettingsReader); ok {
+		enabled, settingsErr := settings.PersonalizationEnabled(ctx, cc.UserID)
+		if settingsErr != nil {
+			return fmt.Errorf("get personalization setting: %w", settingsErr)
+		}
+		personalizationEnabled = personalizationEnabled && enabled
+	}
+	if !personalizationEnabled {
+		cc.BasePreferences = ""
+	}
 
 	// Location Fallback
 	if cc.UserLocation == nil && searchProfile.UserLatitude != nil && searchProfile.UserLongitude != nil {
@@ -453,6 +465,12 @@ func (l *ServiceImpl) persistResults(
 		data.AIItineraryResponse.Restaurants = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Restaurants, cityID)
 		data.AIItineraryResponse.Bars = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Bars, cityID)
 		data.Activities = l.canonicalizePOIs(storageCtx, data.Activities, cityID)
+
+		data.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.PointsOfInterest)
+		data.AIItineraryResponse.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.PointsOfInterest)
+		data.AIItineraryResponse.Restaurants = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.Restaurants)
+		data.AIItineraryResponse.Bars = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.Bars)
+		data.Activities = l.rerankPOIs(storageCtx, cc.UserID, data.Activities)
 	}
 
 	// Send domain-specific event with pre-parsed data
@@ -461,7 +479,7 @@ func (l *ServiceImpl) persistResults(
 	switch cc.Domain {
 	case locitypes.DomainAccommodation:
 		// Send hotels as pre-parsed data (POI-adapted for a single client shape).
-		hotelPOIs := l.canonicalizePOIs(storageCtx, convertHotelsToPOIs(data.Hotels), cityID)
+		hotelPOIs := l.rerankPOIs(storageCtx, cc.UserID, l.canonicalizePOIs(storageCtx, convertHotelsToPOIs(data.Hotels), cityID))
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type:    locitypes.EventTypeHotels,
 			EventID: recommendationRunID,
@@ -473,7 +491,7 @@ func (l *ServiceImpl) persistResults(
 		}, 3)
 	case locitypes.DomainDining:
 		// Send restaurants as pre-parsed data (POI-adapted).
-		restaurantPOIs := l.canonicalizePOIs(storageCtx, convertRestaurantsToPOIs(data.Restaurants), cityID)
+		restaurantPOIs := l.rerankPOIs(storageCtx, cc.UserID, l.canonicalizePOIs(storageCtx, convertRestaurantsToPOIs(data.Restaurants), cityID))
 		l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
 			Type:    locitypes.EventTypeRestaurants,
 			EventID: recommendationRunID,

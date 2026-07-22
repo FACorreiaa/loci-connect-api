@@ -2227,6 +2227,72 @@ func (r *RepositoryImpl) UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID
 	return nil
 }
 
+// POIIDsMissingEmbeddings returns only candidate IDs that still need vectors.
+func (r *RepositoryImpl) POIIDsMissingEmbeddings(ctx context.Context, poiIDs []uuid.UUID) ([]uuid.UUID, error) {
+	if len(poiIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.pgpool.Query(ctx, `
+		SELECT candidate.id
+		FROM unnest($1::uuid[]) WITH ORDINALITY AS candidate(id, source_rank)
+		JOIN points_of_interest poi ON poi.id = candidate.id
+		WHERE poi.embedding IS NULL
+		ORDER BY candidate.source_rank`, poiIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list missing candidate embeddings: %w", err)
+	}
+	defer rows.Close()
+	missing := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan missing candidate embedding: %w", err)
+		}
+		missing = append(missing, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate missing candidate embeddings: %w", err)
+	}
+	return missing, nil
+}
+
+// RankPOIsByPreference uses pgvector cosine distance for the final ordering.
+// Missing vectors and disabled personalization retain their candidate order.
+func (r *RepositoryImpl) RankPOIsByPreference(ctx context.Context, userID uuid.UUID, poiIDs []uuid.UUID) ([]uuid.UUID, error) {
+	if userID == uuid.Nil || len(poiIDs) == 0 {
+		return poiIDs, nil
+	}
+	rows, err := r.pgpool.Query(ctx, `
+		SELECT candidate.id
+		FROM unnest($2::uuid[]) WITH ORDINALITY AS candidate(id, source_rank)
+		LEFT JOIN points_of_interest poi ON poi.id = candidate.id
+		LEFT JOIN user_preference_vectors preferences ON preferences.user_id = $1
+		LEFT JOIN personalization_settings settings ON settings.user_id = $1
+		ORDER BY CASE
+			WHEN COALESCE(settings.personalization_enabled, TRUE)
+			 AND preferences.embedding IS NOT NULL
+			 AND poi.embedding IS NOT NULL
+			THEN poi.embedding <=> preferences.embedding
+			ELSE NULL
+		END NULLS LAST, candidate.source_rank`, userID, poiIDs)
+	if err != nil {
+		return nil, fmt.Errorf("rank POIs by preference: %w", err)
+	}
+	defer rows.Close()
+	ranked := make([]uuid.UUID, 0, len(poiIDs))
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan preference-ranked POI: %w", err)
+		}
+		ranked = append(ranked, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate preference-ranked POIs: %w", err)
+	}
+	return ranked, nil
+}
+
 // poiWithoutEmbeddingRow is a DB row struct for GetPOIsWithoutEmbeddings query
 type poiWithoutEmbeddingRow struct {
 	ID          uuid.UUID `db:"id"`
