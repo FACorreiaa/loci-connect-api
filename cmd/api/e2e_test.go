@@ -15,12 +15,16 @@ import (
 	"connectrpc.com/connect"
 	authpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
+	recommendationpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation/recommendationconnect"
 	userpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 )
@@ -28,7 +32,7 @@ import (
 // bootServer wires the full dependency graph against the ephemeral Postgres
 // container and serves the assembled router (full interceptor chain) over an
 // httptest server.
-func bootServer(t *testing.T) (string, func()) {
+func bootServer(t *testing.T) (string, *Dependencies, func()) {
 	t.Helper()
 	host, port := testsupport.HostPort(t)
 
@@ -82,11 +86,11 @@ func bootServer(t *testing.T) (string, func()) {
 		srv.Close()
 		deps.Cleanup()
 	}
-	return srv.URL, cleanup
+	return srv.URL, deps, cleanup
 }
 
 func TestE2E_HealthAndReady(t *testing.T) {
-	baseURL, cleanup := bootServer(t)
+	baseURL, _, cleanup := bootServer(t)
 	defer cleanup()
 
 	for _, path := range []string{"/health", "/ready"} {
@@ -98,7 +102,7 @@ func TestE2E_HealthAndReady(t *testing.T) {
 }
 
 func TestE2E_RegisterLoginAndAuthInterceptor(t *testing.T) {
-	baseURL, cleanup := bootServer(t)
+	baseURL, _, cleanup := bootServer(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -181,7 +185,7 @@ func authPasses(ctx context.Context, userClient userconnect.UserServiceClient, t
 // OLD refresh token is rejected after rotation (so any client retry with a
 // stale refresh token is a hard logout — the behaviour to design around).
 func TestE2E_AuthLifecycle(t *testing.T) {
-	baseURL, cleanup := bootServer(t)
+	baseURL, _, cleanup := bootServer(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -222,4 +226,118 @@ func TestE2E_AuthLifecycle(t *testing.T) {
 
 	// 6. A garbage token is rejected.
 	assert.False(t, authPasses(ctx, userClient, "not-a-jwt"), "garbage token must be Unauthenticated")
+}
+
+func recommendationVector(axis int, value float32) []float32 {
+	vector := make([]float32, 768)
+	vector[axis] = value
+	return vector
+}
+
+func TestE2E_RecommendationFlywheel(t *testing.T) {
+	baseURL, deps, cleanup := bootServer(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	authClient := authconnect.NewAuthServiceClient(httpClient, baseURL)
+	recommendationClient := recommendationconnect.NewRecommendationServiceClient(httpClient, baseURL)
+
+	email := fmt.Sprintf("flywheel-%s@example.com", uuid.NewString())
+	const password = "Sup3rStr0ngP@ss!"
+	_, err := authClient.Register(ctx, connect.NewRequest(&authpb.RegisterRequest{
+		Email: email, Username: "flywheel" + uuid.NewString()[:8], Password: password,
+	}))
+	require.NoError(t, err)
+	login, err := authClient.Login(ctx, connect.NewRequest(&authpb.LoginRequest{Email: email, Password: password}))
+	require.NoError(t, err)
+	userID, err := uuid.Parse(login.Msg.GetUserId())
+	require.NoError(t, err)
+
+	cityID := uuid.New()
+	likedPOI := uuid.New()
+	otherPOI := uuid.New()
+	oppositePOI := uuid.New()
+	_, err = deps.DB.Pool.Exec(ctx, `
+		INSERT INTO cities (id, name, country) VALUES ($1, 'Flywheel City', 'PT')`, cityID)
+	require.NoError(t, err)
+	for index, fixture := range []struct {
+		id        uuid.UUID
+		name      string
+		embedding []float32
+	}{
+		{id: likedPOI, name: "Hidden Garden", embedding: recommendationVector(0, 1)},
+		{id: otherPOI, name: "Night Market", embedding: recommendationVector(1, 1)},
+		{id: oppositePOI, name: "Busy Plaza", embedding: recommendationVector(0, -1)},
+	} {
+		_, err = deps.DB.Pool.Exec(ctx, `
+			INSERT INTO points_of_interest (
+				id, name, description, location, city_id, category, embedding
+			) VALUES ($1, $2, 'E2E recommendation candidate',
+				ST_SetSRID(ST_MakePoint($3, $4), 4326), $5, 'attraction', $6::vector)`,
+			fixture.id, fixture.name, -9.14+float64(index)/100, 38.72+float64(index)/100,
+			cityID, preference.FormatVector(fixture.embedding))
+		require.NoError(t, err)
+	}
+
+	trace := &recommendationpb.RecommendationTrace{
+		RunId: "e2e-flywheel-run", ItemId: likedPOI.String(), Rank: 2,
+		AlgorithmVersion:  "discover-preference-rerank-v1",
+		ExperimentVariant: preference.ExperimentVariant(userID),
+		Surface:           recommendationpb.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER,
+		Channel:           recommendationpb.RecommendationChannel_RECOMMENDATION_CHANNEL_WEB,
+	}
+	require.NoError(t, deps.RecommendationHandler.IssueTraces(ctx, userID, []*recommendationpb.RecommendationTrace{trace}))
+
+	poiID := likedPOI.String()
+	events := []*recommendationpb.RecommendationEvent{
+		{
+			ClientEventId: uuid.NewString(), EventType: recommendationpb.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED,
+			Trace: trace, OccurredAt: timestamppb.Now(), PoiId: &poiID,
+		},
+		{
+			ClientEventId: uuid.NewString(), EventType: recommendationpb.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED,
+			Trace: trace, OccurredAt: timestamppb.Now(), PoiId: &poiID,
+		},
+	}
+	authedEvents := connect.NewRequest(&recommendationpb.RecordEventsRequest{Events: events})
+	authedEvents.Header().Set("Authorization", "Bearer "+login.Msg.GetAccessToken())
+	recorded, err := recommendationClient.RecordEvents(ctx, authedEvents)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), recorded.Msg.GetAccepted())
+	assert.Equal(t, int32(1), recorded.Msg.GetDuplicates())
+
+	otherAccess, _ := registerAndLogin(t, ctx, authClient)
+	forged := connect.NewRequest(&recommendationpb.RecordEventsRequest{Events: []*recommendationpb.RecommendationEvent{{
+		ClientEventId: uuid.NewString(), EventType: recommendationpb.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED,
+		Trace: trace, OccurredAt: timestamppb.Now(), PoiId: &poiID,
+	}}})
+	forged.Header().Set("Authorization", "Bearer "+otherAccess)
+	_, err = recommendationClient.RecordEvents(ctx, forged)
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+
+	var feedbackCount int
+	require.NoError(t, deps.DB.Pool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM preference_feedback WHERE user_id = $1 AND poi_id = $2`, userID, poiID).Scan(&feedbackCount))
+	assert.Equal(t, 1, feedbackCount, "logical retry must create one learning signal")
+
+	reranker := preference.NewReranker(deps.DB.Pool, deps.PreferenceVectors, deps.Logger)
+	stats, err := reranker.Run(ctx, 0)
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, stats.UsersUpdated, 1)
+	learned, found, err := deps.PreferenceVectors.GetEmbedding(ctx, userID)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Len(t, learned, 768)
+	assert.InDelta(t, 1, learned[0], 0.0001)
+
+	ranker, ok := deps.POIRepo.(interface {
+		RankPOIsByPreference(context.Context, uuid.UUID, []uuid.UUID) ([]uuid.UUID, error)
+	})
+	require.True(t, ok)
+	ranked, err := ranker.RankPOIsByPreference(ctx, userID, []uuid.UUID{otherPOI, oppositePOI, likedPOI})
+	require.NoError(t, err)
+	require.Len(t, ranked, 3)
+	assert.Equal(t, likedPOI, ranked[0], "learned taste must move the liked place to rank one")
 }
