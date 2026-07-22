@@ -18,11 +18,13 @@ import (
 	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/resumebuf"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -33,14 +35,21 @@ type ChatHandler struct {
 	service   service.LlmInteractiontService
 	logger    *slog.Logger
 	resumeBuf *resumebuf.Buffer
+	issuer    AttributionIssuer
+}
+
+// AttributionIssuer persists the exact traces emitted to an authenticated user.
+type AttributionIssuer interface {
+	IssueTraces(context.Context, uuid.UUID, []*recommendationv1.RecommendationTrace) error
 }
 
 // NewChatHandler creates a new ChatHandler.
-func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger *slog.Logger) *ChatHandler {
+func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger *slog.Logger, issuer AttributionIssuer) *ChatHandler {
 	return &ChatHandler{
 		resumeBuf: resumebuf.New(),
 		service:   llmInteractionService,
 		logger:    logger,
+		issuer:    issuer,
 	}
 }
 
@@ -171,7 +180,7 @@ func (h *ChatHandler) StreamChat(
 		if events, found := h.resumeBuf.Replay(bufSessionID, cc.ResumeToken); found {
 			llmCancel()
 			for _, ev := range events {
-				resp, mErr := h.mapEventToProto(ev)
+				resp, mErr := h.mapEventToProto(ctx, ev, userID)
 				if mErr != nil {
 					continue
 				}
@@ -225,7 +234,7 @@ func (h *ChatHandler) StreamChat(
 
 			appendEvent(event)
 
-			resp, err := h.mapEventToProto(event)
+			resp, err := h.mapEventToProto(ctx, event, userID)
 			if err != nil {
 				h.logger.Error("Failed to map event", "error", err)
 				continue
@@ -289,7 +298,7 @@ func (h *ChatHandler) toConnectError(err error) error {
 // StreamEvent (event_type enum + payload oneof). It decodes event.Data through a
 // JSON round-trip so both the typed payload structs and legacy map shapes map
 // cleanly onto the concrete payload for each event type.
-func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.StreamEvent, error) {
+func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.StreamEvent, userID uuid.UUID) (*chatv1.StreamEvent, error) {
 	resp := &chatv1.StreamEvent{
 		Message:   event.Message,
 		Timestamp: timestamppb.New(event.Timestamp),
@@ -333,9 +342,9 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.Stre
 		if !decodeData(event.Data, &cr) {
 			return nil, fmt.Errorf("itinerary event %q: undecodable data", event.EventID)
 		}
-		resp.Payload = &chatv1.StreamEvent_Itinerary{Itinerary: &chatv1.ItineraryPayload{
-			CityResponse: presenter.ToAiCityResponse(&cr),
-		}}
+		cityResponse := presenter.ToAiCityResponse(&cr)
+		attributeCityResponse(cityResponse, event, userID)
+		resp.Payload = &chatv1.StreamEvent_Itinerary{Itinerary: &chatv1.ItineraryPayload{CityResponse: cityResponse}}
 
 	case locitypes.EventTypeCityData:
 		var gcd locitypes.GeneralCityData
@@ -346,24 +355,28 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.Stre
 
 	case locitypes.EventTypeHotels:
 		pois, gcd, sid := decodeDomainList(event.Data)
+		attributePOIs(pois, event, userID)
 		resp.Payload = &chatv1.StreamEvent_Hotels{Hotels: &chatv1.HotelsPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
 
 	case locitypes.EventTypeRestaurants:
 		pois, gcd, sid := decodeDomainList(event.Data)
+		attributePOIs(pois, event, userID)
 		resp.Payload = &chatv1.StreamEvent_Restaurants{Restaurants: &chatv1.RestaurantsPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
 
 	case "activities":
 		pois, gcd, sid := decodeDomainList(event.Data)
+		attributePOIs(pois, event, userID)
 		resp.Payload = &chatv1.StreamEvent_Activities{Activities: &chatv1.ActivitiesPayload{
 			Activities: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
 
 	case "nearby", locitypes.EventTypeGeneralPOI, locitypes.EventTypePersonalizedPOI:
 		pois, gcd, sid := decodeDomainList(event.Data)
+		attributePOIs(pois, event, userID)
 		resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
@@ -371,8 +384,10 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.Stre
 	case "poi_detail_complete":
 		var poi locitypes.POIDetailedInfo
 		if decodeData(event.Data, &poi) {
+			pois := presenter.ToPOIDetailedInfoSlice([]locitypes.POIDetailedInfo{poi})
+			attributePOIs(pois, event, userID)
 			resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
-				Pois: presenter.ToPOIDetailedInfoSlice([]locitypes.POIDetailedInfo{poi}),
+				Pois: pois,
 			}}
 		} else {
 			resp.Payload = &chatv1.StreamEvent_Progress{Progress: progressPayload(event)}
@@ -389,7 +404,102 @@ func (h *ChatHandler) mapEventToProto(event locitypes.StreamEvent) (*chatv1.Stre
 		resp.Payload = &chatv1.StreamEvent_Progress{Progress: progressPayload(event)}
 	}
 
+	if h.issuer != nil {
+		traces := recommendationTraces(resp)
+		if len(traces) > 0 {
+			if err := h.issuer.IssueTraces(ctx, userID, traces); err != nil {
+				return nil, fmt.Errorf("issue recommendation attribution: %w", err)
+			}
+		}
+	}
 	return resp, nil
+}
+
+func recommendationTraces(event *chatv1.StreamEvent) []*recommendationv1.RecommendationTrace {
+	if event == nil {
+		return nil
+	}
+	var pois []*poiv1.POIDetailedInfo
+	switch {
+	case event.GetGeneralPois() != nil:
+		pois = event.GetGeneralPois().GetPois()
+	case event.GetHotels() != nil:
+		pois = event.GetHotels().GetPois()
+	case event.GetRestaurants() != nil:
+		pois = event.GetRestaurants().GetPois()
+	case event.GetActivities() != nil:
+		pois = event.GetActivities().GetActivities()
+	case event.GetItinerary() != nil:
+		response := event.GetItinerary().GetCityResponse()
+		if response != nil {
+			pois = append(pois, response.GetPointsOfInterest()...)
+			if itinerary := response.GetItineraryResponse(); itinerary != nil {
+				pois = append(pois, itinerary.GetPointsOfInterest()...)
+				pois = append(pois, itinerary.GetRestaurants()...)
+				pois = append(pois, itinerary.GetBars()...)
+			}
+		}
+	}
+	traces := make([]*recommendationv1.RecommendationTrace, 0, len(pois))
+	for _, poi := range pois {
+		if poi != nil && poi.GetRecommendationTrace() != nil {
+			traces = append(traces, poi.GetRecommendationTrace())
+		}
+	}
+	return traces
+}
+
+func attributeCityResponse(response *chatv1.AiCityResponse, event locitypes.StreamEvent, userID uuid.UUID) {
+	if response == nil {
+		return
+	}
+	attributePOIs(response.GetPointsOfInterest(), event, userID)
+	if itinerary := response.GetItineraryResponse(); itinerary != nil {
+		attributePOIs(itinerary.GetPointsOfInterest(), event, userID)
+		attributePOIs(itinerary.GetRestaurants(), event, userID)
+		attributePOIs(itinerary.GetBars(), event, userID)
+	}
+}
+
+func attributePOIs(pois []*poiv1.POIDetailedInfo, event locitypes.StreamEvent, userID uuid.UUID) {
+	if event.EventID == "" {
+		return
+	}
+	variant := preference.ExperimentVariant(userID)
+	surface, algorithm := attributionForEvent(event.Type, variant)
+	for rank, poi := range pois {
+		if poi == nil || poi.GetId() == "" || poi.GetId() == uuid.Nil.String() {
+			continue
+		}
+		poi.RecommendationTrace = &recommendationv1.RecommendationTrace{
+			RunId:             event.EventID,
+			ItemId:            poi.GetId(),
+			Rank:              int32(rank),
+			AlgorithmVersion:  algorithm,
+			ExperimentVariant: variant,
+			Surface:           surface,
+			Channel:           recommendationv1.RecommendationChannel_RECOMMENDATION_CHANNEL_WEB,
+		}
+	}
+}
+
+func attributionForEvent(eventType, variant string) (recommendationv1.RecommendationSurface, string) {
+	switch eventType {
+	case "nearby":
+		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY, "nearby-hybrid-v1"
+	case locitypes.EventTypeItinerary:
+		if variant != "control" {
+			return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_TRIP, "itinerary-preference-rerank-v1"
+		}
+		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_TRIP, "itinerary-gemini-v1"
+	case "poi_detail_complete":
+		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_PLACE, "place-detail-v1"
+	default:
+		if variant != "control" {
+			return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER, "discover-preference-rerank-v1"
+		}
+		return recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER, "discover-gemini-v1"
+	}
 }
 
 // decodeData re-encodes a stream event's Data (a typed struct or a legacy map)

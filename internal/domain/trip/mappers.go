@@ -8,6 +8,7 @@ import (
 	"time"
 
 	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -70,25 +71,7 @@ func tripFromProto(p *tripv1.TripDraft, uid uuid.UUID) (*Trip, error) {
 			d.Date = &dt
 		}
 		for _, ps := range pd.GetStops() {
-			s := TripStop{
-				POIID:      ps.GetPoiId(),
-				OrderIndex: ps.GetOrderIndex(),
-				Name:       ps.GetName(),
-				Notes:      ps.GetNotes(),
-			}
-			if ps.StartMinute != nil {
-				v := ps.GetStartMinute()
-				s.StartMinute = &v
-			}
-			if ps.DurationMinutes != nil {
-				v := ps.GetDurationMinutes()
-				s.DurationMinutes = &v
-			}
-			if ps.BookingUrl != nil && ps.GetBookingUrl() != "" {
-				b := ps.GetBookingUrl()
-				s.BookingURL = &b
-			}
-			d.Stops = append(d.Stops, s)
+			d.Stops = append(d.Stops, stopFromProto(ps))
 		}
 		t.Days = append(t.Days, d)
 	}
@@ -155,11 +138,61 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 				DurationMinutes: s.DurationMinutes,
 				BookingUrl:      s.BookingURL,
 			}
+			ps.RecommendationTrace = traceToProto(s.RecommendationTrace)
 			pd.Stops = append(pd.Stops, ps)
 		}
 		p.Days = append(p.Days, pd)
 	}
 	return p
+}
+
+func stopFromProto(ps *tripv1.TripStop) TripStop {
+	s := TripStop{
+		POIID:               ps.GetPoiId(),
+		OrderIndex:          ps.GetOrderIndex(),
+		Name:                ps.GetName(),
+		Notes:               ps.GetNotes(),
+		RecommendationTrace: traceFromProto(ps.GetRecommendationTrace()),
+	}
+	if ps.GetId() != "" {
+		s.ID, _ = uuid.Parse(ps.GetId())
+	}
+	if ps.StartMinute != nil {
+		v := ps.GetStartMinute()
+		s.StartMinute = &v
+	}
+	if ps.DurationMinutes != nil {
+		v := ps.GetDurationMinutes()
+		s.DurationMinutes = &v
+	}
+	if ps.BookingUrl != nil && ps.GetBookingUrl() != "" {
+		b := ps.GetBookingUrl()
+		s.BookingURL = &b
+	}
+	return s
+}
+
+func traceFromProto(trace *recommendationv1.RecommendationTrace) *RecommendationTrace {
+	if trace == nil {
+		return nil
+	}
+	return &RecommendationTrace{
+		RunID: trace.GetRunId(), ItemID: trace.GetItemId(), Rank: trace.GetRank(),
+		AlgorithmVersion: trace.GetAlgorithmVersion(), ExperimentVariant: trace.GetExperimentVariant(),
+		Surface: int32(trace.GetSurface()), Channel: int32(trace.GetChannel()),
+	}
+}
+
+func traceToProto(trace *RecommendationTrace) *recommendationv1.RecommendationTrace {
+	if trace == nil {
+		return nil
+	}
+	return &recommendationv1.RecommendationTrace{
+		RunId: trace.RunID, ItemId: trace.ItemID, Rank: trace.Rank,
+		AlgorithmVersion: trace.AlgorithmVersion, ExperimentVariant: trace.ExperimentVariant,
+		Surface: recommendationv1.RecommendationSurface(trace.Surface),
+		Channel: recommendationv1.RecommendationChannel(trace.Channel),
+	}
 }
 
 func constraintToProto(c TripConstraint) *tripv1.TripConstraint {

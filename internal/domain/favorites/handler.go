@@ -134,7 +134,7 @@ func (h *Handler) AddToFavorites(
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to add favorite"))
 	}
 
-	if h.prefs != nil {
+	if h.prefs != nil && req.Msg.GetRecommendationTrace() == nil {
 		h.prefs.Record(ctx, userID, preference.EventFavorited, preference.RecordOpts{
 			POIID:    itemID,
 			Metadata: map[string]any{"content_type": fav.ContentType, "name": fav.ItemName},

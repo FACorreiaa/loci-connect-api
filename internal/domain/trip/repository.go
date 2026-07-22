@@ -31,16 +31,28 @@ type TripConstraint struct {
 	DayEndMinute   *int32   `json:"day_end_minute,omitempty"`
 }
 
+// RecommendationTrace preserves attribution when a recommendation becomes a trip stop.
+type RecommendationTrace struct {
+	RunID             string `json:"run_id"`
+	ItemID            string `json:"item_id"`
+	Rank              int32  `json:"rank"`
+	AlgorithmVersion  string `json:"algorithm_version"`
+	ExperimentVariant string `json:"experiment_variant"`
+	Surface           int32  `json:"surface"`
+	Channel           int32  `json:"channel"`
+}
+
 // TripStop is a place on a day's timeline.
 type TripStop struct {
-	ID              uuid.UUID
-	POIID           string
-	OrderIndex      int32
-	Name            string
-	StartMinute     *int32
-	DurationMinutes *int32
-	Notes           string
-	BookingURL      *string
+	ID                  uuid.UUID
+	POIID               string
+	OrderIndex          int32
+	Name                string
+	StartMinute         *int32
+	DurationMinutes     *int32
+	Notes               string
+	BookingURL          *string
+	RecommendationTrace *RecommendationTrace
 }
 
 // TripDay is one day of a trip.
@@ -210,10 +222,14 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		}
 		for si := range day.Stops {
 			s := &day.Stops[si]
+			traceJSON, marshalErr := json.Marshal(s.RecommendationTrace)
+			if marshalErr != nil {
+				return nil, fmt.Errorf("marshal recommendation trace: %w", marshalErr)
+			}
 			if err := tx.QueryRow(ctx, `
-				INSERT INTO trip_stops (day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-				day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL).
+				INSERT INTO trip_stops (day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+				day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON).
 				Scan(&s.ID); err != nil {
 				return nil, fmt.Errorf("insert stop: %w", err)
 			}
@@ -280,7 +296,7 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 
 	stopRows, err := r.db.Query(ctx, `
 		SELECT s.id, s.day_id, s.poi_id, s.order_index, s.name, s.start_minute,
-		       s.duration_minutes, s.notes, s.booking_url
+		       s.duration_minutes, s.notes, s.booking_url, s.recommendation_trace
 		FROM trip_stops s
 		JOIN trip_days d ON d.id = s.day_id
 		WHERE d.trip_id = $1
@@ -292,12 +308,19 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 
 	for stopRows.Next() {
 		var (
-			s     TripStop
-			dayID uuid.UUID
+			s         TripStop
+			dayID     uuid.UUID
+			traceJSON []byte
 		)
 		if err := stopRows.Scan(&s.ID, &dayID, &s.POIID, &s.OrderIndex, &s.Name,
-			&s.StartMinute, &s.DurationMinutes, &s.Notes, &s.BookingURL); err != nil {
+			&s.StartMinute, &s.DurationMinutes, &s.Notes, &s.BookingURL, &traceJSON); err != nil {
 			return fmt.Errorf("scan stop: %w", err)
+		}
+		if len(traceJSON) > 0 && string(traceJSON) != "null" {
+			s.RecommendationTrace = &RecommendationTrace{}
+			if err := json.Unmarshal(traceJSON, s.RecommendationTrace); err != nil {
+				return fmt.Errorf("unmarshal recommendation trace: %w", err)
+			}
 		}
 		if d := dayByID[dayID]; d != nil {
 			d.Stops = append(d.Stops, s)

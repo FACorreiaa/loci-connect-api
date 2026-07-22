@@ -16,6 +16,11 @@ type VectorReader interface {
 	GetEmbedding(ctx context.Context, userID uuid.UUID) ([]float32, bool, error)
 }
 
+// SettingsReader exposes the privacy switch to recommendation generators.
+type SettingsReader interface {
+	PersonalizationEnabled(ctx context.Context, userID uuid.UUID) (bool, error)
+}
+
 // VectorStore reads and writes user preference vectors.
 type VectorStore interface {
 	VectorReader
@@ -45,9 +50,11 @@ func (s *store) GetEmbedding(ctx context.Context, userID uuid.UUID) ([]float32, 
 	}
 	var raw string
 	err := s.db.QueryRow(ctx, `
-		SELECT embedding::text
-		FROM user_preference_vectors
-		WHERE user_id = $1`, userID).Scan(&raw)
+		SELECT vectors.embedding::text
+		FROM user_preference_vectors vectors
+		LEFT JOIN personalization_settings settings ON settings.user_id = vectors.user_id
+		WHERE vectors.user_id = $1
+		  AND COALESCE(settings.personalization_enabled, TRUE)`, userID).Scan(&raw)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, false, nil
@@ -59,6 +66,21 @@ func (s *store) GetEmbedding(ctx context.Context, userID uuid.UUID) ([]float32, 
 		return nil, false, err
 	}
 	return v, true, nil
+}
+
+func (s *store) PersonalizationEnabled(ctx context.Context, userID uuid.UUID) (bool, error) {
+	if userID == uuid.Nil {
+		return false, nil
+	}
+	var enabled bool
+	err := s.db.QueryRow(ctx, `
+		SELECT COALESCE((
+			SELECT personalization_enabled FROM personalization_settings WHERE user_id = $1
+		), TRUE)`, userID).Scan(&enabled)
+	if err != nil {
+		return false, fmt.Errorf("get personalization setting: %w", err)
+	}
+	return enabled, nil
 }
 
 func (s *store) Upsert(ctx context.Context, userID uuid.UUID, embedding []float32, feedbackCount int, lastFeedbackAt *time.Time) error {
@@ -84,6 +106,10 @@ type noopStore struct{}
 
 func (noopStore) GetEmbedding(context.Context, uuid.UUID) ([]float32, bool, error) {
 	return nil, false, nil
+}
+
+func (noopStore) PersonalizationEnabled(context.Context, uuid.UUID) (bool, error) {
+	return true, nil
 }
 
 func (noopStore) Upsert(context.Context, uuid.UUID, []float32, int, *time.Time) error {

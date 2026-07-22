@@ -14,6 +14,7 @@ import (
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 )
 
@@ -27,12 +28,13 @@ var Version = "dev"
 
 // Deps are the service-layer dependencies MCP tools call into.
 type Deps struct {
-	POIService    poi.Service
-	ListService   itinerarylist.Service
-	ChatService   chatservice.LlmInteractiontService
-	APIKeyService apikey.Service
-	Subscription  subscription.Service
-	Logger        *slog.Logger
+	POIService     poi.Service
+	ListService    itinerarylist.Service
+	ChatService    chatservice.LlmInteractiontService
+	APIKeyService  apikey.Service
+	Subscription   subscription.Service
+	Logger         *slog.Logger
+	Recommendation *recommendation.Handler
 }
 
 // Handler returns the authenticated Streamable HTTP handler to mount at Path.

@@ -423,7 +423,7 @@ func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID,
 		return nil, fmt.Errorf("failed to add item to list: %w", err)
 	}
 
-	if s.prefs != nil {
+	if s.prefs != nil && !params.AttributedRecommendation {
 		s.prefs.Record(ctx, userID, preference.EventSaved, preference.RecordOpts{
 			POIID:    params.ItemID.String(),
 			Metadata: map[string]any{"list_id": listID.String(), "content_type": string(params.ContentType)},

@@ -22,9 +22,11 @@ import (
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation/recommendationconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/review/reviewv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
@@ -132,12 +134,13 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	// interceptor chain — see internal/mcp).
 	if deps.APIKeyService != nil && deps.POISvc != nil {
 		mux.Handle(locimcp.Path, locimcp.Handler(locimcp.Deps{
-			POIService:    deps.POISvc,
-			ListService:   deps.ListSvc,
-			ChatService:   deps.ChatService,
-			APIKeyService: deps.APIKeyService,
-			Subscription:  deps.SubscriptionService,
-			Logger:        deps.Logger,
+			POIService:     deps.POISvc,
+			ListService:    deps.ListSvc,
+			ChatService:    deps.ChatService,
+			APIKeyService:  deps.APIKeyService,
+			Subscription:   deps.SubscriptionService,
+			Logger:         deps.Logger,
+			Recommendation: deps.RecommendationHandler,
 		}))
 		deps.Logger.Info("registered MCP endpoint", "path", locimcp.Path)
 	}
@@ -295,6 +298,18 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		tripPath, tripHandler := tripconnect.NewTripServiceHandler(deps.TripHandler, opts)
 		mux.Handle(tripPath, tripHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", tripPath)
+	}
+
+	if deps.RecommendationHandler != nil {
+		recommendationPath, recommendationHandler := recommendationconnect.NewRecommendationServiceHandler(deps.RecommendationHandler, opts)
+		mux.Handle(recommendationPath, recommendationHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", recommendationPath)
+	}
+
+	if deps.PlaceIntelligenceHandler != nil {
+		placePath, placeHandler := placeconnect.NewPlaceIntelligenceServiceHandler(deps.PlaceIntelligenceHandler, opts)
+		mux.Handle(placePath, placeHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", placePath)
 	}
 
 	if deps.POIHandler != nil {

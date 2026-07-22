@@ -24,12 +24,14 @@ import (
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	poihandler "github.com/FACorreiaa/loci-connect-api/internal/domain/poi/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
@@ -95,27 +97,29 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler        *handler.AuthHandler
-	ChatHandler        *chathandler.ChatHandler
-	ProfileHandler     *profilehandler.ProfileHandler
-	DiscoverHandler    *discoverdomain.Handler
-	ItineraryHandler   *itineraryhandler.ItineraryHandler
-	ListHandler        *itineraryhandler.ListHandler
-	StatisticsHandler  *statistics.Handler
-	RecentsHandler     *recents.Handler
-	UserHandler        *userhandler.UserHandler
-	InterestHandler    *interesthandler.InterestHandler
-	TagsHandler        *tagshandler.TagsHandler
-	PaymentHandler     paymentv1connect.PaymentServiceHandler
-	FavoritesHandler   *favorites.Handler
-	APIKeyHandler      *apikey.Handler
-	ExportHandler      *export.Handler
-	ShareHandler       *share.Handler
-	TripHandler        *trip.Handler
-	POIHandler         *poihandler.POIHandler
-	CustomAuthHandler  *customauthhandler.CustomAuthHandler
-	ReviewHandler      *reviewdomain.Handler
-	EntitlementHandler *entitlement.Handler
+	AuthHandler              *handler.AuthHandler
+	ChatHandler              *chathandler.ChatHandler
+	ProfileHandler           *profilehandler.ProfileHandler
+	DiscoverHandler          *discoverdomain.Handler
+	ItineraryHandler         *itineraryhandler.ItineraryHandler
+	ListHandler              *itineraryhandler.ListHandler
+	StatisticsHandler        *statistics.Handler
+	RecentsHandler           *recents.Handler
+	UserHandler              *userhandler.UserHandler
+	InterestHandler          *interesthandler.InterestHandler
+	TagsHandler              *tagshandler.TagsHandler
+	PaymentHandler           paymentv1connect.PaymentServiceHandler
+	FavoritesHandler         *favorites.Handler
+	APIKeyHandler            *apikey.Handler
+	ExportHandler            *export.Handler
+	ShareHandler             *share.Handler
+	TripHandler              *trip.Handler
+	POIHandler               *poihandler.POIHandler
+	CustomAuthHandler        *customauthhandler.CustomAuthHandler
+	ReviewHandler            *reviewdomain.Handler
+	EntitlementHandler       *entitlement.Handler
+	RecommendationHandler    *recommendation.Handler
+	PlaceIntelligenceHandler *placeintel.Handler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
@@ -304,7 +308,8 @@ func (d *Dependencies) initServices() error {
 // initHandlers initializes all handler dependencies
 func (d *Dependencies) initHandlers() error {
 	d.AuthHandler = handler.NewAuthHandler(d.AuthService, d.Logger)
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger)
+	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
@@ -323,6 +328,7 @@ func (d *Dependencies) initHandlers() error {
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
+	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
