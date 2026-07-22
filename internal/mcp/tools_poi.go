@@ -28,22 +28,22 @@ const descriptionLimit = 300
 
 // POISummary is the compact POI representation returned by list tools.
 type POISummary struct {
-	ID                  string                  `json:"id,omitempty"`
-	Name                string                  `json:"name"`
-	Category            string                  `json:"category,omitempty"`
-	Description         string                  `json:"description,omitempty"`
-	Latitude            float64                 `json:"latitude,omitempty"`
-	Longitude           float64                 `json:"longitude,omitempty"`
-	Address             string                  `json:"address,omitempty"`
-	Rating              float64                 `json:"rating,omitempty"`
-	PriceRange          string                  `json:"price_range,omitempty"`
-	DistanceM           float64                 `json:"distance_meters,omitempty"`
-	City                string                  `json:"city,omitempty"`
-	RecommendationTrace *MCPRecommendationTrace `json:"recommendation_trace,omitempty"`
+	ID                  string               `json:"id,omitempty"`
+	Name                string               `json:"name"`
+	Category            string               `json:"category,omitempty"`
+	Description         string               `json:"description,omitempty"`
+	Latitude            float64              `json:"latitude,omitempty"`
+	Longitude           float64              `json:"longitude,omitempty"`
+	Address             string               `json:"address,omitempty"`
+	Rating              float64              `json:"rating,omitempty"`
+	PriceRange          string               `json:"price_range,omitempty"`
+	DistanceM           float64              `json:"distance_meters,omitempty"`
+	City                string               `json:"city,omitempty"`
+	RecommendationTrace *RecommendationTrace `json:"recommendation_trace,omitempty"`
 }
 
-// MCPRecommendationTrace is returned by recommendation tools and accepted by outcome tools.
-type MCPRecommendationTrace struct {
+// RecommendationTrace is returned by recommendation tools and accepted by outcome tools.
+type RecommendationTrace struct {
 	RunID             string `json:"run_id" jsonschema:"opaque recommendation run id"`
 	ItemID            string `json:"item_id" jsonschema:"recommended item id"`
 	Rank              int32  `json:"rank" jsonschema:"zero-based result rank"`
@@ -116,7 +116,7 @@ func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.P
 	variant := preference.ExperimentVariant(userID)
 	events := make([]*recommendationv1.RecommendationEvent, 0, len(out.Results))
 	for index := range out.Results {
-		trace := &MCPRecommendationTrace{
+		trace := &RecommendationTrace{
 			RunID: runID, ItemID: out.Results[index].ID, Rank: int32(index),
 			AlgorithmVersion: "poi-hybrid-v1", ExperimentVariant: variant,
 			Surface: strings.ToLower(strings.TrimPrefix(surface.String(), "RECOMMENDATION_SURFACE_")),
@@ -149,7 +149,7 @@ func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.P
 	return out
 }
 
-func traceToProto(trace *MCPRecommendationTrace, surface recommendationv1.RecommendationSurface) *recommendationv1.RecommendationTrace {
+func traceToProto(trace *RecommendationTrace, surface recommendationv1.RecommendationSurface) *recommendationv1.RecommendationTrace {
 	if trace == nil {
 		return nil
 	}
@@ -167,7 +167,7 @@ func stringPointer(value string) *string {
 	return &value
 }
 
-func recordMCPOutcome(ctx context.Context, deps Deps, trace *MCPRecommendationTrace, poiID string, eventType recommendationv1.RecommendationEventType) {
+func recordMCPOutcome(ctx context.Context, deps Deps, trace *RecommendationTrace, poiID string, eventType recommendationv1.RecommendationEventType) {
 	if deps.Recommendation == nil || trace == nil {
 		return
 	}

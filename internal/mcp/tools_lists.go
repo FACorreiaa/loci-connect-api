@@ -34,10 +34,10 @@ type getListInput struct {
 }
 
 type addPOIToListInput struct {
-	ListID              string                  `json:"list_id" jsonschema:"target list id from list_user_lists"`
-	PoiID               string                  `json:"poi_id" jsonschema:"POI id from search_pois or find_nearby"`
-	Notes               string                  `json:"notes,omitempty" jsonschema:"optional note attached to the saved item"`
-	RecommendationTrace *MCPRecommendationTrace `json:"recommendation_trace,omitempty" jsonschema:"trace returned with the recommendation"`
+	ListID              string               `json:"list_id" jsonschema:"target list id from list_user_lists"`
+	PoiID               string               `json:"poi_id" jsonschema:"POI id from search_pois or find_nearby"`
+	Notes               string               `json:"notes,omitempty" jsonschema:"optional note attached to the saved item"`
+	RecommendationTrace *RecommendationTrace `json:"recommendation_trace,omitempty" jsonschema:"trace returned with the recommendation"`
 }
 
 type listFavoritesOutput struct {
@@ -46,8 +46,8 @@ type listFavoritesOutput struct {
 }
 
 type addFavoriteInput struct {
-	PoiID               string                  `json:"poi_id" jsonschema:"POI id from search_pois or find_nearby"`
-	RecommendationTrace *MCPRecommendationTrace `json:"recommendation_trace,omitempty" jsonschema:"trace returned with the recommendation"`
+	PoiID               string               `json:"poi_id" jsonschema:"POI id from search_pois or find_nearby"`
+	RecommendationTrace *RecommendationTrace `json:"recommendation_trace,omitempty" jsonschema:"trace returned with the recommendation"`
 }
 
 func registerListTools(server *mcp.Server, deps Deps) {
