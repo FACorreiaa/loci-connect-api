@@ -17,7 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 )
 
-func testGeminiConfig() config.GeminiConfig {
+func testGeminiConfig() config.AIConfig {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		apiKey = "test-key"
@@ -26,7 +26,8 @@ func testGeminiConfig() config.GeminiConfig {
 	if model == "" {
 		model = "gemini-1.5-flash"
 	}
-	return config.GeminiConfig{
+	return config.AIConfig{
+		Provider:       config.AIProviderGemini,
 		APIKey:         apiKey,
 		Model:          model,
 		EmbeddingModel: "gemini-embedding-exp-03-07",

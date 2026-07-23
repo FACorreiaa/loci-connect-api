@@ -34,7 +34,8 @@ Required:
 - `APP_ENV=production`
 - `JWT_SECRET` — 32+ random bytes (the app refuses to boot with `changeme` in prod)
 - `ALLOWED_ORIGINS` — the web app origin(s), comma-separated (CORS)
-- `GEMINI_API_KEY`, `GEMINI_MODEL`
+- `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, and `OPENROUTER_MODEL`
+  (or the documented Gemini alternative)
 - `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `DB_USER/DB_PASSWORD/DB_NAME` **must equal** `POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB`
 - `BASE_URL` — public API URL (used for share links / OG tags)

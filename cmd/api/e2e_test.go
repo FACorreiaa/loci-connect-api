@@ -68,7 +68,8 @@ func bootServer(t *testing.T) (string, *Dependencies, func()) {
 		Observability: config.ObservabilityConfig{MetricsEnabled: false},
 		// Dummy Gemini creds: genai.NewClient only builds a client (no network),
 		// so InitDependencies boots; the e2e flow never calls LLM endpoints.
-		Gemini: config.GeminiConfig{
+		AI: config.AIConfig{
+			Provider:       config.AIProviderGemini,
 			APIKey:         "e2e-dummy-key",
 			Model:          "gemini-1.5-flash",
 			EmbeddingModel: "gemini-embedding-exp-03-07",

@@ -23,10 +23,10 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
-	"github.com/FACorreiaa/loci-connect-api/pkg/gemini"
 )
 
 func (l *ServiceImpl) acquireLLMSlot(ctx context.Context) (func(), error) {
@@ -122,18 +122,18 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	listSvc itinerarylist.Service,
 	tripRepo trip.Repository,
 	logger *slog.Logger,
-	geminiCfg config.GeminiConfig,
+	aiCfg config.AIConfig,
 	llmSem *concurrency.LLMSemaphore,
 	appCache cachestore.Store,
 ) (*ServiceImpl, error) {
 	ctx := context.Background()
-	aiClient, err := gemini.NewChatClient(ctx, geminiCfg, logger)
+	aiClient, err := ai.NewChatClient(ctx, aiCfg, logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini chat client: %w", err)
+		return nil, fmt.Errorf("failed to create AI chat client: %w", err)
 	}
 
 	// Initialize embedding service
-	embeddingService, err := generativeAI.NewGeminiEmbeddingClient(ctx, geminiCfg.APIKey, geminiCfg.EmbeddingModel, logger)
+	embeddingService, err := ai.NewEmbeddingClient(ctx, aiCfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create embedding service: %w", err)
 	}
@@ -156,7 +156,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		listSvc:            listSvc,
 		tripRepo:           tripRepo,
 		cache:              appCache,
-		model:              geminiCfg.Model,
+		model:              aiCfg.Model,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
 		deadLetterCancel:   deadLetterCancel,
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},

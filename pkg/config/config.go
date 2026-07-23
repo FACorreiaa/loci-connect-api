@@ -22,7 +22,7 @@ type Config struct {
 	Cache         CacheConfig
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
-	Gemini        GeminiConfig
+	AI            AIConfig
 }
 
 type CacheConfig struct {
@@ -33,10 +33,18 @@ type CacheConfig struct {
 	CleanupTTL time.Duration
 }
 
-type GeminiConfig struct {
+const (
+	AIProviderGemini     = "gemini"
+	AIProviderOpenRouter = "openrouter"
+)
+
+// AIConfig holds provider-neutral chat and embedding configuration.
+type AIConfig struct {
+	Provider           string
 	APIKey             string
 	Model              string
 	EmbeddingModel     string
+	EmbeddingDimension int
 	MaxConcurrentCalls int
 	MaxRetries         int
 	RetryBaseDelay     time.Duration
@@ -171,42 +179,39 @@ func Load() (*Config, error) {
 			Enabled: getEnvAsBool("PPROF_ENABLED", false),
 			Port:    getEnvAsInt("PPROF_PORT", 6060),
 		},
-		Gemini: GeminiConfig{
-			APIKey: getEnv("GEMINI_API_KEY", ""),
-			Model:  getEnv("GEMINI_MODEL", ""),
-			// gemini-embedding-001 is the GA embedding model; the old
-			// experimental gemini-embedding-exp-03-07 returns 404 upstream.
-			EmbeddingModel:     getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001"),
-			MaxConcurrentCalls: getEnvAsInt("GEMINI_MAX_CONCURRENT_CALLS", 10),
-			MaxRetries:         getEnvAsInt("GEMINI_MAX_RETRIES", 3),
-			RetryBaseDelay:     getEnvAsDurationMillis("GEMINI_RETRY_BASE_DELAY_MS", 500*time.Millisecond),
-			RetryMaxDelay:      getEnvAsDurationMillis("GEMINI_RETRY_MAX_DELAY_MS", 8*time.Second),
-			GenerateTimeout:    getEnvAsDurationSeconds("GEMINI_GENERATE_TIMEOUT_SEC", 30*time.Second),
-			StreamTimeout:      getEnvAsDurationSeconds("GEMINI_STREAM_TIMEOUT_SEC", 2*time.Minute),
-		},
+		AI: loadAIConfig(),
 	}
 
-	if cfg.Gemini.APIKey == "" {
-		return nil, errors.New("GEMINI_API_KEY is required")
+	if cfg.AI.Provider != AIProviderGemini && cfg.AI.Provider != AIProviderOpenRouter {
+		return nil, fmt.Errorf("unsupported AI_PROVIDER %q", cfg.AI.Provider)
+	}
+	if cfg.AI.APIKey == "" {
+		return nil, fmt.Errorf("%s is required", providerAPIKeyEnv(cfg.AI.Provider))
 	}
 
-	if cfg.Gemini.Model == "" {
-		return nil, errors.New("GEMINI_MODEL is required")
+	if cfg.AI.Model == "" {
+		return nil, fmt.Errorf("%s is required", providerModelEnv(cfg.AI.Provider))
 	}
-	if cfg.Gemini.MaxRetries < 0 {
-		return nil, errors.New("GEMINI_MAX_RETRIES must be >= 0")
+	if cfg.AI.EmbeddingModel == "" {
+		return nil, fmt.Errorf("%s is required", providerEmbeddingModelEnv(cfg.AI.Provider))
 	}
-	if cfg.Gemini.RetryBaseDelay < 0 || cfg.Gemini.RetryMaxDelay < 0 {
-		return nil, errors.New("GEMINI retry delays must be non-negative")
+	if cfg.AI.EmbeddingDimension <= 0 {
+		return nil, errors.New("AI_EMBEDDING_DIMENSION must be positive")
 	}
-	if cfg.Gemini.RetryMaxDelay > 0 && cfg.Gemini.RetryBaseDelay > cfg.Gemini.RetryMaxDelay {
-		return nil, errors.New("GEMINI_RETRY_BASE_DELAY must not exceed GEMINI_RETRY_MAX_DELAY")
+	if cfg.AI.MaxRetries < 0 {
+		return nil, errors.New("AI_MAX_RETRIES must be >= 0")
+	}
+	if cfg.AI.RetryBaseDelay < 0 || cfg.AI.RetryMaxDelay < 0 {
+		return nil, errors.New("AI retry delays must be non-negative")
+	}
+	if cfg.AI.RetryMaxDelay > 0 && cfg.AI.RetryBaseDelay > cfg.AI.RetryMaxDelay {
+		return nil, errors.New("AI_RETRY_BASE_DELAY must not exceed AI_RETRY_MAX_DELAY")
 	}
 	if cfg.Server.DefaultRPCTimeout <= 0 || cfg.Server.ChatRPCTimeout <= 0 {
 		return nil, errors.New("RPC timeout values must be positive")
 	}
-	if cfg.Gemini.GenerateTimeout <= 0 || cfg.Gemini.StreamTimeout <= 0 {
-		return nil, errors.New("GEMINI timeout values must be positive")
+	if cfg.AI.GenerateTimeout <= 0 || cfg.AI.StreamTimeout <= 0 {
+		return nil, errors.New("AI timeout values must be positive")
 	}
 
 	if cfg.Auth.JWTSecret == "" {
@@ -224,6 +229,56 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadAIConfig() AIConfig {
+	provider := strings.ToLower(strings.TrimSpace(getEnv("AI_PROVIDER", AIProviderGemini)))
+	cfg := AIConfig{
+		Provider:           provider,
+		EmbeddingDimension: getEnvAsInt("AI_EMBEDDING_DIMENSION", 768),
+		MaxConcurrentCalls: getEnvAsIntFallback("AI_MAX_CONCURRENT_CALLS", "GEMINI_MAX_CONCURRENT_CALLS", 10),
+		MaxRetries:         getEnvAsIntFallback("AI_MAX_RETRIES", "GEMINI_MAX_RETRIES", 3),
+		RetryBaseDelay:     getEnvAsDurationMillisFallback("AI_RETRY_BASE_DELAY_MS", "GEMINI_RETRY_BASE_DELAY_MS", 500*time.Millisecond),
+		RetryMaxDelay:      getEnvAsDurationMillisFallback("AI_RETRY_MAX_DELAY_MS", "GEMINI_RETRY_MAX_DELAY_MS", 8*time.Second),
+		GenerateTimeout:    getEnvAsDurationSecondsFallback("AI_GENERATE_TIMEOUT_SEC", "GEMINI_GENERATE_TIMEOUT_SEC", 30*time.Second),
+		StreamTimeout:      getEnvAsDurationSecondsFallback("AI_STREAM_TIMEOUT_SEC", "GEMINI_STREAM_TIMEOUT_SEC", 2*time.Minute),
+	}
+
+	switch provider {
+	case AIProviderGemini:
+		cfg.APIKey = getEnv("GEMINI_API_KEY", "")
+		cfg.Model = getEnv("GEMINI_MODEL", "")
+		cfg.EmbeddingModel = getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+	case AIProviderOpenRouter:
+		cfg.APIKey = getEnv("OPENROUTER_API_KEY", "")
+		cfg.Model = getEnv("OPENROUTER_MODEL", "openrouter/auto")
+		cfg.EmbeddingModel = getEnv("OPENROUTER_EMBEDDING_MODEL", "google/gemini-embedding-001")
+	default:
+		cfg.Provider = provider
+	}
+
+	return cfg
+}
+
+func providerAPIKeyEnv(provider string) string {
+	if provider == AIProviderOpenRouter {
+		return "OPENROUTER_API_KEY"
+	}
+	return "GEMINI_API_KEY"
+}
+
+func providerModelEnv(provider string) string {
+	if provider == AIProviderOpenRouter {
+		return "OPENROUTER_MODEL"
+	}
+	return "GEMINI_MODEL"
+}
+
+func providerEmbeddingModelEnv(provider string) string {
+	if provider == AIProviderOpenRouter {
+		return "OPENROUTER_EMBEDDING_MODEL"
+	}
+	return "GEMINI_EMBEDDING_MODEL"
 }
 
 // getEnvAsSlice reads a comma-separated env var into a string slice.
@@ -268,6 +323,13 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
+func getEnvAsIntFallback(key, legacyKey string, defaultValue int) int {
+	if os.Getenv(key) != "" {
+		return getEnvAsInt(key, defaultValue)
+	}
+	return getEnvAsInt(legacyKey, defaultValue)
+}
+
 func getEnvAsBool(key string, defaultValue bool) bool {
 	valueStr := os.Getenv(key)
 	if value, err := strconv.ParseBool(valueStr); err == nil {
@@ -288,6 +350,13 @@ func getEnvAsDurationSeconds(key string, defaultValue time.Duration) time.Durati
 	return time.Duration(seconds) * time.Second
 }
 
+func getEnvAsDurationSecondsFallback(key, legacyKey string, defaultValue time.Duration) time.Duration {
+	if os.Getenv(key) != "" {
+		return getEnvAsDurationSeconds(key, defaultValue)
+	}
+	return getEnvAsDurationSeconds(legacyKey, defaultValue)
+}
+
 func getEnvAsDurationMillis(key string, defaultValue time.Duration) time.Duration {
 	valueStr := os.Getenv(key)
 	if valueStr == "" {
@@ -298,4 +367,11 @@ func getEnvAsDurationMillis(key string, defaultValue time.Duration) time.Duratio
 		return defaultValue
 	}
 	return time.Duration(millis) * time.Millisecond
+}
+
+func getEnvAsDurationMillisFallback(key, legacyKey string, defaultValue time.Duration) time.Duration {
+	if os.Getenv(key) != "" {
+		return getEnvAsDurationMillis(key, defaultValue)
+	}
+	return getEnvAsDurationMillis(legacyKey, defaultValue)
 }

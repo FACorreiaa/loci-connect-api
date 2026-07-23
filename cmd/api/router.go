@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"connectrpc.com/connect"
 	c "connectrpc.com/cors"
@@ -21,6 +20,7 @@ import (
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext/localcontextconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
@@ -312,6 +312,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		deps.Logger.Info("registered Connect RPC service", "path", placePath)
 	}
 
+	if deps.LocalContextHandler != nil {
+		lcPath, lcHandler := localcontextconnect.NewLocalContextServiceHandler(deps.LocalContextHandler, opts)
+		mux.Handle(lcPath, lcHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", lcPath)
+	}
+
 	if deps.POIHandler != nil {
 		poiPath, poiHandler := poiconnect.NewPOIServiceHandler(deps.POIHandler, opts)
 		mux.Handle(poiPath, poiHandler)
@@ -374,8 +380,8 @@ func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 			result["ready"] = status{Status: "fail", Detail: "db unavailable"}
 		}
 
-		if os.Getenv("GEMINI_API_KEY") == "" {
-			result["env"] = status{Status: "warn", Detail: "GEMINI_API_KEY missing"}
+		if deps.Config.AI.APIKey == "" {
+			result["env"] = status{Status: "warn", Detail: "AI provider API key missing"}
 		}
 
 		for _, v := range result {

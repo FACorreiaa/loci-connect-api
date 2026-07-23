@@ -16,7 +16,7 @@ import (
 
 // NewChatClient builds a Gemini chat client with retry policy and logging from
 // config, wrapped with per-call timeouts and typed error classification.
-func NewChatClient(ctx context.Context, cfg config.GeminiConfig, logger *slog.Logger) (generativeAI.ChatClient, error) {
+func NewChatClient(ctx context.Context, cfg config.AIConfig, logger *slog.Logger) (generativeAI.ChatClient, error) {
 	client, err := generativeAI.NewGeminiChatClient(ctx, cfg.APIKey, cfg.Model)
 	if err != nil {
 		return nil, err
@@ -97,8 +97,8 @@ func (g *guardedClient) Model() string { return g.inner.Model() }
 
 func (g *guardedClient) Close() error { return g.inner.Close() }
 
-// RetryPolicyFromConfig maps GeminiConfig retry fields to the SDK policy.
-func RetryPolicyFromConfig(cfg config.GeminiConfig) generativeAI.RetryPolicy {
+// RetryPolicyFromConfig maps AIConfig retry fields to the SDK policy.
+func RetryPolicyFromConfig(cfg config.AIConfig) generativeAI.RetryPolicy {
 	return generativeAI.RetryPolicy{
 		MaxRetries: cfg.MaxRetries,
 		BaseDelay:  cfg.RetryBaseDelay,
@@ -107,7 +107,7 @@ func RetryPolicyFromConfig(cfg config.GeminiConfig) generativeAI.RetryPolicy {
 }
 
 // ValidateRetryConfig returns an error when retry delays are inconsistent.
-func ValidateRetryConfig(cfg config.GeminiConfig) error {
+func ValidateRetryConfig(cfg config.AIConfig) error {
 	if cfg.MaxRetries < 0 {
 		return fmt.Errorf("GEMINI_MAX_RETRIES must be >= 0")
 	}

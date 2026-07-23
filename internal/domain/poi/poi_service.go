@@ -12,10 +12,10 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
-	"github.com/FACorreiaa/loci-connect-api/pkg/gemini"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -83,14 +83,14 @@ func NewServiceImpl(
 	discoverRepo interface {
 		TrackSearch(ctx context.Context, userID uuid.UUID, query, cityName, source string, resultCount int) error
 	},
-	geminiCfg config.GeminiConfig,
+	aiCfg config.AIConfig,
 	llmSem *concurrency.LLMSemaphore,
 	appCache cachestore.Store,
 	logger *slog.Logger,
 ) *ServiceImpl {
 	ctx := context.Background()
-	logger.Debug("initializing POI AI client", slog.String("model", geminiCfg.Model))
-	aiClient, err := gemini.NewChatClient(ctx, geminiCfg, logger)
+	logger.Debug("initializing POI AI client", slog.String("model", aiCfg.Model))
+	aiClient, err := ai.NewChatClient(ctx, aiCfg, logger)
 	if err != nil {
 		logger.Error("Failed to initialize AI client", slog.Any("error", err))
 		// For now, set to nil and handle gracefully in methods
@@ -98,7 +98,7 @@ func NewServiceImpl(
 	}
 
 	if embeddingService == nil {
-		embeddingService, err = generativeAI.NewGeminiEmbeddingClient(ctx, geminiCfg.APIKey, geminiCfg.EmbeddingModel, logger)
+		embeddingService, err = ai.NewEmbeddingClient(ctx, aiCfg, logger)
 		if err != nil {
 			logger.Error("Failed to initialize embedding client", slog.Any("error", err))
 		}

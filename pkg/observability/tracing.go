@@ -31,8 +31,10 @@ func InitTracing(ctx context.Context, serviceName string, logger *slog.Logger) (
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 	}
 
-	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(
-		semconv.SchemaURL,
+	// Use a schemaless resource for our extra attributes so merging with
+	// resource.Default() never fails on a schema-URL mismatch when the OTel SDK
+	// (and its built-in semconv) is bumped ahead of this package's semconv pin.
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
 		semconv.ServiceName(serviceName),
 	))
 	if err != nil {

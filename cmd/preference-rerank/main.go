@@ -15,6 +15,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 )
@@ -55,10 +56,9 @@ func main() {
 	poiRepo := poi.NewRepository(database.Pool, logger)
 	var embeddingClient generativeAI.EmbeddingClient
 	if *embeddingBatch > 0 {
-		embeddingClient, err = generativeAI.NewGeminiEmbeddingClient(
+		embeddingClient, err = ai.NewEmbeddingClient(
 			ctx,
-			cfg.Gemini.APIKey,
-			cfg.Gemini.EmbeddingModel,
+			cfg.AI,
 			logger,
 		)
 		if err != nil {

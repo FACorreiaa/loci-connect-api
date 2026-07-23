@@ -4,6 +4,7 @@ import "testing"
 
 func TestLoad_QuotaAndStripeDefaults(t *testing.T) {
 	// Required values so Load passes validation regardless of host env.
+	t.Setenv("AI_PROVIDER", AIProviderGemini)
 	t.Setenv("GEMINI_API_KEY", "test-key")
 	t.Setenv("GEMINI_MODEL", "gemini-test")
 	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
@@ -23,6 +24,7 @@ func TestLoad_QuotaAndStripeDefaults(t *testing.T) {
 }
 
 func TestLoad_QuotaAndStripeOverrides(t *testing.T) {
+	t.Setenv("AI_PROVIDER", AIProviderGemini)
 	t.Setenv("GEMINI_API_KEY", "test-key")
 	t.Setenv("GEMINI_MODEL", "gemini-test")
 	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
@@ -51,5 +53,40 @@ func TestLoad_QuotaAndStripeOverrides(t *testing.T) {
 	}
 	if cfg.Stripe.PriceIDMonthly != "price_m" || cfg.Stripe.PriceIDAnnual != "price_a" {
 		t.Errorf("price IDs = %q/%q", cfg.Stripe.PriceIDMonthly, cfg.Stripe.PriceIDAnnual)
+	}
+}
+
+func TestLoad_OpenRouter(t *testing.T) {
+	t.Setenv("AI_PROVIDER", AIProviderOpenRouter)
+	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+	t.Setenv("OPENROUTER_MODEL", "")
+	t.Setenv("OPENROUTER_EMBEDDING_MODEL", "")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AI.Provider != AIProviderOpenRouter {
+		t.Errorf("provider = %q", cfg.AI.Provider)
+	}
+	if cfg.AI.Model != "openrouter/auto" {
+		t.Errorf("model = %q", cfg.AI.Model)
+	}
+	if cfg.AI.EmbeddingModel != "google/gemini-embedding-001" {
+		t.Errorf("embedding model = %q", cfg.AI.EmbeddingModel)
+	}
+	if cfg.AI.EmbeddingDimension != 768 {
+		t.Errorf("embedding dimension = %d", cfg.AI.EmbeddingDimension)
+	}
+}
+
+func TestLoad_RejectsUnknownAIProvider(t *testing.T) {
+	t.Setenv("AI_PROVIDER", "unknown")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load returned nil error")
 	}
 }

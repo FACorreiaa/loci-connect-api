@@ -30,7 +30,7 @@ sudo mkdir -p /opt/loci && sudo chown "$USER" /opt/loci
 cd /opt/loci
 
 # 3. Production env — copy .env.prod.example -> .env and fill it in
-#    (DB_* must match POSTGRES_*; set real JWT_SECRET + GEMINI_API_KEY)
+#    (DB_* must match POSTGRES_*; set real JWT_SECRET + chosen AI provider key)
 vim .env
 
 # 4. Log in to GHCR so the VPS can pull private images

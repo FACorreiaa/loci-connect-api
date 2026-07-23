@@ -57,7 +57,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to init test cache: %v", err))
 	}
-	testService = NewServiceImpl(realRepo, nil, cityRepo, stubDiscover{}, config.GeminiConfig{
+	testService = NewServiceImpl(realRepo, nil, cityRepo, stubDiscover{}, config.AIConfig{
+		Provider:       config.AIProviderGemini,
 		APIKey:         apiKey,
 		Model:          model,
 		EmbeddingModel: "gemini-embedding-exp-03-07",

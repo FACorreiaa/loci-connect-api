@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
@@ -23,6 +24,7 @@ import (
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
@@ -120,6 +122,7 @@ type Dependencies struct {
 	EntitlementHandler       *entitlement.Handler
 	RecommendationHandler    *recommendation.Handler
 	PlaceIntelligenceHandler *placeintel.Handler
+	LocalContextHandler      *localcontext.Handler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
@@ -231,7 +234,7 @@ func (d *Dependencies) initServices() error {
 
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, nil, nil, nil) // plans wired below after SubscriptionService
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
-	llmSem := concurrency.NewLLMSemaphore(d.Config.Gemini.MaxConcurrentCalls)
+	llmSem := concurrency.NewLLMSemaphore(d.Config.AI.MaxConcurrentCalls)
 	appCache, err := cachestore.New(cachestore.Config{
 		RedisURL:   d.Config.Cache.RedisURL,
 		KeyPrefix:  d.Config.Cache.KeyPrefix,
@@ -243,7 +246,7 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize cache: %w", err)
 	}
 	d.AppCache = appCache
-	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.Gemini, llmSem, appCache, d.Logger)
+	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.AI, llmSem, appCache, d.Logger)
 	poiSvc.SetPreferenceVectors(d.PreferenceVectors)
 	d.POISvc = poiSvc
 	chatSvc, err := chatservice.NewLlmInteractiontService(
@@ -258,7 +261,7 @@ func (d *Dependencies) initServices() error {
 		d.ListSvc,
 		d.TripRepo,
 		d.Logger,
-		d.Config.Gemini,
+		d.Config.AI,
 		llmSem,
 		appCache,
 	)
@@ -329,6 +332,14 @@ func (d *Dependencies) initHandlers() error {
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger)
+
+	// Local context (weather now; booking/transport stubbed). Real OpenWeather
+	// when OPENWEATHER_API_KEY is set, else a labelled stub forecast.
+	if weatherKey := os.Getenv("OPENWEATHER_API_KEY"); weatherKey != "" {
+		d.LocalContextHandler = localcontext.NewHandler(localcontext.NewOpenWeatherAdapter(weatherKey), false, d.Logger)
+	} else {
+		d.LocalContextHandler = localcontext.NewHandler(localcontext.StubWeather{}, true, d.Logger)
+	}
 	d.Logger.Info("handlers initialized")
 	return nil
 }
