@@ -616,10 +616,10 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 		baseURL = "/nearme"
 	default:
 		if cc.TripID != uuid.Nil {
-			routeType = "trip"
-			baseURL = "/trips/" + cc.TripID.String()
+			routeType = "itinerary"
+			baseURL = "/itinerary"
 			queryParams["tripId"] = cc.TripID.String()
-			queryParams["domain"] = "trip"
+			queryParams["domain"] = "itinerary"
 		} else {
 			routeType = "itinerary"
 			baseURL = "/itinerary"
@@ -633,7 +633,7 @@ func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
 	navURL := fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s",
 		baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), queryParams["domain"])
 	if tripID, ok := queryParams["tripId"]; ok {
-		navURL = fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=trip&tripId=%s",
+		navURL = fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=itinerary&tripId=%s",
 			baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), tripID)
 	}
 

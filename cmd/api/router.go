@@ -20,6 +20,7 @@ import (
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1/comparev1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext/localcontextconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
@@ -316,6 +317,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		lcPath, lcHandler := localcontextconnect.NewLocalContextServiceHandler(deps.LocalContextHandler, opts)
 		mux.Handle(lcPath, lcHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", lcPath)
+	}
+
+	if deps.CompareHandler != nil {
+		cmpPath, cmpHandler := comparev1connect.NewCompareServiceHandler(deps.CompareHandler, opts)
+		mux.Handle(cmpPath, cmpHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", cmpPath)
 	}
 
 	if deps.POIHandler != nil {

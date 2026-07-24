@@ -24,8 +24,6 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0 h1:k16WuCRiPDRNmLXALZ3dcQ9QBJbg3rSloJOP/+qikX0=
 github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0/go.mod h1:wldQdJFlTpRdf8MiQ/kMwTc7NwhwbeHi2PGtFHlEkUQ=
-github.com/FACorreiaa/loci-connect-proto v0.8.0 h1:IY3IUXwNa+BsSVJttW+CS6bY4DBH5lPEPIzWX1TGe/w=
-github.com/FACorreiaa/loci-connect-proto v0.8.0/go.mod h1:d5maETQWLfSuOxph8Av/8MRQlnUe5W37CBb6DDbMagU=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

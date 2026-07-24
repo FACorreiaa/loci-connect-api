@@ -25,6 +25,7 @@ import (
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/compare"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
@@ -123,6 +124,7 @@ type Dependencies struct {
 	RecommendationHandler    *recommendation.Handler
 	PlaceIntelligenceHandler *placeintel.Handler
 	LocalContextHandler      *localcontext.Handler
+	CompareHandler           *compare.Handler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
@@ -335,11 +337,33 @@ func (d *Dependencies) initHandlers() error {
 
 	// Local context (weather now; booking/transport stubbed). Real OpenWeather
 	// when OPENWEATHER_API_KEY is set, else a labelled stub forecast.
+	var weather localcontext.WeatherAdapter = localcontext.StubWeather{}
+	weatherEst := true
 	if weatherKey := os.Getenv("OPENWEATHER_API_KEY"); weatherKey != "" {
-		d.LocalContextHandler = localcontext.NewHandler(localcontext.NewOpenWeatherAdapter(weatherKey), false, d.Logger)
-	} else {
-		d.LocalContextHandler = localcontext.NewHandler(localcontext.StubWeather{}, true, d.Logger)
+		weather = localcontext.NewOpenWeatherAdapter(weatherKey)
+		weatherEst = false
 	}
+	d.LocalContextHandler = localcontext.NewHandler(weather, weatherEst, d.Logger)
+
+	bookingDL := localcontext.NewBookingComDeepLinkFromEnv()
+	diningDL := localcontext.NewOpenTableDeepLinkFromEnv()
+	uberDL := localcontext.NewUberDeepLinkFromEnv()
+	transport := localcontext.StubTransportWithDrive{
+		Fallback: localcontext.StubTransport{},
+		Uber:     uberDL,
+	}
+	compareSvc := compare.NewService(
+		d.CityRepo,
+		d.POISvc,
+		weather,
+		weatherEst,
+		transport,
+		bookingDL,
+		diningDL,
+		d.SubscriptionService,
+		d.Logger,
+	)
+	d.CompareHandler = compare.NewHandler(compareSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
