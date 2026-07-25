@@ -180,6 +180,45 @@ func TestAuthHandler_RefreshToken_Success(t *testing.T) {
 	}
 }
 
+// A real client cannot put its access token in session_id: the proto caps that
+// field at 200 characters and a JWT is roughly 370, so the request is rejected
+// before reaching the handler. Clients that worked around it by sending the
+// JWT's `jti` got Valid:false, because the handler parses the field as a token.
+// Either way session restore always failed and every page refresh looked like a
+// logout. The authenticated header is now the primary path.
+func TestAuthHandler_ValidateSession_UsesContextClaims(t *testing.T) {
+	svc, _, tokens, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	// Any attempt to treat session_id as a token must fail, proving the result
+	// below came from the context claims and not from the field.
+	tokens.AccessFunc = func(string) (*service.Claims, error) {
+		return nil, errors.New("session_id is not a token")
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{
+		UserID:   "user-id",
+		Username: "rpcuser",
+		Email:    "rpc@example.com",
+		Role:     "user",
+	})
+
+	// No session_id at all - exactly what the fixed client sends.
+	resp, err := handler.ValidateSession(ctx, connect.NewRequest(&auth.ValidateSessionRequest{}))
+	if err != nil {
+		t.Fatalf("ValidateSession: %v", err)
+	}
+	if !resp.Msg.Valid {
+		t.Fatal("expected the session to validate from the Authorization header")
+	}
+	if resp.Msg.Email == nil || *resp.Msg.Email != "rpc@example.com" {
+		t.Fatalf("unexpected claims in response: %#v", resp.Msg)
+	}
+	if resp.Msg.UserId == nil || *resp.Msg.UserId != "user-id" {
+		t.Fatalf("unexpected user id in response: %#v", resp.Msg)
+	}
+}
+
 func TestAuthHandler_ValidateSession(t *testing.T) {
 	ctx := context.Background()
 	svc, _, tokens, _ := servicetest.NewTestAuthService()

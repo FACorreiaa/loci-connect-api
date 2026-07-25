@@ -89,8 +89,28 @@ func (h *AuthHandler) RefreshToken(ctx context.Context, req *connect.Request[aut
 	return connect.NewResponse(presenter.RefreshTokenResponse(tokens)), nil
 }
 
-// ValidateSession validates a session (treated as an access token here).
+// ValidateSession reports whether the caller's session is still good.
+//
+// It authenticates from the Authorization header, which is the only thing that
+// can work: the request's session_id field is capped at 200 characters by the
+// proto validation rules, while an access token is ~370, so a client that sent
+// its token here was rejected with InvalidArgument, and a client that sent the
+// JWT's `jti` instead got Valid:false because a bare UUID is not a parseable
+// token. Either way the RPC could never succeed, which made every page refresh
+// look like a logout.
+//
+// session_id is still honoured when present and short enough to be a token, so
+// older clients keep working.
 func (h *AuthHandler) ValidateSession(ctx context.Context, req *connect.Request[auth.ValidateSessionRequest]) (*connect.Response[auth.ValidateSessionResponse], error) {
+	if ctxClaims, err := interceptors.GetClaimsFromContext(ctx); err == nil && ctxClaims != nil {
+		return connect.NewResponse(presenter.ValidateSessionResponse(&service.Claims{
+			UserID:   ctxClaims.UserID,
+			Email:    ctxClaims.Email,
+			Username: ctxClaims.Username,
+			Role:     ctxClaims.Role,
+		})), nil
+	}
+
 	if req.Msg.SessionId == "" {
 		return connect.NewResponse(&auth.ValidateSessionResponse{Valid: false}), nil
 	}

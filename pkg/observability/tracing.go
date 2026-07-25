@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -19,14 +21,27 @@ import (
 // stays in place (spans cost ~nothing) and the returned shutdown is a no-op —
 // tracing is opt-in per environment.
 func InitTracing(ctx context.Context, serviceName string, logger *slog.Logger) (func(context.Context) error, error) {
-	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 	if endpoint == "" {
 		logger.Info("OTEL_EXPORTER_OTLP_ENDPOINT not set; tracing disabled")
 		return func(context.Context) error { return nil }, nil
 	}
 
-	// The exporter reads OTEL_EXPORTER_OTLP_ENDPOINT (and friends) itself.
-	exporter, err := otlptracehttp.New(ctx)
+	// A set-but-malformed endpoint (e.g. "https://", scheme only) used to sail
+	// past the emptiness check and leave the exporter posting to a hostless URL,
+	// logging `traces export: Post "https:///": http: no Host in request URL`
+	// every batch interval, forever. Validate here and disable tracing instead
+	// of shipping a broken exporter.
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		logger.Warn("OTEL_EXPORTER_OTLP_ENDPOINT is not a valid http(s) URL with a host; tracing disabled",
+			"endpoint", endpoint)
+		return func(context.Context) error { return nil }, nil
+	}
+
+	// Pass the endpoint explicitly rather than relying on the exporter re-reading
+	// the environment, so what we validated is what gets used.
+	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 	}

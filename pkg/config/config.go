@@ -89,8 +89,19 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret  string
-	AdminEmail string
+	JWTSecret string
+	// JWTRefreshSecret signs refresh tokens. It must differ from JWTSecret:
+	// with one shared key an access token verifies as a refresh token, so a
+	// leaked access token could be exchanged for a fresh pair. Defaults to
+	// JWTSecret so existing deployments keep booting, but production refuses
+	// to start when the two are equal.
+	JWTRefreshSecret string
+	// Token lifetimes. These used to be hardcoded in dependencies.go while the
+	// env vars sat in .env doing nothing, so the running config did not match
+	// what the file claimed.
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+	AdminEmail      string
 }
 
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
@@ -151,8 +162,11 @@ func Load() (*Config, error) {
 			MaxConnIdleTime: getEnvAsDurationSeconds("DB_MAX_CONN_IDLE_SEC", 10*time.Minute),
 		},
 		Auth: AuthConfig{
-			JWTSecret:  getEnv("JWT_SECRET", "changeme"),
-			AdminEmail: getEnv("ADMIN_EMAIL", ""),
+			JWTSecret:        getEnv("JWT_SECRET", "changeme"),
+			JWTRefreshSecret: getEnv("JWT_REFRESH_SECRET", ""),
+			AccessTokenTTL:   getEnvAsDuration("JWT_ACCESS_TOKEN_TTL", time.Hour),
+			RefreshTokenTTL:  getEnvAsDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
+			AdminEmail:       getEnv("ADMIN_EMAIL", ""),
 		},
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
@@ -226,6 +240,25 @@ func Load() (*Config, error) {
 	}
 	if len(cfg.Auth.JWTSecret) < 32 {
 		return nil, errors.New("JWT_SECRET must be at least 32 characters")
+	}
+
+	// Fall back to the access secret so existing deployments keep working, but
+	// say so, and refuse the shared-key setup outright in production.
+	if cfg.Auth.JWTRefreshSecret == "" {
+		cfg.Auth.JWTRefreshSecret = cfg.Auth.JWTSecret
+	}
+	if cfg.Auth.JWTRefreshSecret == cfg.Auth.JWTSecret && strings.EqualFold(getEnv("APP_ENV", "development"), "production") {
+		return nil, errors.New("JWT_REFRESH_SECRET must be set and must differ from JWT_SECRET in production")
+	}
+	if len(cfg.Auth.JWTRefreshSecret) < 32 {
+		return nil, errors.New("JWT_REFRESH_SECRET must be at least 32 characters")
+	}
+
+	if cfg.Auth.AccessTokenTTL <= 0 || cfg.Auth.RefreshTokenTTL <= 0 {
+		return nil, errors.New("JWT token TTLs must be positive")
+	}
+	if cfg.Auth.RefreshTokenTTL <= cfg.Auth.AccessTokenTTL {
+		return nil, errors.New("JWT_REFRESH_TOKEN_TTL must be longer than JWT_ACCESS_TOKEN_TTL")
 	}
 
 	return cfg, nil
@@ -336,6 +369,21 @@ func getEnvAsBool(key string, defaultValue bool) bool {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvAsDuration parses a Go duration string ("15m", "168h"). Unlike the
+// *Seconds helpers it takes the unit from the value, which is what the
+// JWT_*_TTL variables have always been written as.
+func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
+	valueStr := strings.TrimSpace(os.Getenv(key))
+	if valueStr == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(valueStr)
+	if err != nil || d <= 0 {
+		return defaultValue
+	}
+	return d
 }
 
 func getEnvAsDurationSeconds(key string, defaultValue time.Duration) time.Duration {

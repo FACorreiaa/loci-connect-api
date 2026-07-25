@@ -940,7 +940,15 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	query := `
         WITH grouped_interactions AS (
             SELECT
-                COALESCE(session_id::text, city_name || '_' || DATE(created_at)) as session_key,
+                -- COALESCE alone is not enough: when session_id is NULL the
+                -- fallback concat is itself NULL if city_name is NULL (SQL
+                -- concat propagates NULL), so session_key came back NULL and
+                -- the row scan failed with "cannot scan NULL into *string",
+                -- 500-ing the whole chat history. Guard the inner operand too.
+                COALESCE(
+                    session_id::text,
+                    COALESCE(city_name, 'unknown') || '_' || DATE(created_at)::text
+                ) as session_key,
                 user_id,
                 city_name,
                 MIN(created_at) as first_interaction,
@@ -975,7 +983,10 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
         SELECT
             session_key,
             user_id,
-            city_name,
+            -- city_name is nullable in llm_interactions but scans into a plain
+            -- string; coalesce so a NULL city cannot fail the row scan the same
+            -- way session_key did.
+            COALESCE(city_name, '') as city_name,
             first_interaction,
             last_interaction,
             interaction_count,
@@ -995,7 +1006,15 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 	countQuery := `
         WITH grouped_interactions AS (
             SELECT
-                COALESCE(session_id::text, city_name || '_' || DATE(created_at)) as session_key,
+                -- COALESCE alone is not enough: when session_id is NULL the
+                -- fallback concat is itself NULL if city_name is NULL (SQL
+                -- concat propagates NULL), so session_key came back NULL and
+                -- the row scan failed with "cannot scan NULL into *string",
+                -- 500-ing the whole chat history. Guard the inner operand too.
+                COALESCE(
+                    session_id::text,
+                    COALESCE(city_name, 'unknown') || '_' || DATE(created_at)::text
+                ) as session_key,
                 user_id,
                 city_name
             FROM llm_interactions

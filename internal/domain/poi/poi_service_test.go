@@ -143,6 +143,14 @@ func (m *MockCityRepository) GetAllCities(ctx context.Context) ([]locitypes.City
 	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
 }
 
+func (m *MockCityRepository) SearchCitiesByName(ctx context.Context, query string, limit int) ([]locitypes.CityDetail, error) {
+	args := m.Called(ctx, query, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
+}
+
 // MockPOIRepository is a mock implementation of POIRepository
 type MockPOIRepository struct {
 	mock.Mock

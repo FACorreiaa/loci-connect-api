@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -14,6 +13,7 @@ import (
 	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	cityhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/city/handler"
 	customauthhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/handler"
 	customauthservice "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/service"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
@@ -125,6 +125,7 @@ type Dependencies struct {
 	PlaceIntelligenceHandler *placeintel.Handler
 	LocalContextHandler      *localcontext.Handler
 	CompareHandler           *compare.Handler
+	CityHandler              *cityhandler.CityHandler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
@@ -194,6 +195,9 @@ func (d *Dependencies) initRepositories() error {
 	d.ProfileRepo = profiles.NewPostgresUserRepo(d.DB.Pool, d.Logger)
 	d.POIRepo = poirepo.NewRepository(d.DB.Pool, d.Logger)
 	d.CityRepo = cityrepo.NewCityRepository(d.DB.Pool, d.Logger)
+	// CityService has existed unregistered while the client already called
+	// SearchCities; wire it so the city picker stops failing.
+	d.CityHandler = cityhandler.NewCityHandler(cityrepo.NewCityService(d.CityRepo, d.Logger))
 	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.DiscoverRepo = discoverdomain.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.ListRepo = itinerarylist.NewRepository(d.DB.Pool, d.Logger)
@@ -221,10 +225,25 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("jwt secret is required")
 	}
 
-	accessTokenTTL := 1 * time.Hour // Increased from 15 minutes for better UX
-	refreshTokenTTL := 30 * 24 * time.Hour
+	// Separate signing keys. Sharing one meant an access token also verified as
+	// a refresh token, so anything that leaked a short-lived access token handed
+	// over a 30-day session. Config falls back to the access secret outside
+	// production and rejects the shared setup in it.
+	refreshSecret := []byte(d.Config.Auth.JWTRefreshSecret)
+	if len(refreshSecret) == 0 {
+		refreshSecret = jwtSecret
+	}
+	if string(refreshSecret) == string(jwtSecret) {
+		d.Logger.Warn("JWT_REFRESH_SECRET is unset or equal to JWT_SECRET; access tokens validate as refresh tokens. Set a distinct value before production.")
+	}
 
-	d.TokenManager = service.NewTokenManager(jwtSecret, jwtSecret, accessTokenTTL, refreshTokenTTL)
+	// TTLs come from config so JWT_ACCESS_TOKEN_TTL / JWT_REFRESH_TOKEN_TTL
+	// actually take effect; they were previously hardcoded here while the env
+	// vars sat unread in .env.
+	accessTokenTTL := d.Config.Auth.AccessTokenTTL
+	refreshTokenTTL := d.Config.Auth.RefreshTokenTTL
+
+	d.TokenManager = service.NewTokenManager(jwtSecret, refreshSecret, accessTokenTTL, refreshTokenTTL)
 	emailService := service.NewEmailService()
 	d.AuthService = service.NewAuthService(
 		d.AuthRepo,

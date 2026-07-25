@@ -317,6 +317,22 @@ func (m *MockCityRepository) GetAllCities(ctx context.Context) ([]locitypes.City
 	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
 }
 
+func (m *MockCityRepository) GetCityByID(ctx context.Context, cityID uuid.UUID) (*locitypes.CityDetail, error) {
+	args := m.Called(ctx, cityID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*locitypes.CityDetail), args.Error(1)
+}
+
+func (m *MockCityRepository) SearchCitiesByName(ctx context.Context, query string, limit int) ([]locitypes.CityDetail, error) {
+	args := m.Called(ctx, query, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
+}
+
 func (m *MockCityRepository) FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.CityDetail, error) {
 	args := m.Called(ctx, queryEmbedding, limit)
 	if args.Get(0) == nil {

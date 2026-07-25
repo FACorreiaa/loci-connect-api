@@ -21,6 +21,7 @@ import (
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1/comparev1connect"
+	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city/cityconnect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext/localcontextconnect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
@@ -311,6 +312,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		placePath, placeHandler := placeconnect.NewPlaceIntelligenceServiceHandler(deps.PlaceIntelligenceHandler, opts)
 		mux.Handle(placePath, placeHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", placePath)
+	}
+
+	if deps.CityHandler != nil {
+		cityPath, cityHandler := cityconnect.NewCityServiceHandler(deps.CityHandler, opts)
+		mux.Handle(cityPath, cityHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", cityPath)
 	}
 
 	if deps.LocalContextHandler != nil {

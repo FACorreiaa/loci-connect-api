@@ -2,6 +2,7 @@ package city
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -25,6 +26,8 @@ type Repository interface {
 	FindCityByFuzzyName(ctx context.Context, cityName string) (*locitypes.CityDetail, error)
 	GetCityIDByName(ctx context.Context, cityName string) (uuid.UUID, error)
 	GetAllCities(ctx context.Context) ([]locitypes.CityDetail, error)
+	GetCityByID(ctx context.Context, cityID uuid.UUID) (*locitypes.CityDetail, error)
+	SearchCitiesByName(ctx context.Context, query string, limit int) ([]locitypes.CityDetail, error)
 
 	// Vector similarity search methods
 	FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.CityDetail, error)
@@ -451,6 +454,105 @@ func (r *RepositoryImpl) GetAllCities(ctx context.Context) ([]locitypes.CityDeta
 	span.SetAttributes(attribute.Int("results.count", len(cities)))
 	span.SetStatus(codes.Ok, "All cities retrieved")
 
+	return cities, nil
+}
+
+// GetCityByID retrieves a single city by its primary key. Returns (nil, nil)
+// when no such city exists so callers can map that to NotFound.
+func (r *RepositoryImpl) GetCityByID(ctx context.Context, cityID uuid.UUID) (*locitypes.CityDetail, error) {
+	ctx, span := otel.Tracer("CityRepository").Start(ctx, "GetCityByID", trace.WithAttributes(
+		attribute.String("city.id", cityID.String()),
+	))
+	defer span.End()
+
+	l := r.logger.With(slog.String("method", "GetCityByID"))
+
+	query := `
+        SELECT
+            id,
+            name,
+            country,
+            COALESCE(state_province, '') as state_province,
+            COALESCE(ai_summary, '') as ai_summary,
+            ST_Y(center_location) as center_latitude,
+            ST_X(center_location) as center_longitude
+        FROM cities
+        WHERE id = $1
+    `
+
+	rows, err := r.pgpool.Query(ctx, query, cityID)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to query city by id", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database query failed")
+		return nil, fmt.Errorf("failed to query city by id %s: %w", cityID, err)
+	}
+
+	city, err := pgx.CollectOneRow(rows, pgx.RowToAddrOfStructByName[locitypes.CityDetail])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		l.ErrorContext(ctx, "Failed to collect city row", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to find city by id %s: %w", cityID, err)
+	}
+
+	span.SetStatus(codes.Ok, "City retrieved")
+	return city, nil
+}
+
+// SearchCitiesByName does a prefix/substring match on city name and country,
+// ordered so that names starting with the query come first. An empty query
+// falls back to an alphabetical page, which is what the client's initial
+// "browse cities" call sends.
+func (r *RepositoryImpl) SearchCitiesByName(ctx context.Context, query string, limit int) ([]locitypes.CityDetail, error) {
+	ctx, span := otel.Tracer("CityRepository").Start(ctx, "SearchCitiesByName", trace.WithAttributes(
+		attribute.String("search.query", query),
+		attribute.Int("search.limit", limit),
+	))
+	defer span.End()
+
+	l := r.logger.With(slog.String("method", "SearchCitiesByName"))
+
+	if limit <= 0 {
+		limit = 20
+	}
+
+	sql := `
+        SELECT
+            id,
+            name,
+            country,
+            COALESCE(state_province, '') as state_province,
+            COALESCE(ai_summary, '') as ai_summary,
+            ST_Y(center_location) as center_latitude,
+            ST_X(center_location) as center_longitude
+        FROM cities
+        WHERE $1 = '' OR name ILIKE '%' || $1 || '%' OR country ILIKE '%' || $1 || '%'
+        ORDER BY
+            CASE WHEN name ILIKE $1 || '%' THEN 0 ELSE 1 END,
+            name ASC
+        LIMIT $2
+    `
+
+	rows, err := r.pgpool.Query(ctx, sql, query, limit)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to search cities", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database query failed")
+		return nil, fmt.Errorf("failed to search cities for %q: %w", query, err)
+	}
+
+	cities, err := pgx.CollectRows(rows, pgx.RowToStructByName[locitypes.CityDetail])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect city rows", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect city search rows: %w", err)
+	}
+
+	span.SetAttributes(attribute.Int("results.count", len(cities)))
+	span.SetStatus(codes.Ok, "Cities searched")
 	return cities, nil
 }
 
