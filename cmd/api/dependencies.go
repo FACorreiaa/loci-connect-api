@@ -25,6 +25,7 @@ import (
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/compare"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
@@ -82,6 +83,8 @@ type Dependencies struct {
 	// Services
 	TokenManager        service.TokenManager
 	AuthService         *service.AuthService
+	// MFAService is nil when MFA_SECRET_KEY is unset.
+	MFAService *mfa.Service
 	ChatService         chatservice.LlmInteractiontService
 	ProfileSvc          profiles.Service
 	POISvc              poirepo.Service
@@ -253,6 +256,13 @@ func (d *Dependencies) initServices() error {
 		refreshTokenTTL,
 	)
 
+	// MFA is opt-in on the presence of MFA_SECRET_KEY. Without a key there is no
+	// safe way to store TOTP secrets, so the feature stays off rather than
+	// degrading to plaintext storage.
+	if err := d.initMFA(); err != nil {
+		return err
+	}
+
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, nil, nil, nil) // plans wired below after SubscriptionService
 	d.ProfileSvc = profiles.NewUserProfilesService(d.ProfileRepo, d.InterestRepo, d.TagRepo, d.Logger)
 	llmSem := concurrency.NewLLMSemaphore(d.Config.AI.MaxConcurrentCalls)
@@ -324,14 +334,47 @@ func (d *Dependencies) initServices() error {
 
 	d.Logger.Info("services initialized")
 	return nil
+}
 
-	// Needs imports and struct fields.
-	// Since replace_file_content is single block, I will use multi_replace for this file.
+// initMFA wires the MFA service when a secret key is configured.
+//
+// Absence of MFA_SECRET_KEY is a supported state, not an error: it leaves login
+// exactly as it was. A key that is present but the wrong size IS an error —
+// booting with a broken key would let users enrol into an MFA they can never
+// complete.
+func (d *Dependencies) initMFA() error {
+	key := d.Config.Auth.MFASecretKey
+	if key == "" {
+		d.Logger.Warn("MFA_SECRET_KEY not set; two-factor authentication is disabled")
+		return nil
+	}
+
+	cipher, err := mfa.NewCipher([]byte(key))
+	if err != nil {
+		return fmt.Errorf("MFA is misconfigured: %w", err)
+	}
+
+	d.MFAService = mfa.NewService(
+		mfa.NewPostgresRepository(d.DB.Pool),
+		cipher,
+		mfa.ParsePolicy(d.Config.Auth.MFARequiredForRole),
+		d.Logger,
+	)
+
+	// Login now challenges enrolled users before issuing any token.
+	d.AuthService.WithMFA(d.MFAService)
+
+	d.Logger.Info("two-factor authentication enabled",
+		"required_for_roles", d.Config.Auth.MFARequiredForRole)
+	return nil
 }
 
 // initHandlers initializes all handler dependencies
 func (d *Dependencies) initHandlers() error {
 	d.AuthHandler = handler.NewAuthHandler(d.AuthService, d.Logger)
+	if d.MFAService != nil {
+		d.AuthHandler.WithMFA(d.MFAService)
+	}
 	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)

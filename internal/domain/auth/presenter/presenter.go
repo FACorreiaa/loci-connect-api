@@ -26,7 +26,26 @@ func RegisterResponse(result *service.RegisterResult) *commonpb.Response {
 
 // LoginResponse converts a login result into its RPC response.
 func LoginResponse(result *service.LoginResult) *auth.LoginResponse {
-	if result == nil || result.User == nil || result.Tokens == nil {
+	if result == nil || result.User == nil {
+		return &auth.LoginResponse{}
+	}
+
+	// A challenged login carries no tokens — they do not exist yet. Identity
+	// fields are still sent so the MFA screen can name the account being signed
+	// into.
+	if result.MFARequired {
+		token := result.MFAToken
+		return &auth.LoginResponse{
+			Username:    result.User.Username,
+			UserId:      result.User.ID.String(),
+			Email:       result.User.Email,
+			MfaRequired: true,
+			MfaToken:    &token,
+			Message:     "Enter your authentication code to finish signing in",
+		}
+	}
+
+	if result.Tokens == nil {
 		return &auth.LoginResponse{}
 	}
 

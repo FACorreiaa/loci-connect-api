@@ -2,8 +2,10 @@ package servicetest
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,9 +19,11 @@ import (
 
 // MockTokenManager implements TokenManager for tests.
 type MockTokenManager struct {
-	GenerateFunc func(userID, email, username, role string) (*service.TokenPair, error)
-	AccessFunc   func(token string) (*service.Claims, error)
-	RefreshFunc  func(token string) (*service.Claims, error)
+	GenerateFunc     func(userID, email, username, role string) (*service.TokenPair, error)
+	AccessFunc       func(token string) (*service.Claims, error)
+	RefreshFunc      func(token string) (*service.Claims, error)
+	MFAChallengeFunc func(userID, email, username, role string) (string, time.Time, error)
+	MFAValidateFunc  func(token string) (*service.Claims, error)
 }
 
 func (m *MockTokenManager) GenerateTokenPair(userID, email, username, role string) (*service.TokenPair, error) {
@@ -41,6 +45,25 @@ func (m *MockTokenManager) ValidateRefreshToken(tokenString string) (*service.Cl
 		return m.RefreshFunc(tokenString)
 	}
 	return &service.Claims{UserID: "user"}, nil
+}
+
+func (m *MockTokenManager) GenerateMFAChallengeToken(userID, email, username, role string) (string, time.Time, error) {
+	if m.MFAChallengeFunc != nil {
+		return m.MFAChallengeFunc(userID, email, username, role)
+	}
+	// The default carries the user id so a test can assert which user was
+	// challenged without wiring a real signer.
+	return "mfa-challenge-" + userID, time.Now().Add(5 * time.Minute), nil
+}
+
+func (m *MockTokenManager) ValidateMFAChallengeToken(tokenString string) (*service.Claims, error) {
+	if m.MFAValidateFunc != nil {
+		return m.MFAValidateFunc(tokenString)
+	}
+	if id, ok := strings.CutPrefix(tokenString, "mfa-challenge-"); ok {
+		return &service.Claims{UserID: id}, nil
+	}
+	return nil, errors.New("not an MFA challenge token")
 }
 
 // MockEmailSender captures sent emails for assertions.

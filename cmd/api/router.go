@@ -63,6 +63,10 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		authconnect.AuthServiceValidateSessionProcedure,
 		authconnect.AuthServiceForgotPasswordProcedure,
 		authconnect.AuthServiceResetPasswordProcedure,
+		// VerifyMFA completes a login, so the caller has no access token yet. It
+		// authenticates with the challenge token from Login instead — the handler
+		// accepts nothing else.
+		authconnect.AuthServiceVerifyMFAProcedure,
 		// Public statistics endpoint
 		statisticsv1connect.StatisticsServiceGetMainPageStatisticsProcedure,
 		statisticsv1connect.StatisticsServiceStreamMainPageStatisticsProcedure,

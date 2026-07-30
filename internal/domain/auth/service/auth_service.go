@@ -60,6 +60,14 @@ type LoginParams struct {
 type LoginResult struct {
 	User   *repository.User
 	Tokens *TokenPair
+
+	// MFARequired is true when the password was correct but a second factor is
+	// still outstanding. Tokens is nil in that case — the whole point of step-up
+	// is that no usable credential exists until VerifyMFA succeeds.
+	MFARequired bool
+
+	// MFAToken is the challenge token to pass back to VerifyMFA.
+	MFAToken string
 }
 
 // RefreshTokenParams contains the data needed to refresh tokens.
@@ -73,6 +81,16 @@ type ResendVerificationResult struct {
 	AlreadyVerified bool
 }
 
+// MFAVerifier is the slice of the MFA service that login needs.
+//
+// A narrow port, not the whole mfa.Service: auth must be able to ask "does this
+// user owe a second factor" and "is this one valid" without gaining the ability
+// to enrol or disable anything.
+type MFAVerifier interface {
+	IsEnabled(ctx context.Context, userID uuid.UUID) (bool, error)
+	VerifyForLogin(ctx context.Context, userID uuid.UUID, code, recoveryCode string) error
+}
+
 // AuthService coordinates AUTH business logic.
 type AuthService struct {
 	repo         repository.AuthRepository
@@ -80,6 +98,10 @@ type AuthService struct {
 	emailService EmailSender
 	sessionTTL   time.Duration
 	logger       *slog.Logger
+
+	// mfa is nil when MFA is not configured, in which case login behaves exactly
+	// as it did before.
+	mfa MFAVerifier
 }
 
 // NewAuthService constructs a new AuthService.
@@ -101,6 +123,12 @@ func NewAuthService(
 		sessionTTL:   sessionTTL,
 		logger:       logger,
 	}
+}
+
+// WithMFA enables login step-up. Without it, Login keeps its previous behaviour.
+func (s *AuthService) WithMFA(v MFAVerifier) *AuthService {
+	s.mfa = v
+	return s
 }
 
 // RegisterUser creates a new user account, issues tokens, and sends verification email.
@@ -160,12 +188,79 @@ func (s *AuthService) Login(ctx context.Context, params LoginParams) (*LoginResu
 		return nil, common.ErrInvalidCredentials
 	}
 
+	// Step up before any token exists. Everything below this point — token pair,
+	// session row, last-login stamp — is the second half of a login and must not
+	// happen for a user who still owes a second factor.
+	if s.mfa != nil {
+		enabled, err := s.mfa.IsEnabled(ctx, user.ID)
+		if err != nil {
+			// Failing open here would silently disable MFA for everyone the moment
+			// the MFA table became unreadable.
+			return nil, fmt.Errorf("could not determine MFA status: %w", err)
+		}
+		if enabled {
+			challenge, _, err := s.tokenManager.GenerateMFAChallengeToken(
+				user.ID.String(), user.Email, user.Username, user.Role)
+			if err != nil {
+				return nil, err
+			}
+			return &LoginResult{
+				User:        user,
+				MFARequired: true,
+				MFAToken:    challenge,
+			}, nil
+		}
+	}
+
+	return s.completeLogin(ctx, user, params.Metadata)
+}
+
+// CompleteMFALogin finishes a login that was challenged, after the second factor
+// has been verified.
+//
+// Separate from Login so there is exactly one code path that mints tokens, and
+// it is only reachable once a factor has been checked.
+func (s *AuthService) CompleteMFALogin(ctx context.Context, challengeToken, code, recoveryCode string, meta SessionMetadata) (*LoginResult, error) {
+	if s.mfa == nil {
+		return nil, errors.New("MFA is not configured")
+	}
+
+	claims, err := s.tokenManager.ValidateMFAChallengeToken(challengeToken)
+	if err != nil {
+		return nil, common.ErrInvalidCredentials
+	}
+
+	userID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return nil, common.ErrInvalidCredentials
+	}
+
+	if err := s.mfa.VerifyForLogin(ctx, userID, code, recoveryCode); err != nil {
+		return nil, err
+	}
+
+	// Re-read the user rather than trusting the claims: the account may have been
+	// deactivated during the challenge window.
+	user, err := s.repo.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !user.IsActive {
+		return nil, ErrAccountInactive
+	}
+
+	return s.completeLogin(ctx, user, meta)
+}
+
+// completeLogin issues the token pair and records the session. The only place
+// that mints login tokens.
+func (s *AuthService) completeLogin(ctx context.Context, user *repository.User, meta SessionMetadata) (*LoginResult, error) {
 	tokens, err := s.tokenManager.GenerateTokenPair(user.ID.String(), user.Email, user.Username, user.Role)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.createSession(ctx, user.ID, tokens.RefreshToken, params.Metadata); err != nil {
+	if err := s.createSession(ctx, user.ID, tokens.RefreshToken, meta); err != nil {
 		return nil, err
 	}
 

@@ -1,7 +1,9 @@
 package service
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -15,7 +17,32 @@ type TokenManager interface {
 	GenerateTokenPair(userID, email, username, role string) (*TokenPair, error)
 	ValidateAccessToken(tokenString string) (*Claims, error)
 	ValidateRefreshToken(tokenString string) (*Claims, error)
+
+	// GenerateMFAChallengeToken issues the short-lived token that stands in for a
+	// half-completed login: the password was correct, the second factor is not in
+	// yet. It grants no API access.
+	GenerateMFAChallengeToken(userID, email, username, role string) (string, time.Time, error)
+	ValidateMFAChallengeToken(tokenString string) (*Claims, error)
 }
+
+const (
+	// purposeAccess and purposeMFAChallenge tag what a token is for.
+	//
+	// Defence in depth only: challenge tokens are signed with a different key, so
+	// cross-use is already cryptographically impossible. The claim makes a
+	// mistake visible rather than merely ineffective.
+	purposeAccess       = "access"
+	purposeMFAChallenge = "mfa_challenge"
+
+	// mfaChallengeTTL is how long the user has to enter their code. Long enough
+	// to pick up a phone, short enough that a leaked challenge token is close to
+	// worthless.
+	mfaChallengeTTL = 5 * time.Minute
+
+	// mfaChallengeKeyLabel domain-separates the derived challenge signing key from
+	// the access secret it is derived from.
+	mfaChallengeKeyLabel = "loci/mfa-challenge-token/v1"
+)
 
 type jwtTokenManager struct {
 	accessTokenSecret  []byte
@@ -38,6 +65,12 @@ type Claims struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+
+	// Purpose distinguishes an access token from an MFA challenge token. Empty on
+	// tokens issued before MFA existed, which are still valid access tokens —
+	// requiring it would sign out every current session on deploy.
+	Purpose string `json:"purpose,omitempty"`
+
 	jwt.RegisteredClaims
 }
 
@@ -63,6 +96,7 @@ func (tm *jwtTokenManager) GenerateTokenPair(userID, email, username, role strin
 		Email:    email,
 		Username: username,
 		Role:     role,
+		Purpose:  purposeAccess,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(accessExpiresAt),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -107,7 +141,72 @@ func (tm *jwtTokenManager) GenerateTokenPair(userID, email, username, role strin
 
 // ValidateAccessToken validates an access token and returns claims
 func (tm *jwtTokenManager) ValidateAccessToken(tokenString string) (*Claims, error) {
-	return tm.validateToken(tokenString, tm.accessTokenSecret)
+	claims, err := tm.validateToken(tokenString, tm.accessTokenSecret)
+	if err != nil {
+		return nil, err
+	}
+
+	// An MFA challenge token must never open the API. It is signed with a
+	// different key so it cannot reach this point, but a future refactor that
+	// merged the keys would silently turn a half-login into a full one.
+	if claims.Purpose != "" && claims.Purpose != purposeAccess {
+		return nil, errors.New("token is not an access token")
+	}
+	return claims, nil
+}
+
+// GenerateMFAChallengeToken issues a token that proves only that the password
+// step was passed.
+func (tm *jwtTokenManager) GenerateMFAChallengeToken(userID, email, username, role string) (string, time.Time, error) {
+	now := time.Now()
+	expiresAt := now.Add(mfaChallengeTTL)
+
+	claims := &Claims{
+		UserID:   userID,
+		Email:    email,
+		Username: username,
+		Role:     role,
+		Purpose:  purposeMFAChallenge,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			ID:        uuid.New().String(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := token.SignedString(tm.mfaChallengeSecret())
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return signed, expiresAt, nil
+}
+
+// ValidateMFAChallengeToken validates a challenge token from VerifyMFA.
+func (tm *jwtTokenManager) ValidateMFAChallengeToken(tokenString string) (*Claims, error) {
+	claims, err := tm.validateToken(tokenString, tm.mfaChallengeSecret())
+	if err != nil {
+		return nil, err
+	}
+
+	// Symmetric to ValidateAccessToken: only a challenge token completes a login.
+	if claims.Purpose != purposeMFAChallenge {
+		return nil, errors.New("token is not an MFA challenge token")
+	}
+	return claims, nil
+}
+
+// mfaChallengeSecret derives the challenge signing key from the access secret.
+//
+// Derived rather than configured so MFA cannot be deployed with a missing or
+// weak third secret. HMAC with a fixed label gives a key that is independent of
+// the access secret in practice: a challenge token cannot be verified as an
+// access token, or vice versa, even though only one secret is configured.
+func (tm *jwtTokenManager) mfaChallengeSecret() []byte {
+	mac := hmac.New(sha256.New, tm.accessTokenSecret)
+	mac.Write([]byte(mfaChallengeKeyLabel))
+	return mac.Sum(nil)
 }
 
 // ValidateRefreshToken validates a refresh token and returns claims
