@@ -165,6 +165,24 @@ func (m *MockPOIRepository) SavePoi(ctx context.Context, poi locitypes.POIDetail
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
+func (m *MockPOIRepository) UpsertPOIByIdentity(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, bool, error) {
+	args := m.Called(ctx, poi, cityID)
+	return args.Get(0).(uuid.UUID), args.Bool(1), args.Error(2)
+}
+
+// PersistGeneratedPOIs is called on the LLM search fallback. It is best-effort by
+// design, so the mock stays permissive: tests that do not care about POI identity
+// should not have to set an expectation for it.
+func (m *MockPOIRepository) PersistGeneratedPOIs(ctx context.Context, pois []locitypes.POIDetailedInfo, cityID uuid.UUID) PersistResult {
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "PersistGeneratedPOIs" {
+			args := m.Called(ctx, pois, cityID)
+			return args.Get(0).(PersistResult)
+		}
+	}
+	return PersistResult{}
+}
+
 func (m *MockPOIRepository) FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error) {
 	args := m.Called(ctx, name, cityID)
 	if args.Get(0) == nil {

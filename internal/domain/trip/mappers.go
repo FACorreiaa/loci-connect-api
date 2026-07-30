@@ -65,15 +65,37 @@ func tripFromProto(p *tripv1.TripDraft, uid uuid.UUID) (*Trip, error) {
 		t.SourceSessionID = &s
 	}
 	for _, pd := range p.GetDays() {
-		d := TripDay{DayNumber: pd.GetDayNumber()}
+		d := TripDay{
+			DayNumber: pd.GetDayNumber(),
+			CityName:  pd.GetCityName(),
+			TravelDay: pd.GetTravelDay(),
+		}
 		if pd.Date != nil {
 			dt := pd.GetDate().AsTime()
 			d.Date = &dt
+		}
+		// A malformed city id is not worth failing the whole save over — the day
+		// keeps its name and loses only the link.
+		if pd.CityId != nil && pd.GetCityId() != "" {
+			if cid, err := uuid.Parse(pd.GetCityId()); err == nil {
+				d.CityID = &cid
+			}
+		}
+		if pd.CityLat != nil {
+			lat := pd.GetCityLat()
+			d.CityLat = &lat
+		}
+		if pd.CityLon != nil {
+			lon := pd.GetCityLon()
+			d.CityLon = &lon
 		}
 		for _, ps := range pd.GetStops() {
 			d.Stops = append(d.Stops, stopFromProto(ps))
 		}
 		t.Days = append(t.Days, d)
+	}
+	for _, pl := range p.GetLegs() {
+		t.Legs = append(t.Legs, legFromProto(pl))
 	}
 	return t, nil
 }
@@ -123,7 +145,18 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 		p.SourceSessionId = t.SourceSessionID
 	}
 	for _, d := range t.Days {
-		pd := &tripv1.TripDay{Id: d.ID.String(), DayNumber: d.DayNumber}
+		pd := &tripv1.TripDay{
+			Id:        d.ID.String(),
+			DayNumber: d.DayNumber,
+			CityName:  d.CityName,
+			TravelDay: d.TravelDay,
+			CityLat:   d.CityLat,
+			CityLon:   d.CityLon,
+		}
+		if d.CityID != nil {
+			cid := d.CityID.String()
+			pd.CityId = &cid
+		}
 		if d.Date != nil {
 			pd.Date = timestamppb.New(*d.Date)
 		}
@@ -143,7 +176,69 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 		}
 		p.Days = append(p.Days, pd)
 	}
+	for _, l := range t.Legs {
+		p.Legs = append(p.Legs, legToProto(l))
+	}
 	return p
+}
+
+// legFromProto / legToProto convert travel between cities. The proto id is
+// ignored on the way in: legs are replace-all on save, so the database assigns
+// identity.
+func legFromProto(pl *tripv1.TripLeg) TripLeg {
+	l := TripLeg{
+		AfterDay:     pl.GetAfterDay(),
+		FromName:     pl.GetFromName(),
+		ToName:       pl.GetToName(),
+		DistanceKm:   pl.GetDistanceKm(),
+		DurationMins: pl.GetDurationMins(),
+		Mode:         pl.GetMode(),
+		BookingURL:   pl.BookingUrl,
+	}
+	if l.Mode == "" {
+		l.Mode = "drive"
+	}
+	// Coordinates are plain doubles on the wire; zero means "not supplied", and
+	// 0,0 is in the Atlantic, so treating it as absent is safe.
+	if lat := pl.GetFromLat(); lat != 0 {
+		l.FromLat = &lat
+	}
+	if lon := pl.GetFromLon(); lon != 0 {
+		l.FromLon = &lon
+	}
+	if lat := pl.GetToLat(); lat != 0 {
+		l.ToLat = &lat
+	}
+	if lon := pl.GetToLon(); lon != 0 {
+		l.ToLon = &lon
+	}
+	return l
+}
+
+func legToProto(l TripLeg) *tripv1.TripLeg {
+	pl := &tripv1.TripLeg{
+		Id:           l.ID.String(),
+		AfterDay:     l.AfterDay,
+		FromName:     l.FromName,
+		ToName:       l.ToName,
+		DistanceKm:   l.DistanceKm,
+		DurationMins: l.DurationMins,
+		Mode:         l.Mode,
+		BookingUrl:   l.BookingURL,
+	}
+	if l.FromLat != nil {
+		pl.FromLat = *l.FromLat
+	}
+	if l.FromLon != nil {
+		pl.FromLon = *l.FromLon
+	}
+	if l.ToLat != nil {
+		pl.ToLat = *l.ToLat
+	}
+	if l.ToLon != nil {
+		pl.ToLon = *l.ToLon
+	}
+	return pl
 }
 
 func stopFromProto(ps *tripv1.TripStop) TripStop {

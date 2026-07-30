@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -24,6 +25,13 @@ type Handler struct {
 	baseURL string
 	prefs   preference.Recorder
 	plans   PlanChecker
+
+	// Optional, attached via WithPacking and used only by SuggestPacking. Nil is
+	// supported: the packing list then carries no weather-driven items rather
+	// than guessed ones.
+	weather          WeatherSource
+	weatherEstimated bool
+	log              *slog.Logger
 }
 
 // PlanChecker resolves effective subscription plan for export gating.

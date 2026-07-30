@@ -30,6 +30,13 @@ var _ Repository = (*RepositoryImpl)(nil)
 
 type Repository interface {
 	SavePoi(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
+	// UpsertPOIByIdentity resolves a POI to a stable persisted row, so a place
+	// found by search can be reviewed, saved and listed. See poi_identity.go.
+	// The bool reports whether the row was created, so callers can embed each
+	// place once rather than on every repeat search.
+	UpsertPOIByIdentity(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, bool, error)
+	// PersistGeneratedPOIs gives a batch stable ids in place.
+	PersistGeneratedPOIs(ctx context.Context, pois []locitypes.POIDetailedInfo, cityID uuid.UUID) PersistResult
 	FindPoiByNameAndCity(ctx context.Context, name string, cityID uuid.UUID) (*locitypes.POIDetailedInfo, error)
 	// GetPOIsByNamesAndCitySortedByDistance(ctx context.Context, names []string, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
 	GetPOIsByCityAndDistance(ctx context.Context, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
@@ -628,7 +635,10 @@ func (r *RepositoryImpl) GetPOIByID(ctx context.Context, poiID uuid.UUID) (*loci
 			COALESCE(average_rating, 0) AS rating,
 			city_id,
 			COALESCE(tags, '{}') AS tags,
-			COALESCE(images, '{}') AS images,
+			-- points_of_interest has no images column (poi_details does), so this
+			-- selected a column that does not exist and GetPOI failed for every
+			-- POI with a missing-column error.
+			'{}'::text[] AS images,
 			created_at
 		FROM points_of_interest
 		WHERE id = $1

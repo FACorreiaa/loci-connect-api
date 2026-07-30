@@ -1,23 +1,11 @@
 package compare
 
-import "math"
+import "github.com/FACorreiaa/loci-connect-api/pkg/geo"
 
-// HaversineKm returns the great-circle distance in kilometers.
-func HaversineKm(lat1, lon1, lat2, lon2 float64) float64 {
-	const r = 6371.0
-	toRad := func(d float64) float64 { return d * math.Pi / 180.0 }
-	dLat := toRad(lat2 - lat1)
-	dLon := toRad(lon2 - lon1)
-	sinLat := math.Sin(dLat / 2)
-	sinLon := math.Sin(dLon / 2)
-	a := sinLat*sinLat + math.Cos(toRad(lat1))*math.Cos(toRad(lat2))*sinLon*sinLon
-	return 2 * r * math.Asin(math.Min(1, math.Sqrt(a)))
-}
-
-// DriveMins estimates road travel time at ~80 km/h average.
-func DriveMins(distanceKm float64) int {
-	if distanceKm <= 0 {
-		return 0
-	}
-	return int(distanceKm / 80.0 * 60.0)
-}
+// These are thin aliases so existing compare code (and its tests) keep reading
+// naturally. The implementations live in pkg/geo because the go/no-go scorer in
+// localcontext needs them too, and compare already imports localcontext.
+var (
+	HaversineKm = geo.HaversineKm
+	DriveMins   = geo.DriveMins
+)

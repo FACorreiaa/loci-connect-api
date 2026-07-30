@@ -43,9 +43,9 @@ func (h *Handler) CompareWeekend(
 		}
 	}
 
-	allow3, allowDual := EntitlementsForUser(ctx, h.svc.plans, uid)
-	if len(candidates) > 2 && !allow3 {
-		candidates = candidates[:2]
+	ent := EntitlementsForUser(ctx, h.svc.plans, uid)
+	if len(candidates) > ent.MaxCandidates {
+		candidates = candidates[:ent.MaxCandidates]
 	}
 
 	start := req.Msg.GetStartDate().AsTime()
@@ -59,8 +59,8 @@ func (h *Handler) CompareWeekend(
 		Start:              start,
 		End:                end,
 		UserID:             uid,
-		Allow3Candidates:   allow3,
-		AllowDualCity:      allowDual,
+		Allow3Candidates:   ent.MaxCandidates > FreeMaxCandidates,
+		AllowDualCity:      ent.AllowMultiCity,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("compare: %w", err))
