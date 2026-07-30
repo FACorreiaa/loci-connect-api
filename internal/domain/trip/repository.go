@@ -61,6 +61,34 @@ type TripDay struct {
 	DayNumber int32
 	Date      *time.Time
 	Stops     []TripStop
+
+	// Which city this day is spent in. Empty means the trip's primary city,
+	// which is how every single-city trip looks.
+	CityID    *uuid.UUID
+	CityName  string
+	CityLat   *float64
+	CityLon   *float64
+	TravelDay bool
+}
+
+// TripLeg is travel between two consecutive cities in a multi-city trip.
+//
+// AfterDay is the day number at whose end the journey happens (0 = the outbound
+// leg from home). It is a plain number rather than a day FK so a leg survives
+// days being renumbered mid-edit.
+type TripLeg struct {
+	ID           uuid.UUID
+	AfterDay     int32
+	FromName     string
+	ToName       string
+	FromLat      *float64
+	FromLon      *float64
+	ToLat        *float64
+	ToLon        *float64
+	DistanceKm   float64
+	DurationMins int32
+	Mode         string
+	BookingURL   *string
 }
 
 // Trip is the full editable trip aggregate.
@@ -72,6 +100,8 @@ type Trip struct {
 	Title           string
 	Constraints     TripConstraint
 	Days            []TripDay
+	// Legs is travel between the trip's cities. Empty for a single-city trip.
+	Legs            []TripLeg
 	Version         int64
 	SourceSessionID *string
 	IsPublic        bool
@@ -216,8 +246,10 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	for di := range t.Days {
 		day := &t.Days[di]
 		if err := tx.QueryRow(ctx, `
-			INSERT INTO trip_days (trip_id, day_number, date) VALUES ($1, $2, $3) RETURNING id`,
-			t.ID, day.DayNumber, day.Date).Scan(&day.ID); err != nil {
+			INSERT INTO trip_days (trip_id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+			t.ID, day.DayNumber, day.Date,
+			day.CityID, day.CityName, day.CityLat, day.CityLon, day.TravelDay).Scan(&day.ID); err != nil {
 			return nil, fmt.Errorf("insert day: %w", err)
 		}
 		for si := range day.Stops {
@@ -233,6 +265,23 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 				Scan(&s.ID); err != nil {
 				return nil, fmt.Errorf("insert stop: %w", err)
 			}
+		}
+	}
+
+	// Legs, replace-all like days for the same reason: trip-sized data, and a
+	// partial update is not worth the bookkeeping.
+	if _, err := tx.Exec(ctx, `DELETE FROM trip_legs WHERE trip_id = $1`, t.ID); err != nil {
+		return nil, fmt.Errorf("clear legs: %w", err)
+	}
+	for li := range t.Legs {
+		leg := &t.Legs[li]
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO trip_legs (trip_id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
+				distance_km, duration_mins, mode, booking_url)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+			t.ID, leg.AfterDay, leg.FromName, leg.ToName, leg.FromLat, leg.FromLon, leg.ToLat, leg.ToLon,
+			leg.DistanceKm, leg.DurationMins, leg.Mode, leg.BookingURL).Scan(&leg.ID); err != nil {
+			return nil, fmt.Errorf("insert leg: %w", err)
 		}
 	}
 
@@ -266,10 +315,39 @@ func (r *repository) SetShare(ctx context.Context, id, userID uuid.UUID, isPubli
 	return r.GetTrip(ctx, id, userID)
 }
 
-// loadDays populates t.Days and their stops, ordered.
+// loadLegs populates t.Legs, ordered along the route.
+func (r *repository) loadLegs(ctx context.Context, t *Trip) error {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
+		       distance_km, duration_mins, mode, booking_url
+		FROM trip_legs WHERE trip_id = $1 ORDER BY after_day, created_at`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load legs: %w", err)
+	}
+	defer rows.Close()
+
+	t.Legs = nil
+	for rows.Next() {
+		var l TripLeg
+		if err := rows.Scan(&l.ID, &l.AfterDay, &l.FromName, &l.ToName,
+			&l.FromLat, &l.FromLon, &l.ToLat, &l.ToLon,
+			&l.DistanceKm, &l.DurationMins, &l.Mode, &l.BookingURL); err != nil {
+			return fmt.Errorf("scan leg: %w", err)
+		}
+		t.Legs = append(t.Legs, l)
+	}
+	return rows.Err()
+}
+
+// loadDays populates t.Days and their stops, ordered, plus the legs between
+// cities — a multi-city trip is not complete without them.
 func (r *repository) loadDays(ctx context.Context, t *Trip) error {
+	if err := r.loadLegs(ctx, t); err != nil {
+		return err
+	}
 	dayRows, err := r.db.Query(ctx, `
-		SELECT id, day_number, date FROM trip_days WHERE trip_id = $1 ORDER BY day_number`, t.ID)
+		SELECT id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day
+		FROM trip_days WHERE trip_id = $1 ORDER BY day_number`, t.ID)
 	if err != nil {
 		return fmt.Errorf("load days: %w", err)
 	}
@@ -279,7 +357,8 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 	t.Days = nil
 	for dayRows.Next() {
 		var d TripDay
-		if err := dayRows.Scan(&d.ID, &d.DayNumber, &d.Date); err != nil {
+		if err := dayRows.Scan(&d.ID, &d.DayNumber, &d.Date,
+			&d.CityID, &d.CityName, &d.CityLat, &d.CityLon, &d.TravelDay); err != nil {
 			return fmt.Errorf("scan day: %w", err)
 		}
 		t.Days = append(t.Days, d)

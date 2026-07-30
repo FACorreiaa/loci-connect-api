@@ -529,9 +529,12 @@ func (r *RepositoryImpl) SearchCitiesByName(ctx context.Context, query string, l
             ST_Y(center_location) as center_latitude,
             ST_X(center_location) as center_longitude
         FROM cities
-        WHERE $1 = '' OR name ILIKE '%' || $1 || '%' OR country ILIKE '%' || $1 || '%'
+        -- The explicit ::text casts matter: without them Postgres cannot infer
+        -- the parameter type from the bare equality alone, and the empty-query
+        -- "browse all" branch silently matched nothing.
+        WHERE $1::text = '' OR name ILIKE '%' || $1::text || '%' OR country ILIKE '%' || $1::text || '%'
         ORDER BY
-            CASE WHEN name ILIKE $1 || '%' THEN 0 ELSE 1 END,
+            CASE WHEN name ILIKE $1::text || '%' THEN 0 ELSE 1 END,
             name ASC
         LIMIT $2
     `

@@ -187,7 +187,8 @@ func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query, cityN
 
 		span.AddEvent("fallback_to_llm")
 
-		// Generate POIs using LLM
+		// Generate POIs using LLM. These come back with throwaway ids, so they get
+		// persisted below before anyone sees them.
 		llmPOIs, err := s.generatePOIsWithLLM(ctx, query, cityName)
 		if err != nil {
 			l.ErrorContext(ctx, "Failed to generate POIs with LLM",
@@ -207,6 +208,13 @@ func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query, cityN
 			attribute.Int("llm_results.count", len(llmPOIs)),
 			attribute.String("source", "llm"),
 		)
+
+		// Give them stable identities before returning. Without this the ids are
+		// regenerated on every search: the same place comes back with a different
+		// uuid each time, GetPOI fails for all of them, and nothing keyed on
+		// poi_id — reviews, saves, favourites, list items — can attach to a place
+		// the user can actually see.
+		s.persistGeneratedPOIs(ctx, llmPOIs, cityName)
 
 		// Track search (async, don't fail on error)
 		if s.discoverRepo != nil {

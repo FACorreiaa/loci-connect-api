@@ -280,3 +280,57 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 		assert.InDelta(t, *city.CenterLongitude, *foundCity.CenterLongitude, 0.000001)
 	})
 }
+
+// SearchCitiesByName backs the client's city picker. The empty-query case is the
+// "browse" path the picker uses on mount, and it silently returned nothing —
+// worth pinning, because a search box that works but a browse list that does not
+// looks like there is no data at all.
+func TestCityRepository_SearchCitiesByName_Integration(t *testing.T) {
+	clearCityTables(t)
+	ctx := context.Background()
+
+	for _, c := range []locitypes.CityDetail{
+		{Name: "TestCityAlfa", Country: "Portugal", CenterLatitude: f64(38.7), CenterLongitude: f64(-9.1)},
+		{Name: "TestCityBravo", Country: "Spain", CenterLatitude: f64(40.4), CenterLongitude: f64(-3.7)},
+		{Name: "TestCityCharlie", Country: "France", CenterLatitude: f64(48.8), CenterLongitude: f64(2.3)},
+	} {
+		_, err := testCityRepo.SaveCity(ctx, c)
+		require.NoError(t, err)
+	}
+
+	t.Run("empty query browses", func(t *testing.T) {
+		got, err := testCityRepo.SearchCitiesByName(ctx, "", 50)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(got), 3, "an empty query must list cities, not nothing")
+	})
+
+	t.Run("matches on name", func(t *testing.T) {
+		got, err := testCityRepo.SearchCitiesByName(ctx, "Bravo", 50)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.Equal(t, "TestCityBravo", got[0].Name)
+	})
+
+	t.Run("matches on country", func(t *testing.T) {
+		got, err := testCityRepo.SearchCitiesByName(ctx, "Spain", 50)
+		require.NoError(t, err)
+		names := make([]string, 0, len(got))
+		for _, c := range got {
+			names = append(names, c.Name)
+		}
+		assert.Contains(t, names, "TestCityBravo")
+	})
+
+	t.Run("prefix matches sort first", func(t *testing.T) {
+		got, err := testCityRepo.SearchCitiesByName(ctx, "TestCity", 50)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(got), 3)
+		assert.Equal(t, "TestCityAlfa", got[0].Name, "alphabetical within the prefix bucket")
+	})
+
+	t.Run("honours the limit", func(t *testing.T) {
+		got, err := testCityRepo.SearchCitiesByName(ctx, "TestCity", 2)
+		require.NoError(t, err)
+		assert.Len(t, got, 2)
+	})
+}

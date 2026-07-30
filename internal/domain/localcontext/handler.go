@@ -17,6 +17,11 @@ type Handler struct {
 	weather   WeatherAdapter
 	estimated bool // true when the weather source is a stub/placeholder
 	logger    *slog.Logger
+
+	// Optional, attached via WithScoring, and only used by GetGoScore. Nil is a
+	// supported state: the score then answers from coordinates alone.
+	cities CityResolver
+	pois   POICounter
 }
 
 // NewHandler builds the handler. `estimated` should be true when `weather` is a

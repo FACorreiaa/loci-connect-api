@@ -26,15 +26,15 @@ type PlanChecker interface {
 
 // Service compares weekend city candidates.
 type Service struct {
-	cities    cityrepo.Repository
-	pois      poirepo.Service
-	weather   localcontext.WeatherAdapter
-	transport localcontext.StubTransportWithDrive
-	booking   localcontext.BookingComDeepLink
-	dining    localcontext.OpenTableDeepLink
+	cities     cityrepo.Repository
+	pois       poirepo.Service
+	weather    localcontext.WeatherAdapter
+	transport  localcontext.StubTransportWithDrive
+	booking    localcontext.BookingComDeepLink
+	dining     localcontext.OpenTableDeepLink
 	weatherEst bool
-	logger    *slog.Logger
-	plans     PlanChecker
+	logger     *slog.Logger
+	plans      PlanChecker
 }
 
 func NewService(
@@ -62,13 +62,13 @@ func NewService(
 }
 
 type CompareInput struct {
-	OriginCity     string
-	OriginLat      float64
-	OriginLon      float64
-	Candidates     []string
-	Start          time.Time
-	End            time.Time
-	UserID         uuid.UUID
+	OriginCity       string
+	OriginLat        float64
+	OriginLon        float64
+	Candidates       []string
+	Start            time.Time
+	End              time.Time
+	UserID           uuid.UUID
 	Allow3Candidates bool
 	AllowDualCity    bool
 }
@@ -108,16 +108,23 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 		return nil, fmt.Errorf("need at least 2 resolvable candidate cities")
 	}
 
-	feasible, outline, totalMins := dualCityFeasible(originLat, originLon, resolved, windowHours)
+	// Plan a route through however many cities fit the window. Two-in-a-weekend
+	// is just the smallest case of this, so the same planner answers both.
+	route := s.planRoute(originName, originLat, originLon, resolved, in)
+	resp.MultiCityPlan = toMultiCityPlanProto(route, resolved, in.AllowDualCity)
+
+	// DualCityOption is retained for clients that have not moved to
+	// MultiCityPlan yet. It describes the same route, narrowed to a yes/no.
 	resp.DualCityOption = &comparev1.DualCityOption{
-		Feasible:        feasible && in.AllowDualCity,
-		Outline:         outline,
-		TotalTravelMins: int32(totalMins),
+		Feasible:        route.Feasible && len(route.Cities) >= 2 && in.AllowDualCity,
+		Outline:         route.Outline,
+		TotalTravelMins: int32(route.TotalTravelMins),
 		ProOnly:         !in.AllowDualCity,
 	}
-	if !in.AllowDualCity && feasible {
-		resp.DualCityOption.Outline = outline + " (Pro: unlock dual-city outline export)"
+	if !in.AllowDualCity && route.Feasible && len(route.Cities) >= 2 {
+		resp.DualCityOption.Outline = route.Outline + " (Pro: unlock the multi-city outline export)"
 	}
+	feasible := route.Feasible && len(route.Cities) >= 2
 
 	_, reason := pickRecommendation(scores)
 	resp.RecommendationReason = reason
@@ -129,7 +136,11 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 	}
 	if feasible && in.AllowDualCity && scores[0].score-scores[1].score < 3 {
 		resp.Recommendation = comparev1.CompareRecommendation_COMPARE_RECOMMENDATION_BOTH
-		resp.RecommendationReason = "Both cities are close enough for a split weekend"
+		if n := len(route.Cities); n > 2 {
+			resp.RecommendationReason = fmt.Sprintf("All %d fit the window: %s", n, route.Outline)
+		} else {
+			resp.RecommendationReason = "Both cities are close enough to combine in this window"
+		}
 	}
 
 	return resp, nil
@@ -197,6 +208,18 @@ func (s *Service) buildColumn(
 	pros, cons := buildProsCons(city.Name, pois, distKm, travelMins, weatherClear)
 	score := scoreColumn(len(pois), distKm, weatherClear)
 
+	// The go/no-go judgement, computed from the same inputs this column already
+	// shows. Same function as the standalone GetGoScore RPC, so the number a
+	// user sees on /compare matches the one they get anywhere else.
+	goScore := localcontext.Score(localcontext.ScoreInput{
+		CityName:         city.Name,
+		Forecast:         fc,
+		WeatherEstimated: s.weatherEst,
+		TravelMins:       travelMins,
+		WindowHours:      windowHours,
+		POICount:         len(pois),
+	})
+
 	col := &comparev1.CityCompareColumn{
 		CityName:           city.Name,
 		CityId:             city.ID.String(),
@@ -208,6 +231,7 @@ func (s *Service) buildColumn(
 		WeatherIsEstimated: s.weatherEst,
 		Pros:               pros,
 		Cons:               cons,
+		GoScore:            localcontext.ToGoScoreProto(goScore),
 		StaySnippet:        fmt.Sprintf("Search stays in %s center", city.Name),
 		EatSnippet:         fmt.Sprintf("Reserve tables in %s", city.Name),
 		BookingOptions: []*comparev1.BookingLink{
@@ -244,7 +268,15 @@ func (s *Service) buildColumn(
 		col.TransportOptions = append(col.TransportOptions, link)
 	}
 
-	return col, score, resolvedCity{name: city.Name, lat: lat, lon: lon}, nil
+	return col, score, resolvedCity{
+		id:       city.ID.String(),
+		name:     city.Name,
+		lat:      lat,
+		lon:      lon,
+		goScore:  goScore.Score,
+		poiCount: len(pois),
+		scorePB:  col.GoScore,
+	}, nil
 }
 
 func ptr(s string) *string { return &s }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
+
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -89,35 +91,16 @@ func scoreColumn(poiCount int, distanceKm float64, weatherClear bool) float64 {
 	return score
 }
 
-func dualCityFeasible(originLat, originLon float64, cols []resolvedCity, windowHours float64) (bool, string, int) {
-	if len(cols) < 2 {
-		return false, "", 0
-	}
-	a, b := cols[0], cols[1]
-	interKm := HaversineKm(a.lat, a.lon, b.lat, b.lon)
-	leg1 := HaversineKm(originLat, originLon, a.lat, a.lon)
-	leg2 := interKm
-	leg3 := HaversineKm(b.lat, b.lon, originLat, originLon)
-	totalKm := leg1 + leg2 + leg3
-	totalMins := DriveMins(totalKm) + 60 // buffer for stops
-
-	maxDrive := windowHours * 0.35 * 60 // ~35% of window for driving
-	feasible := totalMins <= int(maxDrive) && interKm <= 180
-	outline := fmt.Sprintf(
-		"Day 1: %s (stay overnight nearby). Day 2: %s, then return. ~%d min total driving.",
-		a.name, b.name, totalMins,
-	)
-	if !feasible {
-		outline = fmt.Sprintf(
-			"Tight for one weekend: ~%.0f km and ~%d min driving between %s and %s. Pick one or extend the trip.",
-			totalKm, totalMins, a.name, b.name,
-		)
-	}
-	return feasible, outline, totalMins
-}
-
 type resolvedCity struct {
+	id   string
 	name string
 	lat  float64
 	lon  float64
+	// goScore is the city's 0-100 verdict, and poiCount how much there is to do.
+	// The multi-city planner uses both: the score to decide which cities survive
+	// when they do not all fit, the count to warn about days that outrun the
+	// places we know.
+	goScore  int
+	poiCount int
+	scorePB  *lcv1.GoScore
 }

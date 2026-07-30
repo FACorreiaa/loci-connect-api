@@ -348,6 +348,8 @@ func (d *Dependencies) initHandlers() error {
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
+	// SuggestPacking is wired below, once the weather adapter exists — a packing
+	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
@@ -362,7 +364,18 @@ func (d *Dependencies) initHandlers() error {
 		weather = localcontext.NewOpenWeatherAdapter(weatherKey)
 		weatherEst = false
 	}
-	d.LocalContextHandler = localcontext.NewHandler(weather, weatherEst, d.Logger)
+	// WithScoring lights up GetGoScore ("should I go this weekend?"). Without it
+	// the handler still serves weather; with it the score can resolve a city by
+	// name and factor in how much there is to do there.
+	d.LocalContextHandler = localcontext.
+		NewHandler(weather, weatherEst, d.Logger).
+		WithScoring(d.CityRepo, d.POISvc)
+
+	// Give the trip handler the same forecast source, so a packing list can be
+	// derived from the trip's actual weather rather than generic advice.
+	if d.TripHandler != nil {
+		d.TripHandler = d.TripHandler.WithPacking(weather, weatherEst).WithLogger(d.Logger)
+	}
 
 	bookingDL := localcontext.NewBookingComDeepLinkFromEnv()
 	diningDL := localcontext.NewOpenTableDeepLinkFromEnv()
