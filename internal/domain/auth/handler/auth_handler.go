@@ -21,6 +21,10 @@ type AuthHandler struct {
 	authconnect.UnimplementedAuthServiceHandler
 	service *service.AuthService
 	logger  *slog.Logger
+
+	// mfa is nil when MFA is not configured; the MFA RPCs then report
+	// Unimplemented instead of panicking on a nil dependency.
+	mfa MFAService
 }
 
 // NewAuthHandler constructs a new handler.

@@ -102,6 +102,14 @@ type AuthConfig struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	AdminEmail      string
+
+	// MFASecretKey encrypts TOTP secrets at rest. Must be exactly 32 bytes.
+	// Empty disables MFA entirely rather than storing secrets in plaintext —
+	// see internal/domain/mfa.
+	MFASecretKey string
+	// MFARequiredForRole is a comma-separated list of roles that cannot turn MFA
+	// off, e.g. "admin,owner". Empty means MFA is optional for everyone.
+	MFARequiredForRole string
 }
 
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
@@ -167,6 +175,9 @@ func Load() (*Config, error) {
 			AccessTokenTTL:   getEnvAsDuration("JWT_ACCESS_TOKEN_TTL", time.Hour),
 			RefreshTokenTTL:  getEnvAsDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
 			AdminEmail:       getEnv("ADMIN_EMAIL", ""),
+
+			MFASecretKey:       getEnv("MFA_SECRET_KEY", ""),
+			MFARequiredForRole: getEnv("MFA_REQUIRED_FOR_ROLE", ""),
 		},
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
