@@ -682,22 +682,28 @@ func (r *RepositoryImpl) GetPOIByID(ctx context.Context, poiID uuid.UUID) (*loci
 	}
 
 	return &locitypes.POIDetailedInfo{
-		ID:           row.ID,
-		Name:         row.Name,
-		Description:  row.Description,
-		Longitude:    row.Longitude,
-		Latitude:     row.Latitude,
-		Category:     row.Category,
-		Address:      row.Address,
-		Website:      row.Website,
-		PhoneNumber:  row.PhoneNumber,
-		OpeningHours: row.OpeningHours,
-		PriceLevel:   row.PriceLevel,
-		Rating:       row.Rating,
-		CityID:       row.CityID,
-		Tags:         row.Tags,
-		Images:       row.Images,
-		CreatedAt:    row.CreatedAt,
+		ID:   row.ID,
+		Name: row.Name,
+		// points_of_interest holds one description, and the two struct fields
+		// are used interchangeably across the codebase — 34 non-test call sites
+		// read DescriptionPOI. Populating only Description meant GetPOI returned
+		// a place whose description was invisible to most of its consumers, and
+		// to the description_poi field on the wire.
+		Description:    row.Description,
+		DescriptionPOI: row.Description,
+		Longitude:      row.Longitude,
+		Latitude:       row.Latitude,
+		Category:       row.Category,
+		Address:        row.Address,
+		Website:        row.Website,
+		PhoneNumber:    row.PhoneNumber,
+		OpeningHours:   row.OpeningHours,
+		PriceLevel:     row.PriceLevel,
+		Rating:         row.Rating,
+		CityID:         row.CityID,
+		Tags:           row.Tags,
+		Images:         row.Images,
+		CreatedAt:      row.CreatedAt,
 	}, nil
 }
 
