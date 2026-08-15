@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/health"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
@@ -51,6 +52,10 @@ func main() {
 	}
 	defer database.Close()
 
+	// Run records make these jobs observable. Until now a job that died and a
+	// job with nothing to do left identical evidence: none.
+	recorder := health.NewRecorder(database.Pool)
+
 	store := preference.NewVectorStore(database.Pool, logger)
 	job := preference.NewReranker(database.Pool, store, logger)
 	poiRepo := poi.NewRepository(database.Pool, logger)
@@ -70,16 +75,42 @@ func main() {
 
 	run := func() error {
 		if *embeddingBatch > 0 {
+			embeddingRun, startErr := recorder.Start(ctx, health.RunPOIEmbeddings)
+			if startErr != nil {
+				logger.Warn("could not open embedding run record", "error", startErr)
+			}
 			processed, failed, backfillErr := backfillPOIEmbeddings(
 				ctx, database.Pool, poiRepo, embeddingClient, *embeddingBatch, logger,
 			)
+			embeddingRun.ItemsSeen = processed + failed
+			embeddingRun.ItemsUpdated = processed
+			embeddingRun.ItemsFailed = failed
+			if failed > 0 {
+				embeddingRun.Warn("%d POIs could not be embedded", failed)
+			}
+			if finishErr := recorder.Finish(ctx, embeddingRun, backfillErr); finishErr != nil {
+				logger.Warn("could not close embedding run record", "error", finishErr)
+			}
 			if backfillErr != nil {
 				logger.Warn("POI embedding backfill failed", "error", backfillErr)
 			} else {
 				logger.Info("POI embedding backfill complete", "processed", processed, "failed", failed)
 			}
 		}
+
+		rerankRun, startErr := recorder.Start(ctx, health.RunPreferenceRank)
+		if startErr != nil {
+			logger.Warn("could not open rerank run record", "error", startErr)
+		}
 		stats, runErr := job.Run(ctx, *lookback)
+		rerankRun.ItemsSeen = stats.UsersConsidered
+		rerankRun.ItemsUpdated = stats.UsersUpdated
+		if stats.UsersSkipped > 0 {
+			rerankRun.Warn("%d users skipped", stats.UsersSkipped)
+		}
+		if finishErr := recorder.Finish(ctx, rerankRun, runErr); finishErr != nil {
+			logger.Warn("could not close rerank run record", "error", finishErr)
+		}
 		if runErr != nil {
 			return runErr
 		}

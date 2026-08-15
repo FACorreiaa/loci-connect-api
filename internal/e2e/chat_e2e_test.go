@@ -10,10 +10,10 @@ import (
 
 	"connectrpc.com/connect"
 
-	authv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	authv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
 )
 
 // TestChatE2E drives the full stack against a RUNNING server: register → login →

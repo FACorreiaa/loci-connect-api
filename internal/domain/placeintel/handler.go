@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	placev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
+	placev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"

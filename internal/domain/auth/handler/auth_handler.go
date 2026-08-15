@@ -6,9 +6,9 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	auth "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
-	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
+	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/presenter"

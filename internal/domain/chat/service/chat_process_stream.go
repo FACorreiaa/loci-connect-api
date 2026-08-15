@@ -42,9 +42,19 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 	cc.Domain = domainDetector.DetectDomain(ctx, cleanedMessage)
 
 	// 3. Fetch User Data & Preferences
-	_, searchProfile, _, err := l.FetchUserData(ctx, cc.UserID, cc.ProfileID)
+	interests, searchProfile, tags, err := l.FetchUserData(ctx, cc.UserID, cc.ProfileID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch user data: %w", err)
+	}
+	// FetchUserData queries three tables; two of those results used to be
+	// discarded here. getUserPreferencesPrompt has always been able to render
+	// interests and "Tags to Avoid" — those branches were simply unreachable
+	// because the profile it was handed never carried them. The repository does
+	// not join them (they live in user_profile_interests and the tag tables), so
+	// attaching them is the caller's job.
+	if searchProfile != nil {
+		searchProfile.Interests = interests
+		searchProfile.Tags = tags
 	}
 	cc.BasePreferences = getUserPreferencesPrompt(searchProfile)
 	personalizationEnabled := preference.ExperimentVariant(cc.UserID) != "control"
@@ -66,6 +76,14 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 			UserLon: *searchProfile.UserLongitude,
 		}
 	}
+
+	// 3b. Retrieve the evidence this turn may speak from.
+	//
+	// Runs before the prompt is built, because the whole point is that the model
+	// sees real rows rather than reconstructing places from memory. Best-effort:
+	// on failure cc.Packet stays nil and generation proceeds ungrounded, which is
+	// the behaviour that predates this step.
+	l.assembleEvidencePacket(cc)
 
 	// 4. Resume or create session.
 	// When the client sends a session_id we resume that session (appending the new
@@ -121,6 +139,12 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 		"message":     normalizeCacheComponent(cleanedMessage),
 		"domain":      string(cc.Domain),
 		"preferences": cc.BasePreferences,
+		// The packet is part of the prompt, so it is part of the cache identity.
+		// Without this a response generated before grounding — or against a
+		// different candidate set — would be replayed and then recorded against
+		// this turn's evidence, making the audit trail describe an answer that
+		// was never produced from it.
+		"packet_id": packetIDFor(cc),
 	}
 	cacheKeyBytes, err := json.Marshal(cacheKeyData)
 	if err != nil {
@@ -208,6 +232,12 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs",
 		slog.Int("total_unique_pois", len(allPOIs)))
 
+	// Check the answer against the evidence it was given, and strip any
+	// identifier the model invented. This must happen before persistResults
+	// reaches canonicalizePOIs, otherwise a fabricated UUID would be written to
+	// the database as though retrieval had produced it.
+	cc.Verification = l.verifyAndRecordGrounding(cc, data, rawResponses)
+
 	return data, nil
 }
 
@@ -278,33 +308,36 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 		})
 	}
 
-	// Spawn workers based on Domain
+	// Spawn workers based on Domain.
+	//
+	// Prompts that name places are grounded in the evidence packet; city_data
+	// describes the city itself and has nothing to cite, so it is left alone.
 	switch cc.Domain {
 	case locitypes.DomainItinerary, locitypes.DomainGeneral:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		runStreamWorker("general_pois", getGeneralPOIPrompt(cc.CityName), cc.CacheKey+"_general_pois")
-		runStreamWorker("itinerary", getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences), cc.CacheKey+"_itinerary")
+		runStreamWorker("general_pois", groundPrompt(getGeneralPOIPrompt(cc.CityName), cc.Packet), cc.CacheKey+"_general_pois")
+		runStreamWorker("itinerary", groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences), cc.Packet), cc.CacheKey+"_itinerary")
 	case locitypes.DomainAccommodation:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("hotels", getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_hotels")
+		runStreamWorker("hotels", groundPrompt(getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_hotels")
 	case locitypes.DomainDining:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("restaurants", getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_restaurants")
+		runStreamWorker("restaurants", groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_restaurants")
 	case locitypes.DomainActivities:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("activities", getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.CacheKey+"_activities")
+		runStreamWorker("activities", groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_activities")
 	case locitypes.DomainNearby:
 		g.Go(func() (err error) {
 			defer func() {
@@ -436,6 +469,11 @@ func (l *ServiceImpl) persistResults(
 		return err
 	}
 	l.logger.InfoContext(ctx, "Successfully saved interaction", slog.String("interaction_id", savedID.String()))
+
+	// 2b. Attach the evidence trail now that there is an interaction to hang it
+	// on. Uses storageCtx so a disconnected client does not cost us the audit
+	// record; a failure here is logged, never returned.
+	l.recordEvidence(storageCtx, savedID.String(), cc.Packet, cc.Verification)
 
 	// 3. Update POI IDs with the saved interaction ID and cityID
 	if cityID != uuid.Nil {

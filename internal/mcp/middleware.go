@@ -61,6 +61,10 @@ func authMiddleware(deps Deps, next http.Handler) http.Handler {
 		ctx := interceptors.ContextWithClaims(r.Context(), &interceptors.Claims{
 			UserID: userID.String(),
 		})
+		// Carry the key's scopes so individual tools can require one. Without
+		// this the claims say only "who", and every tool a key can reach is
+		// every tool the owner can reach.
+		ctx = withScopes(ctx, key.Scopes)
 		if deps.Subscription != nil {
 			ctx = subscription.WithQuotaConsumer(ctx, func(qctx context.Context) error {
 				return deps.Subscription.ConsumeQuota(qctx, userID, "")

@@ -13,7 +13,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	tripv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"github.com/google/uuid"
 )
 

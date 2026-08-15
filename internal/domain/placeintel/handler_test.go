@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	placev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place"
+	placev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place"
 	"github.com/stretchr/testify/assert"
 )
 

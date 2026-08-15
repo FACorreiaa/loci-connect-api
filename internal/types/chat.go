@@ -236,6 +236,10 @@ type HotelDetailedInfo struct {
 	Images           []string  `json:"images"`
 	LlmInteractionID uuid.UUID `json:"llm_interaction_id"`
 	Err              error     `json:"-"` // Not serialized
+
+	// Grounded reports whether this hotel was cited from an evidence packet
+	// rather than recalled by the model. See POIDetailedInfo.Grounded.
+	Grounded bool `json:"grounded,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for HotelDetailedInfo
@@ -336,6 +340,10 @@ type RestaurantDetailedInfo struct {
 	Rating           float64   `json:"rating"`
 	LlmInteractionID uuid.UUID `json:"llm_interaction_id"`
 	Err              error     `json:"-"`
+
+	// Grounded reports whether this restaurant was cited from an evidence packet
+	// rather than recalled by the model. See POIDetailedInfo.Grounded.
+	Grounded bool `json:"grounded,omitempty"`
 }
 
 // Context-aware chat types

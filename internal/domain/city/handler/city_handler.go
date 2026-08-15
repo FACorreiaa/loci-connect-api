@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city/cityconnect"
+	cityv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city/cityconnect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/city"

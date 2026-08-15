@@ -322,6 +322,14 @@ func (m *MockPOIRepository) SearchPOIsHybrid(ctx context.Context, filter locityp
 	return args.Get(0).([]locitypes.POIDetailedInfo), args.Error(1)
 }
 
+func (m *MockPOIRepository) SearchPOIsLexical(ctx context.Context, cityID uuid.UUID, query string, limit int) ([]LexicalHit, error) {
+	args := m.Called(ctx, cityID, query, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]LexicalHit), args.Error(1)
+}
+
 func (m *MockPOIRepository) UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID, embedding []float32) error {
 	args := m.Called(ctx, poiID, embedding)
 	return args.Error(0)

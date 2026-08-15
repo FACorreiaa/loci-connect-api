@@ -9,22 +9,24 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// maxToolResults caps list responses so a broad search does not flood the
-// client's context window.
-const maxToolResults = 20
-
-// descriptionLimit truncates long AI-generated descriptions in list results.
-const descriptionLimit = 300
+// Result bounds come from the shared retrieval package rather than from local
+// literals, so "how many results" and "how long a description" mean the same
+// thing on the MCP surface, the Connect handlers and the chat path.
+const (
+	maxToolResults   = retrieval.MaxEvidence
+	descriptionLimit = retrieval.MaxDescriptionChars
+)
 
 // POISummary is the compact POI representation returned by list tools.
 type POISummary struct {
@@ -37,9 +39,21 @@ type POISummary struct {
 	Address             string               `json:"address,omitempty"`
 	Rating              float64              `json:"rating,omitempty"`
 	PriceRange          string               `json:"price_range,omitempty"`
-	DistanceM           float64              `json:"distance_meters,omitempty"`
 	City                string               `json:"city,omitempty"`
 	RecommendationTrace *RecommendationTrace `json:"recommendation_trace,omitempty"`
+
+	// DistanceKm is populated only by the tools that actually measure a
+	// distance. This field used to be `distance_meters` filled from
+	// POIDetailedInfo.Distance, which holds kilometres on the spatial code paths
+	// and a raw cosine similarity score on the vector ones — so an agent reading
+	// "distance_meters: 0.82" was being told a similarity score was a distance.
+	DistanceKm float64 `json:"distance_km,omitempty"`
+
+	// Source is where the underlying data came from (for example "llm").
+	// MatchReason is why this result surfaced: lexical, semantic, both, nearby.
+	// Together they let a calling agent cite Loci the way Loci cites itself.
+	Source      string `json:"source,omitempty"`
+	MatchReason string `json:"match_reason,omitempty"`
 }
 
 // RecommendationTrace is returned by recommendation tools and accepted by outcome tools.
@@ -71,7 +85,13 @@ func callerUserID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-func summarize(pois []locitypes.POIDetailedInfo) poiListOutput {
+// summarize compacts POIs for a tool response.
+//
+// distances is optional and keyed by POI id; only tools that genuinely measured
+// a distance supply it. Callers that did not measure pass nil, and the field is
+// simply omitted rather than filled with whatever POIDetailedInfo.Distance
+// happens to be carrying on that code path.
+func summarize(pois []locitypes.POIDetailedInfo, distances map[uuid.UUID]float64) poiListOutput {
 	out := poiListOutput{Count: len(pois)}
 	if len(pois) > maxToolResults {
 		pois = pois[:maxToolResults]
@@ -82,9 +102,10 @@ func summarize(pois []locitypes.POIDetailedInfo) poiListOutput {
 		if desc == "" {
 			desc = p.Description
 		}
-		if len(desc) > descriptionLimit {
-			desc = desc[:descriptionLimit] + "…"
-		}
+		// Rune-aware: a byte slice here splits multi-byte characters and emits
+		// invalid UTF-8 for names like "Café" or "Belém".
+		desc = retrieval.TruncateRunes(desc, descriptionLimit)
+
 		var id string
 		if p.ID != uuid.Nil {
 			id = p.ID.String()
@@ -99,15 +120,16 @@ func summarize(pois []locitypes.POIDetailedInfo) poiListOutput {
 			Address:     p.Address,
 			Rating:      p.Rating,
 			PriceRange:  p.PriceRange,
-			DistanceM:   p.Distance,
+			DistanceKm:  distances[p.ID],
 			City:        p.City,
+			Source:      p.Source,
 		})
 	}
 	return out
 }
 
-func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.POIDetailedInfo, surface recommendationv1.RecommendationSurface) poiListOutput {
-	out := summarize(pois)
+func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.POIDetailedInfo, surface recommendationv1.RecommendationSurface, distances map[uuid.UUID]float64) poiListOutput {
+	out := summarize(pois, distances)
 	userID, err := callerUserID(ctx)
 	if err != nil {
 		return out
@@ -211,7 +233,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_pois",
 		Description: "Search Loci's points-of-interest database near a location. Combines keyword and semantic matching when a query is given.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in searchPOIsInput) (*mcp.CallToolResult, poiListOutput, error) {
+	}, guardTool("search_pois", func(ctx context.Context, _ *mcp.CallToolRequest, in searchPOIsInput) (*mcp.CallToolResult, poiListOutput, error) {
 		radius := in.RadiusKm
 		if radius <= 0 {
 			radius = 5
@@ -234,13 +256,23 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 		if err != nil {
 			return nil, poiListOutput{}, toolError(err)
 		}
-		return nil, summarizeRecommendations(ctx, deps, pois, recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER), nil
-	})
+		// This tool is spatial — it takes a centre and a radius — so the
+		// distances it reports are real kilometres from that centre.
+		out := summarizeRecommendations(ctx, deps, pois,
+			recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER,
+			measuredDistances(pois))
+		reason := string(retrieval.MatchNearby)
+		if in.Query != "" {
+			reason = string(retrieval.MatchBoth)
+		}
+		labelMatchReason(&out, reason)
+		return nil, out, nil
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_poi_details",
 		Description: "Fetch full details for a single point of interest by its Loci id.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, *locitypes.POIDetailedInfo, error) {
+	}, guardTool("get_poi_details", func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, *locitypes.POIDetailedInfo, error) {
 		id, err := uuid.Parse(in.ID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid poi id %q", in.ID)
@@ -250,12 +282,12 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 			return nil, nil, toolError(err)
 		}
 		return nil, poiInfo, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_nearby",
 		Description: "Find restaurants, hotels, activities, or attractions near a location. Results come from Loci's database and are AI-enriched on first request for an area.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in findNearbyInput) (*mcp.CallToolResult, poiListOutput, error) {
+	}, guardTool("find_nearby", func(ctx context.Context, _ *mcp.CallToolRequest, in findNearbyInput) (*mcp.CallToolResult, poiListOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, poiListOutput{}, err
@@ -283,6 +315,34 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 		if err != nil {
 			return nil, poiListOutput{}, toolError(err)
 		}
-		return nil, summarizeRecommendations(ctx, deps, pois, recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY), nil
-	})
+		out := summarizeRecommendations(ctx, deps, pois,
+			recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_NEARBY,
+			measuredDistances(pois))
+		labelMatchReason(&out, string(retrieval.MatchNearby))
+		return nil, out, nil
+	}))
+}
+
+// measuredDistances extracts distances for results produced by a spatial query.
+//
+// Only call this from a tool whose query was actually a radius search: on those
+// paths POIDetailedInfo.Distance holds kilometres. The vector search paths reuse
+// the same field for a cosine similarity score, and reporting that as a distance
+// is what this indirection exists to prevent.
+func measuredDistances(pois []locitypes.POIDetailedInfo) map[uuid.UUID]float64 {
+	out := make(map[uuid.UUID]float64, len(pois))
+	for _, p := range pois {
+		if p.ID != uuid.Nil && p.Distance > 0 {
+			out[p.ID] = p.Distance
+		}
+	}
+	return out
+}
+
+// labelMatchReason stamps why these results surfaced, so a calling agent can
+// tell a keyword hit from a semantic one.
+func labelMatchReason(out *poiListOutput, reason string) {
+	for i := range out.Results {
+		out.Results[i].MatchReason = reason
+	}
 }

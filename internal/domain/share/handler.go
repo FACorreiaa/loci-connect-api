@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-	sharev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
+	sharev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/share"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/share/sharev1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

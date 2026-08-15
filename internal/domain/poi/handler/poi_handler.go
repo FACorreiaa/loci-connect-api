@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
-	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"

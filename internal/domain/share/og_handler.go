@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	sharev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share"
+	sharev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/share"
 )
 
 // OGMetaHandler returns an HTTP handler that serves OG meta tags for social sharing

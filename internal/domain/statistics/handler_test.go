@@ -12,7 +12,7 @@ import (
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics"
+	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics"
 )
 
 // stubStatsService is a no-op Service implementation used by handler tests.

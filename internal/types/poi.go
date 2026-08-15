@@ -80,6 +80,22 @@ type POIDetailedInfo struct {
 	Amenities        string            `json:"amenities"`
 	Err              error             `json:"-"`
 	Source           string            `json:"source,omitempty"` // Source of the POI data (e.g., "google", "yelp", etc.)
+
+	// SimilarityScore is cosine similarity against the query embedding, in
+	// [0,1], and RelevanceScore is the fused rank score from hybrid search.
+	// Both are omitted when the producing query did not compute them.
+	//
+	// These exist because Distance cannot carry them: it already means
+	// kilometres on the spatial paths and a raw similarity score on the vector
+	// paths, and overloading it further is how a ranking becomes unexplainable.
+	SimilarityScore float64 `json:"similarity_score,omitempty"`
+	RelevanceScore  float64 `json:"relevance_score,omitempty"`
+
+	// Grounded reports whether this place was cited from an evidence packet —
+	// i.e. it came from a row retrieved before generation, not from the model's
+	// memory. False means the suggestion may still be real, but Loci did not
+	// verify it against its own data and must not present it as verified.
+	Grounded bool `json:"grounded,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for POIDetailedInfo

@@ -61,7 +61,7 @@ func registerItineraryTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_itineraries",
 		Description: "List the user's saved travel itineraries in Loci.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in listItinerariesInput) (*mcp.CallToolResult, listItinerariesOutput, error) {
+	}, guardTool("list_itineraries", func(ctx context.Context, _ *mcp.CallToolRequest, in listItinerariesInput) (*mcp.CallToolResult, listItinerariesOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, listItinerariesOutput{}, err
@@ -82,12 +82,12 @@ func registerItineraryTools(server *mcp.Server, deps Deps) {
 			out.Itineraries = append(out.Itineraries, summarizeItinerary(&resp.Itineraries[i]))
 		}
 		return nil, out, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_itinerary",
 		Description: "Fetch a saved itinerary including its full markdown content.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getItineraryInput) (*mcp.CallToolResult, *locitypes.UserSavedItinerary, error) {
+	}, guardTool("get_itinerary", func(ctx context.Context, _ *mcp.CallToolRequest, in getItineraryInput) (*mcp.CallToolResult, *locitypes.UserSavedItinerary, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -101,12 +101,12 @@ func registerItineraryTools(server *mcp.Server, deps Deps) {
 			return nil, nil, toolError(err)
 		}
 		return nil, it, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "update_itinerary",
 		Description: "Update a saved itinerary's title, description, tags, markdown content, or visibility. Only provided fields change.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in updateItineraryInput) (*mcp.CallToolResult, ItinerarySummary, error) {
+	}, guardTool("update_itinerary", func(ctx context.Context, _ *mcp.CallToolRequest, in updateItineraryInput) (*mcp.CallToolResult, ItinerarySummary, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, ItinerarySummary{}, err
@@ -126,5 +126,5 @@ func registerItineraryTools(server *mcp.Server, deps Deps) {
 			return nil, ItinerarySummary{}, toolError(err)
 		}
 		return nil, summarizeItinerary(updated), nil
-	})
+	}))
 }

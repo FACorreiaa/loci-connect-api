@@ -18,20 +18,12 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
-	"google.golang.org/genai"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
 		slog.Warn("Error loading .env file")
 		log.Fatal(err)
-	}
-
-	apiKey := os.Getenv("GEMINI_API_KEY")
-
-	// List available models if requested (or just for debug)
-	if os.Getenv("LIST_GEMINI_MODELS") == "true" {
-		listGeminiModels(context.Background(), apiKey)
 	}
 
 	// Initialize logger
@@ -167,41 +159,3 @@ func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) er
 	return nil
 }
 
-func listGeminiModels(ctx context.Context, apiKey string) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
-	if err != nil {
-		log.Printf("Failed to create GenAI client: %v", err)
-		return
-	}
-
-	// List models
-	// The SDK might vary on how to list models.
-	// Checking previous knowledge or guessing typical pattern `client.Models.List`.
-	// The google.golang.org/genai SDK (v0.0.1?) usually has `client.Models.List(ctx, nil)`.
-	// Or `client.ListModels(ctx)`.
-	// I will try `client.Models.List`.
-
-	// Note: If I am unsure about SDK, I should check docs or types if possible.
-	// But I will assume `client.Models.List` iter pattern.
-
-	iter, err := client.Models.List(ctx, nil)
-	if err != nil {
-		log.Printf("Error listing models: %v", err)
-		return
-	}
-	fmt.Println("Available Gemini Models:")
-	for {
-		m, err := iter.Next(ctx)
-		if err != nil {
-			if err.Error() == "no more items in iterator" || err.Error() == "iterator is done" || err.Error() == "done" {
-				break
-			}
-			// log.Printf("Stop iterating models: %v", err)
-			break
-		}
-		// Print model info safely
-		fmt.Printf("- %s\n", m.Name)
-	}
-}

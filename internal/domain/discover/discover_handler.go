@@ -11,9 +11,9 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/discover/presenter"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	discoverv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	discoverv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/discover"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/discover/discoverconnect"
 )
 
 const defaultPageSize = 10

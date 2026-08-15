@@ -33,7 +33,7 @@ func registerChatTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "plan_itinerary",
 		Description: "Generate and save a personalized itinerary for a city using Loci's travel AI (Pro plan required). The itinerary is stored in the user's Loci account.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in planItineraryInput) (*mcp.CallToolResult, planItineraryOutput, error) {
+	}, guardTool("plan_itinerary", func(ctx context.Context, _ *mcp.CallToolRequest, in planItineraryInput) (*mcp.CallToolResult, planItineraryOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, planItineraryOutput{}, err
@@ -70,5 +70,5 @@ func registerChatTools(server *mcp.Server, deps Deps) {
 			Message:   resp.Message,
 			Itinerary: resp.UpdatedItinerary,
 		}, nil
-	})
+	}))
 }

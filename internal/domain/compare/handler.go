@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-	comparev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1/comparev1connect"
+	comparev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1/comparev1connect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"

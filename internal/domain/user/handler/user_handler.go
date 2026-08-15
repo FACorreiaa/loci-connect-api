@@ -9,13 +9,14 @@ import (
 
 	"connectrpc.com/connect"
 
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	userpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	userpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user/userconnect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -24,12 +25,23 @@ import (
 type UserHandler struct {
 	userconnect.UnimplementedUserServiceHandler
 	service user.UserService
+	// exporter assembles the full self-service data export. Optional: without
+	// it the export falls back to the profile-only payload it used to return.
+	exporter *userdata.Exporter
 }
 
 // NewUserHandler constructs a new handler.
 func NewUserHandler(svc user.UserService) *UserHandler {
 	return &UserHandler{
 		service: svc,
+	}
+}
+
+// SetExporter enables the complete data export. Without it the handler returns
+// the profile alone, which is what it did before the exporter existed.
+func (h *UserHandler) SetExporter(e *userdata.Exporter) {
+	if h != nil {
+		h.exporter = e
 	}
 }
 
@@ -243,11 +255,21 @@ func (h *UserHandler) ExportUserData(
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	payload := map[string]any{
-		"exported_at": time.Now().UTC().Format(time.RFC3339),
-		"profile":     profile,
+	var data []byte
+	if h.exporter != nil {
+		bundle, buildErr := h.exporter.Build(ctx, userID, profile)
+		if buildErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, buildErr)
+		}
+		data, err = bundle.JSON()
+	} else {
+		// Fallback for a handler constructed without an exporter.
+		payload := map[string]any{
+			"exported_at": time.Now().UTC().Format(time.RFC3339),
+			"profile":     profile,
+		}
+		data, err = json.MarshalIndent(payload, "", "  ")
 	}
-	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("marshal export: %w", err))
 	}

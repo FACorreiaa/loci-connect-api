@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	tripv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip/tripconnect"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip/tripconnect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"

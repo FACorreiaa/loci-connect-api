@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	auth "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
+	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"

@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/genai"
 
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
@@ -20,6 +20,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -102,6 +103,9 @@ type ServiceImpl struct {
 	cache              cachestore.Store
 	model              string
 	prefVectors        preference.VectorReader
+	// assembler grounds generation in retrieved rows. Optional: when nil the
+	// chat path behaves exactly as it did before evidence packets existed.
+	assembler *retrieval.Assembler
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
@@ -170,5 +174,15 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 func (l *ServiceImpl) SetPreferenceVectors(r preference.VectorReader) {
 	if l != nil {
 		l.prefVectors = r
+	}
+}
+
+// SetRetrievalAssembler enables grounded generation: retrieved POI rows are
+// rendered into the prompt and the answer is checked against them afterwards.
+// Without it the service keeps its previous behaviour of generating from the
+// city name and preference text alone.
+func (l *ServiceImpl) SetRetrievalAssembler(a *retrieval.Assembler) {
+	if l != nil {
+		l.assembler = a
 	}
 }

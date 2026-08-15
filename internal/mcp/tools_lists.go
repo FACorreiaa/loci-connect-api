@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -54,7 +54,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_user_lists",
 		Description: "List the user's saved place lists (and itinerary lists) in Loci.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in listUserListsInput) (*mcp.CallToolResult, listUserListsOutput, error) {
+	}, guardTool("list_user_lists", func(ctx context.Context, _ *mcp.CallToolRequest, in listUserListsInput) (*mcp.CallToolResult, listUserListsOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, listUserListsOutput{}, err
@@ -77,12 +77,12 @@ func registerListTools(server *mcp.Server, deps Deps) {
 			})
 		}
 		return nil, out, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_list",
 		Description: "Fetch a list with all its saved items.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in getListInput) (*mcp.CallToolResult, *locitypes.ListWithItems, error) {
+	}, guardTool("get_list", func(ctx context.Context, _ *mcp.CallToolRequest, in getListInput) (*mcp.CallToolResult, *locitypes.ListWithItems, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -96,12 +96,12 @@ func registerListTools(server *mcp.Server, deps Deps) {
 			return nil, nil, toolError(err)
 		}
 		return nil, list, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_poi_to_list",
 		Description: "Add a point of interest to one of the user's lists.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in addPOIToListInput) (*mcp.CallToolResult, map[string]string, error) {
+	}, guardTool("add_poi_to_list", func(ctx context.Context, _ *mcp.CallToolRequest, in addPOIToListInput) (*mcp.CallToolResult, map[string]string, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -124,12 +124,12 @@ func registerListTools(server *mcp.Server, deps Deps) {
 		}
 		recordMCPOutcome(ctx, deps, in.RecommendationTrace, in.PoiID, recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_ADDED_TO_LIST)
 		return nil, map[string]string{"status": "added", "item_id": item.ItemID.String()}, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_favorites",
 		Description: "List the user's favorite points of interest.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listFavoritesOutput, error) {
+	}, guardTool("list_favorites", func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listFavoritesOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, listFavoritesOutput{}, err
@@ -138,14 +138,15 @@ func registerListTools(server *mcp.Server, deps Deps) {
 		if err != nil {
 			return nil, listFavoritesOutput{}, toolError(err)
 		}
-		summarized := summarize(pois)
+		// Favorites are not a spatial query, so no distance is measured or reported.
+		summarized := summarize(pois, nil)
 		return nil, listFavoritesOutput{Favorites: summarized.Results, Count: summarized.Count}, nil
-	})
+	}))
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_favorite",
 		Description: "Add a point of interest to the user's favorites.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in addFavoriteInput) (*mcp.CallToolResult, map[string]string, error) {
+	}, guardTool("add_favorite", func(ctx context.Context, _ *mcp.CallToolRequest, in addFavoriteInput) (*mcp.CallToolResult, map[string]string, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -160,5 +161,5 @@ func registerListTools(server *mcp.Server, deps Deps) {
 		}
 		recordMCPOutcome(ctx, deps, in.RecommendationTrace, in.PoiID, recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED)
 		return nil, map[string]string{"status": "added", "favorite_id": id.String()}, nil
-	})
+	}))
 }

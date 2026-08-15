@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
-	tripv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

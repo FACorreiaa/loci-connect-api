@@ -1,7 +1,7 @@
 package service
 
 import (
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"

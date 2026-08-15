@@ -43,6 +43,7 @@ func Handler(deps Deps) http.Handler {
 		Name:    serverName,
 		Version: Version,
 	}, nil)
+	registerStatusTools(server, deps)
 	registerPOITools(server, deps)
 	registerItineraryTools(server, deps)
 	registerListTools(server, deps)

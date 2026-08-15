@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"

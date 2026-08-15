@@ -5,9 +5,9 @@ import (
 
 	"github.com/google/uuid"
 
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )

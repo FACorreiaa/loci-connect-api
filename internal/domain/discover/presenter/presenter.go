@@ -1,9 +1,9 @@
 package presenter
 
 import (
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	commonv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	discoverv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	commonv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	discoverv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/discover"
 
 	chatpresenter "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"

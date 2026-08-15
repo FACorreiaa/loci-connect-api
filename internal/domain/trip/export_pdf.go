@@ -3,7 +3,7 @@ package trip
 import (
 	"fmt"
 
-	exportv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export"
+	exportv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export"
 
 	exportdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 )

@@ -196,6 +196,9 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
 	}
 
 	response := row.toResponse()
+	if err := r.loadDomainPreferences(ctx, response.ID, &response); err != nil {
+		l.WarnContext(ctx, "profile loaded without domain preferences", slog.Any("error", err))
+	}
 	l.DebugContext(ctx, "Fetched user preference profile successfully")
 	span.SetStatus(codes.Ok, "Preference profile fetched")
 	return &response, nil
@@ -243,6 +246,11 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
 	}
 
 	response := row.toResponse()
+	if err := r.loadDomainPreferences(ctx, response.ID, &response); err != nil {
+		// The base profile is usable without them; losing the whole profile over
+		// the optional part would be the worse failure.
+		l.WarnContext(ctx, "default profile loaded without domain preferences", slog.Any("error", err))
+	}
 	l.DebugContext(ctx, "Fetched default user preference profile successfully")
 	span.SetStatus(codes.Ok, "Default preference profile fetched")
 	return &response, nil

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
-	entitlementv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/entitlement/v1"
+	entitlementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"

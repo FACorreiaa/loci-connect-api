@@ -61,6 +61,11 @@ type Repository interface {
 	SavePOIDetails(ctx context.Context, poi locitypes.POIDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
 	SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error)
 
+	// SearchPOIsLexical is the deterministic retrieval lane: Postgres full-text
+	// over search_tsv plus a trigram arm for misspellings. No embedding, no LLM,
+	// no network. Complements the vector lane rather than replacing it.
+	SearchPOIsLexical(ctx context.Context, cityID uuid.UUID, query string, limit int) ([]LexicalHit, error)
+
 	// Vector similarity search methods
 	FindSimilarPOIs(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.POIDetailedInfo, error)
 	FindSimilarPOIsByCity(ctx context.Context, queryEmbedding []float32, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error)
@@ -2168,6 +2173,10 @@ func (r *RepositoryImpl) SearchPOIsHybrid(ctx context.Context, filter locitypes.
 			Latitude:       row.Latitude,
 			Category:       row.Category,
 			Distance:       row.DistanceMeters / 1000, // Convert meters to km
+			// The SQL computes both scores and this mapping used to discard
+			// them, so nothing downstream could explain or re-rank a result.
+			SimilarityScore: row.SimilarityScore,
+			RelevanceScore:  row.HybridScore,
 		}
 	}
 

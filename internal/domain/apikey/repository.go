@@ -35,10 +35,15 @@ type Key struct {
 	LastUsedAt *time.Time
 	ExpiresAt  *time.Time
 	RevokedAt  *time.Time
+
+	// Scopes is what this key is allowed to do. A key authenticates as its
+	// owning user, so this is the only thing narrowing it from full account
+	// access.
+	Scopes []Scope
 }
 
 type Repository interface {
-	Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time) (*Key, error)
+	Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]Key, error)
 	// Revoke marks the key revoked; returns ErrNotFound when the key does not
 	// belong to userID or is already revoked.
@@ -56,23 +61,28 @@ func NewRepository(pgpool PgxPool) Repository {
 	return &repository{pgpool: pgpool}
 }
 
-const keyColumns = `id, user_id, name, key_prefix, created_at, last_used_at, expires_at, revoked_at`
+const keyColumns = `id, user_id, name, key_prefix, created_at, last_used_at, expires_at, revoked_at, scopes`
 
 func scanKey(row pgx.Row) (*Key, error) {
 	var k Key
-	err := row.Scan(&k.ID, &k.UserID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &k.LastUsedAt, &k.ExpiresAt, &k.RevokedAt)
+	var scopes []string
+	err := row.Scan(&k.ID, &k.UserID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &k.LastUsedAt, &k.ExpiresAt, &k.RevokedAt, &scopes)
 	if err != nil {
 		return nil, err
 	}
+	k.Scopes = ScopesFromStrings(scopes)
 	return &k, nil
 }
 
-func (r *repository) Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time) (*Key, error) {
+func (r *repository) Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error) {
+	if len(scopes) == 0 {
+		scopes = DefaultScopes
+	}
 	query := `
-		INSERT INTO api_keys (user_id, name, key_prefix, key_hash, expires_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO api_keys (user_id, name, key_prefix, key_hash, expires_at, scopes)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING ` + keyColumns
-	k, err := scanKey(r.pgpool.QueryRow(ctx, query, userID, name, keyPrefix, keyHash, expiresAt))
+	k, err := scanKey(r.pgpool.QueryRow(ctx, query, userID, name, keyPrefix, keyHash, expiresAt, ScopeStrings(scopes)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create api key: %w", err)
 	}

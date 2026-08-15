@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	paymentv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
+	paymentv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

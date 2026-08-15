@@ -9,7 +9,7 @@ import (
 	"connectrpc.com/connect"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geo"
-	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
 )
 

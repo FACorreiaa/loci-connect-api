@@ -2,8 +2,8 @@ package compare
 
 import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/multicity"
-	comparev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1"
-	tripv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip"
+	comparev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 )
 
 // planRoute turns the resolved comparison columns into a multi-city route.

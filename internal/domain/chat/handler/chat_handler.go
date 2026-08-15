@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
-	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
+	cityv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"

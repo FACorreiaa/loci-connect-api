@@ -8,9 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	itineraryv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	itineraryv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
 
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	listservice "github.com/FACorreiaa/loci-connect-api/internal/domain/list"

@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	profilev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile"
+	profilev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )

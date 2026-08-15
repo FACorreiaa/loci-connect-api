@@ -14,6 +14,7 @@ import (
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	cityhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/city/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/compare"
 	customauthhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/handler"
 	customauthservice "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/service"
 	discoverdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/discover"
@@ -25,8 +26,8 @@ import (
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/memory"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
-	"github.com/FACorreiaa/loci-connect-api/internal/domain/compare"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
@@ -36,20 +37,23 @@ import (
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 )
 
 // Dependencies holds all application dependencies
@@ -60,31 +64,32 @@ type Dependencies struct {
 	AppCache cachestore.Store
 
 	// Repositories
-	AuthRepo       repository.AuthRepository
-	InterestRepo   interestrepo.Repository
-	TagRepo        tagrepo.Repository
-	ProfileRepo    profiles.Repository
-	POIRepo        poirepo.Repository
-	CityRepo       cityrepo.Repository
-	ChatRepo       chatrepo.Repository
-	DiscoverRepo   discoverdomain.Repository
-	ListRepo       itinerarylist.Repository
-	StatisticsRepo statistics.Repository
-	RecentsRepo    recents.Repository
-	UserRepo       user.UserRepo
-	UsageRepo      subscription.Repository
-	PaymentRepo    payment.Repository
-	FavoritesRepo  favorites.Repository
-	APIKeyRepo     apikey.Repository
-	ReviewRepo     reviewdomain.Repository
-	ShareRepo      share.Repository
-	TripRepo       trip.Repository
+	AuthRepo          repository.AuthRepository
+	InterestRepo      interestrepo.Repository
+	TagRepo           tagrepo.Repository
+	ProfileRepo       profiles.Repository
+	POIRepo           poirepo.Repository
+	CityRepo          cityrepo.Repository
+	ChatRepo          chatrepo.Repository
+	DiscoverRepo      discoverdomain.Repository
+	ListRepo          itinerarylist.Repository
+	StatisticsRepo    statistics.Repository
+	RecentsRepo       recents.Repository
+	UserRepo          user.UserRepo
+	UsageRepo         subscription.Repository
+	PaymentRepo       payment.Repository
+	FavoritesRepo     favorites.Repository
+	APIKeyRepo        apikey.Repository
+	ReviewRepo        reviewdomain.Repository
+	ShareRepo         share.Repository
+	TripRepo          trip.Repository
+	TravelHistoryRepo travelhistory.Repository
 
 	// Services
-	TokenManager        service.TokenManager
-	AuthService         *service.AuthService
+	TokenManager service.TokenManager
+	AuthService  *service.AuthService
 	// MFAService is nil when MFA_SECRET_KEY is unset.
-	MFAService *mfa.Service
+	MFAService          *mfa.Service
 	ChatService         chatservice.LlmInteractiontService
 	ProfileSvc          profiles.Service
 	POISvc              poirepo.Service
@@ -126,12 +131,15 @@ type Dependencies struct {
 	EntitlementHandler       *entitlement.Handler
 	RecommendationHandler    *recommendation.Handler
 	PlaceIntelligenceHandler *placeintel.Handler
+	MemoryHandler            *memory.Handler
 	LocalContextHandler      *localcontext.Handler
 	CompareHandler           *compare.Handler
 	CityHandler              *cityhandler.CityHandler
+	TravelHistoryHandler     *travelhistory.Handler
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
+	RetrievalAssembler *retrieval.Assembler
 }
 
 // InitDependencies initializes all application dependencies
@@ -214,6 +222,7 @@ func (d *Dependencies) initRepositories() error {
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger)
+	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
 
@@ -300,6 +309,11 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
 	}
 	chatSvc.SetPreferenceVectors(d.PreferenceVectors)
+	// Grounded generation: retrieve real POI rows before prompting, then verify
+	// the answer against them. Without this the chat path generates from the
+	// city name and preference text alone.
+	d.RetrievalAssembler = retrieval.NewAssembler(d.DB.Pool, d.Logger)
+	chatSvc.SetRetrievalAssembler(d.RetrievalAssembler)
 	d.ChatService = chatSvc
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
@@ -383,7 +397,19 @@ func (d *Dependencies) initHandlers() error {
 	d.ListHandler = itineraryhandler.NewListHandler(d.ListSvc, d.Logger)
 	d.StatisticsHandler = statistics.NewHandler(d.StatisticsSvc, d.Logger)
 	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
+	// Memory: the learned profile, the evidence behind it, and the ability to
+	// remove either. Forgetting rebuilds the derived vector and traits from the
+	// signals that survive, so a deletion cannot leave the rest inconsistent.
+	d.MemoryHandler = memory.NewHandler(
+		memory.NewService(d.DB.Pool, preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser),
+		d.Logger,
+	)
+
 	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
+	// The self-service export previously returned the profile alone, while the
+	// account also held trips, lists, favorites, itineraries, travel history,
+	// chat sessions and the learned taste profile.
+	d.UserHandler.SetExporter(userdata.NewExporter(d.DB.Pool, d.Logger))
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
@@ -391,6 +417,20 @@ func (d *Dependencies) initHandlers() error {
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
+	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger)
+
+	// A confirmed visit becomes a travel-history row. Best-effort: the recorder
+	// swallows its own failures so recording an event never fails because a
+	// derived row could not be written.
+	if d.RecommendationHandler != nil {
+		d.RecommendationHandler = d.RecommendationHandler.WithTravelHistory(
+			travelhistory.NewRecorder(d.TravelHistoryRepo, d.Logger))
+	}
+	// Give statistics the real visited-city count. Until this line, that field
+	// returned hotels+restaurants and was marked "// Placeholder".
+	if d.StatisticsHandler != nil {
+		d.StatisticsHandler = d.StatisticsHandler.WithVisitedCities(d.TravelHistoryRepo)
+	}
 	// SuggestPacking is wired below, once the weather adapter exists — a packing
 	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)

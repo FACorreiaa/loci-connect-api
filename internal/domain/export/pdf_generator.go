@@ -14,7 +14,7 @@ import (
 	"github.com/johnfercher/maroto/v2/pkg/core"
 	"github.com/johnfercher/maroto/v2/pkg/props"
 
-	exportv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export"
+	exportv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export"
 )
 
 // PDFGenerator handles PDF document generation

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	interestv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	interestv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/interests"

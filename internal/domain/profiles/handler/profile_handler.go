@@ -7,9 +7,9 @@ import (
 
 	"connectrpc.com/connect"
 
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	profilev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	profilev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile/profileconnect"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/presenter"

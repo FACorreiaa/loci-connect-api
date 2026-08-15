@@ -11,8 +11,8 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
-	comparev1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1"
-	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
+	comparev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1"
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

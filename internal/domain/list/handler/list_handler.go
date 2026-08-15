@@ -6,8 +6,8 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	listpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
+	listpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

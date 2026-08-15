@@ -4,7 +4,7 @@ import (
 	"maps"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

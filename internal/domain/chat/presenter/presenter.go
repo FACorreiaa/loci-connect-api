@@ -4,10 +4,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	chatv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat"
-	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
-	poiv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi"
+	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
+	cityv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )

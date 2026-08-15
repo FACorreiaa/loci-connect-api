@@ -84,6 +84,25 @@ func TestLoad_OpenRouter(t *testing.T) {
 	}
 }
 
+// An unset AI_PROVIDER must default to OpenRouter, so a deployment that never
+// sets the variable boots on OPENROUTER_API_KEY and never asks for a Gemini key.
+func TestLoad_DefaultsToOpenRouter(t *testing.T) {
+	t.Setenv("AI_PROVIDER", "")
+	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AI.Provider != AIProviderOpenRouter {
+		t.Errorf("provider = %q, want %q", cfg.AI.Provider, AIProviderOpenRouter)
+	}
+	if cfg.AI.APIKey != "test-openrouter-key" {
+		t.Errorf("api key = %q", cfg.AI.APIKey)
+	}
+}
+
 func TestLoad_RejectsUnknownAIProvider(t *testing.T) {
 	t.Setenv("AI_PROVIDER", "unknown")
 	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")

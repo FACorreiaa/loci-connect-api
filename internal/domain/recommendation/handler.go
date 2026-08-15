@@ -11,13 +11,14 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation/recommendationconnect"
+	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation/recommendationconnect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -28,13 +29,36 @@ type Handler struct {
 	recommendationconnect.UnimplementedRecommendationServiceHandler
 	db     *pgxpool.Pool
 	logger *slog.Logger
+
+	// history records confirmed visits as travel history. Optional and
+	// best-effort: never nil after NewHandler, and never able to fail an event
+	// submission — see WithTravelHistory.
+	history travelhistory.Recorder
+}
+
+// WithTravelHistory attaches the travel-history recorder so a confirmed visit
+// also becomes a row in the traveller's history.
+//
+// Optional by design: a nil recorder degrades to recording no history rather
+// than to failing the event, which is the same policy the preference recorder
+// uses.
+func (h *Handler) WithTravelHistory(r travelhistory.Recorder) *Handler {
+	if r == nil {
+		r = travelhistory.NopRecorder{}
+	}
+	h.history = r
+	return h
 }
 
 func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Handler{db: db, logger: logger.With(slog.String("component", "recommendation"))}
+	return &Handler{
+		db:      db,
+		logger:  logger.With(slog.String("component", "recommendation")),
+		history: travelhistory.NopRecorder{},
+	}
 }
 
 // IssueTraces records the exact attribution values the server returned to a
@@ -195,6 +219,9 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 
 	accepted := int32(0)
 	duplicates := int32(0)
+	// Visits derived from accepted events, written to travel history after the
+	// commit so they can never roll the events back.
+	var visited []visitCandidate
 	if len(req.Msg.GetEvents()) > 100 {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too many recommendation events"))
 	}
@@ -273,6 +300,17 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 		}
 		accepted++
 
+		if visitConfirming(event.GetEventType()) && event.GetPoiId() != "" {
+			// Collected here, written after the commit: a travel-history row is
+			// derived from this event, so it must never be able to roll the
+			// event itself back.
+			visited = append(visited, visitCandidate{
+				poiID:      event.GetPoiId(),
+				tripID:     tripID,
+				occurredAt: occurredAt,
+			})
+		}
+
 		preferenceEvent, learns := learningEvent(event.GetEventType())
 		if !learns {
 			continue
@@ -291,7 +329,84 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 	if err := tx.Commit(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit recommendation events: %w", err))
 	}
+
+	h.recordTravelHistory(ctx, userID, visited)
+
 	return connect.NewResponse(&recommendationv1.RecordEventsResponse{Accepted: accepted, Duplicates: duplicates}), nil
+}
+
+// visitCandidate is an accepted event that is evidence of an actual visit.
+type visitCandidate struct {
+	poiID      string
+	tripID     *uuid.UUID
+	occurredAt time.Time
+}
+
+// visitConfirming reports whether an event means the traveller was physically
+// there.
+//
+// RATED counts alongside VISIT_CONFIRMED because learningEvent() already treats
+// the two identically (both produce the "visited" preference signal). Splitting
+// them here would make travel history disagree with the rest of the system about
+// what counts as having been somewhere.
+func visitConfirming(t recommendationv1.RecommendationEventType) bool {
+	switch t {
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED:
+		return true
+	default:
+		return false
+	}
+}
+
+// recordTravelHistory resolves each confirmed stop to a placed city and hands it
+// to the recorder.
+//
+// Runs after the commit and swallows its own errors. A stop we cannot place is
+// skipped rather than recorded at a guessed location: an absent city is honest,
+// an invented one is the class of bug this domain exists to remove.
+func (h *Handler) recordTravelHistory(ctx context.Context, userID uuid.UUID, candidates []visitCandidate) {
+	if h.history == nil || h.db == nil || len(candidates) == 0 {
+		return
+	}
+	for _, c := range candidates {
+		var (
+			poiName           string
+			lat, lon          *float64
+			cityID            *uuid.UUID
+			cityName, country *string
+		)
+		err := h.db.QueryRow(ctx, `
+			SELECT p.name, ST_Y(p.location), ST_X(p.location), p.city_id, c.name, c.country
+			FROM points_of_interest p
+			LEFT JOIN cities c ON c.id = p.city_id
+			WHERE p.id::text = $1`, c.poiID,
+		).Scan(&poiName, &lat, &lon, &cityID, &cityName, &country)
+		if err != nil {
+			h.logger.Debug("skip travel history: poi not resolvable",
+				slog.String("poi_id", c.poiID), slog.String("error", err.Error()))
+			continue
+		}
+		if lat == nil || lon == nil || cityName == nil || *cityName == "" {
+			continue
+		}
+
+		in := travelhistory.VisitInput{
+			CityID:    cityID,
+			CityName:  *cityName,
+			Latitude:  *lat,
+			Longitude: *lon,
+			Source:    travelhistory.SourceVisitEvent,
+			TripID:    c.tripID,
+			VisitedAt: c.occurredAt,
+			POIID:     c.poiID,
+			POIName:   poiName,
+		}
+		if country != nil {
+			in.Country = *country
+		}
+		h.history.RecordVisit(ctx, userID, in)
+	}
 }
 
 func (h *Handler) GetPersonalizationSettings(ctx context.Context, _ *connect.Request[recommendationv1.GetPersonalizationSettingsRequest]) (*connect.Response[recommendationv1.PersonalizationSettings], error) {

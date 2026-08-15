@@ -11,8 +11,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	apikeyv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/apikey"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/apikey/apikeyv1connect"
+	apikeyv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 )
 
 // Handler implements the ApiKeyService.
@@ -58,6 +58,7 @@ func toProto(k *Key) *apikeyv1.ApiKey {
 	if k.RevokedAt != nil {
 		pb.RevokedAt = timestamppb.New(*k.RevokedAt)
 	}
+	pb.Scopes = ScopeStrings(k.Scopes)
 	return pb
 }
 
@@ -76,7 +77,16 @@ func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv
 		expiresAt = &t
 	}
 
-	key, plaintext, err := h.svc.Create(ctx, userID, req.Msg.GetName(), expiresAt)
+	// Omitted scopes mean read-only. An unrecognised scope is rejected rather
+	// than dropped: silently narrowing the grant would hand back a key weaker
+	// than the caller believes they hold, and they would only discover it at the
+	// first refusal.
+	scopes, err := ParseScopes(req.Msg.GetScopes())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	key, plaintext, err := h.svc.Create(ctx, userID, req.Msg.GetName(), expiresAt, scopes)
 	if err != nil {
 		h.logger.ErrorContext(ctx, "failed to create api key", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to create api key"))
@@ -84,7 +94,8 @@ func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv
 
 	h.logger.InfoContext(ctx, "api key created",
 		slog.String("user_id", userID.String()),
-		slog.String("key_id", key.ID.String()))
+		slog.String("key_id", key.ID.String()),
+		slog.String("scopes", JoinScopes(key.Scopes)))
 	return connect.NewResponse(&apikeyv1.CreateApiKeyResponse{
 		ApiKey:       toProto(key),
 		PlaintextKey: plaintext,

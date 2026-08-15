@@ -6,7 +6,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
 	"github.com/google/uuid"
 )
 

@@ -10,8 +10,8 @@ import (
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	recentsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
+	recentsv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recents"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recents/recentsv1connect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

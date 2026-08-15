@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	auth "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth"
-	commonpb "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/common"
+	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
+	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 

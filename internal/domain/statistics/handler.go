@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
+	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -17,11 +17,24 @@ import (
 
 var _ statisticsv1connect.StatisticsServiceHandler = (*Handler)(nil)
 
+// VisitedCitiesCounter reports how many cities a user has actually been to.
+//
+// Narrow on purpose: statistics needs one number from travel history, and an
+// interface keeps that a one-way dependency rather than coupling the two
+// domains.
+type VisitedCitiesCounter interface {
+	CountVisitedCities(ctx context.Context, userID uuid.UUID) (int32, error)
+}
+
 // Handler implements the StatisticsService Connect handlers.
 type Handler struct {
 	statisticsv1connect.UnimplementedStatisticsServiceHandler
 	service Service
 	logger  *slog.Logger
+
+	// visits backs VisitedCitiesCount. Nil until wired; the field reports 0
+	// rather than the hotels+restaurants sum it used to invent.
+	visits VisitedCitiesCounter
 }
 
 // NewHandler constructs a new statistics handler.
@@ -30,6 +43,31 @@ func NewHandler(svc Service, logger *slog.Logger) *Handler {
 		service: svc,
 		logger:  logger,
 	}
+}
+
+// WithVisitedCities attaches the real source for visited-city counts.
+func (h *Handler) WithVisitedCities(v VisitedCitiesCounter) *Handler {
+	h.visits = v
+	return h
+}
+
+// visitedCitiesCount returns the real count, or 0 when travel history is
+// unavailable.
+//
+// Zero is deliberate. This field previously returned `hotels + restaurants`
+// with a "// Placeholder" comment — a number that looked plausible, moved when
+// the user searched, and was never once correct. Reporting 0 when we do not
+// know is the honest failure mode.
+func (h *Handler) visitedCitiesCount(ctx context.Context, userID uuid.UUID) int32 {
+	if h.visits == nil {
+		return 0
+	}
+	n, err := h.visits.CountVisitedCities(ctx, userID)
+	if err != nil {
+		h.logger.WarnContext(ctx, "failed to count visited cities", "error", err)
+		return 0
+	}
+	return n
 }
 
 // getUserIDFromContext extracts user ID as UUID from context
@@ -154,7 +192,7 @@ func (h *Handler) GetDetailedPOIStatistics(
 			UserId:             userID.String(),
 			TotalPoiSearches:   int32(stats.TotalPOIs),
 			FavoritePoisCount:  int32(stats.GeneralPOIs + stats.SuggestedPOIs),
-			VisitedCitiesCount: int32(stats.Hotels + stats.Restaurants), // Placeholder
+			VisitedCitiesCount: h.visitedCitiesCount(ctx, userID),
 			GeneratedAt:        timestamppb.Now(),
 		},
 	}

@@ -9,32 +9,34 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/apikey/apikeyv1connect"
-	authconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/auth/authconnect"
-	chatconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/chat/chatconnect"
-	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
-	discoverconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/discover/discoverconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/entitlement/v1/entitlementv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
-	interestconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest/interestconnect"
-	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/itinerary/itineraryconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/list/listv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/compare/v1/comparev1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city/cityconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext/localcontextconnect"
-	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/payment/v1/paymentv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/place/placeconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/poi/poiconnect"
-	profileconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/profile/profileconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recents/recentsv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/recommendation/recommendationconnect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/review/reviewv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/share/sharev1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/statistics/statisticsv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/tags/tagsv1connect"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/trip/tripconnect"
-	userconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/user/userconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
+	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city/cityconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1/comparev1connect"
+	customauthconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth/customauthconnect"
+	discoverconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/discover/discoverconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1/entitlementv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
+	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext/localcontextconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/memory/memoryv1connect"
+	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
+	profileconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile/profileconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recents/recentsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation/recommendationconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/review/reviewv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/share/sharev1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics/statisticsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/tags/tagsv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory/travelhistoryconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip/tripconnect"
+	userconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user/userconnect"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/otel"
@@ -306,10 +308,22 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		deps.Logger.Info("registered Connect RPC service", "path", tripPath)
 	}
 
+	if deps.TravelHistoryHandler != nil {
+		travelHistoryPath, travelHistoryHandler := travelhistoryconnect.NewTravelHistoryServiceHandler(deps.TravelHistoryHandler, opts)
+		mux.Handle(travelHistoryPath, travelHistoryHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", travelHistoryPath)
+	}
+
 	if deps.RecommendationHandler != nil {
 		recommendationPath, recommendationHandler := recommendationconnect.NewRecommendationServiceHandler(deps.RecommendationHandler, opts)
 		mux.Handle(recommendationPath, recommendationHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", recommendationPath)
+	}
+
+	if deps.MemoryHandler != nil {
+		memoryPath, memoryHandler := memoryv1connect.NewMemoryServiceHandler(deps.MemoryHandler, opts)
+		mux.Handle(memoryPath, memoryHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", memoryPath)
 	}
 
 	if deps.PlaceIntelligenceHandler != nil {

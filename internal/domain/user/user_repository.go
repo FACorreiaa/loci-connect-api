@@ -156,8 +156,13 @@ func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*
 		       email_verified_at, about_you, location, 
 		       COALESCE(interests, '{}') as interests, 
 		       COALESCE(badges, '{}') as badges,
-		       COALESCE(places_visited, 0) as places_visited, 
-		       COALESCE(reviews_written, 0) as reviews_written, 
+		       -- Derived from travel history rather than read from the
+		       -- users.places_visited counter. That counter had no backing rows,
+		       -- so nothing could ever reconcile it and nothing did: it drifted
+		       -- silently. Counting the rows costs an index scan and is correct
+		       -- by construction. See internal/domain/travelhistory.
+		       (SELECT COUNT(*) FROM user_visited_cities v WHERE v.user_id = users.id) as places_visited,
+		       COALESCE(reviews_written, 0) as reviews_written,
 		       COALESCE(lists_created, 0) as lists_created, 
 		       COALESCE(followers, 0) as followers, 
 		       COALESCE(following, 0) as following,

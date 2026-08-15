@@ -2,7 +2,7 @@ package presenter
 
 import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	interestv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/interest"
+	interestv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest"
 )
 
 func ToInterestProto(interest *locitypes.Interest) *interestv1.Interest {

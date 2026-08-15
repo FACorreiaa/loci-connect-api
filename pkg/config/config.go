@@ -276,7 +276,7 @@ func Load() (*Config, error) {
 }
 
 func loadAIConfig() AIConfig {
-	provider := strings.ToLower(strings.TrimSpace(getEnv("AI_PROVIDER", AIProviderGemini)))
+	provider := strings.ToLower(strings.TrimSpace(getEnv("AI_PROVIDER", AIProviderOpenRouter)))
 	cfg := AIConfig{
 		Provider:           provider,
 		EmbeddingDimension: getEnvAsInt("AI_EMBEDDING_DIMENSION", 768),

@@ -17,19 +17,21 @@ type fakeRepo struct {
 		keyPrefix string
 		keyHash   []byte
 		expiresAt *time.Time
+		scopes    []Scope
 	}
 	lookupHash []byte
 	lookupKey  *Key
 	lookupErr  error
 }
 
-func (f *fakeRepo) Create(_ context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time) (*Key, error) {
+func (f *fakeRepo) Create(_ context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error) {
 	f.created.userID = userID
 	f.created.name = name
 	f.created.keyPrefix = keyPrefix
 	f.created.keyHash = keyHash
 	f.created.expiresAt = expiresAt
-	return &Key{ID: uuid.New(), UserID: userID, Name: name, KeyPrefix: keyPrefix, CreatedAt: time.Now()}, nil
+	f.created.scopes = scopes
+	return &Key{ID: uuid.New(), UserID: userID, Name: name, KeyPrefix: keyPrefix, CreatedAt: time.Now(), Scopes: scopes}, nil
 }
 
 func (f *fakeRepo) ListByUser(context.Context, uuid.UUID) ([]Key, error) { return nil, nil }
@@ -49,7 +51,7 @@ func TestCreateKeyFormat(t *testing.T) {
 	svc := NewService(repo)
 	userID := uuid.New()
 
-	_, plaintext, err := svc.Create(context.Background(), userID, "test key", nil)
+	_, plaintext, err := svc.Create(context.Background(), userID, "test key", nil, DefaultScopes)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -75,7 +77,7 @@ func TestCreateKeysAreUnique(t *testing.T) {
 	svc := NewService(&fakeRepo{})
 	seen := map[string]bool{}
 	for range 5 {
-		_, plaintext, err := svc.Create(context.Background(), uuid.New(), "k", nil)
+		_, plaintext, err := svc.Create(context.Background(), uuid.New(), "k", nil, DefaultScopes)
 		if err != nil {
 			t.Fatalf("Create: %v", err)
 		}

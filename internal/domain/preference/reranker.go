@@ -121,6 +121,21 @@ func (r *Reranker) usersWithFeedback(ctx context.Context, lookback time.Duration
 	return out, rows.Err()
 }
 
+// RecomputeUser rebuilds one user's preference vector and taste traits from the
+// feedback that currently exists.
+//
+// Exported for the memory service, which calls it after a user deletes evidence:
+// the derived state has to be rebuilt from what survives, or the remaining
+// traits keep asserting things the record no longer supports.
+//
+// A user with no remaining feedback is not an error — recomputeUser returns
+// early and the profile is simply empty, which is the correct outcome of
+// forgetting everything.
+func (r *Reranker) RecomputeUser(ctx context.Context, userID uuid.UUID) error {
+	_, _, err := r.recomputeUser(ctx, userID)
+	return err
+}
+
 func (r *Reranker) recomputeUser(ctx context.Context, userID uuid.UUID) (signals int, updated bool, err error) {
 	vectors, weights, count, lastAt, err := r.loadWeightedEmbeddings(ctx, userID)
 	if err != nil {
@@ -170,6 +185,32 @@ func (r *Reranker) updateTasteTraits(ctx context.Context, userID uuid.UUID) erro
 	if err != nil {
 		return fmt.Errorf("rebuild taste traits: %w", err)
 	}
+
+	// Record which signals produced which trait, using the same grouping the
+	// INSERT above used. Without this the traits are conclusions with no
+	// citation: "likes bars, 4 signals" and no way to ask which four, dispute
+	// one, or remove it without wiping the whole profile.
+	if _, err := tx.Exec(ctx, `DELETE FROM taste_trait_evidence WHERE user_id = $1`, userID); err != nil {
+		return fmt.Errorf("clear taste trait evidence: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO taste_trait_evidence (user_id, trait_key, feedback_id, weight, occurred_at)
+		SELECT
+			pf.user_id,
+			LOWER(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places')),
+			pf.id,
+			(pf.weight * CASE WHEN pf.event = 'skipped' THEN -1 ELSE 1 END)::double precision,
+			pf.created_at
+		FROM preference_feedback pf
+		JOIN points_of_interest p ON p.id::text = pf.poi_id
+		WHERE pf.user_id = $1 AND pf.poi_id IS NOT NULL AND pf.poi_id <> ''
+		  AND LOWER(COALESCE(NULLIF(p.category, ''), NULLIF(p.poi_type, ''), 'places')) IN (
+			SELECT trait_key FROM user_taste_traits WHERE user_id = $1
+		  )
+		ON CONFLICT (user_id, trait_key, feedback_id) DO NOTHING`, userID); err != nil {
+		return fmt.Errorf("record taste trait evidence: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit taste traits: %w", err)
 	}

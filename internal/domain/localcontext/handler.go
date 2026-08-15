@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
-	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext/localcontextconnect"
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext/localcontextconnect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

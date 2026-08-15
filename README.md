@@ -137,7 +137,7 @@ Copy `.env.prod.example` to `.env` (or export the variables directly). The minim
 |---|---|
 | `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSLMODE` | PostgreSQL connection |
 | `JWT_SECRET` | HMAC secret for access/refresh tokens |
-| `AI_PROVIDER` | AI backend: `openrouter` or `gemini` |
+| `AI_PROVIDER` | AI backend: `openrouter` (default) or `gemini` |
 | `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` | OpenRouter chat and embedding access when `AI_PROVIDER=openrouter` |
 | `GEMINI_API_KEY` + `GEMINI_MODEL` | Gemini access when `AI_PROVIDER=gemini` |
 | `SERVER_HOST`, `SERVER_PORT` | HTTP listen address (default `0.0.0.0:8000`) |

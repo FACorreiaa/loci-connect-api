@@ -8,8 +8,8 @@ import (
 	"connectrpc.com/connect"
 	"github.com/markbates/goth"
 
-	customauth "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth"
-	customauthconnect "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/custom_auth/customauthconnect"
+	customauth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth"
+	customauthconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth/customauthconnect"
 
 	authservice "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
 	cacommon "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/common"

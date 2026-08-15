@@ -10,7 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

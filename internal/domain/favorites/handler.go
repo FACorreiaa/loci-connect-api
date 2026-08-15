@@ -14,8 +14,8 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
-	favoritesv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/favorites/v1/favoritesv1connect"
+	favoritesv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
 )
 
 // Handler implements the FavoritesService

@@ -8,8 +8,8 @@ import (
 
 	"connectrpc.com/connect"
 
-	exportv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export"
-	"github.com/FACorreiaa/loci-connect-proto/gen/go/loci/export/exportv1connect"
+	exportv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
 )
 
 // Handler implements the ExportService

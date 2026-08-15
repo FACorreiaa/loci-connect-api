@@ -2,7 +2,7 @@ package presenter
 
 import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	cityv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/city"
+	cityv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city"
 )
 
 func ToCityProto(city locitypes.CityDetail) *cityv1.CityDetail {

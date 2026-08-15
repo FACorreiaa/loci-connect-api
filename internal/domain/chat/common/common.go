@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -243,7 +244,21 @@ type ChatContext struct {
 
 	// Derived/Generated fields populated during preparation
 	SessionID       uuid.UUID
+	CityID          uuid.UUID
 	Domain          locitypes.DomainType
 	CacheKey        string
 	BasePreferences string
+
+	// Packet is the evidence this turn is allowed to speak from: real POI rows
+	// retrieved before generation, enriched with crowd-verified facts and the
+	// user's visit history. It is rendered into the prompt and kept afterwards
+	// so the answer can be checked against it. Nil when retrieval is unavailable
+	// or the city could not be resolved, in which case generation falls back to
+	// its previous ungrounded behaviour.
+	Packet *retrieval.ContextPacket
+
+	// Verification is the result of checking the generated answer against
+	// Packet. Populated during parsing, persisted once the interaction row
+	// exists to attach it to.
+	Verification retrieval.Verification
 }

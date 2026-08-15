@@ -138,7 +138,19 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 
 	case locitypes.IntentAskQuestion:
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Answering your question with semantic context..."}, 3)
-		finalResponseMessage = "I’m here to help! For now, I’ll assume you’re asking about your trip. What specifically would you like to know?"
+		// Answer the question from the evidence just retrieved, the itinerary
+		// the user is holding, and what has already been said. This branch used
+		// to return a fixed string without calling a model, so a direct question
+		// was answered by asking the user to repeat it.
+		answer, answerErr := l.answerQuestionStreamed(ctx, session, message,
+			l.packetForSession(ctx, session, message, cityID, semanticPOIs), eventCh)
+		if answerErr != nil {
+			l.logger.WarnContext(ctx, "failed to answer question", slog.Any("error", answerErr))
+			finalResponseMessage = "I could not work that one out just now. Could you rephrase it?"
+			assistantMessageType = locitypes.TypeError
+		} else {
+			finalResponseMessage = answer
+		}
 
 	case "replace_poi":
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: "Processing: Replacing Point of Interest..."}, 3)

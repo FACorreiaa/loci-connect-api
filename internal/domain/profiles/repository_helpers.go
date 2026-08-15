@@ -3,13 +3,84 @@ package profiles
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
+
+// loadDomainPreferences reads the four per-domain preference blobs for a profile
+// and attaches them to the response.
+//
+// These four tables (migration 0018) have been written since they were created
+// and never read: every reference in the codebase was an INSERT ... ON CONFLICT
+// DO UPDATE. Meanwhile getUserPreferencesPrompt carries a rendering branch for
+// each one, all four unreachable because nothing ever populated the fields. The
+// user was answering a preferences questionnaire whose answers reached the
+// database and stopped there.
+//
+// One query with four LEFT JOINs rather than four round trips; a profile with no
+// row in a given table simply gets a nil pointer, which is what the renderer
+// already checks for.
+//
+// Best-effort by design: a malformed blob for one domain must not cost the
+// caller their whole profile, so unmarshal failures are skipped rather than
+// returned. A read failure is returned, because that means the database is
+// unhealthy rather than one row being odd.
+func (r *RepositoryImpl) loadDomainPreferences(
+	ctx context.Context,
+	profileID uuid.UUID,
+	response *locitypes.UserPreferenceProfileResponse,
+) error {
+	const query = `
+		SELECT
+			a.accommodation_filters,
+			d.dining_filters,
+			ac.activity_filters,
+			i.itinerary_filters
+		FROM user_preference_profiles p
+		LEFT JOIN user_accommodation_preferences a ON a.user_preference_profile_id = p.id
+		LEFT JOIN user_dining_preferences        d ON d.user_preference_profile_id = p.id
+		LEFT JOIN user_activity_preferences     ac ON ac.user_preference_profile_id = p.id
+		LEFT JOIN user_itinerary_preferences     i ON i.user_preference_profile_id = p.id
+		WHERE p.id = $1`
+
+	var accommodation, dining, activity, itinerary []byte
+	if err := r.pgpool.QueryRow(ctx, query, profileID).
+		Scan(&accommodation, &dining, &activity, &itinerary); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// The profile itself is gone; the caller already has what it read.
+			return nil
+		}
+		return fmt.Errorf("read domain preferences: %w", err)
+	}
+
+	decode(r, ctx, "accommodation", accommodation, &response.AccommodationPreferences)
+	decode(r, ctx, "dining", dining, &response.DiningPreferences)
+	decode(r, ctx, "activity", activity, &response.ActivityPreferences)
+	decode(r, ctx, "itinerary", itinerary, &response.ItineraryPreferences)
+
+	return nil
+}
+
+// decode unmarshals one preference blob into target, leaving target untouched
+// when the column was NULL or the stored JSON no longer matches the struct.
+func decode[T any](r *RepositoryImpl, ctx context.Context, domain string, raw []byte, target **T) {
+	if len(raw) == 0 {
+		return
+	}
+	var value T
+	if err := json.Unmarshal(raw, &value); err != nil {
+		r.logger.WarnContext(ctx, "skipping unreadable domain preferences",
+			slog.String("domain", domain), slog.Any("error", err))
+		return
+	}
+	*target = &value
+}
 
 // Transaction helper methods for updating domain preferences
 

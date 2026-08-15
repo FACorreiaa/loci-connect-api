@@ -1,7 +1,7 @@
 package localcontext
 
 import (
-	lcv1 "github.com/FACorreiaa/loci-connect-proto/gen/go/loci/localcontext"
+	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 )
 
 // ToGoScoreProto converts a scored verdict to its wire form.
