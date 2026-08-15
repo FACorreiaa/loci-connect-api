@@ -3,6 +3,7 @@ module github.com/FACorreiaa/loci-connect-api
 go 1.26.1
 
 require (
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260709200747-435963d16310.1
 	connectrpc.com/connect v1.20.0
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
@@ -42,7 +43,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260709200747-435963d16310.1 // indirect
 	buf.build/go/protovalidate v1.2.0 // indirect
 	cel.dev/expr v0.25.2 // indirect
 	cloud.google.com/go v0.123.0 // indirect
