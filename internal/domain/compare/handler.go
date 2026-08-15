@@ -52,15 +52,15 @@ func (h *Handler) CompareWeekend(
 	end := req.Msg.GetEndDate().AsTime()
 
 	out, err := h.svc.CompareWeekend(ctx, CompareInput{
-		OriginCity:         req.Msg.GetOriginCity(),
-		OriginLat:          req.Msg.GetOriginLat(),
-		OriginLon:          req.Msg.GetOriginLon(),
-		Candidates:         candidates,
-		Start:              start,
-		End:                end,
-		UserID:             uid,
-		Allow3Candidates:   ent.MaxCandidates > FreeMaxCandidates,
-		AllowDualCity:      ent.AllowMultiCity,
+		OriginCity:       req.Msg.GetOriginCity(),
+		OriginLat:        req.Msg.GetOriginLat(),
+		OriginLon:        req.Msg.GetOriginLon(),
+		Candidates:       candidates,
+		Start:            start,
+		End:              end,
+		UserID:           uid,
+		Allow3Candidates: ent.MaxCandidates > FreeMaxCandidates,
+		AllowDualCity:    ent.AllowMultiCity,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("compare: %w", err))

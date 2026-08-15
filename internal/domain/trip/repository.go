@@ -93,13 +93,13 @@ type TripLeg struct {
 
 // Trip is the full editable trip aggregate.
 type Trip struct {
-	ID              uuid.UUID
-	UserID          uuid.UUID
-	CityID          *uuid.UUID
-	CityName        string
-	Title           string
-	Constraints     TripConstraint
-	Days            []TripDay
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	CityID      *uuid.UUID
+	CityName    string
+	Title       string
+	Constraints TripConstraint
+	Days        []TripDay
 	// Legs is travel between the trip's cities. Empty for a single-city trip.
 	Legs            []TripLeg
 	Version         int64

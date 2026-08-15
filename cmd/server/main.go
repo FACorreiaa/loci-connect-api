@@ -158,4 +158,3 @@ func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) er
 
 	return nil
 }
-

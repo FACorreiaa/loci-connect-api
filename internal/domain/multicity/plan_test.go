@@ -194,7 +194,7 @@ func TestPlan_RespectsMaxCities(t *testing.T) {
 		OriginName: "Porto", OriginLat: porto.Lat, OriginLon: porto.Lon,
 		Candidates: []City{lisbon, evora, beja, coimbra},
 		Start:      start, End: end,
-		MaxCities:  2,
+		MaxCities: 2,
 	})
 
 	if len(got.Cities) != 2 {
