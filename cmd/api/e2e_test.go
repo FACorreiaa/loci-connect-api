@@ -60,10 +60,28 @@ func bootServer(t *testing.T) (string, *Dependencies, func()) {
 			// config.Load's defaults, so set the pool sizing explicitly.
 			MaxConns: 10,
 			MinConns: 2,
+			// Likewise the lifetimes. Left at zero, pgxpool refuses every
+			// acquisition ("too many failed attempts acquiring connection")
+			// and InitDependencies fails with "database connection failed
+			// after retries" — against a container that is up and already
+			// migrated. Mirrors config.Load's defaults.
+			MaxConnLifetime: 5 * time.Minute,
+			MaxConnIdleTime: 10 * time.Minute,
 		},
 		Auth: config.AuthConfig{
-			JWTSecret:  "e2e-test-jwt-secret-0123456789abcdef",
-			AdminEmail: "",
+			JWTSecret: "e2e-test-jwt-secret-0123456789abcdef",
+			// A distinct refresh secret, because sharing one key lets an access
+			// token verify as a refresh token — which production refuses to boot
+			// with, and the e2e harness should not quietly differ on.
+			JWTRefreshSecret: "e2e-test-refresh-secret-abcdef0123456789",
+			// Token lifetimes, for the same reason as the pool lifetimes above:
+			// this config is hand-built, so it gets none of config.Load's
+			// defaults. Left at zero every token is issued already expired, and
+			// the auth tests fail with "token has invalid claims: token is
+			// expired" on a token minted a millisecond earlier.
+			AccessTokenTTL:  time.Hour,
+			RefreshTokenTTL: 30 * 24 * time.Hour,
+			AdminEmail:      "",
 		},
 		Observability: config.ObservabilityConfig{MetricsEnabled: false},
 		// Dummy Gemini creds: genai.NewClient only builds a client (no network),
