@@ -102,6 +102,10 @@ func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	if poi.DescriptionPOI != "" {
 		resp.DescriptionPoi = proto.String(poi.DescriptionPOI)
 	}
+	// Always set, never conditional on being true: the client has to be able to
+	// tell "Loci checked and this is unverified" from "this response predates
+	// grounding". An omitted field means the latter.
+	resp.Grounded = proto.Bool(poi.Grounded)
 	if poi.Latitude != 0 {
 		resp.Latitude = proto.Float64(poi.Latitude)
 	}

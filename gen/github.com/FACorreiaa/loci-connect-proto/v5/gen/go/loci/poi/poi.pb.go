@@ -64,8 +64,13 @@ type POIDetailedInfo struct {
 	RecommendationRationale *string                             `protobuf:"bytes,30,opt,name=recommendation_rationale,json=recommendationRationale,proto3,oneof" json:"recommendation_rationale,omitempty"`
 	RecommendationTrace     *recommendation.RecommendationTrace `protobuf:"bytes,31,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
 	VerifiedFacts           *place.PlaceFacts                   `protobuf:"bytes,32,opt,name=verified_facts,json=verifiedFacts,proto3,oneof" json:"verified_facts,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// Whether this place was cited from Loci's own retrieved evidence rather than
+	// recalled by the model. False does not mean the place is fake — it means Loci
+	// did not verify it against its own data, so it must not be presented as
+	// verified. Absent on responses produced before grounding existed.
+	Grounded      *bool `protobuf:"varint,33,opt,name=grounded,proto3,oneof" json:"grounded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *POIDetailedInfo) Reset() {
@@ -322,6 +327,13 @@ func (x *POIDetailedInfo) GetVerifiedFacts() *place.PlaceFacts {
 	return nil
 }
 
+func (x *POIDetailedInfo) GetGrounded() bool {
+	if x != nil && x.Grounded != nil {
+		return *x.Grounded
+	}
+	return false
+}
+
 // HotelDetailedInfo represents hotel-specific information
 type HotelDetailedInfo struct {
 	state               protoimpl.MessageState              `protogen:"open.v1"`
@@ -342,8 +354,10 @@ type HotelDetailedInfo struct {
 	Images              []string                            `protobuf:"bytes,15,rep,name=images,proto3" json:"images,omitempty"`
 	LlmInteractionId    string                              `protobuf:"bytes,16,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
 	RecommendationTrace *recommendation.RecommendationTrace `protobuf:"bytes,17,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// See POIDetailedInfo.grounded.
+	Grounded      *bool `protobuf:"varint,18,opt,name=grounded,proto3,oneof" json:"grounded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HotelDetailedInfo) Reset() {
@@ -495,6 +509,13 @@ func (x *HotelDetailedInfo) GetRecommendationTrace() *recommendation.Recommendat
 	return nil
 }
 
+func (x *HotelDetailedInfo) GetGrounded() bool {
+	if x != nil && x.Grounded != nil {
+		return *x.Grounded
+	}
+	return false
+}
+
 // RestaurantDetailedInfo represents restaurant-specific information
 type RestaurantDetailedInfo struct {
 	state               protoimpl.MessageState              `protogen:"open.v1"`
@@ -516,8 +537,10 @@ type RestaurantDetailedInfo struct {
 	Rating              float64                             `protobuf:"fixed64,16,opt,name=rating,proto3" json:"rating,omitempty"`
 	LlmInteractionId    string                              `protobuf:"bytes,17,opt,name=llm_interaction_id,json=llmInteractionId,proto3" json:"llm_interaction_id,omitempty"`
 	RecommendationTrace *recommendation.RecommendationTrace `protobuf:"bytes,18,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// See POIDetailedInfo.grounded.
+	Grounded      *bool `protobuf:"varint,19,opt,name=grounded,proto3,oneof" json:"grounded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RestaurantDetailedInfo) Reset() {
@@ -674,6 +697,13 @@ func (x *RestaurantDetailedInfo) GetRecommendationTrace() *recommendation.Recomm
 		return x.RecommendationTrace
 	}
 	return nil
+}
+
+func (x *RestaurantDetailedInfo) GetGrounded() bool {
+	if x != nil && x.Grounded != nil {
+		return *x.Grounded
+	}
+	return false
 }
 
 // POIFilters for filtering POIs
@@ -1086,7 +1116,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xb4\x0f\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xe2\x0f\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1138,7 +1168,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\bR\x17recommendationRationale\x88\x01\x01\x12`\n" +
 	"\x14recommendation_trace\x18\x1f \x01(\v2(.loci.recommendation.RecommendationTraceH\tR\x13recommendationTrace\x88\x01\x01\x12B\n" +
 	"\x0everified_facts\x18  \x01(\v2\x16.loci.place.PlaceFactsH\n" +
-	"R\rverifiedFacts\x88\x01\x01\x1a?\n" +
+	"R\rverifiedFacts\x88\x01\x01\x12\x1f\n" +
+	"\bgrounded\x18! \x01(\bH\vR\bgrounded\x88\x01\x01\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x12\n" +
@@ -1153,7 +1184,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x12_uncertainty_scoreB\x1b\n" +
 	"\x19_recommendation_rationaleB\x17\n" +
 	"\x15_recommendation_traceB\x11\n" +
-	"\x0f_verified_facts\"\xb6\a\n" +
+	"\x0f_verified_factsB\v\n" +
+	"\t_grounded\"\xe4\a\n" +
 	"\x11HotelDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1181,13 +1213,15 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x06images\x18\x0f \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x14\"\n" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x06images\x127\n" +
 	"\x12llm_interaction_id\x18\x10 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionId\x12`\n" +
-	"\x14recommendation_trace\x18\x11 \x01(\v2(.loci.recommendation.RecommendationTraceH\x04R\x13recommendationTrace\x88\x01\x01B\x0f\n" +
+	"\x14recommendation_trace\x18\x11 \x01(\v2(.loci.recommendation.RecommendationTraceH\x04R\x13recommendationTrace\x88\x01\x01\x12\x1f\n" +
+	"\bgrounded\x18\x12 \x01(\bH\x05R\bgrounded\x88\x01\x01B\x0f\n" +
 	"\r_phone_numberB\n" +
 	"\n" +
 	"\b_websiteB\x10\n" +
 	"\x0e_opening_hoursB\x0e\n" +
 	"\f_price_rangeB\x17\n" +
-	"\x15_recommendation_trace\"\x96\b\n" +
+	"\x15_recommendation_traceB\v\n" +
+	"\t_grounded\"\xc4\b\n" +
 	"\x16RestaurantDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1216,7 +1250,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x06images\x12/\n" +
 	"\x06rating\x18\x10 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\x00\x00R\x06rating\x127\n" +
 	"\x12llm_interaction_id\x18\x11 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10llmInteractionId\x12`\n" +
-	"\x14recommendation_trace\x18\x12 \x01(\v2(.loci.recommendation.RecommendationTraceH\x06R\x13recommendationTrace\x88\x01\x01B\n" +
+	"\x14recommendation_trace\x18\x12 \x01(\v2(.loci.recommendation.RecommendationTraceH\x06R\x13recommendationTrace\x88\x01\x01\x12\x1f\n" +
+	"\bgrounded\x18\x13 \x01(\bH\aR\bgrounded\x88\x01\x01B\n" +
 	"\n" +
 	"\b_addressB\n" +
 	"\n" +
@@ -1225,7 +1260,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x0e_opening_hoursB\x0e\n" +
 	"\f_price_levelB\x0f\n" +
 	"\r_cuisine_typeB\x17\n" +
-	"\x15_recommendation_trace\"\xbe\x01\n" +
+	"\x15_recommendation_traceB\v\n" +
+	"\t_grounded\"\xbe\x01\n" +
 	"\n" +
 	"POIFilters\x12&\n" +
 	"\x04city\x18\x01 \x01(\tB\r\xbaH\n" +
