@@ -253,8 +253,9 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 				if err == pgx.ErrNoRows {
 					r.logger.WarnContext(ctx, "City not found in database, itinerary creation will be skipped", "city_name", interaction.CityName, "interaction_id", interactionID.String())
 					span.AddEvent("City not found in database", trace.WithAttributes(attribute.String("city.name", interaction.CityName)))
-					// err is pgx.ErrNoRows, so cityID remains uuid.Nil, processing continues correctly. Clear err.
-					err = nil
+					// err is pgx.ErrNoRows, so cityID remains uuid.Nil and
+					// processing continues correctly; err is overwritten by the
+					// next query before it is read again.
 				} else {
 					span.RecordError(err)
 					span.SetStatus(codes.Error, "Failed to get city_id")
@@ -1911,7 +1912,7 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 }
 
 // GetFeaturedCollections returns curated featured collections
-func (r *RepositoryImpl) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
+func (r *RepositoryImpl) GetFeaturedCollections(_ context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
 	// For now, return hardcoded collections
 	// TODO: Move this to a database table when we have proper featured collections system
 	collections := []locitypes.FeaturedCollection{

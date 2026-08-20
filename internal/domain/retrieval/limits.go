@@ -56,15 +56,16 @@ func ClampLimit(value, fallback, maximum int) int {
 	return value
 }
 
-// TruncateRunes shortens s to at most max runes, appending an ellipsis when it
-// had to cut. Rune-aware so multi-byte place names are never split mid-character.
-func TruncateRunes(s string, max int) string {
-	if max <= 0 {
+// TruncateRunes shortens s to at most maxRunes runes, appending an ellipsis
+// when it had to cut. Rune-aware so multi-byte place names are never split
+// mid-character.
+func TruncateRunes(s string, maxRunes int) string {
+	if maxRunes <= 0 {
 		return ""
 	}
 	runes := []rune(s)
-	if len(runes) <= max {
+	if len(runes) <= maxRunes {
 		return s
 	}
-	return string(runes[:max]) + "…"
+	return string(runes[:maxRunes]) + "…"
 }

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Pre-commit: format, then lint, before anything lands in git.
+# golangci-lint version must stay in lockstep with CI (.github/workflows/).
+set -euo pipefail
+
+# gofumpt is run via `go run` at a pinned version rather than a go.mod tool
+# directive. This module vendors its dependencies, and a tool directive drags
+# gofumpt's whole tree (golang.org/x/tools et al) into the build list without
+# vendoring it, so every later `go build` fails with "inconsistent vendoring"
+# until `go mod vendor` is re-run. `go run pkg@version` resolves outside the
+# main module, so vendor/ and go.mod stay untouched, the version stays pinned
+# here, and the binary is always built with the local toolchain — which a
+# `gofumpt` off PATH is not, and stale toolchains miss newer gofmt rules.
+GOFUMPT_VERSION="v0.11.0"
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# Fail closed if the linter is missing — a skipped lint is not a pass.
+if ! command -v golangci-lint >/dev/null 2>&1; then
+  echo "pre-commit: golangci-lint not on PATH. Install v2.13.0 to match CI:" >&2
+  echo "  https://golangci-lint.run/welcome/install/" >&2
+  exit 1
+fi
+
+# Remember what was already staged so we only re-add those after formatting.
+staged_go="$(git diff --cached --name-only --diff-filter=ACM -- '*.go' || true)"
+
+echo "pre-commit: gofumpt -w ."
+go run "mvdan.cc/gofumpt@${GOFUMPT_VERSION}" -w .
+
+# Re-stage only files that were already in the index (partial commits stay partial).
+if [[ -n "${staged_go}" ]]; then
+  while IFS= read -r f; do
+    [[ -z "${f}" ]] && continue
+    [[ -f "${f}" ]] || continue
+    git add -- "${f}"
+  done <<< "${staged_go}"
+  echo "pre-commit: re-staged previously staged .go files after gofumpt"
+fi
+
+echo "pre-commit: golangci-lint run"
+golangci-lint run
+
+echo "pre-commit: ok"

@@ -59,17 +59,17 @@ func (r *RepositoryImpl) loadDomainPreferences(
 		return fmt.Errorf("read domain preferences: %w", err)
 	}
 
-	decode(r, ctx, "accommodation", accommodation, &response.AccommodationPreferences)
-	decode(r, ctx, "dining", dining, &response.DiningPreferences)
-	decode(r, ctx, "activity", activity, &response.ActivityPreferences)
-	decode(r, ctx, "itinerary", itinerary, &response.ItineraryPreferences)
+	decode(ctx, r, "accommodation", accommodation, &response.AccommodationPreferences)
+	decode(ctx, r, "dining", dining, &response.DiningPreferences)
+	decode(ctx, r, "activity", activity, &response.ActivityPreferences)
+	decode(ctx, r, "itinerary", itinerary, &response.ItineraryPreferences)
 
 	return nil
 }
 
 // decode unmarshals one preference blob into target, leaving target untouched
 // when the column was NULL or the stored JSON no longer matches the struct.
-func decode[T any](r *RepositoryImpl, ctx context.Context, domain string, raw []byte, target **T) {
+func decode[T any](ctx context.Context, r *RepositoryImpl, domain string, raw []byte, target **T) {
 	if len(raw) == 0 {
 		return
 	}

@@ -130,7 +130,8 @@ func (l *ServiceImpl) retrieveCandidates(
 	}
 
 	semantic, err := l.generateSemanticPOIRecommendations(
-		ctx, cc.Message, cc.CityID, cc.UserID, cc.UserLocation, defaultSemanticWeight)
+		ctx, cc.Message, cc.CityID, cc.UserID, cc.UserLocation, defaultSemanticWeight,
+	)
 	if err != nil {
 		l.logger.WarnContext(ctx, "semantic retrieval lane failed",
 			slog.Any("error", err), slog.String("city_id", cc.CityID.String()))

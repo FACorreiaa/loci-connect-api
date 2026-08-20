@@ -32,27 +32,27 @@ type stubService struct {
 	lastCalls []string
 }
 
-func (s *stubService) GetDiscoverPageData(ctx context.Context, userID uuid.UUID, limit int) (*locitypes.DiscoverPageData, error) {
+func (s *stubService) GetDiscoverPageData(_ context.Context, _ uuid.UUID, _ int) (*locitypes.DiscoverPageData, error) {
 	s.lastCalls = append(s.lastCalls, "GetDiscoverPageData")
 	return s.pageData, s.err
 }
 
-func (s *stubService) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
+func (s *stubService) GetTrendingDiscoveries(_ context.Context, _ int) ([]locitypes.TrendingDiscovery, error) {
 	s.lastCalls = append(s.lastCalls, "GetTrendingDiscoveries")
 	return s.trending, s.err
 }
 
-func (s *stubService) GetFeaturedCollections(ctx context.Context, limit int) ([]locitypes.FeaturedCollection, error) {
+func (s *stubService) GetFeaturedCollections(_ context.Context, _ int) ([]locitypes.FeaturedCollection, error) {
 	s.lastCalls = append(s.lastCalls, "GetFeaturedCollections")
 	return s.featured, s.err
 }
 
-func (s *stubService) GetRecentDiscoveries(ctx context.Context, userID uuid.UUID, page, limit int) ([]locitypes.ChatSession, int, error) {
+func (s *stubService) GetRecentDiscoveries(_ context.Context, _ uuid.UUID, _, limit int) ([]locitypes.ChatSession, int, error) {
 	s.lastCalls = append(s.lastCalls, "GetRecentDiscoveries")
 	return s.recent, len(s.recent), s.err
 }
 
-func (s *stubService) GetCategoryResults(ctx context.Context, category, cityName string, page, limit int) ([]locitypes.DiscoverResult, error) {
+func (s *stubService) GetCategoryResults(_ context.Context, _, _ string, page, limit int) ([]locitypes.DiscoverResult, error) {
 	s.lastCalls = append(s.lastCalls, "GetCategoryResults")
 	return s.category, s.err
 }

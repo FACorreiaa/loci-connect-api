@@ -513,7 +513,8 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 
 				// Add semantic POI to itinerary
 				session.CurrentItinerary.AIItineraryResponse.PointsOfInterest = append(
-					session.CurrentItinerary.AIItineraryResponse.PointsOfInterest, semanticPOI)
+					session.CurrentItinerary.AIItineraryResponse.PointsOfInterest, semanticPOI,
+				)
 				l.logger.InfoContext(ctx, "Added semantic POI to streaming itinerary",
 					slog.String("poi_name", semanticPOI.Name))
 				span.SetAttributes(attribute.String("added_poi", semanticPOI.Name))
@@ -589,7 +590,8 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	}
 
 	session.CurrentItinerary.AIItineraryResponse.PointsOfInterest = append(
-		session.CurrentItinerary.AIItineraryResponse.PointsOfInterest, newPOI)
+		session.CurrentItinerary.AIItineraryResponse.PointsOfInterest, newPOI,
+	)
 
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
 		Type: "poi_added_successfully",

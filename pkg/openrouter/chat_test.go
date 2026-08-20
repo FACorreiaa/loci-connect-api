@@ -73,7 +73,7 @@ func TestChatClientGenerate(t *testing.T) {
 }
 
 func TestChatClientGenerateStream(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: {\"id\":\"req-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hel\"}}]}\n\n")
 		_, _ = io.WriteString(w, "data: {\"id\":\"req-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo\"},\"finish_reason\":\"stop\"}]}\n\n")
@@ -104,7 +104,7 @@ func TestChatClientGenerateStream(t *testing.T) {
 
 func TestChatClientDoesNotRetryPaymentRequired(t *testing.T) {
 	requests := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		requests++
 		w.WriteHeader(http.StatusPaymentRequired)
 		_, _ = io.WriteString(w, `{"error":{"message":"insufficient credits"}}`)

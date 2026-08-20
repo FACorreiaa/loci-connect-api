@@ -72,7 +72,7 @@ func (h *AuthHandler) VerifyMFA(
 // BeginMFAEnrollment issues a secret and provisioning URI for the caller.
 func (h *AuthHandler) BeginMFAEnrollment(
 	ctx context.Context,
-	req *connect.Request[auth.BeginMFAEnrollmentRequest],
+	_ *connect.Request[auth.BeginMFAEnrollmentRequest],
 ) (*connect.Response[auth.BeginMFAEnrollmentResponse], error) {
 	claims, err := h.mfaClaims(ctx)
 	if err != nil {
@@ -191,7 +191,7 @@ func (h *AuthHandler) RegenerateRecoveryCodes(
 // GetMFAStatus reports the caller's MFA state for the Settings UI.
 func (h *AuthHandler) GetMFAStatus(
 	ctx context.Context,
-	req *connect.Request[auth.GetMFAStatusRequest],
+	_ *connect.Request[auth.GetMFAStatusRequest],
 ) (*connect.Response[auth.GetMFAStatusResponse], error) {
 	claims, err := h.mfaClaims(ctx)
 	if err != nil {

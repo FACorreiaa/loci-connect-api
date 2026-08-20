@@ -23,7 +23,7 @@ func NewInterestHandler(svc interests.Service) *InterestHandler {
 	return &InterestHandler{service: svc}
 }
 
-func (h *InterestHandler) GetInterests(ctx context.Context, req *connect.Request[interestv1.GetInterestsRequest]) (*connect.Response[interestv1.GetInterestsResponse], error) {
+func (h *InterestHandler) GetInterests(ctx context.Context, _ *connect.Request[interestv1.GetInterestsRequest]) (*connect.Response[interestv1.GetInterestsResponse], error) {
 	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
 	if !ok || userIDStr == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)

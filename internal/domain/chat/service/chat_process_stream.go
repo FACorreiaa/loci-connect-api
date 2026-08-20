@@ -444,7 +444,7 @@ func (l *ServiceImpl) persistResults(
 	// 2. Save Interaction
 	var fullResponseBuilder strings.Builder
 	for partType, content := range rawResponses {
-		fullResponseBuilder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", partType, content))
+		fmt.Fprintf(&fullResponseBuilder, "[%s]\n%s\n\n", partType, content)
 	}
 	fullResponse := fullResponseBuilder.String()
 	if fullResponse == "" {

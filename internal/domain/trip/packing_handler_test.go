@@ -51,6 +51,7 @@ func (f *fakeTripRepo) SaveTrip(context.Context, *Trip, int64) (*Trip, error) { 
 func (f *fakeTripRepo) ListTrips(context.Context, uuid.UUID, int, int) ([]*Trip, int, error) {
 	return nil, 0, nil
 }
+
 func (f *fakeTripRepo) SetShare(context.Context, uuid.UUID, uuid.UUID, bool, string) (*Trip, error) {
 	return f.trip, nil
 }

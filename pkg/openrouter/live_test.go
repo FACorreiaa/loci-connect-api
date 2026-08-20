@@ -2,12 +2,11 @@ package openrouter_test
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"log/slog"
 
 	"github.com/joho/godotenv"
 

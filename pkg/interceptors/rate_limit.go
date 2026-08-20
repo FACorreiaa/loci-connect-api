@@ -23,11 +23,11 @@ func (i *RateLimitInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFu
 		if i == nil || i.limiter == nil {
 			return next(ctx, req)
 		}
-		if allowed, retryAfter := allowWithRetry(i.limiter); allowed {
+		allowed, retryAfter := allowWithRetry(i.limiter)
+		if allowed {
 			return next(ctx, req)
-		} else {
-			return nil, newRateLimitError(retryAfter)
 		}
+		return nil, newRateLimitError(retryAfter)
 	}
 }
 

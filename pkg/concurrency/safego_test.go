@@ -46,7 +46,7 @@ func TestGo_PanickingFIsContainedAndLogged(t *testing.T) {
 	}
 }
 
-func TestGo_NilLoggerDoesNotCrashOnPanic(t *testing.T) {
+func TestGo_NilLoggerDoesNotCrashOnPanic(_ *testing.T) {
 	var wg sync.WaitGroup
 	Go(&wg, nil, func() {
 		panic("nil-logger-panic")

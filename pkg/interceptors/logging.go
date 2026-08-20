@@ -42,7 +42,7 @@ func (i *LoggingInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc
 		)...)
 
 		resp, err := next(ctx, req)
-		i.logUnaryComplete(logger, ctx, req.Spec().Procedure, start, requestSize, resp, err)
+		i.logUnaryComplete(ctx, logger, req.Spec().Procedure, start, requestSize, resp, err)
 		return resp, err
 	}
 }
@@ -85,8 +85,8 @@ func (i *LoggingInterceptor) WrapStreamingHandler(next connect.StreamingHandlerF
 }
 
 func (i *LoggingInterceptor) logUnaryComplete(
-	logger *slog.Logger,
 	ctx context.Context,
+	logger *slog.Logger,
 	procedure string,
 	start time.Time,
 	requestSize int,

@@ -323,22 +323,8 @@ Required JSON structure (return ONLY this, nothing else):
 }
 
 If the POI is not found, return: {"name": "", "latitude": 0, "longitude": 0, "category": "", "description_poi": ""}`,
-		poi, city)
-}
-
-// getCityDescriptionPrompt generates a prompt for city data
-func getCityDescriptionPrompt(cityName string) string {
-	return fmt.Sprintf(`
-        Provide detailed information about the city %s in JSON format with the following structure:
-        {
-            "city_name": "%s",
-            "country": "Country name",
-            "state_province": "State or province, if applicable",
-            "description": "A detailed description of the city",
-            "center_latitude": float64,
-            "center_longitude": float64
-        }
-    `, cityName, cityName)
+		poi, city,
+	)
 }
 
 /*

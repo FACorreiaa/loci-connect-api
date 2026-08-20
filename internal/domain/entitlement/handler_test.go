@@ -26,6 +26,7 @@ type stubLists struct {
 func (s stubLists) CountUserLists(context.Context, uuid.UUID) (int, error) {
 	return s.lists, nil
 }
+
 func (s stubLists) CountUserListItems(context.Context, uuid.UUID) (int, error) {
 	return s.places, nil
 }

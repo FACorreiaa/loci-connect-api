@@ -44,9 +44,9 @@ func (i *RequestIDInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFu
 		if resp != nil && requestID != "" {
 			func() {
 				defer func() {
-					if r := recover(); r != nil {
-						// Silently handle nil pointer in response interface
-					}
+					// Swallow a nil-pointer panic from a response
+					// implementation that does not tolerate Header().
+					_ = recover()
 				}()
 				if header := resp.Header(); header != nil {
 					header.Set(i.headerName, requestID)

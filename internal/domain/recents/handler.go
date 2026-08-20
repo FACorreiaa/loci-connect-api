@@ -219,7 +219,7 @@ func (h *Handler) GetCityInteractions(
 // RecordInteraction records a new user interaction
 func (h *Handler) RecordInteraction(
 	ctx context.Context,
-	req *connect.Request[recentsv1.RecordInteractionRequest],
+	_ *connect.Request[recentsv1.RecordInteractionRequest],
 ) (*connect.Response[recentsv1.RecordInteractionResponse], error) {
 	l := h.logger.With(slog.String("method", "RecordInteraction"))
 

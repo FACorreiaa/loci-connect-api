@@ -254,7 +254,7 @@ func (h *paymentHandler) CancelSubscription(ctx context.Context, req *connect.Re
 	}), nil
 }
 
-func (h *paymentHandler) GetUserSubscriptions(ctx context.Context, req *connect.Request[paymentv1.GetUserSubscriptionsRequest]) (*connect.Response[paymentv1.GetUserSubscriptionsResponse], error) {
+func (h *paymentHandler) GetUserSubscriptions(ctx context.Context, _ *connect.Request[paymentv1.GetUserSubscriptionsRequest]) (*connect.Response[paymentv1.GetUserSubscriptionsResponse], error) {
 	userID, err := h.authenticatedUserID(ctx)
 	if err != nil {
 		return nil, err
@@ -272,7 +272,7 @@ func (h *paymentHandler) GetUserSubscriptions(ctx context.Context, req *connect.
 	}), nil
 }
 
-func (h *paymentHandler) GetSubscription(ctx context.Context, req *connect.Request[paymentv1.GetSubscriptionRequest]) (*connect.Response[paymentv1.GetSubscriptionResponse], error) {
+func (h *paymentHandler) GetSubscription(ctx context.Context, _ *connect.Request[paymentv1.GetSubscriptionRequest]) (*connect.Response[paymentv1.GetSubscriptionResponse], error) {
 	userID, err := h.authenticatedUserID(ctx)
 	if err != nil {
 		return nil, err

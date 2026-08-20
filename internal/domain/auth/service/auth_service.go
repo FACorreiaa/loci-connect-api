@@ -200,7 +200,8 @@ func (s *AuthService) Login(ctx context.Context, params LoginParams) (*LoginResu
 		}
 		if enabled {
 			challenge, _, err := s.tokenManager.GenerateMFAChallengeToken(
-				user.ID.String(), user.Email, user.Username, user.Role)
+				user.ID.String(), user.Email, user.Username, user.Role,
+			)
 			if err != nil {
 				return nil, err
 			}

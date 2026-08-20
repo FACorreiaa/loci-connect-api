@@ -17,7 +17,7 @@ type TestLLMClient struct {
 	CloseFn          func() error
 }
 
-func (t *TestLLMClient) StartChatSession(ctx context.Context, config *genai.GenerateContentConfig) (*generativeAI.ChatSession, error) {
+func (t *TestLLMClient) StartChatSession(_ context.Context, _ *genai.GenerateContentConfig) (*generativeAI.ChatSession, error) {
 	panic("unimplemented")
 }
 

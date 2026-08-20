@@ -174,5 +174,5 @@ func paginationParamsCommon(p *commonpb.PaginationRequest) (page, pageSize int) 
 			pageSize = int(p.GetPageSize())
 		}
 	}
-	return
+	return page, pageSize
 }

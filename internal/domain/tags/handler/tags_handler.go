@@ -31,7 +31,7 @@ func NewTagsHandler(svc Service) *TagsHandler {
 	return &TagsHandler{service: svc}
 }
 
-func (h *TagsHandler) GetTags(ctx context.Context, req *connect.Request[tagsv1.GetTagsRequest]) (*connect.Response[tagsv1.GetTagsResponse], error) {
+func (h *TagsHandler) GetTags(ctx context.Context, _ *connect.Request[tagsv1.GetTagsRequest]) (*connect.Response[tagsv1.GetTagsResponse], error) {
 	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
 	if !ok || userIDStr == "" {
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)

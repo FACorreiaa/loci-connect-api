@@ -59,7 +59,7 @@ func buildProsCons(
 	return pros, cons
 }
 
-func pickRecommendation(columns []columnScore) (rec string, reason string) {
+func pickRecommendation(columns []columnScore) (rec, reason string) {
 	if len(columns) == 0 {
 		return "unspecified", ""
 	}

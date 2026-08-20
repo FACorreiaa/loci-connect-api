@@ -128,13 +128,15 @@ func (s *Service) staleReasons(ctx context.Context, status *CorpusStatus) []stri
 		pct := float64(status.POIsMissingEmbedding) / float64(status.POICount) * 100
 		reasons = append(reasons, fmt.Sprintf(
 			"%d of %d POIs (%.0f%%) have no embedding and cannot be found by semantic search",
-			status.POIsMissingEmbedding, status.POICount, pct))
+			status.POIsMissingEmbedding, status.POICount, pct,
+		))
 	}
 
 	if status.FactsExpired > 0 {
 		reasons = append(reasons, fmt.Sprintf(
 			"%d of %d crowd-verified facts are past their TTL and are no longer offered as evidence",
-			status.FactsExpired, status.FactsTotal))
+			status.FactsExpired, status.FactsTotal,
+		))
 	}
 
 	for kind, last := range status.LastRuns {
@@ -150,7 +152,8 @@ func (s *Service) staleReasons(ctx context.Context, status *CorpusStatus) []stri
 		case last.CompletedAt != nil && time.Since(*last.CompletedAt) > staleRunAfter:
 			reasons = append(reasons, fmt.Sprintf(
 				"the %s job last succeeded %s ago", kind,
-				time.Since(*last.CompletedAt).Round(time.Hour)))
+				time.Since(*last.CompletedAt).Round(time.Hour),
+			))
 		}
 	}
 
@@ -158,7 +161,8 @@ func (s *Service) staleReasons(ctx context.Context, status *CorpusStatus) []stri
 		for _, kind := range stuck {
 			reasons = append(reasons, fmt.Sprintf(
 				"a %s run started over %s ago and never finished; it probably died",
-				kind, deadRunAfter))
+				kind, deadRunAfter,
+			))
 		}
 	}
 

@@ -87,7 +87,7 @@ func getUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 // This endpoint is PUBLIC - all users can access it.
 func (h *Handler) GetMainPageStatistics(
 	ctx context.Context,
-	req *connect.Request[statisticsv1.GetMainPageStatisticsRequest],
+	_ *connect.Request[statisticsv1.GetMainPageStatisticsRequest],
 ) (*connect.Response[statisticsv1.GetMainPageStatisticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetMainPageStatistics"))
 
@@ -171,7 +171,7 @@ func (h *Handler) StreamMainPageStatistics(
 // This endpoint requires AUTHENTICATION.
 func (h *Handler) GetDetailedPOIStatistics(
 	ctx context.Context,
-	req *connect.Request[statisticsv1.GetDetailedPOIStatisticsRequest],
+	_ *connect.Request[statisticsv1.GetDetailedPOIStatisticsRequest],
 ) (*connect.Response[statisticsv1.GetDetailedPOIStatisticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetDetailedPOIStatistics"))
 
@@ -205,7 +205,7 @@ func (h *Handler) GetDetailedPOIStatistics(
 // This endpoint requires AUTHENTICATION.
 func (h *Handler) GetLandingPageStatistics(
 	ctx context.Context,
-	req *connect.Request[statisticsv1.GetLandingPageStatisticsRequest],
+	_ *connect.Request[statisticsv1.GetLandingPageStatisticsRequest],
 ) (*connect.Response[statisticsv1.GetLandingPageStatisticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetLandingPageStatistics"))
 
@@ -246,7 +246,7 @@ func (h *Handler) GetLandingPageStatistics(
 // This endpoint requires AUTHENTICATION.
 func (h *Handler) GetUserActivityAnalytics(
 	ctx context.Context,
-	req *connect.Request[statisticsv1.GetUserActivityAnalyticsRequest],
+	_ *connect.Request[statisticsv1.GetUserActivityAnalyticsRequest],
 ) (*connect.Response[statisticsv1.GetUserActivityAnalyticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetUserActivityAnalytics"))
 
@@ -276,7 +276,7 @@ func (h *Handler) GetUserActivityAnalytics(
 // This endpoint requires ADMIN AUTHENTICATION.
 func (h *Handler) GetSystemAnalytics(
 	ctx context.Context,
-	req *connect.Request[statisticsv1.GetSystemAnalyticsRequest],
+	_ *connect.Request[statisticsv1.GetSystemAnalyticsRequest],
 ) (*connect.Response[statisticsv1.GetSystemAnalyticsResponse], error) {
 	l := h.logger.With(slog.String("method", "GetSystemAnalytics"))
 

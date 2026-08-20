@@ -16,7 +16,7 @@ func startIPLimitedHandler(perSecond, burst, maxEntries int) http.Handler {
 	interceptor := NewIPRateLimitInterceptor(perSecond, burst, maxEntries)
 	return connect.NewUnaryHandler(
 		"/test.Service/Method",
-		func(ctx context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
+		func(_ context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
 			return connect.NewResponse(&emptypb.Empty{}), nil
 		},
 		connect.WithInterceptors(interceptor),
@@ -63,7 +63,7 @@ func TestUserRateLimitInterceptor_SkipsWithoutUserID(t *testing.T) {
 	}
 
 	enabled := NewUserRateLimitInterceptor(1, 1, 10)
-	handler := enabled.WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+	handler := enabled.WrapUnary(func(_ context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		return connect.NewResponse(&emptypb.Empty{}), nil
 	})
 	req := connect.NewRequest(&emptypb.Empty{})
@@ -77,7 +77,7 @@ func TestUserRateLimitInterceptor_SkipsWithoutUserID(t *testing.T) {
 
 func TestUserRateLimitInterceptor_LimitsAuthenticatedUser(t *testing.T) {
 	interceptor := NewUserRateLimitInterceptor(1, 1, 10)
-	handler := interceptor.WrapUnary(func(ctx context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
+	handler := interceptor.WrapUnary(func(_ context.Context, _ connect.AnyRequest) (connect.AnyResponse, error) {
 		return connect.NewResponse(&emptypb.Empty{}), nil
 	})
 	req := connect.NewRequest(&emptypb.Empty{})

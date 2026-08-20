@@ -161,8 +161,10 @@ func TestScore_StaysWithinBounds(t *testing.T) {
 	floor := Score(ScoreInput{
 		CityName: "X", Forecast: wet(3), TravelMins: 900, WindowHours: 24, POICount: 0,
 		Alerts: []Alert{
-			{Kind: AlertStrike, Title: "a"}, {Kind: AlertClosure, Title: "b"},
-			{Kind: AlertHoliday, Title: "c"}, {Kind: AlertClosure, Title: "d"},
+			{Kind: AlertStrike, Title: "a"},
+			{Kind: AlertClosure, Title: "b"},
+			{Kind: AlertHoliday, Title: "c"},
+			{Kind: AlertClosure, Title: "d"},
 		},
 	})
 	if floor.Score < 0 || floor.Score > 100 {

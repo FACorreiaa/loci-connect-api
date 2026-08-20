@@ -38,7 +38,7 @@ const (
 // The plaintext is returned to be shown to the user exactly once and then
 // discarded; only the hashes are persisted. This is the same reasoning as
 // passwords: a database dump must not yield usable second factors.
-func GenerateRecoveryCodes() (plain []string, hashes []string, err error) {
+func GenerateRecoveryCodes() (plain, hashes []string, err error) {
 	plain = make([]string, 0, RecoveryCodeCount)
 	hashes = make([]string, 0, RecoveryCodeCount)
 
@@ -59,14 +59,14 @@ func GenerateRecoveryCodes() (plain []string, hashes []string, err error) {
 
 func newRecoveryCode() (string, error) {
 	groups := make([]string, 0, recoveryGroups)
-	max := big.NewInt(int64(len(recoveryAlphabet)))
+	alphabetLen := big.NewInt(int64(len(recoveryAlphabet)))
 
 	for range recoveryGroups {
 		var sb strings.Builder
 		for range recoveryGroupLen {
 			// crypto/rand, not math/rand: these are credentials, and a predictable
 			// sequence would let one leaked code expose the rest.
-			n, err := rand.Int(rand.Reader, max)
+			n, err := rand.Int(rand.Reader, alphabetLen)
 			if err != nil {
 				return "", fmt.Errorf("mfa: generate recovery code: %w", err)
 			}

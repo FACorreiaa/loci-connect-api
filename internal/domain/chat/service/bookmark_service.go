@@ -15,7 +15,7 @@ import (
 
 // BookmarkPOI bookmarks a POI (Point of Interest) for the user.
 // It uses the generic "List" service, storing POIs in a default "Bookmarks" list if no specific list is provided.
-func (s *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
+func (l *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("ChatService").Start(ctx, "BookmarkPOI", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 	))
@@ -30,7 +30,7 @@ func (s *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req loc
 	// In a real app, maybe we use a specific type "favorites" etc.
 	// For simplicity, we search by name "Bookmarks" and content type "poi" if applicable?
 	// List search is flexible.
-	lists, err := s.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
+	lists, err := l.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
 	var bookmarkListID uuid.UUID
 
 	// Filter for user's own "Bookmarks" list
@@ -45,7 +45,7 @@ func (s *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req loc
 
 	if bookmarkListID == uuid.Nil {
 		// Create new "Bookmarks" list
-		newList, err := s.listSvc.CreateTopLevelList(ctx, userID, "Bookmarks", "My bookmarked places", nil, false, false)
+		newList, err := l.listSvc.CreateTopLevelList(ctx, userID, "Bookmarks", "My bookmarked places", nil, false, false)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "Failed to create Bookmarks list")
@@ -68,7 +68,7 @@ func (s *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req loc
 		addReq.ItemAIDescription = *req.Description
 	}
 
-	item, err := s.listSvc.AddListItem(ctx, userID, bookmarkListID, addReq)
+	item, err := l.listSvc.AddListItem(ctx, userID, bookmarkListID, addReq)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Failed to add POI to bookmarks list")
@@ -80,7 +80,7 @@ func (s *ServiceImpl) BookmarkPOI(ctx context.Context, userID uuid.UUID, req loc
 }
 
 // GetBookmarkedPOIs retrieves bookmarked POIs for the user.
-func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserPOIsResponse, error) {
+func (l *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserPOIsResponse, error) {
 	ctx, span := otel.Tracer("ChatService").Start(ctx, "GetBookmarkedPOIs", trace.WithAttributes(
 		attribute.String("user.id", userID.String()),
 		attribute.Int("page", page),
@@ -89,7 +89,7 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 	defer span.End()
 
 	// 1. Find "Bookmarks" list
-	lists, err := s.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
+	lists, err := l.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
 	var bookmarkListID uuid.UUID
 	if err == nil {
 		for _, l := range lists {
@@ -114,7 +114,7 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 	// List service doesn't have pagination for items in `GetListItemsByContentType` yet?
 	// It returns a slice. We'll paginate manually here for now, or update ListService later.
 	// NOTE: `GetListItemsByContentType` returns `ListItem` pointers.
-	items, err := s.listSvc.GetListItemsByContentType(ctx, userID, bookmarkListID, locitypes.ContentTypePOI)
+	items, err := l.listSvc.GetListItemsByContentType(ctx, userID, bookmarkListID, locitypes.ContentTypePOI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bookmarked items: %w", err)
 	}
@@ -137,7 +137,7 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 	// Actually `GetListItemsByContentType` signature says `[]*locitypes.ListItem`.
 	// Does `ListItem` contain POI details? No.
 	// We need to fetch POI details.
-	// We can use `s.poiRepo.GetPOIsByIDs` if it exists.
+	// We can use `l.poiRepo.GetPOIsByIDs` if it exists.
 	// Or loop and fetch.
 	// `poiRepo` likely has `GetPOI`.
 	var pois []locitypes.POIDetailedInfo
@@ -160,9 +160,9 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 		// If fails, we just return basic info from ListItem (e.g. notes as name?).
 		// Actually, `locitypes.ListItem` has `ItemAIDescription`.
 		// Let's try to get POI.
-		// s.poiRepo might not have GetPOI exposed easily here.
+		// l.poiRepo might not have GetPOI exposed easily here.
 		// I will rely on what I have.
-		// Wait, `s.listSvc.GetListDetails` (Line 23) returns `*locitypes.ListWithItems`.
+		// Wait, `l.listSvc.GetListDetails` (Line 23) returns `*locitypes.ListWithItems`.
 		// `ListWithItems` (types/itinerary_list.go) has `Items []*ListItem`.
 		// It doesn't seem to return `ListItemWithContent`.
 		// So hydration is left to consumer.
@@ -174,7 +174,7 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 			// Name, Location, etc. are missing!
 			// This is a limitation.
 			// Ideally ListService should provide hydration or we query POI repo.
-			// I will attempt to query s.poiRepo
+			// I will attempt to query l.poiRepo
 		}
 		// If I can't query, I'll return what I have.
 		pois = append(pois, p)
@@ -189,9 +189,9 @@ func (s *ServiceImpl) GetBookmarkedPOIs(ctx context.Context, userID uuid.UUID, p
 }
 
 // RemovePOI removes a bookmarked POI.
-func (s *ServiceImpl) RemovePOI(ctx context.Context, userID, poiID uuid.UUID) error {
+func (l *ServiceImpl) RemovePOI(ctx context.Context, userID, poiID uuid.UUID) error {
 	// 1. Find "Bookmarks" list
-	lists, err := s.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
+	lists, err := l.listSvc.SearchLists(ctx, "Bookmarks", "", "", "", nil)
 	var bookmarkListID uuid.UUID
 	if err == nil {
 		for _, l := range lists {
@@ -208,11 +208,11 @@ func (s *ServiceImpl) RemovePOI(ctx context.Context, userID, poiID uuid.UUID) er
 
 	// 2. Remove ListItem
 	// ListService need ItemID. Assuming POIID == ItemID.
-	return s.listSvc.RemoveListItem(ctx, userID, bookmarkListID, poiID)
+	return l.listSvc.RemoveListItem(ctx, userID, bookmarkListID, poiID)
 }
 
 // SaveItineraryFromInteraction bookmarks an itinerary (likely a list of POIs generated by AI).
-func (s *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
+func (l *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID uuid.UUID, req locitypes.BookmarkRequest) (uuid.UUID, error) {
 	// Delegate to Repository which handles creating `user_saved_itineraries`.
 	// This seems to be a separate concept from "Bookmarks List".
 	// "UserSavedItinerary" is complex type.
@@ -234,15 +234,15 @@ func (s *ServiceImpl) SaveItineraryFromInteraction(ctx context.Context, userID u
 		itinerary.IsPublic = *req.IsPublic
 	}
 
-	return s.llmInteractionRepo.AddChatToBookmark(ctx, itinerary)
+	return l.llmInteractionRepo.AddChatToBookmark(ctx, itinerary)
 }
 
 // GetBookmarkedItineraries retrieves saved itineraries.
-func (s *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error) {
-	return s.llmInteractionRepo.GetBookmarkedItineraries(ctx, userID, page, limit)
+func (l *ServiceImpl) GetBookmarkedItineraries(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.PaginatedUserItinerariesResponse, error) {
+	return l.llmInteractionRepo.GetBookmarkedItineraries(ctx, userID, page, limit)
 }
 
 // RemoveItinerary removes a saved itinerary.
-func (s *ServiceImpl) RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error {
-	return s.llmInteractionRepo.RemoveChatFromBookmark(ctx, userID, itineraryID)
+func (l *ServiceImpl) RemoveItinerary(ctx context.Context, userID, itineraryID uuid.UUID) error {
+	return l.llmInteractionRepo.RemoveChatFromBookmark(ctx, userID, itineraryID)
 }

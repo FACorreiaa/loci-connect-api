@@ -63,7 +63,7 @@ func (h *ListHandler) CreateList(ctx context.Context, req *connect.Request[listp
 	return connect.NewResponse(&listpb.CreateListResponse{Success: true, List: toProtoList(l)}), nil
 }
 
-func (h *ListHandler) GetLists(ctx context.Context, req *connect.Request[listpb.GetListsRequest]) (*connect.Response[listpb.GetListsResponse], error) {
+func (h *ListHandler) GetLists(ctx context.Context, _ *connect.Request[listpb.GetListsRequest]) (*connect.Response[listpb.GetListsResponse], error) {
 	userID, err := userFromCtx(ctx)
 	if err != nil {
 		return nil, err

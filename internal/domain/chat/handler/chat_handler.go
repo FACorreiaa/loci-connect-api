@@ -504,7 +504,7 @@ func attributionForEvent(eventType, variant string) (recommendationv1.Recommenda
 
 // decodeData re-encodes a stream event's Data (a typed struct or a legacy map)
 // into target via JSON. Best-effort: false if Data is nil or does not decode.
-func decodeData(data any, target any) bool {
+func decodeData(data, target any) bool {
 	if data == nil {
 		return false
 	}

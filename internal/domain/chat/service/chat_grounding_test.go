@@ -29,13 +29,13 @@ func testPacket(ids ...uuid.UUID) *retrieval.ContextPacket {
 // be stripped before anything downstream can persist it. canonicalizePOIs runs
 // after this and would otherwise treat a fabricated UUID as a retrieved row.
 func TestNeutralizeFabricatedIDsStripsInventedIdentifiers(t *testing.T) {
-	real := uuid.New()
+	realID := uuid.New()
 	invented := uuid.New()
 
-	cc := &common.ChatContext{Packet: testPacket(real)}
+	cc := &common.ChatContext{Packet: testPacket(realID)}
 	data := &locitypes.AiCityResponse{
 		PointsOfInterest: []locitypes.POIDetailedInfo{
-			{ID: real, Name: "Bar Alta"},
+			{ID: realID, Name: "Bar Alta"},
 			{ID: invented, Name: "Bar That Does Not Exist"},
 			{Name: "Unnamed suggestion with no id"},
 		},
@@ -44,8 +44,8 @@ func TestNeutralizeFabricatedIDsStripsInventedIdentifiers(t *testing.T) {
 	l := &ServiceImpl{}
 	grounded, fabricated := l.neutralizeFabricatedIDs(cc, data)
 
-	if len(grounded) != 1 || grounded[0] != real {
-		t.Errorf("grounded = %v, want [%s]", grounded, real)
+	if len(grounded) != 1 || grounded[0] != realID {
+		t.Errorf("grounded = %v, want [%s]", grounded, realID)
 	}
 	if len(fabricated) != 1 || fabricated[0] != invented {
 		t.Errorf("fabricated = %v, want [%s]", fabricated, invented)
@@ -54,7 +54,7 @@ func TestNeutralizeFabricatedIDsStripsInventedIdentifiers(t *testing.T) {
 	if !data.PointsOfInterest[0].Grounded {
 		t.Error("retrieved place was not marked grounded")
 	}
-	if data.PointsOfInterest[0].ID != real {
+	if data.PointsOfInterest[0].ID != realID {
 		t.Error("retrieved place lost its identifier")
 	}
 
@@ -64,7 +64,7 @@ func TestNeutralizeFabricatedIDsStripsInventedIdentifiers(t *testing.T) {
 	if data.PointsOfInterest[1].Grounded {
 		t.Error("fabricated place was marked grounded")
 	}
-	// The suggestion itself is kept — it may be a real place we simply do not
+	// The suggestion itself is kept — it may be a realID place we simply do not
 	// have. Only the false claim of provenance is removed.
 	if data.PointsOfInterest[1].Name == "" {
 		t.Error("fabricated place was dropped entirely; only its id should be")
@@ -72,13 +72,13 @@ func TestNeutralizeFabricatedIDsStripsInventedIdentifiers(t *testing.T) {
 }
 
 func TestNeutralizeFabricatedIDsCoversHotelsAndRestaurants(t *testing.T) {
-	real := uuid.New()
+	realID := uuid.New()
 	invented := uuid.New()
 
-	cc := &common.ChatContext{Packet: testPacket(real)}
+	cc := &common.ChatContext{Packet: testPacket(realID)}
 	data := &locitypes.AiCityResponse{
 		Hotels:      []locitypes.HotelDetailedInfo{{ID: invented, Name: "Ghost Hotel"}},
-		Restaurants: []locitypes.RestaurantDetailedInfo{{ID: real, Name: "Real Tasca"}},
+		Restaurants: []locitypes.RestaurantDetailedInfo{{ID: realID, Name: "Real Tasca"}},
 	}
 
 	l := &ServiceImpl{}

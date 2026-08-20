@@ -424,7 +424,8 @@ func (d *Dependencies) initHandlers() error {
 	// derived row could not be written.
 	if d.RecommendationHandler != nil {
 		d.RecommendationHandler = d.RecommendationHandler.WithTravelHistory(
-			travelhistory.NewRecorder(d.TravelHistoryRepo, d.Logger))
+			travelhistory.NewRecorder(d.TravelHistoryRepo, d.Logger),
+		)
 	}
 	// Give statistics the real visited-city count. Until this line, that field
 	// returned hotels+restaurants and was marked "// Placeholder".

@@ -144,8 +144,8 @@ func (l *ServiceImpl) GetPOIDetailedInfosResponse(ctx context.Context, userID uu
 			l.logger.InfoContext(ctx, "Cache hit for POI details", slog.String("cache_key", cacheKey))
 			span.AddEvent("Cache hit")
 			span.SetStatus(codes.Ok, "POI details served from cache")
-			copy := *p
-			return &copy, nil
+			cached := *p
+			return &cached, nil
 		}
 	}
 

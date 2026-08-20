@@ -132,7 +132,6 @@ func aggregateDaily(entries []openWeatherEntry) []WeatherDay {
 		high, low  float64
 		pop        float64
 		conditions map[string]int
-		set        bool
 	}
 	byDay := map[string]*acc{}
 	var order []string

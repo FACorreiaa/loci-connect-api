@@ -183,7 +183,7 @@ func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, 
 		Category       string    `db:"category"`
 	}
 
-	poiDbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiRow])
+	poiDBRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[poiRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -192,19 +192,19 @@ func (r *RepositoryImpl) FindPoiByNameAndCity(ctx context.Context, name string, 
 	}
 	// Log the successful retrieval
 	r.logger.Info("POI found successfully",
-		slog.String("name", poiDbRow.Name),
-		slog.Float64("latitude", poiDbRow.Latitude),
-		slog.Float64("longitude", poiDbRow.Longitude),
+		slog.String("name", poiDBRow.Name),
+		slog.Float64("latitude", poiDBRow.Latitude),
+		slog.Float64("longitude", poiDBRow.Longitude),
 		slog.String("cityID", cityID.String()))
 
 	return &locitypes.POIDetailedInfo{
-		ID:             poiDbRow.ID,
-		CityID:         poiDbRow.CityID,
-		Name:           poiDbRow.Name,
-		DescriptionPOI: poiDbRow.DescriptionPOI,
-		Latitude:       poiDbRow.Latitude,
-		Longitude:      poiDbRow.Longitude,
-		Category:       poiDbRow.Category,
+		ID:             poiDBRow.ID,
+		CityID:         poiDBRow.CityID,
+		Name:           poiDBRow.Name,
+		DescriptionPOI: poiDBRow.DescriptionPOI,
+		Latitude:       poiDBRow.Latitude,
+		Longitude:      poiDBRow.Longitude,
+		Category:       poiDBRow.Category,
 	}, nil
 }
 

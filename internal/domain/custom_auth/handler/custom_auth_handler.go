@@ -39,7 +39,7 @@ func NewCustomAuthHandler(
 
 // GetOAuthURL returns the OAuth authorization URL for the specified provider
 func (h *CustomAuthHandler) GetOAuthURL(
-	ctx context.Context,
+	_ context.Context,
 	req *connect.Request[customauth.GetOAuthURLRequest],
 ) (*connect.Response[customauth.GetOAuthURLResponse], error) {
 	provider := providerToString(req.Msg.Provider)
@@ -100,7 +100,7 @@ func (h *CustomAuthHandler) OAuthCallback(
 
 // SendPhoneVerification sends a verification code via SMS
 func (h *CustomAuthHandler) SendPhoneVerification(
-	ctx context.Context,
+	_ context.Context,
 	req *connect.Request[customauth.SendPhoneVerificationRequest],
 ) (*connect.Response[customauth.SendPhoneVerificationResponse], error) {
 	if !h.phoneService.IsEnabled() {

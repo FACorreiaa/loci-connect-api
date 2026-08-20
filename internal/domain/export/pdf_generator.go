@@ -38,7 +38,7 @@ func (g *PDFGenerator) getMaroto() core.Maroto {
 }
 
 // addHeader adds a styled header to the PDF
-func (g *PDFGenerator) addHeader(m core.Maroto, title string, subtitle string) {
+func (g *PDFGenerator) addHeader(m core.Maroto, title, subtitle string) {
 	m.AddRow(15,
 		col.New(12).Add(
 			text.New(title, props.Text{

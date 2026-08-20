@@ -1,4 +1,4 @@
-.PHONY: help generate build run test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine
+.PHONY: help generate build run test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine hooks lint-go
 
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -95,3 +95,9 @@ pprof-save: ## Save all profiles to files
 	@echo "Profiles saved: cpu.prof, heap.prof, goroutine.prof"
 
 .DEFAULT_GOAL := help
+
+hooks: ## Install versioned git hooks (.githooks → core.hooksPath)
+	bash scripts/install-hooks.sh
+
+lint-go: ## Run golangci-lint (same command the pre-commit hook runs)
+	golangci-lint run

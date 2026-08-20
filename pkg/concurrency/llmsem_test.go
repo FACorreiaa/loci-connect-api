@@ -73,12 +73,12 @@ func TestNewLLMSemaphore_ZeroIsNil(t *testing.T) {
 }
 
 func TestLLMSemaphore_AllowsMaxConcurrent(t *testing.T) {
-	const max = 3
-	sem := NewLLMSemaphore(max)
+	const maxConcurrent = 3
+	sem := NewLLMSemaphore(maxConcurrent)
 	ctx := context.Background()
 
-	releases := make([]func(), 0, max)
-	for i := 0; i < max; i++ {
+	releases := make([]func(), 0, maxConcurrent)
+	for i := 0; i < maxConcurrent; i++ {
 		release, err := sem.Acquire(ctx)
 		if err != nil {
 			t.Fatalf("acquire %d: %v", i, err)

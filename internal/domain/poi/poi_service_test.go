@@ -66,7 +66,7 @@ func (stubDiscoverRepo) TrackSearch(_ context.Context, _ uuid.UUID, _, _, _ stri
 type stubEmbeddingClient struct{}
 
 // BatchGenerateEmbeddings implements genai_sdk.EmbeddingClient.
-func (s stubEmbeddingClient) BatchGenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error) {
+func (s stubEmbeddingClient) BatchGenerateEmbeddings(_ context.Context, _ []string) ([][]float32, error) {
 	panic("unimplemented")
 }
 
@@ -76,7 +76,7 @@ func (s stubEmbeddingClient) Close() {
 }
 
 // GenerateCityEmbedding implements genai_sdk.EmbeddingClient.
-func (s stubEmbeddingClient) GenerateCityEmbedding(ctx context.Context, name string, country string, description string) ([]float32, error) {
+func (s stubEmbeddingClient) GenerateCityEmbedding(_ context.Context, _, country, description string) ([]float32, error) {
 	panic("unimplemented")
 }
 

@@ -18,15 +18,15 @@ import (
 // stubStatsService is a no-op Service implementation used by handler tests.
 type stubStatsService struct{}
 
-func (s *stubStatsService) GetMainPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.MainPageStatistics, error) {
+func (s *stubStatsService) GetMainPageStatistics(_ context.Context, _ uuid.UUID) (*locitypes.MainPageStatistics, error) {
 	return &locitypes.MainPageStatistics{}, nil
 }
 
-func (s *stubStatsService) GetDetailedPOIStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.DetailedPOIStatistics, error) {
+func (s *stubStatsService) GetDetailedPOIStatistics(_ context.Context, _ uuid.UUID) (*locitypes.DetailedPOIStatistics, error) {
 	return &locitypes.DetailedPOIStatistics{}, nil
 }
 
-func (s *stubStatsService) GetLandingPageStatistics(ctx context.Context, userID uuid.UUID) (*locitypes.LandingPageUserStats, error) {
+func (s *stubStatsService) GetLandingPageStatistics(_ context.Context, _ uuid.UUID) (*locitypes.LandingPageUserStats, error) {
 	return &locitypes.LandingPageUserStats{}, nil
 }
 

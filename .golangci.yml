@@ -11,6 +11,29 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # revive/var-naming wants CreateApiKey -> CreateAPIKey. These methods
+      # implement the generated ApiKeyServiceHandler interface in
+      # gen/.../apikeyv1connect, whose method names come straight from the RPC
+      # names in the .proto. Renaming them does not just churn code, it stops
+      # the handler satisfying the interface and the package no longer builds.
+      # The name has to change in the proto first, which is a wire-level
+      # decision, not a lint fix.
+      - linters:
+          - revive
+          - staticcheck
+        path: internal/domain/apikey/handler\.go
+        text: '(var-naming|ST1003): method (Create|List|Revoke)Api'
+
+      # revive/exported flags trip.TripStop, compare.CompareInput and friends
+      # as stuttering. They are correct that Stop and Input read better, but
+      # these are exported types used across packages; renaming them is an API
+      # change that deserves its own commit and its own review, not a drive-by
+      # in a hook rollout.
+      - linters:
+          - revive
+        path: internal/domain/(trip/repository|compare/service)\.go
+        text: 'exported: type name will be used as'
     paths:
       - tools/cmd/stringer.go
       - third_party$
@@ -18,6 +41,17 @@ linters:
       - examples$
 
   settings:
+    revive:
+      rules:
+        # unused-parameter is off. It fires on interface implementations and
+        # test stubs, where the parameter exists because the interface says so,
+        # not because the body wants it. Chasing it is an unbounded cascade —
+        # revive reports one parameter per function per run, so each pass just
+        # uncovers the next — and the payoff is `_` in place of a name that
+        # documents what the argument is. The obvious ones are already fixed.
+        - name: unused-parameter
+          disabled: true
+
     staticcheck:
       checks:
         - all

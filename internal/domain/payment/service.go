@@ -287,7 +287,7 @@ func (s *service) GetUserInvoices(ctx context.Context, userID uuid.UUID, page, p
 
 // Subscriptions
 
-func (s *service) CreateSubscription(ctx context.Context, req *CreateSubscriptionParams) (*CreateSubscriptionResult, error) {
+func (s *service) CreateSubscription(_ context.Context, req *CreateSubscriptionParams) (*CreateSubscriptionResult, error) {
 	// 1. Find or Create Customer
 	// Ideally, we check DB for existing Stripe Customer ID.
 	// Since I don't have UserRepo here, I'll assume we try to find by email or create new.
@@ -362,12 +362,11 @@ func (s *service) CancelSubscription(ctx context.Context, subscriptionID string,
 		}
 		_, err := subscription.Update(subscriptionID, updateParams)
 		return err
-	} else {
-		// Immediate cancellation
-		_, err := subscription.Cancel(subscriptionID, params)
-		return err
 	}
-	// Webhook will update DB status
+
+	// Immediate cancellation. Webhook will update DB status.
+	_, err := subscription.Cancel(subscriptionID, params)
+	return err
 }
 
 // planFromStripeItems maps the first subscription item's billing interval to a
