@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"google.golang.org/genai"
@@ -22,6 +23,38 @@ var ErrRateLimited = errors.New("llm provider rate limited")
 // retries were exhausted.
 var ErrUnavailable = errors.New("llm provider unavailable")
 
+// ErrOutOfCredits marks a provider refusing the call because the account
+// has no credit left (HTTP 402). Unlike ErrRateLimited this is terminal
+// for the credential: retrying the same key never succeeds, so callers
+// should fail over to another provider rather than back off.
+var ErrOutOfCredits = errors.New("llm provider out of credits")
+
+// ErrAuthFailed marks a missing, malformed, or rejected credential
+// (HTTP 401/403). Also terminal for the credential.
+var ErrAuthFailed = errors.New("llm provider authentication failed")
+
+// Terminal reports whether err means the credential that produced it is
+// unusable, so retrying it is pointless and the caller should move on to
+// another provider.
+func Terminal(err error) bool {
+	return errors.Is(err, ErrOutOfCredits) || errors.Is(err, ErrAuthFailed)
+}
+
+// Failover reports whether err is a provider-side failure that another
+// provider might survive. Context cancellation is deliberately excluded:
+// the caller is already gone, so burning a second provider is waste.
+func Failover(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	return Terminal(err) ||
+		errors.Is(err, ErrRateLimited) ||
+		errors.Is(err, ErrUnavailable)
+}
+
 // Classify wraps err with the matching sentinel so callers can use
 // errors.Is. Context cancellation and deadline errors pass through
 // unchanged; unrecognized errors are returned as-is.
@@ -36,7 +69,11 @@ func Classify(err error) error {
 	var apiErr genai.APIError
 	if errors.As(err, &apiErr) {
 		switch {
-		case apiErr.Code == 429:
+		case apiErr.Code == http.StatusPaymentRequired:
+			return fmt.Errorf("%w: %w", ErrOutOfCredits, err)
+		case apiErr.Code == http.StatusUnauthorized || apiErr.Code == http.StatusForbidden:
+			return fmt.Errorf("%w: %w", ErrAuthFailed, err)
+		case apiErr.Code == http.StatusTooManyRequests:
 			return fmt.Errorf("%w: %w", ErrRateLimited, err)
 		case apiErr.Code >= 500:
 			return fmt.Errorf("%w: %w", ErrUnavailable, err)
@@ -44,10 +81,23 @@ func Classify(err error) error {
 		return err
 	}
 
+	// Providers that do not surface a status code still describe these
+	// conditions in prose. Check credits before quota: OpenRouter's 402
+	// body says "requires more credits", and a bare "credit" match must
+	// not be swallowed by the rate-limit branch below.
 	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "resource_exhausted") ||
+	switch {
+	case strings.Contains(msg, "insufficient credit") ||
+		strings.Contains(msg, "requires more credit") ||
+		strings.Contains(msg, "negative credit"):
+		return fmt.Errorf("%w: %w", ErrOutOfCredits, err)
+	case strings.Contains(msg, "invalid api key") ||
+		strings.Contains(msg, "no auth credentials") ||
+		strings.Contains(msg, "unauthorized"):
+		return fmt.Errorf("%w: %w", ErrAuthFailed, err)
+	case strings.Contains(msg, "resource_exhausted") ||
 		strings.Contains(msg, "too many requests") ||
-		strings.Contains(msg, "quota") {
+		strings.Contains(msg, "quota"):
 		return fmt.Errorf("%w: %w", ErrRateLimited, err)
 	}
 	return err

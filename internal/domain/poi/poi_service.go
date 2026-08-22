@@ -2,6 +2,7 @@ package poi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -92,8 +93,13 @@ func NewServiceImpl(
 	logger.Debug("initializing POI AI client", slog.String("model", aiCfg.Model))
 	aiClient, err := ai.NewChatClient(ctx, aiCfg, logger)
 	if err != nil {
-		logger.Error("Failed to initialize AI client", slog.Any("error", err))
-		// For now, set to nil and handle gracefully in methods
+		// Deliberately non-fatal: POI reads that hit cache or the database
+		// still work without an LLM. Every call site that needs the client
+		// checks for nil and returns a diagnosable error. NewChatClient
+		// only fails once the whole provider chain is unusable, so this
+		// path means no provider — primary or fallback — could be built.
+		logger.Error("no usable AI provider; LLM-backed POI features disabled",
+			slog.Any("error", err))
 		aiClient = nil
 	}
 
@@ -135,6 +141,13 @@ func (s *ServiceImpl) generateWithLLMSlot(
 	prompt string,
 	config *genai.GenerateContentConfig,
 ) (*genai.GenerateContentResponse, error) {
+	// The constructor tolerates a failed AI client so the rest of the
+	// service still serves cached and database-backed reads. Fail here
+	// with a diagnosable error rather than panicking on a nil client.
+	if s.aiClient == nil {
+		return nil, errors.New("AI client is not available - check API key configuration")
+	}
+
 	// Quota-armed channels (MCP API keys) pay here — right before the LLM
 	// call — so cache and database hits stay free. Web RPCs never arm the
 	// context and are unaffected.

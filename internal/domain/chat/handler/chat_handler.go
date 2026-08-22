@@ -600,6 +600,29 @@ func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 		InternalCode: "stream_error",
 		Retryable:    false,
 	}
+	// Prefer the producer's classification. Text matching stays as a
+	// fallback for events emitted without one, but it must not override
+	// an explicit code: the prose is user-facing copy and changing a
+	// sentence should never change a retry hint.
+	switch event.ErrorCode {
+	case locitypes.StreamErrorCapacity:
+		se.InternalCode = "capacity"
+		se.Retryable = true
+		ra := int32(5000)
+		se.RetryAfterMs = &ra
+		return se
+	case locitypes.StreamErrorQuotaExceeded:
+		se.InternalCode = "quota_exceeded"
+		se.Retryable = true
+		return se
+	case locitypes.StreamErrorProviderUnavailable:
+		se.InternalCode = "provider_unavailable"
+		se.Retryable = true
+		ra := int32(30000)
+		se.RetryAfterMs = &ra
+		return se
+	}
+
 	switch lower := strings.ToLower(msg); {
 	case strings.Contains(lower, "high traffic"), strings.Contains(lower, "capacity"):
 		se.InternalCode = "capacity"

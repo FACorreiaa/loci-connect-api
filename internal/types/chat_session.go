@@ -188,7 +188,27 @@ type StreamEvent struct {
 	EventID    string          `json:"event_id"`
 	IsFinal    bool            `json:"is_final,omitempty"`
 	Navigation *NavigationData `json:"navigation,omitempty"`
+	// ErrorCode carries the producer's classification of Error so
+	// transports do not have to re-derive it by matching on the
+	// user-facing prose. Empty on events produced before classification
+	// existed; transports fall back to text matching in that case.
+	ErrorCode StreamErrorCode `json:"error_code,omitempty"`
 }
+
+// StreamErrorCode classifies a streaming failure for transports.
+type StreamErrorCode string
+
+const (
+	// StreamErrorCapacity means the request was shed under load and the
+	// same request is likely to succeed shortly.
+	StreamErrorCapacity StreamErrorCode = "capacity"
+	// StreamErrorQuotaExceeded means the provider rate-limited the call.
+	StreamErrorQuotaExceeded StreamErrorCode = "quota_exceeded"
+	// StreamErrorProviderUnavailable means the upstream provider failed
+	// or every provider in the fallback chain was exhausted. Retryable,
+	// but it usually needs an operator, not the user.
+	StreamErrorProviderUnavailable StreamErrorCode = "provider_unavailable"
+)
 
 // NavigationData contains information for URL navigation
 type NavigationData struct {

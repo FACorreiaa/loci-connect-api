@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
 
 func (l *ServiceImpl) ContinueSessionStreamed(
@@ -734,14 +736,29 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.Any("error", err))
 		if ctx.Err() == nil {
 			errorMsg := fmt.Sprintf("%s worker failed: %v", partType, err)
-			// Check for quota/rate limit errors
-			if strings.Contains(err.Error(), "429") || strings.Contains(err.Error(), "RESOURCE_EXHAUSTED") || strings.Contains(err.Error(), "quota") {
+			// Classify from the typed sentinels rather than the error text
+			// and pass the verdict along, so the transport does not have to
+			// re-derive it by matching on user-facing prose.
+			var errorCode locitypes.StreamErrorCode
+			switch {
+			case errors.Is(err, llmerrors.ErrRateLimited):
+				errorCode = locitypes.StreamErrorQuotaExceeded
 				errorMsg = "We are experiencing high traffic (Quota Exceeded). Please try again in a minute."
+			case errors.Is(err, llmerrors.ErrOutOfCredits), errors.Is(err, llmerrors.ErrAuthFailed):
+				// Every provider in the chain was exhausted or rejected.
+				// Retryable from the client's point of view, but it needs
+				// an operator to actually clear.
+				errorCode = locitypes.StreamErrorProviderUnavailable
+				errorMsg = "The AI service is temporarily unavailable. Please try again later."
+			case errors.Is(err, llmerrors.ErrUnavailable):
+				errorCode = locitypes.StreamErrorProviderUnavailable
+				errorMsg = "The AI service is temporarily unavailable. Please try again in a moment."
 			}
 
 			sendEvent(locitypes.StreamEvent{
-				Type:  locitypes.EventTypeError,
-				Error: errorMsg,
+				Type:      locitypes.EventTypeError,
+				Error:     errorMsg,
+				ErrorCode: errorCode,
 			})
 		}
 		return fmt.Errorf("%s worker failed: %w", partType, err)

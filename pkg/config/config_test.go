@@ -201,3 +201,138 @@ func TestLoad_RejectsRefreshTTLShorterThanAccessTTL(t *testing.T) {
 		t.Fatal("expected Load to reject a refresh TTL shorter than the access TTL")
 	}
 }
+
+// baseEnv sets the non-AI values Load requires so each fallback test can
+// vary only the AI settings it cares about.
+func baseEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AI_PROVIDER", AIProviderOpenRouter)
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("AI_FALLBACK_OPENROUTER_API_KEY", "")
+	t.Setenv("AI_FALLBACK_ENABLED", "")
+	t.Setenv("AI_FALLBACK_MODELS", "")
+}
+
+// The headline requirement: the app must boot and stay usable with no
+// primary provider key configured at all, so it is testable locally
+// without an OpenRouter account.
+func TestLoad_NoPrimaryKeyBootsOnFallback(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("AI_FALLBACK_OPENROUTER_API_KEY", "fallback-key")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load with fallback only: %v", err)
+	}
+	if cfg.AI.APIKey != "" {
+		t.Fatalf("primary APIKey = %q, want empty", cfg.AI.APIKey)
+	}
+	if !cfg.AI.FallbackEnabled {
+		t.Fatal("FallbackEnabled = false, want true outside production")
+	}
+	if len(cfg.AI.Fallbacks) != len(defaultFallbackModels) {
+		t.Fatalf("Fallbacks = %d, want %d", len(cfg.AI.Fallbacks), len(defaultFallbackModels))
+	}
+	if got := cfg.AI.Fallbacks[0].Model; got != defaultFallbackModels[0] {
+		t.Fatalf("first fallback model = %q, want %q", got, defaultFallbackModels[0])
+	}
+	for i, spec := range cfg.AI.Fallbacks {
+		if spec.APIKey != "fallback-key" {
+			t.Fatalf("fallback[%d] APIKey = %q, want the fallback key", i, spec.APIKey)
+		}
+		if spec.Provider != AIProviderOpenRouter {
+			t.Fatalf("fallback[%d] Provider = %q, want openrouter", i, spec.Provider)
+		}
+	}
+}
+
+func TestLoad_NoKeyAndNoFallbackStillFails(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("AI_FALLBACK_ENABLED", "false")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load: want error when neither a primary key nor a fallback is configured")
+	}
+}
+
+func TestLoad_FallbackReusesPrimaryKeyWhenUnset(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(cfg.AI.Fallbacks) == 0 {
+		t.Fatal("want fallbacks derived from the primary key")
+	}
+	if got := cfg.AI.Fallbacks[0].APIKey; got != "primary-key" {
+		t.Fatalf("fallback APIKey = %q, want the primary key", got)
+	}
+}
+
+func TestLoad_FallbackModelsOverride(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("AI_FALLBACK_MODELS", "a/one:free, b/two:free")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := []string{"a/one:free", "b/two:free"}
+	if len(cfg.AI.Fallbacks) != len(want) {
+		t.Fatalf("Fallbacks = %d, want %d", len(cfg.AI.Fallbacks), len(want))
+	}
+	for i, w := range want {
+		if got := cfg.AI.Fallbacks[i].Model; got != w {
+			t.Fatalf("fallback[%d] = %q, want %q (whitespace must be trimmed)", i, got, w)
+		}
+	}
+}
+
+// Production must not silently serve from the shared free tier.
+func TestLoad_ProductionRejectsFallback(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("JWT_REFRESH_SECRET", "refresh-secret-refresh-secret-refresh")
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("AI_FALLBACK_ENABLED", "true")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load: want error when fallback is enabled in production")
+	}
+}
+
+func TestLoad_ProductionRejectsFreePrimaryModel(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("JWT_REFRESH_SECRET", "refresh-secret-refresh-secret-refresh")
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("OPENROUTER_MODEL", "z-ai/glm-5.2:free")
+	t.Setenv("AI_FALLBACK_ENABLED", "false")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load: want error when the production primary model is a :free model")
+	}
+}
+
+func TestLoad_ProductionDefaultsFallbackOff(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("JWT_REFRESH_SECRET", "refresh-secret-refresh-secret-refresh")
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AI.FallbackEnabled {
+		t.Fatal("FallbackEnabled = true in production, want false by default")
+	}
+	if len(cfg.AI.Fallbacks) != 0 {
+		t.Fatalf("Fallbacks = %d in production, want 0", len(cfg.AI.Fallbacks))
+	}
+}

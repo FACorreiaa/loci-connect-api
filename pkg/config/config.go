@@ -38,11 +38,38 @@ const (
 	AIProviderOpenRouter = "openrouter"
 )
 
+// defaultFallbackModels are OpenRouter's zero-cost models, ordered by
+// suitability. Both advertise structured_outputs and response_format,
+// which Loci's JSON-contract prompts require; the larger free models
+// (nemotron-3-ultra, nemotron-3.5-lightning) do not, so they are
+// deliberately excluded despite bigger context windows.
+var defaultFallbackModels = []string{
+	"z-ai/glm-5.2:free",
+	"nvidia/nemotron-3-super-120b-a12b:free",
+}
+
+// AIProviderSpec identifies one link in the chat fallback chain.
+type AIProviderSpec struct {
+	Provider string
+	APIKey   string
+	Model    string
+}
+
 // AIConfig holds provider-neutral chat and embedding configuration.
+//
+// Provider/APIKey/Model describe the primary chat provider. When
+// FallbackEnabled is set, Fallbacks lists additional providers tried in
+// order after the primary fails with a provider-side error, so the app
+// keeps working without a funded key. Embeddings never fall back: no
+// free embedding model exists, so retrieval degrades to lexical search
+// instead.
 type AIConfig struct {
 	Provider           string
 	APIKey             string
 	Model              string
+	FallbackEnabled    bool
+	Fallbacks          []AIProviderSpec
+	FallbackCooldown   time.Duration
 	EmbeddingModel     string
 	EmbeddingDimension int
 	MaxConcurrentCalls int
@@ -210,12 +237,28 @@ func Load() (*Config, error) {
 	if cfg.AI.Provider != AIProviderGemini && cfg.AI.Provider != AIProviderOpenRouter {
 		return nil, fmt.Errorf("unsupported AI_PROVIDER %q", cfg.AI.Provider)
 	}
-	if cfg.AI.APIKey == "" {
+	// A missing primary key is survivable only when the fallback chain can
+	// answer in its place. That is the whole point of the chain: the app
+	// must stay testable with no provider account configured at all.
+	if cfg.AI.APIKey == "" && len(cfg.AI.Fallbacks) == 0 {
 		return nil, fmt.Errorf("%s is required", providerAPIKeyEnv(cfg.AI.Provider))
 	}
 
-	if cfg.AI.Model == "" {
+	if cfg.AI.Model == "" && cfg.AI.APIKey != "" {
 		return nil, fmt.Errorf("%s is required", providerModelEnv(cfg.AI.Provider))
+	}
+
+	// Guard against a dev default silently becoming the production model.
+	// Free models are rate-limited and shared; they are a local testing
+	// floor, never a production serving path.
+	if IsProduction() {
+		if strings.HasSuffix(cfg.AI.Model, ":free") {
+			return nil, fmt.Errorf("%s must not be a :free model in production, got %q",
+				providerModelEnv(cfg.AI.Provider), cfg.AI.Model)
+		}
+		if cfg.AI.FallbackEnabled {
+			return nil, errors.New("AI_FALLBACK_ENABLED must be false in production")
+		}
 	}
 	if cfg.AI.EmbeddingModel == "" {
 		return nil, fmt.Errorf("%s is required", providerEmbeddingModelEnv(cfg.AI.Provider))
@@ -301,7 +344,44 @@ func loadAIConfig() AIConfig {
 		cfg.Provider = provider
 	}
 
+	cfg.FallbackEnabled = getEnvAsBool("AI_FALLBACK_ENABLED", !IsProduction())
+	cfg.FallbackCooldown = getEnvAsDurationSeconds("AI_FALLBACK_COOLDOWN_SEC", 5*time.Minute)
+	if cfg.FallbackEnabled {
+		cfg.Fallbacks = loadFallbacks()
+	}
+
 	return cfg
+}
+
+// loadFallbacks builds the ordered fallback chain. Every entry is an
+// OpenRouter model: the free tier is the only zero-cost provider wired
+// into the app, and its key is read separately so it can be a spend-
+// capped key distinct from the primary one.
+func loadFallbacks() []AIProviderSpec {
+	key := getEnv("AI_FALLBACK_OPENROUTER_API_KEY", getEnv("OPENROUTER_API_KEY", ""))
+	if key == "" {
+		return nil
+	}
+
+	models := getEnvAsSlice("AI_FALLBACK_MODELS", defaultFallbackModels)
+	specs := make([]AIProviderSpec, 0, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		specs = append(specs, AIProviderSpec{
+			Provider: AIProviderOpenRouter,
+			APIKey:   key,
+			Model:    model,
+		})
+	}
+	return specs
+}
+
+// IsProduction reports whether the process is running as production.
+func IsProduction() bool {
+	return strings.EqualFold(getEnv("APP_ENV", "development"), "production")
 }
 
 func providerAPIKeyEnv(provider string) string {
