@@ -20,7 +20,6 @@ const (
 	SourceOpenMeteo  = "open-meteo"
 	SourceGDACS      = "gdacs"
 	SourceAirQuality = "open-meteo-air"
-	SourceNews       = "gdelt"
 	SourceUSGS       = "usgs"
 )
 

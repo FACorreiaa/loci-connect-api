@@ -44,7 +44,7 @@ func NewSignalsHTTPClient() *httpx.Client {
 //	BIGDATACLOUD_BASE_URL     override the reverse geocoder
 //
 // Everything works with no keys and no configuration at all.
-func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier, cache *signalCache) *Gatherer {
+func NewGathererFromEnv(logger *slog.Logger, cache *signalCache) *Gatherer {
 	if !envBool("SIGNALS_ENABLED", true) {
 		logf(logger, slog.LevelInfo, "signals: disabled by SIGNALS_ENABLED")
 		return nil
@@ -73,18 +73,6 @@ func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier, cache *s
 	}
 	// Air quality always has a value, unlike the event-driven sources, so the
 	// threshold is what stops it attaching an alert to every trip forever.
-	// GDELT is off by default, and the doc comment on NewsSource says why: it
-	// answers in 23-26s where every other source here takes under a second, and
-	// a live query for French strikes returned a hunger strike, Russian
-	// airstrikes and a football match. It never blocks a request, but it should
-	// still only run where an operator has looked at the output and decided it
-	// helps.
-	if envBool("GDELT_ENABLED", false) {
-		// Its own client: the shared one times out at 8s, which GDELT would
-		// never once beat.
-		news := NewNewsSource(os.Getenv("GDELT_BASE_URL"), httpxClientForNews(), classifier, logger)
-		sources = append(sources, news)
-	}
 	if envBool("AIR_QUALITY_ENABLED", true) {
 		sources = append(sources, NewAirQualitySource(
 			os.Getenv("OPENMETEO_AIR_QUALITY_BASE_URL"),
@@ -150,23 +138,6 @@ func envFloat(key string, def float64) float64 {
 func envDuration(key string, def time.Duration) time.Duration {
 	n := envInt(key, int(def.Seconds()))
 	return time.Duration(n) * time.Second
-}
-
-// httpxClientForNews builds the long-timeout client the news source needs.
-//
-// Separate from the shared one because that times out at 8s and GDELT answers
-// in 23-26s; sharing it would guarantee a failure on every refresh.
-func httpxClientForNews() *httpx.Client {
-	return httpx.New(httpx.Config{
-		Timeout:       envDuration("GDELT_TIMEOUT_SEC", gdeltTimeout),
-		MaxRetries:    1,
-		RatePerSecond: 1,
-		Burst:         1,
-		UserAgent:     envString("SIGNALS_USER_AGENT", "loci/1.0 (+https://loci.app)"),
-	}).WithObserver(func(source, outcome string, d time.Duration) {
-		observability.ExternalRequestsTotal.WithLabelValues(source, outcome).Inc()
-		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
-	})
 }
 
 // NewFXFromEnv builds the exchange-rate adapter and the fuel assumptions used

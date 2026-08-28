@@ -29,7 +29,11 @@ type AlertKind string
 const (
 	AlertClosure AlertKind = "closure"
 	AlertHoliday AlertKind = "holiday"
-	AlertStrike  AlertKind = "strike"
+	// AlertStrike has no producer. GDELT was built for it, measured and removed
+	// (see deploy/OPS.md); transport disruption needs real transit APIs, which
+	// are per-market. Kept because the proto value exists and cannot be
+	// withdrawn, and because that is where such a source would land.
+	AlertStrike AlertKind = "strike"
 
 	// Kinds below have no proto enum value yet — they map to UNSPECIFIED on the
 	// wire until the next proto release adds them. Declared here first because

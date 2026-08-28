@@ -54,11 +54,21 @@ it all off.
 - **`loci_external_cache_hits_total{source}`** is the quota guard. These are free tiers with
   rate limits; a hit ratio falling towards zero means a cache key became too specific and
   the provider is about to start refusing us.
-- **`GDELT_ENABLED` defaults to off and should stay off** unless someone has looked at the
-  output. Measured: 23-26s for a query that completes, 60s+ timeouts for anything precise
-  enough to be useful, and a live query for French transport strikes returned a hunger
-  strike, Russian airstrikes and a football match. It never blocks a request (it serves
-  cache and refreshes in the background), but it is decoration, not information.
+- **There is no transport-strike source, and that is deliberate.** GDELT was built,
+  measured and removed. It answered in 23-26s where every other provider here takes under a
+  second, timed out past 60s on any query narrow enough to be precise, and a live query for
+  French transport strikes returned a hunger strike, Russian airstrikes and a football
+  match. The queries that would fix the precision are exactly the ones that do not
+  complete, so there is no tuning path out of it, and `sourcecountry:` filters by publisher
+  rather than by subject. Do not re-add it.
+
+  The reason this mattered enough to delete rather than leave switched off: the alert list
+  also carries measured hazards and real public holidays, and a false "Russian strikes hit
+  Kyiv" alert on a Paris trip teaches users to ignore the whole list.
+
+  If transport disruption is wanted later, it is a per-market feature built on real transit
+  APIs (SNCF, TfL, NS, DB) or Transitous/MOTIS — accurate, but per-country and mostly keyed.
+  `ALERT_KIND_STRIKE` remains in the proto for that.
 - **Open-Meteo's free tier is non-commercial, and Loci is commercial.** Their terms define
   non-commercial "as elaborated by creative commons" and give "websites or apps that have
   subscriptions or display advertisements" as an example of *commercial* use. Loci sells a

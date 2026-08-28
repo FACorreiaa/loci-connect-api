@@ -1,12 +1,8 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
-	"os"
-
-	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -462,27 +458,10 @@ func (d *Dependencies) initHandlers() error {
 	// WithScoring lights up GetGoScore ("should I go this weekend?"). Without it
 	// the handler still serves weather; with it the score can resolve a city by
 	// name and factor in how much there is to do there.
-	// Live alert sources (holidays, hazards, air quality; news behind
-	// GDELT_ENABLED). Nil when SIGNALS_ENABLED=false, which every consumer
-	// treats as "no alerts" rather than as an error.
-	//
-	// The news classifier is built only when the news source is actually on:
-	// standing up an AI client for a source nobody enabled would be pure cost.
-	var newsClassifier localcontext.NewsClassifier
-	if os.Getenv("GDELT_ENABLED") == "true" {
-		if chat, err := ai.NewChatClient(context.Background(), d.Config.AI, d.Logger); err != nil {
-			d.Logger.Warn("signals: no AI client for news classification; headlines will be heuristics only",
-				slog.Any("error", err))
-		} else {
-			// A closure rather than the client itself, so localcontext never
-			// imports genai just to name a config argument it always passes nil for.
-			generate := func(ctx context.Context, prompt string) (string, error) {
-				return chat.GenerateText(ctx, prompt, nil)
-			}
-			newsClassifier = localcontext.NewLLMNewsClassifier(generate)
-		}
-	}
-	signals := localcontext.NewGathererFromEnv(d.Logger, newsClassifier, signalCache)
+	// Live alert sources (holidays, hazards, air quality). Nil when
+	// SIGNALS_ENABLED=false, which every consumer treats as "no alerts" rather
+	// than as an error.
+	signals := localcontext.NewGathererFromEnv(d.Logger, signalCache)
 
 	// Exchange rates and the fuel assumptions behind a drive-cost estimate.
 	// Shares the signals HTTP client so the same outbound rate limit and
