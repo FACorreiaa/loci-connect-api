@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -28,7 +29,7 @@ func openMeteoServer(t *testing.T, body string, status int) (*OpenMeteoAdapter, 
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
-	return NewOpenMeteoAdapter(srv.URL, testCache(t)), &hits
+	return NewOpenMeteoAdapter(srv.URL, "", testCache(t)), &hits
 }
 
 // The whole point of this adapter is that it needs no key, so a bare
@@ -199,5 +200,69 @@ func TestOpenMeteo_FailureIsNotCached(t *testing.T) {
 
 // The adapter satisfies the interface the rest of the app depends on.
 func TestOpenMeteo_ImplementsWeatherAdapter(t *testing.T) {
-	var _ WeatherAdapter = NewOpenMeteoAdapter("", nil)
+	var _ WeatherAdapter = NewOpenMeteoAdapter("", "", nil)
+}
+
+// --- paid tier -------------------------------------------------------------
+//
+// Open-Meteo's free tier is non-commercial by their terms, and they name "apps
+// that have subscriptions" as commercial use. Loci sells a Pro plan, so the
+// paid tier has to be reachable by configuration alone — needing a code change
+// to honour a licence is how licences get ignored.
+
+func TestOpenMeteo_NoKeyUsesTheFreeHost(t *testing.T) {
+	a := NewOpenMeteoAdapter("", "", nil)
+	if a.baseURL != openMeteoBaseURL {
+		t.Errorf("got %q, want the free host", a.baseURL)
+	}
+}
+
+func TestOpenMeteo_KeySwitchesToTheCustomerHost(t *testing.T) {
+	a := NewOpenMeteoAdapter("", "secret", nil)
+	if a.baseURL != openMeteoCustomerBaseURL {
+		t.Errorf("got %q, want the customer host", a.baseURL)
+	}
+}
+
+// An explicit base URL still wins, so a self-hosted instance or a test server
+// is not overridden by supplying a key.
+func TestOpenMeteo_ExplicitBaseURLBeatsTheKeyDefault(t *testing.T) {
+	a := NewOpenMeteoAdapter("http://localhost:9999", "secret", nil)
+	if a.baseURL != "http://localhost:9999" {
+		t.Errorf("got %q", a.baseURL)
+	}
+}
+
+func TestOpenMeteo_SendsApiKeyWhenConfigured(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		_, _ = w.Write([]byte(openMeteoFixture))
+	}))
+	defer srv.Close()
+
+	a := NewOpenMeteoAdapter(srv.URL, "secret-key", nil)
+	if _, err := a.Forecast(context.Background(), 38.72, -9.14, 3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(gotQuery, "apikey=secret-key") {
+		t.Errorf("expected the key on the request, got %q", gotQuery)
+	}
+}
+
+func TestOpenMeteo_OmitsApiKeyWhenAbsent(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		_, _ = w.Write([]byte(openMeteoFixture))
+	}))
+	defer srv.Close()
+
+	a := NewOpenMeteoAdapter(srv.URL, "", nil)
+	if _, err := a.Forecast(context.Background(), 38.72, -9.14, 3); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(gotQuery, "apikey") {
+		t.Errorf("no key configured, but one was sent: %q", gotQuery)
+	}
 }

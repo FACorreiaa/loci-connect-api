@@ -6,10 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
-const openMeteoBaseURL = "https://api.open-meteo.com"
+const (
+	openMeteoBaseURL = "https://api.open-meteo.com"
+	// Paid plans are served from a separate host and require &apikey=.
+	//
+	// This matters beyond configuration: Open-Meteo's free tier is
+	// non-commercial by their terms, and they name "apps that have
+	// subscriptions" as commercial use. Without this, taking out a
+	// subscription would still need a code change to actually use it.
+	openMeteoCustomerBaseURL = "https://customer-api.open-meteo.com"
+)
 
 // openMeteoFetchDays is how many days we always ask for, regardless of what the
 // caller wants. Asking for a fixed horizon means one cache entry satisfies every
@@ -28,20 +38,29 @@ const openMeteoFetchDays = 16
 // TTL cache), so it drops in wherever that one was used.
 type OpenMeteoAdapter struct {
 	baseURL string
+	apiKey  string
 	http    *http.Client
 
 	cache *signalCache
 }
 
-// NewOpenMeteoAdapter builds an adapter with sane resilience defaults. An empty
-// baseURL uses the public endpoint; it is a parameter so tests can point at an
-// httptest server and so a self-hosted instance can be configured by env.
-func NewOpenMeteoAdapter(baseURL string, cache *signalCache) *OpenMeteoAdapter {
+// NewOpenMeteoAdapter builds an adapter with sane resilience defaults.
+//
+// baseURL is a parameter so tests can point at an httptest server and a
+// self-hosted instance can be configured by env. An empty apiKey uses the free,
+// non-commercial endpoint; supplying one switches to the customer host unless
+// baseURL overrides it, and sends the key on every request.
+func NewOpenMeteoAdapter(baseURL, apiKey string, cache *signalCache) *OpenMeteoAdapter {
+	apiKey = strings.TrimSpace(apiKey)
 	if baseURL == "" {
 		baseURL = openMeteoBaseURL
+		if apiKey != "" {
+			baseURL = openMeteoCustomerBaseURL
+		}
 	}
 	return &OpenMeteoAdapter{
 		baseURL: baseURL,
+		apiKey:  apiKey,
 		http:    &http.Client{Timeout: 8 * time.Second},
 		cache:   cache,
 	}
@@ -71,6 +90,9 @@ func (a *OpenMeteoAdapter) Forecast(ctx context.Context, lat, lon float64, days 
 	// forecast belongs to.
 	q.Set("timezone", "UTC")
 	q.Set("forecast_days", fmt.Sprintf("%d", openMeteoFetchDays))
+	if a.apiKey != "" {
+		q.Set("apikey", a.apiKey)
+	}
 
 	endpoint := a.baseURL + "/v1/forecast?" + q.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)

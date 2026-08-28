@@ -146,6 +146,7 @@ Copy `.env.prod.example` to `.env` (or export the variables directly). The minim
 | `AI_FALLBACK_COOLDOWN_SEC` | How long a credential is benched after a 401/402 (default `300`) |
 | `SERVER_HOST`, `SERVER_PORT` | HTTP listen address (default `0.0.0.0:8000`) |
 | `WEATHER_PROVIDER` | Forecast source: `openmeteo` (default, no key), `openweather` (needs `OPENWEATHER_API_KEY`), `stub`. Leave unset with a key present to keep OpenWeather |
+| `OPENMETEO_API_KEY` | Optional paid Open-Meteo key. Their free tier is **non-commercial** and Loci sells subscriptions; a key grants a commercial licence and switches to their customer host. See `deploy/OPS.md` |
 | `SIGNALS_ENABLED` | Live trip alerts — public holidays, natural hazards, air quality. Default on; every source is free and keyless |
 | `SIGNALS_USER_AGENT` | Sent on every provider request. Several public APIs throttle or block requests without one |
 | `SIGNALS_RATE_LIMIT_PER_SECOND` / `_BURST` | Per-host outbound rate limit, to stay inside free-tier usage policies (default `5`/`5`) |

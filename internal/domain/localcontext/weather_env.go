@@ -55,20 +55,20 @@ func NewWeatherAdapterFromEnv(logger *slog.Logger, cache *signalCache) (WeatherA
 			// missing key is a config mistake we should not punish users for.
 			logf(logger, slog.LevelWarn,
 				"weather: WEATHER_PROVIDER=openweather but OPENWEATHER_API_KEY is empty; falling back to open-meteo")
-			return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), cache), false
+			return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), os.Getenv("OPENMETEO_API_KEY"), cache), false
 		}
 		logf(logger, slog.LevelInfo, "weather: using openweather", slog.String("provider", provider))
 		return NewOpenWeatherAdapter(key), false
 
 	case WeatherProviderOpenMeteo:
 		logf(logger, slog.LevelInfo, "weather: using open-meteo (no API key required)")
-		return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), cache), false
+		return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), os.Getenv("OPENMETEO_API_KEY"), cache), false
 
 	default:
 		logf(logger, slog.LevelWarn,
 			"weather: unknown WEATHER_PROVIDER, falling back to open-meteo",
 			slog.String("provider", provider))
-		return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), cache), false
+		return NewOpenMeteoAdapter(os.Getenv("OPENMETEO_BASE_URL"), os.Getenv("OPENMETEO_API_KEY"), cache), false
 	}
 }
 

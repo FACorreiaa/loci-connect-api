@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 )
 
-const openMeteoAirQualityBaseURL = "https://air-quality-api.open-meteo.com"
+const (
+	openMeteoAirQualityBaseURL = "https://air-quality-api.open-meteo.com"
+	// Paid counterpart, same reasoning as the forecast host.
+	openMeteoAirQualityCustomerBaseURL = "https://customer-air-quality-api.open-meteo.com"
+)
 
 // European AQI band boundaries.
 //
@@ -44,6 +49,7 @@ const (
 // located because they are elsewhere; this is not.
 type AirQualitySource struct {
 	baseURL   string
+	apiKey    string
 	client    *httpx.Client
 	threshold float64
 
@@ -62,18 +68,22 @@ type airDay struct {
 // NewAirQualitySource builds the source. An empty baseURL uses the public
 // endpoint; a threshold of zero or less uses the default.
 func NewAirQualitySource(
-	baseURL string,
+	baseURL, apiKey string,
 	client *httpx.Client,
 	threshold float64,
 	cache *signalCache,
 ) *AirQualitySource {
+	apiKey = strings.TrimSpace(apiKey)
 	if baseURL == "" {
 		baseURL = openMeteoAirQualityBaseURL
+		if apiKey != "" {
+			baseURL = openMeteoAirQualityCustomerBaseURL
+		}
 	}
 	if threshold <= 0 {
 		threshold = defaultAirQualityThreshold
 	}
-	return &AirQualitySource{baseURL: baseURL, client: client, threshold: threshold, cache: cache}
+	return &AirQualitySource{baseURL: baseURL, apiKey: apiKey, client: client, threshold: threshold, cache: cache}
 }
 
 func (s *AirQualitySource) Name() string { return SourceAirQuality }
@@ -146,6 +156,9 @@ func (s *AirQualitySource) forecast(ctx context.Context, lat, lon float64) ([]ai
 	q.Set("hourly", "european_aqi,pm2_5")
 	q.Set("timezone", "UTC")
 	q.Set("forecast_days", "5")
+	if s.apiKey != "" {
+		q.Set("apikey", s.apiKey)
+	}
 
 	endpoint := s.baseURL + "/v1/air-quality?" + q.Encode()
 	body, err := httpx.GetJSON[openMeteoAirResponse](ctx, s.client, SourceAirQuality, endpoint)

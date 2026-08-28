@@ -59,9 +59,26 @@ it all off.
   enough to be useful, and a live query for French transport strikes returned a hunger
   strike, Russian airstrikes and a football match. It never blocks a request (it serves
   cache and refreshes in the background), but it is decoration, not information.
-- **Open-Meteo's free tier is non-commercial.** It is the default weather and air-quality
-  provider and is correct for validation; a commercial deployment needs their paid tier or
-  `WEATHER_PROVIDER=openweather`.
+- **Open-Meteo's free tier is non-commercial, and Loci is commercial.** Their terms define
+  non-commercial "as elaborated by creative commons" and give "websites or apps that have
+  subscriptions or display advertisements" as an example of *commercial* use. Loci sells a
+  Pro plan through Stripe, so this is not a grey area once we are hosted and taking money.
+  Free-tier limits are <10,000 calls/day, 5,000/hour, 600/minute.
+
+  Three ways out, in rough order of effort:
+  1. `OPENMETEO_API_KEY` — a paid subscription grants a commercial licence, keeps both the
+     forecast and air quality with one provider, and switches to their customer host
+     automatically. Standard is 1M calls/month, which our caching makes enormous headroom.
+     Prices are not published; they sit behind their Stripe checkout.
+  2. `WEATHER_PROVIDER=openweather` — already implemented, needs `OPENWEATHER_API_KEY`.
+     Loses air quality, which has no OpenWeather adapter here.
+  3. MET Norway (api.met.no) is CC BY 4.0 and *permits commercial use* with attribution, no
+     API key, 20 req/s. No adapter exists yet, and it has no global air-quality product.
+     Note it rejects coordinates with more than 4 decimals, which our current `%f`
+     formatting would trip.
+
+  Until Loci is actually hosted and charging, the free tier is the right call — the exposure
+  is a licence term with no revenue behind it yet.
 - Set `REDIS_URL` to share provider caches across replicas. Without it each replica keeps
   its own in-memory copy and the outbound request rate multiplies by the replica count.
   (or the documented Gemini alternative)

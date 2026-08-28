@@ -88,6 +88,7 @@ func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier, cache *s
 	if envBool("AIR_QUALITY_ENABLED", true) {
 		sources = append(sources, NewAirQualitySource(
 			os.Getenv("OPENMETEO_AIR_QUALITY_BASE_URL"),
+			os.Getenv("OPENMETEO_API_KEY"),
 			client,
 			envFloat("AIR_QUALITY_ALERT_THRESHOLD", defaultAirQualityThreshold),
 			cache,

@@ -40,7 +40,7 @@ func TestSignals_EverySourceUnreachable(t *testing.T) {
 		NewHolidaySource(deadURL, client, cache),
 		NewGDACSSource(deadURL, client, 500, cache),
 		NewUSGSSource(deadURL, client, 500, cache),
-		NewAirQualitySource(deadURL, client, 60, cache),
+		NewAirQualitySource(deadURL, "", client, 60, cache),
 	)
 	g.sourceTimeout = 500 * time.Millisecond
 

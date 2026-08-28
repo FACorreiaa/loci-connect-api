@@ -155,7 +155,7 @@ func TestLiveAirQuality(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	s := NewAirQualitySource("", NewSignalsHTTPClient(), defaultAirQualityThreshold, nil)
+	s := NewAirQualitySource("", "", NewSignalsHTTPClient(), defaultAirQualityThreshold, nil)
 	now := time.Now().UTC()
 	start, end := now, now.Add(72*time.Hour)
 
