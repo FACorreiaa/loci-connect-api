@@ -72,23 +72,39 @@ it all off.
 - **Open-Meteo's free tier is non-commercial, and Loci is commercial.** Their terms define
   non-commercial "as elaborated by creative commons" and give "websites or apps that have
   subscriptions or display advertisements" as an example of *commercial* use. Loci sells a
-  Pro plan through Stripe, so this is not a grey area once we are hosted and taking money.
-  Free-tier limits are <10,000 calls/day, 5,000/hour, 600/minute.
+  Pro plan through Stripe, so this is not a grey area. Free-tier limits are <10,000
+  calls/day, 5,000/hour, 600/minute.
 
-  Three ways out, in rough order of effort:
-  1. `OPENMETEO_API_KEY` — a paid subscription grants a commercial licence, keeps both the
-     forecast and air quality with one provider, and switches to their customer host
-     automatically. Standard is 1M calls/month, which our caching makes enormous headroom.
-     Prices are not published; they sit behind their Stripe checkout.
-  2. `WEATHER_PROVIDER=openweather` — already implemented, needs `OPENWEATHER_API_KEY`.
-     Loses air quality, which has no OpenWeather adapter here.
-  3. MET Norway (api.met.no) is CC BY 4.0 and *permits commercial use* with attribution, no
-     API key, 20 req/s. No adapter exists yet, and it has no global air-quality product.
-     Note it rejects coordinates with more than 4 decimals, which our current `%f`
-     formatting would trip.
+  **The server refuses to boot under `APP_ENV=production` if this is misconfigured**, in the
+  same way it refuses a `:free` AI model. That is deliberate: a licence breach here is
+  silent, because Open-Meteo keeps answering, so a warning would be ignored.
 
-  Until Loci is actually hosted and charging, the free tier is the right call — the exposure
-  is a licence term with no revenue behind it yet.
+  **Current decision (2026-08-28): production runs OpenWeather with air quality off.**
+  Open-Meteo Standard is EUR 29/month and grants a commercial licence; that is not worth
+  paying before there are users. So:
+
+  ```
+  WEATHER_PROVIDER=openweather
+  OPENWEATHER_API_KEY=<required>
+  AIR_QUALITY_ENABLED=false
+  ```
+
+  **`AIR_QUALITY_ENABLED=false` is not optional in that configuration.** Air quality is
+  served by Open-Meteo only, so switching just the forecast provider would leave the free
+  tier being called anyway — which is the exact trap the boot guard catches.
+
+  To turn air quality back on, set `OPENMETEO_API_KEY` (paid). That alone satisfies the
+  guard and switches both adapters to their customer host.
+
+  Local development stays on the keyless Open-Meteo default: development is not commercial
+  use, and the guard only applies in production.
+
+  Not chosen, for the record: MET Norway (api.met.no) is CC BY 4.0 and permits commercial
+  use with attribution, no API key, 20 req/s — but has no global air-quality product and
+  rejects coordinates with more than four decimals. OpenAQ was rejected for air quality: it
+  is ground stations only with no forecast, needs a key, and its licensing is per underlying
+  government source, which is more legal surface than a paid Open-Meteo plan, not less.
+
 - Set `REDIS_URL` to share provider caches across replicas. Without it each replica keeps
   its own in-memory copy and the outbound request rate multiplies by the replica count.
   (or the documented Gemini alternative)

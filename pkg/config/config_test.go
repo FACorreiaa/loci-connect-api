@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -145,6 +146,8 @@ func TestLoad_RefreshSecretFallsBackOutsideProduction(t *testing.T) {
 func TestLoad_ProductionRejectsSharedJWTSecret(t *testing.T) {
 	baseAuthEnv(t)
 	t.Setenv("APP_ENV", "production")
+	// Satisfies the weather-licence guard; this test is about JWT secrets.
+	t.Setenv("OPENMETEO_API_KEY", "paid-key")
 
 	if _, err := Load(); err == nil {
 		t.Fatal("expected Load to reject a shared JWT secret in production")
@@ -324,6 +327,8 @@ func TestLoad_ProductionDefaultsFallbackOff(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("JWT_REFRESH_SECRET", "refresh-secret-refresh-secret-refresh")
 	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	// Satisfies the weather-licence guard; this test is about the AI fallback.
+	t.Setenv("OPENMETEO_API_KEY", "paid-key")
 
 	cfg, err := Load()
 	if err != nil {
@@ -334,5 +339,104 @@ func TestLoad_ProductionDefaultsFallbackOff(t *testing.T) {
 	}
 	if len(cfg.AI.Fallbacks) != 0 {
 		t.Fatalf("Fallbacks = %d in production, want 0", len(cfg.AI.Fallbacks))
+	}
+}
+
+// --- weather provider licence guard ----------------------------------------
+//
+// Open-Meteo's free tier is non-commercial by their terms, and they name "apps
+// that have subscriptions" as commercial use. Loci sells a Pro plan, so a
+// production boot on the free tier is a licence breach — and a silent one,
+// because the API keeps answering. These tests exist so it cannot be silent.
+
+// prodEnv sets the minimum needed to reach the production guards.
+func prodEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AI_PROVIDER", AIProviderOpenRouter)
+	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")
+	t.Setenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+	t.Setenv("OPENROUTER_EMBEDDING_MODEL", "google/gemini-embedding-001")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+	t.Setenv("JWT_REFRESH_SECRET", "test-refresh-secret-test-refresh-secret")
+	t.Setenv("AI_FALLBACK_ENABLED", "false")
+	// Clear anything inherited so each case states its own weather config.
+	t.Setenv("OPENMETEO_API_KEY", "")
+	t.Setenv("OPENWEATHER_API_KEY", "")
+	t.Setenv("WEATHER_PROVIDER", "")
+	t.Setenv("AIR_QUALITY_ENABLED", "")
+}
+
+func TestLoad_ProductionRejectsFreeOpenMeteo(t *testing.T) {
+	prodEnv(t)
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected production to refuse the non-commercial free tier")
+	}
+	if !strings.Contains(err.Error(), "OPENMETEO_API_KEY") {
+		t.Errorf("the error must name the way out, got %q", err)
+	}
+}
+
+// A paid key grants a commercial licence, so it satisfies the guard outright.
+func TestLoad_ProductionAllowsPaidOpenMeteo(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("OPENMETEO_API_KEY", "paid-key")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("a paid key must be accepted: %v", err)
+	}
+}
+
+// The trap this guard exists for: air quality is Open-Meteo-only, so switching
+// only the forecast provider still leaves the free tier being called.
+func TestLoad_ProductionRejectsOpenWeatherWithAirQualityStillOn(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("WEATHER_PROVIDER", "openweather")
+	t.Setenv("OPENWEATHER_API_KEY", "ow-key")
+	t.Setenv("AIR_QUALITY_ENABLED", "true")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected air quality to be caught even with openweather selected")
+	}
+	if !strings.Contains(err.Error(), "AIR_QUALITY_ENABLED") {
+		t.Errorf("the error must name air quality, got %q", err)
+	}
+}
+
+func TestLoad_ProductionAllowsOpenWeatherWithAirQualityOff(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("WEATHER_PROVIDER", "openweather")
+	t.Setenv("OPENWEATHER_API_KEY", "ow-key")
+	t.Setenv("AIR_QUALITY_ENABLED", "false")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("openweather with air quality off must boot: %v", err)
+	}
+}
+
+// An unset WEATHER_PROVIDER with an OpenWeather key already present resolves to
+// openweather, matching NewWeatherAdapterFromEnv. The guard must agree with the
+// adapter, or it would reject a deployment that never touches Open-Meteo.
+func TestLoad_ProductionUnsetProviderFollowsTheOpenWeatherKey(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("OPENWEATHER_API_KEY", "ow-key")
+	t.Setenv("AIR_QUALITY_ENABLED", "false")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("an existing OpenWeather key implies openweather: %v", err)
+	}
+}
+
+// Development is not commercial use, so none of this applies outside production.
+func TestLoad_DevelopmentAllowsFreeOpenMeteo(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AI_FALLBACK_ENABLED", "")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("the free tier is fine outside production: %v", err)
 	}
 }

@@ -259,6 +259,21 @@ func Load() (*Config, error) {
 		if cfg.AI.FallbackEnabled {
 			return nil, errors.New("AI_FALLBACK_ENABLED must be false in production")
 		}
+
+		// Same shape of guard, for a licence rather than a rate limit.
+		//
+		// Open-Meteo's free tier is non-commercial by their terms, and they
+		// name "apps that have subscriptions" as an example of commercial use.
+		// Loci sells a Pro plan, so a production deployment on the free tier is
+		// a licence breach — and a silent one, because the API keeps answering.
+		// Refusing to boot is the only thing that reliably surfaces it.
+		//
+		// Ways to satisfy this: set OPENMETEO_API_KEY (a paid subscription
+		// grants a commercial licence), or use WEATHER_PROVIDER=openweather and
+		// AIR_QUALITY_ENABLED=false. See deploy/OPS.md.
+		if err := checkWeatherLicence(); err != nil {
+			return nil, err
+		}
 	}
 	if cfg.AI.EmbeddingModel == "" {
 		return nil, fmt.Errorf("%s is required", providerEmbeddingModelEnv(cfg.AI.Provider))
@@ -389,6 +404,43 @@ func providerAPIKeyEnv(provider string) string {
 		return "OPENROUTER_API_KEY"
 	}
 	return "GEMINI_API_KEY"
+}
+
+// checkWeatherLicence refuses a production boot that would use Open-Meteo's
+// non-commercial free tier.
+//
+// Read straight from the environment rather than from Config: these are
+// localcontext's variables, and threading them through the config struct just
+// to check them here would put weather-provider knowledge in two places.
+func checkWeatherLicence() error {
+	if strings.TrimSpace(os.Getenv("OPENMETEO_API_KEY")) != "" {
+		return nil // paid plan; commercially licensed
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("WEATHER_PROVIDER")))
+	if provider == "" {
+		// Matches NewWeatherAdapterFromEnv: an existing OpenWeather key wins
+		// when no provider is named, otherwise Open-Meteo is the default.
+		if strings.TrimSpace(os.Getenv("OPENWEATHER_API_KEY")) != "" {
+			provider = "openweather"
+		} else {
+			provider = "openmeteo"
+		}
+	}
+	const openMeteoLicenceErr = "WEATHER_PROVIDER=openmeteo needs OPENMETEO_API_KEY in production: " +
+		"Open-Meteo's free tier is non-commercial and Loci sells subscriptions"
+	if provider == "openmeteo" {
+		return errors.New(openMeteoLicenceErr)
+	}
+
+	// Air quality is Open-Meteo-only, so switching the forecast provider alone
+	// still leaves it calling the free tier.
+	const airQualityLicenceErr = "AIR_QUALITY_ENABLED must be false in production without OPENMETEO_API_KEY: " +
+		"air quality is served by Open-Meteo, whose free tier is non-commercial"
+	if getEnvAsBool("AIR_QUALITY_ENABLED", true) {
+		return errors.New(airQualityLicenceErr)
+	}
+	return nil
 }
 
 func providerModelEnv(provider string) string {
