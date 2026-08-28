@@ -155,7 +155,7 @@ func TestLiveAirQuality(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	s := NewAirQualitySource("", "", NewSignalsHTTPClient(), defaultAirQualityThreshold, nil)
+	s := NewAirQualitySource("", "", NewSignalsHTTPClient(), defaultAirQualityBand, nil)
 	now := time.Now().UTC()
 	start, end := now, now.Add(72*time.Hour)
 
@@ -277,5 +277,77 @@ func TestLiveFXRates(t *testing.T) {
 	// The country convenience path must resolve to something priceable.
 	if got := CurrencyForCountry("JP"); got != "JPY" {
 		t.Errorf("JP should resolve to JPY, got %q", got)
+	}
+}
+
+// TestLiveOpenWeatherAirQuality makes a REAL call to OpenWeather's air
+// pollution API. Needs a key and is skipped without one.
+//
+// Run: LOCI_LIVE_WEATHER=1 OPENWEATHER_API_KEY=... go test ./internal/domain/localcontext/ -run TestLiveOpenWeatherAir -v
+//
+// This one matters more than the other live tests. The endpoint paths were
+// confirmed against the live API (they answer 401, not 404), but the response
+// *shape* was written from documentation that could not be fetched — their docs
+// site is JS-rendered. Everything below is therefore unverified until this test
+// runs green against a real key. The GDACS `iscurrent` bug earlier in this work
+// was exactly this failure mode: a field typed from assumption rather than from
+// a live payload.
+func TestLiveOpenWeatherAirQuality(t *testing.T) {
+	if os.Getenv("LOCI_LIVE_WEATHER") != "1" {
+		t.Skip("set LOCI_LIVE_WEATHER=1 to run the live OpenWeather air test")
+	}
+	key := os.Getenv("OPENWEATHER_API_KEY")
+	if key == "" {
+		t.Skip("OPENWEATHER_API_KEY not set; skipping")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	s := NewOpenWeatherAirSource("", key, NewSignalsHTTPClient(), defaultAirQualityBand, nil)
+
+	// Delhi: reliably poor, so this exercises an alert rather than silence.
+	days, err := s.forecast(ctx, 28.61, 77.21)
+	if err != nil {
+		t.Fatalf("live OpenWeather air quality failed: %v", err)
+	}
+	if len(days) == 0 {
+		t.Fatal("no days parsed — the `list` field name or `dt` handling is wrong")
+	}
+
+	for _, d := range days {
+		if d.Date.IsZero() {
+			t.Errorf("a day has no date — `dt` is not an epoch second as assumed")
+		}
+		// Their index is 1-5. Anything else means we are reading the wrong
+		// field, most likely a European AQI from somewhere.
+		if d.MaxAQI < 1 || d.MaxAQI > 5 {
+			t.Errorf("AQI %.0f is outside OpenWeather's 1-5 scale — wrong field?", d.MaxAQI)
+		}
+		t.Logf("%s  aqi %.0f (%s)  pm2.5 %.0f",
+			d.Date.Format("2006-01-02"), d.MaxAQI,
+			bandForOpenWeatherAQI(int(d.MaxAQI)).Label(), d.MaxPM25)
+	}
+	for i := 1; i < len(days); i++ {
+		if !days[i].Date.After(days[i-1].Date) {
+			t.Errorf("days are not ascending at %d", i)
+		}
+	}
+
+	now := time.Now().UTC()
+	alerts, err := s.Fetch(ctx, SignalRequest{
+		Lat: 28.61, Lon: 77.21, Start: now, End: now.Add(72 * time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("fetch failed: %v", err)
+	}
+	if len(alerts) > 1 {
+		t.Errorf("at most one alert per trip is the contract, got %d", len(alerts))
+	}
+	for _, a := range alerts {
+		if a.Located() {
+			t.Error("an air-quality alert must not be located")
+		}
+		t.Logf("alert: %s — %s (sev %.2f)", a.Title, a.Detail, float64(a.Severity))
 	}
 }

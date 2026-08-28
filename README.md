@@ -152,7 +152,7 @@ Copy `.env.prod.example` to `.env` (or export the variables directly). The minim
 | `SIGNALS_RATE_LIMIT_PER_SECOND` / `_BURST` | Per-host outbound rate limit, to stay inside free-tier usage policies (default `5`/`5`) |
 | `GDACS_ENABLED`, `USGS_ENABLED`, `AIR_QUALITY_ENABLED` | Per-source switches. Each fails independently and is benched for 5 min after 2 consecutive failures |
 | `HAZARD_RADIUS_KM` | How near a hazard counts as near the destination (default `500`) |
-| `AIR_QUALITY_ALERT_THRESHOLD` | European AQI at which to warn (default `60` = "poor"). Air quality always has a value, so this is what stops it alerting on every trip |
+| `AIR_QUALITY_ALERT_BAND` | Band at which to warn: `good`…`very_poor` (default `poor`). Provider-neutral, since Open-Meteo reports a 0–100+ European AQI and OpenWeather a 1–5 index. Air quality always has a value, so this is what stops it alerting on every trip |
 | `FX_ENABLED`, `FX_BASE_CURRENCY` | Exchange rates from the ECB via Frankfurter (default on, `EUR`) |
 | `FUEL_LITRES_PER_100KM`, `FUEL_PRICE_PER_LITRE` | Assumptions behind the drive-cost estimate (default `6.5`, `1.75`). Always restated in the response |
 

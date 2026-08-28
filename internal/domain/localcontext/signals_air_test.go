@@ -26,10 +26,10 @@ func hourlyAQ(startDay int, dayPeaks ...float64) string {
 		strings.Join(times, ","), strings.Join(aqi, ","), strings.Join(pm, ","))
 }
 
-func airSource(t *testing.T, body string, status int, threshold float64) (*AirQualitySource, *int64) {
+func airSource(t *testing.T, body string, status int, minBand AQBand) (*AirQualitySource, *int64) {
 	t.Helper()
 	url, hits := serve(t, body, status)
-	return NewAirQualitySource(url, "", testClient(), threshold, testCache(t)), hits
+	return NewAirQualitySource(url, "", testClient(), minBand, testCache(t)), hits
 }
 
 func sepWindow(from, to int) (time.Time, time.Time) {
@@ -41,7 +41,7 @@ func sepWindow(from, to int) (time.Time, time.Time) {
 // the alert list.
 func TestAirQuality_SaysNothingWhenAirIsFine(t *testing.T) {
 	// Lisbon's real readings while this was written were 27-37.
-	s, _ := airSource(t, hourlyAQ(2, 27, 33, 37), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 27, 33, 37), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 4)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14, Start: start, End: end})
@@ -55,7 +55,7 @@ func TestAirQuality_SaysNothingWhenAirIsFine(t *testing.T) {
 
 func TestAirQuality_WarnsWhenAirIsBad(t *testing.T) {
 	// Jakarta's real readings were 86-95.
-	s, _ := airSource(t, hourlyAQ(2, 86, 95, 90), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 86, 95, 90), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 4)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: -6.2, Lon: 106.85, Start: start, End: end})
@@ -86,7 +86,7 @@ func TestAirQuality_WarnsWhenAirIsBad(t *testing.T) {
 // The scorer charges per alert, so a five-day trip through smoke must not be
 // penalised five times for one fact about one place.
 func TestAirQuality_EmitsOneAlertNamingTheWorstDay(t *testing.T) {
-	s, _ := airSource(t, hourlyAQ(2, 70, 150, 80, 95, 65), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 70, 150, 80, 95, 65), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 6)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 28.61, Lon: 77.21, Start: start, End: end})
@@ -108,7 +108,7 @@ func TestAirQuality_EmitsOneAlertNamingTheWorstDay(t *testing.T) {
 // day you want warning about; averaging hides it.
 func TestAirQuality_UsesDailyMaxNotMean(t *testing.T) {
 	// One day peaking at 90: mean of (18, 90, 45) is 51, below the threshold.
-	s, _ := airSource(t, hourlyAQ(2, 90), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 90), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 2)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 0, Lon: 0, Start: start, End: end})
@@ -123,7 +123,7 @@ func TestAirQuality_UsesDailyMaxNotMean(t *testing.T) {
 // A bad day outside the trip is not the traveller's problem.
 func TestAirQuality_IgnoresDaysOutsideTheWindow(t *testing.T) {
 	// Day 2 is clean, day 5 is terrible; the trip is day 2 only.
-	s, _ := airSource(t, hourlyAQ(2, 30, 30, 30, 200), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 30, 30, 30, 200), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 2)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 0, Lon: 0, Start: start, End: end})
@@ -135,26 +135,26 @@ func TestAirQuality_IgnoresDaysOutsideTheWindow(t *testing.T) {
 	}
 }
 
-func TestAirQuality_ThresholdIsConfigurable(t *testing.T) {
+func TestAirQuality_BandThresholdIsConfigurable(t *testing.T) {
 	body := hourlyAQ(2, 45)
 	start, end := sepWindow(2, 2)
 	ctx := context.Background()
 
-	strict, _ := airSource(t, body, http.StatusOK, 40)
+	strict, _ := airSource(t, body, http.StatusOK, AQModerate)
 	if got, _ := strict.Fetch(ctx, SignalRequest{Start: start, End: end}); len(got) != 1 {
-		t.Errorf("threshold 40 should alert on 45, got %d", len(got))
+		t.Errorf("a moderate floor should alert on 45, got %d", len(got))
 	}
 
-	lax, _ := airSource(t, body, http.StatusOK, 60)
+	lax, _ := airSource(t, body, http.StatusOK, AQPoor)
 	if got, _ := lax.Fetch(ctx, SignalRequest{Start: start, End: end}); len(got) != 0 {
-		t.Errorf("threshold 60 should stay quiet on 45, got %d", len(got))
+		t.Errorf("a poor floor should stay quiet on 45, got %d", len(got))
 	}
 }
 
 // Air quality describes the destination itself, so a pin would land on top of
 // the city marker and add nothing. Hazards are located; this is not.
 func TestAirQuality_AlertIsNotLocated(t *testing.T) {
-	s, _ := airSource(t, hourlyAQ(2, 120), http.StatusOK, 60)
+	s, _ := airSource(t, hourlyAQ(2, 120), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 2)
 
 	got, _ := s.Fetch(context.Background(), SignalRequest{Lat: 28.61, Lon: 77.21, Start: start, End: end})
@@ -167,7 +167,7 @@ func TestAirQuality_AlertIsNotLocated(t *testing.T) {
 }
 
 func TestAirQuality_CachesByRoundedCoordinates(t *testing.T) {
-	s, hits := airSource(t, hourlyAQ(2, 90), http.StatusOK, 60)
+	s, hits := airSource(t, hourlyAQ(2, 90), http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 2)
 	ctx := context.Background()
 
@@ -185,7 +185,7 @@ func TestAirQuality_CachesByRoundedCoordinates(t *testing.T) {
 func TestAirQuality_ToleratesNullHours(t *testing.T) {
 	body := `{"hourly":{"time":["2026-09-02T00:00","2026-09-02T08:00","2026-09-02T16:00"],
 	 "european_aqi":[null,95,null],"pm2_5":[null,null,60]}}`
-	s, _ := airSource(t, body, http.StatusOK, 60)
+	s, _ := airSource(t, body, http.StatusOK, AQPoor)
 	start, end := sepWindow(2, 2)
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Start: start, End: end})
@@ -215,7 +215,7 @@ func TestAirQuality_ErrorsOnUnusableResponses(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := airSource(t, tt.body, tt.status, 60)
+			s, _ := airSource(t, tt.body, tt.status, AQPoor)
 			if _, err := s.Fetch(context.Background(), SignalRequest{Start: start, End: end}); err == nil {
 				t.Fatal("expected an error so the Gatherer logs and skips it")
 			}
@@ -223,8 +223,8 @@ func TestAirQuality_ErrorsOnUnusableResponses(t *testing.T) {
 	}
 }
 
-// The labels are the European AQI's own vocabulary, so what a user reads here
-// matches any official air-quality site they check.
+// The labels are the vocabulary official air-quality sites use, so what a user
+// reads here matches what they find when they check.
 func TestAQIBandsAndSeverity(t *testing.T) {
 	bands := []struct {
 		aqi   float64
@@ -238,7 +238,7 @@ func TestAQIBandsAndSeverity(t *testing.T) {
 		{228, "Extremely poor"},
 	}
 	for _, b := range bands {
-		if got := aqiBandLabel(b.aqi); got != b.label {
+		if got := bandForEuropeanAQI(b.aqi).Label(); got != b.label {
 			t.Errorf("AQI %.0f: got %q, want %q", b.aqi, got, b.label)
 		}
 	}
@@ -249,12 +249,12 @@ func TestAQIBandsAndSeverity(t *testing.T) {
 		100: SeverityMajor, 228: SeverityMajor,
 	}
 	for aqi, want := range sev {
-		if got := aqiSeverity(aqi); got != want {
+		if got := bandForEuropeanAQI(aqi).Severity(); got != want {
 			t.Errorf("AQI %.0f: got %v, want %v", aqi, got, want)
 		}
 	}
 }
 
 func TestAirQuality_ImplementsSignalSource(t *testing.T) {
-	var _ SignalSource = NewAirQualitySource("", "", testClient(), 0, nil)
+	var _ SignalSource = NewAirQualitySource("", "", testClient(), AQPoor, nil)
 }

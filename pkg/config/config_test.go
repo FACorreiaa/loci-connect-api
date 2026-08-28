@@ -389,20 +389,49 @@ func TestLoad_ProductionAllowsPaidOpenMeteo(t *testing.T) {
 	}
 }
 
-// The trap this guard exists for: air quality is Open-Meteo-only, so switching
-// only the forecast provider still leaves the free tier being called.
-func TestLoad_ProductionRejectsOpenWeatherWithAirQualityStillOn(t *testing.T) {
+// Air quality follows the weather provider, so OpenWeather now covers both and
+// air quality no longer has to be switched off to stay licence-clean.
+func TestLoad_ProductionAllowsOpenWeatherWithAirQualityOn(t *testing.T) {
 	prodEnv(t)
 	t.Setenv("WEATHER_PROVIDER", "openweather")
 	t.Setenv("OPENWEATHER_API_KEY", "ow-key")
 	t.Setenv("AIR_QUALITY_ENABLED", "true")
 
+	if _, err := Load(); err != nil {
+		t.Fatalf("openweather serves air quality too: %v", err)
+	}
+}
+
+// Selecting openweather without a key is the dangerous case: the adapter falls
+// back to Open-Meteo, so the config reads clean while the free tier is called.
+func TestLoad_ProductionRejectsOpenWeatherWithoutAKey(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("WEATHER_PROVIDER", "openweather")
+	t.Setenv("OPENWEATHER_API_KEY", "")
+
 	_, err := Load()
 	if err == nil {
-		t.Fatal("expected air quality to be caught even with openweather selected")
+		t.Fatal("expected the silent fallback to Open-Meteo to be rejected")
 	}
-	if !strings.Contains(err.Error(), "AIR_QUALITY_ENABLED") {
-		t.Errorf("the error must name air quality, got %q", err)
+	if !strings.Contains(err.Error(), "OPENWEATHER_API_KEY") {
+		t.Errorf("the error must name the missing key, got %q", err)
+	}
+}
+
+// The stub makes no external call, but air quality would still reach
+// Open-Meteo, because it only follows openweather.
+func TestLoad_ProductionStubStillGuardsAirQuality(t *testing.T) {
+	prodEnv(t)
+	t.Setenv("WEATHER_PROVIDER", "stub")
+	t.Setenv("AIR_QUALITY_ENABLED", "true")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected air quality to be caught behind the stub provider")
+	}
+
+	t.Setenv("AIR_QUALITY_ENABLED", "false")
+	if _, err := Load(); err != nil {
+		t.Fatalf("stub with air quality off must boot: %v", err)
 	}
 }
 

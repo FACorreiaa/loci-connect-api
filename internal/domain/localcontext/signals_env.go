@@ -72,15 +72,9 @@ func NewGathererFromEnv(logger *slog.Logger, cache *signalCache) *Gatherer {
 		sources = append(sources, NewUSGSSource(os.Getenv("USGS_BASE_URL"), client, radiusKm, cache))
 	}
 	// Air quality always has a value, unlike the event-driven sources, so the
-	// threshold is what stops it attaching an alert to every trip forever.
+	// band threshold is what stops it attaching an alert to every trip forever.
 	if envBool("AIR_QUALITY_ENABLED", true) {
-		sources = append(sources, NewAirQualitySource(
-			os.Getenv("OPENMETEO_AIR_QUALITY_BASE_URL"),
-			os.Getenv("OPENMETEO_API_KEY"),
-			client,
-			envFloat("AIR_QUALITY_ALERT_THRESHOLD", defaultAirQualityThreshold),
-			cache,
-		))
+		sources = append(sources, newAirQualitySourceFromEnv(client, cache, logger))
 	}
 
 	names := make([]string, 0, len(sources))
@@ -165,4 +159,44 @@ func NewFXFromEnv(client *httpx.Client, cache *signalCache) (adapter *FXAdapter,
 // A nil store is supported and simply disables caching.
 func NewSignalCacheFromEnv(store cachestore.Store, logger *slog.Logger) *signalCache {
 	return newSignalCache(store, logger)
+}
+
+// newAirQualitySourceFromEnv picks the air-quality provider.
+//
+// It follows the weather provider rather than taking a variable of its own, and
+// that is deliberate: the two are a licensing pair, not independent choices.
+// Open-Meteo's free tier is non-commercial, so a deployment that moved its
+// forecast to OpenWeather to avoid that would still have been calling Open-Meteo
+// for air quality on every trip view. Making this a separate switch would just
+// be re-creating that hole and asking operators to remember it.
+//
+//	WEATHER_PROVIDER=openweather  -> OpenWeather air pollution, same key
+//	anything else                 -> Open-Meteo air quality
+func newAirQualitySourceFromEnv(client *httpx.Client, cache *signalCache, logger *slog.Logger) SignalSource {
+	minBand := defaultAirQualityBand
+	if name := envString("AIR_QUALITY_ALERT_BAND", ""); name != "" {
+		if b, ok := bandForBandName(name); ok {
+			minBand = b
+		} else {
+			logf(logger, slog.LevelWarn,
+				"air quality: unrecognised AIR_QUALITY_ALERT_BAND, using the default",
+				slog.String("value", name))
+		}
+	}
+
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("WEATHER_PROVIDER")))
+	owKey := strings.TrimSpace(os.Getenv("OPENWEATHER_API_KEY"))
+	if provider == "" && owKey != "" {
+		provider = WeatherProviderOpenWeather
+	}
+
+	if provider == WeatherProviderOpenWeather && owKey != "" {
+		logf(logger, slog.LevelInfo, "air quality: using openweather air pollution")
+		owBase := os.Getenv("OPENWEATHER_AIR_BASE_URL")
+		return NewOpenWeatherAirSource(owBase, owKey, client, minBand, cache)
+	}
+
+	omBase := os.Getenv("OPENMETEO_AIR_QUALITY_BASE_URL")
+	omKey := os.Getenv("OPENMETEO_API_KEY")
+	return NewAirQualitySource(omBase, omKey, client, minBand, cache)
 }

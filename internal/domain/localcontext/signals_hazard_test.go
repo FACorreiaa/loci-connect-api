@@ -36,6 +36,21 @@ func testClient() *httpx.Client {
 	})
 }
 
+// serveCapturing is serve() plus the last request's query string, for
+// asserting that credentials actually reach the provider.
+func serveCapturing(t *testing.T, body string, status int, query *string) (string, *int64) {
+	t.Helper()
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		*query = r.URL.RawQuery
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(srv.Close)
+	return srv.URL, &hits
+}
+
 func serve(t *testing.T, body string, status int) (string, *int64) {
 	t.Helper()
 	var hits int64

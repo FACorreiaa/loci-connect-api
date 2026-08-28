@@ -16,24 +16,111 @@ const (
 	openMeteoAirQualityCustomerBaseURL = "https://customer-air-quality-api.open-meteo.com"
 )
 
-// European AQI band boundaries.
+// European AQI band boundaries, used by the Open-Meteo source.
 //
 // The scale is 0-20 good, 20-40 fair, 40-60 moderate, 60-80 poor, 80-100 very
-// poor, above 100 extremely poor. Verified against live readings while this was
-// written: Lisbon sat at 27-37, Jakarta at 86-95, Delhi at 112-228.
+// poor, above 100 extremely poor. Verified against live readings: Lisbon sat at
+// 27-37, Jakarta at 86-95, Delhi at 112-228.
 const (
 	aqiPoor          = 60
 	aqiVeryPoor      = 80
 	aqiExtremelyPoor = 100
-
-	// defaultAirQualityThreshold is where we start saying something.
-	//
-	// Deliberately at "poor" rather than lower. Air quality differs from the
-	// other sources in that it always has a value — every destination on earth
-	// has an AQI every day — so a low threshold would attach an alert to every
-	// trip forever and the alert list would stop meaning "something is up".
-	defaultAirQualityThreshold = aqiPoor
 )
+
+// AQBand is a provider-neutral air-quality band.
+//
+// It exists because the two providers do not share a scale: Open-Meteo reports
+// the European AQI (0 to 100+) and OpenWeather reports its own 1-5 index.
+// Comparing an OpenWeather 4 against a European threshold of 60 would silently
+// mean "never alert", so neither raw number is allowed past its own adapter.
+type AQBand int
+
+const (
+	AQGood AQBand = iota
+	AQFair
+	AQModerate
+	AQPoor
+	AQVeryPoor
+	AQExtremelyPoor
+)
+
+// defaultAirQualityBand is where we start saying something.
+//
+// Deliberately at "poor" rather than lower. Air quality differs from the other
+// sources in that it always has a value — every destination on earth has one
+// every day — so a low threshold would attach an alert to every trip forever
+// and the alert list would stop meaning "something is up".
+const defaultAirQualityBand = AQPoor
+
+// Label names the band in the vocabulary official air-quality sites use, so
+// what a user reads here matches what they find when they check.
+func (b AQBand) Label() string {
+	switch b {
+	case AQExtremelyPoor:
+		return "Extremely poor"
+	case AQVeryPoor:
+		return "Very poor"
+	case AQPoor:
+		return "Poor"
+	case AQModerate:
+		return "Moderate"
+	case AQFair:
+		return "Fair"
+	default:
+		return "Good"
+	}
+}
+
+// Severity grades a band for the go-score. Bands below the alerting threshold
+// never reach this.
+func (b AQBand) Severity() Severity {
+	switch {
+	case b >= AQExtremelyPoor:
+		return SeverityMajor
+	case b >= AQVeryPoor:
+		return SeverityModerate
+	default:
+		return SeverityMinor
+	}
+}
+
+// bandForEuropeanAQI maps an Open-Meteo European AQI reading onto the band.
+func bandForEuropeanAQI(aqi float64) AQBand {
+	switch {
+	case aqi >= aqiExtremelyPoor:
+		return AQExtremelyPoor
+	case aqi >= aqiVeryPoor:
+		return AQVeryPoor
+	case aqi >= aqiPoor:
+		return AQPoor
+	case aqi >= 40:
+		return AQModerate
+	case aqi >= 20:
+		return AQFair
+	default:
+		return AQGood
+	}
+}
+
+// bandForBandName parses the configured threshold.
+func bandForBandName(name string) (AQBand, bool) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "good":
+		return AQGood, true
+	case "fair":
+		return AQFair, true
+	case "moderate":
+		return AQModerate, true
+	case "poor":
+		return AQPoor, true
+	case "very_poor", "very poor":
+		return AQVeryPoor, true
+	case "extremely_poor", "extremely poor":
+		return AQExtremelyPoor, true
+	default:
+		return 0, false
+	}
+}
 
 // AirQualitySource warns when the air at a destination is genuinely bad.
 //
@@ -48,10 +135,10 @@ const (
 // city marker and say nothing the destination does not already say. Hazards are
 // located because they are elsewhere; this is not.
 type AirQualitySource struct {
-	baseURL   string
-	apiKey    string
-	client    *httpx.Client
-	threshold float64
+	baseURL string
+	apiKey  string
+	client  *httpx.Client
+	minBand AQBand
 
 	cache *signalCache
 }
@@ -65,12 +152,12 @@ type airDay struct {
 	MaxPM25 float64   `json:"max_pm25"`
 }
 
-// NewAirQualitySource builds the source. An empty baseURL uses the public
-// endpoint; a threshold of zero or less uses the default.
+// NewAirQualitySource builds the Open-Meteo source. An empty baseURL uses the
+// public endpoint.
 func NewAirQualitySource(
 	baseURL, apiKey string,
 	client *httpx.Client,
-	threshold float64,
+	minBand AQBand,
 	cache *signalCache,
 ) *AirQualitySource {
 	apiKey = strings.TrimSpace(apiKey)
@@ -80,10 +167,7 @@ func NewAirQualitySource(
 			baseURL = openMeteoAirQualityCustomerBaseURL
 		}
 	}
-	if threshold <= 0 {
-		threshold = defaultAirQualityThreshold
-	}
-	return &AirQualitySource{baseURL: baseURL, apiKey: apiKey, client: client, threshold: threshold, cache: cache}
+	return &AirQualitySource{baseURL: baseURL, apiKey: apiKey, client: client, minBand: minBand, cache: cache}
 }
 
 func (s *AirQualitySource) Name() string { return SourceAirQuality }
@@ -118,7 +202,8 @@ func (s *AirQualitySource) Fetch(ctx context.Context, req SignalRequest) ([]Aler
 		}
 	}
 
-	if worst.MaxAQI < s.threshold {
+	band := bandForEuropeanAQI(worst.MaxAQI)
+	if band < s.minBand {
 		// Good air is not news. Saying so on every clean trip would train users
 		// to ignore the alert list.
 		return nil, nil
@@ -126,17 +211,17 @@ func (s *AirQualitySource) Fetch(ctx context.Context, req SignalRequest) ([]Aler
 
 	d := worst.Date
 	detail := fmt.Sprintf("European AQI %.0f (%s) on %s",
-		worst.MaxAQI, aqiBandLabel(worst.MaxAQI), d.Format("Mon 2 Jan"))
+		worst.MaxAQI, band.Label(), d.Format("Mon 2 Jan"))
 	if worst.MaxPM25 > 0 {
 		detail += fmt.Sprintf(", PM2.5 %.0f µg/m³", worst.MaxPM25)
 	}
 
 	return []Alert{{
 		Kind:     AlertAirQuality,
-		Title:    fmt.Sprintf("%s air quality expected", aqiBandLabel(worst.MaxAQI)),
+		Title:    fmt.Sprintf("%s air quality expected", band.Label()),
 		Detail:   detail,
 		Date:     &d,
-		Severity: aqiSeverity(worst.MaxAQI),
+		Severity: band.Severity(),
 		Source:   SourceAirQuality,
 	}}, nil
 }
@@ -228,38 +313,4 @@ func (r openMeteoAirResponse) toDailyMax() ([]airDay, error) {
 		out = append(out, *byDay[key])
 	}
 	return out, nil
-}
-
-// aqiSeverity grades an AQI reading.
-//
-// Anything below the alerting threshold never reaches this, so the lowest band
-// here is already "poor".
-func aqiSeverity(aqi float64) Severity {
-	switch {
-	case aqi >= aqiExtremelyPoor:
-		return SeverityMajor
-	case aqi >= aqiVeryPoor:
-		return SeverityModerate
-	default:
-		return SeverityMinor
-	}
-}
-
-// aqiBandLabel names the band in the European AQI's own vocabulary, so the text
-// a user reads matches what they will find on any official air-quality site.
-func aqiBandLabel(aqi float64) string {
-	switch {
-	case aqi >= aqiExtremelyPoor:
-		return "Extremely poor"
-	case aqi >= aqiVeryPoor:
-		return "Very poor"
-	case aqi >= aqiPoor:
-		return "Poor"
-	case aqi >= 40:
-		return "Moderate"
-	case aqi >= 20:
-		return "Fair"
-	default:
-		return "Good"
-	}
 }

@@ -269,8 +269,9 @@ func Load() (*Config, error) {
 		// Refusing to boot is the only thing that reliably surfaces it.
 		//
 		// Ways to satisfy this: set OPENMETEO_API_KEY (a paid subscription
-		// grants a commercial licence), or use WEATHER_PROVIDER=openweather and
-		// AIR_QUALITY_ENABLED=false. See deploy/OPS.md.
+		// grants a commercial licence), or use WEATHER_PROVIDER=openweather
+		// with OPENWEATHER_API_KEY, which serves air quality too. See
+		// deploy/OPS.md.
 		if err := checkWeatherLicence(); err != nil {
 			return nil, err
 		}
@@ -414,34 +415,53 @@ func providerAPIKeyEnv(provider string) string {
 // to check them here would put weather-provider knowledge in two places.
 func checkWeatherLicence() error {
 	if strings.TrimSpace(os.Getenv("OPENMETEO_API_KEY")) != "" {
-		return nil // paid plan; commercially licensed
+		return nil // paid plan; commercially licensed for both forecast and air quality
 	}
 
+	owKey := strings.TrimSpace(os.Getenv("OPENWEATHER_API_KEY"))
 	provider := strings.ToLower(strings.TrimSpace(os.Getenv("WEATHER_PROVIDER")))
 	if provider == "" {
 		// Matches NewWeatherAdapterFromEnv: an existing OpenWeather key wins
 		// when no provider is named, otherwise Open-Meteo is the default.
-		if strings.TrimSpace(os.Getenv("OPENWEATHER_API_KEY")) != "" {
+		if owKey != "" {
 			provider = "openweather"
 		} else {
 			provider = "openmeteo"
 		}
 	}
-	const openMeteoLicenceErr = "WEATHER_PROVIDER=openmeteo needs OPENMETEO_API_KEY in production: " +
-		"Open-Meteo's free tier is non-commercial and Loci sells subscriptions"
-	if provider == "openmeteo" {
+
+	switch provider {
+	case "openweather":
+		// The adapter falls back to Open-Meteo when the key is missing, which
+		// would put us back on the free tier while the config still reads
+		// "openweather". That fallback is right for a dev box and wrong here.
+		if owKey == "" {
+			return errors.New(openWeatherKeyErr)
+		}
+		// Air quality follows the weather provider, so this covers both.
+		return nil
+
+	case "stub":
+		// The stub makes no external call, but air quality would still go to
+		// Open-Meteo because it only follows *openweather*.
+		if getEnvAsBool("AIR_QUALITY_ENABLED", true) {
+			return errors.New(airQualityLicenceErr)
+		}
+		return nil
+
+	default:
 		return errors.New(openMeteoLicenceErr)
 	}
-
-	// Air quality is Open-Meteo-only, so switching the forecast provider alone
-	// still leaves it calling the free tier.
-	const airQualityLicenceErr = "AIR_QUALITY_ENABLED must be false in production without OPENMETEO_API_KEY: " +
-		"air quality is served by Open-Meteo, whose free tier is non-commercial"
-	if getEnvAsBool("AIR_QUALITY_ENABLED", true) {
-		return errors.New(airQualityLicenceErr)
-	}
-	return nil
 }
+
+const (
+	openMeteoLicenceErr = "WEATHER_PROVIDER=openmeteo needs OPENMETEO_API_KEY in production: " +
+		"Open-Meteo's free tier is non-commercial and Loci sells subscriptions"
+	openWeatherKeyErr = "WEATHER_PROVIDER=openweather needs OPENWEATHER_API_KEY in production: " +
+		"without it the adapter falls back to Open-Meteo, whose free tier is non-commercial"
+	airQualityLicenceErr = "AIR_QUALITY_ENABLED must be false in production with this weather " +
+		"provider: air quality would be served by Open-Meteo, whose free tier is non-commercial"
+)
 
 func providerModelEnv(provider string) string {
 	if provider == AIProviderOpenRouter {

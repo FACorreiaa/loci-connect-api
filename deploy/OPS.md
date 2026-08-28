@@ -79,25 +79,38 @@ it all off.
   same way it refuses a `:free` AI model. That is deliberate: a licence breach here is
   silent, because Open-Meteo keeps answering, so a warning would be ignored.
 
-  **Current decision (2026-08-28): production runs OpenWeather with air quality off.**
-  Open-Meteo Standard is EUR 29/month and grants a commercial licence; that is not worth
-  paying before there are users. So:
+  **Current decision (2026-08-28): production runs OpenWeather.** Open-Meteo Standard is
+  EUR 29/month and grants a commercial licence; that is not worth paying before there are
+  users. So:
 
   ```
   WEATHER_PROVIDER=openweather
   OPENWEATHER_API_KEY=<required>
-  AIR_QUALITY_ENABLED=false
   ```
 
-  **`AIR_QUALITY_ENABLED=false` is not optional in that configuration.** Air quality is
-  served by Open-Meteo only, so switching just the forecast provider would leave the free
-  tier being called anyway — which is the exact trap the boot guard catches.
+  **Air quality follows the weather provider** and needs no separate switch: `openweather`
+  uses OpenWeather's air pollution API on the same key, anything else uses Open-Meteo. That
+  pairing is deliberate — they are a licensing pair, not independent choices, and an
+  independent switch would recreate the hole where a deployment moved its forecast off
+  Open-Meteo and kept calling it for air quality on every trip view.
 
-  To turn air quality back on, set `OPENMETEO_API_KEY` (paid). That alone satisfies the
-  guard and switches both adapters to their customer host.
+  The boot guard enforces the whole shape, including the subtle case: selecting
+  `openweather` **without** a key is rejected, because the adapter falls back to Open-Meteo
+  and the config would still read clean.
+
+  `WEATHER_PROVIDER=stub` still requires `AIR_QUALITY_ENABLED=false`, since the stub makes no
+  external call but air quality would go to Open-Meteo anyway.
+
+  To use Open-Meteo for both, set `OPENMETEO_API_KEY` (paid). That alone satisfies the guard.
 
   Local development stays on the keyless Open-Meteo default: development is not commercial
   use, and the guard only applies in production.
+
+  **Caveat on the OpenWeather air source:** its endpoint paths are confirmed against the live
+  API, but the response shape was written from documentation that could not be fetched (their
+  docs are JS-rendered). Run
+  `LOCI_LIVE_WEATHER=1 OPENWEATHER_API_KEY=... go test ./internal/domain/localcontext/ -run TestLiveOpenWeatherAir -v`
+  once against a real key before trusting it in production.
 
   Not chosen, for the record: MET Norway (api.met.no) is CC BY 4.0 and permits commercial
   use with attribution, no API key, 20 req/s — but has no global air-quality product and
