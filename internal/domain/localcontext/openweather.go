@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -83,7 +84,14 @@ func (a *OpenWeatherAdapter) Forecast(ctx context.Context, lat, lon float64, day
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openweather status %d", resp.StatusCode)
+		// Include the body. OpenWeather explains *why* a 401 happened — an
+		// unactivated key reads identically to a wrong one otherwise — and
+		// without this the operator gets a bare status code to debug.
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+		if len(snippet) == 0 {
+			return nil, fmt.Errorf("openweather status %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("openweather status %d: %s", resp.StatusCode, snippet)
 	}
 
 	var body openWeatherResponse
