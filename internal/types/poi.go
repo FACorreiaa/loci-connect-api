@@ -98,15 +98,20 @@ type POIDetailedInfo struct {
 	Grounded bool `json:"grounded,omitempty"`
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for POIDetailedInfo
-// to handle opening_hours field that can be either string or map[string]string
+// UnmarshalJSON implements custom JSON unmarshaling for POIDetailedInfo.
+//
+// Every field intercepted here is one an LLM has been observed getting wrong:
+// opening_hours arrives as either a string or a map, star_rating as either a
+// number or a string, and id as anything at all.
 func (p *POIDetailedInfo) UnmarshalJSON(data []byte) error {
 	// Define a temporary struct with the same fields as POIDetailedInfo
-	// but with OpeningHours as json.RawMessage to handle both string and map
+	// but with the loosely-typed fields as json.RawMessage.
 	type Alias POIDetailedInfo
 	aux := &struct {
 		OpeningHours json.RawMessage `json:"opening_hours"`
 		StarRating   json.RawMessage `json:"star_rating"`
+		ID           json.RawMessage `json:"id"`
+		CityID       json.RawMessage `json:"city_id"`
 		*Alias
 	}{
 		Alias: (*Alias)(p),
@@ -115,6 +120,21 @@ func (p *POIDetailedInfo) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
+
+	// Identifiers, leniently.
+	//
+	// uuid.UUID rejects anything that is not exactly 36 characters, and a model
+	// invents ids freely — a 40-character one was enough to fail the whole
+	// array and discard every POI in a generated itinerary, because the caller
+	// logs the error and returns. One bad id must cost that POI its id, not
+	// cost the user their itinerary.
+	//
+	// Dropping the value is safe: a generated POI is resolved against the
+	// database by identity, not by the id the model supplied. See
+	// UpsertPOIByIdentity, which keys on (city, normalised name) precisely
+	// because a model's ids are not stable.
+	p.ID = parseLenientUUID(aux.ID)
+	p.CityID = parseLenientUUID(aux.CityID)
 
 	// Handle OpeningHours field
 	if len(aux.OpeningHours) > 0 {
@@ -145,6 +165,27 @@ func (p *POIDetailedInfo) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+// parseLenientUUID reads a UUID that may be absent, null, empty, or simply not
+// a UUID at all. Anything unusable becomes uuid.Nil rather than an error.
+func parseLenientUUID(raw json.RawMessage) uuid.UUID {
+	if len(raw) == 0 {
+		return uuid.Nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		// Not even a JSON string — a number or an object, say.
+		return uuid.Nil
+	}
+	if s == "" {
+		return uuid.Nil
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
 }
 
 type AddPoiRequest struct {
