@@ -3,6 +3,7 @@ package localcontext
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
@@ -10,8 +11,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// Handler implements LocalContextService over a WeatherAdapter. Alerts
-// (closures/holidays/strikes) are stubbed empty until real providers are wired.
+// Handler implements LocalContextService over a WeatherAdapter, plus an
+// optional Gatherer supplying live alerts (public holidays today; hazards and
+// air quality next).
 type Handler struct {
 	localcontextconnect.UnimplementedLocalContextServiceHandler
 	weather   WeatherAdapter
@@ -22,6 +24,26 @@ type Handler struct {
 	// supported state: the score then answers from coordinates alone.
 	cities CityResolver
 	pois   POICounter
+
+	// Optional, attached via WithSignals. Nil means no live alert sources are
+	// configured, which is the same observable state as "nothing is happening
+	// at this destination" — an empty alert list either way.
+	signals *Gatherer
+
+	// Optional, attached via WithFX. A nil adapter means rates are simply not
+	// offered; the drive-cost arithmetic needs no provider and still works.
+	fx             *FXAdapter
+	fxBase         string
+	litresPer100Km float64
+	pricePerLitre  float64
+}
+
+// WithSignals attaches the live alert sources (holidays, and later hazards and
+// air quality). Optional, like WithScoring: without it the handler behaves
+// exactly as it did before any source existed.
+func (h *Handler) WithSignals(g *Gatherer) *Handler {
+	h.signals = g
+	return h
 }
 
 // NewHandler builds the handler. `estimated` should be true when `weather` is a
@@ -59,5 +81,20 @@ func (h *Handler) GetLocalContext(
 			PrecipProb: d.PrecipProb,
 		})
 	}
+
+	// Alerts cover the same span the forecast does, so a holiday shows up
+	// alongside the day it falls on. Gather never returns an error — a failing
+	// source is logged and skipped — so there is nothing to degrade here.
+	if h.signals.Enabled() {
+		start := time.Now().UTC()
+		if len(fc) > 0 {
+			start = fc[0].Date
+		}
+		end := start.AddDate(0, 0, days)
+		out.Alerts = ToLocalAlertsProto(
+			h.signals.Gather(ctx, req.Msg.GetLatitude(), req.Msg.GetLongitude(), start, end),
+		)
+	}
+
 	return connect.NewResponse(out), nil
 }

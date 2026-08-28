@@ -25,8 +25,18 @@ const (
 	maxTravelPoints  = 30
 	maxThingsPoints  = 30
 
-	// Each alert (closure, strike, public holiday) costs this much.
+	// alertPenalty is the MOST one alert can cost. An alert's severity scales
+	// it down from there; an alert with no severity set costs the full amount,
+	// which is the flat behaviour this used to have.
 	alertPenalty = 10
+
+	// maxDisruptionPenalty caps the total. Disruptions are one dimension among
+	// four, and without a cap a destination with a run of minor notices — a
+	// holiday, an observance, a small tremor — would be scored worse than one
+	// with a single genuinely disqualifying problem. Real feeds produce runs of
+	// minor notices constantly; the flat per-alert charge was only ever safe
+	// while nothing produced alerts at all.
+	maxDisruptionPenalty = 30
 )
 
 // Verdicts. Thresholds are judgement calls, not science; they exist so the UI
@@ -96,7 +106,7 @@ func Score(in ScoreInput) GoScore {
 
 	total := weather + travel + things
 
-	if penalty := len(in.Alerts) * alertPenalty; penalty > 0 {
+	if penalty := disruptionPenalty(in.Alerts); penalty > 0 {
 		total -= penalty
 		factors = append(factors, ScoreFactor{
 			Label:           "Local disruptions",
@@ -237,6 +247,22 @@ func scoreThings(poiCount int, cityName string) (int, string) {
 		detail = fmt.Sprintf("Plenty to fill the window in %s (%d+ places)", name, saturation)
 	}
 	return points, detail
+}
+
+// disruptionPenalty totals what the alerts should cost, graded by severity and
+// capped.
+//
+// Kept a pure function over the already-gathered alerts, like the rest of this
+// file: whether a wildfire outranks a public holiday is a judgement the score
+// should make identically everywhere, and it must be testable without a
+// network.
+func disruptionPenalty(alerts []Alert) int {
+	var total float64
+	for _, a := range alerts {
+		total += alertPenalty * float64(effectiveSeverity(a))
+	}
+	capped := math.Min(math.Round(total), maxDisruptionPenalty)
+	return int(capped)
 }
 
 func alertDetail(alerts []Alert) string {

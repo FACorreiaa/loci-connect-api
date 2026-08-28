@@ -35,6 +35,21 @@ type Service struct {
 	weatherEst bool
 	logger     *slog.Logger
 	plans      PlanChecker
+
+	// Optional, attached via WithSignals. Nil is supported and means the
+	// columns score without a disruption dimension, exactly as before.
+	signals *localcontext.Gatherer
+}
+
+// WithSignals attaches live alert sources so a compared city is penalised for
+// the same disruptions GetGoScore sees.
+//
+// It is a builder rather than a constructor argument because NewService already
+// takes nine, and because this is genuinely optional: the compare page worked
+// without it and must keep working when no sources are configured.
+func (s *Service) WithSignals(g *localcontext.Gatherer) *Service {
+	s.signals = g
+	return s
 }
 
 func NewService(
@@ -94,7 +109,7 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 	var resolved []resolvedCity
 
 	for _, name := range in.Candidates {
-		col, score, resolvedCity, err := s.buildColumn(ctx, originLat, originLon, name, windowHours)
+		col, score, resolvedCity, err := s.buildColumn(ctx, originLat, originLon, name, windowHours, in.Start, in.End)
 		if err != nil {
 			s.logger.WarnContext(ctx, "compare column skipped", slog.String("city", name), slog.Any("error", err))
 			continue
@@ -168,6 +183,9 @@ func (s *Service) buildColumn(
 	originLat, originLon float64,
 	cityName string,
 	windowHours float64,
+	// The concrete window, carried alongside windowHours because a duration
+	// alone cannot answer "which holidays fall inside it".
+	windowStart, windowEnd time.Time,
 ) (*comparev1.CityCompareColumn, float64, resolvedCity, error) {
 	city, err := s.cities.FindCityByFuzzyName(ctx, cityName)
 	if err != nil || city == nil {
@@ -211,6 +229,14 @@ func (s *Service) buildColumn(
 	// The go/no-go judgement, computed from the same inputs this column already
 	// shows. Same function as the standalone GetGoScore RPC, so the number a
 	// user sees on /compare matches the one they get anywhere else.
+	// Same alert sources GetGoScore uses, so a public holiday that drops the
+	// standalone score drops this column by the same amount. One algorithm and
+	// one set of inputs is the whole point of sharing the scorer.
+	var alerts []localcontext.Alert
+	if s.signals.Enabled() {
+		alerts = s.signals.Gather(ctx, lat, lon, windowStart, windowEnd)
+	}
+
 	goScore := localcontext.Score(localcontext.ScoreInput{
 		CityName:         city.Name,
 		Forecast:         fc,
@@ -218,6 +244,7 @@ func (s *Service) buildColumn(
 		TravelMins:       travelMins,
 		WindowHours:      windowHours,
 		POICount:         len(pois),
+		Alerts:           alerts,
 	})
 
 	col := &comparev1.CityCompareColumn{

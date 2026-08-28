@@ -30,6 +30,15 @@ const (
 	AlertClosure AlertKind = "closure"
 	AlertHoliday AlertKind = "holiday"
 	AlertStrike  AlertKind = "strike"
+
+	// Kinds below have no proto enum value yet — they map to UNSPECIFIED on the
+	// wire until the next proto release adds them. Declared here first because
+	// the domain sources that produce them are useful before that lands, and an
+	// alert a traveller can read beats silence.
+	AlertHazard     AlertKind = "hazard"
+	AlertAirQuality AlertKind = "air_quality"
+	AlertTransit    AlertKind = "transit"
+	AlertAdvisory   AlertKind = "advisory"
 )
 
 // Alert is a heads-up that may affect a trip day (closures/holidays/strikes).
@@ -38,7 +47,34 @@ type Alert struct {
 	Title  string     `json:"title"`
 	Detail string     `json:"detail"`
 	Date   *time.Time `json:"date,omitempty"`
+
+	// Severity grades how much this should count against the trip, 0..1.
+	//
+	// Zero means "unspecified" and is treated as full weight — see
+	// effectiveSeverity. That default is load-bearing: it is what lets an Alert
+	// built without a severity keep the flat-penalty behaviour the scorer had
+	// before graded severity existed.
+	Severity Severity `json:"severity,omitempty"`
+
+	// Source names the provider this came from ("nager", "usgs", …). Carried so
+	// a user can see who says so, and so a wrong or noisy feed can be
+	// identified from the response rather than from the logs.
+	Source string `json:"source,omitempty"`
+
+	// Lat and Lon locate the alert when it has a place — a wildfire, a
+	// cyclone, an earthquake. Nil for anything country-scoped: a public holiday
+	// has no coordinates, and inventing some to make it mappable would be a
+	// lie. Only located alerts can become map pins.
+	//
+	// Declared separately, not as `Lat, Lon *float64`, because a shared tag on
+	// one line gives both fields the same JSON name and longitude silently
+	// serialises as latitude.
+	Lat *float64 `json:"lat,omitempty"`
+	Lon *float64 `json:"lon,omitempty"`
 }
+
+// Located reports whether this alert can be drawn on a map.
+func (a Alert) Located() bool { return a.Lat != nil && a.Lon != nil }
 
 // BookingOption is a placeholder booking result (real providers land later).
 type BookingOption struct {

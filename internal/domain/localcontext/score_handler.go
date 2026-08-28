@@ -83,6 +83,15 @@ func (h *Handler) GetGoScore(
 		}
 	}
 
+	// Live disruptions for the same window. Gather degrades internally — a
+	// failing source is logged and skipped — so an outage costs the score its
+	// alert dimension rather than costing the user their answer.
+	var alerts []Alert
+	if h.signals.Enabled() {
+		start, end := scoreWindow(req.Msg, windowHours)
+		alerts = h.signals.Gather(ctx, lat, lon, start, end)
+	}
+
 	score := Score(ScoreInput{
 		CityName:         cityName,
 		Forecast:         forecast,
@@ -90,6 +99,7 @@ func (h *Handler) GetGoScore(
 		TravelMins:       travelMins,
 		WindowHours:      windowHours,
 		POICount:         poiCount,
+		Alerts:           alerts,
 	})
 
 	return connect.NewResponse(&lcv1.GetGoScoreResponse{
@@ -142,4 +152,25 @@ func windowFrom(start, end time.Time, provided bool) (windowHours float64, days 
 		days = 5
 	}
 	return windowHours, days
+}
+
+// scoreWindow resolves the concrete dates the alerts should cover.
+//
+// The request's window is optional, and windowFrom already defaults a missing
+// one to 48 hours — but a duration is not enough to ask "which holidays fall in
+// it". When no start is given we assume the window begins now, which is what
+// "should I go this weekend?" means when asked without dates.
+func scoreWindow(msg *lcv1.GetGoScoreRequest, windowHours float64) (start, end time.Time) {
+	if msg.Start != nil {
+		start = msg.Start.AsTime()
+	} else {
+		start = time.Now().UTC()
+	}
+	if msg.End != nil {
+		end = msg.End.AsTime()
+	}
+	if end.IsZero() || !end.After(start) {
+		end = start.Add(time.Duration(windowHours) * time.Hour)
+	}
+	return start, end
 }

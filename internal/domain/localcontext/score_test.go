@@ -257,3 +257,96 @@ func TestScore_ReasonableDriveStillReadsWell(t *testing.T) {
 			got.Verdict, got.Score, VerdictGo)
 	}
 }
+
+// --- graded disruption penalty -------------------------------------------
+//
+// The penalty used to be a flat 10 per alert, which was safe only because
+// nothing ever produced an alert. Now that real feeds do, it is graded by
+// severity and capped.
+
+// The back-compat rule the twelve original score tests rest on: an alert built
+// without a severity still costs the full 10.
+func TestDisruptionPenalty_UnsetSeverityCostsFullWeight(t *testing.T) {
+	got := disruptionPenalty([]Alert{{Kind: AlertStrike, Title: "a"}})
+	if got != alertPenalty {
+		t.Errorf("got %d, want %d", got, alertPenalty)
+	}
+}
+
+func TestDisruptionPenalty_ScalesWithSeverity(t *testing.T) {
+	tests := []struct {
+		name string
+		sev  Severity
+		want int
+	}{
+		{"minor", SeverityMinor, 3}, // 10 * 0.25 = 2.5, rounded
+		{"moderate", SeverityModerate, 5},
+		{"major", SeverityMajor, 10},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := disruptionPenalty([]Alert{{Kind: AlertHoliday, Title: "x", Severity: tt.sev}})
+			if got != tt.want {
+				t.Errorf("got %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+// Without a cap, a destination with a run of minor notices would score worse
+// than one with a single disqualifying problem. Real feeds produce runs of
+// minor notices constantly.
+func TestDisruptionPenalty_IsCapped(t *testing.T) {
+	var alerts []Alert
+	for range 10 {
+		alerts = append(alerts, Alert{Kind: AlertHazard, Title: "x", Severity: SeverityMajor})
+	}
+	if got := disruptionPenalty(alerts); got != maxDisruptionPenalty {
+		t.Errorf("got %d, want the %d cap", got, maxDisruptionPenalty)
+	}
+}
+
+func TestDisruptionPenalty_NoAlertsCostsNothing(t *testing.T) {
+	if got := disruptionPenalty(nil); got != 0 {
+		t.Errorf("got %d, want 0", got)
+	}
+}
+
+// A holiday should shade a verdict, not destroy it — the disruption dimension
+// is capped below the weight of any single positive dimension.
+func TestScore_ModerateHolidayShadesRatherThanSinks(t *testing.T) {
+	base := ScoreInput{CityName: "Lisbon", Forecast: dry(2), TravelMins: 60, WindowHours: 48, POICount: 12}
+	clean := Score(base)
+
+	withHoliday := base
+	withHoliday.Alerts = []Alert{{
+		Kind: AlertHoliday, Title: "Public Day", Severity: SeverityModerate, Source: SourceHolidays,
+	}}
+	got := Score(withHoliday)
+
+	if got.Score >= clean.Score {
+		t.Errorf("a holiday should cost something: %d vs %d", got.Score, clean.Score)
+	}
+	if clean.Score-got.Score != 5 {
+		t.Errorf("expected a 5-point moderate penalty, got %d", clean.Score-got.Score)
+	}
+	if got.Verdict != clean.Verdict {
+		t.Errorf("a single moderate holiday should not flip the verdict: %q -> %q", clean.Verdict, got.Verdict)
+	}
+
+	var found bool
+	for _, f := range got.Factors {
+		if f.Label == "Local disruptions" {
+			found = true
+			if f.Contribution != -5 {
+				t.Errorf("factor contribution: got %d, want -5", f.Contribution)
+			}
+			if f.Detail == "" {
+				t.Error("the disruption factor must say what the disruptions were")
+			}
+		}
+	}
+	if !found {
+		t.Error("expected a Local disruptions factor")
+	}
+}

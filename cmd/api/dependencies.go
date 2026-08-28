@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -440,20 +443,51 @@ func (d *Dependencies) initHandlers() error {
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger)
 
-	// Local context (weather now; booking/transport stubbed). Real OpenWeather
-	// when OPENWEATHER_API_KEY is set, else a labelled stub forecast.
-	var weather localcontext.WeatherAdapter = localcontext.StubWeather{}
-	weatherEst := true
-	if weatherKey := os.Getenv("OPENWEATHER_API_KEY"); weatherKey != "" {
-		weather = localcontext.NewOpenWeatherAdapter(weatherKey)
-		weatherEst = false
-	}
+	// Local context (weather now; booking/transport stubbed). Open-Meteo is the
+	// keyless default, so a deployment that configures nothing still gets real
+	// forecasts; see localcontext.NewWeatherAdapterFromEnv for the
+	// WEATHER_PROVIDER contract and the OpenWeather back-compat rule.
+	//
+	// This single adapter feeds three consumers below — the local-context
+	// handler, the trip handler's packing suggester and the compare service —
+	// so whichever provider is chosen here decides whether the forecast is real
+	// everywhere at once.
+	weather, weatherEst := localcontext.NewWeatherAdapterFromEnv(d.Logger)
 	// WithScoring lights up GetGoScore ("should I go this weekend?"). Without it
 	// the handler still serves weather; with it the score can resolve a city by
 	// name and factor in how much there is to do there.
+	// Live alert sources (holidays, hazards, air quality; news behind
+	// GDELT_ENABLED). Nil when SIGNALS_ENABLED=false, which every consumer
+	// treats as "no alerts" rather than as an error.
+	//
+	// The news classifier is built only when the news source is actually on:
+	// standing up an AI client for a source nobody enabled would be pure cost.
+	var newsClassifier localcontext.NewsClassifier
+	if os.Getenv("GDELT_ENABLED") == "true" {
+		if chat, err := ai.NewChatClient(context.Background(), d.Config.AI, d.Logger); err != nil {
+			d.Logger.Warn("signals: no AI client for news classification; headlines will be heuristics only",
+				slog.Any("error", err))
+		} else {
+			// A closure rather than the client itself, so localcontext never
+			// imports genai just to name a config argument it always passes nil for.
+			generate := func(ctx context.Context, prompt string) (string, error) {
+				return chat.GenerateText(ctx, prompt, nil)
+			}
+			newsClassifier = localcontext.NewLLMNewsClassifier(generate)
+		}
+	}
+	signals := localcontext.NewGathererFromEnv(d.Logger, newsClassifier)
+
+	// Exchange rates and the fuel assumptions behind a drive-cost estimate.
+	// Shares the signals HTTP client so the same outbound rate limit and
+	// metrics cover it.
+	fxAdapter, fxBase, litresPer100Km, pricePerLitre := localcontext.NewFXFromEnv(localcontext.NewSignalsHTTPClient())
+
 	d.LocalContextHandler = localcontext.
 		NewHandler(weather, weatherEst, d.Logger).
-		WithScoring(d.CityRepo, d.POISvc)
+		WithScoring(d.CityRepo, d.POISvc).
+		WithSignals(signals).
+		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre)
 
 	// Give the trip handler the same forecast source, so a packing list can be
 	// derived from the trip's actual weather rather than generic advice.
@@ -478,7 +512,7 @@ func (d *Dependencies) initHandlers() error {
 		diningDL,
 		d.SubscriptionService,
 		d.Logger,
-	)
+	).WithSignals(signals)
 	d.CompareHandler = compare.NewHandler(compareSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
