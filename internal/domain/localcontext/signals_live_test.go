@@ -25,7 +25,7 @@ func TestLiveHolidaySignals(t *testing.T) {
 	defer cancel()
 
 	client := NewSignalsHTTPClient()
-	geo := NewBigDataCloudGeocoder("", client)
+	geo := NewBigDataCloudGeocoder("", client, nil)
 
 	// Lisbon.
 	country, err := geo.CountryCode(ctx, 38.722252, -9.139337)
@@ -36,7 +36,7 @@ func TestLiveHolidaySignals(t *testing.T) {
 		t.Fatalf("country: got %q, want PT", country)
 	}
 
-	g := NewGatherer(geo, nil, NewHolidaySource("", client))
+	g := NewGatherer(geo, nil, NewHolidaySource("", client, nil))
 
 	// A window around Portugal's Republic Day, which is fixed to 5 October.
 	start := time.Date(time.Now().UTC().Year(), 10, 3, 9, 0, 0, 0, time.UTC)
@@ -89,7 +89,7 @@ func TestLiveHazardSources(t *testing.T) {
 
 	t.Run("gdacs returns a parseable global list", func(t *testing.T) {
 		// A radius large enough that the global list cannot come back empty.
-		s := NewGDACSSource("", client, 20000)
+		s := NewGDACSSource("", client, 20000, nil)
 		got, err := s.Fetch(ctx, SignalRequest{Lat: 38.722252, Lon: -9.139337})
 		if err != nil {
 			t.Fatalf("live GDACS failed: %v", err)
@@ -118,7 +118,7 @@ func TestLiveHazardSources(t *testing.T) {
 	})
 
 	t.Run("usgs query is accepted and parseable", func(t *testing.T) {
-		s := NewUSGSSource("", client, 20000)
+		s := NewUSGSSource("", client, 20000, nil)
 		got, err := s.Fetch(ctx, SignalRequest{Lat: 38.722252, Lon: -9.139337})
 		if err != nil {
 			t.Fatalf("live USGS failed: %v", err)
@@ -155,7 +155,7 @@ func TestLiveAirQuality(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	s := NewAirQualitySource("", NewSignalsHTTPClient(), defaultAirQualityThreshold)
+	s := NewAirQualitySource("", NewSignalsHTTPClient(), defaultAirQualityThreshold, nil)
 	now := time.Now().UTC()
 	start, end := now, now.Add(72*time.Hour)
 
@@ -178,17 +178,17 @@ func TestLiveAirQuality(t *testing.T) {
 			t.Fatalf("%s: no days parsed from the hourly series", c.name)
 		}
 		for _, d := range days {
-			if d.date.IsZero() {
+			if d.Date.IsZero() {
 				t.Errorf("%s: a day has no date — the hourly `time` format changed", c.name)
 			}
 			// EAQI is unbounded above but a reading past 1000 means the units
 			// or the field changed under us.
-			if d.maxAQI < 0 || d.maxAQI > 1000 {
-				t.Errorf("%s: implausible AQI %.0f — units may have changed", c.name, d.maxAQI)
+			if d.MaxAQI < 0 || d.MaxAQI > 1000 {
+				t.Errorf("%s: implausible AQI %.0f — units may have changed", c.name, d.MaxAQI)
 			}
 		}
 		for i := 1; i < len(days); i++ {
-			if !days[i].date.After(days[i-1].date) {
+			if !days[i].Date.After(days[i-1].Date) {
 				t.Errorf("%s: days are not ascending", c.name)
 			}
 		}
@@ -205,8 +205,8 @@ func TestLiveAirQuality(t *testing.T) {
 
 		peak := 0.0
 		for _, d := range days {
-			if d.maxAQI > peak {
-				peak = d.maxAQI
+			if d.MaxAQI > peak {
+				peak = d.MaxAQI
 			}
 		}
 		verdict := "no alert"
@@ -316,7 +316,7 @@ func TestLiveFXRates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	a := NewFXAdapter("", NewSignalsHTTPClient())
+	a := NewFXAdapter("", NewSignalsHTTPClient(), nil)
 
 	rates, unsupported, err := a.Rates(ctx, "EUR", []string{"USD", "GBP", "JPY", "VND"})
 	if err != nil {

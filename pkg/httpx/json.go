@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,12 @@ func GetJSON[T any](ctx context.Context, c *Client, source, url string) (T, erro
 	body, err := c.Get(ctx, source, url)
 	if err != nil {
 		return out, err
+	}
+	// A 204, or any empty 2xx body, means "nothing to report". Decoding it
+	// would fail on unexpected end of JSON input and turn a valid empty answer
+	// into a provider failure.
+	if len(bytes.TrimSpace(body)) == 0 {
+		return out, nil
 	}
 	if err := json.Unmarshal(body, &out); err != nil {
 		// Providers answering an error as an HTML page is common enough that the

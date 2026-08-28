@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
@@ -43,7 +44,7 @@ func NewSignalsHTTPClient() *httpx.Client {
 //	BIGDATACLOUD_BASE_URL     override the reverse geocoder
 //
 // Everything works with no keys and no configuration at all.
-func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier) *Gatherer {
+func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier, cache *signalCache) *Gatherer {
 	if !envBool("SIGNALS_ENABLED", true) {
 		logf(logger, slog.LevelInfo, "signals: disabled by SIGNALS_ENABLED")
 		return nil
@@ -53,22 +54,22 @@ func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier) *Gathere
 
 	// Holidays are country-scoped, so they need the geocoder to turn the
 	// requested coordinates into a country.
-	geocoder := NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), client)
+	geocoder := NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), client, cache)
 
 	radiusKm := envFloat("HAZARD_RADIUS_KM", defaultHazardRadiusKm)
 
 	sources := []SignalSource{
-		NewHolidaySource(os.Getenv("NAGER_DATE_BASE_URL"), client),
+		NewHolidaySource(os.Getenv("NAGER_DATE_BASE_URL"), client, cache),
 	}
 	// GDACS is the multi-hazard source (wildfire, cyclone, flood, quake,
 	// volcano) and carries its own severity triage; USGS adds locally
 	// significant quakes GDACS does not rank globally. Each has its own switch
 	// because they fail independently and GDACS is the noisier of the two.
 	if envBool("GDACS_ENABLED", true) {
-		sources = append(sources, NewGDACSSource(os.Getenv("GDACS_BASE_URL"), client, radiusKm))
+		sources = append(sources, NewGDACSSource(os.Getenv("GDACS_BASE_URL"), client, radiusKm, cache))
 	}
 	if envBool("USGS_ENABLED", true) {
-		sources = append(sources, NewUSGSSource(os.Getenv("USGS_BASE_URL"), client, radiusKm))
+		sources = append(sources, NewUSGSSource(os.Getenv("USGS_BASE_URL"), client, radiusKm, cache))
 	}
 	// Air quality always has a value, unlike the event-driven sources, so the
 	// threshold is what stops it attaching an alert to every trip forever.
@@ -89,6 +90,7 @@ func NewGathererFromEnv(logger *slog.Logger, classifier NewsClassifier) *Gathere
 			os.Getenv("OPENMETEO_AIR_QUALITY_BASE_URL"),
 			client,
 			envFloat("AIR_QUALITY_ALERT_THRESHOLD", defaultAirQualityThreshold),
+			cache,
 		))
 	}
 
@@ -176,7 +178,7 @@ func httpxClientForNews() *httpx.Client {
 //	FX_BASE_CURRENCY=EUR         the traveller's home currency
 //	FUEL_LITRES_PER_100KM=6.5    drive-cost assumptions; always stated in the
 //	FUEL_PRICE_PER_LITRE=1.75    response so a user can correct them
-func NewFXFromEnv(client *httpx.Client) (adapter *FXAdapter, base string, litresPer100Km, pricePerLitre float64) {
+func NewFXFromEnv(client *httpx.Client, cache *signalCache) (adapter *FXAdapter, base string, litresPer100Km, pricePerLitre float64) {
 	base = envString("FX_BASE_CURRENCY", "EUR")
 	litresPer100Km = envFloat("FUEL_LITRES_PER_100KM", defaultLitresPer100Km)
 	pricePerLitre = envFloat("FUEL_PRICE_PER_LITRE", defaultPricePerLitre)
@@ -184,5 +186,11 @@ func NewFXFromEnv(client *httpx.Client) (adapter *FXAdapter, base string, litres
 	if !envBool("FX_ENABLED", true) {
 		return nil, base, litresPer100Km, pricePerLitre
 	}
-	return NewFXAdapter(os.Getenv("FX_BASE_URL"), client), base, litresPer100Km, pricePerLitre
+	return NewFXAdapter(os.Getenv("FX_BASE_URL"), client, cache), base, litresPer100Km, pricePerLitre
+}
+
+// NewSignalCacheFromEnv wraps the app's shared cache store for provider payloads.
+// A nil store is supported and simply disables caching.
+func NewSignalCacheFromEnv(store cachestore.Store, logger *slog.Logger) *signalCache {
+	return newSignalCache(store, logger)
 }

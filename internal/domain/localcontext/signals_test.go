@@ -334,3 +334,130 @@ func TestGatherer_DedupesAcrossSources(t *testing.T) {
 		t.Fatalf("expected the duplicate collapsed, got %d: %+v", len(got), got)
 	}
 }
+
+// --- per-source timeout and circuit breaker --------------------------------
+//
+// These exist because of a bug found in live verification: GDACS stopped
+// responding and pinned every GetLocalContext at the full 10s fan-out ceiling,
+// warm cache or cold, because the fan-out waits for every source and a failing
+// one never populates its cache to degrade to.
+
+// One dead source must cost its own budget, not the whole fan-out's.
+func TestGatherer_SlowSourceIsBoundedByTheSourceTimeout(t *testing.T) {
+	slow := &fakeSource{name: "slow", delay: 5 * time.Second}
+	fast := &fakeSource{name: "fast", alerts: []Alert{{Kind: AlertHoliday, Title: "ok"}}}
+
+	g := NewGatherer(nil, nil, slow, fast)
+	g.sourceTimeout = 150 * time.Millisecond
+
+	started := time.Now()
+	got := g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	elapsed := time.Since(started)
+
+	if elapsed > 2*time.Second {
+		t.Errorf("a slow source must be cut off at the source timeout, took %v", elapsed)
+	}
+	if len(got) != 1 || got[0].Title != "ok" {
+		t.Errorf("the healthy source's alert must still arrive, got %+v", got)
+	}
+}
+
+// A provider that just failed is unlikely to succeed a second later, and
+// retrying it costs every caller the source timeout for nothing.
+func TestGatherer_RepeatedFailuresBenchTheSource(t *testing.T) {
+	bad := &fakeSource{name: "bad", err: errors.New("down")}
+	g := NewGatherer(nil, nil, bad)
+
+	for range 5 {
+		g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	}
+	// benchAfterFailures calls get through, then it is taken out of rotation.
+	if bad.calls != benchAfterFailures {
+		t.Errorf("expected the source called %d times then benched, got %d calls",
+			benchAfterFailures, bad.calls)
+	}
+}
+
+// The whole point: once benched, a dead source stops costing latency.
+func TestGatherer_BenchedSourceCostsNothing(t *testing.T) {
+	bad := &fakeSource{name: "bad", err: errors.New("down"), delay: 200 * time.Millisecond}
+	g := NewGatherer(nil, nil, bad)
+	g.sourceTimeout = 500 * time.Millisecond
+
+	for range benchAfterFailures {
+		g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	}
+
+	started := time.Now()
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	if elapsed := time.Since(started); elapsed > 50*time.Millisecond {
+		t.Errorf("a benched source must not be called at all, took %v", elapsed)
+	}
+}
+
+func TestGatherer_BenchExpiresAfterCooldown(t *testing.T) {
+	bad := &fakeSource{name: "bad", err: errors.New("down")}
+	g := NewGatherer(nil, nil, bad)
+
+	base := time.Now()
+	g.now = func() time.Time { return base }
+	for range benchAfterFailures {
+		g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	}
+	benched := bad.calls
+
+	// Still benched just before the cooldown elapses.
+	g.now = func() time.Time { return base.Add(g.cooldown - time.Second) }
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	if bad.calls != benched {
+		t.Errorf("should still be benched, calls went %d -> %d", benched, bad.calls)
+	}
+
+	// Tried again once the cooldown passes.
+	g.now = func() time.Time { return base.Add(g.cooldown + time.Second) }
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	if bad.calls != benched+1 {
+		t.Errorf("should retry after the cooldown, calls went %d -> %d", benched, bad.calls)
+	}
+}
+
+// A source that recovers must be trusted again immediately, not left benched.
+func TestGatherer_SuccessClearsTheFailureCount(t *testing.T) {
+	flaky := &fakeSource{name: "flaky", err: errors.New("blip")}
+	g := NewGatherer(nil, nil, flaky)
+
+	// One failure — below the bench threshold.
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	// Then it recovers.
+	flaky.err = nil
+	flaky.alerts = []Alert{{Kind: AlertHoliday, Title: "back"}}
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+
+	// A later failure must start counting from zero rather than tipping it over.
+	flaky.err = errors.New("blip again")
+	g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+
+	if !g.usable("flaky") {
+		t.Error("a single failure after a success must not bench the source")
+	}
+}
+
+// One dead source must not take healthy ones out with it.
+func TestGatherer_BenchingIsPerSource(t *testing.T) {
+	bad := &fakeSource{name: "bad", err: errors.New("down")}
+	good := &fakeSource{name: "good", alerts: []Alert{{Kind: AlertHoliday, Title: "ok"}}}
+	g := NewGatherer(nil, nil, bad, good)
+
+	for range 4 {
+		g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{})
+	}
+	if g.usable("bad") {
+		t.Error("the failing source should be benched")
+	}
+	if !g.usable("good") {
+		t.Error("the healthy source must stay in rotation")
+	}
+	if got := g.Gather(context.Background(), 0, 0, time.Time{}, time.Time{}); len(got) != 1 {
+		t.Errorf("the healthy source must keep answering, got %d alerts", len(got))
+	}
+}

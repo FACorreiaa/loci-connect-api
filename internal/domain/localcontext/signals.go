@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
 
 // Source names. These are the `source` label on every metric and the value
@@ -73,19 +75,99 @@ type Gatherer struct {
 	country CountryResolver
 	logger  *slog.Logger
 	// timeout bounds the whole fan-out. Sources run concurrently, so this is
-	// the slowest source's budget, not their sum.
+	// the slowest source's budget, not their sum. It is a backstop only —
+	// sourceTimeout is what actually bounds a request in practice.
 	timeout time.Duration
+	// sourceTimeout bounds each source individually.
+	//
+	// This exists because the fan-out waits for every source, so without it the
+	// slowest provider sets the latency of every trip view. Observed for real:
+	// GDACS stopped responding and pinned GetLocalContext at the full 10s
+	// ceiling on every single call, warm cache or cold.
+	sourceTimeout time.Duration
+
+	// Consecutive failures per source, and the time each is benched until.
+	// Same idea as the LLM provider chain in pkg/ai: a provider that just
+	// failed is unlikely to succeed on the next request a second later, and
+	// retrying it costs the user latency for nothing.
+	breakerMu sync.Mutex
+	failures  map[string]int
+	benched   map[string]time.Time
+	cooldown  time.Duration
+	now       func() time.Time
 }
+
+// benchAfterFailures is how many consecutive failures take a source out of
+// rotation. One is too eager — a single timeout can be a blip — and anything
+// higher makes a genuinely dead provider expensive for too long.
+const benchAfterFailures = 2
 
 // NewGatherer builds a Gatherer. A nil CountryResolver is supported: country-
 // scoped sources then simply see an empty country code and return nothing.
 func NewGatherer(country CountryResolver, logger *slog.Logger, sources ...SignalSource) *Gatherer {
 	return &Gatherer{
-		sources: sources,
-		country: country,
-		logger:  logger,
-		timeout: 10 * time.Second,
+		sources:       sources,
+		country:       country,
+		logger:        logger,
+		timeout:       10 * time.Second,
+		sourceTimeout: 3 * time.Second,
+		failures:      make(map[string]int),
+		benched:       make(map[string]time.Time),
+		cooldown:      5 * time.Minute,
+		now:           time.Now,
 	}
+}
+
+// usable reports whether a source should be called, and is the whole point of
+// the breaker: a benched source costs nothing instead of costing every caller
+// the source timeout.
+func (g *Gatherer) usable(name string) bool {
+	g.breakerMu.Lock()
+	defer g.breakerMu.Unlock()
+	until, benched := g.benched[name]
+	return !benched || g.now().After(until)
+}
+
+// recordResult drives the breaker. A success clears the count immediately, so a
+// source that recovers is used again on the very next request.
+func (g *Gatherer) recordResult(ctx context.Context, name string, err error) {
+	g.breakerMu.Lock()
+	defer g.breakerMu.Unlock()
+
+	if err == nil {
+		delete(g.failures, name)
+		delete(g.benched, name)
+		return
+	}
+
+	g.failures[name]++
+	if g.failures[name] < benchAfterFailures {
+		return
+	}
+	if until, already := g.benched[name]; already && g.now().Before(until) {
+		return
+	}
+	g.benched[name] = g.now().Add(g.cooldown)
+	observability.ExternalSourceBenchedTotal.WithLabelValues(name).Inc()
+	if g.logger != nil {
+		g.logger.WarnContext(ctx, "signals: source benched after repeated failures",
+			slog.String("source", name),
+			slog.Int("failures", g.failures[name]),
+			slog.Duration("cooldown", g.cooldown))
+	}
+}
+
+// CountryResolver exposes the geocoder this Gatherer was built with, so other
+// features needing a country from coordinates share one instance — and with it
+// one cache, rather than each paying for the same lookup.
+//
+// Nil-safe: returns nil when signals are switched off, which callers treat as
+// "cannot resolve a country" rather than as an error.
+func (g *Gatherer) CountryResolver() CountryResolver {
+	if g == nil {
+		return nil
+	}
+	return g.country
 }
 
 // Enabled reports whether there is anything to gather. Callers use it to skip
@@ -128,10 +210,20 @@ func (g *Gatherer) Gather(ctx context.Context, lat, lon float64, start, end time
 	)
 
 	for _, src := range g.sources {
+		if !g.usable(src.Name()) {
+			continue
+		}
 		wg.Add(1)
 		go func(src SignalSource) {
 			defer wg.Done()
-			alerts, err := src.Fetch(ctx, req)
+
+			// Each source gets its own budget so one slow provider cannot spend
+			// the whole fan-out's.
+			srcCtx, cancel := context.WithTimeout(ctx, g.sourceTimeout)
+			defer cancel()
+
+			alerts, err := src.Fetch(srcCtx, req)
+			g.recordResult(ctx, src.Name(), err)
 			if err != nil {
 				g.logf(ctx, slog.LevelWarn, "signals: source failed; continuing without it",
 					slog.String("source", src.Name()), slog.Any("error", err))

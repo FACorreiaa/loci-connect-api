@@ -25,7 +25,7 @@ func TestLiveOpenMeteoForecast(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	a := NewOpenMeteoAdapter("")
+	a := NewOpenMeteoAdapter("", nil)
 
 	// Lisbon.
 	days, err := a.Forecast(ctx, 38.722252, -9.139337, 5)

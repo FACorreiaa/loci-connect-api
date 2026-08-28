@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -31,25 +30,20 @@ type OpenMeteoAdapter struct {
 	baseURL string
 	http    *http.Client
 
-	mu    sync.Mutex
-	cache map[string]cacheEntry
-	ttl   time.Duration
-	now   func() time.Time
+	cache *signalCache
 }
 
 // NewOpenMeteoAdapter builds an adapter with sane resilience defaults. An empty
 // baseURL uses the public endpoint; it is a parameter so tests can point at an
 // httptest server and so a self-hosted instance can be configured by env.
-func NewOpenMeteoAdapter(baseURL string) *OpenMeteoAdapter {
+func NewOpenMeteoAdapter(baseURL string, cache *signalCache) *OpenMeteoAdapter {
 	if baseURL == "" {
 		baseURL = openMeteoBaseURL
 	}
 	return &OpenMeteoAdapter{
 		baseURL: baseURL,
 		http:    &http.Client{Timeout: 8 * time.Second},
-		cache:   make(map[string]cacheEntry),
-		ttl:     30 * time.Minute,
-		now:     time.Now,
+		cache:   cache,
 	}
 }
 
@@ -64,13 +58,9 @@ func (a *OpenMeteoAdapter) Forecast(ctx context.Context, lat, lon float64, days 
 	}
 
 	key := a.cacheKey(lat, lon)
-	a.mu.Lock()
-	if e, ok := a.cache[key]; ok && a.now().Sub(e.cachedAt) < a.ttl {
-		cached := clampDays(e.days, days)
-		a.mu.Unlock()
-		return cached, nil
+	if cached, ok := cacheGet[[]WeatherDay](a.cache, SourceOpenMeteo, key); ok {
+		return clampDays(cached, days), nil
 	}
-	a.mu.Unlock()
 
 	q := url.Values{}
 	q.Set("latitude", fmt.Sprintf("%f", lat))
@@ -106,10 +96,7 @@ func (a *OpenMeteoAdapter) Forecast(ctx context.Context, lat, lon float64, days 
 		return nil, err
 	}
 
-	a.mu.Lock()
-	a.cache[key] = cacheEntry{days: daily, cachedAt: a.now()}
-	a.mu.Unlock()
-
+	cacheSet(a.cache, SourceOpenMeteo, key, daily, ttlForecast)
 	return clampDays(daily, days), nil
 }
 

@@ -29,7 +29,7 @@ func hourlyAQ(startDay int, dayPeaks ...float64) string {
 func airSource(t *testing.T, body string, status int, threshold float64) (*AirQualitySource, *int64) {
 	t.Helper()
 	url, hits := serve(t, body, status)
-	return NewAirQualitySource(url, testClient(), threshold), hits
+	return NewAirQualitySource(url, testClient(), threshold, testCache(t)), hits
 }
 
 func sepWindow(from, to int) (time.Time, time.Time) {
@@ -256,5 +256,5 @@ func TestAQIBandsAndSeverity(t *testing.T) {
 }
 
 func TestAirQuality_ImplementsSignalSource(t *testing.T) {
-	var _ SignalSource = NewAirQualitySource("", testClient(), 0)
+	var _ SignalSource = NewAirQualitySource("", testClient(), 0, nil)
 }

@@ -6,7 +6,6 @@ import (
 	"math"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/geo"
@@ -53,27 +52,17 @@ type GDACSSource struct {
 	client   *httpx.Client
 	radiusKm float64
 
-	mu    sync.Mutex
-	cache []gdacsFeature
-	at    time.Time
-	ttl   time.Duration
-	now   func() time.Time
+	cache *signalCache
 }
 
-func NewGDACSSource(baseURL string, client *httpx.Client, radiusKm float64) *GDACSSource {
+func NewGDACSSource(baseURL string, client *httpx.Client, radiusKm float64, cache *signalCache) *GDACSSource {
 	if baseURL == "" {
 		baseURL = gdacsBaseURL
 	}
 	if radiusKm <= 0 {
 		radiusKm = defaultHazardRadiusKm
 	}
-	return &GDACSSource{
-		baseURL:  baseURL,
-		client:   client,
-		radiusKm: radiusKm,
-		ttl:      30 * time.Minute,
-		now:      time.Now,
-	}
+	return &GDACSSource{baseURL: baseURL, client: client, radiusKm: radiusKm, cache: cache}
 }
 
 func (s *GDACSSource) Name() string { return SourceGDACS }
@@ -141,13 +130,10 @@ func (s *GDACSSource) Fetch(ctx context.Context, req SignalRequest) ([]Alert, er
 }
 
 func (s *GDACSSource) events(ctx context.Context) ([]gdacsFeature, error) {
-	s.mu.Lock()
-	if s.cache != nil && s.now().Sub(s.at) < s.ttl {
-		cached := s.cache
-		s.mu.Unlock()
+	// One global list, so one cache key for every destination.
+	if cached, ok := cacheGet[[]gdacsFeature](s.cache, SourceGDACS, "events"); ok {
 		return cached, nil
 	}
-	s.mu.Unlock()
 
 	endpoint := s.baseURL + "/gdacsapi/api/events/geteventlist/EVENTS4APP"
 	body, err := httpx.GetJSON[gdacsResponse](ctx, s.client, SourceGDACS, endpoint)
@@ -155,11 +141,7 @@ func (s *GDACSSource) events(ctx context.Context) ([]gdacsFeature, error) {
 		return nil, err
 	}
 
-	s.mu.Lock()
-	s.cache = body.Features
-	s.at = s.now()
-	s.mu.Unlock()
-
+	cacheSet(s.cache, SourceGDACS, "events", body.Features, ttlHazards)
 	return body.Features, nil
 }
 
@@ -271,17 +253,18 @@ type USGSSource struct {
 	baseURL  string
 	client   *httpx.Client
 	radiusKm float64
+	cache    *signalCache
 	now      func() time.Time
 }
 
-func NewUSGSSource(baseURL string, client *httpx.Client, radiusKm float64) *USGSSource {
+func NewUSGSSource(baseURL string, client *httpx.Client, radiusKm float64, cache *signalCache) *USGSSource {
 	if baseURL == "" {
 		baseURL = usgsBaseURL
 	}
 	if radiusKm <= 0 {
 		radiusKm = defaultHazardRadiusKm
 	}
-	return &USGSSource{baseURL: baseURL, client: client, radiusKm: radiusKm, now: time.Now}
+	return &USGSSource{baseURL: baseURL, client: client, radiusKm: radiusKm, cache: cache, now: time.Now}
 }
 
 func (s *USGSSource) Name() string { return SourceUSGS }
@@ -317,10 +300,19 @@ func (s *USGSSource) Fetch(ctx context.Context, req SignalRequest) ([]Alert, err
 	q.Set("limit", "20")
 	q.Set("orderby", "magnitude")
 
-	endpoint := s.baseURL + "/fdsnws/event/1/query?" + q.Encode()
-	body, err := httpx.GetJSON[usgsResponse](ctx, s.client, SourceUSGS, endpoint)
-	if err != nil {
-		return nil, err
+	// Unlike GDACS this API takes a location, so the key is the location —
+	// rounded to ~11km, since the query already covers a radiusKm-wide area and
+	// a finer key would just miss.
+	key := fmt.Sprintf("%.1f,%.1f", req.Lat, req.Lon)
+	body, ok := cacheGet[usgsResponse](s.cache, SourceUSGS, key)
+	if !ok {
+		endpoint := s.baseURL + "/fdsnws/event/1/query?" + q.Encode()
+		fetched, err := httpx.GetJSON[usgsResponse](ctx, s.client, SourceUSGS, endpoint)
+		if err != nil {
+			return nil, err
+		}
+		body = fetched
+		cacheSet(s.cache, SourceUSGS, key, body, ttlQuakes)
 	}
 
 	var out []Alert

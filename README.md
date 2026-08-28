@@ -145,6 +145,16 @@ Copy `.env.prod.example` to `.env` (or export the variables directly). The minim
 | `AI_FALLBACK_MODELS` | Ordered fallback models (default `z-ai/glm-5.2:free,nvidia/nemotron-3-super-120b-a12b:free`) |
 | `AI_FALLBACK_COOLDOWN_SEC` | How long a credential is benched after a 401/402 (default `300`) |
 | `SERVER_HOST`, `SERVER_PORT` | HTTP listen address (default `0.0.0.0:8000`) |
+| `WEATHER_PROVIDER` | Forecast source: `openmeteo` (default, no key), `openweather` (needs `OPENWEATHER_API_KEY`), `stub`. Leave unset with a key present to keep OpenWeather |
+| `SIGNALS_ENABLED` | Live trip alerts — public holidays, natural hazards, air quality. Default on; every source is free and keyless |
+| `SIGNALS_USER_AGENT` | Sent on every provider request. Several public APIs throttle or block requests without one |
+| `SIGNALS_RATE_LIMIT_PER_SECOND` / `_BURST` | Per-host outbound rate limit, to stay inside free-tier usage policies (default `5`/`5`) |
+| `GDACS_ENABLED`, `USGS_ENABLED`, `AIR_QUALITY_ENABLED` | Per-source switches. Each fails independently and is benched for 5 min after 2 consecutive failures |
+| `HAZARD_RADIUS_KM` | How near a hazard counts as near the destination (default `500`) |
+| `AIR_QUALITY_ALERT_THRESHOLD` | European AQI at which to warn (default `60` = "poor"). Air quality always has a value, so this is what stops it alerting on every trip |
+| `GDELT_ENABLED` | News-derived disruption. **Default off** — 23-90s latency and very low precision; see `deploy/OPS.md` |
+| `FX_ENABLED`, `FX_BASE_CURRENCY` | Exchange rates from the ECB via Frankfurter (default on, `EUR`) |
+| `FUEL_LITRES_PER_100KM`, `FUEL_PRICE_PER_LITRE` | Assumptions behind the drive-cost estimate (default `6.5`, `1.75`). Always restated in the response |
 
 Optional but commonly needed:
 

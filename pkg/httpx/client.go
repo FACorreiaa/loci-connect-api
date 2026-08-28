@@ -186,7 +186,12 @@ func (c *Client) Get(ctx context.Context, source, url string) ([]byte, error) {
 			return nil, lastErr
 		}
 
-		if resp.StatusCode == http.StatusOK {
+		// Any 2xx is a success. Checking for 200 exactly was a real bug: Nager
+		// answers 204 No Content for a country it does not cover, which is a
+		// perfectly good "nothing to report" — but it read as a failure, and
+		// two such destinations were enough to bench the holiday source for
+		// every other destination too.
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			body, rerr := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			if rerr != nil {

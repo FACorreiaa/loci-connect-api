@@ -3,6 +3,7 @@ package localcontext
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,8 +11,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 )
+
+// testCache builds a real in-memory TieredStore, so tests exercise the same
+// cache path production uses rather than a stub that cannot catch a
+// serialisation bug.
+func testCache(t *testing.T) *signalCache {
+	t.Helper()
+	store, err := cachestore.New(cachestore.Config{}, slog.New(slog.NewTextHandler(discard{}, nil)))
+	if err != nil {
+		t.Fatalf("cache: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	return newSignalCache(store, nil)
+}
 
 func testClient() *httpx.Client {
 	return httpx.New(httpx.Config{
@@ -58,7 +73,7 @@ func lisbonWindow() (time.Time, time.Time) {
 // The headline signal: a wildfire near where you are going.
 func TestGDACS_SurfacesNearbyCurrentHazards(t *testing.T) {
 	url, _ := serve(t, gdacsFixture, http.StatusOK)
-	s := NewGDACSSource(url, testClient(), 500)
+	s := NewGDACSSource(url, testClient(), 500, testCache(t))
 	start, end := lisbonWindow()
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14, Start: start, End: end})
@@ -96,7 +111,7 @@ func TestGDACS_FiltersByDistance(t *testing.T) {
 	start, end := lisbonWindow()
 
 	// Iceland's volcano is thousands of km from Lisbon.
-	near := NewGDACSSource(url, testClient(), 500)
+	near := NewGDACSSource(url, testClient(), 500, testCache(t))
 	got, _ := near.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14, Start: start, End: end})
 	for _, a := range got {
 		if strings.Contains(a.Title, "Iceland") {
@@ -105,7 +120,7 @@ func TestGDACS_FiltersByDistance(t *testing.T) {
 	}
 
 	// From Reykjavik it is the nearby one.
-	fromIceland := NewGDACSSource(url, testClient(), 500)
+	fromIceland := NewGDACSSource(url, testClient(), 500, testCache(t))
 	got2, _ := fromIceland.Fetch(context.Background(), SignalRequest{Lat: 64.15, Lon: -21.94, Start: start, End: end})
 	if len(got2) != 1 || !strings.Contains(got2[0].Title, "Iceland") {
 		t.Errorf("expected the Iceland volcano from Reykjavik, got %+v", got2)
@@ -115,7 +130,7 @@ func TestGDACS_FiltersByDistance(t *testing.T) {
 // A flood in January 2025 must not penalise a trip in September 2026.
 func TestGDACS_FiltersByWindowOverlap(t *testing.T) {
 	url, _ := serve(t, gdacsFixture, http.StatusOK)
-	s := NewGDACSSource(url, testClient(), 500)
+	s := NewGDACSSource(url, testClient(), 500, testCache(t))
 	start, end := lisbonWindow()
 
 	got, _ := s.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14, Start: start, End: end})
@@ -148,7 +163,7 @@ func TestGDACSSeverity_MapsAlertLevel(t *testing.T) {
 // page must cost one upstream call.
 func TestGDACS_CachesTheGlobalList(t *testing.T) {
 	url, hits := serve(t, gdacsFixture, http.StatusOK)
-	s := NewGDACSSource(url, testClient(), 500)
+	s := NewGDACSSource(url, testClient(), 500, testCache(t))
 	start, end := lisbonWindow()
 	ctx := context.Background()
 
@@ -164,7 +179,7 @@ func TestGDACS_CachesTheGlobalList(t *testing.T) {
 
 func TestGDACS_UpstreamFailureIsAnError(t *testing.T) {
 	url, _ := serve(t, `{}`, http.StatusInternalServerError)
-	s := NewGDACSSource(url, testClient(), 500)
+	s := NewGDACSSource(url, testClient(), 500, testCache(t))
 	if _, err := s.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14}); err == nil {
 		t.Fatal("expected an error so the Gatherer logs and skips it")
 	}
@@ -182,7 +197,7 @@ func usgsFixture(agoHours int) string {
 
 func TestUSGS_ProducesLocatedQuakeAlerts(t *testing.T) {
 	url, _ := serve(t, usgsFixture(6), http.StatusOK)
-	s := NewUSGSSource(url, testClient(), 500)
+	s := NewUSGSSource(url, testClient(), 500, testCache(t))
 
 	got, err := s.Fetch(context.Background(), SignalRequest{Lat: 38.72, Lon: -9.14})
 	if err != nil {

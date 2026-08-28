@@ -308,3 +308,41 @@ func TestNew_ZeroConfigIsUsable(t *testing.T) {
 		t.Error("rate limiting must always be configured")
 	}
 }
+
+// A 204 is a success meaning "nothing to report". Treating only 200 as success
+// was a real bug: Nager answers 204 for a country it does not cover, and that
+// read as a provider failure.
+func TestGet_AcceptsAll2xx(t *testing.T) {
+	for _, status := range []int{200, 201, 202, 204} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+				if status != http.StatusNoContent {
+					_, _ = w.Write([]byte(`{}`))
+				}
+			}))
+			defer srv.Close()
+
+			if _, err := New(fastClient(t)).Get(context.Background(), "test", srv.URL); err != nil {
+				t.Errorf("status %d should be a success, got %v", status, err)
+			}
+		})
+	}
+}
+
+// Decoding an empty body would fail on unexpected end of JSON input and turn a
+// valid empty answer into a provider failure.
+func TestGetJSON_EmptyBodyIsAnEmptyResult(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	got, err := GetJSON[[]map[string]any](context.Background(), New(fastClient(t)), "nager", srv.URL)
+	if err != nil {
+		t.Fatalf("a 204 must not be an error, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected an empty result, got %v", got)
+	}
+}

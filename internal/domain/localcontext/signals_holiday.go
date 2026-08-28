@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
@@ -27,32 +26,19 @@ type HolidaySource struct {
 	baseURL string
 	client  *httpx.Client
 
-	// Cached per country-year and held for a month. A year's public holidays
-	// are decided long in advance and effectively never change, so this is the
-	// one source where a long TTL is not a trade-off.
-	mu    sync.Mutex
-	cache map[string]holidayEntry
-	ttl   time.Duration
+	// Cached per country-year for a month. A year's public holidays are decided
+	// long in advance and effectively never change, so this is the one source
+	// where a long TTL is not a trade-off.
+	cache *signalCache
 	now   func() time.Time
 }
 
-type holidayEntry struct {
-	holidays []nagerHoliday
-	cachedAt time.Time
-}
-
 // NewHolidaySource builds the source. An empty baseURL uses the public endpoint.
-func NewHolidaySource(baseURL string, client *httpx.Client) *HolidaySource {
+func NewHolidaySource(baseURL string, client *httpx.Client, cache *signalCache) *HolidaySource {
 	if baseURL == "" {
 		baseURL = nagerDateBaseURL
 	}
-	return &HolidaySource{
-		baseURL: baseURL,
-		client:  client,
-		cache:   make(map[string]holidayEntry),
-		ttl:     30 * 24 * time.Hour,
-		now:     time.Now,
-	}
+	return &HolidaySource{baseURL: baseURL, client: client, cache: cache, now: time.Now}
 }
 
 func (s *HolidaySource) Name() string { return SourceHolidays }
@@ -108,13 +94,9 @@ func (s *HolidaySource) Fetch(ctx context.Context, req SignalRequest) ([]Alert, 
 func (s *HolidaySource) holidaysFor(ctx context.Context, country string, year int) ([]nagerHoliday, error) {
 	key := fmt.Sprintf("%s:%d", country, year)
 
-	s.mu.Lock()
-	if e, ok := s.cache[key]; ok && s.now().Sub(e.cachedAt) < s.ttl {
-		cached := e.holidays
-		s.mu.Unlock()
+	if cached, ok := cacheGet[[]nagerHoliday](s.cache, SourceHolidays, key); ok {
 		return cached, nil
 	}
-	s.mu.Unlock()
 
 	endpoint := fmt.Sprintf("%s/api/v3/PublicHolidays/%d/%s", s.baseURL, year, country)
 	holidays, err := httpx.GetJSON[[]nagerHoliday](ctx, s.client, SourceHolidays, endpoint)
@@ -122,10 +104,7 @@ func (s *HolidaySource) holidaysFor(ctx context.Context, country string, year in
 		return nil, err
 	}
 
-	s.mu.Lock()
-	s.cache[key] = holidayEntry{holidays: holidays, cachedAt: s.now()}
-	s.mu.Unlock()
-
+	cacheSet(s.cache, SourceHolidays, key, holidays, ttlHolidays)
 	return holidays, nil
 }
 

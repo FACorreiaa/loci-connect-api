@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
@@ -48,41 +47,33 @@ type AirQualitySource struct {
 	client    *httpx.Client
 	threshold float64
 
-	mu    sync.Mutex
-	cache map[string]airEntry
-	ttl   time.Duration
-	now   func() time.Time
-}
-
-type airEntry struct {
-	days     []airDay
-	cachedAt time.Time
+	cache *signalCache
 }
 
 // airDay is the daily fold of the hourly series.
+// Exported JSON tags because these are marshalled into the shared cache;
+// unexported fields would round-trip as zero values.
 type airDay struct {
-	date    time.Time
-	maxAQI  float64
-	maxPM25 float64
+	Date    time.Time `json:"date"`
+	MaxAQI  float64   `json:"max_aqi"`
+	MaxPM25 float64   `json:"max_pm25"`
 }
 
 // NewAirQualitySource builds the source. An empty baseURL uses the public
 // endpoint; a threshold of zero or less uses the default.
-func NewAirQualitySource(baseURL string, client *httpx.Client, threshold float64) *AirQualitySource {
+func NewAirQualitySource(
+	baseURL string,
+	client *httpx.Client,
+	threshold float64,
+	cache *signalCache,
+) *AirQualitySource {
 	if baseURL == "" {
 		baseURL = openMeteoAirQualityBaseURL
 	}
 	if threshold <= 0 {
 		threshold = defaultAirQualityThreshold
 	}
-	return &AirQualitySource{
-		baseURL:   baseURL,
-		client:    client,
-		threshold: threshold,
-		cache:     make(map[string]airEntry),
-		ttl:       30 * time.Minute,
-		now:       time.Now,
-	}
+	return &AirQualitySource{baseURL: baseURL, client: client, threshold: threshold, cache: cache}
 }
 
 func (s *AirQualitySource) Name() string { return SourceAirQuality }
@@ -109,33 +100,33 @@ func (s *AirQualitySource) Fetch(ctx context.Context, req SignalRequest) ([]Aler
 	// The worst day inside the trip window is what a traveller needs to know.
 	var worst airDay
 	for _, d := range days {
-		if !withinWindow(d.date, req.Start, req.End) {
+		if !withinWindow(d.Date, req.Start, req.End) {
 			continue
 		}
-		if d.maxAQI > worst.maxAQI {
+		if d.MaxAQI > worst.MaxAQI {
 			worst = d
 		}
 	}
 
-	if worst.maxAQI < s.threshold {
+	if worst.MaxAQI < s.threshold {
 		// Good air is not news. Saying so on every clean trip would train users
 		// to ignore the alert list.
 		return nil, nil
 	}
 
-	d := worst.date
+	d := worst.Date
 	detail := fmt.Sprintf("European AQI %.0f (%s) on %s",
-		worst.maxAQI, aqiBandLabel(worst.maxAQI), d.Format("Mon 2 Jan"))
-	if worst.maxPM25 > 0 {
-		detail += fmt.Sprintf(", PM2.5 %.0f µg/m³", worst.maxPM25)
+		worst.MaxAQI, aqiBandLabel(worst.MaxAQI), d.Format("Mon 2 Jan"))
+	if worst.MaxPM25 > 0 {
+		detail += fmt.Sprintf(", PM2.5 %.0f µg/m³", worst.MaxPM25)
 	}
 
 	return []Alert{{
 		Kind:     AlertAirQuality,
-		Title:    fmt.Sprintf("%s air quality expected", aqiBandLabel(worst.maxAQI)),
+		Title:    fmt.Sprintf("%s air quality expected", aqiBandLabel(worst.MaxAQI)),
 		Detail:   detail,
 		Date:     &d,
-		Severity: aqiSeverity(worst.maxAQI),
+		Severity: aqiSeverity(worst.MaxAQI),
 		Source:   SourceAirQuality,
 	}}, nil
 }
@@ -145,13 +136,9 @@ func (s *AirQualitySource) forecast(ctx context.Context, lat, lon float64) ([]ai
 	// asking repeatedly about one city costs one call.
 	key := fmt.Sprintf("%.2f,%.2f", lat, lon)
 
-	s.mu.Lock()
-	if e, ok := s.cache[key]; ok && s.now().Sub(e.cachedAt) < s.ttl {
-		cached := e.days
-		s.mu.Unlock()
+	if cached, ok := cacheGet[[]airDay](s.cache, SourceAirQuality, key); ok {
 		return cached, nil
 	}
-	s.mu.Unlock()
 
 	q := url.Values{}
 	q.Set("latitude", fmt.Sprintf("%f", lat))
@@ -171,10 +158,7 @@ func (s *AirQualitySource) forecast(ctx context.Context, lat, lon float64) ([]ai
 		return nil, err
 	}
 
-	s.mu.Lock()
-	s.cache[key] = airEntry{days: days, cachedAt: s.now()}
-	s.mu.Unlock()
-
+	cacheSet(s.cache, SourceAirQuality, key, days, ttlAirQuality)
 	return days, nil
 }
 
@@ -204,19 +188,19 @@ func (r openMeteoAirResponse) toDailyMax() ([]airDay, error) {
 			if err != nil {
 				continue
 			}
-			d = &airDay{date: parsed}
+			d = &airDay{Date: parsed}
 			byDay[key] = d
 			order = append(order, key)
 		}
 
 		if i < len(h.EuropeanAQI) {
-			if v := h.EuropeanAQI[i]; v != nil && *v > d.maxAQI {
-				d.maxAQI = *v
+			if v := h.EuropeanAQI[i]; v != nil && *v > d.MaxAQI {
+				d.MaxAQI = *v
 			}
 		}
 		if i < len(h.PM25) {
-			if v := h.PM25[i]; v != nil && *v > d.maxPM25 {
-				d.maxPM25 = *v
+			if v := h.PM25[i]; v != nil && *v > d.MaxPM25 {
+				d.MaxPM25 = *v
 			}
 		}
 	}

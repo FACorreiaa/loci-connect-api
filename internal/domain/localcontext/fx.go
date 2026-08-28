@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
@@ -39,31 +38,15 @@ type FXAdapter struct {
 	baseURL string
 	client  *httpx.Client
 
-	mu    sync.Mutex
-	cache map[string]fxEntry
-	ttl   time.Duration
-	now   func() time.Time
-}
-
-type fxEntry struct {
-	rates    []FxRate
-	cachedAt time.Time
+	cache *signalCache
 }
 
 // NewFXAdapter builds the adapter. An empty baseURL uses the public endpoint.
-func NewFXAdapter(baseURL string, client *httpx.Client) *FXAdapter {
+func NewFXAdapter(baseURL string, client *httpx.Client, cache *signalCache) *FXAdapter {
 	if baseURL == "" {
 		baseURL = frankfurterBaseURL
 	}
-	return &FXAdapter{
-		baseURL: baseURL,
-		client:  client,
-		cache:   make(map[string]fxEntry),
-		// The ECB publishes once per working day, so anything shorter than
-		// hours is spending someone's rate limit to re-fetch a constant.
-		ttl: 12 * time.Hour,
-		now: time.Now,
-	}
+	return &FXAdapter{baseURL: baseURL, client: client, cache: cache}
 }
 
 type frankfurterResponse struct {
@@ -108,13 +91,9 @@ func (a *FXAdapter) Rates(ctx context.Context, base string, quotes []string) (ra
 
 	key := base + ">" + strings.Join(wanted, ",")
 
-	a.mu.Lock()
-	if e, ok := a.cache[key]; ok && a.now().Sub(e.cachedAt) < a.ttl {
-		cached := e.rates
-		a.mu.Unlock()
+	if cached, ok := cacheGet[[]FxRate](a.cache, SourceFX, key); ok {
 		return cached, unsupported, nil
 	}
-	a.mu.Unlock()
 
 	q := url.Values{}
 	q.Set("base", base)
@@ -140,10 +119,7 @@ func (a *FXAdapter) Rates(ctx context.Context, base string, quotes []string) (ra
 		out = append(out, FxRate{Base: base, Quote: quote, Rate: rate, AsOf: asOf})
 	}
 
-	a.mu.Lock()
-	a.cache[key] = fxEntry{rates: out, cachedAt: a.now()}
-	a.mu.Unlock()
-
+	cacheSet(a.cache, SourceFX, key, out, ttlFx)
 	return out, unsupported, nil
 }
 

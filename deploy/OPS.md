@@ -36,6 +36,34 @@ Required:
 - `ALLOWED_ORIGINS` — the web app origin(s), comma-separated (CORS)
 - `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, and `OPENROUTER_MODEL`
 - `AI_FALLBACK_ENABLED=false` — the free-tier fallback is a local testing floor. Production fails loudly and pages when the provider is out of credits, rather than degrading paying users onto shared rate-limited models. The server refuses to boot if this is true while `APP_ENV=production`.
+
+### Live trip signals
+
+Public holidays, natural hazards, air quality and exchange rates. Every source is free and
+keyless, so the whole feature works with nothing configured — `SIGNALS_ENABLED=false` turns
+it all off.
+
+- **Nothing here may fail a request.** Each source is bounded at 3s, the whole fan-out at
+  10s, and a source that fails twice consecutively is benched for 5 minutes. Watch
+  `loci_external_source_benched_total`: a source benching repeatedly is a provider outage,
+  and it will show as *missing* trip context rather than as an error, because these adapters
+  degrade silently by design.
+- **`loci_external_requests_total{source,outcome}`** is how you tell a dead provider from a
+  quiet destination. A source whose `ok` count falls to zero while the app keeps serving has
+  disappeared, and nothing else will say so.
+- **`loci_external_cache_hits_total{source}`** is the quota guard. These are free tiers with
+  rate limits; a hit ratio falling towards zero means a cache key became too specific and
+  the provider is about to start refusing us.
+- **`GDELT_ENABLED` defaults to off and should stay off** unless someone has looked at the
+  output. Measured: 23-26s for a query that completes, 60s+ timeouts for anything precise
+  enough to be useful, and a live query for French transport strikes returned a hunger
+  strike, Russian airstrikes and a football match. It never blocks a request (it serves
+  cache and refreshes in the background), but it is decoration, not information.
+- **Open-Meteo's free tier is non-commercial.** It is the default weather and air-quality
+  provider and is correct for validation; a commercial deployment needs their paid tier or
+  `WEATHER_PROVIDER=openweather`.
+- Set `REDIS_URL` to share provider caches across replicas. Without it each replica keeps
+  its own in-memory copy and the outbound request rate multiplies by the replica count.
   (or the documented Gemini alternative)
 - `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `DB_USER/DB_PASSWORD/DB_NAME` **must equal** `POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB`

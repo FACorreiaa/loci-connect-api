@@ -52,6 +52,23 @@ var (
 		[]string{"source"},
 	)
 
+	// ExternalSourceBenchedTotal counts sources taken out of rotation after
+	// repeated failures.
+	//
+	// This is the metric whose absence hid a real outage: when GDACS stopped
+	// responding, every trip view paid the full fan-out timeout and nothing
+	// said so. Unlike the request counter this fires once per bench rather than
+	// once per request, so it measures distinct incidents rather than blast
+	// radius — a steady trickle means one provider is flapping, a spike across
+	// sources means the problem is ours.
+	ExternalSourceBenchedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_external_source_benched_total",
+			Help: "Third-party data sources benched after repeated consecutive failures",
+		},
+		[]string{"source"},
+	)
+
 	// ExternalCacheHitsTotal counts requests served from an adapter's cache
 	// instead of the network.
 	//

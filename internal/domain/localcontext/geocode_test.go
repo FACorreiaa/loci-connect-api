@@ -25,7 +25,7 @@ func geocoder(t *testing.T, body string, status int) (*BigDataCloudGeocoder, *in
 		BaseDelay: time.Millisecond, MaxDelay: 2 * time.Millisecond,
 		RatePerSecond: 1000, Burst: 1000, UserAgent: "loci-test/1.0",
 	})
-	return NewBigDataCloudGeocoder(srv.URL, client), &hits
+	return NewBigDataCloudGeocoder(srv.URL, client, testCache(t)), &hits
 }
 
 func TestGeocoder_ReturnsCountryCode(t *testing.T) {
@@ -106,5 +106,5 @@ func TestGeocoder_UpstreamFailureIsAnError(t *testing.T) {
 }
 
 func TestGeocoder_ImplementsCountryResolver(t *testing.T) {
-	var _ CountryResolver = NewBigDataCloudGeocoder("", httpx.New(httpx.Config{}))
+	var _ CountryResolver = NewBigDataCloudGeocoder("", httpx.New(httpx.Config{}), nil)
 }

@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 )
@@ -34,31 +32,16 @@ type CountryResolver interface {
 type BigDataCloudGeocoder struct {
 	baseURL string
 	client  *httpx.Client
-
-	mu    sync.Mutex
-	cache map[string]countryEntry
-	ttl   time.Duration
-	now   func() time.Time
-}
-
-type countryEntry struct {
-	code     string
-	cachedAt time.Time
+	cache   *signalCache
 }
 
 // NewBigDataCloudGeocoder builds a geocoder. An empty baseURL uses the public
-// endpoint.
-func NewBigDataCloudGeocoder(baseURL string, client *httpx.Client) *BigDataCloudGeocoder {
+// endpoint; a nil cache disables caching.
+func NewBigDataCloudGeocoder(baseURL string, client *httpx.Client, cache *signalCache) *BigDataCloudGeocoder {
 	if baseURL == "" {
 		baseURL = bigDataCloudBaseURL
 	}
-	return &BigDataCloudGeocoder{
-		baseURL: baseURL,
-		client:  client,
-		cache:   make(map[string]countryEntry),
-		ttl:     30 * 24 * time.Hour,
-		now:     time.Now,
-	}
+	return &BigDataCloudGeocoder{baseURL: baseURL, client: client, cache: cache}
 }
 
 type bigDataCloudResponse struct {
@@ -69,12 +52,9 @@ type bigDataCloudResponse struct {
 func (g *BigDataCloudGeocoder) CountryCode(ctx context.Context, lat, lon float64) (string, error) {
 	key := fmt.Sprintf("%.1f,%.1f", lat, lon)
 
-	g.mu.Lock()
-	if e, ok := g.cache[key]; ok && g.now().Sub(e.cachedAt) < g.ttl {
-		g.mu.Unlock()
-		return e.code, nil
+	if code, ok := cacheGet[string](g.cache, SourceGeocode, key); ok {
+		return code, nil
 	}
-	g.mu.Unlock()
 
 	q := url.Values{}
 	q.Set("latitude", fmt.Sprintf("%f", lat))
@@ -94,9 +74,6 @@ func (g *BigDataCloudGeocoder) CountryCode(ctx context.Context, lat, lon float64
 		return "", nil
 	}
 
-	g.mu.Lock()
-	g.cache[key] = countryEntry{code: code, cachedAt: g.now()}
-	g.mu.Unlock()
-
+	cacheSet(g.cache, SourceGeocode, key, code, ttlGeocode)
 	return code, nil
 }

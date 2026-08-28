@@ -12,7 +12,7 @@ const frankfurterFixture = `{"amount":1.0,"base":"EUR","date":"2026-08-27","rate
 func fxAdapter(t *testing.T, body string, status int) (*FXAdapter, *int64) {
 	t.Helper()
 	url, hits := serve(t, body, status)
-	return NewFXAdapter(url, testClient()), hits
+	return NewFXAdapter(url, testClient(), testCache(t)), hits
 }
 
 func TestFX_ReturnsRates(t *testing.T) {

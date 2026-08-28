@@ -66,7 +66,7 @@ func TestNewWeatherAdapterFromEnv(t *testing.T) {
 			t.Setenv("OPENWEATHER_API_KEY", tt.openWeatherKey)
 			t.Setenv("OPENMETEO_BASE_URL", "")
 
-			got, estimated := NewWeatherAdapterFromEnv(nil)
+			got, estimated := NewWeatherAdapterFromEnv(nil, nil)
 
 			switch tt.wantType.(type) {
 			case *OpenMeteoAdapter:
@@ -97,7 +97,7 @@ func TestNewWeatherAdapterFromEnv_HonoursOpenMeteoBaseURL(t *testing.T) {
 	t.Setenv("OPENWEATHER_API_KEY", "")
 	t.Setenv("OPENMETEO_BASE_URL", "http://localhost:9999")
 
-	got, _ := NewWeatherAdapterFromEnv(nil)
+	got, _ := NewWeatherAdapterFromEnv(nil, nil)
 	a, ok := got.(*OpenMeteoAdapter)
 	if !ok {
 		t.Fatalf("got %T, want *OpenMeteoAdapter", got)
@@ -113,7 +113,7 @@ func TestNewWeatherAdapterFromEnv_EmptyBaseURLUsesPublicEndpoint(t *testing.T) {
 	t.Setenv("OPENWEATHER_API_KEY", "")
 	t.Setenv("OPENMETEO_BASE_URL", "")
 
-	got, _ := NewWeatherAdapterFromEnv(nil)
+	got, _ := NewWeatherAdapterFromEnv(nil, nil)
 	a := got.(*OpenMeteoAdapter)
 	if a.baseURL != openMeteoBaseURL {
 		t.Errorf("baseURL: got %q, want %q", a.baseURL, openMeteoBaseURL)

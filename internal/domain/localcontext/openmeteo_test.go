@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 const openMeteoFixture = `{
@@ -29,7 +28,7 @@ func openMeteoServer(t *testing.T, body string, status int) (*OpenMeteoAdapter, 
 		_, _ = w.Write([]byte(body))
 	}))
 	t.Cleanup(srv.Close)
-	return NewOpenMeteoAdapter(srv.URL), &hits
+	return NewOpenMeteoAdapter(srv.URL, testCache(t)), &hits
 }
 
 // The whole point of this adapter is that it needs no key, so a bare
@@ -155,24 +154,6 @@ func TestOpenMeteo_CachesByRoundedCoordinates(t *testing.T) {
 	}
 }
 
-func TestOpenMeteo_ExpiredCacheRefetches(t *testing.T) {
-	a, hits := openMeteoServer(t, openMeteoFixture, http.StatusOK)
-	base := time.Now()
-	a.now = func() time.Time { return base }
-	ctx := context.Background()
-
-	if _, err := a.Forecast(ctx, 38.72, -9.14, 3); err != nil {
-		t.Fatalf("first call: %v", err)
-	}
-	a.now = func() time.Time { return base.Add(31 * time.Minute) }
-	if _, err := a.Forecast(ctx, 38.72, -9.14, 3); err != nil {
-		t.Fatalf("second call: %v", err)
-	}
-	if got := *hits; got != 2 {
-		t.Fatalf("expected a refetch after the TTL, got %d calls", got)
-	}
-}
-
 // Callers degrade gracefully on an error (handler.go returns empty context, the
 // scorer treats a nil forecast as neutral), but only if we actually return one
 // rather than a half-parsed forecast.
@@ -218,5 +199,5 @@ func TestOpenMeteo_FailureIsNotCached(t *testing.T) {
 
 // The adapter satisfies the interface the rest of the app depends on.
 func TestOpenMeteo_ImplementsWeatherAdapter(t *testing.T) {
-	var _ WeatherAdapter = NewOpenMeteoAdapter("")
+	var _ WeatherAdapter = NewOpenMeteoAdapter("", nil)
 }

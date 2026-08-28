@@ -33,7 +33,7 @@ func nagerSource(t *testing.T, body string, status int) (*HolidaySource, *int64)
 		BaseDelay: time.Millisecond, MaxDelay: 2 * time.Millisecond,
 		RatePerSecond: 1000, Burst: 1000, UserAgent: "loci-test/1.0",
 	})
-	return NewHolidaySource(srv.URL, client), &hits
+	return NewHolidaySource(srv.URL, client, testCache(t)), &hits
 }
 
 func window(fromDay, toDay int) (time.Time, time.Time) {
@@ -220,5 +220,22 @@ func TestHolidaySource_SkipsUnparseableRows(t *testing.T) {
 }
 
 func TestHolidaySource_ImplementsSignalSource(t *testing.T) {
-	var _ SignalSource = NewHolidaySource("", httpx.New(httpx.Config{}))
+	var _ SignalSource = NewHolidaySource("", httpx.New(httpx.Config{}), nil)
+}
+
+// Nager answers 204 No Content for a country it does not cover (Taiwan and
+// India, among others). That is "no holidays on file", not a failure — and
+// treating it as one benched the whole holiday source, so one unsupported
+// destination silently removed holidays from every other destination too.
+func TestHolidaySource_UncoveredCountryIsEmptyNotAnError(t *testing.T) {
+	s, _ := nagerSource(t, "", http.StatusNoContent)
+	start, end := window(2, 4)
+
+	got, err := s.Fetch(context.Background(), SignalRequest{CountryCode: "TW", Start: start, End: end})
+	if err != nil {
+		t.Fatalf("a 204 must not be an error, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no holidays, got %d", len(got))
+	}
 }

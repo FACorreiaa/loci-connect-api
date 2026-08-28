@@ -15,11 +15,17 @@ import (
 // Optional, like WithScoring and WithSignals: without it GetFxRates reports the
 // feature as unconfigured rather than failing, and EstimateDriveCost still
 // answers from the built-in defaults, since the arithmetic needs no provider.
-func (h *Handler) WithFX(fx *FXAdapter, base string, litresPer100Km, pricePerLitre float64) *Handler {
+func (h *Handler) WithFX(
+	fx *FXAdapter,
+	base string,
+	litresPer100Km, pricePerLitre float64,
+	country CountryResolver,
+) *Handler {
 	h.fx = fx
 	h.fxBase = normaliseCurrency(base)
 	h.litresPer100Km = litresPer100Km
 	h.pricePerLitre = pricePerLitre
+	h.fxCountry = country
 	return h
 }
 
@@ -40,19 +46,30 @@ func (h *Handler) GetFxRates(
 	}
 
 	quotes := req.Msg.GetQuotes()
+
 	// A caller holding a destination should not have to know its currency, so
-	// the country code is accepted as a stand-in.
-	if len(quotes) == 0 {
-		if cc := req.Msg.GetCountryCode(); cc != "" {
-			if currency := CurrencyForCountry(cc); currency != "" {
-				quotes = []string{currency}
-			} else {
-				// We know the country and cannot price it. Saying so beats an
-				// empty response the client cannot distinguish from a failure.
-				return connect.NewResponse(&lcv1.GetFxRatesResponse{
-					Unsupported: []string{cc},
-				}), nil
-			}
+	// a country code — or just coordinates — is accepted as a stand-in.
+	countryCode := req.Msg.GetCountryCode()
+	if len(quotes) == 0 && countryCode == "" &&
+		req.Msg.Latitude != nil && req.Msg.Longitude != nil && h.fxCountry != nil {
+		resolved, err := h.fxCountry.CountryCode(ctx, req.Msg.GetLatitude(), req.Msg.GetLongitude())
+		if err != nil {
+			h.logger.WarnContext(ctx, "fx: country lookup failed; no rate to offer",
+				slog.Any("error", err))
+			return connect.NewResponse(&lcv1.GetFxRatesResponse{}), nil
+		}
+		countryCode = resolved
+	}
+
+	if len(quotes) == 0 && countryCode != "" {
+		if currency := CurrencyForCountry(countryCode); currency != "" {
+			quotes = []string{currency}
+		} else {
+			// We know the country and cannot price it. Saying so beats an
+			// empty response the client cannot distinguish from a failure.
+			return connect.NewResponse(&lcv1.GetFxRatesResponse{
+				Unsupported: []string{countryCode},
+			}), nil
 		}
 	}
 	if len(quotes) == 0 {

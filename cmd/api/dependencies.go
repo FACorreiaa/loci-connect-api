@@ -452,7 +452,13 @@ func (d *Dependencies) initHandlers() error {
 	// handler, the trip handler's packing suggester and the compare service —
 	// so whichever provider is chosen here decides whether the forecast is real
 	// everywhere at once.
-	weather, weatherEst := localcontext.NewWeatherAdapterFromEnv(d.Logger)
+	// One shared cache for every third-party payload, backed by the app's
+	// TieredStore — in memory, mirrored to Redis when REDIS_URL is set. The
+	// adapters previously each kept a private map, which died with the process
+	// and was per-replica.
+	signalCache := localcontext.NewSignalCacheFromEnv(d.AppCache, d.Logger)
+
+	weather, weatherEst := localcontext.NewWeatherAdapterFromEnv(d.Logger, signalCache)
 	// WithScoring lights up GetGoScore ("should I go this weekend?"). Without it
 	// the handler still serves weather; with it the score can resolve a city by
 	// name and factor in how much there is to do there.
@@ -476,18 +482,18 @@ func (d *Dependencies) initHandlers() error {
 			newsClassifier = localcontext.NewLLMNewsClassifier(generate)
 		}
 	}
-	signals := localcontext.NewGathererFromEnv(d.Logger, newsClassifier)
+	signals := localcontext.NewGathererFromEnv(d.Logger, newsClassifier, signalCache)
 
 	// Exchange rates and the fuel assumptions behind a drive-cost estimate.
 	// Shares the signals HTTP client so the same outbound rate limit and
 	// metrics cover it.
-	fxAdapter, fxBase, litresPer100Km, pricePerLitre := localcontext.NewFXFromEnv(localcontext.NewSignalsHTTPClient())
+	fxAdapter, fxBase, litresPer100Km, pricePerLitre := localcontext.NewFXFromEnv(localcontext.NewSignalsHTTPClient(), signalCache)
 
 	d.LocalContextHandler = localcontext.
 		NewHandler(weather, weatherEst, d.Logger).
 		WithScoring(d.CityRepo, d.POISvc).
 		WithSignals(signals).
-		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre)
+		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre, signals.CountryResolver())
 
 	// Give the trip handler the same forecast source, so a packing list can be
 	// derived from the trip's actual weather rather than generic advice.

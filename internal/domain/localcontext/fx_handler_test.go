@@ -2,6 +2,7 @@ package localcontext
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -15,7 +16,7 @@ func fxHandler(t *testing.T, body string, status int) *Handler {
 	t.Helper()
 	url, _ := serve(t, body, status)
 	h := NewHandler(StubWeather{}, true, slog.New(slog.NewTextHandler(discard{}, nil)))
-	return h.WithFX(NewFXAdapter(url, testClient()), "EUR", 6.5, 1.75)
+	return h.WithFX(NewFXAdapter(url, testClient(), testCache(t)), "EUR", 6.5, 1.75, nil)
 }
 
 type discard struct{}
@@ -171,5 +172,119 @@ func TestEstimateDriveCost_ZeroDistanceCostsNothing(t *testing.T) {
 	// bare number.
 	if resp.Msg.Estimate.Assumptions == "" {
 		t.Error("assumptions must always be populated")
+	}
+}
+
+// --- coordinate path -------------------------------------------------------
+//
+// The client usually has coordinates and, at best, an LLM-generated country
+// *name* like "Portugal". Resolving that to a currency client-side would
+// duplicate a country table the server already has, so the server does it.
+
+func fxHandlerWithCountry(t *testing.T, body string, status int, c CountryResolver) *Handler {
+	t.Helper()
+	url, _ := serve(t, body, status)
+	h := NewHandler(StubWeather{}, true, slog.New(slog.NewTextHandler(discard{}, nil)))
+	return h.WithFX(NewFXAdapter(url, testClient(), testCache(t)), "EUR", 6.5, 1.75, c)
+}
+
+func TestGetFxRates_ResolvesCurrencyFromCoordinates(t *testing.T) {
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK, &fakeCountry{code: "US"})
+	lat, lon := 40.71, -74.0
+
+	resp, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		Latitude: &lat, Longitude: &lon,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Msg.Rates) != 1 || resp.Msg.Rates[0].Quote != "USD" {
+		t.Errorf("expected USD from US coordinates, got %+v", resp.Msg.Rates)
+	}
+}
+
+// An explicit country code is more precise than a reverse-geocode, so it wins
+// and saves the lookup entirely.
+func TestGetFxRates_CountryCodeBeatsCoordinates(t *testing.T) {
+	geo := &fakeCountry{code: "US"}
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK, geo)
+	lat, lon := 40.71, -74.0
+	cc := "JP"
+
+	resp, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		CountryCode: &cc, Latitude: &lat, Longitude: &lon,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Msg.Rates) != 1 || resp.Msg.Rates[0].Quote != "JPY" {
+		t.Errorf("expected JPY from the explicit country, got %+v", resp.Msg.Rates)
+	}
+	if geo.calls != 0 {
+		t.Errorf("an explicit country must skip the geocode, got %d calls", geo.calls)
+	}
+}
+
+func TestGetFxRates_ExplicitQuotesSkipTheGeocode(t *testing.T) {
+	geo := &fakeCountry{code: "US"}
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK, geo)
+	lat, lon := 40.71, -74.0
+
+	if _, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		Quotes: []string{"GBP"}, Latitude: &lat, Longitude: &lon,
+	})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if geo.calls != 0 {
+		t.Errorf("explicit quotes must skip the geocode, got %d calls", geo.calls)
+	}
+}
+
+// A geocoder outage means no rate to offer — not a failed RPC.
+func TestGetFxRates_GeocodeFailureDegrades(t *testing.T) {
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK,
+		&fakeCountry{err: errors.New("geocoder down")})
+	lat, lon := 40.71, -74.0
+
+	resp, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		Latitude: &lat, Longitude: &lon,
+	}))
+	if err != nil {
+		t.Fatalf("a geocoder outage must not fail the RPC, got %v", err)
+	}
+	if len(resp.Msg.Rates) != 0 {
+		t.Errorf("got %+v", resp.Msg.Rates)
+	}
+}
+
+// Coordinates at sea resolve to no country at all.
+func TestGetFxRates_CoordinatesWithNoCountryAreEmpty(t *testing.T) {
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK, &fakeCountry{code: ""})
+	lat, lon := 0.0, -30.0
+
+	resp, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		Latitude: &lat, Longitude: &lon,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Msg.Rates) != 0 {
+		t.Errorf("got %+v", resp.Msg.Rates)
+	}
+}
+
+// Without a resolver configured the coordinate path is simply unavailable.
+func TestGetFxRates_NoResolverIsEmptyNotAnError(t *testing.T) {
+	h := fxHandlerWithCountry(t, frankfurterFixture, http.StatusOK, nil)
+	lat, lon := 40.71, -74.0
+
+	resp, err := h.GetFxRates(context.Background(), connect.NewRequest(&lcv1.GetFxRatesRequest{
+		Latitude: &lat, Longitude: &lon,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.Msg.Rates) != 0 {
+		t.Errorf("got %+v", resp.Msg.Rates)
 	}
 }
