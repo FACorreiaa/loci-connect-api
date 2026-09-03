@@ -215,6 +215,18 @@ func (h *ChatHandler) StreamChat(
 			llmCancel()
 			close(eventCh)
 		}()
+		// Registered after the cancel/close defer so it runs first (LIFO):
+		// a panic anywhere in the pipeline becomes a terminal error event for
+		// this stream instead of taking the whole process down.
+		defer func() {
+			if r := recover(); r != nil {
+				h.logger.Error("chat stream pipeline panicked", "recover", r)
+				select {
+				case eventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "internal error"}:
+				case <-llmCtx.Done():
+				}
+			}
+		}()
 		err := h.service.ProcessUnifiedChatMessageStream(cc)
 		if err != nil {
 			select {

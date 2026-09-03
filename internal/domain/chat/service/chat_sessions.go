@@ -17,6 +17,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 )
 
 // GetUserChatSessions retrieves paginated chat sessions for a user
@@ -100,13 +101,13 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		UserLocation: userLocation,
 		EventCh:      eventCh,
 	}
-	go func() {
+	concurrency.Run(l.logger, func() {
 		// Note: eventCh is closed by ProcessUnifiedChatMessageStream via closeOnce
 		err := l.ProcessUnifiedChatMessageStream(cc)
 		if err != nil {
 			l.logger.Error("error processing stream", "error", err)
 		}
-	}()
+	})
 
 	var lastItinerary locitypes.AiCityResponse
 	var lastMessage string
@@ -135,13 +136,13 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 
 func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
 	eventCh := make(chan locitypes.StreamEvent, 100) // Buffered channel to prevent blocking
-	go func() {
+	concurrency.Run(l.logger, func() {
 		defer close(eventCh) // Ensure channel is closed when goroutine exits
 		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
 		if err != nil {
 			l.logger.Error("error processing continue stream", "error", err)
 		}
-	}()
+	})
 
 	var lastItinerary locitypes.AiCityResponse
 	var lastMessage string

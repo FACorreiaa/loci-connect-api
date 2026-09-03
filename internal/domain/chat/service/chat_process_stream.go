@@ -20,6 +20,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 )
 
 // prepareChatContext handles extracting city, intent detection, fetching user profile,
@@ -609,7 +610,7 @@ func (l *ServiceImpl) persistResults(
 	//}(builders, cc.UserID, cc.ProfileID, cityID, savedID, cc.UserLocation)
 
 	// Restore background processing for POI details saving
-	go func() {
+	concurrency.Run(l.logger, func() {
 		// Use detached context with long timeout for background processing
 		bgCtx, bgCancel := context.WithTimeout(context.WithoutCancel(cc.Ctx), 5*time.Minute)
 		defer bgCancel()
@@ -623,7 +624,7 @@ func (l *ServiceImpl) persistResults(
 			savedID,         // 6. LLM Interaction UUID
 			cc.UserLocation, // 7. *locitypes.UserLocation (Extract from 'data' or 'cc'?)
 		)
-	}()
+	})
 
 	return nil
 }
