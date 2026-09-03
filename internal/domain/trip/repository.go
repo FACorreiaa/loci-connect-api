@@ -243,29 +243,8 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1`, t.ID); err != nil {
 		return nil, fmt.Errorf("clear days: %w", err)
 	}
-	for di := range t.Days {
-		day := &t.Days[di]
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO trip_days (trip_id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			t.ID, day.DayNumber, day.Date,
-			day.CityID, day.CityName, day.CityLat, day.CityLon, day.TravelDay).Scan(&day.ID); err != nil {
-			return nil, fmt.Errorf("insert day: %w", err)
-		}
-		for si := range day.Stops {
-			s := &day.Stops[si]
-			traceJSON, marshalErr := json.Marshal(s.RecommendationTrace)
-			if marshalErr != nil {
-				return nil, fmt.Errorf("marshal recommendation trace: %w", marshalErr)
-			}
-			if err := tx.QueryRow(ctx, `
-				INSERT INTO trip_stops (day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-				day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON).
-				Scan(&s.ID); err != nil {
-				return nil, fmt.Errorf("insert stop: %w", err)
-			}
-		}
+	if err := insertDays(ctx, tx, t); err != nil {
+		return nil, err
 	}
 
 	// Legs, replace-all like days for the same reason: trip-sized data, and a
@@ -273,16 +252,8 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_legs WHERE trip_id = $1`, t.ID); err != nil {
 		return nil, fmt.Errorf("clear legs: %w", err)
 	}
-	for li := range t.Legs {
-		leg := &t.Legs[li]
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO trip_legs (trip_id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
-				distance_km, duration_mins, mode, booking_url)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-			t.ID, leg.AfterDay, leg.FromName, leg.ToName, leg.FromLat, leg.FromLon, leg.ToLat, leg.ToLon,
-			leg.DistanceKm, leg.DurationMins, leg.Mode, leg.BookingURL).Scan(&leg.ID); err != nil {
-			return nil, fmt.Errorf("insert leg: %w", err)
-		}
+	if err := insertLegs(ctx, tx, t); err != nil {
+		return nil, err
 	}
 
 	// Append an immutable snapshot for merge-safe reconciliation.
@@ -337,6 +308,95 @@ func (r *repository) loadLegs(ctx context.Context, t *Trip) error {
 		t.Legs = append(t.Legs, l)
 	}
 	return rows.Err()
+}
+
+// insertDays writes a trip's days and then its stops as two batched round
+// trips instead of one per row. Day ids come back from the first batch so the
+// stops can reference them; ids are assigned back onto t in place.
+func insertDays(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if len(t.Days) == 0 {
+		return nil
+	}
+	days := &pgx.Batch{}
+	for di := range t.Days {
+		day := &t.Days[di]
+		days.Queue(`
+			INSERT INTO trip_days (trip_id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+			t.ID, day.DayNumber, day.Date,
+			day.CityID, day.CityName, day.CityLat, day.CityLon, day.TravelDay)
+	}
+	br := tx.SendBatch(ctx, days)
+	for di := range t.Days {
+		if err := br.QueryRow().Scan(&t.Days[di].ID); err != nil {
+			_ = br.Close()
+			return fmt.Errorf("insert day: %w", err)
+		}
+	}
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("insert day: %w", err)
+	}
+
+	stops := &pgx.Batch{}
+	for di := range t.Days {
+		day := &t.Days[di]
+		for si := range day.Stops {
+			s := &day.Stops[si]
+			traceJSON, err := json.Marshal(s.RecommendationTrace)
+			if err != nil {
+				return fmt.Errorf("marshal recommendation trace: %w", err)
+			}
+			stops.Queue(`
+				INSERT INTO trip_stops (day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+				day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON)
+		}
+	}
+	if stops.Len() == 0 {
+		return nil
+	}
+	br = tx.SendBatch(ctx, stops)
+	for di := range t.Days {
+		for si := range t.Days[di].Stops {
+			if err := br.QueryRow().Scan(&t.Days[di].Stops[si].ID); err != nil {
+				_ = br.Close()
+				return fmt.Errorf("insert stop: %w", err)
+			}
+		}
+	}
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("insert stop: %w", err)
+	}
+	return nil
+}
+
+// insertLegs writes a trip's legs in one batched round trip, assigning the
+// returned ids back onto t in place.
+func insertLegs(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if len(t.Legs) == 0 {
+		return nil
+	}
+	legs := &pgx.Batch{}
+	for li := range t.Legs {
+		leg := &t.Legs[li]
+		legs.Queue(`
+			INSERT INTO trip_legs (trip_id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
+				distance_km, duration_mins, mode, booking_url)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+			t.ID, leg.AfterDay, leg.FromName, leg.ToName, leg.FromLat, leg.FromLon, leg.ToLat, leg.ToLon,
+			leg.DistanceKm, leg.DurationMins, leg.Mode, leg.BookingURL)
+	}
+	br := tx.SendBatch(ctx, legs)
+	for li := range t.Legs {
+		if err := br.QueryRow().Scan(&t.Legs[li].ID); err != nil {
+			_ = br.Close()
+			return fmt.Errorf("insert leg: %w", err)
+		}
+	}
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("insert leg: %w", err)
+	}
+	return nil
 }
 
 // loadDays populates t.Days and their stops, ordered, plus the legs between
