@@ -369,41 +369,69 @@ func (h *Handler) recordTravelHistory(ctx context.Context, userID uuid.UUID, can
 	if h.history == nil || h.db == nil || len(candidates) == 0 {
 		return
 	}
+	poiIDs := make([]string, 0, len(candidates))
 	for _, c := range candidates {
+		poiIDs = append(poiIDs, c.poiID)
+	}
+
+	// One round trip for the whole batch rather than one per stop.
+	rows, err := h.db.Query(ctx, `
+		SELECT p.id::text, p.name, ST_Y(p.location), ST_X(p.location), p.city_id, c.name, c.country
+		FROM points_of_interest p
+		LEFT JOIN cities c ON c.id = p.city_id
+		WHERE p.id::text = ANY($1)`, poiIDs)
+	if err != nil {
+		h.logger.Debug("skip travel history: poi lookup failed", slog.String("error", err.Error()))
+		return
+	}
+	defer rows.Close()
+
+	type placedPOI struct {
+		name              string
+		lat, lon          *float64
+		cityID            *uuid.UUID
+		cityName, country *string
+	}
+	placed := make(map[string]placedPOI, len(candidates))
+	for rows.Next() {
 		var (
-			poiName           string
-			lat, lon          *float64
-			cityID            *uuid.UUID
-			cityName, country *string
+			id string
+			p  placedPOI
 		)
-		err := h.db.QueryRow(ctx, `
-			SELECT p.name, ST_Y(p.location), ST_X(p.location), p.city_id, c.name, c.country
-			FROM points_of_interest p
-			LEFT JOIN cities c ON c.id = p.city_id
-			WHERE p.id::text = $1`, c.poiID,
-		).Scan(&poiName, &lat, &lon, &cityID, &cityName, &country)
-		if err != nil {
-			h.logger.Debug("skip travel history: poi not resolvable",
-				slog.String("poi_id", c.poiID), slog.String("error", err.Error()))
+		if err := rows.Scan(&id, &p.name, &p.lat, &p.lon, &p.cityID, &p.cityName, &p.country); err != nil {
+			h.logger.Debug("skip travel history: poi scan failed", slog.String("error", err.Error()))
+			return
+		}
+		placed[id] = p
+	}
+	if err := rows.Err(); err != nil {
+		h.logger.Debug("skip travel history: poi lookup failed", slog.String("error", err.Error()))
+		return
+	}
+
+	for _, c := range candidates {
+		p, ok := placed[c.poiID]
+		if !ok {
+			h.logger.Debug("skip travel history: poi not resolvable", slog.String("poi_id", c.poiID))
 			continue
 		}
-		if lat == nil || lon == nil || cityName == nil || *cityName == "" {
+		if p.lat == nil || p.lon == nil || p.cityName == nil || *p.cityName == "" {
 			continue
 		}
 
 		in := travelhistory.VisitInput{
-			CityID:    cityID,
-			CityName:  *cityName,
-			Latitude:  *lat,
-			Longitude: *lon,
+			CityID:    p.cityID,
+			CityName:  *p.cityName,
+			Latitude:  *p.lat,
+			Longitude: *p.lon,
 			Source:    travelhistory.SourceVisitEvent,
 			TripID:    c.tripID,
 			VisitedAt: c.occurredAt,
 			POIID:     c.poiID,
-			POIName:   poiName,
+			POIName:   p.name,
 		}
-		if country != nil {
-			in.Country = *country
+		if p.country != nil {
+			in.Country = *p.country
 		}
 		h.history.RecordVisit(ctx, userID, in)
 	}
