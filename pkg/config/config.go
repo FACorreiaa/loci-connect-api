@@ -208,7 +208,7 @@ func Load() (*Config, error) {
 		},
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
-			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 300),
+			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 100),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),

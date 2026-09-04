@@ -8,13 +8,13 @@ This document outlines the implementation strategy for the new pricing tiers and
 Two public tiers. "Pro" is the marketing name for both `premium_monthly` and
 `premium_annual` plan values; Pro is sold as unlimited but carries a hidden
 fair-use cap. Limits are env-configurable (`FREE_DAILY_LLM_LIMIT`, default 10;
-`PRO_DAILY_LLM_LIMIT`, default 300).
+`PRO_DAILY_LLM_LIMIT`, default 100).
 
 | Tier | Limits | Notes |
 |------|--------|-------|
 | **Admin** (`ADMIN_EMAIL` env) | Unlimited | Quota bypass |
 | **Free** | 10 LLM requests/day | Metered on chat RPCs only (StartChat, ContinueChat, StreamChat) |
-| **Pro** (`premium_monthly` / `premium_annual`) | "Unlimited" — hidden fair-use cap 300/day | Fair-use denial shows retry copy, never an upgrade CTA |
+| **Pro** (`premium_monthly` / `premium_annual`) | "Unlimited" — hidden fair-use cap 100/day | Fair-use denial shows retry copy, never an upgrade CTA |
 
 Historic tier table (superseded): free 5/day, paid 10/day, premium unlimited.
 The `paid`/`explorer` plan strings never existed in the DB enum and were removed.

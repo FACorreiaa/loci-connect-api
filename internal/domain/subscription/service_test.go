@@ -120,17 +120,20 @@ func TestConsumeQuota_AtLimit(t *testing.T) {
 }
 
 func TestConsumeQuota_ProPlanFairUseCap(t *testing.T) {
-	repo := &fakeUsageRepo{usage: 299, plan: PlanPremiumMonthly}
+	// Derived from the configured cap so tuning PRO_DAILY_LLM_LIMIT does not
+	// silently invalidate the boundary this test is asserting.
+	cap := DefaultLimits().ProDaily
+	repo := &fakeUsageRepo{usage: cap - 1, plan: PlanPremiumMonthly}
 	svc := newTestService(repo, "admin@example.com")
 
 	if err := svc.ConsumeQuota(context.Background(), uuid.New(), "user@example.com"); err != nil {
-		t.Fatalf("pro at 299/300 should pass, got %v", err)
+		t.Fatalf("pro one under the cap should pass, got %v", err)
 	}
 
-	// Now at 300: fair-use cap reached.
+	// Now at the cap: fair use reached.
 	err := svc.ConsumeQuota(context.Background(), uuid.New(), "user@example.com")
 	if !errors.Is(err, ErrQuotaExceeded) {
-		t.Fatalf("pro at 300/300 should be denied, got %v", err)
+		t.Fatalf("pro at the cap should be denied, got %v", err)
 	}
 	var quotaErr *QuotaExceededError
 	if !errors.As(err, &quotaErr) || !IsProPlan(quotaErr.Plan) {
@@ -246,11 +249,11 @@ func TestDailyLimitForPlan(t *testing.T) {
 	if got := l.dailyLimitForPlan(PlanFree); got != 10 {
 		t.Fatalf("free limit = %d, want 10", got)
 	}
-	if got := l.dailyLimitForPlan(PlanPremiumMonthly); got != 300 {
-		t.Fatalf("premium_monthly limit = %d, want 300", got)
+	if got := l.dailyLimitForPlan(PlanPremiumMonthly); got != 100 {
+		t.Fatalf("premium_monthly limit = %d, want 100", got)
 	}
-	if got := l.dailyLimitForPlan(PlanPremiumAnnual); got != 300 {
-		t.Fatalf("premium_annual limit = %d, want 300", got)
+	if got := l.dailyLimitForPlan(PlanPremiumAnnual); got != 100 {
+		t.Fatalf("premium_annual limit = %d, want 100", got)
 	}
 	if got := l.dailyLimitForPlan("unknown"); got != 10 {
 		t.Fatalf("unknown plan limit = %d, want free limit 10", got)

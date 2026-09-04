@@ -22,8 +22,8 @@ func TestLoad_QuotaAndStripeDefaults(t *testing.T) {
 	if cfg.Subscription.FreeDailyLLMLimit != 10 {
 		t.Errorf("FreeDailyLLMLimit default = %d, want 10", cfg.Subscription.FreeDailyLLMLimit)
 	}
-	if cfg.Subscription.ProDailyLLMLimit != 300 {
-		t.Errorf("ProDailyLLMLimit default = %d, want 300", cfg.Subscription.ProDailyLLMLimit)
+	if cfg.Subscription.ProDailyLLMLimit != 100 {
+		t.Errorf("ProDailyLLMLimit default = %d, want 100", cfg.Subscription.ProDailyLLMLimit)
 	}
 }
 

@@ -20,7 +20,7 @@ type Limits struct {
 
 // DefaultLimits mirrors the config defaults for callers without config access.
 func DefaultLimits() Limits {
-	return Limits{FreeDaily: 10, ProDaily: 300}
+	return Limits{FreeDaily: 10, ProDaily: 100}
 }
 
 // dailyLimitForPlan maps subscription plan names to daily request quotas.
