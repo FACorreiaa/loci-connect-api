@@ -26,9 +26,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o 
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata wget
+RUN apk --no-cache add ca-certificates tzdata wget \
+    && addgroup -S loci && adduser -S -G loci -H loci
 
-WORKDIR /root/
+WORKDIR /app
 
 # Copy binaries from builder
 COPY --from=builder /app/server .
@@ -40,6 +41,9 @@ EXPOSE 8080 9090 6060
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Drop root: the server binds unprivileged ports and writes nothing to disk.
+USER loci
 
 # Run the application
 CMD ["./server"]

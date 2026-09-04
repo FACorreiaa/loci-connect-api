@@ -107,3 +107,58 @@ Observability: OpenTelemetry tracing, structured JSON logs, Prometheus metrics.
 3. In `StartChat`, the goroutine leaks `eventCh` if `ProcessUnifiedChatMessageStream` returns before the main goroutine enters `range`. The buffer mitigates but does not completely eliminate the leak. Should we add a `sync.Once` close guard or a `select` on `ctx.Done()` to close early on cancellation?
 4. `log.Fatalf` on embedding init — is the intent truly fail-fast? Would users prefer degraded responses (e.g., "embeddings temporarily unavailable, showing general results") over a 503?
 5. God files: do we want to split by subdomain (POI, Chat, Itinerary) now or defer until after next release? Churn on these files is high; splitting mid-flight risks merge conflicts.
+
+---
+
+## Re-audit 2026-09-03
+
+Scope: modern-Go and performance pass over `main` at `2b8eb7e` (Go 1.27, connect-go 1.20, pgx v5, golangci-lint v2 + gofumpt in pre-commit). Read against the 2026-04-27 findings above.
+
+### Closed since 2026-04-27
+
+| Finding | Status |
+|---|---|
+| F005 `MustGetClaimsFromContext` | **Removed.** `pkg/interceptors/auth.go` has no panic-on-missing-claims helper. |
+| F007 unbuffered `eventCh` | **Fixed.** Every stream channel is `make(chan StreamEvent, 100)`. |
+| F009 `wg.Wait()` without recover | **Fixed.** `pkg/concurrency/safego.go` (`Go`/`Run`) and `errgroup` workers recover; `pkg/concurrency/llmsem.go` bounds outbound LLM calls (`AI_MAX_CONCURRENT_CALLS`, default 10). |
+| F010 chat god file | **Fixed.** Split into `chat_stream_session.go`, `chat_process_stream.go`, `chat_poi_generation.go`, `chat_sessions.go`, …; largest ≈33 KB. |
+| F015 `pool.Close()` error | **Invalid finding.** `pgxpool.Pool.Close()` returns nothing; there is no error to check. |
+| F016 default JWT secret | **Mitigated.** Separate access/refresh secrets with a boot warning if they collide (`cmd/api/dependencies.go`). |
+| — | New since April: provider fallback chain with cooldown + stream-boundary failover (`pkg/ai/fallback.go`), protovalidate interceptor, three-layer rate limiting, OTel + Prometheus + slog, 127 `_test.go` files, testcontainers integration + e2e harness. |
+
+### Still open
+
+| Finding | Status |
+|---|---|
+| F001/F002 log-then-return duplication | Open, low impact. Pick one logging layer when touching those files. |
+| F011 `poi_repository.go` | Still ≈2.9 k lines. Split by aggregate when the next POI feature lands, not before. |
+| F017 `br.Close()` unchecked | Open in `internal/domain/chat/repository/chat_repository.go`. |
+| TODO/FIXME | 11 markers in non-test `internal`/`pkg`/`cmd`. Triage into issues or delete. |
+
+### New findings (ranked) — with what shipped today
+
+| # | Sev | Where | Finding | Action |
+|---|---|---|---|---|
+| R1 | **High** | `internal/domain/chat/handler/chat_handler.go:213`, `internal/domain/chat/service/chat_sessions.go:103,138`, `chat_process_stream.go:612` | Outer streaming goroutines had no `recover()`. A panic outside the inner `errgroup` workers killed the process for every connected client. | **Fixed** (`fb4c4b5`). Handler recovers, logs, emits a terminal error event, then closes; service sites use `concurrency.Run`. Regression test `stream_panic_test.go` drives StreamChat over a real Connect client against a panicking service. |
+| R2 | Med | `internal/domain/trip/repository.go` `SaveTrip` | One `INSERT … RETURNING` round trip per day, per stop, per leg inside a single tx — latency and lock time linear in trip size. | **Fixed** (`716e3ab`). Three `pgx.Batch` sends (`insertDays`, `insertLegs`); ids assigned back in place. Covered by `multicity_integration_test.go`. |
+| R3 | Med | `internal/domain/recommendation/handler.go` `recordTravelHistory` | One `SELECT` per confirmed stop. | **Fixed** (`2b8eb7e`). Single `WHERE p.id::text = ANY($1)` lookup, candidates walked in original order. New `travelhistory_integration_test.go`. |
+| R4 | Med | `Dockerfile` | Runtime stage ran as root in `/root`. | **Fixed.** `loci` system user, `WORKDIR /app`, `USER loci`. Verified `id` → non-root in the built image. |
+| R5 | Low | `cmd/server/main.go` | No explicit `ReadHeaderTimeout`; pprof server had no timeouts at all. Main server was already bounded by `ReadTimeout=30s`, so this is hardening, not a hole. | **Fixed.** `ReadHeaderTimeout: 10s` on both; pprof gets `ReadTimeout`/`IdleTimeout`; `WriteTimeout: 0` kept on both (streaming). |
+| R6 | Med | `cmd/api/router.go:141-154`, `internal/mcp` | MCP HTTP endpoint authenticates by API key outside the Connect interceptor chain. Not verified here that it enforces the same protovalidate + per-IP/user rate limits. | **Open.** Verify parity or route MCP through the same limiter; add an e2e test hitting MCP unauthenticated + over-limit. |
+| R7 | Low | `internal/domain/chat/service/chat_process_stream.go:612` | `context.WithoutCancel` + 5 min timeout for background POI persistence is correct, but the goroutine is untracked at shutdown; `srv.Shutdown` (30 s) will not wait for it. | Open. Acceptable loss (idempotent cache write); document or track with a WaitGroup on the service. |
+| R8 | Low | `pkg/db/migrations` run at boot (`cmd/api/dependencies.go:177-198`) | Fine for one replica; two replicas racing goose at startup is undefined. | Open. When hosted, run migrations as an ArgoCD PreSync Job (see `PRODUCTION-READINESS.md` §3) and gate boot on schema version only. |
+
+### Things that look bad but are fine
+
+- `WriteTimeout: 0` on the API server — deliberate for SSE/LLM streams; application deadlines (`CHAT_STREAM_MAX_TIMEOUT_SEC`) bound them.
+- `context.Background()` for AI client init (F004) — still fine.
+- Prometheus label cardinality — bounded to procedure/code/plan.
+
+### Verification run for this section
+
+```
+go build ./... && go vet ./...
+go test ./internal/domain/chat/... ./internal/domain/trip/ ./internal/domain/recommendation/ ./cmd/...
+go test -tags=integration -p 1 -count=1 ./internal/domain/trip/ ./internal/domain/recommendation/
+docker build -t loci-api:audit . && docker run --rm loci-api:audit id
+```

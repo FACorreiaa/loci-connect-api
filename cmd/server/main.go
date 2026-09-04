@@ -93,8 +93,14 @@ func startPprofServer(cfg *config.Config, logger *slog.Logger) {
 	logger.Info("pprof server started", "addr", addr, "endpoints", "/debug/pprof/")
 
 	server := &http.Server{
-		Addr:    addr,
-		Handler: mux,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		// Profiles (e.g. /debug/pprof/profile?seconds=30) stream for as long as
+		// the caller asks, so the write side stays unbounded like the API server.
+		WriteTimeout: 0,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -115,6 +121,9 @@ func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) er
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: handler,
+		// ReadHeaderTimeout: bounds a client that trickles headers (slowloris);
+		// stated explicitly rather than inherited from ReadTimeout.
+		ReadHeaderTimeout: 10 * time.Second,
 		// ReadTimeout: Time to read the entire request including body
 		ReadTimeout: 30 * time.Second,
 		// WriteTimeout: For streaming endpoints (SSE/gRPC streams), this must be long enough
