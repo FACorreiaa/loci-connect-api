@@ -97,14 +97,25 @@ func newProviderClient(
 	linkCfg.APIKey = apiKey
 	linkCfg.Model = model
 
+	var (
+		client generativeAI.ChatClient
+		err    error
+	)
 	switch provider {
 	case config.AIProviderGemini:
-		return gemini.NewChatClient(ctx, linkCfg, logger)
+		client, err = gemini.NewChatClient(ctx, linkCfg, logger)
 	case config.AIProviderOpenRouter:
-		return openrouter.NewChatClient(linkCfg, logger)
+		client, err = openrouter.NewChatClient(linkCfg, logger)
 	default:
 		return nil, fmt.Errorf("unsupported AI provider %q", provider)
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Meter every link in the chain, so tokens are attributed to the model
+	// that actually answered rather than to the one that was configured first.
+	return newMetered(client, recordPrometheus), nil
 }
 
 func NewEmbeddingClient(

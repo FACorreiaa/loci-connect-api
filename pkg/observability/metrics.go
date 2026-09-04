@@ -84,6 +84,29 @@ var (
 		[]string{"plan"},
 	)
 
+	// LLMCallsTotal tracks completed model calls by model and SDK method.
+	//
+	// One metered chat request fans out into several model calls, so this
+	// divided by loci_quota_consumed_total is the fan-out multiplier: the
+	// number of model calls a single user action actually costs.
+	LLMCallsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_llm_calls_total",
+			Help: "Completed LLM calls by model and method",
+		},
+		[]string{"model", "method"},
+	)
+
+	// LLMTokensTotal tracks provider-reported token usage by model and kind.
+	// Kind is one of prompt, completion, thoughts, cached.
+	LLMTokensTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_llm_tokens_total",
+			Help: "LLM tokens reported by the provider, by model and token kind",
+		},
+		[]string{"model", "kind"},
+	)
+
 	// CheckoutSessionsCreatedTotal tracks Stripe Checkout sessions created.
 	CheckoutSessionsCreatedTotal = promauto.NewCounter(
 		prometheus.CounterOpts{
