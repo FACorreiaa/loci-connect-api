@@ -98,6 +98,7 @@ func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTr
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
+	h.recordReopen(ctx, t, uid)
 	return connect.NewResponse(tripToProto(t)), nil
 }
 

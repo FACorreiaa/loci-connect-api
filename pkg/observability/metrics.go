@@ -84,6 +84,19 @@ var (
 		[]string{"plan"},
 	)
 
+	// TripReopenedTotal counts reads of a trip last saved a day or more ago.
+	//
+	// This is the retention claim the product is sold on: people come back to a
+	// plan they made yesterday. Volume only; the distinct-user rate comes from
+	// the matching "trip reopened" log line, since user and trip ids are
+	// unbounded cardinality as labels.
+	TripReopenedTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "loci_trip_reopened_total",
+			Help: "Reads of a trip last saved at least 24h earlier",
+		},
+	)
+
 	// MCPToolCallsTotal tracks MCP tool invocations by tool and outcome.
 	//
 	// Deliberately carries no user label: user ids are unbounded cardinality.
