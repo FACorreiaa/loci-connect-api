@@ -51,3 +51,18 @@ func (h *Handler) recordReopen(ctx context.Context, t *Trip, userID uuid.UUID) {
 		slog.String("user_id", userID.String()),
 		slog.Duration("since_last_save", time.Since(t.UpdatedAt)))
 }
+
+// recordReopenEvent sends the re-open to product analytics.
+//
+// Separate from the counter and the log line on purpose: those answer "how
+// many", this answers "who", and only the third can be joined against the
+// signup the browser reported.
+func (h *Handler) recordReopenEvent(t *Trip, userID uuid.UUID) {
+	if t == nil || !reopened(t.UpdatedAt, time.Now()) {
+		return
+	}
+	h.analytics.Capture(userID.String(), "trip_reopened", map[string]any{
+		"trip_id":          t.ID.String(),
+		"hours_since_save": int(time.Since(t.UpdatedAt).Hours()),
+	})
+}

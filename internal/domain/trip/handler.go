@@ -14,6 +14,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -32,6 +33,17 @@ type Handler struct {
 	weather          WeatherSource
 	weatherEstimated bool
 	log              *slog.Logger
+
+	// Optional, attached via WithAnalytics. Nil records no product events,
+	// which is the normal state wherever no PostHog key is configured.
+	analytics *analytics.Recorder
+}
+
+// WithAnalytics attaches the product-event recorder so a re-opened trip reaches
+// the same dataset as the web client's events, keyed by the same user.
+func (h *Handler) WithAnalytics(r *analytics.Recorder) *Handler {
+	h.analytics = r
+	return h
 }
 
 // PlanChecker resolves effective subscription plan for export gating.
@@ -99,6 +111,7 @@ func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTr
 		return nil, toConnectErr(err)
 	}
 	h.recordReopen(ctx, t, uid)
+	h.recordReopenEvent(t, uid)
 	return connect.NewResponse(tripToProto(t)), nil
 }
 

@@ -48,6 +48,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
@@ -61,6 +62,11 @@ type Dependencies struct {
 	DB       *db.DB
 	Logger   *slog.Logger
 	AppCache cachestore.Store
+
+	// Analytics records product events server-side. Nil when no PostHog key is
+	// configured, and inert in that case rather than absent, so no call site
+	// needs a nil check.
+	Analytics *analytics.Recorder
 
 	// Repositories
 	AuthRepo          repository.AuthRepository
@@ -147,6 +153,14 @@ func InitDependencies(cfg *config.Config, logger *slog.Logger) (*Dependencies, e
 		Config: cfg,
 		Logger: logger,
 	}
+
+	// Product analytics first, so anything built below can be handed the
+	// recorder. A missing key is not an error: the recorder is simply inert.
+	sink, err := analytics.NewPostHogSink(logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init product analytics: %w", err)
+	}
+	deps.Analytics = analytics.New(sink, logger)
 
 	// Initialize database
 	if err := deps.initDatabase(); err != nil {
@@ -477,7 +491,8 @@ func (d *Dependencies) initHandlers() error {
 	// Give the trip handler the same forecast source, so a packing list can be
 	// derived from the trip's actual weather rather than generic advice.
 	if d.TripHandler != nil {
-		d.TripHandler = d.TripHandler.WithPacking(weather, weatherEst).WithLogger(d.Logger)
+		d.TripHandler = d.TripHandler.WithPacking(weather, weatherEst).WithLogger(d.Logger).
+			WithAnalytics(d.Analytics)
 	}
 
 	bookingDL := localcontext.NewBookingComDeepLinkFromEnv()
@@ -515,6 +530,11 @@ func (d *Dependencies) Cleanup() {
 	}
 	if d.DB != nil {
 		d.DB.Close()
+	}
+	// Flush queued product events before the process exits, or the last
+	// session's worth of them is lost on every deploy.
+	if err := d.Analytics.Close(); err != nil {
+		d.Logger.Warn("failed to flush product analytics", slog.Any("error", err))
 	}
 	d.Logger.Info("cleanup completed")
 }

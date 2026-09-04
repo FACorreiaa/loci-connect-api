@@ -126,8 +126,17 @@ func guardTool[In, Out any](
 ) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error) {
 	required := toolScope(name)
 	return func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+		capture := func(outcome string) {
+			userID, _ := interceptors.GetUserIDFromContext(ctx)
+			deps.Analytics.Capture(userID, "mcp_tool_called", map[string]any{
+				"tool":    name,
+				"outcome": outcome,
+			})
+		}
+
 		record := func(outcome string) {
 			observability.MCPToolCallsTotal.WithLabelValues(name, outcome).Inc()
+			capture(outcome)
 			if deps.Logger == nil {
 				return
 			}

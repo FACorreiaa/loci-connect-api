@@ -150,6 +150,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 			Logger:         deps.Logger,
 			Recommendation: deps.RecommendationHandler,
 			Timeout:        deps.Config.Server.ChatRPCTimeout,
+			Analytics:      deps.Analytics,
 		}))
 		deps.Logger.Info("registered MCP endpoint", "path", locimcp.Path)
 	}

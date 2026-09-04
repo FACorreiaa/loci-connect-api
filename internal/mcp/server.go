@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 )
 
 // Path is where the Streamable HTTP MCP endpoint is mounted on the API mux.
@@ -41,6 +42,11 @@ type Deps struct {
 	// router passes the chat RPC timeout, since plan_itinerary is the slowest
 	// tool and generates on the same path as a chat request.
 	Timeout time.Duration
+
+	// Analytics records tool calls as product events. Optional; nil records
+	// nothing. This is the only way agent users appear in the funnel at all —
+	// they have no browser, so the web client sees none of them.
+	Analytics *analytics.Recorder
 }
 
 // Handler returns the authenticated Streamable HTTP handler to mount at Path.
