@@ -7,6 +7,7 @@ package mcp
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -35,6 +36,11 @@ type Deps struct {
 	Subscription   subscription.Service
 	Logger         *slog.Logger
 	Recommendation *recommendation.Handler
+
+	// Timeout bounds a single MCP request. Zero disables the deadline; the
+	// router passes the chat RPC timeout, since plan_itinerary is the slowest
+	// tool and generates on the same path as a chat request.
+	Timeout time.Duration
 }
 
 // Handler returns the authenticated Streamable HTTP handler to mount at Path.
@@ -55,5 +61,5 @@ func Handler(deps Deps) http.Handler {
 		return server
 	}, &mcp.StreamableHTTPOptions{Stateless: true})
 
-	return authMiddleware(deps, streamable)
+	return authMiddleware(deps, withTimeout(deps.Timeout, streamable))
 }

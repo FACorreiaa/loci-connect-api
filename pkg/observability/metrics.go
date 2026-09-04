@@ -84,6 +84,19 @@ var (
 		[]string{"plan"},
 	)
 
+	// MCPToolCallsTotal tracks MCP tool invocations by tool and outcome.
+	//
+	// Deliberately carries no user label: user ids are unbounded cardinality.
+	// The per-user record is the structured "mcp tool call" log line, which is
+	// what Gate 2's "tool calls by distinct non-owner users" is counted from.
+	MCPToolCallsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_mcp_tool_calls_total",
+			Help: "MCP tool invocations by tool name and outcome",
+		},
+		[]string{"tool", "outcome"},
+	)
+
 	// LLMCallsTotal tracks completed model calls by model and SDK method.
 	//
 	// One metered chat request fans out into several model calls, so this

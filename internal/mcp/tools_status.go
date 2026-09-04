@@ -50,13 +50,13 @@ type statusGrounding struct {
 	Note         string   `json:"note"`
 }
 
-func registerStatusTools(server *mcp.Server, _ Deps) {
+func registerStatusTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "status",
 		Description: "Report what this API key may do, the bounds every tool enforces, " +
 			"and how Loci's results are grounded. Call this first to avoid attempting " +
 			"tools the key cannot use.",
-	}, guardTool("status", func(ctx context.Context, _ *mcp.CallToolRequest, _ statusInput) (*mcp.CallToolResult, statusOutput, error) {
+	}, guardTool(deps, "status", func(ctx context.Context, _ *mcp.CallToolRequest, _ statusInput) (*mcp.CallToolResult, statusOutput, error) {
 		granted := scopesFromContext(ctx)
 
 		allowed := make([]string, 0, len(allToolNames()))

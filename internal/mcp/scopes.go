@@ -2,10 +2,13 @@ package mcp
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
 
 // scopesKey is the context key carrying the presenting key's granted scopes.
@@ -98,17 +101,54 @@ func allToolNames() []string {
 	return names
 }
 
-// guardTool wraps a tool handler with its scope requirement.
+// Outcomes recorded for a tool call. Bounded set, safe as a metric label.
+const (
+	outcomeOK     = "ok"
+	outcomeDenied = "denied"
+	outcomeError  = "error"
+
+	// mcpToolCallMsg is the log message Gate 2's distinct-user count is built
+	// on. Changing it breaks that query.
+	mcpToolCallMsg = "mcp tool call"
+)
+
+// guardTool wraps a tool handler with its scope requirement and records the
+// call.
+//
+// Every tool goes through here and the contract test keeps it that way, so this
+// is the one place that sees every invocation. The counter carries volume by
+// tool and outcome; the log line carries the caller, because a user id in a
+// Prometheus label would be unbounded cardinality.
 func guardTool[In, Out any](
+	deps Deps,
 	name string,
 	handler func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error),
 ) func(context.Context, *mcp.CallToolRequest, In) (*mcp.CallToolResult, Out, error) {
 	required := toolScope(name)
 	return func(ctx context.Context, req *mcp.CallToolRequest, in In) (*mcp.CallToolResult, Out, error) {
+		record := func(outcome string) {
+			observability.MCPToolCallsTotal.WithLabelValues(name, outcome).Inc()
+			if deps.Logger == nil {
+				return
+			}
+			userID, _ := interceptors.GetUserIDFromContext(ctx)
+			deps.Logger.InfoContext(ctx, mcpToolCallMsg,
+				slog.String("tool", name),
+				slog.String("user_id", userID),
+				slog.String("outcome", outcome))
+		}
+
 		if err := requireScope(ctx, required); err != nil {
+			record(outcomeDenied)
 			var zero Out
 			return nil, zero, err
 		}
-		return handler(ctx, req, in)
+		result, out, err := handler(ctx, req, in)
+		if err != nil {
+			record(outcomeError)
+			return result, out, err
+		}
+		record(outcomeOK)
+		return result, out, nil
 	}
 }

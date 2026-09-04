@@ -141,3 +141,27 @@ MCP has no header channel to carry a `Retry-After`.
 
 A tool added without classifying it fails the test rather than shipping as an
 unclassified capability.
+
+## Deadlines and accounting
+
+Every MCP request carries a deadline, set from `CHAT_RPC_TIMEOUT_SEC` (default
+3 minutes) because `plan_itinerary` generates on the same path as a chat
+request. The endpoint sits outside the Connect interceptor chain, so it
+inherits none of the RPC timeouts, and the server's `WriteTimeout` is 0 for
+streaming; without this a hung tool would hold its connection for as long as
+the client waits.
+
+The deadline is applied to the request context and observed by the tool. It is
+deliberately not enforced by abandoning the handler on another goroutine:
+net/http completes the request when `ServeHTTP` returns, so an abandoned tool
+would write into a finished response, which is a data race. Buffering the body
+instead would defeat the streaming transport.
+
+Every tool call is recorded once, in `guardTool`:
+
+- `loci_mcp_tool_calls_total{tool, outcome}` where outcome is `ok`, `denied`
+  (scope refused) or `error`.
+- A structured log line, message `mcp tool call`, carrying `tool`, `user_id`
+  and `outcome`. The user lives in the log rather than a metric label because
+  user ids are unbounded cardinality. Gate 2's "MCP tool calls by distinct
+  non-owner users" is counted from this line.

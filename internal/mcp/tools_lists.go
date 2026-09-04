@@ -54,7 +54,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_user_lists",
 		Description: "List the user's saved place lists (and itinerary lists) in Loci.",
-	}, guardTool("list_user_lists", func(ctx context.Context, _ *mcp.CallToolRequest, in listUserListsInput) (*mcp.CallToolResult, listUserListsOutput, error) {
+	}, guardTool(deps, "list_user_lists", func(ctx context.Context, _ *mcp.CallToolRequest, in listUserListsInput) (*mcp.CallToolResult, listUserListsOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, listUserListsOutput{}, err
@@ -82,7 +82,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_list",
 		Description: "Fetch a list with all its saved items.",
-	}, guardTool("get_list", func(ctx context.Context, _ *mcp.CallToolRequest, in getListInput) (*mcp.CallToolResult, *locitypes.ListWithItems, error) {
+	}, guardTool(deps, "get_list", func(ctx context.Context, _ *mcp.CallToolRequest, in getListInput) (*mcp.CallToolResult, *locitypes.ListWithItems, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -101,7 +101,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_poi_to_list",
 		Description: "Add a point of interest to one of the user's lists.",
-	}, guardTool("add_poi_to_list", func(ctx context.Context, _ *mcp.CallToolRequest, in addPOIToListInput) (*mcp.CallToolResult, map[string]string, error) {
+	}, guardTool(deps, "add_poi_to_list", func(ctx context.Context, _ *mcp.CallToolRequest, in addPOIToListInput) (*mcp.CallToolResult, map[string]string, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err
@@ -129,7 +129,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_favorites",
 		Description: "List the user's favorite points of interest.",
-	}, guardTool("list_favorites", func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listFavoritesOutput, error) {
+	}, guardTool(deps, "list_favorites", func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listFavoritesOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, listFavoritesOutput{}, err
@@ -146,7 +146,7 @@ func registerListTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_favorite",
 		Description: "Add a point of interest to the user's favorites.",
-	}, guardTool("add_favorite", func(ctx context.Context, _ *mcp.CallToolRequest, in addFavoriteInput) (*mcp.CallToolResult, map[string]string, error) {
+	}, guardTool(deps, "add_favorite", func(ctx context.Context, _ *mcp.CallToolRequest, in addFavoriteInput) (*mcp.CallToolResult, map[string]string, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, nil, err

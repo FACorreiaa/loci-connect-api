@@ -233,7 +233,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_pois",
 		Description: "Search Loci's points-of-interest database near a location. Combines keyword and semantic matching when a query is given.",
-	}, guardTool("search_pois", func(ctx context.Context, _ *mcp.CallToolRequest, in searchPOIsInput) (*mcp.CallToolResult, poiListOutput, error) {
+	}, guardTool(deps, "search_pois", func(ctx context.Context, _ *mcp.CallToolRequest, in searchPOIsInput) (*mcp.CallToolResult, poiListOutput, error) {
 		radius := in.RadiusKm
 		if radius <= 0 {
 			radius = 5
@@ -272,7 +272,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_poi_details",
 		Description: "Fetch full details for a single point of interest by its Loci id.",
-	}, guardTool("get_poi_details", func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, *locitypes.POIDetailedInfo, error) {
+	}, guardTool(deps, "get_poi_details", func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, *locitypes.POIDetailedInfo, error) {
 		id, err := uuid.Parse(in.ID)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid poi id %q", in.ID)
@@ -287,7 +287,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "find_nearby",
 		Description: "Find restaurants, hotels, activities, or attractions near a location. Results come from Loci's database and are AI-enriched on first request for an area.",
-	}, guardTool("find_nearby", func(ctx context.Context, _ *mcp.CallToolRequest, in findNearbyInput) (*mcp.CallToolResult, poiListOutput, error) {
+	}, guardTool(deps, "find_nearby", func(ctx context.Context, _ *mcp.CallToolRequest, in findNearbyInput) (*mcp.CallToolResult, poiListOutput, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
 			return nil, poiListOutput{}, err
