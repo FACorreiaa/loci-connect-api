@@ -16,6 +16,15 @@ fair-use cap. Limits are env-configurable (`FREE_DAILY_LLM_LIMIT`, default 10;
 | **Free** | 10 LLM requests/day | Metered on chat RPCs only (StartChat, ContinueChat, StreamChat) |
 | **Pro** (`premium_monthly` / `premium_annual`) | "Unlimited" — hidden fair-use cap 100/day | Fair-use denial shows retry copy, never an upgrade CTA |
 
+### Measuring what a request costs
+
+The quota meters chat RPCs, but one RPC fans out into several model calls across
+parallel workers plus a post-response background pass, so the request count is
+not a cost signal. `loci_llm_calls_total` and `loci_llm_tokens_total` (both
+labelled by the model that answered) carry the real usage; divide either by
+`loci_quota_consumed_total` to get per-user-action cost. See `PRICING.md`
+§"Unit economics" for the queries and the thresholds.
+
 Historic tier table (superseded): free 5/day, paid 10/day, premium unlimited.
 The `paid`/`explorer` plan strings never existed in the DB enum and were removed.
 
