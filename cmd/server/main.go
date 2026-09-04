@@ -55,6 +55,21 @@ func main() {
 		}
 	}()
 
+	// Metric export is separate from tracing and separately opt-in: a host may
+	// scrape /metrics, push OTLP, both, or neither.
+	shutdownMetrics, metricsErr := observability.InitMetrics(context.Background(), "loci-connect-api", logger)
+	if metricsErr != nil {
+		logger.Error("failed to initialize metric export", "error", metricsErr)
+		os.Exit(1)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownMetrics(ctx); err != nil {
+			logger.Warn("metric export shutdown failed", "error", err)
+		}
+	}()
+
 	// Initialize dependencies
 	deps, err := api.InitDependencies(cfg, logger)
 	if err != nil {
