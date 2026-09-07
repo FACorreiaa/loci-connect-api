@@ -94,19 +94,35 @@ func main() {
 	// Setup router
 	handler := api.SetupRouter(deps)
 
+	// Background loops that live as long as the API does. Cancelled when the
+	// server stops, which ends the Telegram long poll rather than leaving it
+	// holding a request against Telegram.
+	backgroundCtx, stopBackground := context.WithCancel(context.Background())
+	defer stopBackground()
+
 	// Receive Telegram messages alongside the API.
 	//
 	// Returns immediately when no bot is configured, so this is started
-	// unconditionally. Cancelled when the server stops, which ends the long
-	// poll rather than leaving it holding a request against Telegram.
-	telegramCtx, stopTelegram := context.WithCancel(context.Background())
-	defer stopTelegram()
+	// unconditionally.
 	concurrency.Run(logger, func() {
-		if err := deps.RunTelegram(telegramCtx); err != nil {
+		if err := deps.RunTelegram(backgroundCtx); err != nil {
 			// The bridge stopping is not the API failing: itineraries are
 			// still answered in the app, and taking the server down with it
 			// would turn a chat outage into an outage.
 			logger.Error("telegram bridge stopped", "error", err)
+		}
+	})
+
+	// Keep Apple's client secret fresh alongside the API.
+	//
+	// Returns immediately when Apple sign-in is not configured, so this is
+	// started unconditionally.
+	concurrency.Run(logger, func() {
+		if err := deps.RunAppleSecretRefresh(backgroundCtx); err != nil {
+			// The renewal loop stopping does not break sign-in today — the
+			// secret it last signed is valid for months — so it is not a
+			// reason to take the API down.
+			logger.Error("apple client secret renewal stopped", "error", err)
 		}
 	})
 
