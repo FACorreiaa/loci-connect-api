@@ -24,6 +24,7 @@ type Config struct {
 	Profiling     ProfilingConfig
 	AI            AIConfig
 	Secrets       SecretsConfig
+	Messaging     MessagingConfig
 }
 
 type CacheConfig struct {
@@ -155,6 +156,21 @@ type SecretsConfig struct {
 	EncryptionKey string
 }
 
+// MessagingConfig holds the chat-platform bridge settings.
+type MessagingConfig struct {
+	// TelegramBotToken is the credential from BotFather. Empty disables the
+	// bridge entirely — no poller starts and the settings page says so rather
+	// than issuing link codes nothing can redeem.
+	//
+	// It travels in the Bot API's URL path, which is why nothing on that path
+	// wraps an error that could carry it; see internal/domain/messaging/telegram.
+	TelegramBotToken string
+
+	// TelegramBotHandle is the "@name" people send their link code to. Shown in
+	// settings; the bridge itself resolves the bot from the token.
+	TelegramBotHandle string
+}
+
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
 type SubscriptionConfig struct {
@@ -228,6 +244,10 @@ func Load() (*Config, error) {
 		},
 		Secrets: SecretsConfig{
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
+		},
+		Messaging: MessagingConfig{
+			TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
+			TelegramBotHandle: getEnv("TELEGRAM_BOT_HANDLE", ""),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),

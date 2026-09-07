@@ -86,6 +86,22 @@ func main() {
 	// Setup router
 	handler := api.SetupRouter(deps)
 
+	// Receive Telegram messages alongside the API.
+	//
+	// Returns immediately when no bot is configured, so this is started
+	// unconditionally. Cancelled when the server stops, which ends the long
+	// poll rather than leaving it holding a request against Telegram.
+	telegramCtx, stopTelegram := context.WithCancel(context.Background())
+	defer stopTelegram()
+	concurrency.Run(logger, func() {
+		if err := deps.RunTelegram(telegramCtx); err != nil {
+			// The bridge stopping is not the API failing: itineraries are
+			// still answered in the app, and taking the server down with it
+			// would turn a chat outage into an outage.
+			logger.Error("telegram bridge stopped", "error", err)
+		}
+	})
+
 	// Start HTTP server
 	if err := runServer(cfg, logger, handler); err != nil {
 		logger.Error("server error", "error", err)

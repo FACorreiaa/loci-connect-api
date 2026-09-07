@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -22,12 +23,16 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/entitlement"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/memory"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/chatbridge"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/telegram"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
@@ -100,7 +105,15 @@ type Dependencies struct {
 	MFAService *mfa.Service
 	// AICredentials is nil when ENCRYPTION_KEY is unset, which leaves every
 	// account on Loci's own model provider.
-	AICredentials       *aicreds.Service
+	AICredentials *aicreds.Service
+	// Integrations is nil when ENCRYPTION_KEY is unset: no access token could
+	// be stored, so no external MCP server can be connected.
+	Integrations *integrations.Service
+	// Messaging is nil when no chat platform is configured.
+	Messaging *messaging.Service
+	// sealer is shared by everything that stores a user's secret, so a key
+	// rotation has one place to take effect.
+	sealer              *secret.Sealer
 	ChatService         chatservice.LlmInteractiontService
 	ProfileSvc          profiles.Service
 	POISvc              poirepo.Service
@@ -343,6 +356,11 @@ func (d *Dependencies) initServices() error {
 	d.RetrievalAssembler = retrieval.NewAssembler(d.DB.Pool, d.Logger)
 	chatSvc.SetRetrievalAssembler(d.RetrievalAssembler)
 	d.ChatService = chatSvc
+
+	// Both need the same sealer as the credential store, so they are built
+	// after it and are nil for the same reason it is.
+	d.initIntegrations()
+	d.initMessaging()
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
@@ -405,9 +423,64 @@ func (d *Dependencies) initAICredentials() error {
 		return fmt.Errorf("ENCRYPTION_KEY cannot be used: %w", err)
 	}
 
+	d.sealer = sealer
 	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer)
 	d.Logger.Info("bring-your-own-key enabled", slog.Int("encryption_keys", len(keys)))
 	return nil
+}
+
+// initIntegrations wires external MCP servers.
+//
+// Shares the credential service's sealer rather than building a second one: two
+// sealers over one ENCRYPTION_KEY would be two places for a rotation to go
+// wrong. Nil when bring-your-own-key is off, because an access token would then
+// have nowhere safe to live.
+func (d *Dependencies) initIntegrations() {
+	if d.sealer == nil {
+		d.Logger.Info("external MCP servers disabled; no encryption key is configured")
+		return
+	}
+	d.Integrations = integrations.NewService(
+		integrations.NewRepository(d.DB.Pool),
+		integrations.NewClient(),
+		d.sealer,
+	)
+}
+
+// initMessaging wires the chat-platform bridge.
+//
+// Absence of a bot token is a supported state and disables the bridge, so the
+// settings page explains it rather than issuing link codes nothing can redeem.
+func (d *Dependencies) initMessaging() {
+	if d.Config.Messaging.TelegramBotToken == "" {
+		d.Logger.Info("telegram bridge disabled; TELEGRAM_BOT_TOKEN is not set")
+		return
+	}
+	d.Messaging = messaging.NewService(
+		messaging.NewRepository(d.DB.Pool),
+		chatbridge.New(d.ChatService, d.Logger),
+		d.Config.Messaging.TelegramBotHandle,
+		d.Logger,
+	)
+}
+
+// RunTelegram receives and answers Telegram messages until ctx is cancelled.
+//
+// Returns nil immediately when no bot is configured, so the caller can start it
+// unconditionally. A long poll rather than a webhook because Loci has no public
+// address yet; see internal/domain/messaging/telegram.
+func (d *Dependencies) RunTelegram(ctx context.Context) error {
+	if d.Messaging == nil {
+		return nil
+	}
+
+	poller := telegram.NewPoller(
+		telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil),
+		messaging.NewRepository(d.DB.Pool),
+		d.Messaging,
+		d.Logger,
+	)
+	return poller.Run(ctx)
 }
 
 // byokWrapper returns the wrapper that lets a request be served by its
