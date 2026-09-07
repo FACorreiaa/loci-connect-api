@@ -54,7 +54,15 @@ func TestAuthService_RegisterUser_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("user persisted not found: %v", err)
 	}
-	servicetest.WaitFor(t, func() bool { return email.VerificationSent() })
+	// No verification email: VerifyEmail is exposed by no RPC and the client has
+	// no route for it, so the link would be a dead end at both ends. The token
+	// is still created, so turning it on later needs no migration.
+	if len(repo.Tokens) == 0 {
+		t.Fatalf("verification token should still be created")
+	}
+	if email.VerificationSent() {
+		t.Fatalf("a verification email was sent with nowhere for it to lead")
+	}
 	if user.HashedPassword == "" {
 		t.Fatalf("expected hashed password to be stored")
 	}
@@ -294,9 +302,12 @@ func TestAuthService_ResendVerificationEmail(t *testing.T) {
 	if result == nil || result.AlreadyVerified {
 		t.Fatalf("expected resend to proceed")
 	}
-	servicetest.WaitFor(t, func() bool { return email.VerificationSent() })
 	if len(repo.Tokens) == 0 {
 		t.Fatalf("verification token not stored")
+	}
+	// Same as registration: token yes, email no. See sendEmailVerification.
+	if email.VerificationSent() {
+		t.Fatalf("a verification email was sent with nowhere for it to lead")
 	}
 
 	now := time.Now()

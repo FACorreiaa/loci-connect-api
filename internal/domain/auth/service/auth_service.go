@@ -565,15 +565,20 @@ func (s *AuthService) sendEmailVerification(ctx context.Context, user *repositor
 		return err
 	}
 
-	if s.emailService != nil {
-		emailCtx, cancel := backgroundEmailContext(ctx)
-		go func(ctx context.Context, cancel context.CancelFunc, email, name, verificationToken string) {
-			defer cancel()
-			if err := s.emailService.SendVerificationEmail(email, name, verificationToken); err != nil {
-				s.logger.WarnContext(ctx, "failed to send verification email", slog.Any("error", err))
-			}
-		}(emailCtx, cancel, user.Email, user.DisplayName, token)
-	}
+	// The email itself is deliberately NOT sent, and the token above is created
+	// anyway so that turning this on needs no migration.
+	//
+	// There is nowhere for it to lead. VerifyEmail exists on this service and on
+	// the repository, but it is exposed by no RPC and no HTTP handler, and the
+	// client has no route to land on — so the link in that mail is a dead end at
+	// both ends. Sending it would ask every new account to complete a step that
+	// cannot be completed, which is worse than not asking.
+	//
+	// Nothing gates on verification today: Login does not check it, so leaving
+	// this unsent locks nobody out. To turn it on, expose VerifyEmail over RPC,
+	// add the client route at /auth/verify-email, and restore the send here.
+	s.logger.DebugContext(ctx, "email verification token created but not sent",
+		slog.String("reason", "no VerifyEmail endpoint or client route exists"))
 	return nil
 }
 
