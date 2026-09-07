@@ -1,8 +1,13 @@
 name: _deploy
 
 # Reusable deploy pipeline: build + push the API and Postgres images to GHCR,
-# then deploy to the VPS over SSH. Called by deploy.yml (release tags) and
-# cd.yml (auto-deploy on green CI).
+# then open a promote PR against the infra repo. ArgoCD rolls the release when
+# that PR merges. Called by deploy.yml (release tags) and cd.yml (auto-deploy
+# on green CI).
+#
+# There is no direct deploy here on purpose. Nothing in this repository can put
+# a new image in front of users on its own — the promote PR is the gate, which
+# is the same rule khepri and norviq run under.
 on:
   workflow_call:
     inputs:
@@ -78,72 +83,97 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy:
+  # k3s/ArgoCD delivery. Opens a PR against the infra repo bumping both image
+  # tags; merging it is what deploys. Self-gating: without INFRA_TOKEN it skips
+  # rather than fails, so a fork or a repo without the secret still goes green.
+  #
+  # Replaces a compose-over-SSH deploy that never once succeeded between
+  # 2026-08-15 and 2026-09-07 — every run failed on an unset VPS_SSH_KEY — and
+  # whose target turned out to be the k3s node itself, so it would have run an
+  # unmanaged container stack beside Kubernetes.
+  promote:
+    name: Open promote PR against the infra repo
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # The gate is a run step rather than `if: secrets.INFRA_TOKEN != ''`.
+      # The secrets context is not dependably available in a step-level `if`,
+      # and a condition that silently evaluates false would skip delivery on
+      # every push while the job still reported green.
+      - name: Check delivery is configured
+        id: gate
+        env:
+          INFRA_TOKEN: ${{ secrets.INFRA_TOKEN }}
+        run: |
+          if [ -n "${INFRA_TOKEN}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout LuminaVaultInfra
+        if: steps.gate.outputs.configured == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.git_ref }}
+          repository: LuminaVault/LuminaVaultInfra
+          token: ${{ secrets.INFRA_TOKEN }}
+          ref: main
 
-      - name: Copy compose file to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT || 22 }}
-          source: "docker-compose.prod.yaml"
-          target: "${{ secrets.VPS_APP_DIR }}"
-
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_SSH_PORT || 22 }}
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.VPS_APP_DIR }}"
-            export API_IMAGE="${{ needs.build.outputs.api_image }}:${{ inputs.image_tag }}"
-            export POSTGRES_IMAGE="${{ needs.build.outputs.pg_image }}:${{ inputs.image_tag }}"
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-            docker compose -f docker-compose.prod.yaml pull
-            docker compose -f docker-compose.prod.yaml up -d
-            docker image prune -f
-
-  # k3s/ArgoCD delivery: commit the freshly-pushed image tag into loci-infra;
-  # ArgoCD sees the git change and rolls the Deployment. Self-gating — it
-  # skips cleanly until the INFRA_PAT secret exists, so it's safe to merge now
-  # and runs alongside the compose deploy during the VPS→k3s cutover.
-  bump-infra:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Bump loci-infra image tag
+      - name: Open pull request
+        if: steps.gate.outputs.configured == 'true'
         env:
-          INFRA_PAT: ${{ secrets.INFRA_PAT }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          GH_TOKEN: ${{ secrets.INFRA_TOKEN }}
+          TAG: ${{ inputs.image_tag }}
         run: |
           set -euo pipefail
-          if [ -z "${INFRA_PAT}" ]; then
-            echo "INFRA_PAT not set — skipping ArgoCD image bump. Add the repo secret to enable k3s delivery."
+          short="${TAG:0:7}"
+          branch="promote/loci-${short}"
+
+          values=apps/loci/api/values-production.yaml
+          manifest=apps/loci/data/postgres.yaml
+
+          # sed rather than yq: both files carry the reasoning for what they do
+          # in comments and blank lines between blocks, and `yq -i` rewrites the
+          # document — it keeps the comments but drops the blank lines, so every
+          # promote PR would arrive with unrelated whitespace churn around the
+          # one line that actually changed.
+          sed -i -E "s|^( *tag: ).*|\1\"${TAG}\"|" "$values"
+          # The API and Postgres images are built from the same commit and move
+          # together. A Postgres older than the migrations about to run against
+          # it is a broken deploy, not a version skew.
+          sed -i -E "s|^( *image: ghcr\\.io/facorreiaa/loci-connect-api-postgres:).*|\1${TAG}|" "$manifest"
+
+          if git diff --quiet; then
+            echo "already at ${short}; nothing to promote"
             exit 0
           fi
-          if ! command -v yq >/dev/null 2>&1; then
-            sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-            sudo chmod +x /usr/local/bin/yq
-          fi
-          git clone --depth 1 "https://x-access-token:${INFRA_PAT}@github.com/FACorreiaa/loci-infra.git"
-          cd loci-infra
-          yq -i ".image.tag = \"${IMAGE_TAG}\"" charts/loci-api/values.yaml
+
           git config user.name "loci-ci"
           git config user.email "ci@users.noreply.github.com"
-          if git diff --quiet; then
-            echo "image tag already ${IMAGE_TAG} — nothing to commit."
-            exit 0
-          fi
-          git commit -am "deploy: loci-api ${IMAGE_TAG}"
-          git push
+          git checkout -b "${branch}"
+          git add "$values" "$manifest"
+          git commit -m "chore(loci): promote image to ${short}"
+          git push origin "${branch}"
+
+          cat > /tmp/pr-body.md <<EOF
+          Promotes the Loci API and its Postgres to \`${TAG}\`.
+
+          Built from ${{ github.repository }}@${{ github.sha }} by the deploy workflow.
+          Merging this makes ArgoCD sync \`loci-api-production\` and \`loci-data\`
+          in the \`horus\` namespace.
+          EOF
+
+          gh pr create \
+            --repo LuminaVault/LuminaVaultInfra \
+            --base main \
+            --head "${branch}" \
+            --title "chore(loci): promote image to ${short}" \
+            --body-file /tmp/pr-body.md
+
+      - name: Report when delivery is not configured
+        if: steps.gate.outputs.configured == 'false'
+        run: |
+          echo "INFRA_TOKEN is not set, so no promote PR was opened."
+          echo "The images are built and pushed; nothing will deploy until the"
+          echo "secret exists. It needs contents:write and pull-requests:write"
+          echo "on LuminaVault/LuminaVaultInfra."
