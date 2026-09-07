@@ -1,8 +1,9 @@
 name: CD (auto-deploy main)
 
-# Continuous deploy: when the CI workflow finishes successfully on main,
-# build the images at that commit and deploy to the VPS. A broken main never
-# deploys because this only runs on CI success.
+# Continuous delivery: when the CI workflow finishes successfully on main,
+# build the images at that commit and open a promote PR against the infra repo.
+# A broken main never reaches that PR, because this only runs on CI success —
+# and merging the PR, not this workflow, is what deploys.
 on:
   workflow_run:
     workflows: ["CI"]

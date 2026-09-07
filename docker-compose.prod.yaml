@@ -12,7 +12,7 @@
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-ghcr.io/facorreia/loci-connect-api-postgres:latest}
+    image: ${POSTGRES_IMAGE:-ghcr.io/facorreiaa/loci-connect-api-postgres:latest}
     platform: linux/amd64 # postgis/postgis base is amd64-only
     container_name: loci-postgres
     restart: unless-stopped
@@ -33,7 +33,7 @@ services:
     # No host port published: the DB is only reachable on the internal network.
 
   api:
-    image: ${API_IMAGE:-ghcr.io/facorreia/loci-connect-api:latest}
+    image: ${API_IMAGE:-ghcr.io/facorreiaa/loci-connect-api:latest}
     container_name: loci-api
     restart: unless-stopped
     depends_on:
@@ -52,7 +52,7 @@ services:
     networks: [loci-net]
 
   preference-rerank:
-    image: ${API_IMAGE:-ghcr.io/facorreia/loci-connect-api:latest}
+    image: ${API_IMAGE:-ghcr.io/facorreiaa/loci-connect-api:latest}
     container_name: loci-preference-rerank
     restart: unless-stopped
     command: ["./preference-rerank", "-lookback=168h", "-interval=15m", "-embedding-batch=50"]
