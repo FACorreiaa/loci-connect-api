@@ -89,10 +89,28 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		)
 		rateLimiter = interceptors.NewRateLimitInterceptor(limiter)
 	}
+	// Which hops may set the address the per-IP limiter keys on. Already
+	// validated by config.Load, which refuses to boot on a bad value.
+	trustedProxies, err := interceptors.ParseTrustedProxies(deps.Config.Server.TrustedProxies)
+	if err != nil {
+		deps.Logger.Error("TRUSTED_PROXIES is invalid; no proxy will be trusted",
+			slog.String("error", err.Error()))
+	}
+	if len(trustedProxies) == 0 && deps.Config.Server.WarnNoTrustedProxies {
+		// Not fatal: a server reached directly is correct with none, and that
+		// is a real deployment. But behind an ingress every request arrives
+		// from the proxy, so the limiter would key them all together and the
+		// first few callers would spend the budget for everybody.
+		deps.Logger.Warn("TRUSTED_PROXIES is not set; the per-IP rate limiter will key every " +
+			"request behind a proxy on the proxy's own address. Set it to the pod network " +
+			"(10.42.0.0/16 on k3s) when running behind an ingress.")
+	}
+
 	ipRateLimiter := interceptors.NewIPRateLimitInterceptor(
 		deps.Config.Server.IPRateLimitPerSecond,
 		deps.Config.Server.IPRateLimitBurst,
 		deps.Config.Server.IPRateLimitMaxEntries,
+		trustedProxies,
 	)
 	userRateLimiter := interceptors.NewUserRateLimitInterceptor(
 		deps.Config.Server.UserRateLimitPerSecond,
