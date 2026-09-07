@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
@@ -21,9 +20,18 @@ import (
 )
 
 func main() {
+	// A .env file is a development convenience, not a requirement. In a
+	// container every value arrives as an environment variable and there is no
+	// file to read, so a missing one is normal and config.Load below is what
+	// decides whether the resulting configuration is usable.
+	//
+	// This used to warn and then log.Fatal on the same error, which meant the
+	// server could not start anywhere without a .env on disk — it crash-looped
+	// on its first real deploy. cmd/loci-doctor and cmd/preference-rerank
+	// already ignored it; this is now consistent with them.
 	if err := godotenv.Load(); err != nil {
-		slog.Warn("Error loading .env file")
-		log.Fatal(err)
+		slog.Warn("no .env file; reading configuration from the environment",
+			slog.String("error", err.Error()))
 	}
 
 	// Initialize logger
