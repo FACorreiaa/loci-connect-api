@@ -42,14 +42,18 @@ const (
 	// ApiKeyServiceRevokeApiKeyProcedure is the fully-qualified name of the ApiKeyService's
 	// RevokeApiKey RPC.
 	ApiKeyServiceRevokeApiKeyProcedure = "/loci.apikey.ApiKeyService/RevokeApiKey"
+	// ApiKeyServiceGetSetupInstructionsProcedure is the fully-qualified name of the ApiKeyService's
+	// GetSetupInstructions RPC.
+	ApiKeyServiceGetSetupInstructionsProcedure = "/loci.apikey.ApiKeyService/GetSetupInstructions"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	apiKeyServiceServiceDescriptor            = apikey.File_loci_apikey_apikey_proto.Services().ByName("ApiKeyService")
-	apiKeyServiceCreateApiKeyMethodDescriptor = apiKeyServiceServiceDescriptor.Methods().ByName("CreateApiKey")
-	apiKeyServiceListApiKeysMethodDescriptor  = apiKeyServiceServiceDescriptor.Methods().ByName("ListApiKeys")
-	apiKeyServiceRevokeApiKeyMethodDescriptor = apiKeyServiceServiceDescriptor.Methods().ByName("RevokeApiKey")
+	apiKeyServiceServiceDescriptor                    = apikey.File_loci_apikey_apikey_proto.Services().ByName("ApiKeyService")
+	apiKeyServiceCreateApiKeyMethodDescriptor         = apiKeyServiceServiceDescriptor.Methods().ByName("CreateApiKey")
+	apiKeyServiceListApiKeysMethodDescriptor          = apiKeyServiceServiceDescriptor.Methods().ByName("ListApiKeys")
+	apiKeyServiceRevokeApiKeyMethodDescriptor         = apiKeyServiceServiceDescriptor.Methods().ByName("RevokeApiKey")
+	apiKeyServiceGetSetupInstructionsMethodDescriptor = apiKeyServiceServiceDescriptor.Methods().ByName("GetSetupInstructions")
 )
 
 // ApiKeyServiceClient is a client for the loci.apikey.ApiKeyService service.
@@ -61,6 +65,14 @@ type ApiKeyServiceClient interface {
 	ListApiKeys(context.Context, *connect.Request[apikey.ListApiKeysRequest]) (*connect.Response[apikey.ListApiKeysResponse], error)
 	// RevokeApiKey permanently disables a key.
 	RevokeApiKey(context.Context, *connect.Request[apikey.RevokeApiKeyRequest]) (*connect.Response[apikey.RevokeApiKeyResponse], error)
+	// GetSetupInstructions previews how one kind of agent is connected.
+	//
+	// Deliberately takes no key and returns none: the snippets carry a
+	// placeholder. It exists so the page can answer "what am I signing up for"
+	// without minting a credential to answer it, and so the call it makes every
+	// time it is opened never has a secret in its response. The real
+	// instructions come back from CreateApiKey.
+	GetSetupInstructions(context.Context, *connect.Request[apikey.GetSetupInstructionsRequest]) (*connect.Response[apikey.GetSetupInstructionsResponse], error)
 }
 
 // NewApiKeyServiceClient constructs a client for the loci.apikey.ApiKeyService service. By default,
@@ -91,14 +103,21 @@ func NewApiKeyServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(apiKeyServiceRevokeApiKeyMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getSetupInstructions: connect.NewClient[apikey.GetSetupInstructionsRequest, apikey.GetSetupInstructionsResponse](
+			httpClient,
+			baseURL+ApiKeyServiceGetSetupInstructionsProcedure,
+			connect.WithSchema(apiKeyServiceGetSetupInstructionsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // apiKeyServiceClient implements ApiKeyServiceClient.
 type apiKeyServiceClient struct {
-	createApiKey *connect.Client[apikey.CreateApiKeyRequest, apikey.CreateApiKeyResponse]
-	listApiKeys  *connect.Client[apikey.ListApiKeysRequest, apikey.ListApiKeysResponse]
-	revokeApiKey *connect.Client[apikey.RevokeApiKeyRequest, apikey.RevokeApiKeyResponse]
+	createApiKey         *connect.Client[apikey.CreateApiKeyRequest, apikey.CreateApiKeyResponse]
+	listApiKeys          *connect.Client[apikey.ListApiKeysRequest, apikey.ListApiKeysResponse]
+	revokeApiKey         *connect.Client[apikey.RevokeApiKeyRequest, apikey.RevokeApiKeyResponse]
+	getSetupInstructions *connect.Client[apikey.GetSetupInstructionsRequest, apikey.GetSetupInstructionsResponse]
 }
 
 // CreateApiKey calls loci.apikey.ApiKeyService.CreateApiKey.
@@ -116,6 +135,11 @@ func (c *apiKeyServiceClient) RevokeApiKey(ctx context.Context, req *connect.Req
 	return c.revokeApiKey.CallUnary(ctx, req)
 }
 
+// GetSetupInstructions calls loci.apikey.ApiKeyService.GetSetupInstructions.
+func (c *apiKeyServiceClient) GetSetupInstructions(ctx context.Context, req *connect.Request[apikey.GetSetupInstructionsRequest]) (*connect.Response[apikey.GetSetupInstructionsResponse], error) {
+	return c.getSetupInstructions.CallUnary(ctx, req)
+}
+
 // ApiKeyServiceHandler is an implementation of the loci.apikey.ApiKeyService service.
 type ApiKeyServiceHandler interface {
 	// CreateApiKey mints a new key. The plaintext key is returned exactly
@@ -125,6 +149,14 @@ type ApiKeyServiceHandler interface {
 	ListApiKeys(context.Context, *connect.Request[apikey.ListApiKeysRequest]) (*connect.Response[apikey.ListApiKeysResponse], error)
 	// RevokeApiKey permanently disables a key.
 	RevokeApiKey(context.Context, *connect.Request[apikey.RevokeApiKeyRequest]) (*connect.Response[apikey.RevokeApiKeyResponse], error)
+	// GetSetupInstructions previews how one kind of agent is connected.
+	//
+	// Deliberately takes no key and returns none: the snippets carry a
+	// placeholder. It exists so the page can answer "what am I signing up for"
+	// without minting a credential to answer it, and so the call it makes every
+	// time it is opened never has a secret in its response. The real
+	// instructions come back from CreateApiKey.
+	GetSetupInstructions(context.Context, *connect.Request[apikey.GetSetupInstructionsRequest]) (*connect.Response[apikey.GetSetupInstructionsResponse], error)
 }
 
 // NewApiKeyServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -151,6 +183,12 @@ func NewApiKeyServiceHandler(svc ApiKeyServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(apiKeyServiceRevokeApiKeyMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	apiKeyServiceGetSetupInstructionsHandler := connect.NewUnaryHandler(
+		ApiKeyServiceGetSetupInstructionsProcedure,
+		svc.GetSetupInstructions,
+		connect.WithSchema(apiKeyServiceGetSetupInstructionsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.apikey.ApiKeyService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ApiKeyServiceCreateApiKeyProcedure:
@@ -159,6 +197,8 @@ func NewApiKeyServiceHandler(svc ApiKeyServiceHandler, opts ...connect.HandlerOp
 			apiKeyServiceListApiKeysHandler.ServeHTTP(w, r)
 		case ApiKeyServiceRevokeApiKeyProcedure:
 			apiKeyServiceRevokeApiKeyHandler.ServeHTTP(w, r)
+		case ApiKeyServiceGetSetupInstructionsProcedure:
+			apiKeyServiceGetSetupInstructionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -178,4 +218,8 @@ func (UnimplementedApiKeyServiceHandler) ListApiKeys(context.Context, *connect.R
 
 func (UnimplementedApiKeyServiceHandler) RevokeApiKey(context.Context, *connect.Request[apikey.RevokeApiKeyRequest]) (*connect.Response[apikey.RevokeApiKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.apikey.ApiKeyService.RevokeApiKey is not implemented"))
+}
+
+func (UnimplementedApiKeyServiceHandler) GetSetupInstructions(context.Context, *connect.Request[apikey.GetSetupInstructionsRequest]) (*connect.Response[apikey.GetSetupInstructionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.apikey.ApiKeyService.GetSetupInstructions is not implemented"))
 }

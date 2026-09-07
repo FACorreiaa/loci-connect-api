@@ -24,6 +24,9 @@ const (
 )
 
 // AlertKind classifies a trip-time heads-up.
+//
+// Values are only ever appended. Reordering or removing one silently changes
+// the meaning of data already on the wire.
 type AlertKind int32
 
 const (
@@ -31,6 +34,12 @@ const (
 	AlertKind_ALERT_KIND_CLOSURE     AlertKind = 1
 	AlertKind_ALERT_KIND_HOLIDAY     AlertKind = 2
 	AlertKind_ALERT_KIND_STRIKE      AlertKind = 3
+	// A natural hazard near the destination — wildfire, cyclone, flood,
+	// earthquake, volcanic activity.
+	AlertKind_ALERT_KIND_HAZARD      AlertKind = 4
+	AlertKind_ALERT_KIND_AIR_QUALITY AlertKind = 5
+	AlertKind_ALERT_KIND_TRANSIT     AlertKind = 6
+	AlertKind_ALERT_KIND_ADVISORY    AlertKind = 7
 )
 
 // Enum value maps for AlertKind.
@@ -40,12 +49,20 @@ var (
 		1: "ALERT_KIND_CLOSURE",
 		2: "ALERT_KIND_HOLIDAY",
 		3: "ALERT_KIND_STRIKE",
+		4: "ALERT_KIND_HAZARD",
+		5: "ALERT_KIND_AIR_QUALITY",
+		6: "ALERT_KIND_TRANSIT",
+		7: "ALERT_KIND_ADVISORY",
 	}
 	AlertKind_value = map[string]int32{
 		"ALERT_KIND_UNSPECIFIED": 0,
 		"ALERT_KIND_CLOSURE":     1,
 		"ALERT_KIND_HOLIDAY":     2,
 		"ALERT_KIND_STRIKE":      3,
+		"ALERT_KIND_HAZARD":      4,
+		"ALERT_KIND_AIR_QUALITY": 5,
+		"ALERT_KIND_TRANSIT":     6,
+		"ALERT_KIND_ADVISORY":    7,
 	}
 )
 
@@ -153,13 +170,31 @@ func (x *WeatherDay) GetPrecipProb() float64 {
 	return 0
 }
 
-// LocalAlert warns about something affecting a trip day (closure/holiday/strike).
+// LocalAlert warns about something affecting a trip day (closure/holiday/
+// hazard/strike).
 type LocalAlert struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          AlertKind              `protobuf:"varint,1,opt,name=kind,proto3,enum=loci.localcontext.AlertKind" json:"kind,omitempty"`
-	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
-	Date          *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=date,proto3,oneof" json:"date,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Kind   AlertKind              `protobuf:"varint,1,opt,name=kind,proto3,enum=loci.localcontext.AlertKind" json:"kind,omitempty"`
+	Title  string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Detail string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	Date   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=date,proto3,oneof" json:"date,omitempty"`
+	// How much this should count against the trip, 0..1.
+	//
+	// The server grades alerts rather than treating them alike — a public holiday
+	// and a red-level wildfire are not the same news — and the go-score's
+	// disruption penalty scales with this. Clients should use it to rank and to
+	// colour, never to decide whether to show an alert at all.
+	Severity float64 `protobuf:"fixed64,5,opt,name=severity,proto3" json:"severity,omitempty"`
+	// Which provider reported it ("nager", "gdacs", "usgs"). Shown so a user can
+	// see who says so, and so a noisy feed is identifiable from the response
+	// rather than only from server logs.
+	Source string `protobuf:"bytes,6,opt,name=source,proto3" json:"source,omitempty"`
+	// Where the alert is, when it has a place — a wildfire, a cyclone, an
+	// earthquake. Absent for anything country-scoped: a public holiday has no
+	// coordinates, and inventing some to make it mappable would be a lie.
+	// Only alerts carrying both can be drawn as map pins.
+	Latitude      *float64 `protobuf:"fixed64,7,opt,name=latitude,proto3,oneof" json:"latitude,omitempty"`
+	Longitude     *float64 `protobuf:"fixed64,8,opt,name=longitude,proto3,oneof" json:"longitude,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -220,6 +255,34 @@ func (x *LocalAlert) GetDate() *timestamppb.Timestamp {
 		return x.Date
 	}
 	return nil
+}
+
+func (x *LocalAlert) GetSeverity() float64 {
+	if x != nil {
+		return x.Severity
+	}
+	return 0
+}
+
+func (x *LocalAlert) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *LocalAlert) GetLatitude() float64 {
+	if x != nil && x.Latitude != nil {
+		return *x.Latitude
+	}
+	return 0
+}
+
+func (x *LocalAlert) GetLongitude() float64 {
+	if x != nil && x.Longitude != nil {
+		return *x.Longitude
+	}
+	return 0
 }
 
 // GetLocalContextRequest asks for weather + alerts near a point.
@@ -650,6 +713,404 @@ func (x *GetGoScoreResponse) GetCityName() string {
 	return ""
 }
 
+// FxRate is one currency pair at a point in time.
+//
+// Reference rates republished from the ECB. They are exact rather than
+// modelled, but the ECB publishes only 30 currencies — anywhere else returns no
+// rate at all, because a made-up number about someone's money is worse than
+// none.
+type FxRate struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Base  string                 `protobuf:"bytes,1,opt,name=base,proto3" json:"base,omitempty"`
+	Quote string                 `protobuf:"bytes,2,opt,name=quote,proto3" json:"quote,omitempty"`
+	Rate  float64                `protobuf:"fixed64,3,opt,name=rate,proto3" json:"rate,omitempty"`
+	// The day the rate was published. Shown so a user can tell a Friday rate read
+	// on a Sunday for what it is.
+	AsOf          *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=as_of,json=asOf,proto3" json:"as_of,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FxRate) Reset() {
+	*x = FxRate{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FxRate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FxRate) ProtoMessage() {}
+
+func (x *FxRate) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FxRate.ProtoReflect.Descriptor instead.
+func (*FxRate) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *FxRate) GetBase() string {
+	if x != nil {
+		return x.Base
+	}
+	return ""
+}
+
+func (x *FxRate) GetQuote() string {
+	if x != nil {
+		return x.Quote
+	}
+	return ""
+}
+
+func (x *FxRate) GetRate() float64 {
+	if x != nil {
+		return x.Rate
+	}
+	return 0
+}
+
+func (x *FxRate) GetAsOf() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AsOf
+	}
+	return nil
+}
+
+// GetFxRatesRequest asks what the traveller's money is worth at a destination.
+type GetFxRatesRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ISO-4217. Defaults to the server's configured base when empty.
+	Base *string `protobuf:"bytes,1,opt,name=base,proto3,oneof" json:"base,omitempty"`
+	// Explicit quote currencies. When empty, country_code is used instead.
+	Quotes []string `protobuf:"bytes,2,rep,name=quotes,proto3" json:"quotes,omitempty"`
+	// ISO-3166 alpha-2. A convenience so a caller holding a destination does not
+	// have to know its currency.
+	CountryCode *string `protobuf:"bytes,3,opt,name=country_code,json=countryCode,proto3,oneof" json:"country_code,omitempty"`
+	// Coordinates, resolved to a country server-side.
+	//
+	// The most useful entry point in practice: a client holding a destination
+	// usually has its coordinates, and often only a display country name like
+	// "Portugal" rather than an ISO code. Resolving that name client-side would
+	// mean duplicating a country table that already exists on the server, so the
+	// server does it with the same geocoder it runs for alerts.
+	//
+	// Ignored when country_code or quotes are supplied.
+	Latitude      *float64 `protobuf:"fixed64,4,opt,name=latitude,proto3,oneof" json:"latitude,omitempty"`
+	Longitude     *float64 `protobuf:"fixed64,5,opt,name=longitude,proto3,oneof" json:"longitude,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFxRatesRequest) Reset() {
+	*x = GetFxRatesRequest{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFxRatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFxRatesRequest) ProtoMessage() {}
+
+func (x *GetFxRatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFxRatesRequest.ProtoReflect.Descriptor instead.
+func (*GetFxRatesRequest) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetFxRatesRequest) GetBase() string {
+	if x != nil && x.Base != nil {
+		return *x.Base
+	}
+	return ""
+}
+
+func (x *GetFxRatesRequest) GetQuotes() []string {
+	if x != nil {
+		return x.Quotes
+	}
+	return nil
+}
+
+func (x *GetFxRatesRequest) GetCountryCode() string {
+	if x != nil && x.CountryCode != nil {
+		return *x.CountryCode
+	}
+	return ""
+}
+
+func (x *GetFxRatesRequest) GetLatitude() float64 {
+	if x != nil && x.Latitude != nil {
+		return *x.Latitude
+	}
+	return 0
+}
+
+func (x *GetFxRatesRequest) GetLongitude() float64 {
+	if x != nil && x.Longitude != nil {
+		return *x.Longitude
+	}
+	return 0
+}
+
+type GetFxRatesResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Rates []*FxRate              `protobuf:"bytes,1,rep,name=rates,proto3" json:"rates,omitempty"`
+	// Currencies that were asked for, or implied by country_code, that the ECB
+	// does not publish. Returned rather than dropped so a client can say "no rate
+	// available" instead of silently showing nothing.
+	Unsupported   []string `protobuf:"bytes,2,rep,name=unsupported,proto3" json:"unsupported,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFxRatesResponse) Reset() {
+	*x = GetFxRatesResponse{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFxRatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFxRatesResponse) ProtoMessage() {}
+
+func (x *GetFxRatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFxRatesResponse.ProtoReflect.Descriptor instead.
+func (*GetFxRatesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetFxRatesResponse) GetRates() []*FxRate {
+	if x != nil {
+		return x.Rates
+	}
+	return nil
+}
+
+func (x *GetFxRatesResponse) GetUnsupported() []string {
+	if x != nil {
+		return x.Unsupported
+	}
+	return nil
+}
+
+// DriveCostEstimate prices the fuel for a driving leg.
+type DriveCostEstimate struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	DistanceKm float64                `protobuf:"fixed64,1,opt,name=distance_km,json=distanceKm,proto3" json:"distance_km,omitempty"`
+	Litres     float64                `protobuf:"fixed64,2,opt,name=litres,proto3" json:"litres,omitempty"`
+	Cost       float64                `protobuf:"fixed64,3,opt,name=cost,proto3" json:"cost,omitempty"`
+	Currency   string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	// What the number rests on, in words. Always populated: a bare figure about
+	// someone's money invites either misplaced trust or dismissal, and only the
+	// assumptions let a user correct it against their own car.
+	Assumptions   string `protobuf:"bytes,5,opt,name=assumptions,proto3" json:"assumptions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DriveCostEstimate) Reset() {
+	*x = DriveCostEstimate{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DriveCostEstimate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DriveCostEstimate) ProtoMessage() {}
+
+func (x *DriveCostEstimate) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DriveCostEstimate.ProtoReflect.Descriptor instead.
+func (*DriveCostEstimate) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DriveCostEstimate) GetDistanceKm() float64 {
+	if x != nil {
+		return x.DistanceKm
+	}
+	return 0
+}
+
+func (x *DriveCostEstimate) GetLitres() float64 {
+	if x != nil {
+		return x.Litres
+	}
+	return 0
+}
+
+func (x *DriveCostEstimate) GetCost() float64 {
+	if x != nil {
+		return x.Cost
+	}
+	return 0
+}
+
+func (x *DriveCostEstimate) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *DriveCostEstimate) GetAssumptions() string {
+	if x != nil {
+		return x.Assumptions
+	}
+	return ""
+}
+
+type EstimateDriveCostRequest struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	DistanceKm float64                `protobuf:"fixed64,1,opt,name=distance_km,json=distanceKm,proto3" json:"distance_km,omitempty"`
+	// ISO-4217 for the result. Defaults to the server's configured base.
+	Currency      *string `protobuf:"bytes,2,opt,name=currency,proto3,oneof" json:"currency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EstimateDriveCostRequest) Reset() {
+	*x = EstimateDriveCostRequest{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EstimateDriveCostRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EstimateDriveCostRequest) ProtoMessage() {}
+
+func (x *EstimateDriveCostRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EstimateDriveCostRequest.ProtoReflect.Descriptor instead.
+func (*EstimateDriveCostRequest) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *EstimateDriveCostRequest) GetDistanceKm() float64 {
+	if x != nil {
+		return x.DistanceKm
+	}
+	return 0
+}
+
+func (x *EstimateDriveCostRequest) GetCurrency() string {
+	if x != nil && x.Currency != nil {
+		return *x.Currency
+	}
+	return ""
+}
+
+type EstimateDriveCostResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Estimate      *DriveCostEstimate     `protobuf:"bytes,1,opt,name=estimate,proto3" json:"estimate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EstimateDriveCostResponse) Reset() {
+	*x = EstimateDriveCostResponse{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EstimateDriveCostResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EstimateDriveCostResponse) ProtoMessage() {}
+
+func (x *EstimateDriveCostResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EstimateDriveCostResponse.ProtoReflect.Descriptor instead.
+func (*EstimateDriveCostResponse) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EstimateDriveCostResponse) GetEstimate() *DriveCostEstimate {
+	if x != nil {
+		return x.Estimate
+	}
+	return nil
+}
+
 var File_loci_localcontext_localcontext_proto protoreflect.FileDescriptor
 
 const file_loci_localcontext_localcontext_proto_rawDesc = "" +
@@ -662,15 +1123,22 @@ const file_loci_localcontext_localcontext_proto_rawDesc = "" +
 	"\x05low_c\x18\x03 \x01(\x01R\x04lowC\x12%\n" +
 	"\tcondition\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18dR\tcondition\x128\n" +
 	"\vprecip_prob\x18\x05 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\xf0?)\x00\x00\x00\x00\x00\x00\x00\x00R\n" +
-	"precipProb\"\xca\x01\n" +
+	"precipProb\"\xb1\x03\n" +
 	"\n" +
 	"LocalAlert\x12:\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1c.loci.localcontext.AlertKindB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04kind\x12 \n" +
 	"\x05title\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\x05title\x12 \n" +
 	"\x06detail\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xe8\aR\x06detail\x123\n" +
-	"\x04date\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x04date\x88\x01\x01B\a\n" +
-	"\x05_date\"\xa3\x01\n" +
+	"\x04date\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\x04date\x88\x01\x01\x123\n" +
+	"\bseverity\x18\x05 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\xf0?)\x00\x00\x00\x00\x00\x00\x00\x00R\bseverity\x12\x1f\n" +
+	"\x06source\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x182R\x06source\x128\n" +
+	"\blatitude\x18\a \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x01R\blatitude\x88\x01\x01\x12:\n" +
+	"\tlongitude\x18\b \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x02R\tlongitude\x88\x01\x01B\a\n" +
+	"\x05_dateB\v\n" +
+	"\t_latitudeB\f\n" +
+	"\n" +
+	"_longitude\"\xa3\x01\n" +
 	"\x16GetLocalContextRequest\x123\n" +
 	"\blatitude\x18\x01 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0R\blatitude\x125\n" +
 	"\tlongitude\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0R\tlongitude\x12\x1d\n" +
@@ -711,16 +1179,57 @@ const file_loci_localcontext_localcontext_proto_rawDesc = "" +
 	"\x04_end\"m\n" +
 	"\x12GetGoScoreResponse\x120\n" +
 	"\x05score\x18\x01 \x01(\v2\x1a.loci.localcontext.GoScoreR\x05score\x12%\n" +
-	"\tcity_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName*n\n" +
+	"\tcity_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\"\x9b\x01\n" +
+	"\x06FxRate\x12\x1c\n" +
+	"\x04base\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x98\x01\x03R\x04base\x12\x1e\n" +
+	"\x05quote\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x98\x01\x03R\x05quote\x12\"\n" +
+	"\x04rate\x18\x03 \x01(\x01B\x0e\xbaH\v\x12\t!\x00\x00\x00\x00\x00\x00\x00\x00R\x04rate\x12/\n" +
+	"\x05as_of\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x04asOf\"\xb3\x02\n" +
+	"\x11GetFxRatesRequest\x12 \n" +
+	"\x04base\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18\x03H\x00R\x04base\x88\x01\x01\x12 \n" +
+	"\x06quotes\x18\x02 \x03(\tB\b\xbaH\x05\x92\x01\x02\x10\n" +
+	"R\x06quotes\x12/\n" +
+	"\fcountry_code\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18\x02H\x01R\vcountryCode\x88\x01\x01\x128\n" +
+	"\blatitude\x18\x04 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x02R\blatitude\x88\x01\x01\x12:\n" +
+	"\tlongitude\x18\x05 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x03R\tlongitude\x88\x01\x01B\a\n" +
+	"\x05_baseB\x0f\n" +
+	"\r_country_codeB\v\n" +
+	"\t_latitudeB\f\n" +
+	"\n" +
+	"_longitude\"g\n" +
+	"\x12GetFxRatesResponse\x12/\n" +
+	"\x05rates\x18\x01 \x03(\v2\x19.loci.localcontext.FxRateR\x05rates\x12 \n" +
+	"\vunsupported\x18\x02 \x03(\tR\vunsupported\"\xb1\x01\n" +
+	"\x11DriveCostEstimate\x12\x1f\n" +
+	"\vdistance_km\x18\x01 \x01(\x01R\n" +
+	"distanceKm\x12\x16\n" +
+	"\x06litres\x18\x02 \x01(\x01R\x06litres\x12\x12\n" +
+	"\x04cost\x18\x03 \x01(\x01R\x04cost\x12#\n" +
+	"\bcurrency\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18\x03R\bcurrency\x12*\n" +
+	"\vassumptions\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\vassumptions\"\x82\x01\n" +
+	"\x18EstimateDriveCostRequest\x12/\n" +
+	"\vdistance_km\x18\x01 \x01(\x01B\x0e\xbaH\v\x12\t)\x00\x00\x00\x00\x00\x00\x00\x00R\n" +
+	"distanceKm\x12(\n" +
+	"\bcurrency\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18\x03H\x00R\bcurrency\x88\x01\x01B\v\n" +
+	"\t_currency\"]\n" +
+	"\x19EstimateDriveCostResponse\x12@\n" +
+	"\bestimate\x18\x01 \x01(\v2$.loci.localcontext.DriveCostEstimateR\bestimate*\xd2\x01\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ALERT_KIND_CLOSURE\x10\x01\x12\x16\n" +
 	"\x12ALERT_KIND_HOLIDAY\x10\x02\x12\x15\n" +
-	"\x11ALERT_KIND_STRIKE\x10\x032\xcf\x01\n" +
+	"\x11ALERT_KIND_STRIKE\x10\x03\x12\x15\n" +
+	"\x11ALERT_KIND_HAZARD\x10\x04\x12\x1a\n" +
+	"\x16ALERT_KIND_AIR_QUALITY\x10\x05\x12\x16\n" +
+	"\x12ALERT_KIND_TRANSIT\x10\x06\x12\x17\n" +
+	"\x13ALERT_KIND_ADVISORY\x10\a2\x9a\x03\n" +
 	"\x13LocalContextService\x12]\n" +
 	"\x0fGetLocalContext\x12).loci.localcontext.GetLocalContextRequest\x1a\x1f.loci.localcontext.LocalContext\x12Y\n" +
 	"\n" +
-	"GetGoScore\x12$.loci.localcontext.GetGoScoreRequest\x1a%.loci.localcontext.GetGoScoreResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext;localcontextb\x06proto3"
+	"GetGoScore\x12$.loci.localcontext.GetGoScoreRequest\x1a%.loci.localcontext.GetGoScoreResponse\x12Y\n" +
+	"\n" +
+	"GetFxRates\x12$.loci.localcontext.GetFxRatesRequest\x1a%.loci.localcontext.GetFxRatesResponse\x12n\n" +
+	"\x11EstimateDriveCost\x12+.loci.localcontext.EstimateDriveCostRequest\x1a,.loci.localcontext.EstimateDriveCostResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext;localcontextb\x06proto3"
 
 var (
 	file_loci_localcontext_localcontext_proto_rawDescOnce sync.Once
@@ -735,38 +1244,51 @@ func file_loci_localcontext_localcontext_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_localcontext_localcontext_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_localcontext_localcontext_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_loci_localcontext_localcontext_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_loci_localcontext_localcontext_proto_goTypes = []any{
-	(AlertKind)(0),                 // 0: loci.localcontext.AlertKind
-	(*WeatherDay)(nil),             // 1: loci.localcontext.WeatherDay
-	(*LocalAlert)(nil),             // 2: loci.localcontext.LocalAlert
-	(*GetLocalContextRequest)(nil), // 3: loci.localcontext.GetLocalContextRequest
-	(*LocalContext)(nil),           // 4: loci.localcontext.LocalContext
-	(*ScoreFactor)(nil),            // 5: loci.localcontext.ScoreFactor
-	(*GoScore)(nil),                // 6: loci.localcontext.GoScore
-	(*GetGoScoreRequest)(nil),      // 7: loci.localcontext.GetGoScoreRequest
-	(*GetGoScoreResponse)(nil),     // 8: loci.localcontext.GetGoScoreResponse
-	(*timestamppb.Timestamp)(nil),  // 9: google.protobuf.Timestamp
+	(AlertKind)(0),                    // 0: loci.localcontext.AlertKind
+	(*WeatherDay)(nil),                // 1: loci.localcontext.WeatherDay
+	(*LocalAlert)(nil),                // 2: loci.localcontext.LocalAlert
+	(*GetLocalContextRequest)(nil),    // 3: loci.localcontext.GetLocalContextRequest
+	(*LocalContext)(nil),              // 4: loci.localcontext.LocalContext
+	(*ScoreFactor)(nil),               // 5: loci.localcontext.ScoreFactor
+	(*GoScore)(nil),                   // 6: loci.localcontext.GoScore
+	(*GetGoScoreRequest)(nil),         // 7: loci.localcontext.GetGoScoreRequest
+	(*GetGoScoreResponse)(nil),        // 8: loci.localcontext.GetGoScoreResponse
+	(*FxRate)(nil),                    // 9: loci.localcontext.FxRate
+	(*GetFxRatesRequest)(nil),         // 10: loci.localcontext.GetFxRatesRequest
+	(*GetFxRatesResponse)(nil),        // 11: loci.localcontext.GetFxRatesResponse
+	(*DriveCostEstimate)(nil),         // 12: loci.localcontext.DriveCostEstimate
+	(*EstimateDriveCostRequest)(nil),  // 13: loci.localcontext.EstimateDriveCostRequest
+	(*EstimateDriveCostResponse)(nil), // 14: loci.localcontext.EstimateDriveCostResponse
+	(*timestamppb.Timestamp)(nil),     // 15: google.protobuf.Timestamp
 }
 var file_loci_localcontext_localcontext_proto_depIdxs = []int32{
-	9,  // 0: loci.localcontext.WeatherDay.date:type_name -> google.protobuf.Timestamp
+	15, // 0: loci.localcontext.WeatherDay.date:type_name -> google.protobuf.Timestamp
 	0,  // 1: loci.localcontext.LocalAlert.kind:type_name -> loci.localcontext.AlertKind
-	9,  // 2: loci.localcontext.LocalAlert.date:type_name -> google.protobuf.Timestamp
+	15, // 2: loci.localcontext.LocalAlert.date:type_name -> google.protobuf.Timestamp
 	1,  // 3: loci.localcontext.LocalContext.weather:type_name -> loci.localcontext.WeatherDay
 	2,  // 4: loci.localcontext.LocalContext.alerts:type_name -> loci.localcontext.LocalAlert
 	5,  // 5: loci.localcontext.GoScore.factors:type_name -> loci.localcontext.ScoreFactor
-	9,  // 6: loci.localcontext.GetGoScoreRequest.start:type_name -> google.protobuf.Timestamp
-	9,  // 7: loci.localcontext.GetGoScoreRequest.end:type_name -> google.protobuf.Timestamp
+	15, // 6: loci.localcontext.GetGoScoreRequest.start:type_name -> google.protobuf.Timestamp
+	15, // 7: loci.localcontext.GetGoScoreRequest.end:type_name -> google.protobuf.Timestamp
 	6,  // 8: loci.localcontext.GetGoScoreResponse.score:type_name -> loci.localcontext.GoScore
-	3,  // 9: loci.localcontext.LocalContextService.GetLocalContext:input_type -> loci.localcontext.GetLocalContextRequest
-	7,  // 10: loci.localcontext.LocalContextService.GetGoScore:input_type -> loci.localcontext.GetGoScoreRequest
-	4,  // 11: loci.localcontext.LocalContextService.GetLocalContext:output_type -> loci.localcontext.LocalContext
-	8,  // 12: loci.localcontext.LocalContextService.GetGoScore:output_type -> loci.localcontext.GetGoScoreResponse
-	11, // [11:13] is the sub-list for method output_type
-	9,  // [9:11] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	15, // 9: loci.localcontext.FxRate.as_of:type_name -> google.protobuf.Timestamp
+	9,  // 10: loci.localcontext.GetFxRatesResponse.rates:type_name -> loci.localcontext.FxRate
+	12, // 11: loci.localcontext.EstimateDriveCostResponse.estimate:type_name -> loci.localcontext.DriveCostEstimate
+	3,  // 12: loci.localcontext.LocalContextService.GetLocalContext:input_type -> loci.localcontext.GetLocalContextRequest
+	7,  // 13: loci.localcontext.LocalContextService.GetGoScore:input_type -> loci.localcontext.GetGoScoreRequest
+	10, // 14: loci.localcontext.LocalContextService.GetFxRates:input_type -> loci.localcontext.GetFxRatesRequest
+	13, // 15: loci.localcontext.LocalContextService.EstimateDriveCost:input_type -> loci.localcontext.EstimateDriveCostRequest
+	4,  // 16: loci.localcontext.LocalContextService.GetLocalContext:output_type -> loci.localcontext.LocalContext
+	8,  // 17: loci.localcontext.LocalContextService.GetGoScore:output_type -> loci.localcontext.GetGoScoreResponse
+	11, // 18: loci.localcontext.LocalContextService.GetFxRates:output_type -> loci.localcontext.GetFxRatesResponse
+	14, // 19: loci.localcontext.LocalContextService.EstimateDriveCost:output_type -> loci.localcontext.EstimateDriveCostResponse
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_loci_localcontext_localcontext_proto_init() }
@@ -776,13 +1298,15 @@ func file_loci_localcontext_localcontext_proto_init() {
 	}
 	file_loci_localcontext_localcontext_proto_msgTypes[1].OneofWrappers = []any{}
 	file_loci_localcontext_localcontext_proto_msgTypes[6].OneofWrappers = []any{}
+	file_loci_localcontext_localcontext_proto_msgTypes[9].OneofWrappers = []any{}
+	file_loci_localcontext_localcontext_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_localcontext_localcontext_proto_rawDesc), len(file_loci_localcontext_localcontext_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
