@@ -50,7 +50,11 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 	if _, err := repo.GetUserByEmail(ctx, "rpc-register@example.com"); err != nil {
 		t.Fatalf("user not stored: %v", err)
 	}
-	servicetest.WaitFor(t, func() bool { return emails.VerificationSent() })
+	// Registration deliberately sends no verification email: nothing exposes
+	// VerifyEmail and the client has no route for it. See sendEmailVerification.
+	if emails.VerificationSent() {
+		t.Fatalf("a verification email was sent with nowhere for it to lead")
+	}
 	if len(repo.Sessions) != 1 {
 		t.Fatalf("expected one session, got %d", len(repo.Sessions))
 	}
