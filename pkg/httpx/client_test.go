@@ -217,8 +217,14 @@ func TestGet_CancelledContextIsNotRetried(t *testing.T) {
 	if _, err := New(fastClient(t)).Get(ctx, "test", srv.URL); err == nil {
 		t.Fatal("expected an error")
 	}
-	if calls > 1 {
-		t.Errorf("expected no retry after context expiry, got %d attempts", calls)
+	// Read atomically, unlike the assertions above.
+	//
+	// Those run after their request returned, which orders the handler's write
+	// before the read. This one does not: the context expires at 20ms while the
+	// handler is still inside a 50ms sleep, so it is still writing when the
+	// assertion runs, and a plain read here is a data race the detector fails on.
+	if attempts := atomic.LoadInt64(&calls); attempts > 1 {
+		t.Errorf("expected no retry after context expiry, got %d attempts", attempts)
 	}
 }
 
