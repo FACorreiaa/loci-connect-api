@@ -326,15 +326,42 @@ func Load() (*Config, error) {
 	}
 
 	// Guard against a dev default silently becoming the production model.
-	// Free models are rate-limited and shared; they are a local testing
-	// floor, never a production serving path.
+	//
+	// This used to forbid the fallback chain outright in production, on the
+	// grounds that free models are rate-limited and shared and so "a local
+	// testing floor, never a production serving path". The rate-limit point
+	// stands and is the reason for the shape below; the blanket ban went
+	// further than it needed to, and also forbade using those models as a
+	// floor for callers who have no provider of their own — which is the one
+	// place a shared, throttled model is the right answer, because the
+	// alternative is no answer.
+	//
+	// So the narrower rule: a free model must not be the PRIMARY, where its
+	// shared bucket becomes every paying request's problem. Behind the
+	// primary, and as the free tier's own chain, it is allowed.
 	if IsProduction() {
 		if strings.HasSuffix(cfg.AI.Model, ":free") {
 			return nil, fmt.Errorf("%s must not be a :free model in production, got %q",
 				providerModelEnv(cfg.AI.Provider), cfg.AI.Model)
 		}
-		if cfg.AI.FallbackEnabled {
-			return nil, errors.New("AI_FALLBACK_ENABLED must be false in production")
+
+		// The spend ceiling, and the reason a dedicated key exists at all.
+		//
+		// AI_FALLBACK_OPENROUTER_API_KEY names the account that funds the free
+		// floor — one bucket shared by every free-tier caller. Everything on it
+		// must be zero-cost, or a single non-free entry bills the operator for
+		// traffic the tier promises is free.
+		//
+		// Without that key the fallbacks run on the operator's own paid
+		// account, which is a deliberate paid backstop rather than a floor, so
+		// no ceiling applies.
+		if getEnv("AI_FALLBACK_OPENROUTER_API_KEY", "") != "" {
+			for _, spec := range cfg.AI.Fallbacks {
+				if spec.Provider == AIProviderOpenRouter && !strings.HasSuffix(spec.Model, ":free") {
+					return nil, fmt.Errorf("AI_FALLBACK_MODELS entry %q must be a :free model: "+
+						"AI_FALLBACK_OPENROUTER_API_KEY funds the shared free floor", spec.Model)
+				}
+			}
 		}
 
 		// Same shape of guard, for a licence rather than a rate limit.

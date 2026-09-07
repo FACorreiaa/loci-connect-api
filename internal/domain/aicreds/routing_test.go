@@ -2,6 +2,7 @@ package aicreds
 
 import (
 	"context"
+	"errors"
 	"iter"
 	"strings"
 	"testing"
@@ -271,5 +272,142 @@ func TestModelReportsTheSharedProvider(t *testing.T) {
 	r, _, _ := newRouter(t)
 	if r.Model() != "shared-model" {
 		t.Errorf("Model = %q", r.Model())
+	}
+}
+
+// planStub stands in for the subscription service.
+type planStub struct {
+	plan  string
+	err   error
+	calls int
+}
+
+func (p *planStub) EffectivePlan(context.Context, uuid.UUID) (string, error) {
+	p.calls++
+	return p.plan, p.err
+}
+
+func newTieredRouter(t *testing.T, plan string) (*Router, *fakeRepo, *planStub) {
+	t.Helper()
+	repo := newFakeRepo()
+	plans := &planStub{plan: plan}
+	r := NewRouter(&stubClient{model: "paid-model"}, NewService(repo, sealerWith(t, 1)), nil)
+	r.WithFreeTier(&stubClient{model: "free-model"}, plans)
+	return r, repo, plans
+}
+
+// The point of the free chain: a free-plan caller must never reach the primary,
+// which is the key the operator pays per token for.
+func TestAFreePlanIsServedByTheFreeChain(t *testing.T) {
+	r, _, plans := newTieredRouter(t, "free")
+
+	if got := answered(t, r, authed(t, uuid.New())); got != "free-model" {
+		t.Errorf("answered by %q, want the free chain", got)
+	}
+	if plans.calls == 0 {
+		t.Error("the plan was never consulted")
+	}
+}
+
+func TestAPaidPlanIsServedByThePaidChain(t *testing.T) {
+	for _, plan := range []string{"premium_monthly", "premium_annual"} {
+		t.Run(plan, func(t *testing.T) {
+			r, _, _ := newTieredRouter(t, plan)
+			if got := answered(t, r, authed(t, uuid.New())); got != "paid-model" {
+				t.Errorf("answered by %q, want the paid chain", got)
+			}
+		})
+	}
+}
+
+// A user's own key outranks the tier entirely. They are paying the provider
+// directly, so the plan is irrelevant to which backend answers.
+func TestABroughtKeyBeatsTheFreeTier(t *testing.T) {
+	r, _, _ := newTieredRouter(t, "free")
+	user := uuid.New()
+
+	if _, err := r.svc.Save(t.Context(), user, Input{
+		Provider: "openrouter", APIKey: testKey, Model: "their-own-model",
+	}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if got := answered(t, r, authed(t, user)); got != "their-own-model" {
+		t.Errorf("answered by %q, want the user's own provider", got)
+	}
+}
+
+// A plan lookup that fails must not decide the question in the operator's
+// favour: unknown plan falls to the free chain, because charging somebody's
+// paid budget on a database error is the worse mistake.
+func TestAnUnreadablePlanFallsToTheFreeChain(t *testing.T) {
+	r, _, plans := newTieredRouter(t, "free")
+	plans.err = errors.New("subscriptions table is having a moment")
+
+	if got := answered(t, r, authed(t, uuid.New())); got != "free-model" {
+		t.Errorf("answered by %q, want the free chain", got)
+	}
+}
+
+// Without a free chain configured the tier is moot and everyone gets the paid
+// one, which is exactly today's behaviour.
+func TestWithoutAFreeChainEveryoneGetsThePaidOne(t *testing.T) {
+	r, _, _ := newRouter(t)
+
+	if got := answered(t, r, authed(t, uuid.New())); got != "shared-model" {
+		t.Errorf("answered by %q, want the paid chain", got)
+	}
+}
+
+// Background work has no caller, so there is no plan to read and nothing to
+// bill to a tier.
+func TestUnauthenticatedWorkUsesThePaidChain(t *testing.T) {
+	r, _, plans := newTieredRouter(t, "free")
+
+	if got := answered(t, r, t.Context()); got != "paid-model" {
+		t.Errorf("answered by %q, want the paid chain", got)
+	}
+	if plans.calls != 0 {
+		t.Error("a plan was looked up for a request with no caller")
+	}
+}
+
+// The plan is cached per user: a chat turn makes several model calls, and each
+// one hitting the subscriptions table would be a query per token stream.
+func TestThePlanIsNotLookedUpOnEveryCall(t *testing.T) {
+	r, _, plans := newTieredRouter(t, "free")
+	ctx := authed(t, uuid.New())
+
+	for range 5 {
+		answered(t, r, ctx)
+	}
+	if plans.calls != 1 {
+		t.Errorf("plan looked up %d times for 5 calls, want 1", plans.calls)
+	}
+}
+
+// Tier routing is independent of bring-your-own-key. An operator can run a
+// free tier without ever configuring ENCRYPTION_KEY, and a free caller must
+// still not reach the chain the operator pays for.
+//
+// This was wrong on the first pass: clientFor returned the shared client as
+// soon as sealing was unavailable, which skipped the tier check entirely.
+func TestTheFreeTierWorksWithoutAnEncryptionKey(t *testing.T) {
+	r := NewRouter(&stubClient{model: "paid-model"}, NewService(newFakeRepo(), nil), nil)
+	r.WithFreeTier(&stubClient{model: "free-model"}, &planStub{plan: "free"})
+
+	if got := answered(t, r, authed(t, uuid.New())); got != "free-model" {
+		t.Errorf("answered by %q, want the free chain", got)
+	}
+}
+
+// And with a nil service entirely, which is what a deployment with no
+// credential store at all looks like.
+func TestTheFreeTierWorksWithNoCredentialServiceAtAll(t *testing.T) {
+	r := NewRouter(&stubClient{model: "paid-model"}, nil, nil)
+	r.WithFreeTier(&stubClient{model: "free-model"}, &planStub{plan: "free"})
+
+	if got := answered(t, r, authed(t, uuid.New())); got != "free-model" {
+		t.Errorf("answered by %q, want the free chain", got)
 	}
 }

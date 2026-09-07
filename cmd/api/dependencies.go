@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -55,6 +56,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -62,6 +64,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
+	"github.com/google/uuid"
 )
 
 // Dependencies holds all application dependencies
@@ -490,12 +493,58 @@ func (d *Dependencies) RunTelegram(ctx context.Context) error {
 // builds its own provider chain and a router wraps exactly one. They keep
 // separate caches; the entries are per user and closed on shutdown.
 func (d *Dependencies) byokWrapper() func(generativeAI.ChatClient) generativeAI.ChatClient {
-	if d.AICredentials == nil {
+	free := d.freeChatChain()
+
+	// Nothing to route: no stored credentials to prefer and no cheaper chain to
+	// send free callers to, so the services keep the client they built.
+	if d.AICredentials == nil && free == nil {
 		return nil
 	}
+
 	return func(shared generativeAI.ChatClient) generativeAI.ChatClient {
-		return aicreds.NewRouter(shared, d.AICredentials, d.Logger)
+		router := aicreds.NewRouter(shared, d.AICredentials, d.Logger)
+		if free != nil {
+			// lazyPlans, not d.SubscriptionService: that field is populated
+			// after the services this wraps are constructed, so a direct
+			// reference here would capture nil.
+			router = router.WithFreeTier(free, lazyPlans{d: d})
+		}
+		return router
 	}
+}
+
+// freeChatChain builds the chain that serves free-tier callers, or nil when the
+// deployment has no free floor configured.
+//
+// Absent is a supported state: without it every caller reaches the operator's
+// primary, which is how this ran before the free tier existed.
+func (d *Dependencies) freeChatChain() generativeAI.ChatClient {
+	free, err := ai.NewFreeChatClient(context.Background(), d.Config.AI, d.Logger)
+	if err != nil {
+		d.Logger.Info("no free chat chain; every caller will use the configured provider",
+			slog.String("reason", err.Error()))
+		return nil
+	}
+	return free
+}
+
+// lazyPlans reads the subscription service at call time.
+//
+// The chat and POI services are constructed before SubscriptionService exists,
+// so the wrapper that routes by plan cannot hold it directly. Reading it per
+// call also means a nil service early in startup reports an error rather than
+// panicking — and the router treats an unreadable plan as free, which is the
+// safe direction: serving a cheaper model beats billing somebody who may not
+// be paying.
+type lazyPlans struct {
+	d *Dependencies
+}
+
+func (l lazyPlans) EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	if l.d.SubscriptionService == nil {
+		return "", errors.New("subscription service is not initialised yet")
+	}
+	return l.d.SubscriptionService.EffectivePlan(ctx, userID)
 }
 
 // initMFA wires the MFA service when a secret key is configured.
