@@ -13,7 +13,9 @@ import (
 )
 
 func startIPLimitedHandler(perSecond, burst, maxEntries int) http.Handler {
-	interceptor := NewIPRateLimitInterceptor(perSecond, burst, maxEntries)
+	// No trusted proxies: these tests drive the handler directly, so the peer
+	// address is the right key and a forwarding header must not override it.
+	interceptor := NewIPRateLimitInterceptor(perSecond, burst, maxEntries, nil)
 	return connect.NewUnaryHandler(
 		"/test.Service/Method",
 		func(_ context.Context, _ *connect.Request[emptypb.Empty]) (*connect.Response[emptypb.Empty], error) {
@@ -102,7 +104,16 @@ func TestClientIPFromHeader_PrefersForwardedFor(t *testing.T) {
 		"X-Forwarded-For": []string{"198.51.100.7, 10.0.0.1"},
 		"X-Real-IP":       []string{"203.0.113.1"},
 	}
-	if got := clientIPFromHeader(header, "127.0.0.1:8080"); got != "198.51.100.7" {
+
+	// The peer has to be trusted for the header to count. This test previously
+	// passed nothing and still expected the forwarded address, which is the
+	// behaviour that let any caller choose its own rate-limit key; see
+	// trustedproxy_test.go.
+	trusted, err := ParseTrustedProxies([]string{"127.0.0.1", "10.0.0.0/8"})
+	if err != nil {
+		t.Fatalf("ParseTrustedProxies: %v", err)
+	}
+	if got := clientIPFromHeader(header, "127.0.0.1:8080", trusted); got != "198.51.100.7" {
 		t.Fatalf("client IP = %q, want 198.51.100.7", got)
 	}
 }

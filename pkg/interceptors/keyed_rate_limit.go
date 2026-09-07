@@ -9,23 +9,30 @@ import (
 // IPRateLimitInterceptor enforces per-client-IP rate limits.
 type IPRateLimitInterceptor struct {
 	store *keyedLimiterStore
+	// trustedProxies are the hops whose forwarding headers may be believed.
+	// Empty means none, and the peer address is used — see clientIPFromHeader.
+	trustedProxies []*trustedNet
 }
 
 // NewIPRateLimitInterceptor creates a per-IP rate limiting interceptor.
 // Returns nil when perSecond, burst, or maxEntries are non-positive (disabled).
-func NewIPRateLimitInterceptor(perSecond, burst, maxEntries int) *IPRateLimitInterceptor {
+//
+// trustedProxies must be empty unless something in front of this server
+// overwrites X-Forwarded-For. Trusting a hop that does not means accepting a
+// rate-limit key from the caller.
+func NewIPRateLimitInterceptor(perSecond, burst, maxEntries int, trustedProxies []*trustedNet) *IPRateLimitInterceptor {
 	store := newKeyedLimiterStore(perSecond, burst, maxEntries)
 	if store == nil {
 		return nil
 	}
-	return &IPRateLimitInterceptor{store: store}
+	return &IPRateLimitInterceptor{store: store, trustedProxies: trustedProxies}
 }
 
 func (i *IPRateLimitInterceptor) check(ctx context.Context, req connect.AnyRequest) error {
 	if i == nil || i.store == nil {
 		return nil
 	}
-	key := clientIPFromUnary(ctx, req)
+	key := clientIPFromUnary(ctx, req, i.trustedProxies)
 	if key == "" {
 		return nil
 	}
@@ -40,7 +47,7 @@ func (i *IPRateLimitInterceptor) checkStream(conn connect.StreamingHandlerConn) 
 	if i == nil || i.store == nil {
 		return nil
 	}
-	key := clientIPFromStream(conn)
+	key := clientIPFromStream(conn, i.trustedProxies)
 	if key == "" {
 		return nil
 	}

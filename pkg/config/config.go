@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -85,13 +86,29 @@ type AIConfig struct {
 }
 
 type ServerConfig struct {
-	Host                    string
-	Port                    int
-	BaseURL                 string
-	RateLimitPerSecond      int
-	RateLimitBurst          int
-	IPRateLimitPerSecond    int
-	IPRateLimitBurst        int
+	Host                 string
+	Port                 int
+	BaseURL              string
+	RateLimitPerSecond   int
+	RateLimitBurst       int
+	IPRateLimitPerSecond int
+	IPRateLimitBurst     int
+
+	// TrustedProxies are the hops whose X-Forwarded-For may be believed, as
+	// CIDRs or bare addresses (TRUSTED_PROXIES).
+	//
+	// Empty is safe but wrong behind an ingress: the per-IP limiter then keys
+	// every request on the proxy's own address, so all callers share one bucket
+	// and the first few to arrive spend the budget for everybody. Set it to the
+	// pod network when running behind Traefik.
+	//
+	// Do NOT add a hop that does not overwrite the header — trusting one that
+	// merely passes it through means accepting a rate-limit key from the caller.
+	TrustedProxies []string
+
+	// WarnNoTrustedProxies is set when production is configured with none, so
+	// the router can say so once at boot instead of every request.
+	WarnNoTrustedProxies    bool
 	IPRateLimitMaxEntries   int
 	UserRateLimitPerSecond  int
 	UserRateLimitBurst      int
@@ -205,6 +222,7 @@ func Load() (*Config, error) {
 			BaseURL:                 getEnv("BASE_URL", "http://localhost:8080"),
 			RateLimitPerSecond:      getEnvAsInt("SERVER_RATE_LIMIT_PER_SECOND", 100),
 			RateLimitBurst:          getEnvAsInt("SERVER_RATE_LIMIT_BURST", 200),
+			TrustedProxies:          getEnvAsSlice("TRUSTED_PROXIES", nil),
 			IPRateLimitPerSecond:    getEnvAsInt("SERVER_IP_RATE_LIMIT_PER_SECOND", 30),
 			IPRateLimitBurst:        getEnvAsInt("SERVER_IP_RATE_LIMIT_BURST", 60),
 			IPRateLimitMaxEntries:   getEnvAsInt("SERVER_IP_RATE_LIMIT_MAX_ENTRIES", 10_000),
@@ -272,6 +290,26 @@ func Load() (*Config, error) {
 		},
 		AI: loadAIConfig(),
 	}
+
+	// TRUSTED_PROXIES decides which hops may set the address the per-IP rate
+	// limiter keys on, so a typo silently disables that limiter's fairness.
+	// Refused at boot rather than dropped.
+	for _, entry := range cfg.Server.TrustedProxies {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		var err error
+		if strings.Contains(entry, "/") {
+			_, err = netip.ParsePrefix(entry)
+		} else {
+			_, err = netip.ParseAddr(entry)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("TRUSTED_PROXIES entry %q is not a valid address or CIDR", entry)
+		}
+	}
+	cfg.Server.WarnNoTrustedProxies = IsProduction() && len(cfg.Server.TrustedProxies) == 0
 
 	if cfg.AI.Provider != AIProviderGemini && cfg.AI.Provider != AIProviderOpenRouter {
 		return nil, fmt.Errorf("unsupported AI_PROVIDER %q", cfg.AI.Provider)
