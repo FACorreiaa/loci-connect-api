@@ -39,13 +39,21 @@ const (
 	// LocalContextServiceGetGoScoreProcedure is the fully-qualified name of the LocalContextService's
 	// GetGoScore RPC.
 	LocalContextServiceGetGoScoreProcedure = "/loci.localcontext.LocalContextService/GetGoScore"
+	// LocalContextServiceGetFxRatesProcedure is the fully-qualified name of the LocalContextService's
+	// GetFxRates RPC.
+	LocalContextServiceGetFxRatesProcedure = "/loci.localcontext.LocalContextService/GetFxRates"
+	// LocalContextServiceEstimateDriveCostProcedure is the fully-qualified name of the
+	// LocalContextService's EstimateDriveCost RPC.
+	LocalContextServiceEstimateDriveCostProcedure = "/loci.localcontext.LocalContextService/EstimateDriveCost"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	localContextServiceServiceDescriptor               = localcontext.File_loci_localcontext_localcontext_proto.Services().ByName("LocalContextService")
-	localContextServiceGetLocalContextMethodDescriptor = localContextServiceServiceDescriptor.Methods().ByName("GetLocalContext")
-	localContextServiceGetGoScoreMethodDescriptor      = localContextServiceServiceDescriptor.Methods().ByName("GetGoScore")
+	localContextServiceServiceDescriptor                 = localcontext.File_loci_localcontext_localcontext_proto.Services().ByName("LocalContextService")
+	localContextServiceGetLocalContextMethodDescriptor   = localContextServiceServiceDescriptor.Methods().ByName("GetLocalContext")
+	localContextServiceGetGoScoreMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetGoScore")
+	localContextServiceGetFxRatesMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetFxRates")
+	localContextServiceEstimateDriveCostMethodDescriptor = localContextServiceServiceDescriptor.Methods().ByName("EstimateDriveCost")
 )
 
 // LocalContextServiceClient is a client for the loci.localcontext.LocalContextService service.
@@ -53,6 +61,10 @@ type LocalContextServiceClient interface {
 	GetLocalContext(context.Context, *connect.Request[localcontext.GetLocalContextRequest]) (*connect.Response[localcontext.LocalContext], error)
 	// GetGoScore answers "should I go this weekend?" for one destination.
 	GetGoScore(context.Context, *connect.Request[localcontext.GetGoScoreRequest]) (*connect.Response[localcontext.GetGoScoreResponse], error)
+	// GetFxRates answers "what is my money worth there?".
+	GetFxRates(context.Context, *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error)
+	// EstimateDriveCost prices the fuel for a driving leg.
+	EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error)
 }
 
 // NewLocalContextServiceClient constructs a client for the loci.localcontext.LocalContextService
@@ -77,13 +89,27 @@ func NewLocalContextServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(localContextServiceGetGoScoreMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getFxRates: connect.NewClient[localcontext.GetFxRatesRequest, localcontext.GetFxRatesResponse](
+			httpClient,
+			baseURL+LocalContextServiceGetFxRatesProcedure,
+			connect.WithSchema(localContextServiceGetFxRatesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		estimateDriveCost: connect.NewClient[localcontext.EstimateDriveCostRequest, localcontext.EstimateDriveCostResponse](
+			httpClient,
+			baseURL+LocalContextServiceEstimateDriveCostProcedure,
+			connect.WithSchema(localContextServiceEstimateDriveCostMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // localContextServiceClient implements LocalContextServiceClient.
 type localContextServiceClient struct {
-	getLocalContext *connect.Client[localcontext.GetLocalContextRequest, localcontext.LocalContext]
-	getGoScore      *connect.Client[localcontext.GetGoScoreRequest, localcontext.GetGoScoreResponse]
+	getLocalContext   *connect.Client[localcontext.GetLocalContextRequest, localcontext.LocalContext]
+	getGoScore        *connect.Client[localcontext.GetGoScoreRequest, localcontext.GetGoScoreResponse]
+	getFxRates        *connect.Client[localcontext.GetFxRatesRequest, localcontext.GetFxRatesResponse]
+	estimateDriveCost *connect.Client[localcontext.EstimateDriveCostRequest, localcontext.EstimateDriveCostResponse]
 }
 
 // GetLocalContext calls loci.localcontext.LocalContextService.GetLocalContext.
@@ -96,12 +122,26 @@ func (c *localContextServiceClient) GetGoScore(ctx context.Context, req *connect
 	return c.getGoScore.CallUnary(ctx, req)
 }
 
+// GetFxRates calls loci.localcontext.LocalContextService.GetFxRates.
+func (c *localContextServiceClient) GetFxRates(ctx context.Context, req *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error) {
+	return c.getFxRates.CallUnary(ctx, req)
+}
+
+// EstimateDriveCost calls loci.localcontext.LocalContextService.EstimateDriveCost.
+func (c *localContextServiceClient) EstimateDriveCost(ctx context.Context, req *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error) {
+	return c.estimateDriveCost.CallUnary(ctx, req)
+}
+
 // LocalContextServiceHandler is an implementation of the loci.localcontext.LocalContextService
 // service.
 type LocalContextServiceHandler interface {
 	GetLocalContext(context.Context, *connect.Request[localcontext.GetLocalContextRequest]) (*connect.Response[localcontext.LocalContext], error)
 	// GetGoScore answers "should I go this weekend?" for one destination.
 	GetGoScore(context.Context, *connect.Request[localcontext.GetGoScoreRequest]) (*connect.Response[localcontext.GetGoScoreResponse], error)
+	// GetFxRates answers "what is my money worth there?".
+	GetFxRates(context.Context, *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error)
+	// EstimateDriveCost prices the fuel for a driving leg.
+	EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error)
 }
 
 // NewLocalContextServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -122,12 +162,28 @@ func NewLocalContextServiceHandler(svc LocalContextServiceHandler, opts ...conne
 		connect.WithSchema(localContextServiceGetGoScoreMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	localContextServiceGetFxRatesHandler := connect.NewUnaryHandler(
+		LocalContextServiceGetFxRatesProcedure,
+		svc.GetFxRates,
+		connect.WithSchema(localContextServiceGetFxRatesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	localContextServiceEstimateDriveCostHandler := connect.NewUnaryHandler(
+		LocalContextServiceEstimateDriveCostProcedure,
+		svc.EstimateDriveCost,
+		connect.WithSchema(localContextServiceEstimateDriveCostMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.localcontext.LocalContextService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LocalContextServiceGetLocalContextProcedure:
 			localContextServiceGetLocalContextHandler.ServeHTTP(w, r)
 		case LocalContextServiceGetGoScoreProcedure:
 			localContextServiceGetGoScoreHandler.ServeHTTP(w, r)
+		case LocalContextServiceGetFxRatesProcedure:
+			localContextServiceGetFxRatesHandler.ServeHTTP(w, r)
+		case LocalContextServiceEstimateDriveCostProcedure:
+			localContextServiceEstimateDriveCostHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -143,4 +199,12 @@ func (UnimplementedLocalContextServiceHandler) GetLocalContext(context.Context, 
 
 func (UnimplementedLocalContextServiceHandler) GetGoScore(context.Context, *connect.Request[localcontext.GetGoScoreRequest]) (*connect.Response[localcontext.GetGoScoreResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.GetGoScore is not implemented"))
+}
+
+func (UnimplementedLocalContextServiceHandler) GetFxRates(context.Context, *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.GetFxRates is not implemented"))
+}
+
+func (UnimplementedLocalContextServiceHandler) EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.EstimateDriveCost is not implemented"))
 }
