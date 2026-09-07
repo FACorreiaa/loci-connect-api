@@ -46,7 +46,7 @@ func testP8(t *testing.T) string {
 
 func appleConfig(t *testing.T) OAuthConfig {
 	return OAuthConfig{
-		AppleClientID:   "fyi.lociai.web",
+		AppleClientID:   "fyi.lociai.app",
 		AppleTeamID:     "ABCDE12345",
 		AppleKeyID:      "KEY1234567",
 		ApplePrivateKey: testP8(t),

@@ -105,21 +105,43 @@ key the server signs with rather than a secret you paste.
 1. **Team ID** — <https://developer.apple.com/account> → Membership. Ten
    characters, e.g. `A1B2C3D4E5`. → `APPLE_TEAM_ID`
 2. **App ID** — Certificates, Identifiers & Profiles → Identifiers → **+** →
-   **App IDs** → App. Give it a bundle ID (`fyi.lociai.app`) and enable the
+   **App IDs** → App. Give it a bundle ID (`com.lociai.app`) and enable the
    **Sign In with Apple** capability. This is the iOS app's identity; the web
    flow needs it to exist so the Services ID can be grouped under it.
-3. **Services ID** — Identifiers → **+** → **Services IDs**. Description
-   `Loci Web`, identifier `fyi.lociai.web`. **This identifier — not the App
-   ID — is `APPLE_CLIENT_ID`.** Getting these two the wrong way round produces
+
+   It does NOT need a shipped app behind it — no build, no App Store listing,
+   no provisioning profile. But the string is permanent: it becomes the iOS
+   bundle ID, and changing it later means a new listing and new Apple user
+   identifiers for everyone.
+3. **Services ID** — Identifiers → **+** → **Services IDs**. Its identifier is
+   `fyi.lociai.app`. **That identifier — not the App ID — is
+   `APPLE_CLIENT_ID`.** Getting the two the wrong way round produces
    `invalid_client`, which says nothing about which one is wrong.
+
+   > **App IDs and Services IDs share one identifier namespace.** Registering
+   > an App ID fails with "An App ID with Identifier '...' is not available" if
+   > a *Services* ID already holds that string — and the Identifiers list is
+   > filtered to App IDs by default, so the thing blocking you is invisible.
+   > Switch the filter to Services IDs before concluding somebody else owns
+   > the name. This is why Loci's two identifiers do not share a prefix.
 
    Then **Configure** the Services ID:
    - Primary App ID: the App ID from step 2
-   - **Domains and Subdomains**: `lociai.fyi`
+   - **Domains and Subdomains**: `lociai.fyi` — bare host, no scheme, no path
    - **Return URLs**: `https://lociai.fyi/auth/oauth/apple/callback`
 
    Apple rejects `http://` and rejects `localhost` here. See
    [Local development](#4-local-development) for what to do instead.
+
+   > The Configure dialog is a **picker**, not a form: domains and return URLs
+   > are registered at the team level, and this attaches them to *this*
+   > Services ID. Tick them in the list, then **Done → Continue → Save** — all
+   > three. Save on its own silently keeps nothing, which reads exactly like a
+   > page that is not working.
+   >
+   > `apple-developer-domain-association.txt` downloads from the **+**
+   > (register Website URLs) flow, not from the picker. A domain already
+   > verified by another project in the same team needs no file at all.
 
 4. **Domain verification.** Apple's Configure dialog offers a
    `apple-developer-domain-association.txt` download and then verifies it at
@@ -227,7 +249,7 @@ done
 printf %s 'YOUR_ID.apps.googleusercontent.com' > GOOGLE_CLIENT_ID
 printf %s 'GOCSPX-...'                         > GOOGLE_CLIENT_SECRET
 openssl rand -base64 32 | tr -d '\n'           > SESSION_SECRET
-printf %s 'fyi.lociai.web'                     > APPLE_CLIENT_ID
+printf %s 'fyi.lociai.app'                     > APPLE_CLIENT_ID
 printf %s 'ABCDE12345'                         > APPLE_TEAM_ID
 printf %s 'KEY1234567'                         > APPLE_KEY_ID
 cp ~/Downloads/AuthKey_KEY1234567.p8            APPLE_PRIVATE_KEY
