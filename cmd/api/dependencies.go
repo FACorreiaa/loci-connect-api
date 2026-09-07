@@ -388,7 +388,17 @@ func (d *Dependencies) initServices() error {
 
 	// Custom auth (OAuth + phone). Both degrade gracefully when their env vars
 	// are absent: OAuth registers no providers, phone reports disabled.
-	d.OAuthService = customauthservice.NewOAuthService(customauthservice.LoadOAuthConfigFromEnv())
+	//
+	// An error here means a provider is PARTLY configured, which is a
+	// deployment mistake rather than a choice not to offer it — and one whose
+	// only other symptom is a sign-in button that fails for every visitor.
+	oauthSvc, err := customauthservice.NewOAuthService(
+		customauthservice.LoadOAuthConfigFromEnv(), d.Logger,
+	)
+	if err != nil {
+		return fmt.Errorf("oauth: %w", err)
+	}
+	d.OAuthService = oauthSvc
 	d.PhoneService = customauthservice.NewPhoneService(customauthservice.LoadTwilioConfigFromEnv())
 	d.ReviewSvc = reviewdomain.NewService(d.ReviewRepo, d.Logger)
 
@@ -465,6 +475,18 @@ func (d *Dependencies) initMessaging() {
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
 	)
+}
+
+// RunAppleSecretRefresh re-signs Apple's client secret until ctx is cancelled.
+//
+// Returns nil immediately when Apple sign-in is not configured, so the caller
+// can start it unconditionally. Apple caps the secret's lifetime at six months;
+// see internal/domain/custom_auth/service.
+func (d *Dependencies) RunAppleSecretRefresh(ctx context.Context) error {
+	if d.OAuthService == nil {
+		return nil
+	}
+	return d.OAuthService.RunAppleSecretRefresh(ctx)
 }
 
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
