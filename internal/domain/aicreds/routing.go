@@ -13,6 +13,7 @@ import (
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -42,9 +43,38 @@ type Router struct {
 	// providers.GatewayHTTPClient.
 	httpClient *http.Client
 
+	// free serves callers with no provider of their own and no paid plan. Nil
+	// when no free chain is configured, in which case the tier is moot and
+	// everyone gets the shared chain — today's behaviour.
+	free generativeAI.ChatClient
+	// plans resolves a caller's effective plan. Nil disables tier routing.
+	plans PlanLookup
+
 	mu     sync.Mutex
 	cached map[uuid.UUID]*cachedClient
+	// planCache holds the answer briefly. A single chat turn makes several
+	// model calls, and a subscriptions query per call would be a query per
+	// token stream.
+	planCache map[uuid.UUID]cachedPlan
 }
+
+// PlanLookup reports a user's effective plan. Satisfied by
+// subscription.Service.
+type PlanLookup interface {
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
+type cachedPlan struct {
+	plan string
+	at   time.Time
+}
+
+// planTTL is how long a plan answer is reused.
+//
+// Short: an upgrade should take effect while somebody is still looking at the
+// screen that sold it to them. Long enough that a burst of model calls inside
+// one turn asks once.
+const planTTL = time.Minute
 
 type cachedClient struct {
 	client generativeAI.ChatClient
@@ -69,7 +99,23 @@ func NewRouter(shared generativeAI.ChatClient, svc *Service, logger *slog.Logger
 		logger:     logger,
 		httpClient: &http.Client{},
 		cached:     make(map[uuid.UUID]*cachedClient),
+		planCache:  make(map[uuid.UUID]cachedPlan),
 	}
+}
+
+// WithFreeTier routes callers with no provider of their own and no paid plan to
+// free, instead of the chain the operator pays for.
+//
+// Both arguments are required for the routing to engage: without a plan lookup
+// there is no way to tell a free caller from a paying one, and guessing in
+// either direction is worse than not routing at all.
+func (r *Router) WithFreeTier(free generativeAI.ChatClient, plans PlanLookup) *Router {
+	if free == nil || plans == nil {
+		return r
+	}
+	r.free = free
+	r.plans = plans
+	return r
 }
 
 // clientFor answers which client serves this call.
@@ -78,18 +124,23 @@ func NewRouter(shared generativeAI.ChatClient, svc *Service, logger *slog.Logger
 // degrade the account to Loci's provider, not break it: the alternative is
 // that one bad key saved in settings makes every itinerary request fail.
 func (r *Router) clientFor(ctx context.Context) generativeAI.ChatClient {
-	if r.svc == nil || !r.svc.Enabled() {
-		return r.shared
-	}
-
 	rawID, ok := interceptors.GetUserIDFromContext(ctx)
 	if !ok {
-		// Background work and unauthenticated paths run on Loci's provider.
+		// Background work and unauthenticated paths have no caller, so there
+		// is no credential to find and no plan to read.
 		return r.shared
 	}
 	userID, err := uuid.Parse(rawID)
 	if err != nil {
 		return r.shared
+	}
+
+	// Tier routing does not depend on bring-your-own-key. With no encryption
+	// key configured there are no stored credentials to consult, but a free
+	// caller should still be served by the free chain rather than the one the
+	// operator pays for.
+	if r.svc == nil || !r.svc.Enabled() {
+		return r.chainForPlan(ctx, userID)
 	}
 
 	resolved, err := r.svc.Resolve(ctx, userID)
@@ -100,7 +151,7 @@ func (r *Router) clientFor(ctx context.Context) generativeAI.ChatClient {
 		// it — otherwise that client would hold connections to a provider the
 		// user has stopped paying for until the process exits.
 		r.Forget(userID)
-		return r.shared
+		return r.chainForPlan(ctx, userID)
 	case err != nil:
 		// A stored credential that will not open — the encryption key was
 		// rotated out from under it, or the address it names is no longer one
@@ -118,6 +169,55 @@ func (r *Router) clientFor(ctx context.Context) generativeAI.ChatClient {
 		return r.shared
 	}
 	return client
+}
+
+// chainForPlan picks between the free chain and the one the operator pays for.
+//
+// A brought key never reaches here — it outranks the tier, because the user is
+// paying the provider directly and the plan says nothing about which backend
+// should answer.
+//
+// Every uncertainty resolves to the free chain. An unreadable plan must not
+// spend the operator's tokens: billing somebody on a database error is a worse
+// mistake than serving them a cheaper model.
+func (r *Router) chainForPlan(ctx context.Context, userID uuid.UUID) generativeAI.ChatClient {
+	if r.free == nil || r.plans == nil {
+		return r.shared
+	}
+
+	plan, err := r.effectivePlan(ctx, userID)
+	if err != nil {
+		r.logger.WarnContext(ctx, "could not read the caller's plan; serving the free chain",
+			slog.String("user_id", userID.String()),
+			slog.String("error", err.Error()))
+		return r.free
+	}
+	if subscription.IsProPlan(plan) {
+		return r.shared
+	}
+	return r.free
+}
+
+// effectivePlan reads the plan, reusing a recent answer.
+func (r *Router) effectivePlan(ctx context.Context, userID uuid.UUID) (string, error) {
+	now := time.Now()
+
+	r.mu.Lock()
+	if hit, ok := r.planCache[userID]; ok && now.Sub(hit.at) < planTTL {
+		r.mu.Unlock()
+		return hit.plan, nil
+	}
+	r.mu.Unlock()
+
+	plan, err := r.plans.EffectivePlan(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+
+	r.mu.Lock()
+	r.planCache[userID] = cachedPlan{plan: plan, at: now}
+	r.mu.Unlock()
+	return plan, nil
 }
 
 // recordFailure notes why this credential did not serve the request.

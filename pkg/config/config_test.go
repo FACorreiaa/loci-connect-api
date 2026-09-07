@@ -526,3 +526,83 @@ func TestLoad_EncryptionKeyIsUsableBySecret(t *testing.T) {
 		t.Fatalf("the configured key does not build a sealer: %v", err)
 	}
 }
+
+// The production guard used to forbid the fallback chain outright, which also
+// forbade a free floor. It now forbids the thing that was actually dangerous:
+// a free model serving as the PRIMARY, where its shared rate limit becomes
+// every paying request's problem.
+func TestLoad_ProductionAllowsAFreeFloorButNotAFreePrimary(t *testing.T) {
+	base := func(t *testing.T) {
+		t.Helper()
+		t.Setenv("APP_ENV", "production")
+		t.Setenv("AI_PROVIDER", AIProviderOpenRouter)
+		t.Setenv("OPENROUTER_API_KEY", "paid-key")
+		t.Setenv("OPENROUTER_EMBEDDING_MODEL", "openai/text-embedding-3-small")
+		t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+		t.Setenv("JWT_REFRESH_SECRET", "different-secret-different-secret")
+		// Production refuses Open-Meteo without a key (its free tier is
+		// non-commercial and Loci sells subscriptions), and no provider named
+		// plus no OpenWeather key defaults to Open-Meteo. Unrelated to the
+		// chain, but it gates Load.
+		t.Setenv("OPENWEATHER_API_KEY", "test-weather-key")
+	}
+
+	t.Run("a free floor is allowed", func(t *testing.T) {
+		base(t)
+		t.Setenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+		t.Setenv("AI_FALLBACK_ENABLED", "true")
+		t.Setenv("AI_FALLBACK_OPENROUTER_API_KEY", "free-key")
+		t.Setenv("AI_FALLBACK_MODELS", "z-ai/glm-5.2:free")
+
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load refused a free floor: %v", err)
+		}
+		if !cfg.AI.FallbackEnabled || len(cfg.AI.Fallbacks) != 1 {
+			t.Fatalf("fallbacks = %v enabled=%v", cfg.AI.Fallbacks, cfg.AI.FallbackEnabled)
+		}
+	})
+
+	t.Run("a free primary is still refused", func(t *testing.T) {
+		base(t)
+		t.Setenv("OPENROUTER_MODEL", "z-ai/glm-5.2:free")
+
+		if _, err := Load(); err == nil {
+			t.Fatal("a :free model was accepted as the production primary")
+		}
+	})
+
+	// The spend ceiling: a dedicated fallback key is the shared free floor, so
+	// everything on it must be zero-cost. Without this, one non-free entry
+	// bills the operator for every free-tier caller.
+	t.Run("a dedicated fallback key requires free models", func(t *testing.T) {
+		base(t)
+		t.Setenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+		t.Setenv("AI_FALLBACK_ENABLED", "true")
+		t.Setenv("AI_FALLBACK_OPENROUTER_API_KEY", "free-key")
+		t.Setenv("AI_FALLBACK_MODELS", "anthropic/claude-opus-4")
+
+		_, err := Load()
+		if err == nil {
+			t.Fatal("a paid model was accepted on the dedicated free-floor key")
+		}
+		if !strings.Contains(err.Error(), ":free") {
+			t.Errorf("error = %q, want it to name the :free requirement", err)
+		}
+	})
+
+	// Without a dedicated key the fallbacks run on the operator's own paid
+	// account, which is a deliberate paid backstop rather than a free floor —
+	// so the ceiling does not apply.
+	t.Run("without a dedicated key paid fallbacks are allowed", func(t *testing.T) {
+		base(t)
+		t.Setenv("OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
+		t.Setenv("AI_FALLBACK_ENABLED", "true")
+		t.Setenv("AI_FALLBACK_OPENROUTER_API_KEY", "")
+		t.Setenv("AI_FALLBACK_MODELS", "anthropic/claude-opus-4")
+
+		if _, err := Load(); err != nil {
+			t.Fatalf("Load refused a paid backstop on the primary key: %v", err)
+		}
+	})
+}
