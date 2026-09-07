@@ -77,6 +77,28 @@ type ServiceImpl struct {
 	prefVectors preference.VectorReader
 }
 
+// Option adjusts how the service reaches its model provider.
+type Option func(generativeAI.ChatClient) generativeAI.ChatClient
+
+// WithClientWrapper wraps the provider chain this service was built with, so a
+// request can be served by the caller's own provider without this package
+// knowing that per-user credentials exist. See aicreds.Router.
+func WithClientWrapper(wrap func(generativeAI.ChatClient) generativeAI.ChatClient) Option {
+	return Option(wrap)
+}
+
+func applyOptions(client generativeAI.ChatClient, opts []Option) generativeAI.ChatClient {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if wrapped := opt(client); wrapped != nil {
+			client = wrapped
+		}
+	}
+	return client
+}
+
 func NewServiceImpl(
 	poiRepository Repository,
 	embeddingService generativeAI.EmbeddingClient,
@@ -88,6 +110,7 @@ func NewServiceImpl(
 	llmSem *concurrency.LLMSemaphore,
 	appCache cachestore.Store,
 	logger *slog.Logger,
+	opts ...Option,
 ) *ServiceImpl {
 	ctx := context.Background()
 	logger.Debug("initializing POI AI client", slog.String("model", aiCfg.Model))
@@ -101,6 +124,12 @@ func NewServiceImpl(
 		logger.Error("no usable AI provider; LLM-backed POI features disabled",
 			slog.Any("error", err))
 		aiClient = nil
+	}
+	if aiClient != nil {
+		// Only ever wraps a real client: the nil above means no provider could
+		// be built at all, and wrapping that would turn every call site's nil
+		// check into a non-nil interface holding nothing.
+		aiClient = applyOptions(aiClient, opts)
 	}
 
 	if embeddingService == nil {

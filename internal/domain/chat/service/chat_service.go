@@ -114,6 +114,31 @@ type ServiceImpl struct {
 	llmSem           *concurrency.LLMSemaphore
 }
 
+// Option adjusts how the service reaches its model provider.
+type Option func(generativeAI.ChatClient) generativeAI.ChatClient
+
+// WithClientWrapper wraps the provider chain this service was built with.
+//
+// It exists so a request can be served by the caller's own provider without
+// this package knowing that per-user credentials exist: the wrapper decides,
+// and the dozen call sites that reach for the client are unchanged. See
+// aicreds.Router.
+func WithClientWrapper(wrap func(generativeAI.ChatClient) generativeAI.ChatClient) Option {
+	return Option(wrap)
+}
+
+func applyOptions(client generativeAI.ChatClient, opts []Option) generativeAI.ChatClient {
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if wrapped := opt(client); wrapped != nil {
+			client = wrapped
+		}
+	}
+	return client
+}
+
 // NewLlmInteractiontService creates a new user service instance.
 func NewLlmInteractiontService(interestRepo interests.Repository,
 	searchProfileRepo profiles.Repository,
@@ -129,12 +154,14 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 	aiCfg config.AIConfig,
 	llmSem *concurrency.LLMSemaphore,
 	appCache cachestore.Store,
+	opts ...Option,
 ) (*ServiceImpl, error) {
 	ctx := context.Background()
 	aiClient, err := ai.NewChatClient(ctx, aiCfg, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AI chat client: %w", err)
 	}
+	aiClient = applyOptions(aiClient, opts)
 
 	// Initialize embedding service
 	embeddingService, err := ai.NewEmbeddingClient(ctx, aiCfg, logger)

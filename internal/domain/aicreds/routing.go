@@ -95,7 +95,11 @@ func (r *Router) clientFor(ctx context.Context) generativeAI.ChatClient {
 	resolved, err := r.svc.Resolve(ctx, userID)
 	switch {
 	case errors.Is(err, ErrNotFound):
-		// The ordinary case: this account did not bring a key.
+		// The ordinary case: this account did not bring a key. It is also what
+		// a deletion looks like, so drop any client still cached from before
+		// it — otherwise that client would hold connections to a provider the
+		// user has stopped paying for until the process exits.
+		r.Forget(userID)
 		return r.shared
 	case err != nil:
 		// A stored credential that will not open — the encryption key was
@@ -172,8 +176,13 @@ func (r *Router) cachedFor(ctx context.Context, userID uuid.UUID, resolved Resol
 	return client, nil
 }
 
-// Forget drops the cached client for a user, so a credential deleted through
-// settings stops serving requests immediately rather than at its next change.
+// Forget drops the cached client for a user.
+//
+// Called when a credential resolves to nothing, which is what a deletion looks
+// like from here. Routing is already correct without it — Resolve reports
+// ErrNotFound and the account falls back before the cache is consulted — so
+// this exists to release the connections, not to change the answer. That is
+// also why no caller has to remember to invoke it.
 func (r *Router) Forget(userID uuid.UUID) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

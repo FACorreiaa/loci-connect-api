@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
@@ -53,6 +55,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 )
 
@@ -94,7 +97,10 @@ type Dependencies struct {
 	TokenManager service.TokenManager
 	AuthService  *service.AuthService
 	// MFAService is nil when MFA_SECRET_KEY is unset.
-	MFAService          *mfa.Service
+	MFAService *mfa.Service
+	// AICredentials is nil when ENCRYPTION_KEY is unset, which leaves every
+	// account on Loci's own model provider.
+	AICredentials       *aicreds.Service
 	ChatService         chatservice.LlmInteractiontService
 	ProfileSvc          profiles.Service
 	POISvc              poirepo.Service
@@ -299,7 +305,15 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize cache: %w", err)
 	}
 	d.AppCache = appCache
-	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.AI, llmSem, appCache, d.Logger)
+
+	// Bring-your-own-key. Leaves both services on Loci's own provider when
+	// ENCRYPTION_KEY is unset, exactly as before.
+	if err := d.initAICredentials(); err != nil {
+		return err
+	}
+	byok := d.byokWrapper()
+
+	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.AI, llmSem, appCache, d.Logger, byok)
 	poiSvc.SetPreferenceVectors(d.PreferenceVectors)
 	d.POISvc = poiSvc
 	chatSvc, err := chatservice.NewLlmInteractiontService(
@@ -317,6 +331,7 @@ func (d *Dependencies) initServices() error {
 		d.Config.AI,
 		llmSem,
 		appCache,
+		chatservice.Option(byok),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
@@ -361,6 +376,53 @@ func (d *Dependencies) initServices() error {
 
 	d.Logger.Info("services initialized")
 	return nil
+}
+
+// initAICredentials wires bring-your-own-key when an encryption key is
+// configured.
+//
+// Absence of ENCRYPTION_KEY is a supported state: every account runs on Loci's
+// own provider, which is what happens today. A key that is present but
+// malformed IS an error, the same way a bad MFA_SECRET_KEY is. Booting past it
+// would disable the feature silently, so an operator who set the variable
+// would see a settings page refusing to store keys, and any account that had
+// already brought one would quietly go back to being served by us.
+func (d *Dependencies) initAICredentials() error {
+	raw := d.Config.Secrets.EncryptionKey
+	if raw == "" {
+		d.Logger.Warn("ENCRYPTION_KEY not set; bring-your-own-key is disabled")
+		return nil
+	}
+
+	keys, err := secret.ParseKeys(raw)
+	if err != nil {
+		// The error names the shape of the problem, never the key material.
+		return fmt.Errorf("ENCRYPTION_KEY is malformed: %w", err)
+	}
+
+	sealer, err := secret.NewSealer(keys...)
+	if err != nil {
+		return fmt.Errorf("ENCRYPTION_KEY cannot be used: %w", err)
+	}
+
+	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer)
+	d.Logger.Info("bring-your-own-key enabled", slog.Int("encryption_keys", len(keys)))
+	return nil
+}
+
+// byokWrapper returns the wrapper that lets a request be served by its
+// caller's own provider.
+//
+// One router per service rather than one shared between them, because each
+// builds its own provider chain and a router wraps exactly one. They keep
+// separate caches; the entries are per user and closed on shutdown.
+func (d *Dependencies) byokWrapper() func(generativeAI.ChatClient) generativeAI.ChatClient {
+	if d.AICredentials == nil {
+		return nil
+	}
+	return func(shared generativeAI.ChatClient) generativeAI.ChatClient {
+		return aicreds.NewRouter(shared, d.AICredentials, d.Logger)
+	}
 }
 
 // initMFA wires the MFA service when a secret key is configured.

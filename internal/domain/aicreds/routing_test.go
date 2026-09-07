@@ -244,7 +244,7 @@ func TestCloseClosesTheSharedClientAndEveryUsersOwn(t *testing.T) {
 
 // Deleting a credential in settings must stop it serving immediately, not at
 // its next change — there will not be one.
-func TestForgetDropsACachedClient(t *testing.T) {
+func TestDeletingACredentialReleasesItsClient(t *testing.T) {
 	r, _, _ := newRouter(t)
 	user := uuid.New()
 
@@ -256,13 +256,14 @@ func TestForgetDropsACachedClient(t *testing.T) {
 	if err := r.svc.Delete(t.Context(), user); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	r.Forget(user)
 
-	if len(r.cached) != 0 {
-		t.Error("the client outlived the credential")
-	}
+	// No Forget call: the next request is what notices, so deleting a
+	// credential does not depend on a handler remembering to tell the router.
 	if got := answered(t, r, authed(t, user)); got != "shared-model" {
 		t.Errorf("answered by %q after deletion, want the shared provider", got)
+	}
+	if len(r.cached) != 0 {
+		t.Error("the client outlived the credential it was built from")
 	}
 }
 
