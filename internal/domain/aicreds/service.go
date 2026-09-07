@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -63,6 +64,12 @@ type Resolved struct {
 	// through ParseGatewayURL.
 	BaseURL string
 	APIKey  string
+
+	// Version is the credential's updated_at. Callers that cache a client
+	// built from this compare it to decide whether the cached one is stale,
+	// which is what makes a saved change take effect on the next request
+	// rather than the next deploy.
+	Version time.Time
 }
 
 // Service validates, seals and opens provider credentials.
@@ -209,7 +216,13 @@ func (s *Service) Resolve(ctx context.Context, userID uuid.UUID) (Resolved, erro
 		baseURL = parsed
 	}
 
-	return Resolved{Provider: entry.Name, Model: model, BaseURL: baseURL, APIKey: string(plaintext)}, nil
+	return Resolved{
+		Provider: entry.Name,
+		Model:    model,
+		BaseURL:  baseURL,
+		APIKey:   string(plaintext),
+		Version:  c.UpdatedAt,
+	}, nil
 }
 
 // hint is the tail of the key, for "a key ending a203 is stored".
