@@ -130,7 +130,16 @@ jobs:
           branch="promote/loci-${short}"
 
           values=apps/loci/api/values-production.yaml
-          manifest=apps/loci/data/postgres.yaml
+          # Every manifest that pins an image. The two CronJobs run the same
+          # two images as the API and its Postgres — the rerank shares the
+          # API's config loader and migrations, and pg_dump must match the
+          # server's major version — so leaving them behind would pin them to
+          # whatever tag they were written with, forever.
+          manifests=(
+            apps/loci/data/postgres.yaml
+            apps/loci/data/preference-rerank-cronjob.yaml
+            apps/loci/data/backup-cronjob.yaml
+          )
 
           # sed rather than yq: both files carry the reasoning for what they do
           # in comments and blank lines between blocks, and `yq -i` rewrites the
@@ -141,7 +150,15 @@ jobs:
           # The API and Postgres images are built from the same commit and move
           # together. A Postgres older than the migrations about to run against
           # it is a broken deploy, not a version skew.
-          sed -i -E "s|^( *image: ghcr\\.io/facorreiaa/loci-connect-api-postgres:).*|\1${TAG}|" "$manifest"
+          #
+          # The two patterns are mutually exclusive — the API one requires a
+          # colon straight after "api", so it cannot match "api-postgres:" —
+          # which is why both can run over every file regardless of which
+          # images that file happens to pin.
+          for m in "${manifests[@]}"; do
+            sed -i -E "s|^( *image: ghcr\\.io/facorreiaa/loci-connect-api-postgres:).*|\1${TAG}|" "$m"
+            sed -i -E "s|^( *image: ghcr\\.io/facorreiaa/loci-connect-api:).*|\1${TAG}|" "$m"
+          done
 
           if git diff --quiet; then
             echo "already at ${short}; nothing to promote"
@@ -151,7 +168,7 @@ jobs:
           git config user.name "loci-ci"
           git config user.email "ci@users.noreply.github.com"
           git checkout -b "${branch}"
-          git add "$values" "$manifest"
+          git add "$values" "${manifests[@]}"
           git commit -m "chore(loci): promote image to ${short}"
           git push origin "${branch}"
 
