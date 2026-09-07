@@ -23,6 +23,7 @@ type Config struct {
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
 	AI            AIConfig
+	Secrets       SecretsConfig
 }
 
 type CacheConfig struct {
@@ -139,6 +140,21 @@ type AuthConfig struct {
 	MFARequiredForRole string
 }
 
+// SecretsConfig holds the key material that seals user-supplied secrets at
+// rest: bring-your-own-key provider credentials and external MCP access
+// tokens. Distinct from AuthConfig.MFASecretKey, which seals one thing Loci
+// generates itself.
+type SecretsConfig struct {
+	// EncryptionKey is ENCRYPTION_KEY in pkg/secret's format: comma-separated
+	// "<id>:<base64 of 32 bytes>" entries with the active key first, or a bare
+	// base64 key meaning id 1. Two entries is what rotation looks like.
+	//
+	// Empty is a supported state. It disables every feature that would
+	// otherwise have to store a user's secret, which is the only honest
+	// alternative to storing one in the clear.
+	EncryptionKey string
+}
+
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
 type SubscriptionConfig struct {
@@ -209,6 +225,9 @@ func Load() (*Config, error) {
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
 			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 100),
+		},
+		Secrets: SecretsConfig{
+			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),
