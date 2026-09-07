@@ -86,7 +86,14 @@ func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	key, plaintext, err := h.svc.Create(ctx, userID, req.Msg.GetName(), expiresAt, scopes)
+	// TODO(connections): read the client kind from the request and return the
+	// setup instructions alongside the key, once loci-connect-proto with
+	// CreateApiKeyRequest.client_kind is published and this module depends on
+	// it. Until then every key is minted as ClientOther, which is what the
+	// generic instructions describe and what pre-existing keys already carry.
+	clientKind := ClientOther
+
+	key, plaintext, err := h.svc.Create(ctx, userID, req.Msg.GetName(), expiresAt, scopes, clientKind)
 	if err != nil {
 		h.logger.ErrorContext(ctx, "failed to create api key", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to create api key"))

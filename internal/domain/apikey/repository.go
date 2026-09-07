@@ -40,10 +40,14 @@ type Key struct {
 	// owning user, so this is the only thing narrowing it from full account
 	// access.
 	Scopes []Scope
+
+	// ClientKind is which agent this key's setup instructions were written
+	// for. Presentation only — see the type.
+	ClientKind ClientKind
 }
 
 type Repository interface {
-	Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error)
+	Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope, clientKind ClientKind) (*Key, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]Key, error)
 	// Revoke marks the key revoked; returns ErrNotFound when the key does not
 	// belong to userID or is already revoked.
@@ -61,28 +65,40 @@ func NewRepository(pgpool PgxPool) Repository {
 	return &repository{pgpool: pgpool}
 }
 
-const keyColumns = `id, user_id, name, key_prefix, created_at, last_used_at, expires_at, revoked_at, scopes`
+const keyColumns = `id, user_id, name, key_prefix, created_at, last_used_at, expires_at, revoked_at, scopes, client_kind`
 
 func scanKey(row pgx.Row) (*Key, error) {
 	var k Key
 	var scopes []string
-	err := row.Scan(&k.ID, &k.UserID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &k.LastUsedAt, &k.ExpiresAt, &k.RevokedAt, &scopes)
+	var clientKind string
+	err := row.Scan(&k.ID, &k.UserID, &k.Name, &k.KeyPrefix, &k.CreatedAt, &k.LastUsedAt, &k.ExpiresAt, &k.RevokedAt, &scopes, &clientKind)
 	if err != nil {
 		return nil, err
 	}
 	k.Scopes = ScopesFromStrings(scopes)
+	// Read leniently: the column is constrained, but a row written by a
+	// future version should render as "other" rather than break the listing
+	// that is how somebody revokes a key.
+	if kind := ClientKind(clientKind); kind.Valid() {
+		k.ClientKind = kind
+	} else {
+		k.ClientKind = ClientOther
+	}
 	return &k, nil
 }
 
-func (r *repository) Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error) {
+func (r *repository) Create(ctx context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope, clientKind ClientKind) (*Key, error) {
 	if len(scopes) == 0 {
 		scopes = DefaultScopes
 	}
+	if !clientKind.Valid() {
+		clientKind = ClientOther
+	}
 	query := `
-		INSERT INTO api_keys (user_id, name, key_prefix, key_hash, expires_at, scopes)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO api_keys (user_id, name, key_prefix, key_hash, expires_at, scopes, client_kind)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING ` + keyColumns
-	k, err := scanKey(r.pgpool.QueryRow(ctx, query, userID, name, keyPrefix, keyHash, expiresAt, ScopeStrings(scopes)))
+	k, err := scanKey(r.pgpool.QueryRow(ctx, query, userID, name, keyPrefix, keyHash, expiresAt, ScopeStrings(scopes), string(clientKind)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create api key: %w", err)
 	}

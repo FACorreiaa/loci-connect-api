@@ -161,3 +161,22 @@ func guardTool[In, Out any](
 		return result, out, nil
 	}
 }
+
+// ReadOnlyToolNames returns the tools a key with only ScopeRead may call.
+//
+// Exported for the setup instructions the settings page shows: an agent
+// verifying its connection should list the tools and call one that cannot
+// change anything or spend the owner's daily quota. Returned as a copy so a
+// caller cannot reorder the table that decides which scope a tool needs.
+func ReadOnlyToolNames() []string {
+	return append([]string(nil), readOnlyTools...)
+}
+
+// GeneratingToolNames returns the tools that spend the daily LLM quota.
+//
+// The setup instructions name them so an agent is told not to call them while
+// checking that its connection works — an unlucky verification would otherwise
+// cost the owner a generation.
+func GeneratingToolNames() []string {
+	return append([]string(nil), generatingTools...)
+}
