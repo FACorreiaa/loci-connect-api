@@ -64,7 +64,7 @@ out change my data?"
 | Tool | Purpose |
 |---|---|
 | `status` | What this key may do, the bounds every tool enforces, how results are grounded. |
-| `search_pois` | Keyword + semantic search near a location. |
+| `search_pois` | Keyword and semantic search near a location, fused. Each result reports which lane matched. |
 | `get_poi_details` | Full detail for one place by id. |
 | `find_nearby` | Restaurants, hotels, activities or attractions within a radius. |
 | `list_itineraries` | The caller's saved itineraries. |
@@ -76,6 +76,26 @@ out change my data?"
 `find_nearby` is read-only from the caller's perspective but may trigger
 enrichment writes to Loci's own POI corpus on first request for an area. It never
 writes to the caller's data.
+
+`search_pois` runs two independent retrieval lanes and fuses them with
+reciprocal-rank fusion:
+
+- **lexical** — full-text over the weighted `search_tsv` column plus a trigram
+  arm for misspellings. Deterministic, needs no embedding, and the only lane
+  that can match a proper noun.
+- **semantic** — a query embedding against POI embeddings, which finds things a
+  keyword cannot ("somewhere quiet for coffee").
+
+Each result's `match_reason` names the lane that matched it — `lexical`,
+`semantic`, or `both`. It is not a blanket label: two results in one response
+can carry different reasons, and that difference is real.
+
+One lane failing is logged and skipped rather than failing the call, because a
+single working lane still answers the question. Both failing is an error.
+
+`radius_km` is a **hard bound on both lanes**, not a ranking hint: a name match
+outside it is not returned. It defaults to 25 km, which is wide enough for a
+search centred on a town to reach the coast around it.
 
 ### Mutating — require `write`
 

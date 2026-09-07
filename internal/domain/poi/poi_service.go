@@ -42,6 +42,13 @@ type Service interface {
 	SearchPOIsSemanticByCity(ctx context.Context, query string, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error)
 	SearchPOIsByQueryAndCity(ctx context.Context, query, cityName string) ([]locitypes.POIDetailedInfo, error)
 	SearchPOIsHybrid(ctx context.Context, filter locitypes.POIFilter, query string, semanticWeight float64) ([]locitypes.POIDetailedInfo, error)
+
+	// SearchPOIsFused answers a text query with a lexical lane and a
+	// semantic/spatial lane, fused with RRF, and reports per result which
+	// lane matched. Prefer it over SearchPOIsHybrid for anything a user
+	// typed: Hybrid has no lexical arm and degrades to distance ranking when
+	// the rows have no embedding.
+	SearchPOIsFused(ctx context.Context, filter locitypes.POIFilter, query string, semanticWeight float64) ([]SearchResult, error)
 	GenerateEmbeddingForPOI(ctx context.Context, poiID uuid.UUID) error
 	GenerateEmbeddingsForAllPOIs(ctx context.Context, batchSize int) error
 
