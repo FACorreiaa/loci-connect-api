@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -32,6 +33,54 @@ type listItinerariesOutput struct {
 
 type getItineraryInput struct {
 	ID string `json:"id" jsonschema:"itinerary id from list_itineraries"`
+}
+
+// ItineraryDetail is the full single-itinerary representation, with the
+// markdown body that list_itineraries omits.
+//
+// Hand-written with string ids for the same reason as POIDetail: returning
+// locitypes.UserSavedItinerary declared its uuid.UUID ids as 16-integer arrays
+// while marshalling them as strings, and the SDK's output validation rejected
+// the call before the client saw it.
+type ItineraryDetail struct {
+	ID              string   `json:"id"`
+	Title           string   `json:"title"`
+	Description     string   `json:"description,omitempty"`
+	MarkdownContent string   `json:"markdown_content,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	IsPublic        bool     `json:"is_public"`
+
+	PrimaryCityID string `json:"primary_city_id,omitempty"`
+
+	// Nullable in the database, so omitted rather than reported as zero — an
+	// agent reading "estimated_duration_days: 0" would treat an unknown as a
+	// same-day trip.
+	EstimatedDurationDays *int32 `json:"estimated_duration_days,omitempty"`
+	EstimatedCostLevel    *int32 `json:"estimated_cost_level,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func detailFromItinerary(it *locitypes.UserSavedItinerary) ItineraryDetail {
+	out := ItineraryDetail{
+		ID:                    it.ID.String(),
+		Title:                 it.Title,
+		MarkdownContent:       it.MarkdownContent,
+		Tags:                  it.Tags,
+		IsPublic:              it.IsPublic,
+		EstimatedDurationDays: it.EstimatedDurationDays,
+		EstimatedCostLevel:    it.EstimatedCostLevel,
+		CreatedAt:             it.CreatedAt,
+		UpdatedAt:             it.UpdatedAt,
+	}
+	if it.Description != nil {
+		out.Description = *it.Description
+	}
+	if it.PrimaryCityID != nil && *it.PrimaryCityID != uuid.Nil {
+		out.PrimaryCityID = it.PrimaryCityID.String()
+	}
+	return out
 }
 
 type updateItineraryInput struct {
@@ -87,20 +136,23 @@ func registerItineraryTools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_itinerary",
 		Description: "Fetch a saved itinerary including its full markdown content.",
-	}, guardTool(deps, "get_itinerary", func(ctx context.Context, _ *mcp.CallToolRequest, in getItineraryInput) (*mcp.CallToolResult, *locitypes.UserSavedItinerary, error) {
+	}, guardTool(deps, "get_itinerary", func(ctx context.Context, _ *mcp.CallToolRequest, in getItineraryInput) (*mcp.CallToolResult, ItineraryDetail, error) {
 		userID, err := callerUserID(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, ItineraryDetail{}, err
 		}
 		id, err := uuid.Parse(in.ID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("invalid itinerary id %q", in.ID)
+			return nil, ItineraryDetail{}, fmt.Errorf("invalid itinerary id %q", in.ID)
 		}
 		it, err := deps.POIService.GetItinerary(ctx, userID, id)
 		if err != nil {
-			return nil, nil, toolError(err)
+			return nil, ItineraryDetail{}, toolError(err)
 		}
-		return nil, it, nil
+		if it == nil {
+			return nil, ItineraryDetail{}, fmt.Errorf("itinerary %s not found", in.ID)
+		}
+		return nil, detailFromItinerary(it), nil
 	}))
 
 	mcp.AddTool(server, &mcp.Tool{
