@@ -1,5 +1,11 @@
-// Package openrouter adapts OpenRouter's OpenAI-compatible API to the
+// Package openrouter adapts OpenAI's chat-completions dialect to the
 // provider-neutral interfaces used by the application.
+//
+// Named for the backend it was written against and still defaults to, but the
+// dialect is not OpenRouter's: OpenAI, xAI, NVIDIA and a self-hosted Hermes
+// gateway all speak it. NewCompatibleChatClient is how one of those is reached;
+// see pkg/ai/providers for which addresses are known and which are the user's
+// to supply.
 package openrouter
 
 import (
@@ -7,7 +13,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"iter"
@@ -32,6 +37,10 @@ const (
 
 // ChatClient implements generativeAI.ChatClient using OpenRouter.
 type ChatClient struct {
+	// name is the backend this client is pointed at, used in errors and logs.
+	// Without it every failure against a user's own gateway would be reported
+	// as an OpenRouter failure.
+	name        string
 	apiKey      string
 	model       string
 	baseURL     string
@@ -46,30 +55,92 @@ type ChatClient struct {
 
 var _ generativeAI.ChatClient = (*ChatClient)(nil)
 
-// NewChatClient creates an OpenRouter chat client. The HTTP client has no
-// global timeout because each operation is bounded by its configured context.
+// Options describes one OpenAI-dialect backend.
+//
+// It exists so a user's own provider can be built per request, which
+// config.AIConfig cannot express: that struct describes the server's single
+// configured provider, and a credential someone brought is neither single nor
+// the server's.
+type Options struct {
+	// Name is the backend, for errors and logs. Defaults to "openrouter".
+	Name string
+
+	// BaseURL defaults to OpenRouter's. For a user-supplied address it must
+	// already have been through providers.ParseGatewayURL.
+	BaseURL string
+
+	APIKey string
+	Model  string
+
+	// HTTPClient is shared so a per-user provider gets connection reuse rather
+	// than a TLS handshake per request. For a user-supplied address this must
+	// be a providers.GatewayHTTPClient, which re-checks the target at dial
+	// time. Nil gets a plain client, which is only safe for the addresses this
+	// build hardcodes.
+	HTTPClient *http.Client
+
+	Logger      *slog.Logger
+	MaxRetries  int
+	BaseDelay   time.Duration
+	MaxDelay    time.Duration
+	GenerateTTL time.Duration
+	StreamTTL   time.Duration
+}
+
+// NewChatClient creates a chat client for the server's configured provider.
+// The HTTP client has no global timeout because each operation is bounded by
+// its configured context.
 func NewChatClient(cfg config.AIConfig, logger *slog.Logger) (*ChatClient, error) {
-	if cfg.APIKey == "" {
-		return nil, errors.New("OpenRouter API key is required")
+	return NewCompatibleChatClient(Options{
+		APIKey:      cfg.APIKey,
+		Model:       cfg.Model,
+		Logger:      logger,
+		MaxRetries:  cfg.MaxRetries,
+		BaseDelay:   cfg.RetryBaseDelay,
+		MaxDelay:    cfg.RetryMaxDelay,
+		GenerateTTL: cfg.GenerateTimeout,
+		StreamTTL:   cfg.StreamTimeout,
+	})
+}
+
+// NewCompatibleChatClient creates a client for any backend speaking OpenAI's
+// chat-completions dialect.
+func NewCompatibleChatClient(opts Options) (*ChatClient, error) {
+	name := opts.Name
+	if name == "" {
+		name = "openrouter"
 	}
-	if cfg.Model == "" {
-		return nil, errors.New("OpenRouter model is required")
+	baseURL := strings.TrimRight(opts.BaseURL, "/")
+	if baseURL == "" {
+		baseURL = defaultBaseURL
 	}
+	if opts.APIKey == "" {
+		return nil, fmt.Errorf("%s API key is required", name)
+	}
+	if opts.Model == "" {
+		return nil, fmt.Errorf("%s model is required", name)
+	}
+	logger := opts.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
+	httpClient := opts.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{}
+	}
 
 	return &ChatClient{
-		apiKey:      cfg.APIKey,
-		model:       cfg.Model,
-		baseURL:     defaultBaseURL,
-		httpClient:  &http.Client{},
+		name:        name,
+		apiKey:      opts.APIKey,
+		model:       opts.Model,
+		baseURL:     baseURL,
+		httpClient:  httpClient,
 		logger:      logger,
-		maxRetries:  cfg.MaxRetries,
-		baseDelay:   cfg.RetryBaseDelay,
-		maxDelay:    cfg.RetryMaxDelay,
-		generateTTL: cfg.GenerateTimeout,
-		streamTTL:   cfg.StreamTimeout,
+		maxRetries:  opts.MaxRetries,
+		baseDelay:   opts.BaseDelay,
+		maxDelay:    opts.MaxDelay,
+		generateTTL: opts.GenerateTTL,
+		streamTTL:   opts.StreamTTL,
 	}, nil
 }
 
@@ -90,7 +161,7 @@ func (c *ChatClient) Generate(
 
 	var result chatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode OpenRouter response: %w", err)
+		return nil, fmt.Errorf("decode %s response: %w", c.name, err)
 	}
 	if result.Error != nil {
 		return nil, llmerrors.Classify(result.Error.apiError(http.StatusBadGateway))
@@ -141,7 +212,7 @@ func (c *ChatClient) GenerateStream(
 
 			var chunk chatResponse
 			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				yield(nil, fmt.Errorf("decode OpenRouter stream event: %w", err))
+				yield(nil, fmt.Errorf("decode %s stream event: %w", c.name, err))
 				return
 			}
 			if chunk.Error != nil {
@@ -153,7 +224,7 @@ func (c *ChatClient) GenerateStream(
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			yield(nil, llmerrors.Classify(fmt.Errorf("read OpenRouter stream: %w", err)))
+			yield(nil, llmerrors.Classify(fmt.Errorf("read %s stream: %w", c.name, err)))
 		}
 	}
 
@@ -166,7 +237,7 @@ func (c *ChatClient) StartChatSession(
 	context.Context,
 	*genai.GenerateContentConfig,
 ) (*generativeAI.ChatSession, error) {
-	return nil, errors.New("OpenRouter stateful chat sessions are not supported")
+	return nil, fmt.Errorf("%s stateful chat sessions are not supported", c.name)
 }
 
 func (c *ChatClient) Model() string { return c.model }
@@ -176,7 +247,7 @@ func (c *ChatClient) Close() error { return nil }
 func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (*http.Response, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("encode OpenRouter request: %w", err)
+		return nil, fmt.Errorf("encode %s request: %w", c.name, err)
 	}
 
 	for attempt := 0; ; attempt++ {
@@ -187,13 +258,13 @@ func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (
 			bytes.NewReader(body),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("create OpenRouter request: %w", err)
+			return nil, fmt.Errorf("create %s request: %w", c.name, err)
 		}
 		c.setHeaders(req)
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return nil, fmt.Errorf("send OpenRouter request: %w", err)
+			return nil, fmt.Errorf("send %s request: %w", c.name, err)
 		}
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return resp, nil
@@ -206,7 +277,8 @@ func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (
 		delay := retryDelay(resp.Header.Get("Retry-After"), c.baseDelay, c.maxDelay, attempt)
 		c.logger.WarnContext(
 			ctx,
-			"retrying OpenRouter request",
+			"retrying llm request",
+			slog.String("provider", c.name),
 			slog.Int("status", resp.StatusCode),
 			slog.Int("attempt", attempt+1),
 			slog.Duration("delay", delay),
@@ -220,8 +292,13 @@ func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (
 func (c *ChatClient) setHeaders(req *http.Request) {
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", "https://loci.dev")
-	req.Header.Set("X-Title", "Loci")
+	// Attribution headers OpenRouter reads for its own dashboards. Other
+	// backends ignore them, but sending a referrer to a user's private gateway
+	// is not ours to do.
+	if c.name == "openrouter" {
+		req.Header.Set("HTTP-Referer", "https://loci.dev")
+		req.Header.Set("X-Title", "Loci")
+	}
 }
 
 type chatRequest struct {

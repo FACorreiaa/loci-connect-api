@@ -1,9 +1,12 @@
 package config
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 )
 
 func TestLoad_QuotaAndStripeDefaults(t *testing.T) {
@@ -467,5 +470,59 @@ func TestLoad_DevelopmentAllowsFreeOpenMeteo(t *testing.T) {
 
 	if _, err := Load(); err != nil {
 		t.Fatalf("the free tier is fine outside production: %v", err)
+	}
+}
+
+// The required values every Load test needs so validation passes regardless of
+// what the host environment happens to hold.
+func setLoadableEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("AI_PROVIDER", AIProviderGemini)
+	t.Setenv("GEMINI_API_KEY", "test-key")
+	t.Setenv("GEMINI_MODEL", "gemini-test")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+}
+
+// An unset ENCRYPTION_KEY must boot. It disables the features that would store
+// a user's secret; it is not a misconfiguration, and treating it as one would
+// stop the server for everyone who has not opted into BYOK.
+func TestLoad_EncryptionKeyIsOptional(t *testing.T) {
+	setLoadableEnv(t)
+	t.Setenv("ENCRYPTION_KEY", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Secrets.EncryptionKey != "" {
+		t.Errorf("EncryptionKey = %q, want empty", cfg.Secrets.EncryptionKey)
+	}
+}
+
+// Config carries the raw value; pkg/secret owns the format. This checks the two
+// agree, so a key that boots is a key that can actually seal.
+func TestLoad_EncryptionKeyIsUsableBySecret(t *testing.T) {
+	setLoadableEnv(t)
+
+	material := make([]byte, secret.KeySize)
+	for i := range material {
+		material[i] = byte(i)
+	}
+	t.Setenv("ENCRYPTION_KEY", base64.StdEncoding.EncodeToString(material))
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	keys, err := secret.ParseKeys(cfg.Secrets.EncryptionKey)
+	if err != nil {
+		t.Fatalf("the configured key is not one pkg/secret accepts: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("got %d keys, want 1", len(keys))
+	}
+	if _, err := secret.NewSealer(keys...); err != nil {
+		t.Fatalf("the configured key does not build a sealer: %v", err)
 	}
 }

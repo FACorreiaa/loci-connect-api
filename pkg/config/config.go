@@ -23,6 +23,8 @@ type Config struct {
 	Observability ObservabilityConfig
 	Profiling     ProfilingConfig
 	AI            AIConfig
+	Secrets       SecretsConfig
+	Messaging     MessagingConfig
 }
 
 type CacheConfig struct {
@@ -139,6 +141,36 @@ type AuthConfig struct {
 	MFARequiredForRole string
 }
 
+// SecretsConfig holds the key material that seals user-supplied secrets at
+// rest: bring-your-own-key provider credentials and external MCP access
+// tokens. Distinct from AuthConfig.MFASecretKey, which seals one thing Loci
+// generates itself.
+type SecretsConfig struct {
+	// EncryptionKey is ENCRYPTION_KEY in pkg/secret's format: comma-separated
+	// "<id>:<base64 of 32 bytes>" entries with the active key first, or a bare
+	// base64 key meaning id 1. Two entries is what rotation looks like.
+	//
+	// Empty is a supported state. It disables every feature that would
+	// otherwise have to store a user's secret, which is the only honest
+	// alternative to storing one in the clear.
+	EncryptionKey string
+}
+
+// MessagingConfig holds the chat-platform bridge settings.
+type MessagingConfig struct {
+	// TelegramBotToken is the credential from BotFather. Empty disables the
+	// bridge entirely — no poller starts and the settings page says so rather
+	// than issuing link codes nothing can redeem.
+	//
+	// It travels in the Bot API's URL path, which is why nothing on that path
+	// wraps an error that could carry it; see internal/domain/messaging/telegram.
+	TelegramBotToken string
+
+	// TelegramBotHandle is the "@name" people send their link code to. Shown in
+	// settings; the bridge itself resolves the bot from the token.
+	TelegramBotHandle string
+}
+
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
 type SubscriptionConfig struct {
@@ -209,6 +241,13 @@ func Load() (*Config, error) {
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
 			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 100),
+		},
+		Secrets: SecretsConfig{
+			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
+		},
+		Messaging: MessagingConfig{
+			TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
+			TelegramBotHandle: getEnv("TELEGRAM_BOT_HANDLE", ""),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),

@@ -24,7 +24,7 @@ const secretBytes = 32
 type Service interface {
 	// Create mints a new key and returns its metadata plus the plaintext,
 	// which is never persisted and cannot be recovered later.
-	Create(ctx context.Context, userID uuid.UUID, name string, expiresAt *time.Time, scopes []Scope) (key *Key, plaintext string, err error)
+	Create(ctx context.Context, userID uuid.UUID, name string, expiresAt *time.Time, scopes []Scope, clientKind ClientKind) (key *Key, plaintext string, err error)
 	List(ctx context.Context, userID uuid.UUID) ([]Key, error)
 	Revoke(ctx context.Context, userID, keyID uuid.UUID) error
 	// Authenticate resolves a presented plaintext key to its owning key
@@ -56,12 +56,12 @@ func generatePlaintext() (string, error) {
 	return KeyPrefix + base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func (s *service) Create(ctx context.Context, userID uuid.UUID, name string, expiresAt *time.Time, scopes []Scope) (*Key, string, error) {
+func (s *service) Create(ctx context.Context, userID uuid.UUID, name string, expiresAt *time.Time, scopes []Scope, clientKind ClientKind) (*Key, string, error) {
 	plaintext, err := generatePlaintext()
 	if err != nil {
 		return nil, "", err
 	}
-	key, err := s.repo.Create(ctx, userID, name, plaintext[:displayPrefixLen], HashKey(plaintext), expiresAt, scopes)
+	key, err := s.repo.Create(ctx, userID, name, plaintext[:displayPrefixLen], HashKey(plaintext), expiresAt, scopes, clientKind)
 	if err != nil {
 		return nil, "", err
 	}

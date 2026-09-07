@@ -12,26 +12,31 @@ import (
 
 type fakeRepo struct {
 	created struct {
-		userID    uuid.UUID
-		name      string
-		keyPrefix string
-		keyHash   []byte
-		expiresAt *time.Time
-		scopes    []Scope
+		userID     uuid.UUID
+		name       string
+		keyPrefix  string
+		keyHash    []byte
+		expiresAt  *time.Time
+		scopes     []Scope
+		clientKind ClientKind
 	}
 	lookupHash []byte
 	lookupKey  *Key
 	lookupErr  error
 }
 
-func (f *fakeRepo) Create(_ context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope) (*Key, error) {
+func (f *fakeRepo) Create(_ context.Context, userID uuid.UUID, name, keyPrefix string, keyHash []byte, expiresAt *time.Time, scopes []Scope, clientKind ClientKind) (*Key, error) {
 	f.created.userID = userID
 	f.created.name = name
 	f.created.keyPrefix = keyPrefix
 	f.created.keyHash = keyHash
 	f.created.expiresAt = expiresAt
 	f.created.scopes = scopes
-	return &Key{ID: uuid.New(), UserID: userID, Name: name, KeyPrefix: keyPrefix, CreatedAt: time.Now(), Scopes: scopes}, nil
+	f.created.clientKind = clientKind
+	return &Key{
+		ID: uuid.New(), UserID: userID, Name: name, KeyPrefix: keyPrefix,
+		CreatedAt: time.Now(), Scopes: scopes, ClientKind: clientKind,
+	}, nil
 }
 
 func (f *fakeRepo) ListByUser(context.Context, uuid.UUID) ([]Key, error) { return nil, nil }
@@ -51,7 +56,7 @@ func TestCreateKeyFormat(t *testing.T) {
 	svc := NewService(repo)
 	userID := uuid.New()
 
-	_, plaintext, err := svc.Create(context.Background(), userID, "test key", nil, DefaultScopes)
+	_, plaintext, err := svc.Create(context.Background(), userID, "test key", nil, DefaultScopes, ClientOther)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -77,7 +82,7 @@ func TestCreateKeysAreUnique(t *testing.T) {
 	svc := NewService(&fakeRepo{})
 	seen := map[string]bool{}
 	for range 5 {
-		_, plaintext, err := svc.Create(context.Background(), uuid.New(), "k", nil, DefaultScopes)
+		_, plaintext, err := svc.Create(context.Background(), uuid.New(), "k", nil, DefaultScopes, ClientOther)
 		if err != nil {
 			t.Fatalf("Create: %v", err)
 		}
@@ -112,5 +117,23 @@ func TestAuthenticate(t *testing.T) {
 	}
 	if repo.lookupHash == nil {
 		t.Fatal("Authenticate did not hash the key for lookup")
+	}
+}
+
+// The kind is stored so the settings page can say what a key was minted for,
+// which is how somebody works out which one to revoke.
+func TestTheClientKindReachesTheRepository(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	key, _, err := svc.Create(context.Background(), uuid.New(), "Laptop", nil, []Scope{ScopeRead}, ClientCodex)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if repo.created.clientKind != ClientCodex {
+		t.Errorf("stored kind = %q, want %q", repo.created.clientKind, ClientCodex)
+	}
+	if key.ClientKind != ClientCodex {
+		t.Errorf("returned kind = %q, want %q", key.ClientKind, ClientCodex)
 	}
 }

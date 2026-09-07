@@ -1,9 +1,12 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
+	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
@@ -20,12 +23,16 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/entitlement"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/memory"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/chatbridge"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/telegram"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
@@ -53,6 +60,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 )
 
@@ -94,7 +102,18 @@ type Dependencies struct {
 	TokenManager service.TokenManager
 	AuthService  *service.AuthService
 	// MFAService is nil when MFA_SECRET_KEY is unset.
-	MFAService          *mfa.Service
+	MFAService *mfa.Service
+	// AICredentials is nil when ENCRYPTION_KEY is unset, which leaves every
+	// account on Loci's own model provider.
+	AICredentials *aicreds.Service
+	// Integrations is nil when ENCRYPTION_KEY is unset: no access token could
+	// be stored, so no external MCP server can be connected.
+	Integrations *integrations.Service
+	// Messaging is nil when no chat platform is configured.
+	Messaging *messaging.Service
+	// sealer is shared by everything that stores a user's secret, so a key
+	// rotation has one place to take effect.
+	sealer              *secret.Sealer
 	ChatService         chatservice.LlmInteractiontService
 	ProfileSvc          profiles.Service
 	POISvc              poirepo.Service
@@ -299,7 +318,15 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize cache: %w", err)
 	}
 	d.AppCache = appCache
-	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.AI, llmSem, appCache, d.Logger)
+
+	// Bring-your-own-key. Leaves both services on Loci's own provider when
+	// ENCRYPTION_KEY is unset, exactly as before.
+	if err := d.initAICredentials(); err != nil {
+		return err
+	}
+	byok := d.byokWrapper()
+
+	poiSvc := poirepo.NewServiceImpl(d.POIRepo, nil, d.CityRepo, d.DiscoverRepo, d.Config.AI, llmSem, appCache, d.Logger, byok)
 	poiSvc.SetPreferenceVectors(d.PreferenceVectors)
 	d.POISvc = poiSvc
 	chatSvc, err := chatservice.NewLlmInteractiontService(
@@ -317,6 +344,7 @@ func (d *Dependencies) initServices() error {
 		d.Config.AI,
 		llmSem,
 		appCache,
+		chatservice.Option(byok),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
@@ -328,6 +356,11 @@ func (d *Dependencies) initServices() error {
 	d.RetrievalAssembler = retrieval.NewAssembler(d.DB.Pool, d.Logger)
 	chatSvc.SetRetrievalAssembler(d.RetrievalAssembler)
 	d.ChatService = chatSvc
+
+	// Both need the same sealer as the credential store, so they are built
+	// after it and are nil for the same reason it is.
+	d.initIntegrations()
+	d.initMessaging()
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
@@ -361,6 +394,108 @@ func (d *Dependencies) initServices() error {
 
 	d.Logger.Info("services initialized")
 	return nil
+}
+
+// initAICredentials wires bring-your-own-key when an encryption key is
+// configured.
+//
+// Absence of ENCRYPTION_KEY is a supported state: every account runs on Loci's
+// own provider, which is what happens today. A key that is present but
+// malformed IS an error, the same way a bad MFA_SECRET_KEY is. Booting past it
+// would disable the feature silently, so an operator who set the variable
+// would see a settings page refusing to store keys, and any account that had
+// already brought one would quietly go back to being served by us.
+func (d *Dependencies) initAICredentials() error {
+	raw := d.Config.Secrets.EncryptionKey
+	if raw == "" {
+		d.Logger.Warn("ENCRYPTION_KEY not set; bring-your-own-key is disabled")
+		return nil
+	}
+
+	keys, err := secret.ParseKeys(raw)
+	if err != nil {
+		// The error names the shape of the problem, never the key material.
+		return fmt.Errorf("ENCRYPTION_KEY is malformed: %w", err)
+	}
+
+	sealer, err := secret.NewSealer(keys...)
+	if err != nil {
+		return fmt.Errorf("ENCRYPTION_KEY cannot be used: %w", err)
+	}
+
+	d.sealer = sealer
+	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer)
+	d.Logger.Info("bring-your-own-key enabled", slog.Int("encryption_keys", len(keys)))
+	return nil
+}
+
+// initIntegrations wires external MCP servers.
+//
+// Shares the credential service's sealer rather than building a second one: two
+// sealers over one ENCRYPTION_KEY would be two places for a rotation to go
+// wrong. Nil when bring-your-own-key is off, because an access token would then
+// have nowhere safe to live.
+func (d *Dependencies) initIntegrations() {
+	if d.sealer == nil {
+		d.Logger.Info("external MCP servers disabled; no encryption key is configured")
+		return
+	}
+	d.Integrations = integrations.NewService(
+		integrations.NewRepository(d.DB.Pool),
+		integrations.NewClient(),
+		d.sealer,
+	)
+}
+
+// initMessaging wires the chat-platform bridge.
+//
+// Absence of a bot token is a supported state and disables the bridge, so the
+// settings page explains it rather than issuing link codes nothing can redeem.
+func (d *Dependencies) initMessaging() {
+	if d.Config.Messaging.TelegramBotToken == "" {
+		d.Logger.Info("telegram bridge disabled; TELEGRAM_BOT_TOKEN is not set")
+		return
+	}
+	d.Messaging = messaging.NewService(
+		messaging.NewRepository(d.DB.Pool),
+		chatbridge.New(d.ChatService, d.Logger),
+		d.Config.Messaging.TelegramBotHandle,
+		d.Logger,
+	)
+}
+
+// RunTelegram receives and answers Telegram messages until ctx is cancelled.
+//
+// Returns nil immediately when no bot is configured, so the caller can start it
+// unconditionally. A long poll rather than a webhook because Loci has no public
+// address yet; see internal/domain/messaging/telegram.
+func (d *Dependencies) RunTelegram(ctx context.Context) error {
+	if d.Messaging == nil {
+		return nil
+	}
+
+	poller := telegram.NewPoller(
+		telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil),
+		messaging.NewRepository(d.DB.Pool),
+		d.Messaging,
+		d.Logger,
+	)
+	return poller.Run(ctx)
+}
+
+// byokWrapper returns the wrapper that lets a request be served by its
+// caller's own provider.
+//
+// One router per service rather than one shared between them, because each
+// builds its own provider chain and a router wraps exactly one. They keep
+// separate caches; the entries are per user and closed on shutdown.
+func (d *Dependencies) byokWrapper() func(generativeAI.ChatClient) generativeAI.ChatClient {
+	if d.AICredentials == nil {
+		return nil
+	}
+	return func(shared generativeAI.ChatClient) generativeAI.ChatClient {
+		return aicreds.NewRouter(shared, d.AICredentials, d.Logger)
+	}
 }
 
 // initMFA wires the MFA service when a secret key is configured.
