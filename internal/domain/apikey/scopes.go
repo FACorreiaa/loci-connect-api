@@ -44,8 +44,15 @@ type ErrInsufficientScope struct {
 }
 
 func (e *ErrInsufficientScope) Error() string {
-	return fmt.Sprintf("api key lacks the %q scope (holds: %s)",
-		e.Required, JoinScopes(e.Held))
+	// Say what to do about it, not only what is wrong. A key's scopes are
+	// chosen when it is minted and cannot be widened afterwards, so "lacks the
+	// scope" leaves the reader with no next step — and for a long time the
+	// settings UI could not mint anything but a read-only key, which made this
+	// message the only visible symptom of a UI bug.
+	return fmt.Sprintf("api key lacks the %q scope (holds: %s); "+
+		"scopes are fixed when a key is created, so create a new key with %q "+
+		"selected in Settings → MCP & API Keys",
+		e.Required, JoinScopes(e.Held), e.Required)
 }
 
 // Valid reports whether s is a scope this server recognises.
