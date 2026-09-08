@@ -26,6 +26,22 @@ import (
 const (
 	maxToolResults   = retrieval.MaxEvidence
 	descriptionLimit = retrieval.MaxDescriptionChars
+
+	// defaultSearchRadiusKm is what search_pois uses when the caller gives no
+	// radius. It was 5, which is smaller than the places people search: Cabo
+	// Girão is ~13 km from Funchal centre, so no query could reach it and the
+	// catalogue looked emptier than it is. The radius is a hard bound on both
+	// retrieval lanes, so this is the number that decides what is findable at
+	// all by default.
+	defaultSearchRadiusKm = 25
+
+	// defaultNearbyRadiusKm keeps find_nearby tighter than search_pois on
+	// purpose: "near me" means walking distance, not the same island.
+	defaultNearbyRadiusKm = 2
+
+	// semanticWeight balances the two arms inside the semantic lane. Unchanged
+	// from the previous behaviour.
+	semanticWeight = 0.6
 )
 
 // POISummary is the compact POI representation returned by list tools.
@@ -291,7 +307,7 @@ type searchPOIsInput struct {
 	Query     string  `json:"query,omitempty" jsonschema:"free-text search, e.g. 'romantic rooftop bars'; empty lists POIs near the location"`
 	Latitude  float64 `json:"latitude" jsonschema:"search center latitude"`
 	Longitude float64 `json:"longitude" jsonschema:"search center longitude"`
-	RadiusKm  float64 `json:"radius_km,omitempty" jsonschema:"search radius in kilometers, default 5"`
+	RadiusKm  float64 `json:"radius_km,omitempty" jsonschema:"search radius in kilometers, default 25; a hard bound on results"`
 	Category  string  `json:"category,omitempty" jsonschema:"optional category filter, e.g. restaurant, museum, park"`
 }
 
@@ -314,11 +330,11 @@ type findNearbyInput struct {
 func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "search_pois",
-		Description: "Search Loci's points-of-interest database near a location. Combines keyword and semantic matching when a query is given.",
+		Description: "Search Loci's points-of-interest database near a location. A query runs keyword (full-text and typo-tolerant) and semantic retrieval as separate lanes and fuses them; each result reports which lane matched. Without a query it lists the nearest places.",
 	}, guardTool(deps, "search_pois", func(ctx context.Context, _ *mcp.CallToolRequest, in searchPOIsInput) (*mcp.CallToolResult, poiListOutput, error) {
 		radius := in.RadiusKm
 		if radius <= 0 {
-			radius = 5
+			radius = defaultSearchRadiusKm
 		}
 		filter := locitypes.POIFilter{
 			Location: locitypes.GeoPoint{Latitude: in.Latitude, Longitude: in.Longitude},
@@ -326,28 +342,40 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 			Category: in.Category,
 		}
 
-		var (
-			pois []locitypes.POIDetailedInfo
-			err  error
-		)
-		if in.Query != "" {
-			pois, err = deps.POIService.SearchPOIsHybrid(ctx, filter, in.Query, 0.6)
-		} else {
-			pois, err = deps.POIService.SearchPOIs(ctx, filter)
+		// An unqueried call is a listing: nearest first, and "nearby" is the
+		// honest reason. A queried call goes through both retrieval lanes and
+		// carries a per-result reason, because a single label for the whole
+		// response cannot be true when one POI matched by name and the next by
+		// embedding.
+		if in.Query == "" {
+			pois, err := deps.POIService.SearchPOIs(ctx, filter)
+			if err != nil {
+				return nil, poiListOutput{}, toolError(err)
+			}
+			out := summarizeRecommendations(ctx, deps, pois,
+				recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER,
+				measuredDistances(pois))
+			labelMatchReason(&out, string(retrieval.MatchNearby))
+			return nil, out, nil
 		}
+
+		results, err := deps.POIService.SearchPOIsFused(ctx, filter, in.Query, semanticWeight)
 		if err != nil {
 			return nil, poiListOutput{}, toolError(err)
+		}
+
+		pois := make([]locitypes.POIDetailedInfo, 0, len(results))
+		reasons := make(map[uuid.UUID]string, len(results))
+		for _, r := range results {
+			pois = append(pois, r.POI)
+			reasons[r.POI.ID] = string(r.Reason)
 		}
 		// This tool is spatial — it takes a centre and a radius — so the
 		// distances it reports are real kilometres from that centre.
 		out := summarizeRecommendations(ctx, deps, pois,
 			recommendationv1.RecommendationSurface_RECOMMENDATION_SURFACE_DISCOVER,
 			measuredDistances(pois))
-		reason := string(retrieval.MatchNearby)
-		if in.Query != "" {
-			reason = string(retrieval.MatchBoth)
-		}
-		labelMatchReason(&out, reason)
+		applyMatchReasons(&out, reasons)
 		return nil, out, nil
 	}))
 
@@ -379,7 +407,7 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 		}
 		radiusM := in.RadiusKm * 1000
 		if radiusM <= 0 {
-			radiusM = 2000
+			radiusM = defaultNearbyRadiusKm * 1000
 		}
 
 		var pois []locitypes.POIDetailedInfo
@@ -429,5 +457,23 @@ func measuredDistances(pois []locitypes.POIDetailedInfo) map[uuid.UUID]float64 {
 func labelMatchReason(out *poiListOutput, reason string) {
 	for i := range out.Results {
 		out.Results[i].MatchReason = reason
+	}
+}
+
+// applyMatchReasons stamps each result with the lane that actually matched it.
+//
+// The blanket version claimed "both" on every result of any queried search,
+// which was false in both directions: there was no lexical arm to match, and
+// even now a POI found only by name did not match semantically. An agent citing
+// Loci deserves to know which.
+func applyMatchReasons(out *poiListOutput, reasons map[uuid.UUID]string) {
+	for i := range out.Results {
+		id, err := uuid.Parse(out.Results[i].ID)
+		if err != nil {
+			continue
+		}
+		if reason, ok := reasons[id]; ok {
+			out.Results[i].MatchReason = reason
+		}
 	}
 }
