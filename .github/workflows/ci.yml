@@ -33,7 +33,13 @@ jobs:
         run: |
           if [ -n "$(git status --short)" ]; then
             echo "Protobuf output is not up to date. Run 'make generate' and commit the changes."
+            # Both, and in this order: status lists untracked files a diff
+            # cannot show, and the diff says what actually moved. Without the
+            # diff this step reports " M go.mod" and stops, which names the
+            # file and nothing else — not enough to act on, and not
+            # reproducible outside the runner.
             git status --short
+            git --no-pager diff
             exit 1
           fi
 
