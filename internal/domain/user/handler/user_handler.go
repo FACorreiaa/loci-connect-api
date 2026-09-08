@@ -91,6 +91,13 @@ func (h *UserHandler) UpdateUserProfile(
 	}
 
 	params := fromUpdateProto(req.Msg.GetParams())
+	// The proto pattern checks the shape of a zone name; tzdata is the only
+	// authority on whether one exists. Rejecting here is the difference between
+	// "Atlantic/Madiera" failing now, with the field named, and a scheduled
+	// notification failing silently at 9pm in a zone that does not resolve.
+	if err := validateTimezone(params.Timezone); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 	if err := h.service.UpdateUserProfile(ctx, userID, params); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -154,6 +161,15 @@ func toProtoProfile(p *locitypes.UserProfile) *userpb.UserProfile {
 	}
 	if p.Language != nil {
 		proto.Language = p.Language
+	}
+	if p.Timezone != nil {
+		proto.Timezone = p.Timezone
+	}
+	if p.Units != nil {
+		proto.Units = p.Units
+	}
+	if p.Currency != nil {
+		proto.Currency = p.Currency
 	}
 	if p.EmailVerifiedAt != nil {
 		proto.EmailVerifiedAt = timestamppb.New(*p.EmailVerifiedAt)
@@ -226,8 +242,33 @@ func fromUpdateProto(p *userpb.UpdateProfileParams) locitypes.UpdateProfileParam
 	if p.Language != nil {
 		params.Language = p.Language
 	}
+	if p.Timezone != nil {
+		params.Timezone = p.Timezone
+	}
+	if p.Units != nil {
+		params.Units = p.Units
+	}
+	if p.Currency != nil {
+		params.Currency = p.Currency
+	}
 
 	return params
+}
+
+// validateTimezone reports whether a zone name resolves against the tzdata the
+// server runs with.
+//
+// Nil is fine — a partial update that does not mention the timezone leaves it
+// alone. An empty string is also fine, and means "clear it": that is how
+// somebody goes back to letting the browser guess.
+func validateTimezone(tz *string) error {
+	if tz == nil || *tz == "" {
+		return nil
+	}
+	if _, err := time.LoadLocation(*tz); err != nil {
+		return fmt.Errorf("%q is not a time zone this server knows: %w", *tz, err)
+	}
+	return nil
 }
 
 // ptrTo returns a pointer to the given value.
