@@ -694,7 +694,7 @@ var File_loci_apikey_apikey_proto protoreflect.FileDescriptor
 
 const file_loci_apikey_apikey_proto_rawDesc = "" +
 	"\n" +
-	"\x18loci/apikey/apikey.proto\x12\vloci.apikey\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xe3\x03\n" +
+	"\x18loci/apikey/apikey.proto\x12\vloci.apikey\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe3\x03\n" +
 	"\x06ApiKey\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1d\n" +
 	"\x04name\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x04name\x12&\n" +

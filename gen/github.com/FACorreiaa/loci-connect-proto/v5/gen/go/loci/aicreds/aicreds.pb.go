@@ -715,7 +715,7 @@ var File_loci_aicreds_aicreds_proto protoreflect.FileDescriptor
 
 const file_loci_aicreds_aicreds_proto_rawDesc = "" +
 	"\n" +
-	"\x1aloci/aicreds/aicreds.proto\x12\floci.aicreds\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\x9c\x02\n" +
+	"\x1aloci/aicreds/aicreds.proto\x12\floci.aicreds\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x02\n" +
 	"\bProvider\x12\x1d\n" +
 	"\x04name\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18 R\x04name\x12\x1f\n" +
 	"\x05label\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x05label\x12-\n" +
