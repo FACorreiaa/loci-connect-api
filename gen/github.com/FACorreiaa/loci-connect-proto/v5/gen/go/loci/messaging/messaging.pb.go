@@ -387,7 +387,7 @@ var File_loci_messaging_messaging_proto protoreflect.FileDescriptor
 
 const file_loci_messaging_messaging_proto_rawDesc = "" +
 	"\n" +
-	"\x1eloci/messaging/messaging.proto\x12\x0eloci.messaging\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xe7\x01\n" +
+	"\x1eloci/messaging/messaging.proto\x12\x0eloci.messaging\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe7\x01\n" +
 	"\x04Link\x12%\n" +
 	"\bplatform\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18 R\bplatform\x12+\n" +
 	"\fdisplay_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\vdisplayName\x127\n" +

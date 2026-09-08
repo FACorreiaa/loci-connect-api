@@ -1132,7 +1132,7 @@ var File_loci_share_share_proto protoreflect.FileDescriptor
 const file_loci_share_share_proto_rawDesc = "" +
 	"\n" +
 	"\x16loci/share/share.proto\x12\n" +
-	"loci.share\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xe0\x02\n" +
+	"loci.share\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe0\x02\n" +
 	"\rShareMetadata\x12\x1d\n" +
 	"\n" +
 	"share_code\x18\x01 \x01(\tR\tshareCode\x12?\n" +

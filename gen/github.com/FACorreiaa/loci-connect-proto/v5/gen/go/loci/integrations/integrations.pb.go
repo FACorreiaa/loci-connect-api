@@ -502,7 +502,7 @@ var File_loci_integrations_integrations_proto protoreflect.FileDescriptor
 
 const file_loci_integrations_integrations_proto_rawDesc = "" +
 	"\n" +
-	"$loci/integrations/integrations.proto\x12\x11loci.integrations\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\xae\x02\n" +
+	"$loci/integrations/integrations.proto\x12\x11loci.integrations\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xae\x02\n" +
 	"\n" +
 	"Connection\x12%\n" +
 	"\bprovider\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18 R\bprovider\x12$\n" +

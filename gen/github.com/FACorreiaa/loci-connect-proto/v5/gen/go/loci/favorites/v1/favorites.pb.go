@@ -2200,7 +2200,7 @@ var File_loci_favorites_v1_favorites_proto protoreflect.FileDescriptor
 
 const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\n" +
-	"!loci/favorites/v1/favorites.proto\x12\x11loci.favorites.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\x1a(loci/recommendation/recommendation.proto\"\xa5\x04\n" +
+	"!loci/favorites/v1/favorites.proto\x12\x11loci.favorites.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(loci/recommendation/recommendation.proto\"\xa5\x04\n" +
 	"\fFavoriteItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x17\n" +

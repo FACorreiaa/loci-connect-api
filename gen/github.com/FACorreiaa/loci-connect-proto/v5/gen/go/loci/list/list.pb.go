@@ -3154,7 +3154,7 @@ var File_loci_list_list_proto protoreflect.FileDescriptor
 
 const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
-	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\x1a(loci/recommendation/recommendation.proto\"\xcb\x04\n" +
+	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(loci/recommendation/recommendation.proto\"\xcb\x04\n" +
 	"\x04List\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +

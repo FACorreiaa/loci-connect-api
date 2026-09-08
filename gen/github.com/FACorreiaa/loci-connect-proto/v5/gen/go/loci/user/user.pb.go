@@ -130,8 +130,21 @@ type UserProfile struct {
 	Language        *string                `protobuf:"bytes,24,opt,name=language,proto3,oneof" json:"language,omitempty"`
 	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,25,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,26,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// IANA zone name, e.g. "Atlantic/Madeira". Unset means the client falls back
+	// to the browser's own guess, which is all there is before somebody sets one.
+	//
+	// Held server-side rather than in the browser because it has to be readable
+	// without one: a quiet hour, or anything else scheduled, is meaningless
+	// without knowing whose evening it is.
+	Timezone *string `protobuf:"bytes,27,opt,name=timezone,proto3,oneof" json:"timezone,omitempty"`
+	// "metric" or "imperial". Unset means metric, which is what every distance
+	// Loci computes is already in.
+	Units *string `protobuf:"bytes,28,opt,name=units,proto3,oneof" json:"units,omitempty"`
+	// ISO 4217, e.g. "EUR". Unset means EUR, which is what prices were hardcoded
+	// to before this existed.
+	Currency      *string `protobuf:"bytes,29,opt,name=currency,proto3,oneof" json:"currency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UserProfile) Reset() {
@@ -346,6 +359,27 @@ func (x *UserProfile) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *UserProfile) GetTimezone() string {
+	if x != nil && x.Timezone != nil {
+		return *x.Timezone
+	}
+	return ""
+}
+
+func (x *UserProfile) GetUnits() string {
+	if x != nil && x.Units != nil {
+		return *x.Units
+	}
+	return ""
+}
+
+func (x *UserProfile) GetCurrency() string {
+	if x != nil && x.Currency != nil {
+		return *x.Currency
+	}
+	return ""
+}
+
 // UpdateProfileParams for updating user profile
 type UpdateProfileParams struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -365,8 +399,17 @@ type UpdateProfileParams struct {
 	Badges          []string               `protobuf:"bytes,14,rep,name=badges,proto3" json:"badges,omitempty"`
 	Theme           *string                `protobuf:"bytes,15,opt,name=theme,proto3,oneof" json:"theme,omitempty"`
 	Language        *string                `protobuf:"bytes,16,opt,name=language,proto3,oneof" json:"language,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The pattern accepts the shape of an IANA zone name, not the list: that
+	// list ships with the operating system and changes without us.
+	Timezone *string `protobuf:"bytes,17,opt,name=timezone,proto3,oneof" json:"timezone,omitempty"`
+	// "metric" or "imperial". Unset means metric, which is what every distance
+	// Loci computes is already in.
+	Units *string `protobuf:"bytes,18,opt,name=units,proto3,oneof" json:"units,omitempty"`
+	// ISO 4217, e.g. "EUR". Unset means EUR, which is what prices were hardcoded
+	// to before this existed.
+	Currency      *string `protobuf:"bytes,19,opt,name=currency,proto3,oneof" json:"currency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateProfileParams) Reset() {
@@ -507,6 +550,27 @@ func (x *UpdateProfileParams) GetTheme() string {
 func (x *UpdateProfileParams) GetLanguage() string {
 	if x != nil && x.Language != nil {
 		return *x.Language
+	}
+	return ""
+}
+
+func (x *UpdateProfileParams) GetTimezone() string {
+	if x != nil && x.Timezone != nil {
+		return *x.Timezone
+	}
+	return ""
+}
+
+func (x *UpdateProfileParams) GetUnits() string {
+	if x != nil && x.Units != nil {
+		return *x.Units
+	}
+	return ""
+}
+
+func (x *UpdateProfileParams) GetCurrency() string {
+	if x != nil && x.Currency != nil {
+		return *x.Currency
 	}
 	return ""
 }
@@ -801,47 +865,53 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x0freviews_written\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0ereviewsWritten\x12,\n" +
 	"\rlists_created\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\flistsCreated\x12%\n" +
 	"\tfollowers\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tfollowers\x12%\n" +
-	"\tfollowing\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tfollowing\"\xc5\f\n" +
+	"\tfollowing\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tfollowing\"\x81\x0e\n" +
 	"\vUserProfile\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1d\n" +
-	"\x05email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12?\n" +
-	"\busername\x18\x03 \x01(\tB\x1e\xbaH\x1b\xd8\x01\x01r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x00R\busername\x88\x01\x01\x12/\n" +
-	"\tfirstname\x18\x04 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x01R\tfirstname\x88\x01\x01\x12-\n" +
-	"\blastname\x18\x05 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x02R\blastname\x88\x01\x01\x12H\n" +
-	"\fphone_number\x18\x06 \x01(\tB \xbaH\x1d\xd8\x01\x01r\x18\x10\x01\x1822\x12^\\+?[1-9]\\d{1,14}$H\x03R\vphoneNumber\x88\x01\x01\x12#\n" +
-	"\x03age\x18\a \x01(\x05B\f\xbaH\t\xd8\x01\x01\x1a\x04\x18x(\x00H\x04R\x03age\x88\x01\x01\x12&\n" +
-	"\x04city\x18\b \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01H\x05R\x04city\x88\x01\x01\x12+\n" +
-	"\acountry\x18\t \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x06R\acountry\x88\x01\x01\x12/\n" +
+	"\x05email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12<\n" +
+	"\busername\x18\x03 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x00R\busername\x88\x01\x01\x12,\n" +
+	"\tfirstname\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\tfirstname\x88\x01\x01\x12*\n" +
+	"\blastname\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\blastname\x88\x01\x01\x12E\n" +
+	"\fphone_number\x18\x06 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x1822\x12^\\+?[1-9]\\d{1,14}$H\x03R\vphoneNumber\x88\x01\x01\x12 \n" +
+	"\x03age\x18\a \x01(\x05B\t\xbaH\x06\x1a\x04\x18x(\x00H\x04R\x03age\x88\x01\x01\x12#\n" +
+	"\x04city\x18\b \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x05R\x04city\x88\x01\x01\x12(\n" +
+	"\acountry\x18\t \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x06R\acountry\x88\x01\x01\x12,\n" +
 	"\tabout_you\x18\n" +
-	" \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\aR\baboutYou\x88\x01\x01\x12$\n" +
-	"\x03bio\x18\v \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\bR\x03bio\x88\x01\x01\x12.\n" +
-	"\blocation\x18\f \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01H\tR\blocation\x88\x01\x01\x12C\n" +
+	" \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xe8\aH\aR\baboutYou\x88\x01\x01\x12!\n" +
+	"\x03bio\x18\v \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xe8\aH\bR\x03bio\x88\x01\x01\x12+\n" +
+	"\blocation\x18\f \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\tR\blocation\x88\x01\x01\x12C\n" +
 	"\vjoined_date\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\n" +
-	"joinedDate\x12-\n" +
-	"\x06avatar\x18\x0e \x01(\tB\x10\xbaH\r\xd8\x01\x01r\b\x10\x01\x18\x80\x10\x88\x01\x01H\n" +
+	"joinedDate\x12*\n" +
+	"\x06avatar\x18\x0e \x01(\tB\r\xbaH\n" +
+	"r\b\x10\x01\x18\x80\x10\x88\x01\x01H\n" +
 	"R\x06avatar\x88\x01\x01\x12.\n" +
 	"\tinterests\x18\x0f \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x102\"\x06r\x04\x10\x01\x18dR\tinterests\x12(\n" +
 	"\x06badges\x18\x10 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10d\"\x06r\x04\x10\x01\x18dR\x06badges\x12/\n" +
-	"\x05stats\x18\x11 \x01(\v2\x14.loci.user.UserStatsH\vR\x05stats\x88\x01\x01\x125\n" +
-	"\fdisplay_name\x18\x12 \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\x96\x01H\fR\vdisplayName\x88\x01\x01\x12A\n" +
-	"\x11profile_image_url\x18\x13 \x01(\tB\x10\xbaH\r\xd8\x01\x01r\b\x10\x01\x18\x80\x10\x88\x01\x01H\rR\x0fprofileImageUrl\x88\x01\x01\x12\x1b\n" +
+	"\x05stats\x18\x11 \x01(\v2\x14.loci.user.UserStatsH\vR\x05stats\x88\x01\x01\x122\n" +
+	"\fdisplay_name\x18\x12 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x96\x01H\fR\vdisplayName\x88\x01\x01\x12>\n" +
+	"\x11profile_image_url\x18\x13 \x01(\tB\r\xbaH\n" +
+	"r\b\x10\x01\x18\x80\x10\x88\x01\x01H\rR\x0fprofileImageUrl\x88\x01\x01\x12\x1b\n" +
 	"\tis_active\x18\x14 \x01(\bR\bisActive\x12K\n" +
 	"\x11email_verified_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampH\x0eR\x0femailVerifiedAt\x88\x01\x01\x12C\n" +
-	"\rlast_login_at\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampH\x0fR\vlastLoginAt\x88\x01\x01\x12'\n" +
-	"\x05theme\x18\x17 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x182H\x10R\x05theme\x88\x01\x01\x12E\n" +
-	"\blanguage\x18\x18 \x01(\tB$\xbaH!\xd8\x01\x01r\x1c\x10\x02\x18\n" +
+	"\rlast_login_at\x18\x16 \x01(\v2\x1a.google.protobuf.TimestampH\x0fR\vlastLoginAt\x88\x01\x01\x12$\n" +
+	"\x05theme\x18\x17 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182H\x10R\x05theme\x88\x01\x01\x12B\n" +
+	"\blanguage\x18\x18 \x01(\tB!\xbaH\x1er\x1c\x10\x02\x18\n" +
 	"2\x16^[a-z]{2}(-[A-Z]{2})?$H\x11R\blanguage\x88\x01\x01\x12A\n" +
 	"\n" +
 	"created_at\x18\x19 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\v\n" +
+	"updated_at\x18\x1a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\x12X\n" +
+	"\btimezone\x18\x1b \x01(\tB7\xbaH4r2\x10\x03\x18@2,^[A-Za-z][A-Za-z0-9+_-]*(/[A-Za-z0-9+_-]+)*$H\x12R\btimezone\x88\x01\x01\x125\n" +
+	"\x05units\x18\x1c \x01(\tB\x1a\xbaH\x17r\x152\x13^(metric|imperial)$H\x13R\x05units\x88\x01\x01\x122\n" +
+	"\bcurrency\x18\x1d \x01(\tB\x11\xbaH\x0er\f2\n" +
+	"^[A-Z]{3}$H\x14R\bcurrency\x88\x01\x01B\v\n" +
 	"\t_usernameB\f\n" +
 	"\n" +
 	"_firstnameB\v\n" +
@@ -862,34 +932,41 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x12_email_verified_atB\x10\n" +
 	"\x0e_last_login_atB\b\n" +
 	"\x06_themeB\v\n" +
-	"\t_language\"\xac\b\n" +
-	"\x13UpdateProfileParams\x12?\n" +
-	"\busername\x18\x01 \x01(\tB\x1e\xbaH\x1b\xd8\x01\x01r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x00R\busername\x88\x01\x01\x12H\n" +
-	"\fphone_number\x18\x02 \x01(\tB \xbaH\x1d\xd8\x01\x01r\x18\x10\x01\x1822\x12^\\+?[1-9]\\d{1,14}$H\x01R\vphoneNumber\x88\x01\x01\x12%\n" +
-	"\x05email\x18\x03 \x01(\tB\n" +
-	"\xbaH\a\xd8\x01\x01r\x02`\x01H\x02R\x05email\x88\x01\x01\x125\n" +
-	"\fdisplay_name\x18\x04 \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\x96\x01H\x03R\vdisplayName\x88\x01\x01\x12A\n" +
-	"\x11profile_image_url\x18\x05 \x01(\tB\x10\xbaH\r\xd8\x01\x01r\b\x10\x01\x18\x80\x10\x88\x01\x01H\x04R\x0fprofileImageUrl\x88\x01\x01\x12/\n" +
-	"\tfirstname\x18\x06 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x05R\tfirstname\x88\x01\x01\x12-\n" +
-	"\blastname\x18\a \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x06R\blastname\x88\x01\x01\x12#\n" +
-	"\x03age\x18\b \x01(\x05B\f\xbaH\t\xd8\x01\x01\x1a\x04\x18x(\x00H\aR\x03age\x88\x01\x01\x12&\n" +
-	"\x04city\x18\t \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01H\bR\x04city\x88\x01\x01\x12+\n" +
+	"\t_languageB\v\n" +
+	"\t_timezoneB\b\n" +
+	"\x06_unitsB\v\n" +
+	"\t_currency\"\xeb\t\n" +
+	"\x13UpdateProfileParams\x12<\n" +
+	"\busername\x18\x01 \x01(\tB\x1b\xbaH\x18r\x16\x10\x01\x18d2\x10^[a-zA-Z0-9_-]+$H\x00R\busername\x88\x01\x01\x12E\n" +
+	"\fphone_number\x18\x02 \x01(\tB\x1d\xbaH\x1ar\x18\x10\x01\x1822\x12^\\+?[1-9]\\d{1,14}$H\x01R\vphoneNumber\x88\x01\x01\x12\"\n" +
+	"\x05email\x18\x03 \x01(\tB\a\xbaH\x04r\x02`\x01H\x02R\x05email\x88\x01\x01\x122\n" +
+	"\fdisplay_name\x18\x04 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x96\x01H\x03R\vdisplayName\x88\x01\x01\x12>\n" +
+	"\x11profile_image_url\x18\x05 \x01(\tB\r\xbaH\n" +
+	"r\b\x10\x01\x18\x80\x10\x88\x01\x01H\x04R\x0fprofileImageUrl\x88\x01\x01\x12,\n" +
+	"\tfirstname\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x05R\tfirstname\x88\x01\x01\x12*\n" +
+	"\blastname\x18\a \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x06R\blastname\x88\x01\x01\x12 \n" +
+	"\x03age\x18\b \x01(\x05B\t\xbaH\x06\x1a\x04\x18x(\x00H\aR\x03age\x88\x01\x01\x12#\n" +
+	"\x04city\x18\t \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\bR\x04city\x88\x01\x01\x12(\n" +
 	"\acountry\x18\n" +
-	" \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\tR\acountry\x88\x01\x01\x12/\n" +
-	"\tabout_you\x18\v \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xe8\aH\n" +
-	"R\baboutYou\x88\x01\x01\x12.\n" +
-	"\blocation\x18\f \x01(\tB\r\xbaH\n" +
-	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01H\vR\blocation\x88\x01\x01\x12.\n" +
+	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\tR\acountry\x88\x01\x01\x12,\n" +
+	"\tabout_you\x18\v \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xe8\aH\n" +
+	"R\baboutYou\x88\x01\x01\x12+\n" +
+	"\blocation\x18\f \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\vR\blocation\x88\x01\x01\x12.\n" +
 	"\tinterests\x18\r \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x102\"\x06r\x04\x10\x01\x18dR\tinterests\x12(\n" +
 	"\x06badges\x18\x0e \x03(\tB\x10\xbaH\r\x92\x01\n" +
-	"\x10d\"\x06r\x04\x10\x01\x18dR\x06badges\x12T\n" +
-	"\x05theme\x18\x0f \x01(\tB9\xbaH6\xd8\x01\x01r1\x10\x03\x1822+^(classic|modern|loci):(light|dark|system)$H\fR\x05theme\x88\x01\x01\x12E\n" +
-	"\blanguage\x18\x10 \x01(\tB$\xbaH!\xd8\x01\x01r\x1c\x10\x02\x18\n" +
-	"2\x16^[a-z]{2}(-[A-Z]{2})?$H\rR\blanguage\x88\x01\x01B\v\n" +
+	"\x10d\"\x06r\x04\x10\x01\x18dR\x06badges\x12Q\n" +
+	"\x05theme\x18\x0f \x01(\tB6\xbaH3r1\x10\x03\x1822+^(classic|modern|loci):(light|dark|system)$H\fR\x05theme\x88\x01\x01\x12B\n" +
+	"\blanguage\x18\x10 \x01(\tB!\xbaH\x1er\x1c\x10\x02\x18\n" +
+	"2\x16^[a-z]{2}(-[A-Z]{2})?$H\rR\blanguage\x88\x01\x01\x12X\n" +
+	"\btimezone\x18\x11 \x01(\tB7\xbaH4r2\x10\x03\x18@2,^[A-Za-z][A-Za-z0-9+_-]*(/[A-Za-z0-9+_-]+)*$H\x0eR\btimezone\x88\x01\x01\x125\n" +
+	"\x05units\x18\x12 \x01(\tB\x1a\xbaH\x17r\x152\x13^(metric|imperial)$H\x0fR\x05units\x88\x01\x01\x122\n" +
+	"\bcurrency\x18\x13 \x01(\tB\x11\xbaH\x0er\f2\n" +
+	"^[A-Z]{3}$H\x10R\bcurrency\x88\x01\x01B\v\n" +
 	"\t_usernameB\x0f\n" +
 	"\r_phone_numberB\b\n" +
 	"\x06_emailB\x0f\n" +
@@ -906,9 +983,12 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"_about_youB\v\n" +
 	"\t_locationB\b\n" +
 	"\x06_themeB\v\n" +
-	"\t_language\"O\n" +
-	"\x15GetUserProfileRequest\x12*\n" +
-	"\auser_id\x18\x01 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01B\n" +
+	"\t_languageB\v\n" +
+	"\t_timezoneB\b\n" +
+	"\x06_unitsB\v\n" +
+	"\t_currency\"L\n" +
+	"\x15GetUserProfileRequest\x12'\n" +
+	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01B\n" +
 	"\n" +
 	"\b_user_id\"J\n" +
 	"\x16GetUserProfileResponse\x120\n" +
