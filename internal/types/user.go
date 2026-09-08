@@ -41,8 +41,14 @@ type UserProfile struct {
 	LastLoginAt     *time.Time `json:"last_login_at,omitempty" db:"last_login_at"`
 	Theme           *string    `json:"theme,omitempty" db:"theme"`
 	Language        *string    `json:"language,omitempty" db:"language"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
+	// Locale. Nil means never chosen, which is not the same as choosing the
+	// default: the client may fill an unset timezone from the browser's guess,
+	// but must not overwrite one somebody set deliberately.
+	Timezone  *string   `json:"timezone,omitempty" db:"timezone"`
+	Units     *string   `json:"units,omitempty" db:"units"`
+	Currency  *string   `json:"currency,omitempty" db:"currency"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // UpdateProfileParams defines the fields allowed for profile updates.
@@ -64,4 +70,7 @@ type UpdateProfileParams struct {
 	Badges          *[]string `json:"badges,omitempty"`
 	Theme           *string   `json:"theme,omitempty"`
 	Language        *string   `json:"language,omitempty"`
+	Timezone        *string   `json:"timezone,omitempty"`
+	Units           *string   `json:"units,omitempty"`
+	Currency        *string   `json:"currency,omitempty"`
 }

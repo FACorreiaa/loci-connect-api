@@ -145,6 +145,9 @@ type userProfileRow struct {
 	LastLoginAt     *time.Time `db:"last_login_at"`
 	Theme           *string    `db:"theme"`
 	Language        *string    `db:"language"`
+	Timezone        *string    `db:"timezone"`
+	Units           *string    `db:"units"`
+	Currency        *string    `db:"currency"`
 	CreatedAt       time.Time  `db:"created_at"`
 	UpdatedAt       time.Time  `db:"updated_at"`
 }
@@ -166,7 +169,8 @@ func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*
 		       COALESCE(lists_created, 0) as lists_created, 
 		       COALESCE(followers, 0) as followers, 
 		       COALESCE(following, 0) as following,
-		       is_active, last_login_at, theme, language, created_at, updated_at
+		       is_active, last_login_at, theme, language,
+		       timezone, units, currency, created_at, updated_at
 		FROM users WHERE id = $1 AND is_active = TRUE
 	`
 
@@ -204,6 +208,9 @@ func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*
 		LastLoginAt:     row.LastLoginAt,
 		Theme:           row.Theme,
 		Language:        row.Language,
+		Timezone:        row.Timezone,
+		Units:           row.Units,
+		Currency:        row.Currency,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
 	}
@@ -336,6 +343,24 @@ func (r *PostgresUserRepo) UpdateProfile(ctx context.Context, userID uuid.UUID, 
 		args = append(args, *params.Language)
 		argID++
 		span.SetAttributes(attribute.Bool("update.language", true))
+	}
+	if params.Timezone != nil {
+		setClauses = append(setClauses, fmt.Sprintf("timezone = $%d", argID))
+		args = append(args, *params.Timezone)
+		argID++
+		span.SetAttributes(attribute.Bool("update.timezone", true))
+	}
+	if params.Units != nil {
+		setClauses = append(setClauses, fmt.Sprintf("units = $%d", argID))
+		args = append(args, *params.Units)
+		argID++
+		span.SetAttributes(attribute.Bool("update.units", true))
+	}
+	if params.Currency != nil {
+		setClauses = append(setClauses, fmt.Sprintf("currency = $%d", argID))
+		args = append(args, *params.Currency)
+		argID++
+		span.SetAttributes(attribute.Bool("update.currency", true))
 	}
 
 	// If no fields were provided to update, return early (or error?)
