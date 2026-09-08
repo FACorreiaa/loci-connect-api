@@ -19,13 +19,17 @@ func (s *ServiceImpl) enrichAndFilterLLMResponse(rawPOIs []locitypes.POIDetailed
 				poiID = uuid.New()
 			}
 			detailedPOI := locitypes.POIDetailedInfo{
-				ID:               poiID,
-				Name:             p.Name,
-				Latitude:         p.Latitude,
-				Longitude:        p.Longitude,
-				Category:         p.Category,
-				Description:      p.DescriptionPOI,
-				Distance:         distanceKm * 1000,
+				ID:          poiID,
+				Name:        p.Name,
+				Latitude:    p.Latitude,
+				Longitude:   p.Longitude,
+				Category:    p.Category,
+				Description: p.DescriptionPOI,
+				// Kilometres, not metres. This field is published as
+				// `distance_km` by the MCP layer and divided by 1000 on the
+				// spatial paths, so multiplying here reported a POI 1.8 km away
+				// as 1800 — capped by the radius at the "~2000 km" agents saw.
+				Distance:         distanceKm,
 				City:             p.City,
 				CityID:           p.CityID,
 				Address:          p.Address,

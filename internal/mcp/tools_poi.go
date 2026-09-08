@@ -66,6 +66,88 @@ type RecommendationTrace struct {
 	Surface           string `json:"surface" jsonschema:"discover or nearby"`
 }
 
+// POIDetail is the full single-POI representation returned by get_poi_details.
+//
+// Hand-written rather than returning locitypes.POIDetailedInfo, and every id is
+// a string. The SDK infers a tool's output schema from the Go type: uuid.UUID
+// is [16]byte, so it declares an array of 16 integers, while MarshalText emits
+// a 36-character string. The mismatch fails the SDK's own output validation and
+// surfaces as a JSON-RPC transport error, which made this tool uncallable —
+// `llm_interaction_id: has type "string", want "array"`.
+//
+// Returning a domain struct across the MCP boundary is what caused that. It is
+// also how an internal field rename becomes a breaking protocol change, so the
+// rule is the same either way: tool outputs are declared here.
+type POIDetail struct {
+	ID          string  `json:"id,omitempty"`
+	Name        string  `json:"name"`
+	Category    string  `json:"category,omitempty"`
+	Description string  `json:"description,omitempty"`
+	Latitude    float64 `json:"latitude,omitempty"`
+	Longitude   float64 `json:"longitude,omitempty"`
+	Address     string  `json:"address,omitempty"`
+	PhoneNumber string  `json:"phone_number,omitempty"`
+	Website     string  `json:"website,omitempty"`
+	Rating      float64 `json:"rating,omitempty"`
+	PriceRange  string  `json:"price_range,omitempty"`
+	PriceLevel  string  `json:"price_level,omitempty"`
+
+	City   string `json:"city,omitempty"`
+	CityID string `json:"city_id,omitempty"`
+
+	OpeningHours map[string]string `json:"opening_hours,omitempty"`
+	Images       []string          `json:"images,omitempty"`
+	Reviews      []string          `json:"reviews,omitempty"`
+	Tags         []string          `json:"tags,omitempty"`
+	Amenities    string            `json:"amenities,omitempty"`
+	CuisineType  string            `json:"cuisine_type,omitempty"`
+	StarRating   string            `json:"star_rating,omitempty"`
+
+	// Source is where the row came from; Grounded reports whether Loci verified
+	// this place against its own data rather than a model recalling it.
+	Source   string `json:"source,omitempty"`
+	Grounded bool   `json:"grounded,omitempty"`
+}
+
+// detailFromPOI converts the domain struct to the wire type, stringifying ids
+// and dropping the fields an agent has no use for — the internal
+// llm_interaction_id, the ranking scores, and the error.
+func detailFromPOI(p *locitypes.POIDetailedInfo) POIDetail {
+	out := POIDetail{
+		Name:         p.Name,
+		Category:     p.Category,
+		Description:  p.Description,
+		Latitude:     p.Latitude,
+		Longitude:    p.Longitude,
+		Address:      p.Address,
+		PhoneNumber:  p.PhoneNumber,
+		Website:      p.Website,
+		Rating:       p.Rating,
+		PriceRange:   p.PriceRange,
+		PriceLevel:   p.PriceLevel,
+		City:         p.City,
+		OpeningHours: p.OpeningHours,
+		Images:       p.Images,
+		Reviews:      p.Reviews,
+		Tags:         p.Tags,
+		Amenities:    p.Amenities,
+		CuisineType:  p.CuisineType,
+		StarRating:   p.StarRating,
+		Source:       p.Source,
+		Grounded:     p.Grounded,
+	}
+	if p.DescriptionPOI != "" && out.Description == "" {
+		out.Description = p.DescriptionPOI
+	}
+	if p.ID != uuid.Nil {
+		out.ID = p.ID.String()
+	}
+	if p.CityID != uuid.Nil {
+		out.CityID = p.CityID.String()
+	}
+	return out
+}
+
 type poiListOutput struct {
 	Results []POISummary `json:"results"`
 	Count   int          `json:"count"`
@@ -272,16 +354,19 @@ func registerPOITools(server *mcp.Server, deps Deps) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_poi_details",
 		Description: "Fetch full details for a single point of interest by its Loci id.",
-	}, guardTool(deps, "get_poi_details", func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, *locitypes.POIDetailedInfo, error) {
+	}, guardTool(deps, "get_poi_details", func(ctx context.Context, _ *mcp.CallToolRequest, in getPOIDetailsInput) (*mcp.CallToolResult, POIDetail, error) {
 		id, err := uuid.Parse(in.ID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("invalid poi id %q", in.ID)
+			return nil, POIDetail{}, fmt.Errorf("invalid poi id %q", in.ID)
 		}
 		poiInfo, err := deps.POIService.GetPOI(ctx, id)
 		if err != nil {
-			return nil, nil, toolError(err)
+			return nil, POIDetail{}, toolError(err)
 		}
-		return nil, poiInfo, nil
+		if poiInfo == nil {
+			return nil, POIDetail{}, fmt.Errorf("poi %s not found", in.ID)
+		}
+		return nil, detailFromPOI(poiInfo), nil
 	}))
 
 	mcp.AddTool(server, &mcp.Tool{

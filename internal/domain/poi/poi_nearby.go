@@ -3,6 +3,7 @@ package poi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 
@@ -34,7 +35,16 @@ func (s *ServiceImpl) GetGeneralPOIByDistance(ctx context.Context, userID uuid.U
 
 	s.logger.InfoContext(ctx, "Cache miss. Querying POIs from database.", "lat", lat, "lon", lon, "distance_m", distance)
 	poisFromDB, err := s.poiRepository.GetPOIsByLocationAndDistance(ctx, lat, lon, distance)
-	if err == nil && len(poisFromDB) > 0 {
+	// A query error is a failure, not a cache miss. Both used to take this
+	// same branch, so a broken query fell through to paid LLM generation
+	// with nothing logged — which is why a city full of real POIs still
+	// answered source=llm_suggested_pois.
+	if err != nil {
+		s.logger.ErrorContext(ctx, "pois query failed", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("query pois near %f,%f: %w", lat, lon, err)
+	}
+	if len(poisFromDB) > 0 {
 		for i := range poisFromDB {
 			poisFromDB[i].Source = "points_of_interest"
 		}
@@ -111,7 +121,16 @@ func (s *ServiceImpl) GetNearbyRestaurants(ctx context.Context, userID uuid.UUID
 
 	// Get restaurants from database with filters
 	restaurants, err := s.poiRepository.GetPOIsByLocationAndDistanceWithCategory(ctx, lat, lon, distance, "restaurant")
-	if err == nil && len(restaurants) > 0 {
+	// A query error is a failure, not a cache miss. Both used to take this
+	// same branch, so a broken query fell through to paid LLM generation
+	// with nothing logged — which is why a city full of real POIs still
+	// answered source=llm_suggested_pois.
+	if err != nil {
+		s.logger.ErrorContext(ctx, "restaurants query failed", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("query restaurants near %f,%f: %w", lat, lon, err)
+	}
+	if len(restaurants) > 0 {
 		// Apply domain-specific filters
 		filteredRestaurants := s.filterRestaurants(restaurants, cuisineType, priceRange)
 
@@ -165,7 +184,16 @@ func (s *ServiceImpl) GetNearbyActivities(ctx context.Context, userID uuid.UUID,
 
 	// Get activities from database with filters
 	activities, err := s.poiRepository.GetPOIsByLocationAndDistanceWithCategory(ctx, lat, lon, distance, "activity")
-	if err == nil && len(activities) > 0 {
+	// A query error is a failure, not a cache miss. Both used to take this
+	// same branch, so a broken query fell through to paid LLM generation
+	// with nothing logged — which is why a city full of real POIs still
+	// answered source=llm_suggested_pois.
+	if err != nil {
+		s.logger.ErrorContext(ctx, "activities query failed", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("query activities near %f,%f: %w", lat, lon, err)
+	}
+	if len(activities) > 0 {
 		// Apply domain-specific filters
 		filteredActivities := s.filterActivities(activities, activityType, duration)
 
@@ -219,7 +247,16 @@ func (s *ServiceImpl) GetNearbyHotels(ctx context.Context, userID uuid.UUID, lat
 
 	// Get hotels from database with filters
 	hotels, err := s.poiRepository.GetPOIsByLocationAndDistanceWithCategory(ctx, lat, lon, distance, "hotel")
-	if err == nil && len(hotels) > 0 {
+	// A query error is a failure, not a cache miss. Both used to take this
+	// same branch, so a broken query fell through to paid LLM generation
+	// with nothing logged — which is why a city full of real POIs still
+	// answered source=llm_suggested_pois.
+	if err != nil {
+		s.logger.ErrorContext(ctx, "hotels query failed", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("query hotels near %f,%f: %w", lat, lon, err)
+	}
+	if len(hotels) > 0 {
 		// Apply domain-specific filters
 		filteredHotels := s.filterHotels(hotels, starRating, amenities)
 
@@ -273,7 +310,16 @@ func (s *ServiceImpl) GetNearbyAttractions(ctx context.Context, userID uuid.UUID
 
 	// Get attractions from database with filters
 	attractions, err := s.poiRepository.GetPOIsByLocationAndDistanceWithCategory(ctx, lat, lon, distance, "attraction")
-	if err == nil && len(attractions) > 0 {
+	// A query error is a failure, not a cache miss. Both used to take this
+	// same branch, so a broken query fell through to paid LLM generation
+	// with nothing logged — which is why a city full of real POIs still
+	// answered source=llm_suggested_pois.
+	if err != nil {
+		s.logger.ErrorContext(ctx, "attractions query failed", slog.Any("error", err))
+		span.RecordError(err)
+		return nil, fmt.Errorf("query attractions near %f,%f: %w", lat, lon, err)
+	}
+	if len(attractions) > 0 {
 		// Apply domain-specific filters
 		filteredAttractions := s.filterAttractions(attractions, attractionType, isOutdoor)
 
@@ -303,19 +349,37 @@ func (s *ServiceImpl) GetNearbyAttractions(ctx context.Context, userID uuid.UUID
 }
 
 // Helper functions for domain-specific filtering
+// matchesFilter reports whether a POI's field satisfies a requested filter.
+//
+// An empty request matches everything. A non-empty request against an empty
+// field does NOT match: a place with no recorded cuisine cannot be asserted to
+// be sushi, and saying otherwise is how a filtered search returns things that
+// do not meet the filter.
+//
+// Comparison is case-insensitive because these values arrive from users and
+// from a model, so "Italian" and "italian" are the same request.
+func matchesFilter(field, want string) bool {
+	if want == "" {
+		return true
+	}
+	return strings.EqualFold(strings.TrimSpace(field), strings.TrimSpace(want))
+}
+
 func (s *ServiceImpl) filterRestaurants(restaurants []locitypes.POIDetailedInfo, cuisineType, priceRange string) []locitypes.POIDetailedInfo {
 	if cuisineType == "" && priceRange == "" {
 		return restaurants
 	}
 
+	// Each filter reads the field it names. cuisine_type used to be compared
+	// against Category — which for a restaurant is "restaurant", so no cuisine
+	// ever matched — and price_range against PriceLevel, which is a different
+	// scale. Both silently returned nothing and fell through to LLM generation.
 	filtered := make([]locitypes.POIDetailedInfo, 0)
 	for _, restaurant := range restaurants {
-		// Filter by cuisine type
-		if cuisineType != "" && restaurant.Category != cuisineType {
+		if !matchesFilter(restaurant.CuisineType, cuisineType) {
 			continue
 		}
-		// Filter by price range
-		if priceRange != "" && restaurant.PriceLevel != priceRange {
+		if !matchesFilter(restaurant.PriceRange, priceRange) {
 			continue
 		}
 		filtered = append(filtered, restaurant)
@@ -348,10 +412,10 @@ func (s *ServiceImpl) filterHotels(hotels []locitypes.POIDetailedInfo, starRatin
 		return hotels
 	}
 
+	// star_rating reads StarRating, not PriceLevel.
 	filtered := make([]locitypes.POIDetailedInfo, 0)
 	for _, hotel := range hotels {
-		// Filter by star rating
-		if starRating != "" && hotel.PriceLevel != starRating {
+		if !matchesFilter(hotel.StarRating, starRating) {
 			continue
 		}
 		// Filter by amenities (basic string matching)
