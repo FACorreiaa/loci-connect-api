@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 type fakeChat struct {
@@ -21,20 +22,26 @@ type fakeChat struct {
 	continueText string
 	startText    string
 	reply        string
+
+	// callerSeen is whoever the context said was calling, as the provider
+	// router downstream would read it.
+	callerSeen string
 }
 
-func (f *fakeChat) StartChat(_ context.Context, _, _ uuid.UUID, _, message string, _ *locitypes.UserLocation) (*locitypes.ChatResponse, error) {
+func (f *fakeChat) StartChat(ctx context.Context, _, _ uuid.UUID, _, message string, _ *locitypes.UserLocation) (*locitypes.ChatResponse, error) {
 	f.started = true
 	f.startText = message
+	f.callerSeen, _ = interceptors.GetUserIDFromContext(ctx)
 	if f.startErr != nil {
 		return nil, f.startErr
 	}
 	return &locitypes.ChatResponse{SessionID: uuid.New(), Message: f.replyOr("a new plan"), IsNewSession: true}, nil
 }
 
-func (f *fakeChat) ContinueChat(_ context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
+func (f *fakeChat) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
 	f.continued = sessionID
 	f.continueText = message
+	f.callerSeen, _ = interceptors.GetUserIDFromContext(ctx)
 	if f.continueErr != nil {
 		return nil, f.continueErr
 	}
@@ -156,4 +163,32 @@ func TestAFailureToStartIsReported(t *testing.T) {
 	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon"); err == nil {
 		t.Error("a failure to start a conversation was swallowed")
 	}
+}
+
+// A chat message carries no JWT. The provider router reads the caller from the
+// context to pick their own key and their plan's chain, so without this every
+// Telegram message would run on Loci's shared provider regardless of what the
+// account brought or pays for.
+func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
+	userID := uuid.New()
+
+	t.Run("starting", func(t *testing.T) {
+		chat := &fakeChat{}
+		if _, err := New(chat, nil).Answer(t.Context(), userID, "three days in Lisbon"); err != nil {
+			t.Fatalf("answer: %v", err)
+		}
+		if chat.callerSeen != userID.String() {
+			t.Errorf("the chat service saw caller %q, want the linked account %s", chat.callerSeen, userID)
+		}
+	})
+
+	t.Run("continuing", func(t *testing.T) {
+		chat := &fakeChat{sessions: []locitypes.ChatSession{{ID: uuid.New()}}}
+		if _, err := New(chat, nil).Answer(t.Context(), userID, "make day two quieter"); err != nil {
+			t.Fatalf("answer: %v", err)
+		}
+		if chat.callerSeen != userID.String() {
+			t.Errorf("the chat service saw caller %q, want the linked account %s", chat.callerSeen, userID)
+		}
+	})
 }

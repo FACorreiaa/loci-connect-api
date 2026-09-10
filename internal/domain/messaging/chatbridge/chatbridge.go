@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 // Chat is the part of the chat service this bridge uses.
@@ -59,6 +60,13 @@ func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, text string) (s
 	if text == "" {
 		return "", errors.New("chatbridge: nothing to answer")
 	}
+
+	// A chat message arrives with no JWT, so nothing below here would know
+	// whose request this is: the provider router reads the caller from the
+	// context to pick their own key and their plan's chain, and with none it
+	// serves Loci's shared provider to everyone. The link already resolved
+	// the account; this is what makes the rest of the request act as it.
+	ctx = interceptors.ContextWithClaims(ctx, &interceptors.Claims{UserID: userID.String()})
 
 	if sessionID, ok := a.latestSession(ctx, userID); ok {
 		response, err := a.chat.ContinueChat(ctx, userID, sessionID, text, "")
