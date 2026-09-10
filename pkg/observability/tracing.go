@@ -14,36 +14,42 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+
+	posthogotel "github.com/posthog/posthog-go/otel"
 )
 
-// InitTracing installs a real TracerProvider exporting OTLP/HTTP when
-// OTEL_EXPORTER_OTLP_ENDPOINT is set. Without it, the global no-op provider
-// stays in place (spans cost ~nothing) and the returned shutdown is a no-op —
-// tracing is opt-in per environment.
+// defaultPostHogHost is PostHog's EU cloud, matching pkg/analytics's default
+// for the same POSTHOG_API_KEY/POSTHOG_HOST pair.
+const defaultPostHogHost = "https://eu.i.posthog.com"
+
+// InitTracing installs a real TracerProvider when OTEL_EXPORTER_OTLP_ENDPOINT
+// and/or POSTHOG_API_KEY are set — the former exports every span as OTLP/HTTP,
+// the latter registers PostHog's AI Observability span processor, which
+// forwards only the gen_ai.*/llm.*/ai.*/traceloop.* spans LLM calls emit.
+// With neither set, the global no-op provider stays in place (spans cost
+// ~nothing) and the returned shutdown is a no-op — tracing is opt-in per
+// environment.
 func InitTracing(ctx context.Context, serviceName string, logger *slog.Logger) (func(context.Context) error, error) {
 	endpoint := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
-	if endpoint == "" {
-		logger.Info("OTEL_EXPORTER_OTLP_ENDPOINT not set; tracing disabled")
-		return func(context.Context) error { return nil }, nil
-	}
+	posthogKey := strings.TrimSpace(os.Getenv("POSTHOG_API_KEY"))
 
 	// A set-but-malformed endpoint (e.g. "https://", scheme only) used to sail
 	// past the emptiness check and leave the exporter posting to a hostless URL,
 	// logging `traces export: Post "https:///": http: no Host in request URL`
-	// every batch interval, forever. Validate here and disable tracing instead
-	// of shipping a broken exporter.
-	parsed, err := url.Parse(endpoint)
-	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		logger.Warn("OTEL_EXPORTER_OTLP_ENDPOINT is not a valid http(s) URL with a host; tracing disabled",
-			"endpoint", endpoint)
-		return func(context.Context) error { return nil }, nil
+	// every batch interval, forever. Validate here and disable OTLP export
+	// instead of shipping a broken exporter.
+	if endpoint != "" {
+		parsed, err := url.Parse(endpoint)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			logger.Warn("OTEL_EXPORTER_OTLP_ENDPOINT is not a valid http(s) URL with a host; OTLP export disabled",
+				"endpoint", endpoint)
+			endpoint = ""
+		}
 	}
 
-	// Pass the endpoint explicitly rather than relying on the exporter re-reading
-	// the environment, so what we validated is what gets used.
-	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+	if endpoint == "" && posthogKey == "" {
+		logger.Info("OTEL_EXPORTER_OTLP_ENDPOINT and POSTHOG_API_KEY not set; tracing disabled")
+		return func(context.Context) error { return nil }, nil
 	}
 
 	// Use a schemaless resource for our extra attributes so merging with
@@ -56,11 +62,33 @@ func InitTracing(ctx context.Context, serviceName string, logger *slog.Logger) (
 		return nil, fmt.Errorf("failed to build OTel resource: %w", err)
 	}
 
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter, sdktrace.WithBatchTimeout(5*time.Second)),
-		sdktrace.WithResource(res),
-	)
+	opts := []sdktrace.TracerProviderOption{sdktrace.WithResource(res)}
+
+	if endpoint != "" {
+		// Pass the endpoint explicitly rather than relying on the exporter
+		// re-reading the environment, so what we validated is what gets used.
+		exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(endpoint))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
+		}
+		opts = append(opts, sdktrace.WithBatcher(exporter, sdktrace.WithBatchTimeout(5*time.Second)))
+		logger.Info("OTel tracing enabled", "endpoint", endpoint, "service", serviceName)
+	}
+
+	if posthogKey != "" {
+		host := strings.TrimSpace(os.Getenv("POSTHOG_HOST"))
+		if host == "" {
+			host = defaultPostHogHost
+		}
+		processor, err := posthogotel.NewSpanProcessor(ctx, posthogKey, posthogotel.WithHost(host))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create PostHog AI Observability span processor: %w", err)
+		}
+		opts = append(opts, sdktrace.WithSpanProcessor(processor), sdktrace.WithSpanProcessor(AIContextSpanProcessor{}))
+		logger.Info("PostHog AI Observability enabled", "host", host)
+	}
+
+	tp := sdktrace.NewTracerProvider(opts...)
 	otel.SetTracerProvider(tp)
-	logger.Info("OTel tracing enabled", "endpoint", endpoint, "service", serviceName)
 	return tp.Shutdown, nil
 }

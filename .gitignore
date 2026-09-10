@@ -30,3 +30,4 @@ bin
 # server binary (anchored to root)
 /server
 .DS_Store
+.posthog-wizard-cache/

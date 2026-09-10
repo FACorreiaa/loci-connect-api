@@ -115,7 +115,8 @@ func newProviderClient(
 
 	// Meter every link in the chain, so tokens are attributed to the model
 	// that actually answered rather than to the one that was configured first.
-	return newMetered(client, recordPrometheus), nil
+	// Traced the same way, so PostHog AI Observability sees every provider.
+	return newTracing(newMetered(client, recordPrometheus), provider), nil
 }
 
 func NewEmbeddingClient(
