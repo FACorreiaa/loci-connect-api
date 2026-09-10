@@ -35,7 +35,21 @@ type bridge struct {
 //
 // Failures are logged and swallowed: one message that could not be answered
 // must not stop the bot receiving the next.
+// handle answers one update. It never lets a panic escape: the webhook runs
+// it on a detached goroutine, where an unrecovered panic is not a failed
+// request but the whole API process gone — one malformed message from one
+// chat must not take api.lociai.fyi down for everybody.
 func (b bridge) handle(ctx context.Context, update Update) {
+	defer func() {
+		if r := recover(); r != nil {
+			b.logger.ErrorContext(ctx, "panic while handling a telegram update",
+				slog.Any("panic", r), slog.Int64("update_id", update.UpdateID))
+		}
+	}()
+	b.answer(ctx, update)
+}
+
+func (b bridge) answer(ctx context.Context, update Update) {
 	if update.Message == nil || update.Message.Text == "" {
 		// Photos, stickers, joins. Nothing to answer.
 		return
@@ -84,6 +98,12 @@ func (b bridge) keepTyping(ctx context.Context, chatID string) func() {
 	typingCtx, cancel := context.WithCancel(ctx)
 
 	go func() {
+		// A typing indicator is decoration; a panic in it must not be fatal.
+		defer func() {
+			if r := recover(); r != nil {
+				b.logger.ErrorContext(ctx, "panic while sending a telegram typing indicator", slog.Any("panic", r))
+			}
+		}()
 		// Telegram clears the indicator after about five seconds.
 		ticker := time.NewTicker(4 * time.Second)
 		defer ticker.Stop()

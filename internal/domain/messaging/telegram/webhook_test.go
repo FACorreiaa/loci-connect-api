@@ -293,3 +293,25 @@ func (c *countingReader) Read(p []byte) (int, error) {
 	c.n += n
 	return n, err
 }
+
+type panickingHandler struct{}
+
+func (panickingHandler) Handle(context.Context, messaging.InboundMessage) (messaging.OutboundMessage, error) {
+	panic("a message the handler could not stomach")
+}
+
+// The webhook answers on a detached goroutine. A panic there is not a failed
+// request; without recovery it is the whole API process. One bad message
+// from one chat must not do that.
+func TestAPanicWhileAnsweringDoesNotEscapeTheProcess(t *testing.T) {
+	api := newFakeAPI(t)
+	h := newWebhook(t, api, panickingHandler{})
+
+	rec := deliver(h, http.MethodPost, testSecret, []byte(`{"update_id":1,"message":{"message_id":1,"chat":{"id":42},"text":"hello"}}`))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 before handling", rec.Code)
+	}
+	// Give the goroutine time to panic and recover; if recovery were missing
+	// the test binary itself would die here.
+	time.Sleep(50 * time.Millisecond)
+}
