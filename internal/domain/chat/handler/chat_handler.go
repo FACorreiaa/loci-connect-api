@@ -619,6 +619,38 @@ func progressPayload(event locitypes.StreamEvent) *chatv1.ProgressPayload {
 
 // streamErrorFromEvent maps an error event onto a typed StreamError, classifying
 // capacity/quota conditions into retry hints.
+// infrastructureErrorMarkers are the fingerprints of an error that was
+// written for an operator, not a person: driver and network failures wrapped
+// with %w all the way up to the stream. The chat service emits err.Error()
+// from many sites; rather than audit each one, everything is scrubbed here,
+// the single point every error event passes through. On 2026-09-10 a Postgres
+// restart put the production DB user, database name, host and port on
+// people's screens as the "user message".
+var infrastructureErrorMarkers = []string{
+	"sqlstate", "failed to connect", "user=", "database=", "dial tcp",
+	"connection refused", "connection reset", "no such host", "i/o timeout",
+	"context deadline exceeded", "context canceled", "begin transaction",
+	"tls:", "x509", "eof", "broken pipe", "does not exist", "relation ",
+}
+
+const infrastructureUserMessage = "Loci is restarting a service. Try again in a minute."
+
+// looksLikeInfrastructureError reports whether a message carries the kind of
+// detail a person cannot act on and an attacker can.
+func looksLikeInfrastructureError(msg string) bool {
+	lower := strings.ToLower(msg)
+	for _, m := range infrastructureErrorMarkers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	// host:port — an address of ours is never a user's business.
+	if strings.Contains(lower, ":5432") || strings.Contains(lower, ":6379") || strings.Contains(lower, ":8080") {
+		return true
+	}
+	return false
+}
+
 func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 	msg := event.Error
 	if msg == "" {
@@ -631,6 +663,11 @@ func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 		UserMessage:  msg,
 		InternalCode: "stream_error",
 		Retryable:    false,
+	}
+	if looksLikeInfrastructureError(msg) {
+		se.UserMessage = infrastructureUserMessage
+		se.InternalCode = "internal"
+		se.Retryable = true
 	}
 	// Prefer the producer's classification. Text matching stays as a
 	// fallback for events emitted without one, but it must not override
