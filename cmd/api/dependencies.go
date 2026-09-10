@@ -153,7 +153,11 @@ type Dependencies struct {
 	// AICredentialsHandler is always built, over a nil service when
 	// ENCRYPTION_KEY is unset, so the settings page is told the feature is
 	// off rather than shown Unimplemented.
-	AICredentialsHandler     *aicreds.Handler
+	AICredentialsHandler *aicreds.Handler
+	// MessagingHandler and IntegrationsHandler are always built too, for the
+	// same reason: each answers "off" over a nil service.
+	MessagingHandler         *messaging.Handler
+	IntegrationsHandler      *integrations.Handler
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
@@ -652,6 +656,8 @@ func (d *Dependencies) initHandlers() error {
 		),
 	)
 	d.AICredentialsHandler = aicreds.NewHandler(d.AICredentials, d.Logger)
+	d.MessagingHandler = messaging.NewHandler(d.Messaging, d.Logger)
+	d.IntegrationsHandler = integrations.NewHandler(d.Integrations, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)

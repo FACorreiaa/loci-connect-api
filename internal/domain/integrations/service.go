@@ -19,6 +19,17 @@ var ErrSealingUnavailable = errors.New("integrations: connecting a server is una
 // ErrUnknownProvider means the integration is not one Loci knows how to use.
 var ErrUnknownProvider = errors.New("integrations: not an integration Loci supports")
 
+// InputError is a validation failure the user can fix: the message names what
+// to change and never contains the token.
+//
+// Its own type so the handler can tell "you typed it wrong" from "the database
+// is down" without matching on strings.
+type InputError struct{ Msg string }
+
+func (e *InputError) Error() string { return "integrations: " + e.Msg }
+
+func invalid(msg string) error { return &InputError{Msg: msg} }
+
 // Provider is one integration a user may connect.
 //
 // A closed list, for the same reason the model-provider catalogue is one: these
@@ -94,7 +105,7 @@ func (s *Service) Connect(ctx context.Context, userID uuid.UUID, provider, endpo
 	safeEndpoint, err := providers.ParseGatewayURL(endpoint)
 	if err != nil {
 		// The endpoint is the user's own text and safe to report on.
-		return Connection{}, fmt.Errorf("integrations: %w", err)
+		return Connection{}, invalid(err.Error())
 	}
 
 	sealed, err := s.tokenToStore(ctx, userID, entry.Name, strings.TrimSpace(token))
@@ -120,7 +131,7 @@ func (s *Service) tokenToStore(ctx context.Context, userID uuid.UUID, provider, 
 
 	const maxTokenLen = 4096
 	if len(token) > maxTokenLen {
-		return nil, errors.New("integrations: that does not look like an access token")
+		return nil, invalid("that does not look like an access token")
 	}
 
 	sealed, err := s.sealer.Seal(userID[:], []byte(token))

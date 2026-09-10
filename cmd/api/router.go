@@ -20,11 +20,13 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/integrations/integrationsv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext/localcontextconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/memory/memoryv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/messaging/messagingv1connect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
@@ -44,6 +46,8 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
@@ -313,6 +317,24 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	aicredsPath, aicredsConnect := aicredsv1connect.NewAiCredentialServiceHandler(aicredsHandler, opts)
 	mux.Handle(aicredsPath, aicredsConnect)
 	deps.Logger.Info("registered Connect RPC service", "path", aicredsPath)
+
+	// Same rule for the Telegram link and the outbound MCP servers: always
+	// registered, enabled=false when the feature is off.
+	messagingHandler := deps.MessagingHandler
+	if messagingHandler == nil {
+		messagingHandler = messaging.NewHandler(deps.Messaging, deps.Logger)
+	}
+	messagingPath, messagingConnect := messagingv1connect.NewMessagingServiceHandler(messagingHandler, opts)
+	mux.Handle(messagingPath, messagingConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", messagingPath)
+
+	integrationsHandler := deps.IntegrationsHandler
+	if integrationsHandler == nil {
+		integrationsHandler = integrations.NewHandler(deps.Integrations, deps.Logger)
+	}
+	integrationsPath, integrationsConnect := integrationsv1connect.NewIntegrationServiceHandler(integrationsHandler, opts)
+	mux.Handle(integrationsPath, integrationsConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", integrationsPath)
 
 	if deps.ExportHandler != nil {
 		exportPath, exportHandler := exportv1connect.NewExportServiceHandler(deps.ExportHandler, opts)
