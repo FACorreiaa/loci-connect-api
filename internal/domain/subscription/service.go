@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,21 +62,45 @@ type service struct {
 	logger     *slog.Logger
 	adminEmail string
 	limits     Limits
+	// proEmails are complimentary Pro accounts (PRO_EMAILS), lowercased.
+	proEmails map[string]struct{}
 
 	mu        sync.Mutex
 	planCache map[uuid.UUID]planEntry
 	now       func() time.Time
 }
 
-func NewService(repo Repository, logger *slog.Logger, adminEmail string, limits Limits) Service {
+// NewService builds the quota/plan service. proEmails are accounts treated
+// as Pro regardless of their subscriptions row (see config.SubscriptionConfig).
+func NewService(repo Repository, logger *slog.Logger, adminEmail string, limits Limits, proEmails []string) Service {
+	comped := make(map[string]struct{}, len(proEmails))
+	for _, e := range proEmails {
+		if e = normalizeEmail(e); e != "" {
+			comped[e] = struct{}{}
+		}
+	}
 	return &service{
 		repo:       repo,
 		logger:     logger,
 		adminEmail: adminEmail,
 		limits:     limits,
+		proEmails:  comped,
 		planCache:  make(map[uuid.UUID]planEntry),
 		now:        time.Now,
 	}
+}
+
+func normalizeEmail(e string) string {
+	return strings.ToLower(strings.TrimSpace(e))
+}
+
+// isComplimentary reports whether the account is on the PRO_EMAILS list.
+func (s *service) isComplimentary(email string) bool {
+	if email == "" || len(s.proEmails) == 0 {
+		return false
+	}
+	_, ok := s.proEmails[normalizeEmail(email)]
+	return ok
 }
 
 func (s *service) ConsumeQuota(ctx context.Context, userID uuid.UUID, email string) error {
@@ -135,9 +160,15 @@ func (s *service) userPlan(ctx context.Context, userID uuid.UUID) (string, error
 	}
 	s.mu.Unlock()
 
-	plan, err := s.repo.GetUserPlan(ctx, userID)
+	plan, email, err := s.repo.GetUserPlan(ctx, userID)
 	if err != nil {
 		return "", err
+	}
+	// A comped account is Pro whatever the subscriptions row says. Applied
+	// here, before caching, so quota, entitlements and the billing page all
+	// read the same answer.
+	if s.isComplimentary(email) && !IsProPlan(plan) {
+		plan = PlanPremiumAnnual
 	}
 
 	s.mu.Lock()

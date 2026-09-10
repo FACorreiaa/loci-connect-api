@@ -27,7 +27,10 @@ type Repository interface {
 	// below limit. Returns allowed=false (count 0) when the quota is spent;
 	// denied attempts do not inflate the counter.
 	TryIncrementUsage(ctx context.Context, userID uuid.UUID, limit int) (allowed bool, count int, err error)
-	GetUserPlan(ctx context.Context, userID uuid.UUID) (string, error)
+	// GetUserPlan returns the user's effective plan and their email. The
+	// email rides along so the service can apply the complimentary-Pro list
+	// without a second lookup on every cache miss.
+	GetUserPlan(ctx context.Context, userID uuid.UUID) (plan, email string, err error)
 }
 
 type repository struct {
@@ -55,22 +58,29 @@ func (r *repository) GetDailyUsage(ctx context.Context, userID uuid.UUID) (int, 
 	return count, nil
 }
 
-func (r *repository) GetUserPlan(ctx context.Context, userID uuid.UUID) (string, error) {
-	var plan, status string
+func (r *repository) GetUserPlan(ctx context.Context, userID uuid.UUID) (string, string, error) {
+	var email string
+	var plan, status *string
 	var endDate *time.Time
+	// Anchored on users so an account with no subscriptions row still yields
+	// its email; the plan columns are then NULL and read as free.
 	query := `
-		SELECT plan::text, status::text, end_date
-		FROM subscriptions
-		WHERE user_id = $1
+		SELECT u.email::text, s.plan::text, s.status::text, s.end_date
+		FROM users u
+		LEFT JOIN subscriptions s ON s.user_id = u.id
+		WHERE u.id = $1
 	`
-	err := r.pgpool.QueryRow(ctx, query, userID).Scan(&plan, &status, &endDate)
+	err := r.pgpool.QueryRow(ctx, query, userID).Scan(&email, &plan, &status, &endDate)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return PlanFree, nil
+			return PlanFree, "", nil
 		}
-		return "", fmt.Errorf("failed to get user plan: %w", err)
+		return "", "", fmt.Errorf("failed to get user plan: %w", err)
 	}
-	return effectivePlan(plan, status, endDate), nil
+	if plan == nil || status == nil {
+		return PlanFree, email, nil
+	}
+	return effectivePlan(*plan, *status, endDate), email, nil
 }
 
 func (r *repository) TryIncrementUsage(ctx context.Context, userID uuid.UUID, limit int) (bool, int, error) {

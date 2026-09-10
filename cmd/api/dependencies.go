@@ -375,7 +375,7 @@ func (d *Dependencies) initServices() error {
 	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail, subscription.Limits{
 		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
-	})
+	}, d.Config.Subscription.ProEmails)
 	// Freemium list/place caps need EffectivePlan — rebind with the live service.
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService, d.FavoritesRepo, d.PreferenceRecorder)
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)

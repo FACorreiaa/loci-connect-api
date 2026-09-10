@@ -193,6 +193,11 @@ type MessagingConfig struct {
 type SubscriptionConfig struct {
 	FreeDailyLLMLimit int
 	ProDailyLLMLimit  int
+	// ProEmails are accounts treated as Pro without a Stripe subscription —
+	// the founder, testers, anyone comped. Comma-separated, matched
+	// case-insensitively against users.email. Applied where the plan is
+	// resolved, so quota, entitlements, model routing and the client all agree.
+	ProEmails []string
 }
 
 // StripeConfig holds Stripe API credentials and the two Pro price IDs.
@@ -259,6 +264,7 @@ func Load() (*Config, error) {
 		Subscription: SubscriptionConfig{
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
 			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 100),
+			ProEmails:         getEnvAsSlice("PRO_EMAILS", nil),
 		},
 		Secrets: SecretsConfig{
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),

@@ -17,6 +17,7 @@ type fakeUsageRepo struct {
 	usage     int
 	usageErr  error
 	plan      string
+	email     string
 	planErr   error
 	incErr    error
 	getCalls  int
@@ -31,12 +32,12 @@ func (f *fakeUsageRepo) GetDailyUsage(_ context.Context, _ uuid.UUID) (int, erro
 	return f.usage, f.usageErr
 }
 
-func (f *fakeUsageRepo) GetUserPlan(_ context.Context, _ uuid.UUID) (string, error) {
+func (f *fakeUsageRepo) GetUserPlan(_ context.Context, _ uuid.UUID) (string, string, error) {
 	f.planCalls++
 	if f.plan == "" {
-		return PlanFree, f.planErr
+		return PlanFree, f.email, f.planErr
 	}
-	return f.plan, f.planErr
+	return f.plan, f.email, f.planErr
 }
 
 func (f *fakeUsageRepo) TryIncrementUsage(_ context.Context, id uuid.UUID, limit int) (bool, int, error) {
@@ -58,7 +59,66 @@ func testLogger() *slog.Logger {
 }
 
 func newTestService(repo Repository, adminEmail string) Service {
-	return NewService(repo, testLogger(), adminEmail, DefaultLimits())
+	return NewService(repo, testLogger(), adminEmail, DefaultLimits(), nil)
+}
+
+func newCompedService(repo Repository, proEmails ...string) Service {
+	return NewService(repo, testLogger(), "", DefaultLimits(), proEmails)
+}
+
+// PRO_EMAILS: a listed account is Pro with no subscriptions row at all.
+func TestEffectivePlan_ComplimentaryEmailIsPro(t *testing.T) {
+	repo := &fakeUsageRepo{email: "Founder@Example.com"}
+	svc := newCompedService(repo, " founder@example.com ", "tester@example.com")
+
+	plan, err := svc.EffectivePlan(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsProPlan(plan) {
+		t.Fatalf("comped email should resolve to a Pro plan, got %q", plan)
+	}
+}
+
+func TestEffectivePlan_UnlistedEmailStaysFree(t *testing.T) {
+	repo := &fakeUsageRepo{email: "someone@example.com"}
+	svc := newCompedService(repo, "founder@example.com")
+
+	plan, err := svc.EffectivePlan(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan != PlanFree {
+		t.Fatalf("unlisted email must stay free, got %q", plan)
+	}
+}
+
+// The comped plan is what the quota uses too: a listed account gets the Pro
+// daily limit even though the repo reports free.
+func TestConsumeQuota_ComplimentaryEmailGetsProLimit(t *testing.T) {
+	repo := &fakeUsageRepo{email: "founder@example.com", usage: DefaultLimits().FreeDaily}
+	svc := newCompedService(repo, "founder@example.com")
+
+	if err := svc.ConsumeQuota(context.Background(), uuid.New(), "founder@example.com"); err != nil {
+		t.Fatalf("comped account should have the Pro limit, got %v", err)
+	}
+	if repo.lastLimit != DefaultLimits().ProDaily {
+		t.Fatalf("limit = %d, want the Pro limit %d", repo.lastLimit, DefaultLimits().ProDaily)
+	}
+}
+
+// A real Pro row is not downgraded by being absent from the list.
+func TestEffectivePlan_PaidProUnaffectedByList(t *testing.T) {
+	repo := &fakeUsageRepo{email: "paying@example.com", plan: PlanPremiumMonthly}
+	svc := newCompedService(repo, "founder@example.com")
+
+	plan, err := svc.EffectivePlan(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan != PlanPremiumMonthly {
+		t.Fatalf("paid plan changed to %q", plan)
+	}
 }
 
 func TestConsumeQuota_AdminBypass(t *testing.T) {
@@ -159,7 +219,7 @@ func TestConsumeQuota_UnknownPlanFallsBackToFreeLimit(t *testing.T) {
 
 func TestConsumeQuota_ZeroLimitDeniesWithoutIncrement(t *testing.T) {
 	repo := &fakeUsageRepo{}
-	svc := NewService(repo, testLogger(), "", Limits{FreeDaily: 0, ProDaily: 300})
+	svc := NewService(repo, testLogger(), "", Limits{FreeDaily: 0, ProDaily: 300}, nil)
 
 	err := svc.ConsumeQuota(context.Background(), uuid.New(), "user@example.com")
 	if !errors.Is(err, ErrQuotaExceeded) {

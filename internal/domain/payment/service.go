@@ -648,6 +648,12 @@ func (s *service) CreateCustomerPortalSession(ctx context.Context, userID uuid.U
 	}, nil
 }
 
+// effectivePlanReader is what the subscription service also is; asserted
+// optionally so tests can keep passing a bare PlanInvalidator.
+type effectivePlanReader interface {
+	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
+}
+
 // UnlimitedLimit is the sentinel the client renders as "unlimited"; the Pro
 // fair-use cap is deliberately never exposed here.
 const UnlimitedLimit = int32(-1)
@@ -665,6 +671,16 @@ func (s *service) GetSubscription(ctx context.Context, userID uuid.UUID) (*Subsc
 			UserID: userID,
 			Plan:   subquota.PlanFree,
 			Status: "active",
+		}
+	}
+
+	// The billing page must agree with every gate. Plans are resolved by the
+	// subscription service (which applies PRO_EMAILS); when it says Pro and
+	// the row says free, the row is the one that is wrong for display.
+	if reader, ok := s.invalidator.(effectivePlanReader); ok && reader != nil && !subquota.IsProPlan(sub.Plan) {
+		if plan, err := reader.EffectivePlan(ctx, userID); err == nil && subquota.IsProPlan(plan) {
+			sub.Plan = plan
+			sub.Status = "active"
 		}
 	}
 
