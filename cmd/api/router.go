@@ -176,46 +176,41 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	// Register health and metrics routes
 	registerUtilityRoutes(mux, deps)
 
-	allowedOrigins := deps.Config.Server.AllowedOrigins
+	corsHandler := cors.New(corsOptions(deps.Config.Server.AllowedOrigins))
+	return corsHandler.Handler(mux)
+}
+
+// browserRequestHeaders are the non-Connect headers the web client sends on
+// every RPC, and which a preflight therefore asks permission for.
+//
+// The three X-Posthog-* names are added by posthog-js when the client lists
+// the API host under `tracing_headers`, so that a request can be joined to
+// the session that made it. rs/cors answers a preflight that asks for any
+// header outside this list with a bare 204 — no Access-Control-Allow-Origin —
+// and the browser reports that as a CORS failure on the real call. Sign-in
+// broke this way the day PostHog first initialised in production: the API
+// was fine, the allow-list was one header short.
+var browserRequestHeaders = []string{
+	"Authorization",
+	"X-Posthog-Distinct-Id",
+	"X-Posthog-Session-Id",
+	"X-Posthog-Window-Id",
+}
+
+// corsOptions builds the CORS policy for browser clients. Origins come from
+// ALLOWED_ORIGINS; an empty list means local development.
+func corsOptions(allowedOrigins []string) cors.Options {
 	if len(allowedOrigins) == 0 {
 		allowedOrigins = []string{"http://localhost:3000"}
 	}
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   allowedOrigins,                              // From ALLOWED_ORIGINS (comma-separated)
-		AllowedMethods:   c.AllowedMethods(),                          // ["GET", "POST", "OPTIONS"]
-		AllowedHeaders:   append(c.AllowedHeaders(), "Authorization"), // Adds "Authorization" for safety
-		ExposedHeaders:   c.ExposedHeaders(),                          // ["Grpc-Status", "Grpc-Message", "Grpc-Status-Details-Bin"]
+	return cors.Options{
+		AllowedOrigins:   allowedOrigins,
+		AllowedMethods:   c.AllowedMethods(),                                   // GET, POST, OPTIONS
+		AllowedHeaders:   append(c.AllowedHeaders(), browserRequestHeaders...), // Connect's, plus ours
+		ExposedHeaders:   c.ExposedHeaders(),                                   // Grpc-Status, Grpc-Message, Grpc-Status-Details-Bin
 		AllowCredentials: true,
 		MaxAge:           7200, // Cache preflights for 2 hours
-	})
-
-	// Enable CORS for browser clients (Buf Studio, local frontend)
-	//corsHandler := cors.New(cors.Options{
-	//	AllowedOrigins: []string{
-	//		"https://buf.build",
-	//		"https://studio.buf.build",
-	//		"http://localhost:3000",
-	//	},
-	//	AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
-	//	AllowedHeaders: []string{
-	//		"Accept-Encoding",
-	//		"Content-Encoding",
-	//		"Content-Type",
-	//		"Connect-Protocol-Version",
-	//		"Connect-Timeout-Ms",
-	//		"Grpc-Timeout",
-	//		"X-Grpc-Web",
-	//		"X-User-Agent",
-	//	},
-	//	ExposedHeaders: []string{
-	//		"Grpc-Status",
-	//		"Grpc-Message",
-	//		"Grpc-Status-Details-Bin",
-	//	},
-	//	AllowCredentials: true,
-	//})
-
-	return corsHandler.Handler(mux)
+	}
 }
 
 // registerConnectRoutes registers all Connect RPC service service
