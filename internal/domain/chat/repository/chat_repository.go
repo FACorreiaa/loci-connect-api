@@ -41,7 +41,59 @@ var (
 	}
 	responsePrefixREs = compileResponsePrefixREs()
 	jsonMarkdownRE    = regexp.MustCompile("(?s)```json\\s*(.*)\\s*```")
+
+	// promptWrapperRE matches the prompt the unified stream persists
+	// ("Unified Chat Stream - Domain: itinerary, Message: ...") so history
+	// shows the user's own words rather than the wrapper.
+	promptWrapperRE = regexp.MustCompile(`(?is)^Unified Chat Stream - Domain:\s*[a-z_]+,\s*Message:\s*(.+)$`)
+
+	// responseSectionRE matches a section header line ("[itinerary]") in a
+	// multi-part response blob persisted by the unified stream. Sections are
+	// written from a map range, so their order is not stable.
+	responseSectionRE = regexp.MustCompile(`(?m)^\[([a-z_]+)\]\s*$`)
+
+	// responseSectionOrder is the preference order for which section of a
+	// multi-part response is rendered in the chat history.
+	responseSectionOrder = []string{
+		"itinerary",
+		"general_pois",
+		"personalized_pois",
+		"pois",
+		"city_data",
+		"hotels",
+		"restaurants",
+		"activities",
+	}
 )
+
+// stripPromptWrapper returns the user's message from a persisted unified
+// stream prompt, or the prompt unchanged when it is not wrapped.
+func stripPromptWrapper(prompt string) string {
+	if m := promptWrapperRE.FindStringSubmatch(prompt); m != nil {
+		return strings.TrimSpace(m[1])
+	}
+	return prompt
+}
+
+// splitResponseSections splits a multi-part response blob into tag -> body.
+// It returns nil when the response holds no section header lines.
+func splitResponseSections(response string) map[string]string {
+	matches := responseSectionRE.FindAllStringSubmatchIndex(response, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	sections := make(map[string]string, len(matches))
+	for i, m := range matches {
+		tag := response[m[2]:m[3]]
+		bodyStart := m[1]
+		bodyEnd := len(response)
+		if i+1 < len(matches) {
+			bodyEnd = matches[i+1][0]
+		}
+		sections[tag] = strings.TrimSpace(response[bodyStart:bodyEnd])
+	}
+	return sections
+}
 
 func compileResponsePrefixREs() []*regexp.Regexp {
 	res := make([]*regexp.Regexp, len(responsePrefixPatterns))
@@ -1068,7 +1120,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			if prompt, ok := interaction["prompt"].(string); ok && prompt != "" {
 				conversationHistory = append(conversationHistory, locitypes.ConversationMessage{
 					Role:      "user",
-					Content:   prompt,
+					Content:   stripPromptWrapper(prompt),
 					Timestamp: parseTimeFromInterface(interaction["created_at"]),
 				})
 			}
@@ -1204,61 +1256,119 @@ func parseTimeFromInterface(timeInterface any) time.Time {
 	return time.Now()
 }
 
-// Helper function to format JSON response for human-readable display
+// formatResponseForDisplay turns a persisted LLM response into a short
+// human-readable sentence for the chat history. It handles the multi-part
+// blob written by the unified stream ("[city_data]\n{...}\n\n[itinerary]\n{...}")
+// in any section order, the legacy single-tag form ("[itinerary]{...}"), and
+// plain text. It never returns raw JSON.
 func formatResponseForDisplay(response, cityName string) string {
-	// Handle responses with prefixed tags like [itinerary], [city_data], etc.
-	cleanedResponse := response
-
-	// Remove common LLM response prefixes
-	for _, re := range responsePrefixREs {
-		cleanedResponse = re.ReplaceAllString(cleanedResponse, "")
+	if sections := splitResponseSections(response); len(sections) > 0 {
+		for _, tag := range responseSectionOrder {
+			body, ok := sections[tag]
+			if !ok || body == "" {
+				continue
+			}
+			if text, ok := formatSingleResponse(cleanResponseBody(body), cityName); ok {
+				return text
+			}
+		}
+		// Nothing rendered as prose: fall back to the keyword sentences over
+		// the section bodies (never the raw payload).
+		bodies := make([]string, 0, len(sections))
+		for _, tag := range responseSectionOrder {
+			if body := sections[tag]; body != "" {
+				bodies = append(bodies, body)
+			}
+		}
+		return formatFallbackSentence(strings.Join(bodies, "\n"), cityName)
 	}
 
-	// Remove markdown code blocks if present
-	cleanedResponse = jsonMarkdownRE.ReplaceAllString(cleanedResponse, "$1")
-	cleanedResponse = strings.TrimSpace(cleanedResponse)
+	cleanedResponse := cleanResponseBody(response)
 
-	// First, check if cleaned response is valid JSON
+	// Not JSON: return as-is (might be already formatted text).
 	if !json.Valid([]byte(cleanedResponse)) {
-		// If not JSON, return as-is (might be already formatted text)
 		return response
 	}
 
-	// Try to parse as GeneralCityData first (for [city_data] responses)
-	var generalCity locitypes.GeneralCityData
-	if err := json.Unmarshal([]byte(cleanedResponse), &generalCity); err == nil && generalCity.City != "" {
-		return formatCityDataResponse(generalCity)
+	if text, ok := formatSingleResponse(cleanedResponse, cityName); ok {
+		return text
+	}
+	return formatFallbackSentence(cleanedResponse, cityName)
+}
+
+// cleanResponseBody strips a leading section tag and markdown code fences.
+func cleanResponseBody(body string) string {
+	cleaned := body
+	for _, re := range responsePrefixREs {
+		cleaned = re.ReplaceAllString(cleaned, "")
+	}
+	cleaned = jsonMarkdownRE.ReplaceAllString(cleaned, "$1")
+	return strings.TrimSpace(cleaned)
+}
+
+// formatSingleResponse renders one JSON payload as prose. ok is false when
+// the payload is not JSON or holds nothing that can be described.
+func formatSingleResponse(cleaned, cityName string) (string, bool) {
+	if !json.Valid([]byte(cleaned)) {
+		return "", false
 	}
 
-	// Try to parse as AiCityResponse (most common format)
+	// [city_data] responses.
+	var generalCity locitypes.GeneralCityData
+	if err := json.Unmarshal([]byte(cleaned), &generalCity); err == nil && generalCity.City != "" {
+		return formatCityDataResponse(generalCity), true
+	}
+
+	// [itinerary] responses are persisted as a bare AIItineraryResponse
+	// ({"itinerary_name": ..., "points_of_interest": [...]}).
+	var itinerary locitypes.AIItineraryResponse
+	if err := json.Unmarshal([]byte(cleaned), &itinerary); err == nil && itinerary.ItineraryName != "" {
+		return formatItineraryResponse(locitypes.AiCityResponse{AIItineraryResponse: itinerary}, cityName), true
+	}
+
+	// AiCityResponse, which also covers the nested {"points_of_interest": [...]}
+	// shape of [general_pois] sections.
 	var cityResponse locitypes.AiCityResponse
-	if err := json.Unmarshal([]byte(cleanedResponse), &cityResponse); err == nil {
-		// Check if it's a valid itinerary response (either has POIs or itinerary data)
+	if err := json.Unmarshal([]byte(cleaned), &cityResponse); err == nil {
 		if len(cityResponse.PointsOfInterest) > 0 || cityResponse.AIItineraryResponse.ItineraryName != "" || len(cityResponse.AIItineraryResponse.PointsOfInterest) > 0 {
-			return formatItineraryResponse(cityResponse, cityName)
+			return formatItineraryResponse(cityResponse, cityName), true
+		}
+		// Wrapped lists — {"hotels": [...]} and friends — are the same object
+		// shape; render them with the list formatters rather than dropping to
+		// the keyword guess.
+		if len(cityResponse.Hotels) > 0 {
+			return formatHotelResponse(cityResponse.Hotels, cityName), true
+		}
+		if len(cityResponse.Restaurants) > 0 {
+			return formatRestaurantResponse(cityResponse.Restaurants, cityName), true
+		}
+		if len(cityResponse.Activities) > 0 {
+			return formatPOIResponse(cityResponse.Activities, cityName), true
 		}
 	}
 
-	// Try to parse as hotel array
 	var hotels []locitypes.HotelDetailedInfo
-	if err := json.Unmarshal([]byte(cleanedResponse), &hotels); err == nil && len(hotels) > 0 {
-		return formatHotelResponse(hotels, cityName)
+	if err := json.Unmarshal([]byte(cleaned), &hotels); err == nil && len(hotels) > 0 {
+		return formatHotelResponse(hotels, cityName), true
 	}
 
-	// Try to parse as restaurant array
 	var restaurants []locitypes.RestaurantDetailedInfo
-	if err := json.Unmarshal([]byte(cleanedResponse), &restaurants); err == nil && len(restaurants) > 0 {
-		return formatRestaurantResponse(restaurants, cityName)
+	if err := json.Unmarshal([]byte(cleaned), &restaurants); err == nil && len(restaurants) > 0 {
+		return formatRestaurantResponse(restaurants, cityName), true
 	}
 
-	// Try to parse as POI array
 	var pois []locitypes.POIDetailedInfo
-	if err := json.Unmarshal([]byte(cleanedResponse), &pois); err == nil && len(pois) > 0 {
-		return formatPOIResponse(pois, cityName)
+	if err := json.Unmarshal([]byte(cleaned), &pois); err == nil && len(pois) > 0 {
+		return formatPOIResponse(pois, cityName), true
 	}
 
-	// Try to extract meaningful information from malformed JSON or text
-	cleanedLower := strings.ToLower(cleanedResponse)
+	return "", false
+}
+
+// formatFallbackSentence guesses a sentence from keywords in text that could
+// not be rendered as structured prose.
+func formatFallbackSentence(text, cityName string) string {
+	cleanedLower := strings.ToLower(text)
 
 	// Check if it contains city information
 	if strings.Contains(cleanedLower, "city") || strings.Contains(cleanedLower, "country") {

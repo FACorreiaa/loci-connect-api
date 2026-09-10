@@ -208,6 +208,10 @@ const (
 	// or every provider in the fallback chain was exhausted. Retryable,
 	// but it usually needs an operator, not the user.
 	StreamErrorProviderUnavailable StreamErrorCode = "provider_unavailable"
+	// StreamErrorNoResults means the request ran but produced nothing to
+	// show (for example no nearby places). Retrying, typically with a
+	// wider radius, is reasonable.
+	StreamErrorNoResults StreamErrorCode = "no_results"
 )
 
 // NavigationData contains information for URL navigation

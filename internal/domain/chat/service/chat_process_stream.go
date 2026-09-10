@@ -409,6 +409,8 @@ func (l *ServiceImpl) persistResults(
 				cityID = savedCityID
 				l.logger.InfoContext(ctx, "Successfully saved city data", slog.String("city_id", cityID.String()))
 			}
+		} else if err != nil {
+			l.logger.WarnContext(ctx, "parseCityDataFromResponse failed", slog.Any("error", err))
 		}
 	}
 	// Fallback: try to get existing city from database, or create it
@@ -757,6 +759,7 @@ func (l *ServiceImpl) handleNearbyDomain(
 		sendEventWithResponse(locitypes.StreamEvent{
 			Type:      locitypes.EventTypeError,
 			Error:     "Unable to find places near your location. Please try again or expand your search radius.",
+			ErrorCode: locitypes.StreamErrorNoResults,
 			Timestamp: time.Now(),
 			EventID:   uuid.New().String(),
 		})
