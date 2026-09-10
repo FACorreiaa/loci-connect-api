@@ -17,6 +17,14 @@ const PlaceholderToken = "PASTE_YOUR_KEY_HERE__create_one_below"
 // TokenEnvVar is the environment variable the git-safe configurations read.
 const TokenEnvVar = "LOCI_MCP_TOKEN"
 
+// desktopHeaderEnvVar is the variable Claude Desktop's no-space form reads.
+//
+// It holds the whole header value — "Bearer <token>" — not the token, because
+// mcp-remote splices it into an argument that must contain no space. Named
+// differently from TokenEnvVar so the two cannot be confused: exporting a bare
+// token under this name would send "Authorization: loci_sk_…" and fail.
+const desktopHeaderEnvVar = "LOCI_MCP_AUTH"
+
 // Setup is everything a user needs to point one agent at Loci: the config a
 // person edits, and the prompt a person hands to the agent instead.
 //
@@ -121,6 +129,100 @@ func (w *SetupWriter) Instructions(kind ClientKind, token string) Setup {
       "url": %q,
       "headers": {
         "Authorization": "Bearer ${%s}"
+      }
+    }
+  }
+}`, w.endpoint, TokenEnvVar)
+		setup.Export = "export " + TokenEnvVar + "=" + token
+
+	case ClientClaudeDesktop:
+		// Claude Desktop cannot dial an HTTP MCP server with a static bearer
+		// header itself; its remote connectors want OAuth. mcp-remote is the
+		// documented stdio bridge: Desktop runs it as a local server and it
+		// forwards to Loci with the header. It defaults to trying streamable
+		// HTTP first, which is what Loci serves, so no --transport flag.
+		//
+		// Verified against mcp-remote 0.8.6: `--header "Name: value"` is the
+		// flag, ${VAR} in an argument is read from the "env" map, and the
+		// no-space form below is its own documented workaround for Claude
+		// Desktop on Windows, where spaces inside args are not escaped.
+		setup.ConfigLabel = "claude_desktop_config.json"
+		setup.ConfigLang = "json"
+		setup.Config = fmt.Sprintf(`{
+  "mcpServers": {
+    "loci": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote", %q,
+        "--header", "Authorization: Bearer %s"
+      ]
+    }
+  }
+}`, w.endpoint, token)
+
+		// Not the git-safe form the other clients have: this file lives in
+		// Application Support, and Desktop is launched from the dock, so it
+		// never sees a variable you export — the "env" block is the only way
+		// to hand it one. The variable therefore carries the whole header
+		// value, "Bearer" included, because the argument it is spliced into
+		// must not contain a space. A different name from TokenEnvVar so
+		// nobody exports the bare token under it and gets a 401 with no clue.
+		setup.SafeLabel = "claude_desktop_config.json (Windows)"
+		setup.SafeLang = "json"
+		setup.SafeNote = "On Windows, Claude Desktop mangles spaces inside args, so the header " +
+			"cannot be passed as one string. Use this form instead: the header value goes in " +
+			"the env block and the argument has no space in it. The file is the same one: " +
+			"macOS ~/Library/Application Support/Claude/, Windows %APPDATA%\\Claude\\."
+		setup.Safe = fmt.Sprintf(`{
+  "mcpServers": {
+    "loci": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote", %q,
+        "--header", "Authorization:${%s}"
+      ],
+      "env": {
+        %q: "Bearer %s"
+      }
+    }
+  }
+}`, w.endpoint, desktopHeaderEnvVar, desktopHeaderEnvVar, token)
+
+	case ClientCursor:
+		// Cursor reads the same shape as Claude Code's .mcp.json: a url and a
+		// headers map, with the transport inferred from the url. The safe form
+		// uses Cursor's own ${env:NAME} interpolation, which is its documented
+		// syntax rather than the shell's ${NAME}.
+		//
+		// The headers map is documented in Cursor's MCP guide; the ${env:}
+		// form is from the same page and has not been exercised against a
+		// Cursor release here. If it turns out not to interpolate, the literal
+		// form above it still works — the snippet degrades to needing the key
+		// in the file, not to being wrong.
+		setup.ConfigLabel = "~/.cursor/mcp.json"
+		setup.ConfigLang = "json"
+		setup.Config = fmt.Sprintf(`{
+  "mcpServers": {
+    "loci": {
+      "url": %q,
+      "headers": {
+        "Authorization": "Bearer %s"
+      }
+    }
+  }
+}`, w.endpoint, token)
+
+		setup.SafeLabel = ".cursor/mcp.json"
+		setup.SafeLang = "json"
+		setup.SafeNote = "A project-level .cursor/mcp.json is committed with the project. If you " +
+			"put it there rather than in your home directory, use this version and keep the " +
+			"key in your environment."
+		setup.Safe = fmt.Sprintf(`{
+  "mcpServers": {
+    "loci": {
+      "url": %q,
+      "headers": {
+        "Authorization": "Bearer ${env:%s}"
       }
     }
   }

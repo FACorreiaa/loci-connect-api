@@ -82,7 +82,7 @@ func TestTheIssuedInstructionsCarryTheKey(t *testing.T) {
 func TestTheCommittableFileNeverContainsTheKey(t *testing.T) {
 	const token = "loci_sk_realtoken0123456789"
 
-	for _, kind := range []ClientKind{ClientClaudeCode, ClientCodex} {
+	for _, kind := range []ClientKind{ClientClaudeCode, ClientCodex, ClientCursor} {
 		t.Run(string(kind), func(t *testing.T) {
 			setup := testWriter().Instructions(kind, token)
 
@@ -129,6 +129,108 @@ func TestTheClaudeCodeSafeFormIsValidJSON(t *testing.T) {
 	servers, ok := parsed["mcpServers"].(map[string]any)
 	if !ok || servers["loci"] == nil {
 		t.Fatalf("the snippet does not register a server called loci: %v", parsed)
+	}
+}
+
+// Cursor and Claude Desktop are both configured by a JSON file somebody edits
+// by hand, so a snippet that does not parse costs them the whole afternoon.
+func TestTheCursorAndClaudeDesktopFormsAreValidJSON(t *testing.T) {
+	for _, kind := range []ClientKind{ClientCursor, ClientClaudeDesktop} {
+		t.Run(string(kind), func(t *testing.T) {
+			setup := testWriter().Preview(kind)
+
+			for label, blob := range map[string]string{"config": setup.Config, "safe": setup.Safe} {
+				var parsed map[string]any
+				if err := json.Unmarshal([]byte(blob), &parsed); err != nil {
+					t.Fatalf("%s is not valid JSON: %v", label, err)
+				}
+				servers, ok := parsed["mcpServers"].(map[string]any)
+				if !ok || servers["loci"] == nil {
+					t.Fatalf("%s does not register a server called loci: %v", label, parsed)
+				}
+			}
+		})
+	}
+}
+
+// Claude Desktop has no HTTP transport of its own; it reaches Loci through
+// mcp-remote, which takes the header as a process argument. That argument must
+// not contain a space in the alternative form, because Claude Desktop on
+// Windows (and Cursor) mangle spaces inside args — the documented workaround is
+// "Name:${VAR}" with the whole header value, "Bearer …" included, in env.
+func TestClaudeDesktopGoesThroughMcpRemote(t *testing.T) {
+	const token = "loci_sk_realtoken0123456789"
+	setup := testWriter().Instructions(ClientClaudeDesktop, token)
+
+	if !strings.Contains(setup.Config, "mcp-remote") {
+		t.Fatal("the config does not invoke mcp-remote; Claude Desktop cannot speak HTTP itself")
+	}
+	if !strings.Contains(setup.Config, `"Authorization: Bearer `+token+`"`) {
+		t.Error("the literal form does not pass the bearer header to mcp-remote")
+	}
+
+	var parsed struct {
+		Servers map[string]struct {
+			Args []string          `json:"args"`
+			Env  map[string]string `json:"env"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(setup.Safe), &parsed); err != nil {
+		t.Fatalf("the alternative form is not valid JSON: %v", err)
+	}
+	loci := parsed.Servers["loci"]
+
+	var headerArg string
+	for i, arg := range loci.Args {
+		if arg == "--header" && i+1 < len(loci.Args) {
+			headerArg = loci.Args[i+1]
+		}
+	}
+	if headerArg == "" {
+		t.Fatal("no --header argument in the alternative form")
+	}
+	if strings.Contains(headerArg, " ") {
+		t.Errorf("the header argument %q contains a space, which Windows and Cursor mangle", headerArg)
+	}
+	if strings.Contains(headerArg, token) {
+		t.Error("the header argument carries the token literally instead of reading env")
+	}
+
+	var carried bool
+	for _, value := range loci.Env {
+		if value == "Bearer "+token {
+			carried = true
+		}
+	}
+	if !carried {
+		t.Errorf("no env entry holds the full header value %q", "Bearer "+token)
+	}
+	if setup.SafeNote == "" {
+		t.Error("no note explaining when to use the alternative form")
+	}
+}
+
+// Cursor reads ${env:NAME} from the editor's environment, so the safe form is
+// the same shape as Claude Code's with a different interpolation syntax.
+func TestTheCursorSafeFormReadsTheEnvironment(t *testing.T) {
+	setup := testWriter().Preview(ClientCursor)
+
+	if !strings.Contains(setup.Safe, "${env:"+TokenEnvVar+"}") {
+		t.Errorf("the cursor safe form does not use Cursor's ${env:} syntax: %s", setup.Safe)
+	}
+	if !strings.Contains(setup.ConfigLabel, ".cursor/mcp.json") {
+		t.Errorf("the config label %q does not name the file", setup.ConfigLabel)
+	}
+}
+
+func TestEveryKindHasALabelAndSetup(t *testing.T) {
+	for _, kind := range ClientKinds {
+		if kind.Label() == string(kind) {
+			t.Errorf("%s has no label written for a person", kind)
+		}
+		if setup := testWriter().Preview(kind); setup.Config == "" {
+			t.Errorf("%s renders no config", kind)
+		}
 	}
 }
 

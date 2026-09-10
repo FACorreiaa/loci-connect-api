@@ -11,9 +11,11 @@ import "fmt"
 type ClientKind string
 
 const (
-	ClientClaudeCode ClientKind = "claude_code"
-	ClientCodex      ClientKind = "codex"
-	ClientHermes     ClientKind = "hermes"
+	ClientClaudeCode    ClientKind = "claude_code"
+	ClientClaudeDesktop ClientKind = "claude_desktop"
+	ClientCursor        ClientKind = "cursor"
+	ClientCodex         ClientKind = "codex"
+	ClientHermes        ClientKind = "hermes"
 
 	// ClientOther is the generic MCP configuration, and the default: keys
 	// minted before this existed carry it, and so does anything unrecognised
@@ -22,13 +24,22 @@ const (
 )
 
 // ClientKinds is every kind, in the order the settings page offers them.
-var ClientKinds = []ClientKind{ClientClaudeCode, ClientCodex, ClientHermes, ClientOther}
+//
+// The database CHECK constraint on api_keys.client_kind lists the same values;
+// adding one here is a migration as well (see 0083).
+var ClientKinds = []ClientKind{
+	ClientClaudeCode, ClientClaudeDesktop, ClientCursor, ClientCodex, ClientHermes, ClientOther,
+}
 
 // Label is how the kind is written for a person.
 func (k ClientKind) Label() string {
 	switch k {
 	case ClientClaudeCode:
 		return "Claude Code"
+	case ClientClaudeDesktop:
+		return "Claude Desktop"
+	case ClientCursor:
+		return "Cursor"
 	case ClientCodex:
 		return "Codex"
 	case ClientHermes:

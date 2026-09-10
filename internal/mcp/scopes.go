@@ -172,6 +172,15 @@ func ReadOnlyToolNames() []string {
 	return append([]string(nil), readOnlyTools...)
 }
 
+// MutatingToolNames returns the tools that change the caller's stored data.
+//
+// The setup instructions name them alongside the generating tools, so an agent
+// checking its connection is told which calls to keep its hands off. Returned
+// as a copy for the same reason ReadOnlyToolNames is.
+func MutatingToolNames() []string {
+	return append([]string(nil), mutatingTools...)
+}
+
 // GeneratingToolNames returns the tools that spend the daily LLM quota.
 //
 // The setup instructions name them so an agent is told not to call them while

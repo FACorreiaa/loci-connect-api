@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -172,5 +173,26 @@ func TestAllToolNamesIsStable(t *testing.T) {
 			t.Errorf("read-only tools are not listed first: got %v", first[:len(readOnlyTools)])
 			break
 		}
+	}
+}
+
+// The setup instructions name every tool that changes data so an agent checking
+// its connection is told not to call one. That list must be the write set
+// exactly: a tool missing from it is one the prompt will not warn about.
+func TestMutatingToolNamesIsTheWriteSet(t *testing.T) {
+	got := MutatingToolNames()
+	if !reflect.DeepEqual(got, mutatingTools) {
+		t.Fatalf("MutatingToolNames() = %v, want %v", got, mutatingTools)
+	}
+	for _, name := range got {
+		if toolScope(name) != apikey.ScopeWrite {
+			t.Errorf("%s is listed as mutating but requires %q", name, toolScope(name))
+		}
+	}
+
+	// A copy, so a caller cannot reorder the table that decides scopes.
+	got[0] = "tampered"
+	if mutatingTools[0] == "tampered" {
+		t.Fatal("MutatingToolNames() returned the underlying slice")
 	}
 }
