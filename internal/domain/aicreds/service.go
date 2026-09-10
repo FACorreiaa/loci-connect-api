@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -23,6 +24,18 @@ var ErrUnknownProvider = errors.New("aicreds: not a provider a key can be brough
 
 // ErrKeyRequired means a save arrived with no key and none stored to keep.
 var ErrKeyRequired = errors.New("aicreds: an API key is required")
+
+// InputError is a validation failure the user can fix: the message names what
+// to change and never contains the key.
+//
+// Its own type so the handler can tell "you typed it wrong" from "the database
+// is down" without matching on strings — the first is InvalidArgument with the
+// message shown as-is, the second is Internal with the message hidden.
+type InputError struct{ Msg string }
+
+func (e *InputError) Error() string { return "aicreds: " + e.Msg }
+
+func invalid(msg string) error { return &InputError{Msg: msg} }
 
 // hintLen is how much of the key is kept in clear. Enough to answer "is the
 // stored key the one I am looking at", short enough to be useless to a reader.
@@ -80,10 +93,14 @@ type Resolved struct {
 type Service struct {
 	repo   Repository
 	sealer *secret.Sealer
+
+	// verifier is optional; see WithVerifier.
+	verifier KeyVerifier
+	logger   *slog.Logger
 }
 
 func NewService(repo Repository, sealer *secret.Sealer) *Service {
-	return &Service{repo: repo, sealer: sealer}
+	return &Service{repo: repo, sealer: sealer, logger: slog.Default()}
 }
 
 // Enabled reports whether credentials can be stored at all. The settings page
@@ -122,7 +139,7 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in Input) (Credent
 
 	model := strings.TrimSpace(in.Model)
 	if len(model) > 500 {
-		return Credential{}, errors.New("aicreds: the model name is too long")
+		return Credential{}, invalid("the model name is too long")
 	}
 
 	baseURL := ""
@@ -131,7 +148,7 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in Input) (Credent
 		if err != nil {
 			// The gateway URL is the user's own text and safe to report on;
 			// the message names what to fix.
-			return Credential{}, fmt.Errorf("aicreds: %w", err)
+			return Credential{}, invalid(err.Error())
 		}
 		baseURL = parsed
 	}
@@ -141,7 +158,14 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in Input) (Credent
 		return s.keepStoredKey(ctx, userID, entry.Name, model, baseURL)
 	}
 	if len(key) > maxKeyLen {
-		return Credential{}, errors.New("aicreds: that does not look like an API key")
+		return Credential{}, invalid("that does not look like an API key")
+	}
+
+	// Checked before it is sealed, so a mistyped key is refused while the
+	// person is still looking at the form rather than discovered through an
+	// itinerary that quietly ran on Loci's provider.
+	if err := s.verify(ctx, userID, entry, baseURL, key); err != nil {
+		return Credential{}, err
 	}
 
 	sealed, err := s.sealer.Seal(userID[:], []byte(key))

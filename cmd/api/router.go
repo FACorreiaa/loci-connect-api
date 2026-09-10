@@ -9,6 +9,7 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/aicreds/aicredsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
@@ -19,11 +20,13 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/integrations/integrationsv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext/localcontextconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/memory/memoryv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/messaging/messagingv1connect"
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
@@ -42,6 +45,9 @@ import (
 	"go.opentelemetry.io/otel"
 	"golang.org/x/time/rate"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
@@ -154,6 +160,14 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	if deps.PaymentService != nil {
 		mux.Handle("/webhooks/stripe", payment.WebhookHandler(deps.PaymentService, deps.Logger, deps.Config.Stripe.WebhookSecret))
 		deps.Logger.Info("registered webhook", "path", "/webhooks/stripe")
+	}
+
+	// Telegram's deliveries, in webhook mode only. Outside the Connect chain
+	// like Stripe's: the caller holds a shared secret, not a JWT. Nil means the
+	// deployment polls and there is nothing to mount.
+	if hook := deps.TelegramWebhook(); hook != nil {
+		mux.Handle("/webhooks/telegram", hook)
+		deps.Logger.Info("registered webhook", "path", "/webhooks/telegram")
 	}
 
 	// Model Context Protocol endpoint (API-key auth, outside the Connect
@@ -299,6 +313,36 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		mux.Handle(apikeyPath, apikeyHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", apikeyPath)
 	}
+
+	// Registered whether or not bring-your-own-key is on. With no encryption
+	// key the handler answers enabled=false and says why; not registering it
+	// would answer Unimplemented, which the settings page can only show as a
+	// spinner.
+	aicredsHandler := deps.AICredentialsHandler
+	if aicredsHandler == nil {
+		aicredsHandler = aicreds.NewHandler(deps.AICredentials, deps.Logger)
+	}
+	aicredsPath, aicredsConnect := aicredsv1connect.NewAiCredentialServiceHandler(aicredsHandler, opts)
+	mux.Handle(aicredsPath, aicredsConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", aicredsPath)
+
+	// Same rule for the Telegram link and the outbound MCP servers: always
+	// registered, enabled=false when the feature is off.
+	messagingHandler := deps.MessagingHandler
+	if messagingHandler == nil {
+		messagingHandler = messaging.NewHandler(deps.Messaging, deps.Logger)
+	}
+	messagingPath, messagingConnect := messagingv1connect.NewMessagingServiceHandler(messagingHandler, opts)
+	mux.Handle(messagingPath, messagingConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", messagingPath)
+
+	integrationsHandler := deps.IntegrationsHandler
+	if integrationsHandler == nil {
+		integrationsHandler = integrations.NewHandler(deps.Integrations, deps.Logger)
+	}
+	integrationsPath, integrationsConnect := integrationsv1connect.NewIntegrationServiceHandler(integrationsHandler, opts)
+	mux.Handle(integrationsPath, integrationsConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", integrationsPath)
 
 	if deps.ExportHandler != nil {
 		exportPath, exportHandler := exportv1connect.NewExportServiceHandler(deps.ExportHandler, opts)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -56,6 +57,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -114,6 +116,9 @@ type Dependencies struct {
 	Integrations *integrations.Service
 	// Messaging is nil when no chat platform is configured.
 	Messaging *messaging.Service
+	// telegramClient is built once with the service, so the poller and the
+	// webhook — whichever mode runs — share one client and one token.
+	telegramClient *telegram.Client
 	// sealer is shared by everything that stores a user's secret, so a key
 	// rotation has one place to take effect.
 	sealer              *secret.Sealer
@@ -135,20 +140,28 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler              *handler.AuthHandler
-	ChatHandler              *chathandler.ChatHandler
-	ProfileHandler           *profilehandler.ProfileHandler
-	DiscoverHandler          *discoverdomain.Handler
-	ItineraryHandler         *itineraryhandler.ItineraryHandler
-	ListHandler              *itineraryhandler.ListHandler
-	StatisticsHandler        *statistics.Handler
-	RecentsHandler           *recents.Handler
-	UserHandler              *userhandler.UserHandler
-	InterestHandler          *interesthandler.InterestHandler
-	TagsHandler              *tagshandler.TagsHandler
-	PaymentHandler           paymentv1connect.PaymentServiceHandler
-	FavoritesHandler         *favorites.Handler
-	APIKeyHandler            *apikey.Handler
+	AuthHandler       *handler.AuthHandler
+	ChatHandler       *chathandler.ChatHandler
+	ProfileHandler    *profilehandler.ProfileHandler
+	DiscoverHandler   *discoverdomain.Handler
+	ItineraryHandler  *itineraryhandler.ItineraryHandler
+	ListHandler       *itineraryhandler.ListHandler
+	StatisticsHandler *statistics.Handler
+	RecentsHandler    *recents.Handler
+	UserHandler       *userhandler.UserHandler
+	InterestHandler   *interesthandler.InterestHandler
+	TagsHandler       *tagshandler.TagsHandler
+	PaymentHandler    paymentv1connect.PaymentServiceHandler
+	FavoritesHandler  *favorites.Handler
+	APIKeyHandler     *apikey.Handler
+	// AICredentialsHandler is always built, over a nil service when
+	// ENCRYPTION_KEY is unset, so the settings page is told the feature is
+	// off rather than shown Unimplemented.
+	AICredentialsHandler *aicreds.Handler
+	// MessagingHandler and IntegrationsHandler are always built too, for the
+	// same reason: each answers "off" over a nil service.
+	MessagingHandler         *messaging.Handler
+	IntegrationsHandler      *integrations.Handler
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
@@ -437,7 +450,11 @@ func (d *Dependencies) initAICredentials() error {
 	}
 
 	d.sealer = sealer
-	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer)
+	// The verifier asks the provider about a key before it is sealed, so a
+	// typo is refused at the form rather than found through a fallen-back
+	// itinerary. Only a rejection blocks a save; see aicreds.KeyVerifier.
+	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer).
+		WithVerifier(aicreds.NewHTTPVerifier(nil), d.Logger)
 	d.Logger.Info("bring-your-own-key enabled", slog.Int("encryption_keys", len(keys)))
 	return nil
 }
@@ -475,6 +492,24 @@ func (d *Dependencies) initMessaging() {
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
 	)
+	d.telegramClient = telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil)
+}
+
+// TelegramWebhook is the handler Telegram POSTs updates to, or nil when the
+// deployment polls instead — in which case the caller mounts nothing.
+//
+// Which mode runs follows from TELEGRAM_WEBHOOK_SECRET alone: a secret means
+// webhook, none means polling. There is no way to mount this without a secret,
+// because NewWebhook refuses to build one.
+func (d *Dependencies) TelegramWebhook() http.Handler {
+	if d.Messaging == nil || !d.Config.Messaging.UsesWebhook() {
+		return nil
+	}
+	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret, d.Logger)
+	if hook == nil {
+		return nil
+	}
+	return hook
 }
 
 // RunAppleSecretRefresh re-signs Apple's client secret until ctx is cancelled.
@@ -492,15 +527,21 @@ func (d *Dependencies) RunAppleSecretRefresh(ctx context.Context) error {
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
-// unconditionally. A long poll rather than a webhook because Loci has no public
-// address yet; see internal/domain/messaging/telegram.
+// unconditionally. Also returns nil in webhook mode: Telegram refuses
+// getUpdates while a webhook is registered, so a poller started alongside the
+// webhook would fail every request and log an error a minute for nothing.
 func (d *Dependencies) RunTelegram(ctx context.Context) error {
 	if d.Messaging == nil {
 		return nil
 	}
+	if d.Config.Messaging.UsesWebhook() {
+		d.Logger.Info("telegram in webhook mode; not polling",
+			slog.String("path", "/webhooks/telegram"))
+		return nil
+	}
 
 	poller := telegram.NewPoller(
-		telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil),
+		d.telegramClient,
 		messaging.NewRepository(d.DB.Pool),
 		d.Messaging,
 		d.Logger,
@@ -632,7 +673,19 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
-	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
+	// The setup writer is handed the endpoint and tool names as data because
+	// internal/mcp imports apikey; this is the one place that can see both.
+	// The tool lists come from the table that decides scopes, so the prompt's
+	// "do not call these" cannot drift from what the server enforces.
+	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger).WithSetup(
+		apikey.NewSetupWriter(
+			d.Config.Server.BaseURL, locimcp.Path,
+			locimcp.ReadOnlyToolNames(), locimcp.MutatingToolNames(), locimcp.GeneratingToolNames(),
+		),
+	)
+	d.AICredentialsHandler = aicreds.NewHandler(d.AICredentials, d.Logger)
+	d.MessagingHandler = messaging.NewHandler(d.Messaging, d.Logger)
+	d.IntegrationsHandler = integrations.NewHandler(d.Integrations, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)

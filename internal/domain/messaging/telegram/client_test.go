@@ -277,3 +277,35 @@ func TestDisplayName(t *testing.T) {
 		}
 	}
 }
+
+// Telegram refuses getUpdates while a webhook is registered, so knowing which
+// mode Telegram is in is the fastest answer to "why is nothing arriving".
+func TestGetWebhookInfoReportsTelegramsDeliveryMode(t *testing.T) {
+	api := newFakeAPI(t)
+	api.reply["getWebhookInfo"] = map[string]any{
+		"url":                  "https://api.lociai.fyi/webhooks/telegram",
+		"pending_update_count": 3,
+		"last_error_date":      1_700_000_000,
+		"last_error_message":   "Wrong response from the webhook: 401 Unauthorized",
+	}
+
+	info, err := api.client().GetWebhookInfo(t.Context())
+	if err != nil {
+		t.Fatalf("getWebhookInfo: %v", err)
+	}
+	if !info.Set() || info.URL != "https://api.lociai.fyi/webhooks/telegram" {
+		t.Errorf("info = %+v", info)
+	}
+	if info.PendingUpdateCount != 3 || info.LastErrorDate != 1_700_000_000 || !strings.Contains(info.LastErrorMessage, "401") {
+		t.Errorf("info = %+v", info)
+	}
+
+	api.reply["getWebhookInfo"] = map[string]any{"url": ""}
+	info, err = api.client().GetWebhookInfo(t.Context())
+	if err != nil {
+		t.Fatalf("getWebhookInfo: %v", err)
+	}
+	if info.Set() {
+		t.Error("an empty url was reported as a registered webhook")
+	}
+}

@@ -72,10 +72,15 @@ type BYOProvider struct {
 // its OpenAI-compatibility endpoint is a documented shim with parity caveats —
 // not something to ship on the strength of a plan. Claude is reachable today
 // through OpenRouter with a model beginning "anthropic/".
+//
+// The OpenRouter default is a cheap named model rather than a Claude one or
+// the "openrouter/auto" router: it is the user's money, but a blank model
+// field should not commit them to premium rates or to whatever OpenRouter
+// picks. Somebody who wants Claude types "anthropic/…" in the model field.
 var Catalog = []BYOProvider{
 	{
 		Name: "openrouter", Label: "OpenRouter",
-		BaseURL: "https://openrouter.ai/api/v1", DefaultModel: "anthropic/claude-sonnet-4.5",
+		BaseURL: "https://openrouter.ai/api/v1", DefaultModel: "deepseek/deepseek-v4-flash",
 		KeyHint: "sk-or-v1-…", VerifyPath: "/key",
 		Note: "One key, most models — including Claude and GPT. The simplest choice.",
 	},

@@ -99,3 +99,22 @@ func TestVerifyPathHasSomethingToJoinOnto(t *testing.T) {
 		})
 	}
 }
+
+// A blank model field must not commit the user to premium rates or to whatever
+// a router picks. The OpenRouter default is where that was true: it named a
+// Claude model, and "openrouter/auto" would be the same mistake in one word.
+func TestNoDefaultIsARouterOrAPremiumModel(t *testing.T) {
+	for _, p := range Catalog {
+		if p.DefaultModel == "openrouter/auto" {
+			t.Errorf("%s: default model is the router, which can pick any model", p.Name)
+		}
+		if strings.HasPrefix(p.DefaultModel, "anthropic/") {
+			t.Errorf("%s: default model %q is a Claude model; that is a choice the user should make", p.Name, p.DefaultModel)
+		}
+	}
+
+	entry, _ := ByName("openrouter")
+	if entry.DefaultModel != "deepseek/deepseek-v4-flash" {
+		t.Errorf("openrouter default = %q", entry.DefaultModel)
+	}
+}

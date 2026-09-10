@@ -186,7 +186,25 @@ type MessagingConfig struct {
 	// TelegramBotHandle is the "@name" people send their link code to. Shown in
 	// settings; the bridge itself resolves the bot from the token.
 	TelegramBotHandle string
+
+	// TelegramWebhookSecret is the value given to Telegram's setWebhook, which
+	// it echoes back in X-Telegram-Bot-Api-Secret-Token on every delivery.
+	//
+	// Its presence is what selects webhook mode; see UsesWebhook. Empty means
+	// long polling, which needs no public address and is right for a laptop.
+	// There is no separate "mode" variable on purpose: a mode switch with an
+	// empty secret would be an unauthenticated endpoint, and no combination
+	// of settings should be able to produce one.
+	TelegramWebhookSecret string
 }
+
+// UsesWebhook reports whether Telegram delivers updates by POSTing to
+// {BASE_URL}/webhooks/telegram rather than being polled.
+//
+// Derived from the secret alone. The two modes are mutually exclusive at
+// Telegram's end — getUpdates is refused while a webhook is registered — so
+// the poller does not start in this mode; see Dependencies.RunTelegram.
+func (c MessagingConfig) UsesWebhook() bool { return c.TelegramWebhookSecret != "" }
 
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
@@ -270,8 +288,9 @@ func Load() (*Config, error) {
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
 		},
 		Messaging: MessagingConfig{
-			TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
-			TelegramBotHandle: getEnv("TELEGRAM_BOT_HANDLE", ""),
+			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
+			TelegramBotHandle:     getEnv("TELEGRAM_BOT_HANDLE", ""),
+			TelegramWebhookSecret: strings.TrimSpace(getEnv("TELEGRAM_WEBHOOK_SECRET", "")),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),
@@ -349,6 +368,17 @@ func Load() (*Config, error) {
 		if strings.HasSuffix(cfg.AI.Model, ":free") {
 			return nil, fmt.Errorf("%s must not be a :free model in production, got %q",
 				providerModelEnv(cfg.AI.Provider), cfg.AI.Model)
+		}
+
+		// The opposite failure: a model that can cost anything. "openrouter/auto"
+		// hands the choice to OpenRouter per request, and its catalogue runs
+		// up to Claude Opus at about sixty times the default's price. Refused
+		// rather than warned about, because the bill is the only other symptom
+		// and it arrives a month later.
+		if cfg.AI.Provider == AIProviderOpenRouter && strings.EqualFold(cfg.AI.Model, openRouterAutoModel) {
+			return nil, fmt.Errorf("%s must name a model in production, not %q: "+
+				"the router can pick any model, Claude Opus included; the default is %q",
+				providerModelEnv(cfg.AI.Provider), openRouterAutoModel, DefaultOpenRouterModel)
 		}
 
 		// The spend ceiling, and the reason a dedicated key exists at all.
@@ -464,7 +494,7 @@ func loadAIConfig() AIConfig {
 		cfg.EmbeddingModel = getEnv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
 	case AIProviderOpenRouter:
 		cfg.APIKey = getEnv("OPENROUTER_API_KEY", "")
-		cfg.Model = getEnv("OPENROUTER_MODEL", "openrouter/auto")
+		cfg.Model = getEnv("OPENROUTER_MODEL", DefaultOpenRouterModel)
 		cfg.EmbeddingModel = getEnv("OPENROUTER_EMBEDDING_MODEL", "google/gemini-embedding-001")
 	default:
 		cfg.Provider = provider
@@ -504,6 +534,23 @@ func loadFallbacks() []AIProviderSpec {
 	}
 	return specs
 }
+
+// DefaultOpenRouterModel is what OPENROUTER_MODEL falls back to.
+//
+// A named, cheap model rather than OpenRouter's own router. The default used
+// to be "openrouter/auto", which lets OpenRouter pick per request from its
+// whole catalogue — Claude Opus included, at roughly sixty times this model's
+// price — so an unset variable could quietly bill every itinerary at premium
+// rates. DeepSeek V4 Flash is $0.084/$0.168 per million tokens with a one
+// million token context and structured outputs, which is enough for a plan.
+//
+// Also the catalogue default for a user's own OpenRouter key; see
+// pkg/ai/providers. Same footgun, their money.
+const DefaultOpenRouterModel = "deepseek/deepseek-v4-flash"
+
+// openRouterAutoModel is OpenRouter's per-request router. Refused as the
+// production primary; see the check in Load.
+const openRouterAutoModel = "openrouter/auto"
 
 // IsProduction reports whether the process is running as production.
 func IsProduction() bool {

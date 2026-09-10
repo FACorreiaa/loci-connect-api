@@ -48,6 +48,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The one line that says what the running value is. OPENROUTER_MODEL lives
+	// in a sealed secret nobody can read from outside the pod, and the
+	// difference between a cheap model and "openrouter/auto" is a bill, so
+	// the resolved model is logged at boot where it can be checked.
+	logger.Info("chat model resolved",
+		"provider", cfg.AI.Provider,
+		"model", cfg.AI.Model,
+		"fallbacks", len(cfg.AI.Fallbacks))
+
 	// Tracing must be installed before the router captures the global
 	// tracer provider. No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
 	shutdownTracing, err := observability.InitTracing(context.Background(), "loci-connect-api", logger)
