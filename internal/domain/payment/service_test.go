@@ -421,3 +421,47 @@ func TestGetSubscription_ProHidesFairUseCap(t *testing.T) {
 		t.Fatalf("requests today = %d, want 42", got.RequestsToday)
 	}
 }
+
+// compedPlans is the subscription service as the billing page sees it once
+// PRO_EMAILS is in play: the row says free, EffectivePlan says Pro.
+type compedPlans struct {
+	recordingInvalidator
+	plan string
+}
+
+func (c *compedPlans) EffectivePlan(_ context.Context, _ uuid.UUID) (string, error) {
+	return c.plan, nil
+}
+
+func TestGetSubscription_MirrorsComplimentaryPro(t *testing.T) {
+	repo := &fakePaymentRepo{dailyUsage: 3}
+	svc := NewService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)), repo, &compedPlans{plan: "premium_annual"}, StripeConfig{
+		APIKey: "sk_test_dummy", FreeDailyLimit: 10,
+	})
+
+	got, err := svc.GetSubscription(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("GetSubscription: %v", err)
+	}
+	if got.Subscription.Plan != "premium_annual" {
+		t.Fatalf("plan = %q, want the comped Pro plan the gates use", got.Subscription.Plan)
+	}
+	if got.RequestsLimit != UnlimitedLimit {
+		t.Fatalf("requests limit = %d, want unlimited for a comped Pro", got.RequestsLimit)
+	}
+}
+
+func TestGetSubscription_FreeStaysFreeWhenPlansAgree(t *testing.T) {
+	repo := &fakePaymentRepo{}
+	svc := NewService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)), repo, &compedPlans{plan: "free"}, StripeConfig{
+		APIKey: "sk_test_dummy", FreeDailyLimit: 10,
+	})
+
+	got, err := svc.GetSubscription(context.Background(), uuid.New())
+	if err != nil {
+		t.Fatalf("GetSubscription: %v", err)
+	}
+	if got.Subscription.Plan != "free" {
+		t.Fatalf("plan = %q, want free", got.Subscription.Plan)
+	}
+}

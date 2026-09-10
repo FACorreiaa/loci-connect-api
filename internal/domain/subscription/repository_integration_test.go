@@ -89,7 +89,7 @@ func TestGetUserPlan_DefaultsToFree(t *testing.T) {
 	repo, pool := newUsageRepo(t)
 	userID := insertUser(t, pool)
 
-	plan, err := repo.GetUserPlan(context.Background(), userID)
+	plan, _, err := repo.GetUserPlan(context.Background(), userID)
 	require.NoError(t, err)
 	require.Equal(t, PlanFree, plan)
 }
