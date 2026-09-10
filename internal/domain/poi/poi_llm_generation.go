@@ -2,11 +2,16 @@ package poi
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 )
+
+// errAIClientUnavailable is returned when the service was built without a
+// working model client. It is not retryable; it is an operations signal.
+var errAIClientUnavailable = errors.New("AI client is not available - check API key configuration")
 
 // maxLLMPOIAttempts bounds how many times we ask the LLM for nearby POIs.
 // The first attempt uses the standard prompt; subsequent attempts use a
@@ -23,14 +28,25 @@ const maxLLMPOIAttempts = 2
 // an empty slice and a nil error, so the caller surfaces an honest "no
 // results" rather than a masked success.
 func (s *ServiceImpl) generateAndEnrichPOIs(ctx context.Context, userID uuid.UUID, lat, lon, distance float64) ([]locitypes.POIDetailedInfo, error) {
+	// A missing client is a configuration problem, not something a retry or
+	// a stricter prompt can fix: fail fast so operators see it.
+	if s.aiClient == nil {
+		return nil, errAIClientUnavailable
+	}
+
 	for attempt := 1; attempt <= maxLLMPOIAttempts; attempt++ {
 		strict := attempt > 1
 
 		genAIResponse, err := s.generatePOIsFromLLM(ctx, userID, lat, lon, distance, strict)
 		if err != nil {
-			// Transient errors are already retried inside the SDK; anything
-			// surfacing here is non-transient (bad output, auth, etc.).
-			return nil, err
+			// Transient errors are already retried inside the SDK, but a
+			// failed attempt (bad output, provider hiccup) should still give
+			// the strict re-prompt a chance rather than abort the whole flow.
+			s.logger.WarnContext(ctx, "LLM nearby generation failed",
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", maxLLMPOIAttempts),
+				slog.Any("error", err))
+			continue
 		}
 
 		enrichedPOIs := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)
@@ -71,7 +87,12 @@ func (s *ServiceImpl) enrichLLMWithRetry(
 	for attempt := 1; attempt <= maxLLMPOIAttempts; attempt++ {
 		genAIResponse, err := gen()
 		if err != nil {
-			return nil, err
+			s.logger.WarnContext(ctx, "LLM nearby generation failed",
+				slog.String("domain", domain),
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", maxLLMPOIAttempts),
+				slog.Any("error", err))
+			continue
 		}
 
 		enriched := s.enrichAndFilterLLMResponse(genAIResponse.GeneralPOI, lat, lon, distance)

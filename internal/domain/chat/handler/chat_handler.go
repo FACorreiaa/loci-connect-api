@@ -336,7 +336,13 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		var cr locitypes.AiCityResponse
 		if decodeData(event.Data, &cr) && cr.SessionID != uuid.Nil {
 			cp.SessionId = cr.SessionID.String()
-			cp.Result = presenter.ToAiCityResponse(&cr)
+			// The completion event usually carries only navigation data
+			// ({session_id, trip_id}); an empty Result would make the client
+			// treat a zero-valued struct as the final payload and wipe the
+			// data it already rendered.
+			if aiCityResponseHasContent(&cr) {
+				cp.Result = presenter.ToAiCityResponse(&cr)
+			}
 		}
 		resp.Payload = &chatv1.StreamEvent_Complete{Complete: cp}
 
@@ -516,6 +522,20 @@ func attributionForEvent(eventType, variant string) (recommendationv1.Recommenda
 
 // decodeData re-encodes a stream event's Data (a typed struct or a legacy map)
 // into target via JSON. Best-effort: false if Data is nil or does not decode.
+// aiCityResponseHasContent reports whether a decoded AiCityResponse carries
+// anything beyond identifiers, i.e. whether it is worth sending as a result.
+func aiCityResponseHasContent(cr *locitypes.AiCityResponse) bool {
+	if cr == nil {
+		return false
+	}
+	return cr.GeneralCityData.City != "" ||
+		len(cr.PointsOfInterest) > 0 ||
+		len(cr.AIItineraryResponse.PointsOfInterest) > 0 ||
+		len(cr.Hotels) > 0 ||
+		len(cr.Restaurants) > 0 ||
+		len(cr.Activities) > 0
+}
+
 func decodeData(data, target any) bool {
 	if data == nil {
 		return false
@@ -632,6 +652,10 @@ func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 		se.Retryable = true
 		ra := int32(30000)
 		se.RetryAfterMs = &ra
+		return se
+	case locitypes.StreamErrorNoResults:
+		se.InternalCode = "no_results"
+		se.Retryable = true
 		return se
 	}
 
