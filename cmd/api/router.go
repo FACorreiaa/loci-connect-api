@@ -9,6 +9,7 @@ import (
 	c "connectrpc.com/cors"
 
 	"connectrpc.com/validate"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/aicreds/aicredsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
@@ -42,6 +43,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"golang.org/x/time/rate"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
@@ -299,6 +301,18 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		mux.Handle(apikeyPath, apikeyHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", apikeyPath)
 	}
+
+	// Registered whether or not bring-your-own-key is on. With no encryption
+	// key the handler answers enabled=false and says why; not registering it
+	// would answer Unimplemented, which the settings page can only show as a
+	// spinner.
+	aicredsHandler := deps.AICredentialsHandler
+	if aicredsHandler == nil {
+		aicredsHandler = aicreds.NewHandler(deps.AICredentials, deps.Logger)
+	}
+	aicredsPath, aicredsConnect := aicredsv1connect.NewAiCredentialServiceHandler(aicredsHandler, opts)
+	mux.Handle(aicredsPath, aicredsConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", aicredsPath)
 
 	if deps.ExportHandler != nil {
 		exportPath, exportHandler := exportv1connect.NewExportServiceHandler(deps.ExportHandler, opts)

@@ -136,20 +136,24 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler              *handler.AuthHandler
-	ChatHandler              *chathandler.ChatHandler
-	ProfileHandler           *profilehandler.ProfileHandler
-	DiscoverHandler          *discoverdomain.Handler
-	ItineraryHandler         *itineraryhandler.ItineraryHandler
-	ListHandler              *itineraryhandler.ListHandler
-	StatisticsHandler        *statistics.Handler
-	RecentsHandler           *recents.Handler
-	UserHandler              *userhandler.UserHandler
-	InterestHandler          *interesthandler.InterestHandler
-	TagsHandler              *tagshandler.TagsHandler
-	PaymentHandler           paymentv1connect.PaymentServiceHandler
-	FavoritesHandler         *favorites.Handler
-	APIKeyHandler            *apikey.Handler
+	AuthHandler       *handler.AuthHandler
+	ChatHandler       *chathandler.ChatHandler
+	ProfileHandler    *profilehandler.ProfileHandler
+	DiscoverHandler   *discoverdomain.Handler
+	ItineraryHandler  *itineraryhandler.ItineraryHandler
+	ListHandler       *itineraryhandler.ListHandler
+	StatisticsHandler *statistics.Handler
+	RecentsHandler    *recents.Handler
+	UserHandler       *userhandler.UserHandler
+	InterestHandler   *interesthandler.InterestHandler
+	TagsHandler       *tagshandler.TagsHandler
+	PaymentHandler    paymentv1connect.PaymentServiceHandler
+	FavoritesHandler  *favorites.Handler
+	APIKeyHandler     *apikey.Handler
+	// AICredentialsHandler is always built, over a nil service when
+	// ENCRYPTION_KEY is unset, so the settings page is told the feature is
+	// off rather than shown Unimplemented.
+	AICredentialsHandler     *aicreds.Handler
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
@@ -438,7 +442,11 @@ func (d *Dependencies) initAICredentials() error {
 	}
 
 	d.sealer = sealer
-	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer)
+	// The verifier asks the provider about a key before it is sealed, so a
+	// typo is refused at the form rather than found through a fallen-back
+	// itinerary. Only a rejection blocks a save; see aicreds.KeyVerifier.
+	d.AICredentials = aicreds.NewService(aicreds.NewRepository(d.DB.Pool), sealer).
+		WithVerifier(aicreds.NewHTTPVerifier(nil), d.Logger)
 	d.Logger.Info("bring-your-own-key enabled", slog.Int("encryption_keys", len(keys)))
 	return nil
 }
@@ -643,6 +651,7 @@ func (d *Dependencies) initHandlers() error {
 			locimcp.ReadOnlyToolNames(), locimcp.MutatingToolNames(), locimcp.GeneratingToolNames(),
 		),
 	)
+	d.AICredentialsHandler = aicreds.NewHandler(d.AICredentials, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
