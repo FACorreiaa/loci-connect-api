@@ -162,6 +162,14 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		deps.Logger.Info("registered webhook", "path", "/webhooks/stripe")
 	}
 
+	// Telegram's deliveries, in webhook mode only. Outside the Connect chain
+	// like Stripe's: the caller holds a shared secret, not a JWT. Nil means the
+	// deployment polls and there is nothing to mount.
+	if hook := deps.TelegramWebhook(); hook != nil {
+		mux.Handle("/webhooks/telegram", hook)
+		deps.Logger.Info("registered webhook", "path", "/webhooks/telegram")
+	}
+
 	// Model Context Protocol endpoint (API-key auth, outside the Connect
 	// interceptor chain — see internal/mcp).
 	if deps.APIKeyService != nil && deps.POISvc != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -115,6 +116,9 @@ type Dependencies struct {
 	Integrations *integrations.Service
 	// Messaging is nil when no chat platform is configured.
 	Messaging *messaging.Service
+	// telegramClient is built once with the service, so the poller and the
+	// webhook — whichever mode runs — share one client and one token.
+	telegramClient *telegram.Client
 	// sealer is shared by everything that stores a user's secret, so a key
 	// rotation has one place to take effect.
 	sealer              *secret.Sealer
@@ -488,6 +492,24 @@ func (d *Dependencies) initMessaging() {
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
 	)
+	d.telegramClient = telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil)
+}
+
+// TelegramWebhook is the handler Telegram POSTs updates to, or nil when the
+// deployment polls instead — in which case the caller mounts nothing.
+//
+// Which mode runs follows from TELEGRAM_WEBHOOK_SECRET alone: a secret means
+// webhook, none means polling. There is no way to mount this without a secret,
+// because NewWebhook refuses to build one.
+func (d *Dependencies) TelegramWebhook() http.Handler {
+	if d.Messaging == nil || !d.Config.Messaging.UsesWebhook() {
+		return nil
+	}
+	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret, d.Logger)
+	if hook == nil {
+		return nil
+	}
+	return hook
 }
 
 // RunAppleSecretRefresh re-signs Apple's client secret until ctx is cancelled.
@@ -505,15 +527,21 @@ func (d *Dependencies) RunAppleSecretRefresh(ctx context.Context) error {
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
-// unconditionally. A long poll rather than a webhook because Loci has no public
-// address yet; see internal/domain/messaging/telegram.
+// unconditionally. Also returns nil in webhook mode: Telegram refuses
+// getUpdates while a webhook is registered, so a poller started alongside the
+// webhook would fail every request and log an error a minute for nothing.
 func (d *Dependencies) RunTelegram(ctx context.Context) error {
 	if d.Messaging == nil {
 		return nil
 	}
+	if d.Config.Messaging.UsesWebhook() {
+		d.Logger.Info("telegram in webhook mode; not polling",
+			slog.String("path", "/webhooks/telegram"))
+		return nil
+	}
 
 	poller := telegram.NewPoller(
-		telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil),
+		d.telegramClient,
 		messaging.NewRepository(d.DB.Pool),
 		d.Messaging,
 		d.Logger,

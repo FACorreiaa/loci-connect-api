@@ -1,10 +1,11 @@
 // Package telegram is the Bot API adapter: it turns Telegram updates into
 // messaging.InboundMessage and sends the replies back.
 //
-// Long-polling rather than webhooks. A webhook needs a public HTTPS address,
-// which Loci does not have yet; getUpdates works from a laptop or a tailnet
-// with nothing in front of it. The two are interchangeable from the service's
-// side, so this can become a webhook without anything above it changing.
+// Two delivery modes, chosen by configuration: long polling (Poller), which
+// needs no public address and is right for a laptop or a tailnet, and a
+// webhook (Webhook), which needs a public HTTPS address and is right for
+// production. Both hand each update to the same bridge, so the service above
+// cannot tell them apart.
 package telegram
 
 import (
@@ -83,6 +84,35 @@ func (c *Client) GetMe(ctx context.Context) (Account, error) {
 		return Account{}, err
 	}
 	return Account{ID: fmt.Sprint(result.ID), Username: result.Username}, nil
+}
+
+// WebhookInfo is what Telegram believes about where to deliver updates.
+type WebhookInfo struct {
+	// URL is empty when no webhook is registered, which means Telegram is
+	// holding updates for getUpdates instead.
+	URL                string `json:"url"`
+	PendingUpdateCount int    `json:"pending_update_count"`
+	// LastErrorDate and LastErrorMessage are Telegram's own record of the most
+	// recent delivery that failed. Unix seconds; zero and empty when none has.
+	LastErrorDate    int64  `json:"last_error_date"`
+	LastErrorMessage string `json:"last_error_message"`
+}
+
+// Set reports whether a webhook is registered.
+func (w WebhookInfo) Set() bool { return w.URL != "" }
+
+// GetWebhookInfo asks Telegram how it is delivering this bot's updates.
+//
+// The two modes are mutually exclusive at Telegram's end: while a webhook is
+// registered, getUpdates is refused. This is how a deployment finds out that
+// its poller is failing because of a webhook somebody forgot to delete, or
+// that its webhook never receives anything because nobody called setWebhook.
+func (c *Client) GetWebhookInfo(ctx context.Context) (WebhookInfo, error) {
+	var info WebhookInfo
+	if err := c.call(ctx, "getWebhookInfo", nil, &info); err != nil {
+		return WebhookInfo{}, err
+	}
+	return info, nil
 }
 
 // Update is one entry from the bot's update stream.

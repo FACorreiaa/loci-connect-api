@@ -186,7 +186,25 @@ type MessagingConfig struct {
 	// TelegramBotHandle is the "@name" people send their link code to. Shown in
 	// settings; the bridge itself resolves the bot from the token.
 	TelegramBotHandle string
+
+	// TelegramWebhookSecret is the value given to Telegram's setWebhook, which
+	// it echoes back in X-Telegram-Bot-Api-Secret-Token on every delivery.
+	//
+	// Its presence is what selects webhook mode; see UsesWebhook. Empty means
+	// long polling, which needs no public address and is right for a laptop.
+	// There is no separate "mode" variable on purpose: a mode switch with an
+	// empty secret would be an unauthenticated endpoint, and no combination
+	// of settings should be able to produce one.
+	TelegramWebhookSecret string
 }
+
+// UsesWebhook reports whether Telegram delivers updates by POSTing to
+// {BASE_URL}/webhooks/telegram rather than being polled.
+//
+// Derived from the secret alone. The two modes are mutually exclusive at
+// Telegram's end — getUpdates is refused while a webhook is registered — so
+// the poller does not start in this mode; see Dependencies.RunTelegram.
+func (c MessagingConfig) UsesWebhook() bool { return c.TelegramWebhookSecret != "" }
 
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
@@ -270,8 +288,9 @@ func Load() (*Config, error) {
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
 		},
 		Messaging: MessagingConfig{
-			TelegramBotToken:  getEnv("TELEGRAM_BOT_TOKEN", ""),
-			TelegramBotHandle: getEnv("TELEGRAM_BOT_HANDLE", ""),
+			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
+			TelegramBotHandle:     getEnv("TELEGRAM_BOT_HANDLE", ""),
+			TelegramWebhookSecret: strings.TrimSpace(getEnv("TELEGRAM_WEBHOOK_SECRET", "")),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),

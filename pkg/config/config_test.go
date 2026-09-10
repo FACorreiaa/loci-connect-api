@@ -606,3 +606,32 @@ func TestLoad_ProductionAllowsAFreeFloorButNotAFreePrimary(t *testing.T) {
 		}
 	})
 }
+
+// Which Telegram delivery mode runs follows from whether a secret is set.
+// There is no separate switch, so no combination of settings can produce a
+// webhook endpoint that accepts unauthenticated deliveries.
+func TestLoad_TelegramWebhookModeFollowsTheSecret(t *testing.T) {
+	setLoadableEnv(t)
+	t.Setenv("TELEGRAM_BOT_TOKEN", "123456:token")
+
+	t.Setenv("TELEGRAM_WEBHOOK_SECRET", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Messaging.UsesWebhook() {
+		t.Error("webhook mode with no secret; that would be an open endpoint")
+	}
+
+	t.Setenv("TELEGRAM_WEBHOOK_SECRET", "  a3f9c1  ")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Messaging.UsesWebhook() {
+		t.Error("a secret was set and polling mode was chosen")
+	}
+	if cfg.Messaging.TelegramWebhookSecret != "a3f9c1" {
+		t.Errorf("secret = %q; surrounding whitespace from a sealed secret would make every delivery a 401", cfg.Messaging.TelegramWebhookSecret)
+	}
+}
