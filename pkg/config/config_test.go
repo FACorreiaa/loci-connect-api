@@ -77,8 +77,8 @@ func TestLoad_OpenRouter(t *testing.T) {
 	if cfg.AI.Provider != AIProviderOpenRouter {
 		t.Errorf("provider = %q", cfg.AI.Provider)
 	}
-	if cfg.AI.Model != "openrouter/auto" {
-		t.Errorf("model = %q", cfg.AI.Model)
+	if cfg.AI.Model != "deepseek/deepseek-v4-flash" {
+		t.Errorf("model = %q, want the cheap named default; openrouter/auto can pick Opus", cfg.AI.Model)
 	}
 	if cfg.AI.EmbeddingModel != "google/gemini-embedding-001" {
 		t.Errorf("embedding model = %q", cfg.AI.EmbeddingModel)
@@ -633,5 +633,50 @@ func TestLoad_TelegramWebhookModeFollowsTheSecret(t *testing.T) {
 	}
 	if cfg.Messaging.TelegramWebhookSecret != "a3f9c1" {
 		t.Errorf("secret = %q; surrounding whitespace from a sealed secret would make every delivery a 401", cfg.Messaging.TelegramWebhookSecret)
+	}
+}
+
+// "openrouter/auto" lets OpenRouter pick any model per request, Claude Opus
+// included. The only other symptom of that is the bill, so production refuses
+// to boot on it and the error names the variable to change.
+func TestLoad_ProductionRejectsOpenRouterAuto(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("JWT_REFRESH_SECRET", "refresh-secret-refresh-secret-refresh")
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("OPENROUTER_MODEL", "openrouter/auto")
+	t.Setenv("AI_FALLBACK_ENABLED", "false")
+	// Unrelated production guard; satisfied so the model is the only reason
+	// Load can refuse.
+	t.Setenv("OPENMETEO_API_KEY", "paid-plan")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load: want error when the production primary model is openrouter/auto")
+	}
+	if !strings.Contains(err.Error(), "OPENROUTER_MODEL") {
+		t.Errorf("error = %q does not name the variable to change", err)
+	}
+
+	// A named model, the default included, boots.
+	t.Setenv("OPENROUTER_MODEL", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load with the default model: %v", err)
+	}
+	if cfg.AI.Model != DefaultOpenRouterModel {
+		t.Errorf("model = %q", cfg.AI.Model)
+	}
+}
+
+// Development keeps the router available: it is a fine way to try models on
+// a laptop, and the guard exists for the bill, which only production runs up.
+func TestLoad_DevelopmentAllowsOpenRouterAuto(t *testing.T) {
+	baseEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("OPENROUTER_MODEL", "openrouter/auto")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load: %v", err)
 	}
 }
