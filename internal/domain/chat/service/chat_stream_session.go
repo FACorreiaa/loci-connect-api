@@ -21,6 +21,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
 
 func (l *ServiceImpl) ContinueSessionStreamed(
@@ -49,6 +50,14 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		return err
 	}
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: "session_validated", Data: map[string]string{"status": "active"}}, 3)
+
+	// Give every LLM call this turn makes a shared PostHog AI Observability
+	// session and user, and mark this span as the turn's root with a gen_ai.*
+	// attribute so PostHog's span filter forwards it as the trace root instead
+	// of dropping it.
+	span.SetAttributes(attribute.String("gen_ai.conversation.id", sessionID.String()))
+	ctx = observability.WithAISession(ctx, sessionID.String())
+	ctx = observability.WithAIDistinctID(ctx, session.UserID.String())
 
 	// --- 2. Fetch City ID ---
 	cityData, err := l.cityRepo.FindCityByNameAndCountry(ctx, session.SessionContext.CityName, "")
@@ -622,6 +631,15 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return err
 	}
+
+	// Give every LLM call this turn makes a shared PostHog AI Observability
+	// session and user, and mark this span as the turn's root with a gen_ai.*
+	// attribute so PostHog's span filter forwards it as the trace root instead
+	// of dropping it.
+	span.SetAttributes(attribute.String("gen_ai.conversation.id", cc.SessionID.String()))
+	ctx = observability.WithAISession(ctx, cc.SessionID.String())
+	ctx = observability.WithAIDistinctID(ctx, cc.UserID.String())
+	cc.Ctx = ctx
 
 	rawResponses, err := l.orchestrateLLMStreams(&cc)
 	if err != nil {

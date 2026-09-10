@@ -112,6 +112,8 @@ func NewUserChatClient(ctx context.Context, spec UserSpec) (generativeAI.ChatCli
 
 	// Metered like every other link, so tokens are attributed to the model that
 	// answered. The counters do not yet distinguish a user's own spend from
-	// ours; they measure usage, and usage is real either way.
-	return newMetered(client, recordPrometheus), nil
+	// ours; they measure usage, and usage is real either way. Traced the same
+	// way, so a brought-your-own-key call gets the same PostHog AI
+	// Observability coverage as the operator's own chain.
+	return newTracing(newMetered(client, recordPrometheus), entry.Name), nil
 }

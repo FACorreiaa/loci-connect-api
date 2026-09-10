@@ -35,6 +35,11 @@ func TestInitTracing_EndpointHandling(t *testing.T) {
 			// reports whether *this* call installed a real provider.
 			otel.SetTracerProvider(noop.NewTracerProvider())
 			t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", tc.endpoint)
+			// Isolate from POSTHOG_API_KEY: this table only exercises the
+			// OTLP-endpoint branch, and a key present in the environment
+			// would keep a real TracerProvider installed even for the
+			// "disabled" cases.
+			t.Setenv("POSTHOG_API_KEY", "")
 
 			shutdown, err := InitTracing(context.Background(), "test-service", logger)
 			if err != nil {
