@@ -20,6 +20,12 @@ type Handler struct {
 	apikeyv1connect.UnimplementedApiKeyServiceHandler
 	svc    Service
 	logger *slog.Logger
+
+	// setup renders the per-client instructions. Nil when the composition
+	// root did not supply one, in which case keys are still minted and only
+	// the instructions are missing — they are a convenience, the key is the
+	// product.
+	setup *SetupWriter
 }
 
 // NewHandler creates a new API key handler.
@@ -28,6 +34,16 @@ func NewHandler(svc Service, logger *slog.Logger) *Handler {
 		svc:    svc,
 		logger: logger.With(slog.String("component", "apikey-handler")),
 	}
+}
+
+// WithSetup gives the handler a writer for setup instructions.
+//
+// Supplied by the composition root rather than built here because the writer
+// needs the MCP endpoint and tool names, which live in internal/mcp — a
+// package that imports this one.
+func (h *Handler) WithSetup(writer *SetupWriter) *Handler {
+	h.setup = writer
+	return h
 }
 
 func callerID(ctx context.Context) (uuid.UUID, error) {
@@ -59,7 +75,24 @@ func toProto(k *Key) *apikeyv1.ApiKey {
 		pb.RevokedAt = timestamppb.New(*k.RevokedAt)
 	}
 	pb.Scopes = ScopeStrings(k.Scopes)
+	pb.ClientKind = string(k.ClientKind)
 	return pb
+}
+
+func setupToProto(s Setup) *apikeyv1.SetupInstructions {
+	return &apikeyv1.SetupInstructions{
+		ClientKind:  string(s.Kind),
+		Endpoint:    s.Endpoint,
+		ConfigLabel: s.ConfigLabel,
+		ConfigLang:  s.ConfigLang,
+		Config:      s.Config,
+		SafeLabel:   s.SafeLabel,
+		SafeLang:    s.SafeLang,
+		Safe:        s.Safe,
+		SafeNote:    s.SafeNote,
+		ExportLine:  s.Export,
+		Prompt:      s.Prompt,
+	}
 }
 
 func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv1.CreateApiKeyRequest]) (*connect.Response[apikeyv1.CreateApiKeyResponse], error) {
@@ -86,12 +119,12 @@ func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 
-	// TODO(connections): read the client kind from the request and return the
-	// setup instructions alongside the key, once loci-connect-proto with
-	// CreateApiKeyRequest.client_kind is published and this module depends on
-	// it. Until then every key is minted as ClientOther, which is what the
-	// generic instructions describe and what pre-existing keys already carry.
-	clientKind := ClientOther
+	// Empty means the generic client; anything else must be a kind there are
+	// instructions for. See ParseClientKind for why unknown is an error.
+	clientKind, err := ParseClientKind(req.Msg.GetClientKind())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 
 	key, plaintext, err := h.svc.Create(ctx, userID, req.Msg.GetName(), expiresAt, scopes, clientKind)
 	if err != nil {
@@ -102,10 +135,40 @@ func (h *Handler) CreateApiKey(ctx context.Context, req *connect.Request[apikeyv
 	h.logger.InfoContext(ctx, "api key created",
 		slog.String("user_id", userID.String()),
 		slog.String("key_id", key.ID.String()),
+		slog.String("client_kind", string(key.ClientKind)),
 		slog.String("scopes", JoinScopes(key.Scopes)))
-	return connect.NewResponse(&apikeyv1.CreateApiKeyResponse{
+
+	resp := &apikeyv1.CreateApiKeyResponse{
 		ApiKey:       toProto(key),
 		PlaintextKey: plaintext,
+	}
+	// The only response that can carry instructions with the real key in
+	// them: the plaintext exists here and nowhere else.
+	if h.setup != nil {
+		resp.Setup = setupToProto(h.setup.Instructions(clientKind, plaintext))
+	}
+	return connect.NewResponse(resp), nil
+}
+
+// GetSetupInstructions renders the setup for a client with the placeholder
+// where the key goes, so the page can show what connecting looks like without
+// minting a credential to find out.
+func (h *Handler) GetSetupInstructions(ctx context.Context, req *connect.Request[apikeyv1.GetSetupInstructionsRequest]) (*connect.Response[apikeyv1.GetSetupInstructionsResponse], error) {
+	if _, err := callerID(ctx); err != nil {
+		return nil, err
+	}
+	if h.setup == nil {
+		// Unavailable rather than Unimplemented: the RPC exists, this
+		// deployment has no address to write into it.
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("setup instructions are not configured on this server"))
+	}
+
+	kind, err := ParseClientKind(req.Msg.GetClientKind())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&apikeyv1.GetSetupInstructionsResponse{
+		Instructions: setupToProto(h.setup.Preview(kind)),
 	}), nil
 }
 

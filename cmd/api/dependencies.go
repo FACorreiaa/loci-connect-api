@@ -56,6 +56,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -632,7 +633,16 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
-	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger)
+	// The setup writer is handed the endpoint and tool names as data because
+	// internal/mcp imports apikey; this is the one place that can see both.
+	// The tool lists come from the table that decides scopes, so the prompt's
+	// "do not call these" cannot drift from what the server enforces.
+	d.APIKeyHandler = apikey.NewHandler(d.APIKeyService, d.Logger).WithSetup(
+		apikey.NewSetupWriter(
+			d.Config.Server.BaseURL, locimcp.Path,
+			locimcp.ReadOnlyToolNames(), locimcp.MutatingToolNames(), locimcp.GeneratingToolNames(),
+		),
+	)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
