@@ -8,10 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 )
 
-// fakeVoice stands in for the speech client, recording what it was asked.
+// fakeVoice stands in for the transcription client, recording what it was
+// asked and what vocabulary it was given.
 type fakeVoice struct {
 	mu sync.Mutex
 
@@ -19,54 +22,45 @@ type fakeVoice struct {
 	transcribeErr error
 	heard         [][]byte
 	heardTypes    []string
-
-	shortened   []string
-	shortenErr  error
-	spoken      []string
-	sayErr      error
-	cannotSpeak bool
+	hints         []string
+	disabled      bool
 }
 
-func (v *fakeVoice) Transcribe(_ context.Context, audio []byte, mimeType string) (string, error) {
+func (v *fakeVoice) Transcribe(_ context.Context, audio []byte, mimeType, hint string) (string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.heard = append(v.heard, audio)
 	v.heardTypes = append(v.heardTypes, mimeType)
+	v.hints = append(v.hints, hint)
 	return v.transcript, v.transcribeErr
 }
 
-func (v *fakeVoice) Shorten(_ context.Context, text string) (string, error) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.shortened = append(v.shortened, text)
-	if v.shortenErr != nil {
-		return "", v.shortenErr
-	}
-	return "short: " + text, nil
-}
-
-func (v *fakeVoice) Say(_ context.Context, text string, _ time.Duration) ([]byte, error) {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	v.spoken = append(v.spoken, text)
-	if v.sayErr != nil {
-		return nil, v.sayErr
-	}
-	return []byte("OggSOpusHead"), nil
-}
-
-func (v *fakeVoice) CanSpeak() bool { return !v.cannotSpeak }
-
-func (v *fakeVoice) said() []string {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	return append([]string(nil), v.spoken...)
-}
+func (v *fakeVoice) Enabled() bool { return !v.disabled }
 
 func (v *fakeVoice) recordings() int {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	return len(v.heard)
+}
+
+func (v *fakeVoice) lastHint() string {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if len(v.hints) == 0 {
+		return ""
+	}
+	return v.hints[len(v.hints)-1]
+}
+
+// fakePlaces is the vocabulary a speaker is expected to use.
+type fakePlaces struct {
+	hint  string
+	asked int
+}
+
+func (p *fakePlaces) For(context.Context, uuid.UUID) string {
+	p.asked++
+	return p.hint
 }
 
 // echoingHandler answers whatever the transcript turned out to be, which is
@@ -86,7 +80,7 @@ func (h *echoingHandler) Handle(ctx context.Context, in messaging.InboundMessage
 	h.mu.Unlock()
 
 	if in.Audio != nil {
-		transcript, err := in.Audio(ctx)
+		transcript, err := in.Audio(ctx, testUserID)
 		h.mu.Lock()
 		h.asked = true
 		h.lastErr = err
@@ -127,21 +121,28 @@ func voiceUpdate(id, chatID int64, clip *Recording, video bool) map[string]any {
 	}
 }
 
+// testUserID stands in for the account a chat resolved to.
+var testUserID = uuid.MustParse("11111111-2222-3333-4444-555555555555")
+
 func voiceBridge(t *testing.T, api *fakeAPI, handler Handler, voice Voice, opts VoiceOptions) bridge {
+	t.Helper()
+	return voiceBridgeWithPlaces(t, api, handler, voice, nil, opts)
+}
+
+func voiceBridgeWithPlaces(t *testing.T, api *fakeAPI, handler Handler, voice Voice, places Vocabulary, opts VoiceOptions) bridge {
 	t.Helper()
 	b := newBridge(api.client(), handler, newTestLogger())
 	if voice != nil {
-		b = b.withVoice(voice, opts)
+		b = b.withVoice(voice, places, opts)
 	}
 	return b
 }
 
 func defaultOptions() VoiceOptions {
 	return VoiceOptions{
-		MaxDuration:       60 * time.Second,
-		MaxVideoDuration:  30 * time.Second,
+		MaxDuration:       45 * time.Second,
+		MaxVideoDuration:  20 * time.Second,
 		MaxBytes:          20 << 20,
-		RepliesEnabled:    true,
 		VideoNotesEnabled: true,
 	}
 }
@@ -194,8 +195,8 @@ func TestALongRecordingIsRefusedWithoutBeingFetched(t *testing.T) {
 		clip  *Recording
 		video bool
 	}{
-		{"a voice note past a minute", &Recording{FileID: "abc", Duration: 90, MIMEType: "audio/ogg"}, false},
-		{"a video message past thirty seconds", &Recording{FileID: "abc", Duration: 45}, true},
+		{"a voice note past the cap", &Recording{FileID: "abc", Duration: 90, MIMEType: "audio/ogg"}, false},
+		{"a video message past its shorter cap", &Recording{FileID: "abc", Duration: 30}, true},
 		{"a recording too big to fetch", &Recording{FileID: "abc", Duration: 5, FileSize: 64 << 20}, false},
 	}
 
@@ -270,107 +271,70 @@ func TestWithoutSpeechARecordingIsRefusedPolitely(t *testing.T) {
 	}
 }
 
-// Everything after the written answer is additive. A synthesis that failed is
-// not a reason to tell somebody their itinerary did not work.
-func TestAFailureToSpeakStillDeliversTheWrittenAnswer(t *testing.T) {
-	for _, tt := range []struct {
-		name  string
-		spoil func(*fakeVoice)
-	}{
-		{"synthesis failed", func(v *fakeVoice) { v.sayErr = errors.New("the provider went away") }},
-		{"shortening failed", func(v *fakeVoice) { v.shortenErr = errors.New("the provider went away") }},
-		{"there is no encoder", func(v *fakeVoice) { v.cannotSpeak = true }},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			api := newFakeAPI(t)
-			api.reply["getFile"] = map[string]any{"file_path": "voice/file_1.oga"}
-			voice := &fakeVoice{transcript: "three days in Lisbon"}
-			tt.spoil(voice)
-
-			b := voiceBridge(t, api, &echoingHandler{}, voice, defaultOptions())
-			b.handle(context.Background(),
-				decodeUpdate(t, voiceUpdate(1, 4242, &Recording{FileID: "abc", Duration: 8, MIMEType: "audio/ogg"}, false)))
-
-			texts := sentTexts(api)
-			var answered bool
-			for _, text := range texts {
-				if strings.Contains(text, "plan for: three days in Lisbon") {
-					answered = true
-				}
-				// Nothing about the failure reaches the chat.
-				if strings.Contains(strings.ToLower(text), "went wrong") {
-					t.Errorf("the chat was told something failed: %q", text)
-				}
-			}
-			if !answered {
-				t.Errorf("the written answer never arrived: %v", texts)
-			}
-			if len(api.callsTo("sendVoice")) != 0 {
-				t.Error("a voice note was sent despite the failure")
-			}
-		})
-	}
-}
-
-func TestSpokenRepliesCanBeTurnedOff(t *testing.T) {
+// The vocabulary hint is not decoration. The cluster's transcription service
+// turns "Cais do Sodré" into "Case 2 Soda" without it, and an itinerary is then
+// planned for somewhere that does not exist.
+func TestThePlaceNamesAreSentWithTheRecording(t *testing.T) {
 	api := newFakeAPI(t)
 	api.reply["getFile"] = map[string]any{"file_path": "voice/file_1.oga"}
-	opts := defaultOptions()
-	opts.RepliesEnabled = false
-
 	voice := &fakeVoice{transcript: "three days in Lisbon"}
-	b := voiceBridge(t, api, &echoingHandler{}, voice, opts)
+	places := &fakePlaces{hint: "Lisbon, Cais do Sodré, Bairro Alto"}
 
+	b := voiceBridgeWithPlaces(t, api, &echoingHandler{}, voice, places, defaultOptions())
 	b.handle(context.Background(),
 		decodeUpdate(t, voiceUpdate(1, 4242, &Recording{FileID: "abc", Duration: 8, MIMEType: "audio/ogg"}, false)))
 
-	// Understood, answered in writing, nothing synthesised. This is the switch
-	// to reach for when speaking gets expensive.
-	if voice.recordings() != 1 {
-		t.Error("the recording was not understood")
+	if voice.lastHint() != "Lisbon, Cais do Sodré, Bairro Alto" {
+		t.Errorf("hint sent was %q", voice.lastHint())
 	}
-	if got := voice.said(); len(got) != 0 {
-		t.Errorf("something was synthesised anyway: %v", got)
-	}
-	if len(api.callsTo("sendVoice")) != 0 {
-		t.Error("a voice note was sent while spoken replies were off")
+	// Looked up against the account, which only exists once the chat has been
+	// resolved — so it cannot happen when the update arrives.
+	if places.asked != 1 {
+		t.Errorf("the vocabulary was asked for %d times, want once", places.asked)
 	}
 }
 
-func TestAWrittenReplyIsSpokenAfterItIsSent(t *testing.T) {
+// A hint improves a transcript; it is not a precondition for one.
+func TestARecordingIsStillUnderstoodWithNoPlaceNames(t *testing.T) {
 	api := newFakeAPI(t)
 	api.reply["getFile"] = map[string]any{"file_path": "voice/file_1.oga"}
 	voice := &fakeVoice{transcript: "three days in Lisbon"}
+
+	b := voiceBridgeWithPlaces(t, api, &echoingHandler{}, voice, &fakePlaces{hint: ""}, defaultOptions())
+	b.handle(context.Background(),
+		decodeUpdate(t, voiceUpdate(1, 4242, &Recording{FileID: "abc", Duration: 8, MIMEType: "audio/ogg"}, false)))
+
+	if voice.recordings() != 1 {
+		t.Error("the recording was not transcribed")
+	}
+	if got := sentTexts(api); len(got) < 2 {
+		t.Errorf("sent %v, want an echo and an answer", got)
+	}
+}
+
+// A service that is down is not a reason to tell somebody to re-record: the
+// clip was never going to work, and saying "I could not make that out" sends
+// them back to try again for nothing.
+func TestAFailureToTranscribeIsReportedAsWhatItWas(t *testing.T) {
+	api := newFakeAPI(t)
+	api.reply["getFile"] = map[string]any{"file_path": "voice/file_1.oga"}
+	voice := &fakeVoice{transcribeErr: errors.New("the service is down")}
 
 	b := voiceBridge(t, api, &echoingHandler{}, voice, defaultOptions())
 	b.handle(context.Background(),
 		decodeUpdate(t, voiceUpdate(1, 4242, &Recording{FileID: "abc", Duration: 8, MIMEType: "audio/ogg"}, false)))
 
-	if got := len(api.callsTo("sendVoice")); got != 1 {
-		t.Fatalf("sent %d voice notes, want one", got)
+	texts := sentTexts(api)
+	if len(texts) == 0 {
+		t.Fatal("nothing was said about a failed transcription")
 	}
-	if got := voice.said(); len(got) != 1 || !strings.HasPrefix(got[0], "short: ") {
-		t.Errorf("spoke %v, want the shortened answer", got)
-	}
-
-	// The written answer goes first: it is the thing the person asked for, and
-	// everything after it is additive.
-	order := api.methodOrder()
-	sendMessageAt, sendVoiceAt := -1, -1
-	for i, method := range order {
-		if method == "sendMessage" && sendMessageAt < 0 {
-			sendMessageAt = i
-		}
-		if method == "sendVoice" {
-			sendVoiceAt = i
-		}
-	}
-	if sendMessageAt < 0 || sendVoiceAt < 0 || sendMessageAt > sendVoiceAt {
-		t.Errorf("order was %v, want the written answer before the spoken one", order)
+	// The handler decides the wording; what matters here is that the failure
+	// reached it rather than being swallowed.
+	if !strings.Contains(strings.ToLower(texts[len(texts)-1]), "make that out") {
+		t.Errorf("reply was %q", texts[len(texts)-1])
 	}
 }
 
-// A typed message must behave exactly as it always did.
 func TestATypedMessageIsUntouched(t *testing.T) {
 	api := newFakeAPI(t)
 	voice := &fakeVoice{transcript: "should never be reached"}

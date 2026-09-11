@@ -105,67 +105,11 @@ func TestDownloadRefusesAPathThatEscapes(t *testing.T) {
 	}
 }
 
-func TestSendVoicePostsMultipart(t *testing.T) {
-	fake := newFakeAPI(t)
-
-	ogg := []byte("OggSOpusHead and then some audio")
-	if err := fake.client().SendVoice(context.Background(), "4242", ogg, 12, "Heard you"); err != nil {
-		t.Fatalf("SendVoice: %v", err)
-	}
-
-	calls := fake.callsTo("sendVoice")
-	if len(calls) != 1 {
-		t.Fatalf("sendVoice called %d times", len(calls))
-	}
-	body := calls[0].body
-	if body["chat_id"] != "4242" {
-		t.Errorf("chat id = %v", body["chat_id"])
-	}
-	if body["duration"] != "12" {
-		t.Errorf("duration = %v", body["duration"])
-	}
-	if body["caption"] != "Heard you" {
-		t.Errorf("caption = %v", body["caption"])
-	}
-	// The audio has to arrive as a file part, or Telegram treats the request
-	// as a reference to a file id it does not have.
-	if body["voice"] != string(ogg) {
-		t.Errorf("voice part = %q, want the audio", body["voice"])
-	}
-	if body["voice_filename"] == "" {
-		t.Error("the voice part was sent without a filename")
-	}
-}
-
-func TestSendVoiceTruncatesALongCaption(t *testing.T) {
-	fake := newFakeAPI(t)
-
-	long := strings.Repeat("a", maxCaptionChars*2)
-	if err := fake.client().SendVoice(context.Background(), "1", []byte("OggS"), 0, long); err != nil {
-		t.Fatalf("SendVoice: %v", err)
-	}
-
-	caption, _ := fake.callsTo("sendVoice")[0].body["caption"].(string)
-	// Losing the voice note entirely because its caption was too long would
-	// be the wrong trade.
-	if len([]rune(caption)) > maxCaptionChars {
-		t.Errorf("caption is %d runes, past the %d limit", len([]rune(caption)), maxCaptionChars)
-	}
-}
-
-func TestSendVoiceRefusesNothing(t *testing.T) {
-	fake := newFakeAPI(t)
-	if err := fake.client().SendVoice(context.Background(), "1", nil, 0, ""); err == nil {
-		t.Error("expected an error for empty audio")
-	}
-}
-
 func TestMediaErrorsNeverCarryTheToken(t *testing.T) {
 	// The token travels in the URL path on every one of these, so a wrapped
 	// *url.Error would print it. That is this package's whole design premise.
 	fake := newFakeAPI(t)
 	fake.failMethod("getFile", 400)
-	fake.failMethod("sendVoice", 400)
 	fake.fileStatus = 500
 	client := fake.client()
 
@@ -175,15 +119,11 @@ func TestMediaErrorsNeverCarryTheToken(t *testing.T) {
 	_, err = client.Download(context.Background(), "voice/file_1.oga", 1<<20)
 	checkNoToken(t, "Download", err)
 
-	checkNoToken(t, "SendVoice", client.SendVoice(context.Background(), "1", []byte("OggS"), 0, ""))
-
 	// And the same once the server is gone entirely, which is the transport
 	// error path where url.Error would be the tempting thing to wrap.
 	fake.server.Close()
 	_, err = client.Download(context.Background(), "voice/file_1.oga", 1<<20)
 	checkNoToken(t, "Download after the server went away", err)
-	checkNoToken(t, "SendVoice after the server went away",
-		client.SendVoice(context.Background(), "1", []byte("OggS"), 0, ""))
 }
 
 func checkNoToken(t *testing.T, what string, err error) {

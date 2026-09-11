@@ -97,18 +97,6 @@ var (
 		[]string{"kind", "outcome"},
 	)
 
-	// VoiceRepliesTotal counts spoken replies, by what became of them.
-	//
-	// Synthesis is the expensive half of speaking and the half behind a switch,
-	// so this is what says whether turning it off would save anything.
-	VoiceRepliesTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "loci_voice_replies_total",
-			Help: "Spoken replies by outcome (spoken, skipped, failed)",
-		},
-		[]string{"outcome"},
-	)
-
 	// VoiceStageSeconds is how long each stage of answering a recording takes.
 	//
 	// Every stage has its own deadline, and those deadlines were chosen before
@@ -117,9 +105,12 @@ var (
 	// before people notice.
 	VoiceStageSeconds = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "loci_voice_stage_seconds",
-			Help:    "Duration of each stage of answering a recording",
-			Buckets: []float64{0.5, 1, 2, 5, 10, 20, 45, 90, 180},
+			Name: "loci_voice_stage_seconds",
+			Help: "Duration of each stage of answering a recording",
+			// Reaching to three minutes because transcription runs on CPU at
+			// roughly two and a half times the length of the clip, on a
+			// replica shared with other apps.
+			Buckets: []float64{1, 2, 5, 10, 20, 45, 90, 180, 300},
 		},
 		[]string{"stage"},
 	)

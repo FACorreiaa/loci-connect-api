@@ -65,11 +65,11 @@ func NewWebhook(client *Client, handler Handler, secret string, concurrency int,
 const defaultConcurrency = 4
 
 // WithVoice lets the webhook hear recordings and say replies.
-func (h *Webhook) WithVoice(voice Voice, opts VoiceOptions) *Webhook {
+func (h *Webhook) WithVoice(voice Voice, vocabulary Vocabulary, opts VoiceOptions) *Webhook {
 	if h == nil {
 		return nil
 	}
-	h.bridge = h.bridge.withVoice(voice, opts)
+	h.bridge = h.bridge.withVoice(voice, vocabulary, opts)
 	return h
 }
 

@@ -1,10 +1,13 @@
-// Package speech hears recordings and says replies aloud.
+// Package speech turns recordings into words.
 //
 // It exists so somebody walking around a city can ask for an itinerary without
-// stopping to type, and get back exactly what typing would have got them. Both
-// directions run on Gemini, and deliberately not through the chat provider:
-// chat runs on OpenRouter in production and has to keep running on it, so this
-// reads its own credential and its own models.
+// stopping to type, and get back exactly what typing would have got them.
+//
+// The provider is named for the wire format it speaks rather than for a
+// vendor, so moving between the cluster's own transcription service and a
+// hosted one is configuration and never code. That matters more than it looks:
+// the cluster runs its own service, free per request and with no audio leaving
+// it, and a type called GeminiTranscriber would have made going back a rewrite.
 package speech
 
 import (
@@ -12,146 +15,132 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os/exec"
-	"strconv"
+	"net/http"
 	"strings"
 	"time"
-
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
-	"google.golang.org/genai"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 )
 
-// transcribePrompt is what the model is told to do with a recording.
-//
-// Verbatim and nothing else, because the transcript is echoed back to the
-// person who spoke it: a model that helpfully tidies "erm, three days in
-// Lisbon" into a polished sentence makes the echo useless as a check on what
-// was actually heard.
-const transcribePrompt = `Transcribe the speech in this recording word for word.
-Reply with the transcript and nothing else — no preamble, no quotation marks, no commentary.
-If there is no speech in it, reply with nothing at all.`
-
-// shortenPrompt reduces an answer to something worth hearing.
-const shortenPrompt = `Rewrite the following for someone listening rather than reading.
-Two or three sentences, spoken plainly, covering only what matters most.
-Leave out links, addresses and lists — they are unusable aloud and the reader has them already.
-Reply with the rewritten text and nothing else.
-
-`
-
-// shortenFloor is the length below which an answer is already speakable.
-//
-// Shortening a paragraph that is already two sentences is a model call that
-// costs money and adds a second of latency to say the same thing.
-const shortenFloor = 400
-
-// defaultSampleRate is assumed when a synthesis response does not say.
-// Gemini's speech models answer at 24 kHz.
-const defaultSampleRate = 24000
-
-// ErrDisabled reports that speech is not configured.
+// ErrDisabled reports that transcription is not configured.
 var ErrDisabled = errors.New("speech: not configured")
 
 // ErrNothingHeard reports that a recording carried no speech.
 //
-// A normal outcome rather than a failure — somebody's pocket, or a note that
-// was all background noise — and worth telling apart from a broken call so the
-// reply can say "I could not hear anything" instead of "something went wrong".
+// A normal outcome rather than a failure — somebody's pocket, or a minute of
+// traffic noise — and worth telling apart so the reply can say "I could not
+// hear anything" instead of "something went wrong".
 var ErrNothingHeard = errors.New("speech: nothing was said")
 
-// Client hears recordings and says replies aloud.
-type Client struct {
-	gemini          *generativeAI.GeminiChatClient
-	transcribeModel string
-	speakModel      string
-	voiceName       string
-	logger          *slog.Logger
-
-	// canEncode records whether the Opus encoder was on PATH at startup.
-	//
-	// Checked once, at construction, so an image built without opus-tools is
-	// one line in the boot log rather than an identical failure on every
-	// spoken reply for as long as nobody reads the logs.
-	canEncode bool
-}
-
-// New builds the speech client, or returns nil when speech is not configured.
+// Failure is why transcription did not produce words.
 //
-// Nil and no error is the supported disabled state, the same shape the
-// Telegram bridge uses for a missing bot token: a deployment without a key
-// answers in text and ignores recordings, rather than refusing to boot.
-func New(ctx context.Context, cfg config.VoiceConfig, logger *slog.Logger) (*Client, error) {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	if !cfg.Enabled() {
-		logger.Info("speech is disabled; no GEMINI_API_KEY is set")
-		return nil, nil
-	}
+// Split out because these read very differently to whoever is waiting: telling
+// somebody their audio was unclear when the service is actually out of
+// capacity sends them back to re-record a clip that was never going to work.
+type Failure int
 
-	gemini, err := generativeAI.NewGeminiClient(ctx, cfg.GeminiAPIKey, cfg.TranscribeModel)
-	if err != nil {
-		return nil, fmt.Errorf("speech: could not build the provider client: %w", err)
-	}
+const (
+	// FailureUnavailable is the service being off, out of credit, or refusing
+	// the credential. The feature is down, not fussy.
+	FailureUnavailable Failure = iota
+	// FailureBusy is rate limiting or saturation. Worth another go shortly.
+	//
+	// Not hypothetical: the cluster's transcription service is CPU-bound on a
+	// single replica shared with other apps, so a queue is an ordinary
+	// afternoon rather than an incident.
+	FailureBusy
+	// FailureFailed is a genuine inability to turn this audio into words.
+	FailureFailed
+)
 
-	c := &Client{
-		gemini:          gemini.WithLogger(logger),
-		transcribeModel: cfg.TranscribeModel,
-		speakModel:      cfg.SpeakModel,
-		voiceName:       cfg.VoiceName,
-		logger:          logger,
-	}
-
-	if _, err := exec.LookPath(encoderBinary); err != nil {
-		// Transcription still works; only spoken replies are lost. Warned
-		// rather than fatal for that reason.
-		logger.Warn("spoken replies are disabled; the opus encoder is not installed",
-			slog.String("binary", encoderBinary))
-	} else {
-		c.canEncode = true
-	}
-
-	// The models are named in the log because they are preview-tagged and get
-	// retired: when one disappears, this line is what says which one was asked
-	// for, without reading the ConfigMap.
-	logger.Info("speech is ready",
-		slog.String("transcribe_model", cfg.TranscribeModel),
-		slog.String("speak_model", cfg.SpeakModel),
-		slog.String("voice", cfg.VoiceName),
-		slog.Bool("can_speak", c.canEncode))
-
-	return c, nil
+// Error is a transcription failure, carrying what to say about it.
+type Error struct {
+	Failure Failure
+	err     error
 }
 
-// CanSpeak reports whether spoken replies are possible.
-func (c *Client) CanSpeak() bool { return c != nil && c.canEncode }
+func (e *Error) Error() string {
+	if e.err == nil {
+		return e.Message()
+	}
+	return e.err.Error()
+}
+
+func (e *Error) Unwrap() error { return e.err }
+
+// Message is what the person waiting should be told.
+func (e *Error) Message() string {
+	switch e.Failure {
+	case FailureUnavailable:
+		return "Voice is switched off at the moment. Type it and I will answer the same way."
+	case FailureBusy:
+		return "I am behind on voice notes right now. Try that again in a moment, or type it."
+	default:
+		return "I could not make that out. Try again, or type it."
+	}
+}
+
+// failureFor maps a provider's status onto what to say about it.
+func failureFor(status int) Failure {
+	switch status {
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden:
+		return FailureUnavailable
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
+		return FailureBusy
+	default:
+		return FailureFailed
+	}
+}
+
+// Transcriber turns spoken audio into text.
+//
+// An interface so the adapter states what it needs and its tests need no
+// provider at all.
+type Transcriber interface {
+	// Transcribe returns the words in a recording.
+	//
+	// hint is vocabulary to bias decoding toward. It is not decoration: a
+	// recogniser with no idea what words to expect turns "Cais do Sodré" into
+	// "Case 2 Soda", and an itinerary is then planned for somewhere that does
+	// not exist.
+	Transcribe(ctx context.Context, audio []byte, mimeType, hint string) (string, error)
+}
+
+// Disabled stands in when nothing is configured, so a missing setting turns off
+// one feature rather than stopping the app from booting.
+type Disabled struct{}
+
+func (Disabled) Transcribe(context.Context, []byte, string, string) (string, error) {
+	return "", ErrDisabled
+}
+
+// Client is the configured transcriber.
+type Client struct {
+	provider Transcriber
+	logger   *slog.Logger
+}
+
+// Enabled reports whether recordings can be understood at all.
+func (c *Client) Enabled() bool {
+	if c == nil || c.provider == nil {
+		return false
+	}
+	_, disabled := c.provider.(Disabled)
+	return !disabled
+}
 
 // Transcribe returns the words in a recording.
-//
-// A recording with no speech in it returns ErrNothingHeard, which the caller
-// should answer rather than report.
-func (c *Client) Transcribe(ctx context.Context, audio []byte, mimeType string) (string, error) {
-	if c == nil {
+func (c *Client) Transcribe(ctx context.Context, audio []byte, mimeType, hint string) (string, error) {
+	if !c.Enabled() {
 		return "", ErrDisabled
 	}
 	if len(audio) == 0 {
 		return "", ErrNothingHeard
 	}
 
-	// Temperature zero: this is a transcription, and there is nothing to be
-	// creative about.
-	var zero float32
-	config := &genai.GenerateContentConfig{Temperature: &zero}
-
-	text, err := c.gemini.GenerateTextFromParts(ctx, transcribePrompt,
-		[]generativeAI.Blob{{Data: audio, MIMEType: mimeType}}, config)
+	text, err := c.provider.Transcribe(ctx, audio, mimeType, hint)
 	if err != nil {
-		if errors.Is(err, generativeAI.ErrNoContent) {
-			return "", ErrNothingHeard
-		}
-		return "", fmt.Errorf("speech: could not transcribe the recording: %w", err)
+		return "", err
 	}
 
 	text = strings.TrimSpace(text)
@@ -161,79 +150,88 @@ func (c *Client) Transcribe(ctx context.Context, audio []byte, mimeType string) 
 	return text, nil
 }
 
-// Shorten reduces a reply to something worth listening to.
+// MessageFor is what to tell somebody whose recording did not become words.
 //
-// An answer already short enough is returned unchanged rather than sent to the
-// model: rewriting two sentences into two sentences costs a call and a second.
-func (c *Client) Shorten(ctx context.Context, text string) (string, error) {
-	if c == nil {
-		return "", ErrDisabled
+// Anything unrecognised gets the vaguest of the three messages, which is the
+// right way round: "I could not make that out" is true of every failure, and
+// the more specific ones are only worth saying when they are known.
+func MessageFor(err error) string {
+	var failure *Error
+	if errors.As(err, &failure) {
+		return failure.Message()
 	}
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return "", fmt.Errorf("speech: nothing to shorten")
+	if errors.Is(err, ErrDisabled) {
+		return (&Error{Failure: FailureUnavailable}).Message()
 	}
-	if len(text) < shortenFloor {
-		return text, nil
-	}
-
-	short, err := c.gemini.GenerateText(ctx, shortenPrompt+text, nil)
-	if err != nil {
-		return "", fmt.Errorf("speech: could not shorten the reply: %w", err)
-	}
-	short = strings.TrimSpace(short)
-	if short == "" {
-		return "", fmt.Errorf("speech: the shortened reply came back empty")
-	}
-	return short, nil
+	return (&Error{Failure: FailureFailed}).Message()
 }
 
-// Say renders text as an OGG/Opus voice note.
-//
-// Two steps, because Gemini answers with headerless PCM and Telegram plays
-// only Opus in an Ogg container: the samples are given a WAV header, then
-// encoded.
-func (c *Client) Say(ctx context.Context, text string, encodeTimeout time.Duration) ([]byte, error) {
-	if c == nil {
-		return nil, ErrDisabled
-	}
-	if !c.canEncode {
-		return nil, ErrEncoderMissing
-	}
-
-	audio, err := c.gemini.GenerateSpeech(ctx, text, generativeAI.SpeechOptions{
-		Model:     c.speakModel,
-		VoiceName: c.voiceName,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("speech: could not synthesise the reply: %w", err)
-	}
-
-	wav, err := wrapPCM(audio.Data, sampleRateOf(audio.MIMEType), 1, 16)
-	if err != nil {
-		return nil, err
-	}
-
-	encodeCtx, cancel := context.WithTimeout(ctx, encodeTimeout)
-	defer cancel()
-	return encodeOgg(encodeCtx, wav)
-}
-
-// sampleRateOf reads the rate out of a PCM MIME type.
-//
-// Gemini describes its audio as "audio/L16;codec=pcm;rate=24000". Getting this
-// wrong does not fail — it produces a reply played at the wrong speed, which
-// is worse than an error, so an unreadable rate falls back to the documented
-// one rather than to zero.
-func sampleRateOf(mimeType string) int {
-	for _, part := range strings.Split(mimeType, ";") {
-		key, value, found := strings.Cut(strings.TrimSpace(part), "=")
-		if !found || !strings.EqualFold(strings.TrimSpace(key), "rate") {
-			continue
-		}
-		if rate, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && rate > 0 {
-			return rate
+// FailureOf reports which kind of failure an error is, for metrics.
+func FailureOf(err error) string {
+	var failure *Error
+	if errors.As(err, &failure) {
+		switch failure.Failure {
+		case FailureUnavailable:
+			return "unavailable"
+		case FailureBusy:
+			return "busy"
 		}
 	}
-	return defaultSampleRate
+	if errors.Is(err, ErrDisabled) {
+		return "unavailable"
+	}
+	return "failed"
 }
+
+func wrap(failure Failure, err error) error {
+	return &Error{Failure: failure, err: err}
+}
+
+func errorf(failure Failure, format string, args ...any) error {
+	return &Error{Failure: failure, err: fmt.Errorf(format, args...)}
+}
+
+// NewClient builds the configured transcriber, or a disabled one.
+//
+// Disabled is a supported state rather than a boot failure: a deployment with
+// nothing configured answers text and says so when a recording arrives, which
+// is the same shape an absent bot token gives the Telegram bridge.
+func NewClient(cfg config.VoiceConfig, logger *slog.Logger) *Client {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	provider := providerFor(cfg, logger)
+	if _, disabled := provider.(Disabled); disabled {
+		logger.Info("transcription is disabled; no provider is configured")
+		return &Client{provider: provider, logger: logger}
+	}
+
+	// The base URL and model are logged because they are the two things that
+	// are wrong when every request 404s, and neither is a secret.
+	logger.Info("transcription is ready",
+		slog.String("provider", cfg.Provider),
+		slog.String("base_url", cfg.BaseURL),
+		slog.String("model", cfg.Model))
+
+	return &Client{provider: provider, logger: logger}
+}
+
+func providerFor(cfg config.VoiceConfig, logger *slog.Logger) Transcriber {
+	switch strings.ToLower(strings.TrimSpace(cfg.Provider)) {
+	case "", "openai_compatible", "openai", "selfhosted", "self_hosted":
+		return NewOpenAICompatibleProvider(cfg.BaseURL, cfg.Model, cfg.APIKey, providerTimeout, nil)
+	default:
+		// Named rather than guessed at: a provider nobody implemented is a
+		// typo in configuration, and quietly falling back to one that happens
+		// to be configured would hide it.
+		logger.Warn("transcription is disabled; the configured provider is not one this server implements",
+			slog.String("provider", cfg.Provider))
+		return Disabled{}
+	}
+}
+
+// providerTimeout is the transport-level ceiling. Each request is bounded by
+// its own context well inside this; it exists so a provider that accepts a
+// connection and then says nothing cannot hold one forever.
+const providerTimeout = 10 * time.Minute

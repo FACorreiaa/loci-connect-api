@@ -220,41 +220,42 @@ type MessagingConfig struct {
 // the poller does not start in this mode; see Dependencies.RunTelegram.
 func (c MessagingConfig) UsesWebhook() bool { return c.TelegramWebhookSecret != "" }
 
-// VoiceConfig holds speech in and speech out.
+// VoiceConfig holds transcription.
 //
-// Deliberately independent of AIConfig. Chat runs on OpenRouter in production
-// and has to keep running on it; speech needs a Gemini key and Gemini's own
-// speech models, and reading the key through AIConfig would mean a voice
-// feature could only ship by moving every itinerary onto a different provider.
-// loadAIConfig reads GEMINI_API_KEY only when AI_PROVIDER is "gemini", and
-// loadFallbacks never reads it at all, so setting it here cannot pull Gemini
-// into the chat chain by accident.
+// Named for the wire format rather than for a vendor, and the variable names
+// match Norviq's so the two apps stay greppable together. The cluster runs its
+// own transcription service — free per request, no key, and no audio leaving
+// the cluster — so the default provider is the self-hosted one and a hosted
+// API is the exception rather than the assumption.
 type VoiceConfig struct {
-	// GeminiAPIKey is the credential for transcription and synthesis. Empty
-	// disables both, the same way an empty bot token disables the bridge: a
-	// deployment without it answers text and ignores recordings rather than
-	// refusing to boot.
-	GeminiAPIKey string
+	// Provider selects the implementation. "openai_compatible" is anything
+	// serving OpenAI's POST /v1/audio/transcriptions, which is the cluster's
+	// own service and most hosted ones.
+	Provider string
 
-	// TranscribeModel hears recordings. SpeakModel says replies aloud, and is
-	// a different model: Gemini's speech models are not its chat models, and
-	// pointing this at a chat model produces a text answer rather than an
-	// error. Both are configuration rather than constants because the speech
-	// models are preview-tagged and get retired with little notice — a
-	// retirement should be a ConfigMap edit, not a release.
-	TranscribeModel string
-	SpeakModel      string
+	// BaseURL is what to call. Empty disables transcription, and there is no
+	// guessed default on purpose: a guess would point at a vendor nobody asked
+	// for, and billing somebody by accident is worse than the feature being
+	// off.
+	BaseURL string
 
-	// VoiceName is one of Gemini's prebuilt voices.
-	VoiceName string
+	// Model is which model to ask for. The cluster preloads its models and
+	// exits if one is missing, so a typo here is a 404 per request rather than
+	// a silent fallback.
+	Model string
+
+	// APIKey is empty for the cluster's own service, which is guarded by
+	// NetworkPolicy rather than by a credential.
+	APIKey string
 
 	// MaxDuration bounds a voice note, MaxVideoDuration a round video message.
-	// The video cap is shorter because a video note is billed as video — very
-	// roughly three hundred tokens a second on top of the audio — so a minute
-	// of footage costs an order of magnitude more than a minute of speech for
-	// a transcript of the same words. Dropping the video track would need
-	// ffmpeg, which is thirty times the size of the encoder already in the
-	// image, so the answer is a shorter cap rather than a transcode.
+	// Both are checked against the Telegram update before anything is
+	// downloaded.
+	//
+	// These are tighter than they look because transcription runs on CPU at
+	// roughly two and a half times the length of the clip, on a single replica
+	// shared with other apps. A minute of audio is minutes of somebody else's
+	// queue.
 	MaxDuration      time.Duration
 	MaxVideoDuration time.Duration
 
@@ -262,25 +263,20 @@ type VoiceConfig struct {
 	// so this matches rather than exceeds it.
 	MaxBytes int64
 
-	// RepliesEnabled turns spoken replies on. Off leaves transcription
-	// working: recordings are still understood, the answer just comes back as
-	// text. This is the switch to reach for if synthesis gets expensive — it
-	// is a ConfigMap value, so flipping it needs a restart, not a release.
-	RepliesEnabled bool
-
-	// VideoNotesEnabled turns round video messages on, separately from voice
-	// notes, because they cost differently. See MaxVideoDuration.
+	// VideoNotesEnabled turns round video messages on. Separate from voice
+	// notes because a video message is the same words for several times the
+	// work: the audio has to be pulled out of a video container.
 	VideoNotesEnabled bool
 
 	// MaxConcurrentUpdates bounds how many updates are answered at once in
 	// webhook mode, which is otherwise one unbounded goroutine per delivery.
-	// Survivable while an update was one call to a model; not while each one
-	// buffers audio through a transcription, a synthesis and an upload.
+	// It is also what this app can hold open against a shared, single-replica
+	// transcription service without starving anything else on it.
 	MaxConcurrentUpdates int
 }
 
 // Enabled reports whether recordings can be understood at all.
-func (c VoiceConfig) Enabled() bool { return c.GeminiAPIKey != "" }
+func (c VoiceConfig) Enabled() bool { return c.BaseURL != "" && c.Model != "" }
 
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
@@ -369,16 +365,15 @@ func Load() (*Config, error) {
 			TelegramWebhookSecret: strings.TrimSpace(getEnv("TELEGRAM_WEBHOOK_SECRET", "")),
 		},
 		Voice: VoiceConfig{
-			GeminiAPIKey:         strings.TrimSpace(getEnv("GEMINI_API_KEY", "")),
-			TranscribeModel:      getEnv("VOICE_TRANSCRIBE_MODEL", "gemini-2.5-flash"),
-			SpeakModel:           getEnv("VOICE_TTS_MODEL", "gemini-2.5-flash-preview-tts"),
-			VoiceName:            getEnv("VOICE_TTS_VOICE", "Kore"),
-			MaxDuration:          getEnvAsDurationSeconds("VOICE_MAX_DURATION_SEC", 60*time.Second),
-			MaxVideoDuration:     getEnvAsDurationSeconds("VOICE_MAX_VIDEO_NOTE_SEC", 30*time.Second),
-			MaxBytes:             int64(getEnvAsInt("VOICE_MAX_BYTES", 20<<20)),
-			RepliesEnabled:       getEnvAsBool("VOICE_REPLIES_ENABLED", true),
-			VideoNotesEnabled:    getEnvAsBool("VOICE_VIDEO_NOTES_ENABLED", true),
-			MaxConcurrentUpdates: getEnvAsInt("VOICE_MAX_CONCURRENT_UPDATES", 4),
+			Provider:             getEnv("TRANSCRIBE_PROVIDER", "openai_compatible"),
+			BaseURL:              strings.TrimSpace(getEnv("TRANSCRIBE_PROVIDER_OPENAI_BASEURL", "")),
+			Model:                getEnv("TRANSCRIBE_PROVIDER_OPENAI_MODEL", ""),
+			APIKey:               strings.TrimSpace(getEnv("TRANSCRIBE_PROVIDER_OPENAI_APIKEY", "")),
+			MaxDuration:          getEnvAsDurationSeconds("TRANSCRIBE_MAX_SECONDS", 45*time.Second),
+			MaxVideoDuration:     getEnvAsDurationSeconds("TRANSCRIBE_MAX_VIDEO_NOTE_SECONDS", 20*time.Second),
+			MaxBytes:             int64(getEnvAsInt("TRANSCRIBE_MAX_BYTES", 20<<20)),
+			VideoNotesEnabled:    getEnvAsBool("TRANSCRIBE_VIDEO_NOTES_ENABLED", true),
+			MaxConcurrentUpdates: getEnvAsInt("TRANSCRIBE_MAX_CONCURRENT_UPDATES", 2),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),

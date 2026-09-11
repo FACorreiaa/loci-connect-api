@@ -51,8 +51,8 @@ func NewPoller(client *Client, repo messaging.Repository, handler Handler, logge
 //
 // A builder rather than a constructor argument, so a deployment with no speech
 // configured builds the poller exactly as it always did.
-func (p *Poller) WithVoice(voice Voice, opts VoiceOptions) *Poller {
-	p.bridge = p.bridge.withVoice(voice, opts)
+func (p *Poller) WithVoice(voice Voice, vocabulary Vocabulary, opts VoiceOptions) *Poller {
+	p.bridge = p.bridge.withVoice(voice, vocabulary, opts)
 	return p
 }
 

@@ -1,196 +1,275 @@
 package speech
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
-	"os/exec"
+	"io"
+	"mime"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 )
 
-func TestWrapPCMWritesACanonicalHeader(t *testing.T) {
-	pcm := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
+// fakeService stands in for anything serving POST /v1/audio/transcriptions,
+// recording the multipart form it was sent.
+type fakeService struct {
+	server *httptest.Server
 
-	got, err := wrapPCM(pcm, 24000, 1, 16)
-	if err != nil {
-		t.Fatalf("wrapPCM: %v", err)
-	}
-	if len(got) != wavHeaderBytes+len(pcm) {
-		t.Fatalf("length = %d, want %d", len(got), wavHeaderBytes+len(pcm))
-	}
+	status int
+	body   string
 
-	if string(got[0:4]) != "RIFF" || string(got[8:12]) != "WAVE" {
-		t.Errorf("not a RIFF/WAVE file: %q", got[:12])
-	}
-	if string(got[12:16]) != "fmt " || string(got[36:40]) != "data" {
-		t.Errorf("chunks are wrong: %q %q", got[12:16], got[36:40])
-	}
-
-	// A wrong rate or block alignment does not fail — it plays the reply at
-	// the wrong speed, which is harder to notice than an error, so the numbers
-	// are asserted exactly.
-	checks := []struct {
-		name string
-		got  uint32
-		want uint32
-	}{
-		{"riff size", binary.LittleEndian.Uint32(got[4:8]), uint32(36 + len(pcm))},
-		{"fmt chunk size", binary.LittleEndian.Uint32(got[16:20]), 16},
-		{"sample rate", binary.LittleEndian.Uint32(got[24:28]), 24000},
-		{"byte rate", binary.LittleEndian.Uint32(got[28:32]), 24000 * 2},
-		{"data size", binary.LittleEndian.Uint32(got[40:44]), uint32(len(pcm))},
-	}
-	for _, c := range checks {
-		if c.got != c.want {
-			t.Errorf("%s = %d, want %d", c.name, c.got, c.want)
-		}
-	}
-	if n := binary.LittleEndian.Uint16(got[20:22]); n != 1 {
-		t.Errorf("format = %d, want 1 (uncompressed PCM)", n)
-	}
-	if n := binary.LittleEndian.Uint16(got[22:24]); n != 1 {
-		t.Errorf("channels = %d, want 1", n)
-	}
-	if n := binary.LittleEndian.Uint16(got[32:34]); n != 2 {
-		t.Errorf("block align = %d, want 2", n)
-	}
-	if n := binary.LittleEndian.Uint16(got[34:36]); n != 16 {
-		t.Errorf("bits per sample = %d, want 16", n)
-	}
-
-	if !bytes.Equal(got[44:], pcm) {
-		t.Error("the samples did not survive the wrap")
-	}
+	fields map[string]string
+	file   []byte
+	name   string
+	auth   string
+	path   string
 }
 
-func TestWrapPCMRejectsNonsense(t *testing.T) {
-	tests := []struct {
-		name                 string
-		pcm                  []byte
-		rate, channels, bits int
-	}{
-		{"no samples", nil, 24000, 1, 16},
-		{"no rate", []byte{0x01}, 0, 1, 16},
-		{"no channels", []byte{0x01}, 24000, 0, 16},
-		{"no sample width", []byte{0x01}, 24000, 1, 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if _, err := wrapPCM(tt.pcm, tt.rate, tt.channels, tt.bits); err == nil {
-				t.Error("expected an error")
+func newFakeService(t *testing.T) *fakeService {
+	t.Helper()
+	f := &fakeService{status: http.StatusOK, body: `{"text":"three days in Lisbon"}`, fields: map[string]string{}}
+
+	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f.path = r.URL.Path
+		f.auth = r.Header.Get("Authorization")
+
+		if _, params, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err == nil {
+			reader := multipart.NewReader(r.Body, params["boundary"])
+			for {
+				part, err := reader.NextPart()
+				if err != nil {
+					break
+				}
+				raw, _ := io.ReadAll(part)
+				if part.FileName() != "" {
+					f.file = raw
+					f.name = part.FileName()
+				} else {
+					f.fields[part.FormName()] = string(raw)
+				}
+				_ = part.Close()
 			}
-		})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(f.status)
+		_, _ = w.Write([]byte(f.body))
+	}))
+	t.Cleanup(f.server.Close)
+	return f
+}
+
+func (f *fakeService) client(t *testing.T, apiKey string) *Client {
+	t.Helper()
+	return NewClient(config.VoiceConfig{
+		Provider: "openai_compatible",
+		BaseURL:  f.server.URL + "/v1",
+		Model:    "Systran/faster-whisper-small",
+		APIKey:   apiKey,
+	}, newQuietLogger())
+}
+
+func TestTranscribeSendsTheRecordingAsAnUpload(t *testing.T) {
+	fake := newFakeService(t)
+	client := fake.client(t, "")
+
+	audio := []byte("OggS a recording")
+	got, err := client.Transcribe(context.Background(), audio, "audio/ogg", "Lisbon, Cais do Sodré")
+	if err != nil {
+		t.Fatalf("Transcribe: %v", err)
+	}
+	if got != "three days in Lisbon" {
+		t.Errorf("transcript = %q", got)
+	}
+
+	if fake.path != "/v1/audio/transcriptions" {
+		t.Errorf("posted to %q", fake.path)
+	}
+	if string(fake.file) != string(audio) {
+		t.Errorf("the recording did not arrive intact: %q", fake.file)
+	}
+	if fake.fields["model"] != "Systran/faster-whisper-small" {
+		t.Errorf("model = %q", fake.fields["model"])
+	}
+	// The hint is the difference between "Cais do Sodré" and "Case 2 Soda".
+	if fake.fields["prompt"] != "Lisbon, Cais do Sodré" {
+		t.Errorf("prompt = %q", fake.fields["prompt"])
+	}
+	// The cluster's service needs no credential; it is guarded by
+	// NetworkPolicy. An empty key must not produce an empty Bearer header,
+	// which some services reject outright.
+	if fake.auth != "" {
+		t.Errorf("an Authorization header was sent with no key: %q", fake.auth)
 	}
 }
 
-func TestSampleRateOf(t *testing.T) {
+func TestTranscribeSendsAKeyWhenThereIsOne(t *testing.T) {
+	fake := newFakeService(t)
+	client := fake.client(t, "sk-test")
+
+	if _, err := client.Transcribe(context.Background(), []byte("OggS"), "audio/ogg", ""); err != nil {
+		t.Fatalf("Transcribe: %v", err)
+	}
+	if fake.auth != "Bearer sk-test" {
+		t.Errorf("Authorization = %q", fake.auth)
+	}
+	if _, sent := fake.fields["prompt"]; sent {
+		t.Error("an empty hint was sent as a prompt")
+	}
+}
+
+// Multipart uploads to these services are routed on the filename as much as on
+// the content type, and an extensionless one is refused by some of them.
+func TestTheUploadIsNamedForItsFormat(t *testing.T) {
 	tests := []struct {
 		mimeType string
-		want     int
+		want     string
 	}{
-		{"audio/L16;codec=pcm;rate=24000", 24000},
-		{"audio/L16; codec=pcm; rate=16000", 16000},
-		{"audio/L16;RATE=48000", 48000},
-		// Anything unreadable falls back to the documented rate rather than
-		// to zero: a wrong rate plays at the wrong speed, and zero fails.
-		{"audio/L16", defaultSampleRate},
-		{"audio/L16;rate=", defaultSampleRate},
-		{"audio/L16;rate=nonsense", defaultSampleRate},
-		{"audio/L16;rate=0", defaultSampleRate},
-		{"", defaultSampleRate},
+		{"audio/ogg", "clip.ogg"},
+		{"audio/ogg; codecs=opus", "clip.ogg"},
+		{"audio/webm;codecs=opus", "clip.webm"},
+		{"audio/mp4", "clip.m4a"},
+		{"video/mp4", "clip.mp4"},
+		{"audio/mpeg", "clip.mp3"},
+		{"audio/wav", "clip.wav"},
+		{"", "clip.wav"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.mimeType, func(t *testing.T) {
-			if got := sampleRateOf(tt.mimeType); got != tt.want {
-				t.Errorf("sampleRateOf(%q) = %d, want %d", tt.mimeType, got, tt.want)
+			fake := newFakeService(t)
+			if _, err := fake.client(t, "").Transcribe(context.Background(), []byte("x"), tt.mimeType, ""); err != nil {
+				t.Fatalf("Transcribe: %v", err)
+			}
+			if fake.name != tt.want {
+				t.Errorf("filename = %q, want %q", fake.name, tt.want)
 			}
 		})
 	}
 }
 
-func TestEncodeOggProducesAnOggOpusStream(t *testing.T) {
-	if _, err := exec.LookPath(encoderBinary); err != nil {
-		t.Skipf("%s is not installed", encoderBinary)
+// Telling somebody their audio was unclear when the service is out of capacity
+// sends them back to re-record a clip that was never going to work.
+func TestFailuresAreToldApartByWhatTheyMean(t *testing.T) {
+	tests := []struct {
+		status  int
+		failure string
+		says    string
+	}{
+		{401, "unavailable", "switched off"},
+		{402, "unavailable", "switched off"},
+		{403, "unavailable", "switched off"},
+		{429, "busy", "behind on voice notes"},
+		{503, "busy", "behind on voice notes"},
+		{400, "failed", "could not make that out"},
+		{500, "failed", "could not make that out"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.says, func(t *testing.T) {
+			fake := newFakeService(t)
+			fake.status = tt.status
+			fake.body = `{"error":"something internal that must not be repeated"}`
+
+			_, err := fake.client(t, "").Transcribe(context.Background(), []byte("OggS"), "audio/ogg", "")
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if got := FailureOf(err); got != tt.failure {
+				t.Errorf("failure = %q, want %q", got, tt.failure)
+			}
+			if !strings.Contains(MessageFor(err), tt.says) {
+				t.Errorf("message = %q, want it to mention %q", MessageFor(err), tt.says)
+			}
+			// The provider's body can echo the request back.
+			if strings.Contains(err.Error(), "something internal") {
+				t.Errorf("the provider's body reached the error: %v", err)
+			}
+		})
+	}
+}
+
+// A recording of a pocket is something to answer, not to report.
+func TestSilenceIsNotAFailure(t *testing.T) {
+	fake := newFakeService(t)
+	fake.body = `{"text":"   "}`
+
+	_, err := fake.client(t, "").Transcribe(context.Background(), []byte("OggS"), "audio/ogg", "")
+	if !errors.Is(err, ErrNothingHeard) {
+		t.Errorf("error = %v, want ErrNothingHeard", err)
 	}
 
-	// Half a second of silence at 24 kHz, mono, 16-bit.
-	wav, err := wrapPCM(make([]byte, 24000), 24000, 1, 16)
-	if err != nil {
-		t.Fatalf("wrapPCM: %v", err)
+	_, err = fake.client(t, "").Transcribe(context.Background(), nil, "audio/ogg", "")
+	if !errors.Is(err, ErrNothingHeard) {
+		t.Errorf("an empty recording = %v, want ErrNothingHeard", err)
 	}
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+// A guessed base URL would point at a vendor nobody asked for. Billing
+// somebody by accident is worse than the feature being off.
+func TestNothingConfiguredMeansDisabledRatherThanGuessed(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  config.VoiceConfig
+	}{
+		{"no base url", config.VoiceConfig{Provider: "openai_compatible", Model: "m"}},
+		{"no model", config.VoiceConfig{Provider: "openai_compatible", BaseURL: "http://whisper:8000/v1"}},
+		{"nothing at all", config.VoiceConfig{}},
+		{"a provider nobody implemented", config.VoiceConfig{
+			Provider: "some-vendor", BaseURL: "http://whisper:8000/v1", Model: "m",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewClient(tt.cfg, newQuietLogger())
+			if client.Enabled() {
+				t.Error("transcription reports itself enabled with nothing to call")
+			}
+			if _, err := client.Transcribe(context.Background(), []byte("OggS"), "audio/ogg", ""); !errors.Is(err, ErrDisabled) {
+				t.Errorf("Transcribe = %v, want ErrDisabled", err)
+			}
+			// And it says the honest thing rather than blaming the audio.
+			if !strings.Contains(MessageFor(ErrDisabled), "switched off") {
+				t.Error("a disabled service should not read as unclear audio")
+			}
+		})
+	}
+}
+
+// The hint is fed to the decoder as if it were preceding speech, and these
+// models look back a fixed, small distance. A long one is not more help.
+func TestALongHintIsCutRatherThanSent(t *testing.T) {
+	fake := newFakeService(t)
+	long := strings.Repeat("Bairro Alto, ", 500)
+
+	if _, err := fake.client(t, "").Transcribe(context.Background(), []byte("OggS"), "audio/ogg", long); err != nil {
+		t.Fatalf("Transcribe: %v", err)
+	}
+	if len(fake.fields["prompt"]) > maxHintBytes {
+		t.Errorf("prompt is %d bytes, past the %d cap", len(fake.fields["prompt"]), maxHintBytes)
+	}
+	if fake.fields["prompt"] == "" {
+		t.Error("the hint was dropped entirely rather than cut")
+	}
+}
+
+func TestATimedOutRequestReadsAsBusyRatherThanBroken(t *testing.T) {
+	fake := newFakeService(t)
+	client := fake.client(t, "")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
 	defer cancel()
 
-	got, err := encodeOgg(ctx, wav)
-	if err != nil {
-		t.Fatalf("encodeOgg: %v", err)
+	_, err := client.Transcribe(ctx, []byte("OggS"), "audio/ogg", "")
+	if err == nil {
+		t.Fatal("expected an error")
 	}
-	if !bytes.HasPrefix(got, []byte("OggS")) {
-		t.Errorf("output is not an Ogg stream: %q", got[:min(8, len(got))])
-	}
-	// Telegram plays a voice note only if it is Opus in that container.
-	if !bytes.Contains(got[:min(128, len(got))], []byte("OpusHead")) {
-		t.Error("output is an Ogg stream but does not carry Opus")
-	}
-}
-
-func TestEncodeOggRejectsEmptyInput(t *testing.T) {
-	if _, err := encodeOgg(context.Background(), nil); err == nil {
-		t.Error("expected an error")
-	}
-}
-
-func TestDisabledClientIsUsableAndSaysSo(t *testing.T) {
-	// New returns a nil *Client when speech is not configured, and every
-	// caller holds it as a pointer rather than checking first — so the methods
-	// have to survive it.
-	var c *Client
-
-	if c.CanSpeak() {
-		t.Error("a nil client should not claim it can speak")
-	}
-	if _, err := c.Transcribe(context.Background(), []byte{0x01}, "audio/ogg"); !errors.Is(err, ErrDisabled) {
-		t.Errorf("Transcribe on a nil client = %v, want ErrDisabled", err)
-	}
-	if _, err := c.Shorten(context.Background(), "anything"); !errors.Is(err, ErrDisabled) {
-		t.Errorf("Shorten on a nil client = %v, want ErrDisabled", err)
-	}
-	if _, err := c.Say(context.Background(), "anything", time.Second); !errors.Is(err, ErrDisabled) {
-		t.Errorf("Say on a nil client = %v, want ErrDisabled", err)
-	}
-}
-
-func TestTranscribeTreatsAnEmptyRecordingAsSilence(t *testing.T) {
-	// No provider call is made, so the client needs no credential: an empty
-	// recording is answered, not reported.
-	c := &Client{}
-	if _, err := c.Transcribe(context.Background(), nil, "audio/ogg"); !errors.Is(err, ErrNothingHeard) {
-		t.Errorf("Transcribe of nothing = %v, want ErrNothingHeard", err)
-	}
-}
-
-func TestShortenLeavesAlreadyShortRepliesAlone(t *testing.T) {
-	// A short reply must not reach the provider — the client here has none,
-	// so a call would panic and the test would say so.
-	c := &Client{}
-	short := "Start at the Jerónimos Monastery, then walk down to the water for lunch."
-
-	got, err := c.Shorten(context.Background(), short)
-	if err != nil {
-		t.Fatalf("Shorten: %v", err)
-	}
-	if got != short {
-		t.Errorf("Shorten rewrote a short reply: %q", got)
-	}
-
-	if _, err := c.Shorten(context.Background(), "   "); err == nil {
-		t.Error("expected an error for blank text")
-	}
-	if len(strings.TrimSpace(shortenPrompt)) == 0 {
-		t.Error("the shorten prompt is empty")
+	// The service is CPU-bound on a shared replica, so a slow answer means a
+	// queue, and a queue is worth trying again.
+	if got := FailureOf(err); got != "busy" {
+		t.Errorf("failure = %q, want busy", got)
 	}
 }

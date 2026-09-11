@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
@@ -34,11 +35,19 @@ func timed[T any](stage string, fn func() (T, error)) (T, error) {
 // backstop: without it a wedged leg holds one of four in-flight slots forever,
 // which is a quarter of the bot.
 const (
-	updateTimeout = 6 * time.Minute
+	updateTimeout = 8 * time.Minute
 
-	getFileTimeout    = 10 * time.Second
-	downloadTimeout   = 30 * time.Second
-	transcribeTimeout = 60 * time.Second
+	getFileTimeout  = 10 * time.Second
+	downloadTimeout = 30 * time.Second
+
+	// transcribeTimeout is generous because the transcription runs on CPU.
+	//
+	// Measured on the cluster's own service: roughly two and a half to three
+	// times the length of the clip, on a single replica shared with other
+	// apps, so a thirty-second recording is over a minute of work and a queue
+	// behind somebody else's is ordinary. Sixty seconds — the obvious number —
+	// would have timed out most real recordings.
+	transcribeTimeout = 4 * time.Minute
 
 	// answerTimeout bounds working out the answer itself.
 	//
@@ -47,10 +56,7 @@ const (
 	// message should behave differently now.
 	answerTimeout = 3 * time.Minute
 
-	shortenTimeout    = 20 * time.Second
-	synthesiseTimeout = 45 * time.Second
-	encodeTimeout     = 15 * time.Second
-	sendTimeout       = 45 * time.Second
+	sendTimeout = 45 * time.Second
 )
 
 // chatBurst is how many answers one chat may ask for at once.
@@ -82,10 +88,20 @@ type Handler interface {
 // the deployment has no speech configured, and recordings are refused politely
 // instead of being ignored.
 type Voice interface {
-	Transcribe(ctx context.Context, audio []byte, mimeType string) (string, error)
-	Shorten(ctx context.Context, text string) (string, error)
-	Say(ctx context.Context, text string, encodeTimeout time.Duration) ([]byte, error)
-	CanSpeak() bool
+	// hint is vocabulary to bias decoding toward. Without it the service turns
+	// "Cais do Sodré" into "Case 2 Soda" and an itinerary is planned for
+	// somewhere that does not exist.
+	Transcribe(ctx context.Context, audio []byte, mimeType, hint string) (string, error)
+	Enabled() bool
+}
+
+// Vocabulary supplies the place names a speaker is likely to use.
+//
+// Looked up against the account the chat belongs to, which is why it is
+// consulted inside the closure rather than when the update arrives: before the
+// link is resolved there is nobody to look anything up for.
+type Vocabulary interface {
+	For(ctx context.Context, userID uuid.UUID) string
 }
 
 // VoiceOptions are the limits a recording is held to.
@@ -93,7 +109,6 @@ type VoiceOptions struct {
 	MaxDuration       time.Duration
 	MaxVideoDuration  time.Duration
 	MaxBytes          int64
-	RepliesEnabled    bool
 	VideoNotesEnabled bool
 }
 
@@ -107,8 +122,9 @@ type bridge struct {
 	handler Handler
 	logger  *slog.Logger
 
-	voice     Voice
-	voiceOpts VoiceOptions
+	voice      Voice
+	voiceOpts  VoiceOptions
+	vocabulary Vocabulary
 
 	// perChat rations what one conversation can ask for. The daily quota is a
 	// counter and says nothing about a burst; this is what keeps one sender
@@ -125,12 +141,13 @@ func newBridge(client *Client, handler Handler, logger *slog.Logger) bridge {
 	}
 }
 
-// withVoice returns a bridge that can hear recordings and say replies.
-func (b bridge) withVoice(voice Voice, opts VoiceOptions) bridge {
-	if voice == nil {
+// withVoice returns a bridge that can hear recordings.
+func (b bridge) withVoice(voice Voice, vocabulary Vocabulary, opts VoiceOptions) bridge {
+	if voice == nil || !voice.Enabled() {
 		return b
 	}
 	b.voice = voice
+	b.vocabulary = vocabulary
 	b.voiceOpts = opts
 	return b
 }
@@ -213,9 +230,12 @@ func (b bridge) answer(ctx context.Context, update Update) {
 	}
 	if clip != nil {
 		// Passed as a function, not as bytes: fetching and transcribing costs
-		// money, and the service is the only thing that knows whether this
-		// chat belongs to an account that has paid for it.
-		in.Audio = func(ctx context.Context) (string, error) { return b.hear(ctx, chatID, msg, clip) }
+		// the cluster real CPU on a service shared with other apps, and the
+		// messaging service is the only thing that knows whether this chat
+		// belongs to an account that has paid for it.
+		in.Audio = func(ctx context.Context, userID uuid.UUID) (string, error) {
+			return b.hear(ctx, chatID, userID, msg, clip)
+		}
 	}
 
 	answerCtx, cancel := context.WithTimeout(ctx, answerTimeout)
@@ -246,13 +266,6 @@ func (b bridge) answer(ctx context.Context, update Update) {
 			slog.String("error", err.Error()))
 	}
 	cancelSend()
-
-	// Only after the written answer has landed. Everything below is additive:
-	// if any of it fails the person already has their plan, so it is logged
-	// and swallowed rather than turned into an apology.
-	if clip != nil {
-		b.speak(ctx, chatID, out)
-	}
 }
 
 // clipOf picks the recording out of a message and holds it to its limits.
@@ -306,7 +319,7 @@ func (b bridge) withinLimits(clip *Recording, maxDuration time.Duration, kind, m
 // came through as "alarm" knows to say it again rather than waiting out a
 // wrong itinerary. And an itinerary takes minutes, so it is also the only
 // early sign that the recording arrived at all.
-func (b bridge) hear(ctx context.Context, chatID string, msg *Message, clip *Recording) (string, error) {
+func (b bridge) hear(ctx context.Context, chatID string, userID uuid.UUID, msg *Message, clip *Recording) (string, error) {
 	kind := kindOf(msg)
 
 	file, err := timed("get_file", func() (File, error) {
@@ -333,10 +346,18 @@ func (b bridge) hear(ctx context.Context, chatID string, msg *Message, clip *Rec
 		return "", err
 	}
 
+	// The hint is looked up now rather than when the update arrived, because
+	// it is the account's places and until the link was resolved there was no
+	// account to look them up for.
+	var hint string
+	if b.vocabulary != nil {
+		hint = b.vocabulary.For(ctx, userID)
+	}
+
 	transcript, err := timed("transcribe", func() (string, error) {
 		transcribeCtx, cancel := context.WithTimeout(ctx, transcribeTimeout)
 		defer cancel()
-		return b.voice.Transcribe(transcribeCtx, audio, mimeTypeOf(clip))
+		return b.voice.Transcribe(transcribeCtx, audio, mimeTypeOf(clip), hint)
 	})
 	if err != nil {
 		observability.VoiceMessagesTotal.WithLabelValues(kind, "failed").Inc()
@@ -350,67 +371,6 @@ func (b bridge) hear(ctx context.Context, chatID string, msg *Message, clip *Rec
 
 	b.send(ctx, chatID, `Heard: "`+truncate(transcript, maxEchoChars)+`"`)
 	return transcript, nil
-}
-
-// speak sends the answer as a voice note, beside the written one.
-//
-// Every failure here is logged and swallowed. The written answer has already
-// arrived, and a synthesis that did not work is not a reason to tell somebody
-// their itinerary failed.
-func (b bridge) speak(ctx context.Context, chatID string, out messaging.OutboundMessage) {
-	if !b.voiceOpts.RepliesEnabled || b.voice == nil || !b.voice.CanSpeak() {
-		observability.VoiceRepliesTotal.WithLabelValues("skipped").Inc()
-		return
-	}
-
-	spoken := out.Speak
-	if spoken == "" {
-		// The service writes a spoken form for its own replies. This one is a
-		// generated answer, which is a plan full of addresses and links —
-		// unusable read aloud, so it is reduced to what is worth hearing.
-		short, err := timed("shorten", func() (string, error) {
-			shortenCtx, cancel := context.WithTimeout(ctx, shortenTimeout)
-			defer cancel()
-			return b.voice.Shorten(shortenCtx, out.Text)
-		})
-		if err != nil {
-			observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
-			b.logger.WarnContext(ctx, "could not shorten a reply for speaking",
-				slog.String("error", err.Error()))
-			return
-		}
-		spoken = short
-	}
-
-	// The indicator is the only thing saying this extra wait is deliberate
-	// rather than the bot having stopped.
-	stopRecording := b.keepAction(ctx, chatID, "record_voice")
-	defer stopRecording()
-
-	ogg, err := timed("synthesise", func() ([]byte, error) {
-		sayCtx, cancel := context.WithTimeout(ctx, synthesiseTimeout)
-		defer cancel()
-		return b.voice.Say(sayCtx, spoken, encodeTimeout)
-	})
-	if err != nil {
-		observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
-		b.logger.WarnContext(ctx, "could not say a reply aloud",
-			slog.String("error", err.Error()))
-		return
-	}
-	stopRecording()
-
-	sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
-	if _, err := timed("send_voice", func() (struct{}, error) {
-		return struct{}{}, b.client.SendVoice(sendCtx, chatID, ogg, 0, "")
-	}); err != nil {
-		observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
-		b.logger.WarnContext(ctx, "could not send a spoken reply",
-			slog.String("error", err.Error()))
-		return
-	}
-	observability.VoiceRepliesTotal.WithLabelValues("spoken").Inc()
 }
 
 // kindOf names the sort of recording a message carries, for metrics.

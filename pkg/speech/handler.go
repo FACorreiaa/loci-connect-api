@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 
 	speechv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/speech"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/speech/speechv1connect"
@@ -36,25 +39,57 @@ var allowedTypes = map[string]struct{}{
 // Registered whether or not speech is configured. With none it answers
 // FailedPrecondition, which is what lets the client hide the microphone rather
 // than offer a button that silently does nothing.
-type Handler struct {
-	speechv1connect.UnimplementedSpeechServiceHandler
-	client *Client
-	logger *slog.Logger
+// Vocabulary supplies place names to bias decoding toward.
+//
+// Derived here rather than sent by the client: the server knows who is asking
+// and holds the place data, and a client could offer anything. It is also the
+// difference between "Cais do Sodré" and "Case 2 Soda", so it is not something
+// to leave to a caller that might omit it.
+type Vocabulary interface {
+	For(ctx context.Context, userID uuid.UUID) string
 }
 
-// NewHandler creates the handler. client may be nil.
-func NewHandler(client *Client, logger *slog.Logger) *Handler {
+type Handler struct {
+	speechv1connect.UnimplementedSpeechServiceHandler
+	client     *Client
+	vocabulary Vocabulary
+	logger     *slog.Logger
+}
+
+// NewHandler creates the handler. client and vocabulary may be nil.
+func NewHandler(client *Client, vocabulary Vocabulary, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Handler{
-		client: client,
-		logger: logger.With(slog.String("component", "speech-handler")),
+		client:     client,
+		vocabulary: vocabulary,
+		logger:     logger.With(slog.String("component", "speech-handler")),
 	}
 }
 
+// hintFor is the vocabulary for whoever is calling, or empty.
+//
+// A hint improves a transcript; it is not a precondition for one, so an
+// unidentifiable caller or a failed lookup transcribes unhinted rather than
+// being refused.
+func (h *Handler) hintFor(ctx context.Context) string {
+	if h.vocabulary == nil {
+		return ""
+	}
+	raw, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok {
+		return ""
+	}
+	userID, err := uuid.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	return h.vocabulary.For(ctx, userID)
+}
+
 func (h *Handler) Transcribe(ctx context.Context, req *connect.Request[speechv1.TranscribeRequest]) (*connect.Response[speechv1.TranscribeResponse], error) {
-	if h.client == nil {
+	if !h.client.Enabled() {
 		return nil, connect.NewError(connect.CodeFailedPrecondition,
 			errors.New("speech is not configured on this server"))
 	}
@@ -65,7 +100,7 @@ func (h *Handler) Transcribe(ctx context.Context, req *connect.Request[speechv1.
 			errors.New("that is not an audio format this server can read"))
 	}
 
-	text, err := h.client.Transcribe(ctx, req.Msg.GetAudio(), mimeType)
+	text, err := h.client.Transcribe(ctx, req.Msg.GetAudio(), mimeType, h.hintFor(ctx))
 	switch {
 	case errors.Is(err, ErrNothingHeard):
 		// Not an error. A recording of a pocket is something the caller should
@@ -74,12 +109,19 @@ func (h *Handler) Transcribe(ctx context.Context, req *connect.Request[speechv1.
 		return connect.NewResponse(&speechv1.TranscribeResponse{}), nil
 
 	case err != nil:
-		// The upstream error can name models and providers, none of which the
-		// caller can act on.
+		// The upstream error can name models, hosts and providers, none of
+		// which the caller can act on. What does reach them is which of the
+		// three kinds of failure it was, because the advice differs: a service
+		// that is down is not a reason to re-record.
 		h.logger.ErrorContext(ctx, "could not transcribe a recording",
+			slog.String("failure", FailureOf(err)),
 			slog.String("error", err.Error()))
-		return nil, connect.NewError(connect.CodeUnavailable,
-			errors.New("could not understand that recording"))
+
+		code := connect.CodeUnavailable
+		if FailureOf(err) == "failed" {
+			code = connect.CodeInternal
+		}
+		return nil, connect.NewError(code, errors.New(MessageFor(err)))
 	}
 
 	return connect.NewResponse(&speechv1.TranscribeResponse{Text: text}), nil

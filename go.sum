@@ -22,8 +22,8 @@ github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6 h1:He8af
 github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6/go.mod h1:8o94RPi1/7XTJvwPpRSzSUedZrtlirdB3r9Z20bi2f8=
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEKWjV8V+WSxDXJ4NFATAsZjh8iIbsQIg=
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
-github.com/FACorreiaa/go-genai-sdk/v2 v2.2.0 h1:NCSKqbT0Vf+JDiog0iJW1JstVFiLObqfwyrFMt42/N4=
-github.com/FACorreiaa/go-genai-sdk/v2 v2.2.0/go.mod h1:oEubhErXzUj22nEmOT+vAYv5hvohG9lfXdIaxJc6Qkc=
+github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0 h1:k16WuCRiPDRNmLXALZ3dcQ9QBJbg3rSloJOP/+qikX0=
+github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0/go.mod h1:wldQdJFlTpRdf8MiQ/kMwTc7NwhwbeHi2PGtFHlEkUQ=
 github.com/FACorreiaa/loci-connect-proto/v5 v5.8.0 h1:kyaU+lmvGavnsZuJB2hHfe3n/apIWC2408jDn62aJ/M=
 github.com/FACorreiaa/loci-connect-proto/v5 v5.8.0/go.mod h1:aFO5vPipG4CFtMg4YoX5HmHQxeofuIazgdUyA4PgYek=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=

@@ -57,6 +57,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/vocabulary"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
@@ -117,9 +118,13 @@ type Dependencies struct {
 	Integrations *integrations.Service
 	// Messaging is nil when no chat platform is configured.
 	Messaging *messaging.Service
-	// Speech is nil when no credential is configured, which is a supported
-	// state: the bot answers text and ignores recordings.
+	// Speech is never nil, but reports itself disabled when nothing is
+	// configured, which is a supported state: the bot answers text and says so
+	// when a recording arrives.
 	Speech *speech.Client
+	// Vocabulary is the place names a speaker is likely to use, which is the
+	// difference between "Cais do Sodré" and "Case 2 Soda".
+	Vocabulary *vocabulary.Places
 	// telegramClient is built once with the service, so the poller and the
 	// webhook — whichever mode runs — share one client and one token.
 	telegramClient *telegram.Client
@@ -504,15 +509,8 @@ func (d *Dependencies) initIntegrations() {
 // and the bot answers text with no speech credential. Tying the two together
 // would make either one silently need the other.
 func (d *Dependencies) initSpeech() {
-	client, err := speech.New(context.Background(), d.Config.Voice, d.Logger)
-	if err != nil {
-		// Not fatal. Speech is additive everywhere it is used: the bot answers
-		// text without it and the web app hides its microphone.
-		d.Logger.Warn("speech is unavailable; recordings will not be understood",
-			slog.String("error", err.Error()))
-		return
-	}
-	d.Speech = client
+	d.Speech = speech.NewClient(d.Config.Voice, d.Logger)
+	d.Vocabulary = vocabulary.New(d.DB.Pool, d.Logger)
 }
 
 // initMessaging wires the chat-platform bridge.
@@ -548,8 +546,8 @@ func (d *Dependencies) TelegramWebhook() http.Handler {
 	if hook == nil {
 		return nil
 	}
-	if d.Speech != nil {
-		hook = hook.WithVoice(d.Speech, d.voiceOptions())
+	if d.Speech.Enabled() {
+		hook = hook.WithVoice(d.Speech, d.Vocabulary, d.voiceOptions())
 	}
 	return hook
 }
@@ -588,8 +586,8 @@ func (d *Dependencies) RunTelegram(ctx context.Context) error {
 		d.Messaging,
 		d.Logger,
 	)
-	if d.Speech != nil {
-		poller = poller.WithVoice(d.Speech, d.voiceOptions())
+	if d.Speech.Enabled() {
+		poller = poller.WithVoice(d.Speech, d.Vocabulary, d.voiceOptions())
 	}
 	return poller.Run(ctx)
 }
@@ -600,7 +598,6 @@ func (d *Dependencies) voiceOptions() telegram.VoiceOptions {
 		MaxDuration:       d.Config.Voice.MaxDuration,
 		MaxVideoDuration:  d.Config.Voice.MaxVideoDuration,
 		MaxBytes:          d.Config.Voice.MaxBytes,
-		RepliesEnabled:    d.Config.Voice.RepliesEnabled,
 		VideoNotesEnabled: d.Config.Voice.VideoNotesEnabled,
 	}
 }

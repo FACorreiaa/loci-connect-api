@@ -537,7 +537,7 @@ func spokenBy(text string, err error) (InboundMessage, *bool) {
 	asked := new(bool)
 	return InboundMessage{
 		Platform: PlatformTelegram, ChatID: "555", DisplayName: "Fernando",
-		Audio: func(context.Context) (string, error) {
+		Audio: func(context.Context, uuid.UUID) (string, error) {
 			*asked = true
 			return text, err
 		},
@@ -681,31 +681,5 @@ func TestASpokenMessageIsNotTreatedAsACommand(t *testing.T) {
 	}
 	if _, err := repo.LinkForChat(t.Context(), PlatformTelegram, "555"); err != nil {
 		t.Error("a spoken \"/unlink\" disconnected the chat")
-	}
-}
-
-// The service writes several replies itself. They are already a sentence or
-// two, so shortening them would be a model call spent on nothing.
-func TestTheServicesOwnRepliesCarryTheirSpokenForm(t *testing.T) {
-	svc, repo, _, _ := newMeteredService(t)
-	linkChat(t, repo, "555")
-
-	for _, tt := range []struct {
-		name string
-		send func() OutboundMessage
-	}{
-		{"help", func() OutboundMessage { return send(t, svc, "555", "/help") }},
-		{"not linked", func() OutboundMessage { return send(t, svc, "999", "hello?") }},
-		{"nothing heard", func() OutboundMessage {
-			in, _ := spokenBy("", nil)
-			out, _ := svc.Handle(t.Context(), in)
-			return out
-		}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			if out := tt.send(); out.Speak == "" {
-				t.Errorf("%q has no spoken form", out.Text)
-			}
-		})
 	}
 }

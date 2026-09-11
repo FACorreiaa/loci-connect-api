@@ -1,16 +1,13 @@
 package telegram
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 )
 
@@ -120,82 +117,6 @@ func checkFilePath(filePath string) error {
 		return fmt.Errorf("telegram: refusing a file path that is not a plain path")
 	}
 	return nil
-}
-
-// SendVoice delivers a voice note.
-//
-// multipart/form-data rather than call's JSON, because the Bot API takes an
-// upload as a file part. Telegram plays this inline as a recording only if it
-// is Opus in an Ogg container; anything else arrives as a file attachment,
-// which is a worse reply than no reply.
-func (c *Client) SendVoice(ctx context.Context, chatID string, ogg []byte, seconds int, caption string) error {
-	if len(ogg) == 0 {
-		return errors.New("telegram: nothing to send as a voice note")
-	}
-
-	fields := map[string]string{"chat_id": chatID}
-	if seconds > 0 {
-		fields["duration"] = strconv.Itoa(seconds)
-	}
-	if caption != "" {
-		// Telegram's caption limit is well under a message's; a caption that
-		// is too long fails the whole send, and losing the voice note over
-		// decoration would be the wrong trade.
-		fields["caption"] = truncate(caption, maxCaptionChars)
-	}
-
-	return c.postMultipart(ctx, "sendVoice", fields, "voice", "reply.ogg", ogg)
-}
-
-// maxCaptionChars is Telegram's limit on a caption.
-const maxCaptionChars = 1024
-
-// postMultipart performs one Bot API method with a file attached.
-//
-// It mirrors call's three rules exactly, because the response is the same
-// whichever way the request went: the transport error is never wrapped, the
-// body is read bounded, and the description is sanitised.
-func (c *Client) postMultipart(ctx context.Context, method string, fields map[string]string, fileField, fileName string, content []byte) error {
-	if c.token == "" {
-		return errors.New("telegram: no bot token configured")
-	}
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for name, value := range fields {
-		if err := writer.WriteField(name, value); err != nil {
-			return fmt.Errorf("telegram: could not encode a %s request", method)
-		}
-	}
-	part, err := writer.CreateFormFile(fileField, fileName)
-	if err != nil {
-		return fmt.Errorf("telegram: could not encode a %s request", method)
-	}
-	if _, err := part.Write(content); err != nil {
-		return fmt.Errorf("telegram: could not encode a %s request", method)
-	}
-	if err := writer.Close(); err != nil {
-		return fmt.Errorf("telegram: could not encode a %s request", method)
-	}
-
-	endpoint := fmt.Sprintf("%s/bot%s/%s", c.baseURL, c.token, method)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, &body)
-	if err != nil {
-		return fmt.Errorf("telegram: could not build a %s request", method)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		// Deliberately not wrapped: see the comment on call.
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return ctxErr
-		}
-		return fmt.Errorf("telegram: %s could not be reached", method)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	return c.decodeEnvelope(resp, method, nil)
 }
 
 // truncate shortens text to at most limit characters, on a rune boundary.

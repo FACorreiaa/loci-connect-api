@@ -201,17 +201,6 @@ func sentTexts(f *fakeAPI) []string {
 	return texts
 }
 
-// methodOrder is every method the fake saw, in the order it saw them.
-func (f *fakeAPI) methodOrder() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	methods := make([]string, 0, len(f.calls))
-	for _, c := range f.calls {
-		methods = append(methods, c.method)
-	}
-	return methods
-}
-
 // newTestLogger keeps test output quiet; the adapter logs at Error on paths
 // these tests deliberately exercise.
 func newTestLogger() *slog.Logger {

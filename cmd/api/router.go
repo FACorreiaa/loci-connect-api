@@ -342,7 +342,7 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	// transcription is a step on the way to asking a question, and the
 	// StreamChat that follows already spends the request. Charging for both
 	// would make speaking cost twice what typing does.
-	speechHandler := speech.NewHandler(deps.Speech, deps.Logger)
+	speechHandler := speech.NewHandler(deps.Speech, deps.Vocabulary, deps.Logger)
 	speechPath, speechConnect := speechv1connect.NewSpeechServiceHandler(speechHandler, opts)
 	mux.Handle(speechPath, speechConnect)
 	deps.Logger.Info("registered Connect RPC service", "path", speechPath)

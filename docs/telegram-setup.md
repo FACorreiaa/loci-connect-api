@@ -224,41 +224,54 @@ reset, rather than being answered.
 
 Send the bot a voice note and it answers the same way it answers a typed
 question: same session, same account, same itinerary. Round video messages work
-too, and can be turned off on their own.
+too, and can be turned off on their own. Replies come back as text — the bot
+does not speak.
 
-It needs `GEMINI_API_KEY`. Without one the bot still answers text and says so
-when a recording arrives, rather than ignoring it. The key is independent of
-`AI_PROVIDER`: chat can stay on OpenRouter while this runs on Gemini, which is
-the only one of the two that can synthesise speech at all.
+Transcription runs on **the cluster's own speech-to-text service**, not a paid
+API. It costs nothing per request, needs no key, and no audio leaves the
+cluster. See `platform/infra/docs/transcription.md`.
+
+    TRANSCRIBE_PROVIDER_OPENAI_BASEURL=http://whisper.horus.svc.cluster.local:8000/v1
+    TRANSCRIBE_PROVIDER_OPENAI_MODEL=Systran/faster-whisper-small
+
+**Use the multilingual model, not `small.en`.** The English-only one does not
+merely mangle Portuguese, it hallucinates fluent English over it: asked to
+transcribe *"quero passar três dias em Lisboa, no bairro de Alfama"* it answered
+*"I hope you enjoyed this video, and don't forget to like, comment and
+subscribe!"* — which would then be echoed back and planned against.
+
+**The app must be named in `allow-whisper`** in the infra repo's
+`cluster/network-policies/horus.yaml`. `horus` is default-deny ingress, and
+without that entry every request fails in a way that reads exactly like the
+service being down.
 
 What happens to a recording, in order:
 
 1. Its length and size are checked against the update itself. Anything past the
-   cap is refused without being downloaded — refusing it afterwards would cost
-   a download and a transcription for an answer nobody gets.
+   cap is refused without being downloaded.
 2. The chat is resolved to an account and the account's quota is spent. **An
-   unlinked chat is never transcribed.** Anybody can message a bot, and fetching
-   and transcribing costs money.
-3. The recording is fetched and transcribed, and the transcript is echoed back
-   before the answer is worked out. Speech recognition mangles place names, and
-   somebody who can see "Alfama" came through as "alarm" knows to say it again
-   rather than waiting out a wrong itinerary.
-4. The written answer is sent.
-5. A spoken summary is synthesised and sent as a voice note, if
-   `VOICE_REPLIES_ENABLED` is on.
+   unlinked chat is never transcribed.**
+3. The account's place names are looked up and sent as a vocabulary hint. This
+   is not decoration — without it *"take me to Cais do Sodré, then Bairro Alto
+   and Belém"* comes back as *"Case 2 Soda, then Baro Alto and Bellum"*.
+4. The recording is transcribed and the transcript is echoed back before the
+   answer is worked out.
+5. The answer is sent.
 
-Everything after step 4 is additive. A synthesis that fails is logged and
-nothing is said about it in the chat: the person already has their plan.
+**Expect seconds, not milliseconds.** The service is CPU-bound on a single
+replica shared with other apps — measured at roughly 2.5× the length of the
+clip. A 45-second cap means up to about two minutes of transcription before
+generation even starts, which is why the typing indicator runs throughout.
 
 A recording cannot carry a link code — a transcript of "A3F9C1D2" read aloud is
 "a three F nine see one D two" — and cannot be a command, because nobody says
-"slash help".
+"slash help". A recording is metered whatever it turns out to say: the
+transcript is what would tell us it said "help", and taking it is the expense.
 
-`VOICE_REPLIES_ENABLED=false` is the switch to reach for if speaking gets
-expensive. Recordings are still understood; the answer just comes back as text.
-It is a ConfigMap value, so it needs a restart rather than a release.
+| Symptom | Cause |
+|---|---|
+| Bot says voice is switched off | `TRANSCRIBE_PROVIDER_OPENAI_BASEURL` empty, or the app is not in `allow-whisper`. |
+| "I am behind on voice notes" | The service is queuing — it is one CPU-bound replica shared with other apps. |
+| Fluent English from foreign speech | The model is `small.en`. Use the multilingual one. |
+| Place names mangled | The vocabulary hint is empty, which it is until the account has a session with a city on it. |
 
-Spoken replies also need `opusenc`, from the `opus-tools` package in the
-runtime image: the provider answers with raw PCM and Telegram plays only Opus
-in an Ogg container. A missing encoder is one line in the boot log and costs
-spoken replies, not transcription.

@@ -25,16 +25,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o 
 # Runtime stage
 FROM alpine:latest
 
-# Install runtime dependencies.
-#
-# opus-tools carries opusenc, which is how a spoken reply becomes something
-# Telegram will play as a voice note: the speech provider answers with raw PCM
-# and Telegram accepts only Opus in an Ogg container. A subprocess rather than
-# a library because Go has no Opus encoder — every binding is cgo, and this
-# binary is built CGO_ENABLED=0. It brings five dependencies and a couple of
-# megabytes, and also carries opusdec, which is the transcode to reach for if
-# the provider ever refuses Telegram's Ogg on the way in.
-RUN apk --no-cache add ca-certificates tzdata wget opus-tools \
+# Install runtime dependencies
+RUN apk --no-cache add ca-certificates tzdata wget \
     && addgroup -S loci && adduser -S -G loci -H loci
 
 WORKDIR /app
