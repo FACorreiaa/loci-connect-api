@@ -371,6 +371,18 @@ func (d *Dependencies) initServices() error {
 	// city name and preference text alone.
 	d.RetrievalAssembler = retrieval.NewAssembler(d.DB.Pool, d.Logger)
 	chatSvc.SetRetrievalAssembler(d.RetrievalAssembler)
+	// Report which cache layer served each part of each answer, so the hit rate
+	// and the tokens it saves are visible next to the rest of the funnel.
+	chatSvc.SetAnalytics(d.Analytics)
+	// The durable generation cache. Off leaves the in-process store as the only
+	// layer, which is the kill-switch for a bad row without a deploy.
+	if d.Config.Cache.GenerationsEnabled {
+		if generations, ok := d.ChatRepo.(*chatrepo.RepositoryImpl); ok {
+			chatSvc.SetGenerationStore(generations)
+		} else {
+			d.Logger.Warn("chat repository does not implement GenerationStore; durable generation cache stays off")
+		}
+	}
 	d.ChatService = chatSvc
 
 	// Both need the same sealer as the credential store, so they are built
