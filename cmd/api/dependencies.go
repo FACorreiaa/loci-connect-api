@@ -520,7 +520,8 @@ func (d *Dependencies) TelegramWebhook() http.Handler {
 	if d.Messaging == nil || !d.Config.Messaging.UsesWebhook() {
 		return nil
 	}
-	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret, d.Logger)
+	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret,
+		d.Config.Voice.MaxConcurrentUpdates, d.Logger)
 	if hook == nil {
 		return nil
 	}

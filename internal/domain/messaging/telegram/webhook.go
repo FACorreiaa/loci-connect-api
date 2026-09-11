@@ -27,25 +27,42 @@ type Webhook struct {
 	bridge bridge
 	secret string
 	logger *slog.Logger
+
+	// seen drops a redelivery before any work starts, and inFlight caps how
+	// many updates are answered at once. Both are new because a recording
+	// costs a download, a transcription, a generation and an upload: an
+	// unbounded goroutine per delivery was survivable while an update was one
+	// call to a model, and is not now that each one buffers audio.
+	seen     *seen
+	inFlight chan struct{}
 }
 
 // NewWebhook builds the handler. Returns nil when no secret is configured,
 // which is the caller's signal not to mount the route at all: an endpoint
 // with an empty secret would accept anything, and refusing to build one is
 // how that state is made unreachable.
-func NewWebhook(client *Client, handler Handler, secret string, logger *slog.Logger) *Webhook {
+func NewWebhook(client *Client, handler Handler, secret string, concurrency int, logger *slog.Logger) *Webhook {
 	if secret == "" || client == nil || handler == nil {
 		return nil
 	}
 	if logger == nil {
 		logger = slog.Default()
 	}
+	if concurrency <= 0 {
+		concurrency = defaultConcurrency
+	}
 	return &Webhook{
-		bridge: bridge{client: client, handler: handler, logger: logger},
-		secret: secret,
-		logger: logger,
+		bridge:   newBridge(client, handler, logger),
+		secret:   secret,
+		logger:   logger,
+		seen:     newSeen(),
+		inFlight: make(chan struct{}, concurrency),
 	}
 }
+
+// defaultConcurrency is how many updates are answered at once when nothing
+// says otherwise.
+const defaultConcurrency = 4
 
 func (h *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -82,14 +99,40 @@ func (h *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A redelivery is dropped here rather than answered again. Checked before
+	// the 200 so a duplicate gets the acknowledgement and nothing else, which
+	// is what stops Telegram retrying it further.
+	if !h.seen.first(update.UpdateID) {
+		h.logger.InfoContext(r.Context(), "telegram redelivered an update that was already answered",
+			slog.Int64("update_id", update.UpdateID))
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	// Acknowledged before it is answered. Telegram retries anything that is not
 	// a prompt 200 and an itinerary takes minutes, so holding the request open
-	// would guarantee both a timeout and a redelivery. A redelivery that
-	// happens anyway is answered twice, which is the accepted cost.
+	// would guarantee both a timeout and a redelivery.
 	//
 	// The request context is cancelled the moment this handler returns, so the
 	// answer runs on a copy with the cancellation removed and the values —
 	// request id, trace — kept.
 	w.WriteHeader(http.StatusOK)
-	go h.bridge.handle(context.WithoutCancel(r.Context()), update)
+	ctx := context.WithoutCancel(r.Context())
+
+	select {
+	case h.inFlight <- struct{}{}:
+		go func() {
+			defer func() { <-h.inFlight }()
+			h.bridge.handle(ctx, update)
+		}()
+	default:
+		// Still a 200, and still an answer. A non-2xx makes Telegram back off
+		// and, over a sustained error rate, stop delivering at all — so being
+		// busy must not look like being broken. And a bot that goes silent
+		// under load looks broken to the person waiting, which is why this
+		// says something rather than dropping quietly.
+		h.logger.WarnContext(ctx, "telegram update turned away; too many already in flight",
+			slog.Int64("update_id", update.UpdateID))
+		go h.bridge.busy(ctx, update)
+	}
 }

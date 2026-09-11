@@ -42,7 +42,7 @@ func NewPoller(client *Client, repo messaging.Repository, handler Handler, logge
 	return &Poller{
 		client: client,
 		repo:   repo,
-		bridge: bridge{client: client, handler: handler, logger: logger},
+		bridge: newBridge(client, handler, logger),
 		logger: logger,
 	}
 }

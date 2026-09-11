@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 )
 
@@ -29,7 +31,53 @@ type bridge struct {
 	client  *Client
 	handler Handler
 	logger  *slog.Logger
+
+	// perChat rations what one conversation can ask for. The daily quota is a
+	// counter and says nothing about a burst; this is what keeps one sender
+	// from spending everybody else's capacity in ten seconds.
+	perChat *chatLimiter
 }
+
+// chatBurst is how many answers one chat may ask for at once.
+//
+// A person asks a follow-up every few seconds at most and then waits for a
+// plan; three in hand and one every ten seconds is well clear of that and well
+// under what a script can do.
+const chatBurst = 3
+
+// chatEvery is how often one chat may be answered. A var rather than a const
+// because rate.Every is a function call.
+var chatEvery = rate.Every(10 * time.Second)
+
+func newBridge(client *Client, handler Handler, logger *slog.Logger) bridge {
+	return bridge{
+		client:  client,
+		handler: handler,
+		logger:  logger,
+		perChat: newChatLimiter(chatEvery, chatBurst),
+	}
+}
+
+// busy tells a chat that the bot is at capacity.
+//
+// Separate from answer because nothing about it should be able to take time:
+// it is the reply sent when there is no capacity to work out a real one.
+func (b bridge) busy(ctx context.Context, update Update) {
+	if update.Message == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, busyReplyTimeout)
+	defer cancel()
+
+	chatID := chatIDOf(update.Message.Chat.ID)
+	if err := b.client.SendMessage(ctx, chatID, "I have my hands full at the moment. Send that again in a minute."); err != nil {
+		b.logger.ErrorContext(ctx, "could not tell a telegram chat the bot was busy",
+			slog.String("error", err.Error()))
+	}
+}
+
+// busyReplyTimeout bounds the one message busy sends.
+const busyReplyTimeout = 15 * time.Second
 
 // handle answers one update.
 //
@@ -56,6 +104,16 @@ func (b bridge) answer(ctx context.Context, update Update) {
 	}
 
 	chatID := chatIDOf(update.Message.Chat.ID)
+
+	if !b.perChat.allow(chatID) {
+		b.logger.InfoContext(ctx, "telegram chat is asking faster than it is answered",
+			slog.String("chat_id", chatID))
+		if err := b.client.SendMessage(ctx, chatID, "That is faster than I can think. Give me a moment and ask again."); err != nil {
+			b.logger.ErrorContext(ctx, "could not tell a telegram chat to slow down",
+				slog.String("error", err.Error()))
+		}
+		return
+	}
 	in := messaging.InboundMessage{
 		Platform: messaging.PlatformTelegram,
 		ChatID:   chatID,
