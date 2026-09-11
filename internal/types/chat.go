@@ -37,6 +37,16 @@ type LlmInteraction struct {
 	Distance           *float64        `json:"distance"`
 	PromptTokenCount   int             `json:"prompt_token_count"`
 	ResponseTokenCount int             `json:"response_token_count"`
+
+	// Cache and provenance columns (migration 0043). CacheKey is the short
+	// hash over every part key of the request; CacheHit is true only when
+	// every part was served from a cache. PromptHash is sha256 of the
+	// rendered prompt(s) and Provider the upstream that answered.
+	CacheKey    string `json:"cache_key,omitempty"`
+	CacheHit    bool   `json:"cache_hit"`
+	PromptHash  string `json:"prompt_hash,omitempty"`
+	Provider    string `json:"provider,omitempty"`
+	IsStreaming bool   `json:"is_streaming"`
 }
 
 // LLMGeneration is one row of llm_generations: a single cached part of an
