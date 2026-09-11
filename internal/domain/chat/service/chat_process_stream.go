@@ -305,7 +305,8 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			responsesMutex.Lock()
 			partCacheKeys[partType] = partCacheKey
 			responsesMutex.Unlock()
-			return l.streamWorkerWithResponseAndCache(gctx, prompt, partType, sendEventWithResponse, cc.Domain, partCacheKey)
+			_, err = l.streamWorkerWithResponseAndCache(gctx, prompt, partType, sendEventWithResponse, cc.Domain, partCacheKey)
+			return err
 		})
 	}
 

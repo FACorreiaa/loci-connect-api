@@ -127,6 +127,38 @@ func WithClientWrapper(wrap func(generativeAI.ChatClient) generativeAI.ChatClien
 	return Option(wrap)
 }
 
+// modelResolver is what a client wrapper that routes per request exposes, so
+// the service can learn which model a given context will be answered by
+// without importing the router. aicreds.Router satisfies it.
+type modelResolver interface {
+	ModelFor(ctx context.Context) string
+}
+
+// modelFor names the model this request is planned to run on. It asks the
+// client when the client routes per request, falls back to the client's
+// process-wide model, and finally to the configured one, so the answer is
+// never empty for a service that has a model at all.
+//
+// It is the planned model, not necessarily the one that answers: a chain may
+// fail over mid-request. Cache keys use this value; the answered model is
+// recorded from the stream (streamResult.ModelVersion).
+func (l *ServiceImpl) modelFor(ctx context.Context) string {
+	if l == nil {
+		return ""
+	}
+	if r, ok := l.aiClient.(modelResolver); ok {
+		if m := r.ModelFor(ctx); m != "" {
+			return m
+		}
+	}
+	if l.aiClient != nil {
+		if m := l.aiClient.Model(); m != "" {
+			return m
+		}
+	}
+	return l.model
+}
+
 func applyOptions(client generativeAI.ChatClient, opts []Option) generativeAI.ChatClient {
 	for _, opt := range opts {
 		if opt == nil {

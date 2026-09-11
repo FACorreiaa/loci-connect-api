@@ -316,6 +316,14 @@ func (r *Router) StartChatSession(ctx context.Context, config *genai.GenerateCon
 // with the shared model is better than guessing at a user's.
 func (r *Router) Model() string { return r.shared.Model() }
 
+// ModelFor names the model a call made with ctx would be answered by: the
+// caller's own provider, the free chain, or the shared one, by the same rules
+// clientFor applies. Model reports the shared provider whoever asks, which is
+// the right answer for a process-wide label and the wrong one for anything
+// keyed per request — a cache key built from it would serve one model's
+// answer under another's name.
+func (r *Router) ModelFor(ctx context.Context) string { return r.clientFor(ctx).Model() }
+
 // Close closes the shared client and every client built for a user.
 func (r *Router) Close() error {
 	r.mu.Lock()

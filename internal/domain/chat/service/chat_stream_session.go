@@ -682,9 +682,23 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	return nil
 }
 
-// ensureItineraryExists initializes the session's CurrentItinerary if it's nil
+// streamResult is what one streamed part produced: the full text, and what
+// the provider reported about producing it. ModelVersion and the token counts
+// are empty on a cache hit — nothing was generated — and empty when the
+// provider does not report them.
+type streamResult struct {
+	Text string
+	// ModelVersion is the model the provider says answered, which can differ
+	// from the one planned when a chain failed over mid-request.
+	ModelVersion string
+	TokensIn     int
+	TokensOut    int
+}
 
-func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) error {
+// streamWorkerWithResponseAndCache streams one part to the client and returns
+// what was streamed. The cache read and write here are the old five-minute
+// retry cache; the durable plan will move both out of this function.
+func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) (streamResult, error) {
 	// Step 1: Check cache first if cacheKey is provided
 	if cacheKey != "" {
 		if cached, found := l.cache.Get(cacheKey); found {
@@ -697,7 +711,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				chunkSize := 100 // characters per chunk
 				for i := 0; i < len(cachedText); i += chunkSize {
 					if ctx.Err() != nil {
-						return ctx.Err()
+						return streamResult{}, ctx.Err()
 					}
 
 					end := min(i+chunkSize, len(cachedText))
@@ -717,7 +731,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					// Small delay to simulate streaming
 					time.Sleep(10 * time.Millisecond)
 				}
-				return nil
+				return streamResult{Text: cachedText}, nil
 			}
 		}
 
@@ -743,7 +757,7 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				Error: "We are experiencing high traffic. Please try again in a minute.",
 			})
 		}
-		return err
+		return streamResult{}, err
 	}
 	defer release()
 
@@ -779,17 +793,18 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 				ErrorCode: errorCode,
 			})
 		}
-		return fmt.Errorf("%s worker failed: %w", partType, err)
+		return streamResult{}, fmt.Errorf("%s worker failed: %w", partType, err)
 	}
 	// Step 3: Stream response and collect full text for caching
 	var fullResponse strings.Builder
+	var result streamResult
 	chunkCount := 0
 	for resp, err := range iter {
 		if ctx.Err() != nil {
 			l.logger.WarnContext(ctx, "Context canceled during streaming",
 				slog.String("part_type", partType),
 				slog.Int("chunks_received", chunkCount))
-			return ctx.Err()
+			return streamResult{}, ctx.Err()
 		}
 		if err != nil {
 			l.logger.ErrorContext(ctx, "Streaming error from LLM",
@@ -801,7 +816,17 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 					Error: fmt.Sprintf("%s streaming error: %v", partType, err),
 				})
 			}
-			return fmt.Errorf("%s streaming error: %w", partType, err)
+			return streamResult{}, fmt.Errorf("%s streaming error: %w", partType, err)
+		}
+		// Providers name the answering model on some or all chunks and
+		// report usage on the last one, cumulatively; keep the latest of
+		// each rather than summing what would then be counted twice.
+		if resp.ModelVersion != "" {
+			result.ModelVersion = resp.ModelVersion
+		}
+		if u := resp.UsageMetadata; u != nil {
+			result.TokensIn = int(u.PromptTokenCount)
+			result.TokensOut = int(u.CandidatesTokenCount)
 		}
 		for _, cand := range resp.Candidates {
 			if cand.Content != nil {
@@ -849,7 +874,8 @@ func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prom
 			slog.String("cache_key", cacheKey),
 			slog.Int("response_length", fullResponse.Len()))
 	}
-	return nil
+	result.Text = fullResponse.String()
+	return result, nil
 }
 
 // convertRestaurantsToPOIs lifts restaurant-specific details into the generic POI shape
