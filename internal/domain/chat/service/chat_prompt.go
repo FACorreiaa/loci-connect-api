@@ -7,11 +7,25 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
+// getUserPreferencesPrompt renders a profile as the USER PREFERENCES block.
+//
+// It renders only what it is handed: a profile scoped by scopeProfileForPart
+// has no name and no stored location, and neither line appears, which is what
+// lets the profile snapshot hash stand for the rendered text. A nil profile
+// renders as nothing at all.
 func getUserPreferencesPrompt(searchProfile *locitypes.UserPreferenceProfileResponse) string {
+	if searchProfile == nil {
+		return ""
+	}
+
 	// Base preferences
-	basePrefs := fmt.Sprintf(`
-BASIC PREFERENCES:
-    - Profile Name: %s
+	basePrefs := `
+BASIC PREFERENCES:`
+	if searchProfile.ProfileName != "" {
+		basePrefs += fmt.Sprintf(`
+    - Profile Name: %s`, searchProfile.ProfileName)
+	}
+	basePrefs += fmt.Sprintf(`
     - Search Radius: %.1f km
     - Preferred Time: %s
     - Budget Level: %d (0=any, 1=cheap, 4=expensive)
@@ -22,7 +36,7 @@ BASIC PREFERENCES:
     - Prefers Accessible POIs: %t
     - Preferred Vibes: [%s]
     - Preferred Transport: %s`,
-		searchProfile.ProfileName, searchProfile.SearchRadiusKm, searchProfile.PreferredTime, searchProfile.BudgetLevel,
+		searchProfile.SearchRadiusKm, searchProfile.PreferredTime, searchProfile.BudgetLevel,
 		searchProfile.PreferOutdoorSeating, searchProfile.PreferDogFriendly, strings.Join(searchProfile.DietaryNeeds, ", "),
 		searchProfile.PreferredPace, searchProfile.PreferAccessiblePOIs, strings.Join(searchProfile.PreferredVibes, ", "),
 		searchProfile.PreferredTransport)
@@ -372,10 +386,28 @@ Respond ONLY WITH with JSON:
 }`, cityName)
 }
 
-func getPersonalizedItineraryPrompt(cityName, basePreferences string) string {
+// requestBlock renders the traveller's own words into a personal prompt.
+//
+// Before this block existed the request text only steered domain detection
+// and retrieval; "3 days in Funchal in winter" and "... in summer" reached
+// the model as the same itinerary prompt and differed only by sampling. The
+// block is what makes the request an input the cache key can honestly stand
+// for. An empty request renders nothing.
+func requestBlock(request string) string {
+	request = strings.TrimSpace(request)
+	if request == "" {
+		return ""
+	}
+	return fmt.Sprintf(`TRAVELLER'S REQUEST:
+%s
+Plan specifically around this request: honour any dates, season, occasion, duration, group or constraints it mentions, together with the preferences below.
+`, request)
+}
+
+func getPersonalizedItineraryPrompt(cityName, request, basePreferences string) string {
 	return fmt.Sprintf(`
 You are a travel planning assistant. Create a personalized itinerary for %s based on user preferences.
-USER PREFERENCES:
+%sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
 {
@@ -395,10 +427,10 @@ Respond ONLY WITH with JSON:
             "distance": <float>
         }
     ]
-}`, cityName, basePreferences)
+}`, cityName, requestBlock(request), basePreferences)
 }
 
-func getAccommodationPrompt(cityName string, lat, lon float64, basePreferences string) string {
+func getAccommodationPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
 	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
 	// (0,0) is in the Atlantic Ocean, not a valid city location
 	var locationDesc string
@@ -410,7 +442,7 @@ func getAccommodationPrompt(cityName string, lat, lon float64, basePreferences s
 
 	return fmt.Sprintf(`
 You are a hotel recommendation assistant. Find suitable accommodation %s.
-USER PREFERENCES:
+%sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
 {
@@ -433,10 +465,10 @@ Respond ONLY WITH with JSON:
             "distance": <float>
         }
     ]
-}`, locationDesc, basePreferences, cityName)
+}`, locationDesc, requestBlock(request), basePreferences, cityName)
 }
 
-func getDiningPrompt(cityName string, lat, lon float64, basePreferences string) string {
+func getDiningPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
 	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
 	var locationDesc string
 	if lat != 0 || lon != 0 {
@@ -447,7 +479,7 @@ func getDiningPrompt(cityName string, lat, lon float64, basePreferences string) 
 
 	return fmt.Sprintf(`
 Find 10 dining options %s.
-USER PREFERENCES:
+%sUSER PREFERENCES:
 %s
 Respond with JSON:
 {
@@ -471,10 +503,10 @@ Respond with JSON:
             "distance": <float>
         }
     ]
-}`, locationDesc, basePreferences, cityName)
+}`, locationDesc, requestBlock(request), basePreferences, cityName)
 }
 
-func getActivitiesPrompt(cityName string, lat, lon float64, basePreferences string) string {
+func getActivitiesPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
 	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
 	var locationDesc string
 	if lat != 0 || lon != 0 {
@@ -485,7 +517,7 @@ func getActivitiesPrompt(cityName string, lat, lon float64, basePreferences stri
 
 	return fmt.Sprintf(`
 You are an activity recommendation assistant. Find activities %s.
-USER PREFERENCES:
+%sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
 {
@@ -507,5 +539,5 @@ Respond ONLY WITH with JSON:
             "distance": <float>
         }
     ]
-}`, locationDesc, basePreferences, cityName)
+}`, locationDesc, requestBlock(request), basePreferences, cityName)
 }

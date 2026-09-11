@@ -316,29 +316,29 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	switch cc.Domain {
 	case locitypes.DomainItinerary, locitypes.DomainGeneral:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		runStreamWorker("general_pois", groundPrompt(getGeneralPOIPrompt(cc.CityName), cc.Packet), cc.CacheKey+"_general_pois")
-		runStreamWorker("itinerary", groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences), cc.Packet), cc.CacheKey+"_itinerary")
+		runStreamWorker("general_pois", groundPrompt(getGeneralPOIPrompt(cc.CityName), cc.Packet.WithoutPersonal()), cc.CacheKey+"_general_pois")
+		runStreamWorker("itinerary", groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.Message, cc.BasePreferences), cc.Packet), cc.CacheKey+"_itinerary")
 	case locitypes.DomainAccommodation:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("hotels", groundPrompt(getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_hotels")
+		runStreamWorker("hotels", groundPrompt(getAccommodationPrompt(cc.CityName, lat, lon, cc.Message, cc.BasePreferences), cc.Packet), cc.CacheKey+"_hotels")
 	case locitypes.DomainDining:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("restaurants", groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_restaurants")
+		runStreamWorker("restaurants", groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.Message, cc.BasePreferences), cc.Packet), cc.CacheKey+"_restaurants")
 	case locitypes.DomainActivities:
 		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
 		var lat, lon float64
 		if cc.UserLocation != nil {
 			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
 		}
-		runStreamWorker("activities", groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_activities")
+		runStreamWorker("activities", groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.Message, cc.BasePreferences), cc.Packet), cc.CacheKey+"_activities")
 	case locitypes.DomainNearby:
 		g.Go(func() (err error) {
 			defer func() {

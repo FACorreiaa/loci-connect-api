@@ -230,3 +230,43 @@ func TestTruncateRunesIsRuneSafe(t *testing.T) {
 		t.Errorf("TruncateRunes() shortened a short string: %q", got)
 	}
 }
+
+// A packet grounding an answer shared across users must carry nothing about
+// the one who asked: no visit history, no learned tastes. The rows and the
+// PacketID stay, so the shared answer still cites and still traces.
+func TestWithoutPersonalDropsVisitHistoryAndTraits(t *testing.T) {
+	p := packetWith(t, idA, idB)
+	p.PacketID = "pkt_test"
+	p.Evidence[1].Visited = true
+	p.TraitLabels = []string{"likes bars"}
+
+	shared := p.WithoutPersonal()
+
+	out := Render(shared)
+	// The citation rules always mention the marker; only the per-place
+	// annotation reveals a visit.
+	if strings.Contains(out, "ALREADY VISITED by this user") {
+		t.Error("shared packet still renders the user's visit history")
+	}
+	if strings.Contains(out, "Learned preferences") {
+		t.Error("shared packet still renders the user's trait labels")
+	}
+	for _, id := range []string{idA, idB} {
+		if !strings.Contains(out, "[poi:"+id+"]") {
+			t.Errorf("shared packet lost the marker for %s", id)
+		}
+	}
+	if shared.PacketID != p.PacketID {
+		t.Error("shared packet lost its PacketID")
+	}
+
+	// The original is untouched: the personal parts still need it.
+	if !p.Evidence[1].Visited || len(p.TraitLabels) != 1 {
+		t.Error("WithoutPersonal mutated the original packet")
+	}
+
+	var nilPacket *ContextPacket
+	if nilPacket.WithoutPersonal() != nil {
+		t.Error("nil packet did not stay nil")
+	}
+}
