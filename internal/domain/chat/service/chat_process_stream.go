@@ -227,40 +227,26 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	ctx := cc.Ctx
 	data := &locitypes.AiCityResponse{SessionID: cc.SessionID}
 
-	// Helper to parse part robustly
-	parsePart := func(key string, target any, nestedKey string) {
-		str, ok := rawResponses[key]
+	// Parse each part with the same parser the write path validates against, so
+	// what is stored and what is shown can never disagree about whether an
+	// answer was usable.
+	parsePart := func(part generationPart, target any) {
+		raw, ok := rawResponses[string(part)]
 		if !ok {
 			return
 		}
-		clean := extractJSONFromMarkdown(str)
-		if nestedKey != "" {
-			var envelope map[string]json.RawMessage
-			if err := json.Unmarshal([]byte(clean), &envelope); err != nil {
-				l.logger.WarnContext(ctx, "failed to unmarshal raw", "key", key, "err", err)
-				return
-			}
-			nested, exists := envelope[nestedKey]
-			if !exists {
-				return
-			}
-			if err := json.Unmarshal(nested, target); err != nil {
-				l.logger.WarnContext(ctx, "failed to unmarshal nested", "key", key, "err", err)
-			}
-			return
-		}
-		if err := json.Unmarshal([]byte(clean), target); err != nil {
-			l.logger.WarnContext(ctx, "failed to unmarshal", "key", key, "err", err)
+		if err := parseGeneratedPart(part, raw, target); err != nil {
+			l.logger.WarnContext(ctx, "failed to parse generated part",
+				slog.String("part", string(part)), slog.Any("error", err))
 		}
 	}
 
-	// Parse each part
-	parsePart("city_data", &data.GeneralCityData, "")
-	parsePart("general_pois", &data.PointsOfInterest, "points_of_interest")
-	parsePart("itinerary", &data.AIItineraryResponse, "")
-	parsePart("hotels", &data.Hotels, "hotels")
-	parsePart("restaurants", &data.Restaurants, "restaurants")
-	parsePart("activities", &data.Activities, "activities")
+	parsePart(partCityData, &data.GeneralCityData)
+	parsePart(partGeneralPOIs, &data.PointsOfInterest)
+	parsePart(partItinerary, &data.AIItineraryResponse)
+	parsePart(partHotels, &data.Hotels)
+	parsePart(partRestaurants, &data.Restaurants)
+	parsePart(partActivities, &data.Activities)
 
 	// Deduplication Logic
 	allPOIs := make([]locitypes.POIDetailedInfo, 0)
@@ -515,6 +501,11 @@ func (l *ServiceImpl) persistResults(
 		}
 	}
 
+	// 1b. Store what the provider produced this turn, so the next identical
+	// request does not have to pay for it again, and tell PostHog what each
+	// part cost or saved.
+	l.persistGenerations(storageCtx, cc, plan, rawResponses, cityID)
+
 	// 2. Save Interaction
 	var fullResponseBuilder strings.Builder
 	for partType, content := range rawResponses {
@@ -525,18 +516,7 @@ func (l *ServiceImpl) persistResults(
 		fullResponse = fmt.Sprintf("Processed %s request for %s", cc.Domain, cc.CityName)
 	}
 
-	interaction := locitypes.LlmInteraction{
-		ID:           uuid.New(),
-		SessionID:    cc.SessionID,
-		UserID:       cc.UserID,
-		ProfileID:    cc.ProfileID,
-		CityName:     cc.CityName,
-		Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", cc.Domain, cc.Message),
-		ResponseText: fullResponse,
-		ModelUsed:    l.model,
-		LatencyMs:    int(time.Since(startTime).Milliseconds()),
-		Timestamp:    startTime,
-	}
+	interaction := l.buildInteractionRow(cc, plan, fullResponse, startTime)
 	savedID, err := l.llmInteractionRepo.SaveInteraction(storageCtx, interaction)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to save interaction", slog.Any("error", err))
