@@ -84,6 +84,46 @@ var (
 		[]string{"plan"},
 	)
 
+	// VoiceMessagesTotal counts recordings, by kind and by what became of them.
+	//
+	// The outcomes are the interesting part: a rising "too_long" means the cap
+	// is set below how people actually speak, and a rising "no_speech" means
+	// the button is being pressed by accident.
+	VoiceMessagesTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_voice_messages_total",
+			Help: "Inbound recordings by kind (voice, video_note) and outcome",
+		},
+		[]string{"kind", "outcome"},
+	)
+
+	// VoiceRepliesTotal counts spoken replies, by what became of them.
+	//
+	// Synthesis is the expensive half of speaking and the half behind a switch,
+	// so this is what says whether turning it off would save anything.
+	VoiceRepliesTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "loci_voice_replies_total",
+			Help: "Spoken replies by outcome (spoken, skipped, failed)",
+		},
+		[]string{"outcome"},
+	)
+
+	// VoiceStageSeconds is how long each stage of answering a recording takes.
+	//
+	// Every stage has its own deadline, and those deadlines were chosen before
+	// there was any traffic to choose them from. This is what says which of
+	// them are wrong, and it is the only way a provider getting slower shows up
+	// before people notice.
+	VoiceStageSeconds = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "loci_voice_stage_seconds",
+			Help:    "Duration of each stage of answering a recording",
+			Buckets: []float64{0.5, 1, 2, 5, 10, 20, 45, 90, 180},
+		},
+		[]string{"stage"},
+	)
+
 	// TripReopenedTotal counts reads of a trip last saved a day or more ago.
 	//
 	// This is the retention claim the product is sold on: people come back to a

@@ -10,7 +10,19 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
+
+// timed records how long one stage of answering a recording took.
+//
+// The deadlines in this file were chosen before there was any traffic to
+// choose them from; this is what says which of them are wrong.
+func timed[T any](stage string, fn func() (T, error)) (T, error) {
+	start := time.Now()
+	result, err := fn()
+	observability.VoiceStageSeconds.WithLabelValues(stage).Observe(time.Since(start).Seconds())
+	return result, err
+}
 
 // The budget for one update.
 //
@@ -203,7 +215,7 @@ func (b bridge) answer(ctx context.Context, update Update) {
 		// Passed as a function, not as bytes: fetching and transcribing costs
 		// money, and the service is the only thing that knows whether this
 		// chat belongs to an account that has paid for it.
-		in.Audio = func(ctx context.Context) (string, error) { return b.hear(ctx, chatID, clip) }
+		in.Audio = func(ctx context.Context) (string, error) { return b.hear(ctx, chatID, msg, clip) }
 	}
 
 	answerCtx, cancel := context.WithTimeout(ctx, answerTimeout)
@@ -257,28 +269,31 @@ func (b bridge) clipOf(msg *Message) (*Recording, string) {
 		if b.voice == nil {
 			return nil, "I cannot listen to recordings right now — type it instead."
 		}
-		return b.withinLimits(msg.Voice, b.voiceOpts.MaxDuration, "voice note")
+		return b.withinLimits(msg.Voice, b.voiceOpts.MaxDuration, "voice note", "voice")
 
 	case msg.VideoNote != nil:
 		if b.voice == nil {
 			return nil, "I cannot listen to recordings right now — type it instead."
 		}
 		if !b.voiceOpts.VideoNotesEnabled {
+			observability.VoiceMessagesTotal.WithLabelValues("video_note", "disabled").Inc()
 			return nil, "I cannot take video messages. Send it as a voice note and I will listen."
 		}
-		return b.withinLimits(msg.VideoNote, b.voiceOpts.MaxVideoDuration, "video message")
+		return b.withinLimits(msg.VideoNote, b.voiceOpts.MaxVideoDuration, "video message", "video_note")
 
 	default:
 		return nil, ""
 	}
 }
 
-func (b bridge) withinLimits(clip *Recording, maxDuration time.Duration, kind string) (*Recording, string) {
+func (b bridge) withinLimits(clip *Recording, maxDuration time.Duration, kind, metric string) (*Recording, string) {
 	if maxDuration > 0 && time.Duration(clip.Duration)*time.Second > maxDuration {
+		observability.VoiceMessagesTotal.WithLabelValues(metric, "too_long").Inc()
 		return nil, "That is a long " + kind + ". Keep it under " +
 			plainDuration(maxDuration) + " and I will catch all of it."
 	}
 	if b.voiceOpts.MaxBytes > 0 && clip.FileSize > b.voiceOpts.MaxBytes {
+		observability.VoiceMessagesTotal.WithLabelValues(metric, "too_big").Inc()
 		return nil, "That " + kind + " is too big for me to fetch. A shorter one will work."
 	}
 	return clip, ""
@@ -291,11 +306,16 @@ func (b bridge) withinLimits(clip *Recording, maxDuration time.Duration, kind st
 // came through as "alarm" knows to say it again rather than waiting out a
 // wrong itinerary. And an itinerary takes minutes, so it is also the only
 // early sign that the recording arrived at all.
-func (b bridge) hear(ctx context.Context, chatID string, clip *Recording) (string, error) {
-	fileCtx, cancel := context.WithTimeout(ctx, getFileTimeout)
-	file, err := b.client.GetFile(fileCtx, clip.FileID)
-	cancel()
+func (b bridge) hear(ctx context.Context, chatID string, msg *Message, clip *Recording) (string, error) {
+	kind := kindOf(msg)
+
+	file, err := timed("get_file", func() (File, error) {
+		fileCtx, cancel := context.WithTimeout(ctx, getFileTimeout)
+		defer cancel()
+		return b.client.GetFile(fileCtx, clip.FileID)
+	})
 	if err != nil {
+		observability.VoiceMessagesTotal.WithLabelValues(kind, "failed").Inc()
 		return "", err
 	}
 
@@ -303,22 +323,30 @@ func (b bridge) hear(ctx context.Context, chatID string, clip *Recording) (strin
 	if limit <= 0 {
 		limit = defaultMaxBytes
 	}
-	downloadCtx, cancel := context.WithTimeout(ctx, downloadTimeout)
-	audio, err := b.client.Download(downloadCtx, file.FilePath, limit)
-	cancel()
+	audio, err := timed("download", func() ([]byte, error) {
+		downloadCtx, cancel := context.WithTimeout(ctx, downloadTimeout)
+		defer cancel()
+		return b.client.Download(downloadCtx, file.FilePath, limit)
+	})
 	if err != nil {
+		observability.VoiceMessagesTotal.WithLabelValues(kind, "failed").Inc()
 		return "", err
 	}
 
-	transcribeCtx, cancel := context.WithTimeout(ctx, transcribeTimeout)
-	transcript, err := b.voice.Transcribe(transcribeCtx, audio, mimeTypeOf(clip))
-	cancel()
+	transcript, err := timed("transcribe", func() (string, error) {
+		transcribeCtx, cancel := context.WithTimeout(ctx, transcribeTimeout)
+		defer cancel()
+		return b.voice.Transcribe(transcribeCtx, audio, mimeTypeOf(clip))
+	})
 	if err != nil {
+		observability.VoiceMessagesTotal.WithLabelValues(kind, "failed").Inc()
 		return "", err
 	}
 	if strings.TrimSpace(transcript) == "" {
+		observability.VoiceMessagesTotal.WithLabelValues(kind, "no_speech").Inc()
 		return "", nil
 	}
+	observability.VoiceMessagesTotal.WithLabelValues(kind, "transcribed").Inc()
 
 	b.send(ctx, chatID, `Heard: "`+truncate(transcript, maxEchoChars)+`"`)
 	return transcript, nil
@@ -331,6 +359,7 @@ func (b bridge) hear(ctx context.Context, chatID string, clip *Recording) (strin
 // their itinerary failed.
 func (b bridge) speak(ctx context.Context, chatID string, out messaging.OutboundMessage) {
 	if !b.voiceOpts.RepliesEnabled || b.voice == nil || !b.voice.CanSpeak() {
+		observability.VoiceRepliesTotal.WithLabelValues("skipped").Inc()
 		return
 	}
 
@@ -339,10 +368,13 @@ func (b bridge) speak(ctx context.Context, chatID string, out messaging.Outbound
 		// The service writes a spoken form for its own replies. This one is a
 		// generated answer, which is a plan full of addresses and links —
 		// unusable read aloud, so it is reduced to what is worth hearing.
-		shortenCtx, cancel := context.WithTimeout(ctx, shortenTimeout)
-		short, err := b.voice.Shorten(shortenCtx, out.Text)
-		cancel()
+		short, err := timed("shorten", func() (string, error) {
+			shortenCtx, cancel := context.WithTimeout(ctx, shortenTimeout)
+			defer cancel()
+			return b.voice.Shorten(shortenCtx, out.Text)
+		})
 		if err != nil {
+			observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
 			b.logger.WarnContext(ctx, "could not shorten a reply for speaking",
 				slog.String("error", err.Error()))
 			return
@@ -355,10 +387,13 @@ func (b bridge) speak(ctx context.Context, chatID string, out messaging.Outbound
 	stopRecording := b.keepAction(ctx, chatID, "record_voice")
 	defer stopRecording()
 
-	sayCtx, cancel := context.WithTimeout(ctx, synthesiseTimeout)
-	ogg, err := b.voice.Say(sayCtx, spoken, encodeTimeout)
-	cancel()
+	ogg, err := timed("synthesise", func() ([]byte, error) {
+		sayCtx, cancel := context.WithTimeout(ctx, synthesiseTimeout)
+		defer cancel()
+		return b.voice.Say(sayCtx, spoken, encodeTimeout)
+	})
 	if err != nil {
+		observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
 		b.logger.WarnContext(ctx, "could not say a reply aloud",
 			slog.String("error", err.Error()))
 		return
@@ -367,10 +402,23 @@ func (b bridge) speak(ctx context.Context, chatID string, out messaging.Outbound
 
 	sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
 	defer cancel()
-	if err := b.client.SendVoice(sendCtx, chatID, ogg, 0, ""); err != nil {
+	if _, err := timed("send_voice", func() (struct{}, error) {
+		return struct{}{}, b.client.SendVoice(sendCtx, chatID, ogg, 0, "")
+	}); err != nil {
+		observability.VoiceRepliesTotal.WithLabelValues("failed").Inc()
 		b.logger.WarnContext(ctx, "could not send a spoken reply",
 			slog.String("error", err.Error()))
+		return
 	}
+	observability.VoiceRepliesTotal.WithLabelValues("spoken").Inc()
+}
+
+// kindOf names the sort of recording a message carries, for metrics.
+func kindOf(msg *Message) string {
+	if msg != nil && msg.VideoNote != nil {
+		return "video_note"
+	}
+	return "voice"
 }
 
 // send delivers one message, logging rather than returning a failure.

@@ -219,3 +219,46 @@ does anything sent by a chat that is not linked to an account yet.
 
 An account that has used up the day's requests is told so, and told when they
 reset, rather than being answered.
+
+## Recordings
+
+Send the bot a voice note and it answers the same way it answers a typed
+question: same session, same account, same itinerary. Round video messages work
+too, and can be turned off on their own.
+
+It needs `GEMINI_API_KEY`. Without one the bot still answers text and says so
+when a recording arrives, rather than ignoring it. The key is independent of
+`AI_PROVIDER`: chat can stay on OpenRouter while this runs on Gemini, which is
+the only one of the two that can synthesise speech at all.
+
+What happens to a recording, in order:
+
+1. Its length and size are checked against the update itself. Anything past the
+   cap is refused without being downloaded — refusing it afterwards would cost
+   a download and a transcription for an answer nobody gets.
+2. The chat is resolved to an account and the account's quota is spent. **An
+   unlinked chat is never transcribed.** Anybody can message a bot, and fetching
+   and transcribing costs money.
+3. The recording is fetched and transcribed, and the transcript is echoed back
+   before the answer is worked out. Speech recognition mangles place names, and
+   somebody who can see "Alfama" came through as "alarm" knows to say it again
+   rather than waiting out a wrong itinerary.
+4. The written answer is sent.
+5. A spoken summary is synthesised and sent as a voice note, if
+   `VOICE_REPLIES_ENABLED` is on.
+
+Everything after step 4 is additive. A synthesis that fails is logged and
+nothing is said about it in the chat: the person already has their plan.
+
+A recording cannot carry a link code — a transcript of "A3F9C1D2" read aloud is
+"a three F nine see one D two" — and cannot be a command, because nobody says
+"slash help".
+
+`VOICE_REPLIES_ENABLED=false` is the switch to reach for if speaking gets
+expensive. Recordings are still understood; the answer just comes back as text.
+It is a ConfigMap value, so it needs a restart rather than a release.
+
+Spoken replies also need `opusenc`, from the `opus-tools` package in the
+runtime image: the provider answers with raw PCM and Telegram plays only Opus
+in an Ogg container. A missing encoder is one line in the boot log and costs
+spoken replies, not transcription.
