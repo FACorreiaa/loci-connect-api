@@ -40,6 +40,12 @@ if [[ -n "${staged_go}" ]]; then
 fi
 
 echo "pre-commit: golangci-lint run"
-golangci-lint run
+# --allow-parallel-runners: golangci-lint takes a global lock, so a lint
+# running in another checkout — a second editor, another agent session,
+# a watch task — makes this one fail with "parallel golangci-lint is
+# running" and aborts the commit under set -e. The flag is golangci-lint's
+# own answer to that: same linters, same config, same cache, allowed to
+# run beside another invocation.
+golangci-lint run --allow-parallel-runners
 
 echo "pre-commit: ok"
