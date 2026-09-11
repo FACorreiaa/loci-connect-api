@@ -37,6 +37,39 @@ type LlmInteraction struct {
 	Distance           *float64        `json:"distance"`
 	PromptTokenCount   int             `json:"prompt_token_count"`
 	ResponseTokenCount int             `json:"response_token_count"`
+
+	// Cache and provenance columns (migration 0043). CacheKey is the short
+	// hash over every part key of the request; CacheHit is true only when
+	// every part was served from a cache. PromptHash is sha256 of the
+	// rendered prompt(s) and Provider the upstream that answered.
+	CacheKey    string `json:"cache_key,omitempty"`
+	CacheHit    bool   `json:"cache_hit"`
+	PromptHash  string `json:"prompt_hash,omitempty"`
+	Provider    string `json:"provider,omitempty"`
+	IsStreaming bool   `json:"is_streaming"`
+}
+
+// LLMGeneration is one row of llm_generations: a single cached part of an
+// answer (city summary, POI list, itinerary, ...) keyed by the inputs that
+// produced it. See migration 0084 for the column semantics.
+type LLMGeneration struct {
+	CacheKey        string     `json:"cache_key"`
+	TemplateVersion string     `json:"template_version"`
+	Part            string     `json:"part"`
+	Domain          string     `json:"domain"`
+	ModelID         string     `json:"model_id"`
+	ModelVersion    string     `json:"model_version"`
+	PromptHash      string     `json:"prompt_hash"`
+	City            string     `json:"city"`
+	CityID          *uuid.UUID `json:"city_id,omitempty"`
+	Response        string     `json:"response"`
+	PacketID        string     `json:"packet_id"`
+	TokensIn        int        `json:"tokens_in"`
+	TokensOut       int        `json:"tokens_out"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	HitCount        int        `json:"hit_count"`
+	LastHitAt       *time.Time `json:"last_hit_at,omitempty"`
 }
 
 type AIItineraryResponse struct {

@@ -260,6 +260,46 @@ func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	}
 }
 
+// saveInteractionQuery writes the audit row for one request. The cache and
+// provenance columns have existed since migration 0043 but were never
+// written; with a durable generation cache the row has to say what was shown
+// and where it came from, or the cost attribution is a guess.
+//
+// provider has a column default ('google'), so an empty string is sent as
+// NULL to let the default apply rather than recording a blank provider.
+const saveInteractionQuery = `
+        INSERT INTO llm_interactions (
+            user_id, session_id, prompt, response, model_name, latency_ms, city_name,
+            cache_key, cache_hit, prompt_hash, provider,
+            prompt_tokens, completion_tokens, total_tokens,
+            is_streaming, response_payload
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7,
+            $8, $9, $10, COALESCE($11, 'google'),
+            $12, $13, $14,
+            $15, $16
+        )
+        RETURNING id
+    `
+
+// nullIfEmpty maps "" to NULL for nullable text columns, so an unset field
+// is stored as absent rather than as an empty string.
+func nullIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// nullIfEmptyJSON maps an empty payload to NULL: an empty json.RawMessage is
+// not valid JSON and would be rejected by a JSONB column.
+func nullIfEmptyJSON(raw json.RawMessage) []byte {
+	if len(raw) == 0 {
+		return nil
+	}
+	return []byte(raw)
+}
+
 func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locitypes.LlmInteraction) (uuid.UUID, error) {
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveInteraction", trace.WithAttributes(
 		semconv.DBSystemKey.String(semconv.DBSystemPostgreSQL.Value.AsString()),
@@ -275,13 +315,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 	var interactionID uuid.UUID
 	err := db.WithTx(ctx, r.pgpool, func(tx pgx.Tx) error {
 		var err error
-		interactionQuery := `
-        INSERT INTO llm_interactions (
-            user_id, session_id, prompt, response, model_name, latency_ms, city_name
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id
-    `
-		err = tx.QueryRow(ctx, interactionQuery,
+		err = tx.QueryRow(ctx, saveInteractionQuery,
 			interaction.UserID,
 			interaction.SessionID,
 			interaction.Prompt,
@@ -289,6 +323,15 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 			interaction.ModelUsed,
 			interaction.LatencyMs,
 			interaction.CityName,
+			nullIfEmpty(interaction.CacheKey),
+			interaction.CacheHit,
+			nullIfEmpty(interaction.PromptHash),
+			nullIfEmpty(interaction.Provider),
+			interaction.PromptTokens,
+			interaction.CompletionTokens,
+			interaction.TotalTokens,
+			interaction.IsStreaming,
+			nullIfEmptyJSON(interaction.ResponsePayload),
 		).Scan(&interactionID)
 		if err != nil {
 			span.RecordError(err)
