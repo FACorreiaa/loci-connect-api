@@ -39,6 +39,29 @@ type LlmInteraction struct {
 	ResponseTokenCount int             `json:"response_token_count"`
 }
 
+// LLMGeneration is one row of llm_generations: a single cached part of an
+// answer (city summary, POI list, itinerary, ...) keyed by the inputs that
+// produced it. See migration 0084 for the column semantics.
+type LLMGeneration struct {
+	CacheKey        string     `json:"cache_key"`
+	TemplateVersion string     `json:"template_version"`
+	Part            string     `json:"part"`
+	Domain          string     `json:"domain"`
+	ModelID         string     `json:"model_id"`
+	ModelVersion    string     `json:"model_version"`
+	PromptHash      string     `json:"prompt_hash"`
+	City            string     `json:"city"`
+	CityID          *uuid.UUID `json:"city_id,omitempty"`
+	Response        string     `json:"response"`
+	PacketID        string     `json:"packet_id"`
+	TokensIn        int        `json:"tokens_in"`
+	TokensOut       int        `json:"tokens_out"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	HitCount        int        `json:"hit_count"`
+	LastHitAt       *time.Time `json:"last_hit_at,omitempty"`
+}
+
 type AIItineraryResponse struct {
 	ItineraryName      string            `json:"itinerary_name"`
 	OverallDescription string            `json:"overall_description"`
