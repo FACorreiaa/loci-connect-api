@@ -30,6 +30,11 @@ type fakeAPI struct {
 	// failures overrides the outcome for one method, so getMe can succeed
 	// while getUpdates conflicts — which is what a second poller looks like.
 	failures map[string]int
+
+	// fileContent is what the /file endpoint serves, and fileStatus the
+	// status it serves it with.
+	fileContent []byte
+	fileStatus  int
 }
 
 type call struct {
@@ -40,14 +45,60 @@ type call struct {
 
 func newFakeAPI(t *testing.T) *fakeAPI {
 	t.Helper()
-	f := &fakeAPI{ok: true, status: http.StatusOK, reply: map[string]any{}, failures: map[string]int{}}
+	f := &fakeAPI{
+		ok:          true,
+		status:      http.StatusOK,
+		reply:       map[string]any{},
+		failures:    map[string]int{},
+		fileContent: []byte("OggS fake recording"),
+		fileStatus:  http.StatusOK,
+	}
 
 	f.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		method := parts[len(parts)-1]
 
+		// A download is not a Bot API method: it lives under /file/bot<token>
+		// and answers with the file itself. Without this branch the last path
+		// segment is the file's name, and the call would be recorded as a
+		// method that does not exist.
+		if len(parts) > 1 && parts[0] == "file" {
+			f.mu.Lock()
+			f.calls = append(f.calls, call{method: "download", path: r.URL.Path})
+			content, status := f.fileContent, f.fileStatus
+			f.mu.Unlock()
+
+			w.WriteHeader(status)
+			_, _ = w.Write(content)
+			return
+		}
+
 		var body map[string]any
-		if raw, _ := io.ReadAll(r.Body); len(raw) > 0 {
+		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+			// Recorded in the same shape as a JSON body so assertions do not
+			// have to care which way the request was sent.
+			body = map[string]any{}
+			if err := r.ParseMultipartForm(8 << 20); err == nil {
+				for name, values := range r.MultipartForm.Value {
+					if len(values) > 0 {
+						body[name] = values[0]
+					}
+				}
+				for name, files := range r.MultipartForm.File {
+					if len(files) == 0 {
+						continue
+					}
+					opened, err := files[0].Open()
+					if err != nil {
+						continue
+					}
+					raw, _ := io.ReadAll(opened)
+					_ = opened.Close()
+					body[name] = string(raw)
+					body[name+"_filename"] = files[0].Filename
+				}
+			}
+		} else if raw, _ := io.ReadAll(r.Body); len(raw) > 0 {
 			_ = json.Unmarshal(raw, &body)
 		}
 
