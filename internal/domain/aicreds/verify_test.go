@@ -291,7 +291,7 @@ func TestVerifyStoredReportsEachOutcome(t *testing.T) {
 			if got.Checked != tc.want.Checked || got.Rejected != tc.want.Rejected {
 				t.Errorf("got %+v, want checked=%v rejected=%v", got, tc.want.Checked, tc.want.Rejected)
 			}
-			if !(got.Checked && !got.Rejected) && got.Detail == "" {
+			if (!got.Checked || got.Rejected) && got.Detail == "" {
 				t.Error("no detail for the person on a non-clean outcome")
 			}
 			if containsAny(got.Detail, testKey) {

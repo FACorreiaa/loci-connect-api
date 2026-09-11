@@ -18,7 +18,7 @@ cd "$ROOT"
 
 # Fail closed if the linter is missing — a skipped lint is not a pass.
 if ! command -v golangci-lint >/dev/null 2>&1; then
-  echo "pre-commit: golangci-lint not on PATH. Install v2.13.0 to match CI:" >&2
+  echo "pre-commit: golangci-lint not on PATH. Install v2.13.2 to match CI:" >&2
   echo "  https://golangci-lint.run/welcome/install/" >&2
   exit 1
 fi
@@ -40,6 +40,12 @@ if [[ -n "${staged_go}" ]]; then
 fi
 
 echo "pre-commit: golangci-lint run"
-golangci-lint run
+# --allow-parallel-runners: golangci-lint takes a global lock, so a lint
+# running in another checkout — a second editor, another agent session,
+# a watch task — makes this one fail with "parallel golangci-lint is
+# running" and aborts the commit under set -e. The flag is golangci-lint's
+# own answer to that: same linters, same config, same cache, allowed to
+# run beside another invocation.
+golangci-lint run --allow-parallel-runners
 
 echo "pre-commit: ok"
