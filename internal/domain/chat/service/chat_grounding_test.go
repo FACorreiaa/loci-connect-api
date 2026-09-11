@@ -159,3 +159,94 @@ func TestVerifyAndRecordGroundingWithoutPacketIsInert(t *testing.T) {
 		t.Error("ungrounded turn altered a POI identifier")
 	}
 }
+
+// A cited place takes its identity and its pin from the packet. The model's own
+// coordinates are a guess; the packet's came from PostGIS, and a map link built
+// on the guess would send someone to the wrong place.
+func TestResolvePacketPOIsTakesTheRowsCoordinates(t *testing.T) {
+	id := uuid.New()
+	packet := testPacket(id)
+	packet.Evidence[0].Latitude = 32.6825
+	packet.Evidence[0].Longitude = -17.0695
+	packet.Evidence[0].Address = "Ribeira Brava, Madeira"
+
+	cc := &common.ChatContext{Packet: packet}
+	data := &locitypes.AiCityResponse{
+		PointsOfInterest: []locitypes.POIDetailedInfo{{
+			Name:      "Ribeira Brava Town Center [poi:" + id.String() + "]",
+			Latitude:  1.1, // the model's guess
+			Longitude: 2.2,
+		}},
+	}
+
+	(&ServiceImpl{}).resolvePacketPOIs(cc, data)
+
+	got := data.PointsOfInterest[0]
+	if got.Name != "Ribeira Brava Town Center" {
+		t.Errorf("the marker survived in the name: %q", got.Name)
+	}
+	if got.ID != id {
+		t.Errorf("the citation did not become the id: got %v, want %v", got.ID, id)
+	}
+	if !got.Grounded {
+		t.Error("a place cited from the packet should be grounded")
+	}
+	if got.Latitude != 32.6825 || got.Longitude != -17.0695 {
+		t.Errorf("kept the model's coordinates: got %v,%v", got.Latitude, got.Longitude)
+	}
+	if got.Address != "Ribeira Brava, Madeira" {
+		t.Errorf("the row's address was not adopted: %q", got.Address)
+	}
+}
+
+// A place the packet does not know keeps what the model said. It is still shown
+// — it may be real — but nothing here claims to know where it is.
+func TestResolvePacketPOIsLeavesAnUncitedPlaceAlone(t *testing.T) {
+	cc := &common.ChatContext{Packet: testPacket(uuid.New())}
+	data := &locitypes.AiCityResponse{
+		PointsOfInterest: []locitypes.POIDetailedInfo{
+			{Name: "Somewhere The Model Imagined", Latitude: 1.1, Longitude: 2.2},
+			{Name: "Cited But Invented [poi:" + uuid.New().String() + "]", Latitude: 3.3},
+		},
+	}
+
+	(&ServiceImpl{}).resolvePacketPOIs(cc, data)
+
+	if got := data.PointsOfInterest[0]; got.Latitude != 1.1 || got.Grounded {
+		t.Errorf("an uncited place was altered: %+v", got)
+	}
+	second := data.PointsOfInterest[1]
+	if strings.Contains(second.Name, "poi:") {
+		t.Errorf("an invented citation was left in the name: %q", second.Name)
+	}
+	if second.Grounded || second.Latitude != 3.3 {
+		t.Errorf("an invented citation should ground nothing: %+v", second)
+	}
+}
+
+// On a full cache hit there is no packet, and the replayed text still carries
+// the original turn's markers. Stripping cannot depend on having evidence.
+func TestResolvePacketPOIsStripsWithoutAPacket(t *testing.T) {
+	cc := &common.ChatContext{} // Packet is nil, as on a cache replay
+	data := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{
+				{Name: "Monte Palace Tropical Garden [poi:" + uuid.New().String() + "]"},
+			},
+		},
+		Hotels:      []locitypes.HotelDetailedInfo{{Name: "Reid's Palace [poi:" + uuid.New().String() + "]"}},
+		Restaurants: []locitypes.RestaurantDetailedInfo{{Name: "Il Gallo d'Oro [poi:" + uuid.New().String() + "]"}},
+	}
+
+	(&ServiceImpl{}).resolvePacketPOIs(cc, data)
+
+	for _, name := range []string{
+		data.AIItineraryResponse.PointsOfInterest[0].Name,
+		data.Hotels[0].Name,
+		data.Restaurants[0].Name,
+	} {
+		if strings.Contains(name, "poi:") {
+			t.Errorf("a marker survived a packetless turn: %q", name)
+		}
+	}
+}

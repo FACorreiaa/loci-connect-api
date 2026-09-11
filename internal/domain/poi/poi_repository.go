@@ -72,6 +72,7 @@ type Repository interface {
 	SearchPOIsHybrid(ctx context.Context, filter locitypes.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]locitypes.POIDetailedInfo, error)
 	UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID, embedding []float32) error
 	GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.POIDetailedInfo, error)
+	POIIDsMissingEmbeddings(ctx context.Context, poiIDs []uuid.UUID) ([]uuid.UUID, error)
 
 	// Hotels
 	FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error)
@@ -102,6 +103,13 @@ type Repository interface {
 	CalculateDistancePostGIS(ctx context.Context, userLat, userLon, poiLat, poiLon float64) (float64, error)
 	SaveLlmPoisToDatabase(ctx context.Context, userID uuid.UUID, pois []locitypes.POIDetailedInfo, genAIResponse *locitypes.GenAIResponse, llmInteractionID uuid.UUID) error
 	SaveLlmInteraction(ctx context.Context, interaction *locitypes.LlmInteraction) (uuid.UUID, error)
+
+	// Images (migration 0085). A picture carries its licence and author with
+	// it; see POIImage.
+	POIsWithoutImages(ctx context.Context, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error)
+	SavePOIImages(ctx context.Context, images []POIImage) error
+	ImagesForPOI(ctx context.Context, poiID uuid.UUID) ([]POIImage, error)
+	ImagesForPOIs(ctx context.Context, poiIDs []uuid.UUID) (map[uuid.UUID][]POIImage, error)
 }
 
 type RepositoryImpl struct {
@@ -640,10 +648,16 @@ func (r *RepositoryImpl) GetPOIByID(ctx context.Context, poiID uuid.UUID) (*loci
 			COALESCE(average_rating, 0) AS rating,
 			city_id,
 			COALESCE(tags, '{}') AS tags,
-			-- points_of_interest has no images column (poi_details does), so this
-			-- selected a column that does not exist and GetPOI failed for every
-			-- POI with a missing-column error.
-			'{}'::text[] AS images,
+			-- points_of_interest has no images column of its own: pictures live
+			-- in poi_images, one row each, because a Wikimedia image cannot be
+			-- shown without its licence and author (migration 0085). Only the
+			-- URLs are needed here; a surface that displays one must read the
+			-- credit alongside it.
+			COALESCE(
+				(SELECT array_agg(pi.url ORDER BY pi.position, pi.fetched_at)
+				 FROM poi_images pi WHERE pi.poi_id = points_of_interest.id),
+				'{}'::text[]
+			) AS images,
 			created_at
 		FROM points_of_interest
 		WHERE id = $1

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
@@ -25,6 +26,7 @@ func main() {
 	lookback := flag.Duration("lookback", 7*24*time.Hour, "only users with feedback in this window (0 = all)")
 	interval := flag.Duration("interval", 0, "repeat interval (0 = run once)")
 	embeddingBatch := flag.Int("embedding-batch", 50, "backfill this many missing POI embeddings before reranking (0 = disabled)")
+	imageBatch := flag.Int("image-batch", 50, "look up Wikimedia images for this many POIs that have none (0 = disabled)")
 	flag.Parse()
 
 	_ = godotenv.Load()
@@ -95,6 +97,33 @@ func main() {
 				logger.Warn("POI embedding backfill failed", "error", backfillErr)
 			} else {
 				logger.Info("POI embedding backfill complete", "processed", processed, "failed", failed)
+			}
+		}
+
+		if *imageBatch > 0 {
+			imageRun, startErr := recorder.Start(ctx, health.RunPOIImages)
+			if startErr != nil {
+				logger.Warn("could not open image run record", "error", startErr)
+			}
+			found, missing, failed, backfillErr := backfillPOIImages(
+				ctx, database.Pool, poiRepo, poi.NewImageFetcher(nil), *imageBatch, logger,
+			)
+			imageRun.ItemsSeen = found + missing + failed
+			imageRun.ItemsUpdated = found
+			imageRun.ItemsFailed = failed
+			if failed > 0 {
+				imageRun.Warn("%d POIs could not be looked up", failed)
+			}
+			if finishErr := recorder.Finish(ctx, imageRun, backfillErr); finishErr != nil {
+				logger.Warn("could not close image run record", "error", finishErr)
+			}
+			if backfillErr != nil {
+				logger.Warn("POI image backfill failed", "error", backfillErr)
+			} else {
+				// missing is not a failure: Commons simply has no picture of
+				// that place, which is the expected answer for most of them.
+				logger.Info("POI image backfill complete",
+					"found", found, "no_image_on_commons", missing, "failed", failed)
 			}
 		}
 
@@ -209,4 +238,73 @@ func backfillPOIEmbeddings(
 		processed++
 	}
 	return processed, failed, nil
+}
+
+// backfillPOIImages attaches a Wikimedia picture to places that have none.
+//
+// Mirrors backfillPOIEmbeddings, including the advisory lock, under a lock id
+// of its own so the two backfills in this job cannot block each other.
+//
+// A place Commons knows nothing about is the common case, not an error:
+// landmarks resolve, the restaurant round the corner does not. Those count as
+// processed rather than failed — the job did its work and the answer was no.
+func backfillPOIImages(
+	ctx context.Context,
+	database *pgxpool.Pool,
+	repo poi.Repository,
+	fetcher *poi.ImageFetcher,
+	batchSize int,
+	logger *slog.Logger,
+) (found, missing, failed int, err error) {
+	if database == nil || repo == nil || fetcher == nil || batchSize <= 0 {
+		return 0, 0, 0, nil
+	}
+	lockConn, err := database.Acquire(ctx)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer lockConn.Release()
+	var locked bool
+	const imageBackfillLockID int64 = 0x4c4f4349 // "LOCI"
+	if err := lockConn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, imageBackfillLockID).Scan(&locked); err != nil {
+		return 0, 0, 0, err
+	}
+	if !locked {
+		logger.InfoContext(ctx, "POI image backfill already running; skipping overlap")
+		return 0, 0, 0, nil
+	}
+	defer func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, unlockErr := lockConn.Exec(unlockCtx, `SELECT pg_advisory_unlock($1)`, imageBackfillLockID); unlockErr != nil {
+			logger.WarnContext(unlockCtx, "failed to release image backfill lock", "error", unlockErr)
+		}
+	}()
+
+	pois, err := repo.POIsWithoutImages(ctx, uuid.Nil, batchSize)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+
+	for _, place := range pois {
+		images, fetchErr := fetcher.FetchForPOI(ctx, place.ID, place.Name, place.City, 1)
+		if fetchErr != nil {
+			failed++
+			logger.WarnContext(ctx, "POI image lookup failed",
+				"poi_id", place.ID.String(), "error", fetchErr)
+			continue
+		}
+		if len(images) == 0 {
+			missing++
+			continue
+		}
+		if saveErr := repo.SavePOIImages(ctx, images); saveErr != nil {
+			failed++
+			logger.WarnContext(ctx, "POI image save failed",
+				"poi_id", place.ID.String(), "error", saveErr)
+			continue
+		}
+		found++
+	}
+	return found, missing, failed, nil
 }

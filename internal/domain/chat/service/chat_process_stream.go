@@ -286,6 +286,11 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	// identifier the model invented. This must happen before persistResults
 	// reaches canonicalizePOIs, otherwise a fabricated UUID would be written to
 	// the database as though retrieval had produced it.
+	// Consume the [poi:<uuid>] citations: clean names, and real coordinates for
+	// the places the packet recognises. Unconditional, and before verification,
+	// because verifyAndRecordGrounding returns early without a packet.
+	l.resolvePacketPOIs(cc, data)
+
 	cc.Verification = l.verifyAndRecordGrounding(cc, data, rawResponses)
 
 	return data, nil
@@ -557,6 +562,17 @@ func (l *ServiceImpl) persistResults(
 		data.AIItineraryResponse.Restaurants = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Restaurants, cityID)
 		data.AIItineraryResponse.Bars = l.canonicalizePOIs(storageCtx, data.AIItineraryResponse.Bars, cityID)
 		data.Activities = l.canonicalizePOIs(storageCtx, data.Activities, cityID)
+
+		// After canonicalisation, because a place only has pictures once it has
+		// the id of the row they hang off.
+		l.attachImages(storageCtx, data)
+
+		// Give the places this turn discovered their vectors now, instead of at
+		// 03:15 tomorrow. Without it the first person to ask about a city gets
+		// an ungrounded answer — and the generation cache then replays it.
+		l.embedNewPOIs(append(append([]locitypes.POIDetailedInfo{},
+			data.PointsOfInterest...),
+			data.AIItineraryResponse.PointsOfInterest...))
 
 		data.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.PointsOfInterest)
 		data.AIItineraryResponse.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.PointsOfInterest)

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -71,6 +72,13 @@ func (l *ServiceImpl) ProcessAndSaveUnifiedResponse(
 	l.logger.InfoContext(ctx, "Processing unified response for POI extraction",
 		slog.String("city_id", cityID.String()),
 		slog.Int("response_parts", len(responses)))
+
+	// This path re-decodes the raw text, so it never sees the names that
+	// resolvePacketPOIs cleaned on the streamed copy. Strip here too, or every
+	// place persisted from here keeps its [poi:<uuid>] marker in the name —
+	// which is also the key FindPoiByNameAndCity matches on, so a marked name
+	// would create a second row for a place we already have.
+	responses = stripCitationsFromParts(responses)
 
 	// Process general POIs if available
 	// CHANGED: used len() instead of .Len() and removed .String()
@@ -260,5 +268,17 @@ func CleanLLMResponse(responseText string) string {
 	// Remove trailing commas before closing braces/brackets (common LLM error)
 	cleaned = trailingCommaBeforeBraceRE.ReplaceAllString(cleaned, "$1")
 
+	return cleaned
+}
+
+// stripCitationsFromParts removes [poi:<uuid>] markers from every raw part.
+//
+// Returns a copy rather than editing in place: the cache stores the raw text
+// with its markers intact, so a replayed answer can still be resolved.
+func stripCitationsFromParts(responses map[string]string) map[string]string {
+	cleaned := make(map[string]string, len(responses))
+	for part, raw := range responses {
+		cleaned[part] = retrieval.StripCitations(raw)
+	}
 	return cleaned
 }

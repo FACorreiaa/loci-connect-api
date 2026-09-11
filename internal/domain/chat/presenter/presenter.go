@@ -91,6 +91,7 @@ func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		Website:          poi.Website,
 		OpeningHours:     poi.OpeningHours,
 		Images:           poi.Images,
+		ImageCredits:     toPOIImages(poi.ImageCredits),
 		PriceRange:       poi.PriceRange,
 		PriceLevel:       poi.PriceLevel,
 		Reviews:          poi.Reviews,
@@ -239,6 +240,28 @@ func ToGetChatSessionsResponse(resp *locitypes.ChatSessionsResponse) *chatv1.Get
 	}
 	for _, s := range resp.Sessions {
 		out.Sessions = append(out.Sessions, ToChatSession(&s))
+	}
+	return out
+}
+
+// toPOIImages carries each picture's licence and author to the client.
+//
+// A URL on its own cannot be displayed: the licences these come under require
+// naming the author and the licence wherever the image appears. Sending the
+// credit alongside is what makes rendering it lawful.
+func toPOIImages(images []locitypes.POIImage) []*poiv1.POIImage {
+	if len(images) == 0 {
+		return nil
+	}
+	out := make([]*poiv1.POIImage, 0, len(images))
+	for _, img := range images {
+		out = append(out, &poiv1.POIImage{
+			Url:           img.URL,
+			Source:        img.Source,
+			Licence:       img.Licence,
+			Attribution:   img.Attribution,
+			SourcePageUrl: img.SourcePageURL,
+		})
 	}
 	return out
 }

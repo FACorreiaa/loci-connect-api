@@ -320,3 +320,75 @@ func TestACitationIsNotShownToTheReader(t *testing.T) {
 		t.Errorf("a cited place in both lists should be sent once:\n%s", got)
 	}
 }
+
+func TestOnlyAGroundedPlaceGetsAMapLink(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{
+				{Name: "Cabo Girão", Grounded: true, Latitude: 32.6325, Longitude: -17.0015, Distance: 0.5},
+				{Name: "Somewhere Imagined", Latitude: 12.3, Longitude: 4.5, Distance: 1.0},
+			},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "google.com/maps/search/?api=1&query=32.632500,-17.001500") {
+		t.Errorf("a grounded place should carry its pin:\n%s", got)
+	}
+	if strings.Contains(got, "12.3") {
+		t.Errorf("an ungrounded place must not be linked by a guessed coordinate:\n%s", got)
+	}
+	if strings.Count(got, "google.com/maps") != 1 {
+		t.Errorf("exactly one link expected:\n%s", got)
+	}
+}
+
+func TestAPictureIsSentWithItsCredit(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{
+				Name: "Cabo Girão",
+				ImageCredits: []locitypes.POIImage{{
+					URL:         "https://upload.wikimedia.org/cabo-girao.jpg",
+					Attribution: "H. Zell",
+					Licence:     "CC BY-SA 3.0",
+				}},
+			}},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "https://upload.wikimedia.org/cabo-girao.jpg") {
+		t.Errorf("the picture is missing:\n%s", got)
+	}
+	// The licence requires the author and the licence wherever the image shows,
+	// and a Telegram preview is the image showing.
+	if !strings.Contains(got, "H. Zell") || !strings.Contains(got, "CC BY-SA 3.0") {
+		t.Errorf("the credit did not travel with the picture:\n%s", got)
+	}
+}
+
+func TestAnUncreditedPictureIsNotSent(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{
+				Name: "Somewhere",
+				ImageCredits: []locitypes.POIImage{
+					{URL: "https://example.test/no-credit.jpg", Licence: "CC BY-SA 3.0"}, // no author
+					{URL: "https://example.test/credited.jpg", Attribution: "Someone", Licence: "CC BY 2.0"},
+				},
+			}},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if strings.Contains(got, "no-credit.jpg") {
+		t.Errorf("an uncreditable picture was sent:\n%s", got)
+	}
+	if !strings.Contains(got, "credited.jpg") {
+		t.Errorf("the creditable picture should still be sent:\n%s", got)
+	}
+}

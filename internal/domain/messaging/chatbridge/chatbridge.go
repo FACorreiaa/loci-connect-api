@@ -251,6 +251,57 @@ func writePOIs(b *strings.Builder, pois []locitypes.POIDetailedInfo) {
 			b.WriteString("\n  ")
 			b.WriteString(detail)
 		}
+		if link := mapLink(poi); link != "" {
+			b.WriteString("\n  ")
+			b.WriteString(link)
+		}
+		if photo := photoLine(poi); photo != "" {
+			b.WriteString("\n  ")
+			b.WriteString(photo)
+		}
 		b.WriteString("\n")
 	}
+}
+
+// photoLine returns a picture's URL and its credit, or "" when the place has no
+// picture we are allowed to show.
+//
+// Telegram previews a bare URL in a plain-text message, so the picture appears
+// without sendPhoto, without a second API call, and without the per-message
+// rate limit that one photo per place would run into.
+//
+// The credit is not decoration. These come from Wikimedia Commons under CC BY-SA
+// and similar, which require naming the author and the licence wherever the
+// image appears — a preview in a chat included. Anything missing either is
+// skipped rather than shown uncredited, though the server should never have
+// stored such a row in the first place.
+func photoLine(poi locitypes.POIDetailedInfo) string {
+	for _, img := range poi.ImageCredits {
+		url := strings.TrimSpace(img.URL)
+		attribution := strings.TrimSpace(img.Attribution)
+		licence := strings.TrimSpace(img.Licence)
+		if url == "" || attribution == "" || licence == "" {
+			continue
+		}
+		return fmt.Sprintf("%s (%s, %s)", url, attribution, licence)
+	}
+	return ""
+}
+
+// mapLink returns a maps URL for a place, or "" when we do not know where it is.
+//
+// Only coordinates resolved from the database earn a link. A grounded place
+// carries the row's own pin (see resolvePacketPOIs); an ungrounded one carries
+// whatever the model guessed, and a link built on a guess sends a traveller to
+// the wrong street with full confidence. No link is the honest answer there.
+//
+// One link, not two: replies are split at Telegram's limit and the parts are
+// sent back to back with no pacing, so every extra line is a real cost. Google
+// Maps opens in the browser or the app on every platform, including iOS.
+func mapLink(poi locitypes.POIDetailedInfo) string {
+	if !poi.Grounded || (poi.Latitude == 0 && poi.Longitude == 0) {
+		return ""
+	}
+	return fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%.6f,%.6f",
+		poi.Latitude, poi.Longitude)
 }

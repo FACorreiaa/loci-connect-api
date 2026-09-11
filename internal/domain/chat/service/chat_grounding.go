@@ -248,6 +248,78 @@ func (l *ServiceImpl) verifyAndRecordGrounding(
 	return verification
 }
 
+// resolvePacketPOIs turns the model's citations into facts about real places.
+//
+// The prompt asks for "Name [poi:<uuid>]" and the model obliges by writing the
+// marker into the name, because none of the JSON schemas declare an id field.
+// Nothing consumed it, so the marker reached readers, the database and trip
+// stops verbatim. This is where it is consumed:
+//
+//   - the name always loses its marker, packet or no packet. On a cache replay
+//     cc.Packet is nil and the stored text still carries the original turn's
+//     markers, so stripping cannot be conditional on having evidence.
+//   - a citation the packet recognises also carries the identity across: the
+//     id, and the coordinates of the row itself. The model's own latitude and
+//     longitude are a guess; the packet's came from PostGIS. A map link is only
+//     honest when it points at the second.
+//
+// A place that cites nothing, or cites something invented, keeps whatever the
+// model said and stays ungrounded. It is still worth showing — it may be a real
+// place — but nothing here pretends to know where it is.
+func (l *ServiceImpl) resolvePacketPOIs(cc *common.ChatContext, data *locitypes.AiCityResponse) {
+	if data == nil {
+		return
+	}
+
+	resolve := func(poi *locitypes.POIDetailedInfo) {
+		clean, id, cited := retrieval.StripCitation(poi.Name)
+		if clean != "" {
+			poi.Name = clean
+		}
+		if !cited {
+			return
+		}
+		evidence, known := cc.Packet.Find(id)
+		if !known {
+			// Invented, or from an earlier packet. neutralizeFabricatedIDs
+			// decides what happens to any id already on the struct; this one
+			// was only ever text in a name, so there is nothing to clear.
+			return
+		}
+		poi.ID = id
+		poi.Grounded = true
+		poi.Latitude = evidence.Latitude
+		poi.Longitude = evidence.Longitude
+		if poi.Address == "" {
+			poi.Address = evidence.Address
+		}
+	}
+
+	for _, list := range [][]locitypes.POIDetailedInfo{
+		data.PointsOfInterest,
+		data.AIItineraryResponse.PointsOfInterest,
+		data.AIItineraryResponse.Restaurants,
+		data.AIItineraryResponse.Bars,
+		data.Activities,
+	} {
+		for i := range list {
+			resolve(&list[i])
+		}
+	}
+	for i := range data.Hotels {
+		clean, _, _ := retrieval.StripCitation(data.Hotels[i].Name)
+		if clean != "" {
+			data.Hotels[i].Name = clean
+		}
+	}
+	for i := range data.Restaurants {
+		clean, _, _ := retrieval.StripCitation(data.Restaurants[i].Name)
+		if clean != "" {
+			data.Restaurants[i].Name = clean
+		}
+	}
+}
+
 // neutralizeFabricatedIDs walks every POI list in the response, keeping ids
 // that came from the packet and clearing the ones that did not.
 func (l *ServiceImpl) neutralizeFabricatedIDs(

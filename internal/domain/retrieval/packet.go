@@ -141,6 +141,22 @@ func (p *ContextPacket) Has(id uuid.UUID) bool {
 	return false
 }
 
+// Find returns the evidence for id, and whether the packet carries it.
+//
+// The caller usually wants what the row said — its coordinates above all —
+// rather than only whether the id was real, which is what Has answers.
+func (p *ContextPacket) Find(id uuid.UUID) (Evidence, bool) {
+	if p == nil {
+		return Evidence{}, false
+	}
+	for _, e := range p.Evidence {
+		if e.POIID == id {
+			return e, true
+		}
+	}
+	return Evidence{}, false
+}
+
 // WithoutPersonal returns a copy of the packet with everything that describes
 // the requesting traveller removed: the visited flags Render turns into
 // "ALREADY VISITED by this user" and the learned trait labels. The candidates,
