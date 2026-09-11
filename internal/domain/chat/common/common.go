@@ -261,4 +261,38 @@ type ChatContext struct {
 	// Packet. Populated during parsing, persisted once the interaction row
 	// exists to attach it to.
 	Verification retrieval.Verification
+
+	// Profile is the preference profile this turn's prompts are rendered from.
+	// Nil when personalisation is off for this user, which is the same state
+	// BasePreferences == "" records — kept as the structured value because the
+	// generation cache hashes the fields each part actually renders, not the
+	// rendered text.
+	Profile *locitypes.UserPreferenceProfileResponse
+
+	// Cacheable says whether this turn's answers may be stored and replayed.
+	// False for requests pinned to the present moment ("open now") and for the
+	// nearby domain, which reads live rows from PostGIS rather than generating.
+	Cacheable bool
+
+	// PartOutcomes records, per answer part, where the text came from and what
+	// it cost. Filled while the parts are streamed and read by the write path,
+	// which persists only what the provider actually produced this turn.
+	PartOutcomes map[string]PartOutcome
+}
+
+// PartOutcome is what one answer part cost and where it came from.
+//
+// ServedFrom is the cache layer that answered ("memory", "db") or "llm" when
+// the provider did. ModelID is the model the request was planned on and
+// ModelVersion the one the provider says answered; they differ when a chain
+// fails over mid-request. PromptHash and the token counts are empty on a cache
+// hit — nothing was rendered and nothing was spent.
+type PartOutcome struct {
+	ServedFrom   string
+	CacheKey     string
+	ModelID      string
+	ModelVersion string
+	PromptHash   string
+	TokensIn     int
+	TokensOut    int
 }

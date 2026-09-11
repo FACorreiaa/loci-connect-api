@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/genai"
@@ -25,6 +26,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
+	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
@@ -102,10 +104,26 @@ type ServiceImpl struct {
 	tripRepo           trip.Repository // auto-persist generated itineraries as editable trips
 	cache              cachestore.Store
 	model              string
-	prefVectors        preference.VectorReader
+	// provider is the configured upstream, used to attribute an interaction
+	// whose model id does not name its vendor.
+	provider    string
+	prefVectors preference.VectorReader
 	// assembler grounds generation in retrieved rows. Optional: when nil the
 	// chat path behaves exactly as it did before evidence packets existed.
 	assembler *retrieval.Assembler
+	// assembleEvidence overrides how a turn retrieves its evidence. Nil in
+	// production; tests set it to observe that a fully cached turn retrieves
+	// nothing at all.
+	assembleEvidence func(cc *common.ChatContext)
+
+	// generations is the durable layer of the generation cache. Optional: nil
+	// means the in-process store is the only layer, which is the state under
+	// the CACHE_GENERATIONS_ENABLED kill-switch and in every unit test.
+	generations repository.GenerationStore
+
+	// analytics records product events server-side. Nil records nothing, which
+	// is the normal state wherever no PostHog key is configured.
+	analytics *analytics.Recorder
 
 	// events
 	deadLetterCh     chan locitypes.StreamEvent
@@ -220,6 +238,7 @@ func NewLlmInteractiontService(interestRepo interests.Repository,
 		tripRepo:           tripRepo,
 		cache:              appCache,
 		model:              aiCfg.Model,
+		provider:           aiCfg.Provider,
 		deadLetterCh:       make(chan locitypes.StreamEvent, 100),
 		deadLetterCancel:   deadLetterCancel,
 		intentClassifier:   &locitypes.SimpleIntentClassifier{},
@@ -244,4 +263,46 @@ func (l *ServiceImpl) SetRetrievalAssembler(a *retrieval.Assembler) {
 	if l != nil {
 		l.assembler = a
 	}
+}
+
+// SetAnalytics attaches the product-event recorder, so every part of every
+// answer reports which cache layer served it and what that saved.
+func (l *ServiceImpl) SetAnalytics(r *analytics.Recorder) {
+	if l != nil {
+		l.analytics = r
+	}
+}
+
+// expiredGenerationSweep is how often expired rows are swept out of
+// llm_generations. Expired rows are already invisible to reads (the lookup
+// filters on expires_at), so this is housekeeping for the table's size, not
+// for correctness — daily is plenty.
+const expiredGenerationSweep = 24 * time.Hour
+
+// SetGenerationStore turns on the durable layer of the generation cache and
+// starts the sweep that keeps its table from growing forever.
+//
+// Without it the service still caches in memory, which is what every unit test
+// and any deployment with CACHE_GENERATIONS_ENABLED=false does.
+func (l *ServiceImpl) SetGenerationStore(s repository.GenerationStore) {
+	if l == nil || s == nil {
+		return
+	}
+	l.generations = s
+
+	logger := l.logger
+	concurrency.Run(logger, func() {
+		ticker := time.NewTicker(expiredGenerationSweep)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			deleted, err := s.DeleteExpiredGenerations(ctx)
+			cancel()
+			if err != nil {
+				logger.Warn("failed to sweep expired generations", "error", err)
+				continue
+			}
+			logger.Info("swept expired generations", "deleted", deleted)
+		}
+	})
 }
