@@ -7,8 +7,10 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-type aiSessionKey struct{}
-type aiDistinctIDKey struct{}
+type (
+	aiSessionKey    struct{}
+	aiDistinctIDKey struct{}
+)
 
 // WithAISession returns a context whose spans carry $ai_session_id, so
 // PostHog's AI Observability groups every LLM call of one chat turn into the
