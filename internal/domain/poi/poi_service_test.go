@@ -501,6 +501,14 @@ func (m *MockPOIRepository) ImagesForPOIs(ctx context.Context, poiIDs []uuid.UUI
 	return args.Get(0).(map[uuid.UUID][]POIImage), args.Error(1)
 }
 
+func (m *MockPOIRepository) POIIDsMissingEmbeddings(ctx context.Context, poiIDs []uuid.UUID) ([]uuid.UUID, error) {
+	args := m.Called(ctx, poiIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]uuid.UUID), args.Error(1)
+}
+
 // Helper to setup service with mock repository
 func setupPOIServiceTest() (*ServiceImpl, *MockPOIRepository, *MockCityRepository) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})) // or io.Discard

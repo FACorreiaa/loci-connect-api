@@ -567,6 +567,13 @@ func (l *ServiceImpl) persistResults(
 		// the id of the row they hang off.
 		l.attachImages(storageCtx, data)
 
+		// Give the places this turn discovered their vectors now, instead of at
+		// 03:15 tomorrow. Without it the first person to ask about a city gets
+		// an ungrounded answer — and the generation cache then replays it.
+		l.embedNewPOIs(append(append([]locitypes.POIDetailedInfo{},
+			data.PointsOfInterest...),
+			data.AIItineraryResponse.PointsOfInterest...))
+
 		data.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.PointsOfInterest)
 		data.AIItineraryResponse.PointsOfInterest = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.PointsOfInterest)
 		data.AIItineraryResponse.Restaurants = l.rerankPOIs(storageCtx, cc.UserID, data.AIItineraryResponse.Restaurants)

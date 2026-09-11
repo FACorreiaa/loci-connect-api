@@ -72,6 +72,7 @@ type Repository interface {
 	SearchPOIsHybrid(ctx context.Context, filter locitypes.POIFilter, queryEmbedding []float32, semanticWeight float64) ([]locitypes.POIDetailedInfo, error)
 	UpdatePOIEmbedding(ctx context.Context, poiID uuid.UUID, embedding []float32) error
 	GetPOIsWithoutEmbeddings(ctx context.Context, limit int) ([]locitypes.POIDetailedInfo, error)
+	POIIDsMissingEmbeddings(ctx context.Context, poiIDs []uuid.UUID) ([]uuid.UUID, error)
 
 	// Hotels
 	FindHotelDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64) ([]locitypes.HotelDetailedInfo, error)
