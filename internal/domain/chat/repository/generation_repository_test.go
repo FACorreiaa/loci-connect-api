@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -287,5 +288,29 @@ func TestDeleteExpiredGenerations(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A conflict means the same inputs were generated again — the previous row
+// expired, or two misses raced. The newer answer replaces the old one, so the
+// hit counters have to start over with it: leaving them behind attributes one
+// response's reuse to a different response, and the sweep's "least used" view
+// of the table becomes fiction.
+func TestPutGenerationResetsTheCountersOnConflict(t *testing.T) {
+	for _, want := range []string{"hit_count = 0", "last_hit_at = NULL"} {
+		if !strings.Contains(putGenerationQuery, want) {
+			t.Fatalf("upsert does not reset the counters: %q missing from\n%s", want, putGenerationQuery)
+		}
+	}
+}
+
+// The read path is the only thing that raises the counter, and only for a row
+// that is still live.
+func TestGetGenerationCountsOnlyLiveHits(t *testing.T) {
+	if !strings.Contains(getGenerationQuery, "hit_count = hit_count + 1") {
+		t.Fatal("read path does not count the hit")
+	}
+	if !strings.Contains(getGenerationQuery, "expires_at > NOW()") {
+		t.Fatal("read path would count a hit on an expired row")
 	}
 }

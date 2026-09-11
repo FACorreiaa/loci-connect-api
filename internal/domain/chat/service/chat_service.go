@@ -288,7 +288,15 @@ func (l *ServiceImpl) SetGenerationStore(s repository.GenerationStore) {
 	if l == nil || s == nil {
 		return
 	}
+	// Second and later calls only swap the store. The sweep is a process-wide
+	// ticker with no stop channel, so starting one per call would leak a
+	// goroutine every time — which a test that builds two services, or any
+	// future re-wiring, would do silently.
+	alreadyRunning := l.generations != nil
 	l.generations = s
+	if alreadyRunning {
+		return
+	}
 
 	logger := l.logger
 	concurrency.Run(logger, func() {

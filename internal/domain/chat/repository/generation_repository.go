@@ -71,7 +71,9 @@ const putGenerationQuery = `
 			tokens_in = EXCLUDED.tokens_in,
 			tokens_out = EXCLUDED.tokens_out,
 			created_at = NOW(),
-			expires_at = EXCLUDED.expires_at`
+			expires_at = EXCLUDED.expires_at,
+			hit_count = 0,
+			last_hit_at = NULL`
 
 const purgeGenerationsByCityQuery = `DELETE FROM llm_generations WHERE city = $1`
 
