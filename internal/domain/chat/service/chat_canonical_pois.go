@@ -57,6 +57,14 @@ func canonicalizePOIsWithDependencies(
 		}
 		if existing != nil && existing.ID != uuid.Nil {
 			candidate.ID = existing.ID
+			// Adopt the stored pin as well as the identity. The row's location
+			// came from PostGIS; the candidate's came from the model, which
+			// guesses coordinates freely. Keeping the guess here would hand a
+			// map link the wrong place for a POI we actually know.
+			if existing.Latitude != 0 || existing.Longitude != 0 {
+				candidate.Latitude = existing.Latitude
+				candidate.Longitude = existing.Longitude
+			}
 			continue
 		}
 

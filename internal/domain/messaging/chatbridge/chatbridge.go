@@ -251,6 +251,28 @@ func writePOIs(b *strings.Builder, pois []locitypes.POIDetailedInfo) {
 			b.WriteString("\n  ")
 			b.WriteString(detail)
 		}
+		if link := mapLink(poi); link != "" {
+			b.WriteString("\n  ")
+			b.WriteString(link)
+		}
 		b.WriteString("\n")
 	}
+}
+
+// mapLink returns a maps URL for a place, or "" when we do not know where it is.
+//
+// Only coordinates resolved from the database earn a link. A grounded place
+// carries the row's own pin (see resolvePacketPOIs); an ungrounded one carries
+// whatever the model guessed, and a link built on a guess sends a traveller to
+// the wrong street with full confidence. No link is the honest answer there.
+//
+// One link, not two: replies are split at Telegram's limit and the parts are
+// sent back to back with no pacing, so every extra line is a real cost. Google
+// Maps opens in the browser or the app on every platform, including iOS.
+func mapLink(poi locitypes.POIDetailedInfo) string {
+	if !poi.Grounded || (poi.Latitude == 0 && poi.Longitude == 0) {
+		return ""
+	}
+	return fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%.6f,%.6f",
+		poi.Latitude, poi.Longitude)
 }

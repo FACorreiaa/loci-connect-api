@@ -26,6 +26,7 @@ const (
 	RunPOIEmbeddings  RunKind = "poi_embeddings"
 	RunCityEmbeddings RunKind = "city_embeddings"
 	RunPreferenceRank RunKind = "preference_rerank"
+	RunPOIImages      RunKind = "poi_images"
 )
 
 // Recorder writes run records. A job that cannot record must still run: losing

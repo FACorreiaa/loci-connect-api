@@ -52,34 +52,39 @@ type POIFilters struct {
 // }
 
 type POIDetailedInfo struct {
-	ID               uuid.UUID         `json:"id,omitempty"`
-	City             string            `json:"city"`
-	CityID           uuid.UUID         `json:"city_id"`
-	Name             string            `json:"name"`
-	DescriptionPOI   string            `json:"description_poi,omitempty"`
-	Distance         float64           `json:"distance"`
-	Latitude         float64           `json:"latitude,omitempty"`
-	Longitude        float64           `json:"longitude,omitempty"`
-	Category         string            `json:"category"`
-	Description      string            `json:"description"`
-	Rating           float64           `json:"rating"`
-	Address          string            `json:"address"`
-	PhoneNumber      string            `json:"phone_number"`
-	Website          string            `json:"website"`
-	OpeningHours     map[string]string `json:"opening_hours"`
-	Images           []string          `json:"images,omitempty"`
-	PriceRange       string            `json:"price_range"`
-	PriceLevel       string            `json:"price_level"`
-	Reviews          []string          `json:"reviews"`
-	LlmInteractionID uuid.UUID         `json:"llm_interaction_id"`
-	Tags             []string          `json:"tags,omitempty"`
-	Priority         int               `json:"priority,omitempty"` // Popularity score 1-10
-	CreatedAt        time.Time         `json:"created_at"`
-	CuisineType      string            `json:"cuisine_type,omitempty"` // For restaurants
-	StarRating       string            `json:"star_rating,omitempty"`  // For hotels
-	Amenities        string            `json:"amenities"`
-	Err              error             `json:"-"`
-	Source           string            `json:"source,omitempty"` // Source of the POI data (e.g., "google", "yelp", etc.)
+	ID             uuid.UUID         `json:"id,omitempty"`
+	City           string            `json:"city"`
+	CityID         uuid.UUID         `json:"city_id"`
+	Name           string            `json:"name"`
+	DescriptionPOI string            `json:"description_poi,omitempty"`
+	Distance       float64           `json:"distance"`
+	Latitude       float64           `json:"latitude,omitempty"`
+	Longitude      float64           `json:"longitude,omitempty"`
+	Category       string            `json:"category"`
+	Description    string            `json:"description"`
+	Rating         float64           `json:"rating"`
+	Address        string            `json:"address"`
+	PhoneNumber    string            `json:"phone_number"`
+	Website        string            `json:"website"`
+	OpeningHours   map[string]string `json:"opening_hours"`
+	Images         []string          `json:"images,omitempty"`
+	// ImageCredits carries the same pictures with the licence and author they
+	// cannot legally be shown without. Images alone is kept for the surfaces
+	// that already read it; anything that renders a picture to a person needs
+	// this one.
+	ImageCredits     []POIImage `json:"image_credits,omitempty"`
+	PriceRange       string     `json:"price_range"`
+	PriceLevel       string     `json:"price_level"`
+	Reviews          []string   `json:"reviews"`
+	LlmInteractionID uuid.UUID  `json:"llm_interaction_id"`
+	Tags             []string   `json:"tags,omitempty"`
+	Priority         int        `json:"priority,omitempty"` // Popularity score 1-10
+	CreatedAt        time.Time  `json:"created_at"`
+	CuisineType      string     `json:"cuisine_type,omitempty"` // For restaurants
+	StarRating       string     `json:"star_rating,omitempty"`  // For hotels
+	Amenities        string     `json:"amenities"`
+	Err              error      `json:"-"`
+	Source           string     `json:"source,omitempty"` // Source of the POI data (e.g., "google", "yelp", etc.)
 
 	// SimilarityScore is cosine similarity against the query embedding, in
 	// [0,1], and RelevanceScore is the fused rank score from hybrid search.
@@ -220,4 +225,20 @@ func TrustSignals(p POIDetailedInfo) (uncertaintyScore float64, missing []string
 		rationale = "A " + p.Category + " matching your preferences."
 	}
 	return uncertaintyScore, missing, rationale
+}
+
+// POIImage is one picture of a place, with the credit it must be shown with.
+//
+// Wikimedia Commons content is CC BY-SA and similar: displaying the image
+// without naming its author and licence breaches the terms it was offered
+// under. Licence and Attribution are therefore not optional — storage rejects a
+// blank one (migration 0085) and the proto requires both.
+type POIImage struct {
+	POIID         uuid.UUID `json:"poi_id"`
+	URL           string    `json:"url"`
+	Source        string    `json:"source"`
+	Licence       string    `json:"licence"`
+	Attribution   string    `json:"attribution"`
+	SourcePageURL string    `json:"source_page_url,omitempty"`
+	Position      int       `json:"position"`
 }

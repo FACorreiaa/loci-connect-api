@@ -472,6 +472,35 @@ func (m *MockPOIRepository) RemoveLLMPoiFromFavouriteByName(ctx context.Context,
 	return args.Error(0)
 }
 
+func (m *MockPOIRepository) POIsWithoutImages(ctx context.Context, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error) {
+	args := m.Called(ctx, cityID, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.POIDetailedInfo), args.Error(1)
+}
+
+func (m *MockPOIRepository) SavePOIImages(ctx context.Context, images []POIImage) error {
+	args := m.Called(ctx, images)
+	return args.Error(0)
+}
+
+func (m *MockPOIRepository) ImagesForPOI(ctx context.Context, poiID uuid.UUID) ([]POIImage, error) {
+	args := m.Called(ctx, poiID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]POIImage), args.Error(1)
+}
+
+func (m *MockPOIRepository) ImagesForPOIs(ctx context.Context, poiIDs []uuid.UUID) (map[uuid.UUID][]POIImage, error) {
+	args := m.Called(ctx, poiIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[uuid.UUID][]POIImage), args.Error(1)
+}
+
 // Helper to setup service with mock repository
 func setupPOIServiceTest() (*ServiceImpl, *MockPOIRepository, *MockCityRepository) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})) // or io.Discard

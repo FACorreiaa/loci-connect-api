@@ -326,3 +326,20 @@ func TestStripCitationReturnsTheNameAndTheID(t *testing.T) {
 		})
 	}
 }
+
+func TestFindReturnsTheEvidenceBehindAnID(t *testing.T) {
+	id := uuid.New()
+	packet := &ContextPacket{Evidence: []Evidence{{POIID: id, Name: "Blandy's", Latitude: 32.6475}}}
+
+	got, ok := packet.Find(id)
+	if !ok || got.Latitude != 32.6475 {
+		t.Errorf("a known id should return its row: %+v ok=%v", got, ok)
+	}
+	if _, ok := packet.Find(uuid.New()); ok {
+		t.Error("an unknown id should not resolve")
+	}
+	var nilPacket *ContextPacket
+	if _, ok := nilPacket.Find(id); ok {
+		t.Error("a nil packet resolves nothing")
+	}
+}

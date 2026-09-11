@@ -320,3 +320,26 @@ func TestACitationIsNotShownToTheReader(t *testing.T) {
 		t.Errorf("a cited place in both lists should be sent once:\n%s", got)
 	}
 }
+
+func TestOnlyAGroundedPlaceGetsAMapLink(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{
+				{Name: "Cabo Girão", Grounded: true, Latitude: 32.6325, Longitude: -17.0015, Distance: 0.5},
+				{Name: "Somewhere Imagined", Latitude: 12.3, Longitude: 4.5, Distance: 1.0},
+			},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "google.com/maps/search/?api=1&query=32.632500,-17.001500") {
+		t.Errorf("a grounded place should carry its pin:\n%s", got)
+	}
+	if strings.Contains(got, "12.3") {
+		t.Errorf("an ungrounded place must not be linked by a guessed coordinate:\n%s", got)
+	}
+	if strings.Count(got, "google.com/maps") != 1 {
+		t.Errorf("exactly one link expected:\n%s", got)
+	}
+}
