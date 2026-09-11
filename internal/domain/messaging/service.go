@@ -32,7 +32,25 @@ type InboundMessage struct {
 	// DisplayName is how the sender is addressed there, for the settings page.
 	DisplayName string
 	Text        string
+
+	// Audio is a recording waiting to be understood, or nil for an ordinary
+	// message.
+	//
+	// A function rather than the bytes, and rather than a transcript already
+	// taken, because fetching and transcribing one costs money and anybody can
+	// message a bot. Taking the transcript before the chat is known would let
+	// a stranger with no account spend the owner's credits a minute of audio
+	// at a time. So this is called only once the chat has been resolved to an
+	// account and that account's quota has covered it.
+	//
+	// It returns an empty transcript with no error when there was no speech in
+	// the recording, which is an ordinary outcome — a pocket, or a minute of
+	// traffic noise — rather than a failure.
+	Audio func(context.Context) (string, error)
 }
+
+// SpokenBy reports whether this message was spoken rather than typed.
+func (m InboundMessage) SpokenBy() bool { return m.Audio != nil }
 
 // OutboundMessage is the reply.
 type OutboundMessage struct {
@@ -40,6 +58,16 @@ type OutboundMessage struct {
 	// Silent suppresses the reply entirely. Used where answering would be
 	// noise — a message this deployment has already handled.
 	Silent bool
+
+	// Speak is what to say aloud, for a platform that can and a sender who
+	// used their voice.
+	//
+	// Empty means "work it out from Text", which costs a model call. The
+	// service fills this in for the replies it writes itself — they are
+	// already a sentence or two, and shortening a sentence into a sentence is
+	// a call spent on nothing — and leaves it empty only for an answer it did
+	// not write.
+	Speak string
 }
 
 // Answerer turns a question from a linked account into an answer.
@@ -154,12 +182,22 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 	// Only recognised commands are intercepted. "/lisbon in march" is a
 	// question with a slash in front of it, and answering it is friendlier
 	// than refusing it over punctuation.
-	if cmd, arg := parseCommand(text); cmd != cmdNone && cmd != cmdUnknown {
-		return s.handleCommand(ctx, in, link, cmd, arg)
-	}
+	//
+	// A recording cannot be one: nobody says "slash help", so a transcript
+	// never carries the slash this matches on. The transcript is also what
+	// would tell us it said "help", and taking it is the expense — there is no
+	// order of operations that makes a spoken command free.
+	if !in.SpokenBy() {
+		if cmd, arg := parseCommand(text); cmd != cmdNone && cmd != cmdUnknown {
+			return s.handleCommand(ctx, in, link, cmd, arg)
+		}
 
-	if text == "" {
-		return OutboundMessage{Text: "Send me a place and I will plan something. Try \"three days in Lisbon\"."}, nil
+		if text == "" {
+			return OutboundMessage{
+				Text:  "Send me a place and I will plan something. Try \"three days in Lisbon\".",
+				Speak: "Send me a place and I will plan something.",
+			}, nil
+		}
 	}
 
 	if err := s.repo.TouchLink(ctx, in.Platform, in.ChatID, in.DisplayName); err != nil {
@@ -173,7 +211,32 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 	}
 
 	if s.answerer == nil {
-		return OutboundMessage{Text: "I cannot answer right now. Try again shortly."}, nil
+		return OutboundMessage{
+			Text:  "I cannot answer right now. Try again shortly.",
+			Speak: "I cannot answer right now. Try again shortly.",
+		}, nil
+	}
+
+	// Only now, with the chat resolved and the request paid for, is the
+	// recording worth fetching.
+	if in.SpokenBy() {
+		spoken, err := in.Audio(ctx)
+		switch {
+		case err != nil:
+			s.logger.ErrorContext(ctx, "could not understand a recording",
+				slog.String("user_id", link.UserID.String()),
+				slog.String("error", err.Error()))
+			return OutboundMessage{
+				Text:  "I could not make that out. Try again, or type it.",
+				Speak: "I could not make that out. Try again, or type it.",
+			}, nil
+		case strings.TrimSpace(spoken) == "":
+			return OutboundMessage{
+				Text:  "I could not hear anything in that.",
+				Speak: "I could not hear anything in that.",
+			}, nil
+		}
+		text = strings.TrimSpace(spoken)
 	}
 
 	answer, err := s.answerer.Answer(ctx, link.UserID, link.Email, text)
@@ -183,7 +246,10 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 			slog.String("error", err.Error()))
 		// The upstream error is not repeated to the chat: it can name models,
 		// providers and internal paths, none of which the sender can act on.
-		return OutboundMessage{Text: "Something went wrong working that out. Try again in a moment."}, nil
+		return OutboundMessage{
+			Text:  "Something went wrong working that out. Try again in a moment.",
+			Speak: "Something went wrong working that out. Try again in a moment.",
+		}, nil
 	}
 	return OutboundMessage{Text: answer}, nil
 }
@@ -212,6 +278,7 @@ func (s *Service) spendQuota(ctx context.Context, link Link) (OutboundMessage, b
 		return OutboundMessage{
 			Text: "That is today's requests used up on your plan. They reset at midnight UTC — " +
 				"or open Loci under Settings › Plan to lift the limit.",
+			Speak: "That is today's requests used up on your plan. They reset at midnight.",
 		}, false
 
 	default:
@@ -221,7 +288,10 @@ func (s *Service) spendQuota(ctx context.Context, link Link) (OutboundMessage, b
 		s.logger.ErrorContext(ctx, "could not meter a chat message",
 			slog.String("user_id", link.UserID.String()),
 			slog.String("error", err.Error()))
-		return OutboundMessage{Text: "Something went wrong checking your plan. Try again in a moment."}, false
+		return OutboundMessage{
+			Text:  "Something went wrong checking your plan. Try again in a moment.",
+			Speak: "Something went wrong checking your plan. Try again in a moment.",
+		}, false
 	}
 }
 
@@ -244,7 +314,10 @@ func (s *Service) handleUnlinked(ctx context.Context, in InboundMessage, text st
 		link, err := s.repo.RedeemCode(ctx, in.Platform, in.ChatID, in.DisplayName, HashCode(code), s.now())
 		switch {
 		case errors.Is(err, ErrBadCode):
-			return OutboundMessage{Text: "That code has expired or was already used. Create a new one in Loci under Settings › Connections."}, nil
+			return OutboundMessage{
+				Text:  "That code has expired or was already used. Create a new one in Loci under Settings › Connections.",
+				Speak: "That code has expired or was already used. Create a new one in Loci, under Settings and Connections.",
+			}, nil
 		case err != nil:
 			return OutboundMessage{}, err
 		}
@@ -252,10 +325,20 @@ func (s *Service) handleUnlinked(ctx context.Context, in InboundMessage, text st
 		s.logger.InfoContext(ctx, "chat linked",
 			slog.String("platform", in.Platform),
 			slog.String("user_id", link.UserID.String()))
-		return OutboundMessage{Text: "Linked. Ask me for an itinerary — try \"three days in Lisbon\" — and it will carry on in the Loci app."}, nil
+		return OutboundMessage{
+			Text:  "Linked. Ask me for an itinerary — try \"three days in Lisbon\" — and it will carry on in the Loci app.",
+			Speak: "Linked. Ask me for an itinerary, and it will carry on in the Loci app.",
+		}, nil
 	}
 
-	return OutboundMessage{Text: "This chat is not linked to a Loci account yet. Open Loci, go to Settings › Connections, and send me the code it gives you."}, nil
+	// A recording gets the same instruction and is never transcribed. There is
+	// nobody to charge it to, and a code cannot be spoken anyway: a transcript
+	// of "A3F9C1D2" read aloud is "a three F nine see one D two", in some
+	// spelling that cannot be normalised back.
+	return OutboundMessage{
+		Text:  "This chat is not linked to a Loci account yet. Open Loci, go to Settings › Connections, and send me the code it gives you.",
+		Speak: "This chat is not linked to a Loci account yet. Open Loci, go to Settings and Connections, and send me the code it gives you.",
+	}, nil
 }
 
 // handleCommand runs a command from a linked chat.
@@ -266,10 +349,13 @@ func (s *Service) handleUnlinked(ctx context.Context, in InboundMessage, text st
 func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Link, cmd command, _ string) (OutboundMessage, error) {
 	switch cmd {
 	case cmdStart:
-		return OutboundMessage{Text: "You are already linked. Ask me for an itinerary — try \"a weekend in Porto\"."}, nil
+		return OutboundMessage{
+			Text:  "You are already linked. Ask me for an itinerary — try \"a weekend in Porto\".",
+			Speak: "You are already linked. Ask me for an itinerary — try a weekend in Porto.",
+		}, nil
 
 	case cmdHelp:
-		return OutboundMessage{Text: strings.Join([]string{
+		return OutboundMessage{Speak: "Ask me for an itinerary in plain language. What you ask here and what you ask in the Loci app are the same conversation.", Text: strings.Join([]string{
 			"Ask me for an itinerary in plain language — \"three days in Lisbon, we like food and old buildings\".",
 			"",
 			"What you ask here and what you ask in the Loci app are the same conversation.",
@@ -284,7 +370,10 @@ func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Lin
 		s.logger.InfoContext(ctx, "chat unlinked",
 			slog.String("platform", in.Platform),
 			slog.String("user_id", link.UserID.String()))
-		return OutboundMessage{Text: "Disconnected. Your trips and history are untouched — only this chat was unlinked."}, nil
+		return OutboundMessage{
+			Text:  "Disconnected. Your trips and history are untouched — only this chat was unlinked.",
+			Speak: "Disconnected. Your trips and history are untouched — only this chat was unlinked.",
+		}, nil
 
 	default:
 		// Unreachable: Handle does not route unrecognised commands here, so

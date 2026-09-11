@@ -65,6 +65,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
+	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/google/uuid"
 )
@@ -116,6 +117,9 @@ type Dependencies struct {
 	Integrations *integrations.Service
 	// Messaging is nil when no chat platform is configured.
 	Messaging *messaging.Service
+	// Speech is nil when no credential is configured, which is a supported
+	// state: the bot answers text and ignores recordings.
+	Speech *speech.Client
 	// telegramClient is built once with the service, so the poller and the
 	// webhook — whichever mode runs — share one client and one token.
 	telegramClient *telegram.Client
@@ -405,6 +409,7 @@ func (d *Dependencies) initServices() error {
 	// After SubscriptionService, not before: a message answered over Telegram
 	// now costs the sender a request the same way asking in the app does, and
 	// the bridge cannot meter what does not exist yet.
+	d.initSpeech()
 	d.initMessaging()
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
@@ -492,6 +497,24 @@ func (d *Dependencies) initIntegrations() {
 	)
 }
 
+// initSpeech wires transcription and synthesis.
+//
+// Separate from the bridge, and built before it, because they are independent:
+// the web app can dictate into its own chat box with no bot configured at all,
+// and the bot answers text with no speech credential. Tying the two together
+// would make either one silently need the other.
+func (d *Dependencies) initSpeech() {
+	client, err := speech.New(context.Background(), d.Config.Voice, d.Logger)
+	if err != nil {
+		// Not fatal. Speech is additive everywhere it is used: the bot answers
+		// text without it and the web app hides its microphone.
+		d.Logger.Warn("speech is unavailable; recordings will not be understood",
+			slog.String("error", err.Error()))
+		return
+	}
+	d.Speech = client
+}
+
 // initMessaging wires the chat-platform bridge.
 //
 // Absence of a bot token is a supported state and disables the bridge, so the
@@ -524,6 +547,9 @@ func (d *Dependencies) TelegramWebhook() http.Handler {
 		d.Config.Voice.MaxConcurrentUpdates, d.Logger)
 	if hook == nil {
 		return nil
+	}
+	if d.Speech != nil {
+		hook = hook.WithVoice(d.Speech, d.voiceOptions())
 	}
 	return hook
 }
@@ -562,7 +588,21 @@ func (d *Dependencies) RunTelegram(ctx context.Context) error {
 		d.Messaging,
 		d.Logger,
 	)
+	if d.Speech != nil {
+		poller = poller.WithVoice(d.Speech, d.voiceOptions())
+	}
 	return poller.Run(ctx)
+}
+
+// voiceOptions are the limits the adapter holds a recording to.
+func (d *Dependencies) voiceOptions() telegram.VoiceOptions {
+	return telegram.VoiceOptions{
+		MaxDuration:       d.Config.Voice.MaxDuration,
+		MaxVideoDuration:  d.Config.Voice.MaxVideoDuration,
+		MaxBytes:          d.Config.Voice.MaxBytes,
+		RepliesEnabled:    d.Config.Voice.RepliesEnabled,
+		VideoNotesEnabled: d.Config.Voice.VideoNotesEnabled,
+	}
 }
 
 // byokWrapper returns the wrapper that lets a request be served by its

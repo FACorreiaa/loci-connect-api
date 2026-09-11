@@ -47,6 +47,15 @@ func NewPoller(client *Client, repo messaging.Repository, handler Handler, logge
 	}
 }
 
+// WithVoice lets the poller hear recordings and say replies.
+//
+// A builder rather than a constructor argument, so a deployment with no speech
+// configured builds the poller exactly as it always did.
+func (p *Poller) WithVoice(voice Voice, opts VoiceOptions) *Poller {
+	p.bridge = p.bridge.withVoice(voice, opts)
+	return p
+}
+
 // Run receives and answers updates until ctx is cancelled.
 //
 // Returns nil on cancellation: a bot told to stop has not failed.

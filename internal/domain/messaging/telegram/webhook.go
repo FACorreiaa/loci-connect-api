@@ -64,6 +64,15 @@ func NewWebhook(client *Client, handler Handler, secret string, concurrency int,
 // says otherwise.
 const defaultConcurrency = 4
 
+// WithVoice lets the webhook hear recordings and say replies.
+func (h *Webhook) WithVoice(voice Voice, opts VoiceOptions) *Webhook {
+	if h == nil {
+		return nil
+	}
+	h.bridge = h.bridge.withVoice(voice, opts)
+	return h
+}
+
 func (h *Webhook) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

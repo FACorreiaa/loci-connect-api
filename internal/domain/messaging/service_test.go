@@ -530,3 +530,182 @@ func TestWithoutAQuotaNothingIsMetered(t *testing.T) {
 		t.Errorf("the answerer ran %d times, want once", answerer.calls)
 	}
 }
+
+// spokenBy builds an inbound recording whose transcript is text, recording
+// whether it was ever asked for.
+func spokenBy(text string, err error) (InboundMessage, *bool) {
+	asked := new(bool)
+	return InboundMessage{
+		Platform: PlatformTelegram, ChatID: "555", DisplayName: "Fernando",
+		Audio: func(context.Context) (string, error) {
+			*asked = true
+			return text, err
+		},
+	}, asked
+}
+
+// The hole this closes: anybody can message a bot. Fetching and transcribing a
+// recording costs money, so a chat with no account behind it must not be able
+// to start that — otherwise a stranger spends the owner's credits a minute of
+// audio at a time, which is worse than the metering gap it would be working
+// around.
+func TestAnUnlinkedChatIsNeverTranscribed(t *testing.T) {
+	svc, _, answerer, quota := newMeteredService(t)
+	in, asked := spokenBy("three days in Lisbon", nil)
+
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if *asked {
+		t.Error("a recording from an unlinked chat was transcribed")
+	}
+	if quota.calls != 0 {
+		t.Error("an unlinked chat spent somebody's quota")
+	}
+	if answerer.calls != 0 {
+		t.Error("an unlinked chat reached the model")
+	}
+	if !strings.Contains(out.Text, "not linked") {
+		t.Errorf("the reply should explain how to link: %q", out.Text)
+	}
+}
+
+func TestARecordingIsPaidForBeforeItIsFetched(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	linkChat(t, repo, "555")
+	quota.err = &subscription.QuotaExceededError{Plan: "free", Limit: 10}
+
+	in, asked := spokenBy("three days in Lisbon", nil)
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	// Out of quota costs nothing: no download, no transcription, no model.
+	if *asked {
+		t.Error("a recording was fetched for an account with no requests left")
+	}
+	if answerer.calls != 0 {
+		t.Error("the model ran for an account with no requests left")
+	}
+	if !strings.Contains(out.Text, "reset") {
+		t.Errorf("the refusal should say when the limit lifts: %q", out.Text)
+	}
+}
+
+func TestARecordingIsAnsweredAsThoughItWereTyped(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	userID := linkChat(t, repo, "555")
+
+	in, asked := spokenBy("  three days in Lisbon  ", nil)
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if !*asked {
+		t.Fatal("the recording was never transcribed")
+	}
+	if quota.calls != 1 {
+		t.Errorf("quota consumed %d times, want once", quota.calls)
+	}
+	if answerer.calls != 1 {
+		t.Fatalf("the model ran %d times", answerer.calls)
+	}
+	// Same session, same account, same everything as typing it would be.
+	if answerer.lastID != userID {
+		t.Errorf("answered as %s, want the linked owner %s", answerer.lastID, userID)
+	}
+	if answerer.last != "three days in Lisbon" {
+		t.Errorf("the model saw %q, want the trimmed transcript", answerer.last)
+	}
+	if out.Text != "here is a plan" {
+		t.Errorf("reply = %q", out.Text)
+	}
+}
+
+func TestSilenceAndFailureAreToldApart(t *testing.T) {
+	t.Run("nothing was said", func(t *testing.T) {
+		svc, repo, answerer, _ := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		in, _ := spokenBy("   ", nil)
+		out, err := svc.Handle(t.Context(), in)
+		if err != nil {
+			t.Fatalf("handle: %v", err)
+		}
+		if answerer.calls != 0 {
+			t.Error("an empty transcript still reached the model")
+		}
+		if !strings.Contains(out.Text, "hear anything") {
+			t.Errorf("reply = %q, want it to say nothing was heard", out.Text)
+		}
+	})
+
+	t.Run("it could not be understood", func(t *testing.T) {
+		svc, repo, answerer, _ := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		in, _ := spokenBy("", errors.New("the provider went away"))
+		out, err := svc.Handle(t.Context(), in)
+		if err != nil {
+			t.Fatalf("handle: %v", err)
+		}
+		if answerer.calls != 0 {
+			t.Error("a failed transcription still reached the model")
+		}
+		// Different advice: silence means speak again, a failure means the
+		// keyboard is the way through.
+		if !strings.Contains(out.Text, "type it") {
+			t.Errorf("reply = %q, want it to offer typing instead", out.Text)
+		}
+	})
+}
+
+// Nobody says "slash help", so a transcript never carries the slash
+// parseCommand matches on. Running commands over a transcript would only make
+// "help" land as an unanswerable question.
+func TestASpokenMessageIsNotTreatedAsACommand(t *testing.T) {
+	svc, repo, answerer, _ := newMeteredService(t)
+	linkChat(t, repo, "555")
+
+	in, _ := spokenBy("/unlink", nil)
+	if _, err := svc.Handle(t.Context(), in); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if answerer.calls != 1 {
+		t.Errorf("the model ran %d times, want the transcript answered as a question", answerer.calls)
+	}
+	if _, err := repo.LinkForChat(t.Context(), PlatformTelegram, "555"); err != nil {
+		t.Error("a spoken \"/unlink\" disconnected the chat")
+	}
+}
+
+// The service writes several replies itself. They are already a sentence or
+// two, so shortening them would be a model call spent on nothing.
+func TestTheServicesOwnRepliesCarryTheirSpokenForm(t *testing.T) {
+	svc, repo, _, _ := newMeteredService(t)
+	linkChat(t, repo, "555")
+
+	for _, tt := range []struct {
+		name string
+		send func() OutboundMessage
+	}{
+		{"help", func() OutboundMessage { return send(t, svc, "555", "/help") }},
+		{"not linked", func() OutboundMessage { return send(t, svc, "999", "hello?") }},
+		{"nothing heard", func() OutboundMessage {
+			in, _ := spokenBy("", nil)
+			out, _ := svc.Handle(t.Context(), in)
+			return out
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			if out := tt.send(); out.Speak == "" {
+				t.Errorf("%q has no spoken form", out.Text)
+			}
+		})
+	}
+}

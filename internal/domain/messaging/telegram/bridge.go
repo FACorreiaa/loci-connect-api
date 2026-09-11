@@ -3,6 +3,8 @@ package telegram
 import (
 	"context"
 	"log/slog"
+	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -10,33 +12,34 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 )
 
-// answerTimeout bounds the work done for a single message.
+// The budget for one update.
 //
-// Generous, because planning an itinerary is slow, but bounded: without it one
-// stuck generation would hold the poll loop forever and the bot would go silent
-// with nothing in the logs to say why.
-const answerTimeout = 3 * time.Minute
+// One deadline for the whole thing used to be enough, when the whole thing was
+// a generation. A recording adds a fetch, a transcription and — after the
+// answer has already been sent — a synthesis and an upload, and a single
+// deadline over all of it either strangles the generation or lets a stuck
+// fetch hold everything. So each leg bounds itself, and updateTimeout is the
+// backstop: without it a wedged leg holds one of four in-flight slots forever,
+// which is a quarter of the bot.
+const (
+	updateTimeout = 6 * time.Minute
 
-// Handler answers an inbound message. Satisfied by messaging.Service.
-type Handler interface {
-	Handle(ctx context.Context, in messaging.InboundMessage) (messaging.OutboundMessage, error)
-}
+	getFileTimeout    = 10 * time.Second
+	downloadTimeout   = 30 * time.Second
+	transcribeTimeout = 60 * time.Second
 
-// bridge turns one Telegram update into a reply.
-//
-// Shared by the poller and the webhook so the two delivery modes answer a
-// message identically — same timeout, same typing indicator, same generic
-// error reply. How an update arrives is the only thing that differs.
-type bridge struct {
-	client  *Client
-	handler Handler
-	logger  *slog.Logger
+	// answerTimeout bounds working out the answer itself.
+	//
+	// Unchanged, and deliberately: planning an itinerary is slow, three
+	// minutes is what that was measured against, and nothing about a typed
+	// message should behave differently now.
+	answerTimeout = 3 * time.Minute
 
-	// perChat rations what one conversation can ask for. The daily quota is a
-	// counter and says nothing about a burst; this is what keeps one sender
-	// from spending everybody else's capacity in ten seconds.
-	perChat *chatLimiter
-}
+	shortenTimeout    = 20 * time.Second
+	synthesiseTimeout = 45 * time.Second
+	encodeTimeout     = 15 * time.Second
+	sendTimeout       = 45 * time.Second
+)
 
 // chatBurst is how many answers one chat may ask for at once.
 //
@@ -49,6 +52,58 @@ const chatBurst = 3
 // because rate.Every is a function call.
 var chatEvery = rate.Every(10 * time.Second)
 
+// maxEchoChars caps the transcript echoed back before the answer.
+//
+// The echo is a check on what was heard, not a transcript service, and a
+// rambling minute should not fill the screen before the plan arrives.
+const maxEchoChars = 300
+
+// Handler answers an inbound message. Satisfied by messaging.Service.
+type Handler interface {
+	Handle(ctx context.Context, in messaging.InboundMessage) (messaging.OutboundMessage, error)
+}
+
+// Voice is the part of the speech client this adapter uses.
+//
+// An interface here rather than a dependency on the speech package, so the
+// adapter states what it needs and its tests do not need a provider. Nil means
+// the deployment has no speech configured, and recordings are refused politely
+// instead of being ignored.
+type Voice interface {
+	Transcribe(ctx context.Context, audio []byte, mimeType string) (string, error)
+	Shorten(ctx context.Context, text string) (string, error)
+	Say(ctx context.Context, text string, encodeTimeout time.Duration) ([]byte, error)
+	CanSpeak() bool
+}
+
+// VoiceOptions are the limits a recording is held to.
+type VoiceOptions struct {
+	MaxDuration       time.Duration
+	MaxVideoDuration  time.Duration
+	MaxBytes          int64
+	RepliesEnabled    bool
+	VideoNotesEnabled bool
+}
+
+// bridge turns one Telegram update into a reply.
+//
+// Shared by the poller and the webhook so the two delivery modes answer a
+// message identically — same timeouts, same typing indicator, same generic
+// error reply. How an update arrives is the only thing that differs.
+type bridge struct {
+	client  *Client
+	handler Handler
+	logger  *slog.Logger
+
+	voice     Voice
+	voiceOpts VoiceOptions
+
+	// perChat rations what one conversation can ask for. The daily quota is a
+	// counter and says nothing about a burst; this is what keeps one sender
+	// from spending everybody else's capacity in ten seconds.
+	perChat *chatLimiter
+}
+
 func newBridge(client *Client, handler Handler, logger *slog.Logger) bridge {
 	return bridge{
 		client:  client,
@@ -58,31 +113,16 @@ func newBridge(client *Client, handler Handler, logger *slog.Logger) bridge {
 	}
 }
 
-// busy tells a chat that the bot is at capacity.
-//
-// Separate from answer because nothing about it should be able to take time:
-// it is the reply sent when there is no capacity to work out a real one.
-func (b bridge) busy(ctx context.Context, update Update) {
-	if update.Message == nil {
-		return
+// withVoice returns a bridge that can hear recordings and say replies.
+func (b bridge) withVoice(voice Voice, opts VoiceOptions) bridge {
+	if voice == nil {
+		return b
 	}
-	ctx, cancel := context.WithTimeout(ctx, busyReplyTimeout)
-	defer cancel()
-
-	chatID := chatIDOf(update.Message.Chat.ID)
-	if err := b.client.SendMessage(ctx, chatID, "I have my hands full at the moment. Send that again in a minute."); err != nil {
-		b.logger.ErrorContext(ctx, "could not tell a telegram chat the bot was busy",
-			slog.String("error", err.Error()))
-	}
+	b.voice = voice
+	b.voiceOpts = opts
+	return b
 }
 
-// busyReplyTimeout bounds the one message busy sends.
-const busyReplyTimeout = 15 * time.Second
-
-// handle answers one update.
-//
-// Failures are logged and swallowed: one message that could not be answered
-// must not stop the bot receiving the next.
 // handle answers one update. It never lets a panic escape: the webhook runs
 // it on a detached goroutine, where an unrecovered panic is not a failed
 // request but the whole API process gone — one malformed message from one
@@ -94,33 +134,76 @@ func (b bridge) handle(ctx context.Context, update Update) {
 				slog.Any("panic", r), slog.Int64("update_id", update.UpdateID))
 		}
 	}()
+
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
 	b.answer(ctx, update)
 }
 
+// busy tells a chat that the bot is at capacity.
+//
+// Separate from answer because nothing about it should be able to take time:
+// it is the reply sent when there is no capacity to work out a real one.
+func (b bridge) busy(ctx context.Context, update Update) {
+	if update.Message == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+
+	b.send(ctx, chatIDOf(update.Message.Chat.ID),
+		"I have my hands full at the moment. Send that again in a minute.")
+}
+
 func (b bridge) answer(ctx context.Context, update Update) {
-	if update.Message == nil || update.Message.Text == "" {
-		// Photos, stickers, joins. Nothing to answer.
+	msg := update.Message
+	if msg == nil {
 		return
 	}
 
-	chatID := chatIDOf(update.Message.Chat.ID)
+	chatID := chatIDOf(msg.Chat.ID)
+
+	// A caption is where Telegram puts a note sent with a recording; there is
+	// nothing in Text for those.
+	text := msg.Text
+	if text == "" {
+		text = msg.Caption
+	}
+
+	var clip *Recording
+	if text == "" {
+		var refusal string
+		clip, refusal = b.clipOf(msg)
+		switch {
+		case refusal != "":
+			b.send(ctx, chatID, refusal)
+			return
+		case clip == nil:
+			// Photos, stickers, joins. Nothing to answer.
+			return
+		}
+	}
 
 	if !b.perChat.allow(chatID) {
 		b.logger.InfoContext(ctx, "telegram chat is asking faster than it is answered",
 			slog.String("chat_id", chatID))
-		if err := b.client.SendMessage(ctx, chatID, "That is faster than I can think. Give me a moment and ask again."); err != nil {
-			b.logger.ErrorContext(ctx, "could not tell a telegram chat to slow down",
-				slog.String("error", err.Error()))
-		}
+		b.send(ctx, chatID, "That is faster than I can think. Give me a moment and ask again.")
 		return
 	}
+
 	in := messaging.InboundMessage{
 		Platform: messaging.PlatformTelegram,
 		ChatID:   chatID,
-		Text:     update.Message.Text,
+		Text:     text,
 	}
-	if from := update.Message.From; from != nil {
+	if from := msg.From; from != nil {
 		in.DisplayName = displayNameOf(from.FirstName, from.Username)
+	}
+	if clip != nil {
+		// Passed as a function, not as bytes: fetching and transcribing costs
+		// money, and the service is the only thing that knows whether this
+		// chat belongs to an account that has paid for it.
+		in.Audio = func(ctx context.Context) (string, error) { return b.hear(ctx, chatID, clip) }
 	}
 
 	answerCtx, cancel := context.WithTimeout(ctx, answerTimeout)
@@ -129,7 +212,7 @@ func (b bridge) answer(ctx context.Context, update Update) {
 	// The indicator is refreshed while the answer is being worked out, because
 	// Telegram clears it after a few seconds and an itinerary takes longer than
 	// that — without this the chat looks idle for most of the wait.
-	stopTyping := b.keepTyping(answerCtx, chatID)
+	stopTyping := b.keepAction(answerCtx, chatID, "typing")
 	out, err := b.handler.Handle(answerCtx, in)
 	stopTyping()
 
@@ -145,37 +228,213 @@ func (b bridge) answer(ctx context.Context, update Update) {
 
 	// Sent on ctx rather than answerCtx: the answer is ready, and letting the
 	// generation's deadline cancel its own delivery would waste the work.
-	if err := b.client.SendMessage(ctx, chatID, out.Text); err != nil {
+	sendCtx, cancelSend := context.WithTimeout(ctx, sendTimeout)
+	if err := b.client.SendMessage(sendCtx, chatID, out.Text); err != nil {
 		b.logger.ErrorContext(ctx, "could not send a telegram reply",
+			slog.String("error", err.Error()))
+	}
+	cancelSend()
+
+	// Only after the written answer has landed. Everything below is additive:
+	// if any of it fails the person already has their plan, so it is logged
+	// and swallowed rather than turned into an apology.
+	if clip != nil {
+		b.speak(ctx, chatID, out)
+	}
+}
+
+// clipOf picks the recording out of a message and holds it to its limits.
+//
+// It returns a refusal rather than an error when the recording is one this
+// deployment will not take, because the sender is waiting and "nothing
+// happened" is the worst of the possible answers. Everything is decided from
+// the update itself: refusing a two-minute recording here costs nothing, and
+// refusing it after the download costs a download and a transcription for an
+// answer nobody gets.
+func (b bridge) clipOf(msg *Message) (*Recording, string) {
+	switch {
+	case msg.Voice != nil:
+		if b.voice == nil {
+			return nil, "I cannot listen to recordings right now — type it instead."
+		}
+		return b.withinLimits(msg.Voice, b.voiceOpts.MaxDuration, "voice note")
+
+	case msg.VideoNote != nil:
+		if b.voice == nil {
+			return nil, "I cannot listen to recordings right now — type it instead."
+		}
+		if !b.voiceOpts.VideoNotesEnabled {
+			return nil, "I cannot take video messages. Send it as a voice note and I will listen."
+		}
+		return b.withinLimits(msg.VideoNote, b.voiceOpts.MaxVideoDuration, "video message")
+
+	default:
+		return nil, ""
+	}
+}
+
+func (b bridge) withinLimits(clip *Recording, maxDuration time.Duration, kind string) (*Recording, string) {
+	if maxDuration > 0 && time.Duration(clip.Duration)*time.Second > maxDuration {
+		return nil, "That is a long " + kind + ". Keep it under " +
+			plainDuration(maxDuration) + " and I will catch all of it."
+	}
+	if b.voiceOpts.MaxBytes > 0 && clip.FileSize > b.voiceOpts.MaxBytes {
+		return nil, "That " + kind + " is too big for me to fetch. A shorter one will work."
+	}
+	return clip, ""
+}
+
+// hear fetches a recording and returns what was said.
+//
+// The transcript is echoed back before the answer is worked out. Two reasons:
+// speech recognition mangles place names, and somebody who can see "Alfama"
+// came through as "alarm" knows to say it again rather than waiting out a
+// wrong itinerary. And an itinerary takes minutes, so it is also the only
+// early sign that the recording arrived at all.
+func (b bridge) hear(ctx context.Context, chatID string, clip *Recording) (string, error) {
+	fileCtx, cancel := context.WithTimeout(ctx, getFileTimeout)
+	file, err := b.client.GetFile(fileCtx, clip.FileID)
+	cancel()
+	if err != nil {
+		return "", err
+	}
+
+	limit := b.voiceOpts.MaxBytes
+	if limit <= 0 {
+		limit = defaultMaxBytes
+	}
+	downloadCtx, cancel := context.WithTimeout(ctx, downloadTimeout)
+	audio, err := b.client.Download(downloadCtx, file.FilePath, limit)
+	cancel()
+	if err != nil {
+		return "", err
+	}
+
+	transcribeCtx, cancel := context.WithTimeout(ctx, transcribeTimeout)
+	transcript, err := b.voice.Transcribe(transcribeCtx, audio, mimeTypeOf(clip))
+	cancel()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(transcript) == "" {
+		return "", nil
+	}
+
+	b.send(ctx, chatID, `Heard: "`+truncate(transcript, maxEchoChars)+`"`)
+	return transcript, nil
+}
+
+// speak sends the answer as a voice note, beside the written one.
+//
+// Every failure here is logged and swallowed. The written answer has already
+// arrived, and a synthesis that did not work is not a reason to tell somebody
+// their itinerary failed.
+func (b bridge) speak(ctx context.Context, chatID string, out messaging.OutboundMessage) {
+	if !b.voiceOpts.RepliesEnabled || b.voice == nil || !b.voice.CanSpeak() {
+		return
+	}
+
+	spoken := out.Speak
+	if spoken == "" {
+		// The service writes a spoken form for its own replies. This one is a
+		// generated answer, which is a plan full of addresses and links —
+		// unusable read aloud, so it is reduced to what is worth hearing.
+		shortenCtx, cancel := context.WithTimeout(ctx, shortenTimeout)
+		short, err := b.voice.Shorten(shortenCtx, out.Text)
+		cancel()
+		if err != nil {
+			b.logger.WarnContext(ctx, "could not shorten a reply for speaking",
+				slog.String("error", err.Error()))
+			return
+		}
+		spoken = short
+	}
+
+	// The indicator is the only thing saying this extra wait is deliberate
+	// rather than the bot having stopped.
+	stopRecording := b.keepAction(ctx, chatID, "record_voice")
+	defer stopRecording()
+
+	sayCtx, cancel := context.WithTimeout(ctx, synthesiseTimeout)
+	ogg, err := b.voice.Say(sayCtx, spoken, encodeTimeout)
+	cancel()
+	if err != nil {
+		b.logger.WarnContext(ctx, "could not say a reply aloud",
+			slog.String("error", err.Error()))
+		return
+	}
+	stopRecording()
+
+	sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+	if err := b.client.SendVoice(sendCtx, chatID, ogg, 0, ""); err != nil {
+		b.logger.WarnContext(ctx, "could not send a spoken reply",
 			slog.String("error", err.Error()))
 	}
 }
 
-// keepTyping shows the indicator until the returned function is called.
-func (b bridge) keepTyping(ctx context.Context, chatID string) func() {
-	typingCtx, cancel := context.WithCancel(ctx)
+// send delivers one message, logging rather than returning a failure.
+func (b bridge) send(ctx context.Context, chatID, text string) {
+	if err := b.client.SendMessage(ctx, chatID, text); err != nil {
+		b.logger.ErrorContext(ctx, "could not send a telegram message",
+			slog.String("error", err.Error()))
+	}
+}
+
+// keepAction shows an activity indicator until the returned function is called.
+func (b bridge) keepAction(ctx context.Context, chatID, action string) func() {
+	actionCtx, cancel := context.WithCancel(ctx)
 
 	go func() {
-		// A typing indicator is decoration; a panic in it must not be fatal.
+		// An indicator is decoration; a panic in it must not be fatal.
 		defer func() {
 			if r := recover(); r != nil {
-				b.logger.ErrorContext(ctx, "panic while sending a telegram typing indicator", slog.Any("panic", r))
+				b.logger.ErrorContext(ctx, "panic while sending a telegram activity indicator",
+					slog.Any("panic", r))
 			}
 		}()
 		// Telegram clears the indicator after about five seconds.
 		ticker := time.NewTicker(4 * time.Second)
 		defer ticker.Stop()
 
-		b.client.SendTyping(typingCtx, chatID)
+		b.client.SendAction(actionCtx, chatID, action)
 		for {
 			select {
-			case <-typingCtx.Done():
+			case <-actionCtx.Done():
 				return
 			case <-ticker.C:
-				b.client.SendTyping(typingCtx, chatID)
+				b.client.SendAction(actionCtx, chatID, action)
 			}
 		}
 	}()
 
 	return cancel
+}
+
+// defaultMaxBytes is what a download is held to when nothing says otherwise.
+// Telegram refuses getFile past twenty megabytes, so this matches it.
+const defaultMaxBytes int64 = 20 << 20
+
+// mimeTypeOf is what a recording should be described to the model as.
+//
+// Telegram gives a voice note's type but not a video message's, which is
+// always MP4.
+func mimeTypeOf(clip *Recording) string {
+	if clip.MIMEType != "" {
+		return clip.MIMEType
+	}
+	return "video/mp4"
+}
+
+// plainDuration renders a limit the way somebody would say it, because this
+// ends up in a sentence rather than in a log line.
+func plainDuration(d time.Duration) string {
+	if d >= time.Minute && d%time.Minute == 0 {
+		if minutes := int(d / time.Minute); minutes == 1 {
+			return "a minute"
+		} else {
+			return strconv.Itoa(minutes) + " minutes"
+		}
+	}
+	return strconv.Itoa(int(d/time.Second)) + " seconds"
 }

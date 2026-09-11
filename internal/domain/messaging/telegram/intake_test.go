@@ -1,6 +1,9 @@
 package telegram
 
 import (
+	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -170,4 +173,47 @@ func TestANilLimiterAllowsEverything(t *testing.T) {
 	if newChatLimiter(0, 0) != nil {
 		t.Error("a limiter with no budget should be nil, meaning disabled")
 	}
+}
+
+// decodeUpdate turns a test fixture into the struct the adapter decodes,
+// through the same JSON path Telegram's deliveries take.
+func decodeUpdate(t *testing.T, raw map[string]any) Update {
+	t.Helper()
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	var u Update
+	if err := json.Unmarshal(encoded, &u); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return u
+}
+
+// sentTexts is every message body the fake was asked to send, in order.
+func sentTexts(f *fakeAPI) []string {
+	var texts []string
+	for _, c := range f.callsTo("sendMessage") {
+		if text, ok := c.body["text"].(string); ok {
+			texts = append(texts, text)
+		}
+	}
+	return texts
+}
+
+// methodOrder is every method the fake saw, in the order it saw them.
+func (f *fakeAPI) methodOrder() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	methods := make([]string, 0, len(f.calls))
+	for _, c := range f.calls {
+		methods = append(methods, c.method)
+	}
+	return methods
+}
+
+// newTestLogger keeps test output quiet; the adapter logs at Error on paths
+// these tests deliberately exercise.
+func newTestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

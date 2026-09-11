@@ -128,29 +128,36 @@ type Recording struct {
 	FileSize int64  `json:"file_size"`
 }
 
+// Message is one message from a chat.
+//
+// A named type rather than an anonymous one because the adapter now passes it
+// around — deciding which kind of recording it carries, and whether that one
+// is within limits — and an anonymous struct cannot be a parameter.
+type Message struct {
+	Chat struct {
+		ID int64 `json:"id"`
+	} `json:"chat"`
+	From *struct {
+		FirstName string `json:"first_name"`
+		Username  string `json:"username"`
+	} `json:"from"`
+	Text string `json:"text"`
+	// Caption is what a recording sent with a note carries. Telegram puts
+	// nothing in Text for those, so without this the note is lost.
+	Caption string `json:"caption"`
+	// Voice is a voice note: the "hold to record" bubble, always Opus in an
+	// Ogg container.
+	Voice *Recording `json:"voice"`
+	// VideoNote is the round video message. It carries no mime_type — it is
+	// always MP4 — and is capped more tightly than a voice note because it is
+	// billed as video; see config.VoiceConfig.
+	VideoNote *Recording `json:"video_note"`
+}
+
 // Update is one entry from the bot's update stream.
 type Update struct {
-	UpdateID int64 `json:"update_id"`
-	Message  *struct {
-		Chat struct {
-			ID int64 `json:"id"`
-		} `json:"chat"`
-		From *struct {
-			FirstName string `json:"first_name"`
-			Username  string `json:"username"`
-		} `json:"from"`
-		Text string `json:"text"`
-		// Caption is what a recording sent with a note carries. Telegram puts
-		// nothing in Text for those, so without this the note is lost.
-		Caption string `json:"caption"`
-		// Voice is a voice note: the "hold to record" bubble, always Opus in
-		// an Ogg container.
-		Voice *Recording `json:"voice"`
-		// VideoNote is the round video message. It carries no mime_type — it
-		// is always MP4 — and is capped more tightly than a voice note
-		// because it is billed as video; see config.VoiceConfig.
-		VideoNote *Recording `json:"video_note"`
-	} `json:"message"`
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message"`
 }
 
 // GetUpdates long-polls for messages from offset onwards.
