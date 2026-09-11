@@ -12,6 +12,7 @@ import (
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
 
 // chunkResponse is one streamed provider response carrying text, and
@@ -82,8 +83,8 @@ func TestStreamWorkerCapturesModelVersionAndUsage(t *testing.T) {
 	l := newStreamService(t, client)
 
 	var events []locitypes.StreamEvent
-	got, err := l.streamWorkerWithResponseAndCache(t.Context(), "prompt", "city_data",
-		func(e locitypes.StreamEvent) { events = append(events, e) }, locitypes.DomainGeneral, "test:city_data")
+	got, err := l.streamPartFromLLM(t.Context(), partPlan{Part: partCityData, CacheKey: "test:city_data"},
+		"prompt", func(e locitypes.StreamEvent) { events = append(events, e) }, locitypes.DomainGeneral)
 	if err != nil {
 		t.Fatalf("stream: %v", err)
 	}
@@ -117,15 +118,18 @@ func TestStreamWorkerCapturesModelVersionAndUsage(t *testing.T) {
 		t.Errorf("client saw %q, result holds %q", streamed.String(), got.Text)
 	}
 
-	// The old retry cache still receives the text.
-	if cached, ok := l.cache.Get("test:city_data"); !ok || cached != got.Text {
-		t.Errorf("cache holds %v, want the streamed text", cached)
+	// The stream itself no longer writes any cache: an unparseable answer used
+	// to be cached here and replayed for five minutes. The write happens in
+	// persistGenerations, after the output has been validated.
+	if _, ok := l.cache.Get("test:city_data"); ok {
+		t.Error("the stream worker wrote to the cache; only the validated write path may")
 	}
 }
 
-// A cache hit generated nothing, so it names no model and spent no tokens;
-// the caller must be able to tell the two apart.
-func TestStreamWorkerReplaysTheCacheWithoutAModel(t *testing.T) {
+// A replayed answer reaches the client as the same chunk stream a generated
+// one does, flagged so the client — and anyone reading the events — can tell
+// which layer answered.
+func TestReplayCachedPartStreamsTheStoredText(t *testing.T) {
 	client := &TestLLMClient{
 		GenerateStreamFn: func(context.Context, string, *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
 			t.Fatal("provider called on a cache hit")
@@ -133,19 +137,36 @@ func TestStreamWorkerReplaysTheCacheWithoutAModel(t *testing.T) {
 		},
 	}
 	l := newStreamService(t, client)
-	l.cache.Set("test:hit", `{"cached": true}`, 0)
+
+	text := strings.Repeat("x", replayChunkSize+7)
+	p := partPlan{
+		Part:     partCityData,
+		CacheKey: "test:hit",
+		Hit:      &cachedPart{Text: text, Layer: observability.LLMCacheLayerDB},
+	}
 
 	var events []locitypes.StreamEvent
-	got, err := l.streamWorkerWithResponseAndCache(t.Context(), "prompt", "city_data",
-		func(e locitypes.StreamEvent) { events = append(events, e) }, locitypes.DomainGeneral, "test:hit")
-	if err != nil {
-		t.Fatalf("stream: %v", err)
+	if err := l.replayCachedPart(t.Context(), p, func(e locitypes.StreamEvent) { events = append(events, e) },
+		locitypes.DomainGeneral); err != nil {
+		t.Fatalf("replay: %v", err)
 	}
-	if got.Text != `{"cached": true}` || got.ModelVersion != "" || got.TokensIn != 0 || got.TokensOut != 0 {
-		t.Errorf("cache hit result = %+v", got)
+
+	if len(events) != 2 {
+		t.Fatalf("sent %d chunks for %d bytes, want 2", len(events), len(text))
 	}
-	if len(events) == 0 || chunkData(t, events[0])["cache_used"] != true {
-		t.Error("replayed chunks are not flagged as cache hits")
+	var streamed strings.Builder
+	for _, e := range events {
+		data := chunkData(t, e)
+		if data["cache_used"] != true {
+			t.Error("replayed chunks are not flagged as cache hits")
+		}
+		if data["cache_layer"] != observability.LLMCacheLayerDB {
+			t.Errorf("cache_layer = %v, want db", data["cache_layer"])
+		}
+		streamed.WriteString(data["chunk"].(string))
+	}
+	if streamed.String() != text {
+		t.Error("the client did not receive the stored text")
 	}
 }
 
@@ -158,8 +179,8 @@ func TestStreamWorkerReportsAProviderFailure(t *testing.T) {
 	}
 	l := newStreamService(t, client)
 
-	got, err := l.streamWorkerWithResponseAndCache(t.Context(), "prompt", "itinerary",
-		func(locitypes.StreamEvent) {}, locitypes.DomainItinerary, "")
+	got, err := l.streamPartFromLLM(t.Context(), partPlan{Part: partItinerary},
+		"prompt", func(locitypes.StreamEvent) {}, locitypes.DomainItinerary)
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want the provider's", err)
 	}

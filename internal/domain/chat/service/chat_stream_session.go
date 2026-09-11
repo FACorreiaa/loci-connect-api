@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -20,7 +19,6 @@ import (
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
-	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
 
@@ -626,7 +624,8 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	defer span.End()
 	cc.Ctx = ctx // Update context with tracing
 
-	if err := l.prepareChatContext(&cc); err != nil {
+	plan, err := l.prepareChatContext(&cc)
+	if err != nil {
 		span.RecordError(err)
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return err
@@ -641,7 +640,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	ctx = observability.WithAIDistinctID(ctx, cc.UserID.String())
 	cc.Ctx = ctx
 
-	rawResponses, err := l.orchestrateLLMStreams(&cc)
+	rawResponses, err := l.orchestrateLLMStreams(&cc, plan)
 	if err != nil {
 		hasContent := false
 		for _, part := range rawResponses {
@@ -667,7 +666,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 		return err
 	}
 
-	if err := l.persistResults(&cc, data, rawResponses, startTime); err != nil {
+	if err := l.persistResults(&cc, plan, data, rawResponses, startTime); err != nil {
 		span.RecordError(err)
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
 		return err
@@ -693,189 +692,6 @@ type streamResult struct {
 	ModelVersion string
 	TokensIn     int
 	TokensOut    int
-}
-
-// streamWorkerWithResponseAndCache streams one part to the client and returns
-// what was streamed. The cache read and write here are the old five-minute
-// retry cache; the durable plan will move both out of this function.
-func (l *ServiceImpl) streamWorkerWithResponseAndCache(ctx context.Context, prompt, partType string, sendEvent func(locitypes.StreamEvent), domain locitypes.DomainType, cacheKey string) (streamResult, error) {
-	// Step 1: Check cache first if cacheKey is provided
-	if cacheKey != "" {
-		if cached, found := l.cache.Get(cacheKey); found {
-			if cachedText, ok := cached.(string); ok {
-				l.logger.InfoContext(ctx, "Cache hit for LLM response",
-					slog.String("part_type", partType),
-					slog.String("cache_key", cacheKey))
-
-				// Stream cached response in chunks to simulate real streaming
-				chunkSize := 100 // characters per chunk
-				for i := 0; i < len(cachedText); i += chunkSize {
-					if ctx.Err() != nil {
-						return streamResult{}, ctx.Err()
-					}
-
-					end := min(i+chunkSize, len(cachedText))
-					chunk := cachedText[i:end]
-
-					sendEvent(locitypes.StreamEvent{
-						Type: locitypes.EventTypeChunk,
-						Data: map[string]any{
-							"part":       partType,
-							"chunk":      chunk,
-							"domain":     string(domain),
-							"cache_key":  cacheKey,
-							"cache_used": true,
-						},
-					})
-
-					// Small delay to simulate streaming
-					time.Sleep(10 * time.Millisecond)
-				}
-				return streamResult{Text: cachedText}, nil
-			}
-		}
-
-		l.logger.InfoContext(ctx, "Cache miss for LLM response",
-			slog.String("part_type", partType),
-			slog.String("cache_key", cacheKey))
-	}
-
-	// Step 2: Cache miss or no cache key - call LLM (SDK retries stream init)
-	l.logger.InfoContext(ctx, "Calling LLM for streaming",
-		slog.String("part_type", partType),
-		slog.String("cache_key", cacheKey),
-		slog.Int("prompt_length", len(prompt)))
-
-	release, err := l.acquireLLMSlot(ctx)
-	if err != nil {
-		l.logger.ErrorContext(ctx, "LLM capacity exceeded",
-			slog.String("part_type", partType),
-			slog.Any("error", err))
-		if ctx.Err() == nil {
-			sendEvent(locitypes.StreamEvent{
-				Type:  locitypes.EventTypeError,
-				Error: "We are experiencing high traffic. Please try again in a minute.",
-			})
-		}
-		return streamResult{}, err
-	}
-	defer release()
-
-	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
-	if err != nil {
-		l.logger.ErrorContext(ctx, "LLM stream call failed",
-			slog.String("part_type", partType),
-			slog.Any("error", err))
-		if ctx.Err() == nil {
-			errorMsg := fmt.Sprintf("%s worker failed: %v", partType, err)
-			// Classify from the typed sentinels rather than the error text
-			// and pass the verdict along, so the transport does not have to
-			// re-derive it by matching on user-facing prose.
-			var errorCode locitypes.StreamErrorCode
-			switch {
-			case errors.Is(err, llmerrors.ErrRateLimited):
-				errorCode = locitypes.StreamErrorQuotaExceeded
-				errorMsg = "We are experiencing high traffic (Quota Exceeded). Please try again in a minute."
-			case errors.Is(err, llmerrors.ErrOutOfCredits), errors.Is(err, llmerrors.ErrAuthFailed):
-				// Every provider in the chain was exhausted or rejected.
-				// Retryable from the client's point of view, but it needs
-				// an operator to actually clear.
-				errorCode = locitypes.StreamErrorProviderUnavailable
-				errorMsg = "The AI service is temporarily unavailable. Please try again later."
-			case errors.Is(err, llmerrors.ErrUnavailable):
-				errorCode = locitypes.StreamErrorProviderUnavailable
-				errorMsg = "The AI service is temporarily unavailable. Please try again in a moment."
-			}
-
-			sendEvent(locitypes.StreamEvent{
-				Type:      locitypes.EventTypeError,
-				Error:     errorMsg,
-				ErrorCode: errorCode,
-			})
-		}
-		return streamResult{}, fmt.Errorf("%s worker failed: %w", partType, err)
-	}
-	// Step 3: Stream response and collect full text for caching
-	var fullResponse strings.Builder
-	var result streamResult
-	chunkCount := 0
-	for resp, err := range iter {
-		if ctx.Err() != nil {
-			l.logger.WarnContext(ctx, "Context canceled during streaming",
-				slog.String("part_type", partType),
-				slog.Int("chunks_received", chunkCount))
-			return streamResult{}, ctx.Err()
-		}
-		if err != nil {
-			l.logger.ErrorContext(ctx, "Streaming error from LLM",
-				slog.String("part_type", partType),
-				slog.Any("error", err))
-			if ctx.Err() == nil {
-				sendEvent(locitypes.StreamEvent{
-					Type:  locitypes.EventTypeError,
-					Error: fmt.Sprintf("%s streaming error: %v", partType, err),
-				})
-			}
-			return streamResult{}, fmt.Errorf("%s streaming error: %w", partType, err)
-		}
-		// Providers name the answering model on some or all chunks and
-		// report usage on the last one, cumulatively; keep the latest of
-		// each rather than summing what would then be counted twice.
-		if resp.ModelVersion != "" {
-			result.ModelVersion = resp.ModelVersion
-		}
-		if u := resp.UsageMetadata; u != nil {
-			result.TokensIn = int(u.PromptTokenCount)
-			result.TokensOut = int(u.CandidatesTokenCount)
-		}
-		for _, cand := range resp.Candidates {
-			if cand.Content != nil {
-				for _, part := range cand.Content.Parts {
-					if part.Text != "" {
-						chunk := part.Text
-						chunkCount++
-						fullResponse.WriteString(chunk)
-
-						// Debug-only, and without a content preview: the chunk is
-						// user-influenced model output and must not land in Info logs.
-						if chunkCount <= 3 {
-							l.logger.DebugContext(ctx, "Received chunk from LLM",
-								slog.String("part_type", partType),
-								slog.Int("chunk_number", chunkCount),
-								slog.Int("chunk_length", len(chunk)))
-						}
-
-						sendEvent(locitypes.StreamEvent{
-							Type: locitypes.EventTypeChunk,
-							Data: map[string]any{
-								"part":       partType,
-								"chunk":      chunk,
-								"domain":     string(domain),
-								"cache_key":  cacheKey,
-								"cache_used": false,
-							},
-						})
-					}
-				}
-			}
-		}
-	}
-
-	l.logger.InfoContext(ctx, "LLM streaming completed",
-		slog.String("part_type", partType),
-		slog.Int("total_chunks", chunkCount),
-		slog.Int("total_response_length", fullResponse.Len()))
-
-	// Step 4: Save full response to cache if cacheKey is provided
-	if cacheKey != "" && fullResponse.Len() > 0 {
-		l.cache.Set(cacheKey, fullResponse.String(), 0)
-		l.logger.InfoContext(ctx, "Saved LLM response to cache",
-			slog.String("part_type", partType),
-			slog.String("cache_key", cacheKey),
-			slog.Int("response_length", fullResponse.Len()))
-	}
-	result.Text = fullResponse.String()
-	return result, nil
 }
 
 // convertRestaurantsToPOIs lifts restaurant-specific details into the generic POI shape
