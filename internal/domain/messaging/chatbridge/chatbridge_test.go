@@ -343,3 +343,52 @@ func TestOnlyAGroundedPlaceGetsAMapLink(t *testing.T) {
 		t.Errorf("exactly one link expected:\n%s", got)
 	}
 }
+
+func TestAPictureIsSentWithItsCredit(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{
+				Name: "Cabo Girão",
+				ImageCredits: []locitypes.POIImage{{
+					URL:         "https://upload.wikimedia.org/cabo-girao.jpg",
+					Attribution: "H. Zell",
+					Licence:     "CC BY-SA 3.0",
+				}},
+			}},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "https://upload.wikimedia.org/cabo-girao.jpg") {
+		t.Errorf("the picture is missing:\n%s", got)
+	}
+	// The licence requires the author and the licence wherever the image shows,
+	// and a Telegram preview is the image showing.
+	if !strings.Contains(got, "H. Zell") || !strings.Contains(got, "CC BY-SA 3.0") {
+		t.Errorf("the credit did not travel with the picture:\n%s", got)
+	}
+}
+
+func TestAnUncreditedPictureIsNotSent(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{
+				Name: "Somewhere",
+				ImageCredits: []locitypes.POIImage{
+					{URL: "https://example.test/no-credit.jpg", Licence: "CC BY-SA 3.0"}, // no author
+					{URL: "https://example.test/credited.jpg", Attribution: "Someone", Licence: "CC BY 2.0"},
+				},
+			}},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if strings.Contains(got, "no-credit.jpg") {
+		t.Errorf("an uncreditable picture was sent:\n%s", got)
+	}
+	if !strings.Contains(got, "credited.jpg") {
+		t.Errorf("the creditable picture should still be sent:\n%s", got)
+	}
+}
