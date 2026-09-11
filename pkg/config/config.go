@@ -47,13 +47,21 @@ const (
 )
 
 // defaultFallbackModels are OpenRouter's zero-cost models, ordered by
-// suitability. Both advertise structured_outputs and response_format,
-// which Loci's JSON-contract prompts require; the larger free models
-// (nemotron-3-ultra, nemotron-3.5-lightning) do not, so they are
-// deliberately excluded despite bigger context windows.
+// suitability. All advertise structured_outputs and response_format, which
+// Loci's JSON-contract prompts require; the larger free models
+// (nemotron-3-ultra, nemotron-3.5-lightning, both a million tokens of context)
+// do not, so they are deliberately excluded despite the bigger window.
+//
+// z-ai/glm-5.2:free was the head here until OpenRouter retired it. Asking for
+// it returns 404 "This model is unavailable for free. The paid version is
+// available now", and the chain does not advance past that — so every non-Pro
+// user's chat failed outright, in production, while the paid primary kept
+// working for anyone on a key. A dead head takes the whole chain down with it,
+// which is the argument for listing more than one live model rather than
+// trusting any single free slug to stay free.
 var defaultFallbackModels = []string{
-	"z-ai/glm-5.2:free",
 	"nvidia/nemotron-3-super-120b-a12b:free",
+	"nex-agi/nex-n2.5-pro:free",
 }
 
 // AIProviderSpec identifies one link in the chat fallback chain.
