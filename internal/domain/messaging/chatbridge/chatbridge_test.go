@@ -3,6 +3,8 @@ package chatbridge
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -191,4 +193,130 @@ func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
 			t.Errorf("the chat service saw caller %q, want the linked account %s", chat.callerSeen, userID)
 		}
 	})
+}
+
+func TestAPlanWithoutProseIsSentAsText(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			ItineraryName:      "Four days in Madeira",
+			OverallDescription: "Levadas, wine and the old town.",
+			PointsOfInterest: []locitypes.POIDetailedInfo{
+				{Name: "Pico do Arieiro", Category: "Viewpoint", Description: "Above the clouds."},
+				{Name: "Blandy's Wine Lodge", Category: "Winery"},
+			},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	for _, want := range []string{"Four days in Madeira", "Pico do Arieiro", "Viewpoint", "Above the clouds.", "Blandy's Wine Lodge"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the reply does not carry %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "open Loci") {
+		t.Errorf("a rendered plan should not fall back to the pointer text:\n%s", got)
+	}
+}
+
+func TestBothThePlanAndTheRestOfTheCityAreSent(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{Name: "Sé Cathedral", Distance: 0.2}},
+		},
+		PointsOfInterest: []locitypes.POIDetailedInfo{
+			{Name: "Sé Cathedral", Distance: 0.2}, // already in the plan
+			{Name: "Porto Moniz Pools", Distance: 45.0},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "Porto Moniz Pools") {
+		t.Errorf("the general city places are missing:\n%s", got)
+	}
+	if strings.Count(got, "Sé Cathedral") != 1 {
+		t.Errorf("a place in both lists should be sent once:\n%s", got)
+	}
+}
+
+func TestPlacesAreOrderedNearestFirst(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{
+				{Name: "Far", Distance: 2.5},
+				{Name: "Unknown"}, // no distance
+				{Name: "Near", Distance: 0.2},
+				{Name: "Middle", Distance: 0.4},
+			},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	var order []int
+	for _, name := range []string{"Near", "Middle", "Far", "Unknown"} {
+		order = append(order, strings.Index(got, name))
+	}
+	for i := 1; i < len(order); i++ {
+		if order[i] < order[i-1] {
+			t.Fatalf("places are not nearest-first (unknown distance last):\n%s", got)
+		}
+	}
+	if !strings.Contains(got, "(0.2 km)") {
+		t.Errorf("a measured distance should be shown:\n%s", got)
+	}
+	if strings.Contains(got, "Unknown — ") || strings.Contains(got, "Unknown (") {
+		t.Errorf("an unknown distance should not be printed:\n%s", got)
+	}
+}
+
+func TestAPlanLongerThanTheCapPointsAtTheApp(t *testing.T) {
+	pois := make([]locitypes.POIDetailedInfo, maxRenderedPOIs+3)
+	for i := range pois {
+		pois[i] = locitypes.POIDetailedInfo{Name: fmt.Sprintf("Place %d", i)}
+	}
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{PointsOfInterest: pois},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if !strings.Contains(got, "and 3 more in Loci.") {
+		t.Errorf("the reply does not say what was left out:\n%s", got)
+	}
+	if strings.Contains(got, fmt.Sprintf("Place %d", maxRenderedPOIs)) {
+		t.Errorf("the reply went past the cap:\n%s", got)
+	}
+}
+
+func TestAnAnswerWithNeitherProseNorPlanStillSaysSomething(t *testing.T) {
+	if got := reply(&locitypes.ChatResponse{}); got == "" {
+		t.Fatal("the reply is empty")
+	}
+}
+
+func TestACitationIsNotShownToTheReader(t *testing.T) {
+	const cited = "Ribeira Brava Town Center [poi:cef674e9-9aeb-41e6-88cb-595d63869f6d]"
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{Name: cited, Distance: 1.2}},
+		},
+		PointsOfInterest: []locitypes.POIDetailedInfo{
+			{Name: cited, Distance: 1.2}, // same place, cited in both lists
+			{Name: "Cabo Girão", Distance: 3.0},
+		},
+	}
+
+	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+
+	if strings.Contains(got, "poi:") || strings.Contains(got, "[") {
+		t.Errorf("the citation marker reached the reader:\n%s", got)
+	}
+	if !strings.Contains(got, "Ribeira Brava Town Center") {
+		t.Errorf("the name did not survive stripping:\n%s", got)
+	}
+	if strings.Count(got, "Ribeira Brava Town Center") != 1 {
+		t.Errorf("a cited place in both lists should be sent once:\n%s", got)
+	}
 }

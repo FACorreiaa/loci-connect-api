@@ -185,6 +185,24 @@ func computePacketID(userID uuid.UUID, query string, cityID uuid.UUID, ids []uui
 // models are inconsistent about both.
 var citationRE = regexp.MustCompile(`(?i)\[\s*poi\s*:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*\]`)
 
+// StripCitation removes the [poi:<uuid>] marker from a generated name and
+// returns the id it carried.
+//
+// The marker is how a grounded answer says which row it used, so it is data
+// worth keeping — it resolves a model's wording back to a real place, with
+// real coordinates — but it is not part of the name a person should read.
+// Anything rendering a generated name owes the reader this call.
+func StripCitation(text string) (clean string, poiID uuid.UUID, ok bool) {
+	ids := ParseCitations(text)
+	clean = strings.TrimSpace(citationRE.ReplaceAllString(text, ""))
+	// Collapse the double space a mid-string marker leaves behind.
+	clean = strings.Join(strings.Fields(clean), " ")
+	if len(ids) == 0 {
+		return clean, uuid.Nil, false
+	}
+	return clean, ids[0], true
+}
+
 // ParseCitations extracts every [poi:<uuid>] citation from generated text, in
 // order of first appearance and de-duplicated.
 func ParseCitations(text string) []uuid.UUID {

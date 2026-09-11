@@ -101,11 +101,23 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		UserLocation: userLocation,
 		EventCh:      eventCh,
 	}
+	// Written by the producer, read only after the range below. The channel
+	// close orders the two. A caller must be told the turn failed rather than
+	// handed an empty answer that reads as success: the Telegram bridge falls
+	// back to a new session on an error, and silently could not.
+	var streamErr error
 	concurrency.Run(l.logger, func() {
-		// Note: eventCh is closed by ProcessUnifiedChatMessageStream via closeOnce
-		err := l.ProcessUnifiedChatMessageStream(cc)
-		if err != nil {
-			l.logger.Error("error processing stream", "error", err)
+		// Close when the producer returns, exactly as ContinueChat does.
+		//
+		// ProcessUnifiedChatMessageStream deliberately leaves the channel open
+		// ("event channel will be closed by handler"): the streaming RPC path
+		// closes it in the handler. StartChat has no handler above it, so
+		// without this the range below waits on a channel nobody closes, and
+		// any non-RPC caller — the Telegram bridge — hangs forever.
+		defer close(eventCh)
+		streamErr = l.ProcessUnifiedChatMessageStream(cc)
+		if streamErr != nil {
+			l.logger.Error("error processing stream", "error", streamErr)
 		}
 	})
 
@@ -125,6 +137,10 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		}
 	}
 
+	if streamErr != nil {
+		return nil, streamErr
+	}
+
 	return &locitypes.ChatResponse{
 		SessionID:        sessionID,
 		Message:          lastMessage,
@@ -136,11 +152,13 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 
 func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
 	eventCh := make(chan locitypes.StreamEvent, 100) // Buffered channel to prevent blocking
+	// See StartChat: the error belongs to the caller, not just the log.
+	var streamErr error
 	concurrency.Run(l.logger, func() {
 		defer close(eventCh) // Ensure channel is closed when goroutine exits
-		err := l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
-		if err != nil {
-			l.logger.Error("error processing continue stream", "error", err)
+		streamErr = l.ContinueSessionStreamed(ctx, sessionID, message, nil, eventCh)
+		if streamErr != nil {
+			l.logger.Error("error processing continue stream", "error", streamErr)
 		}
 	})
 
@@ -164,6 +182,10 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		if event.Message != "" {
 			lastMessage = event.Message
 		}
+	}
+
+	if streamErr != nil {
+		return nil, streamErr
 	}
 
 	return &locitypes.ChatResponse{
