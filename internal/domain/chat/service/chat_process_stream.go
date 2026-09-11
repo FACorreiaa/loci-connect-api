@@ -855,7 +855,13 @@ func (l *ServiceImpl) handleNearbyDomain(
 		responsesMutex.Unlock()
 		return fmt.Errorf("marshal nearby POIs: %w", err)
 	}
-	nearbyCacheKey := cc.CacheKey + "_nearby_pois"
+	// The nearby domain has no generation plan and so no request key to hang
+	// this on. It keys itself: the traveller, where they are (to about 110 m,
+	// so GPS jitter does not mint a new entry per request) and how far they
+	// asked. The user id is load-bearing — these rows carry that user's
+	// distances — and its absence would make this entry global.
+	nearbyCacheKey := fmt.Sprintf("nearby:%s:%.3f:%.3f:%.0f",
+		cc.UserID, roundCoord(lat), roundCoord(lon), distance)
 	responses["nearby_pois"].WriteString(string(poisJSON))
 	partCacheKeys["nearby_pois"] = nearbyCacheKey
 	responsesMutex.Unlock()
