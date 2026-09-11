@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -24,14 +22,18 @@ import (
 )
 
 // prepareChatContext handles extracting city, intent detection, fetching user profile,
-// generating cache keys, and creating the initial DB session.
-func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
+// planning and looking up this turn's generations, and creating the initial DB session.
+//
+// It returns the plan so the rest of the pipeline works from the same values:
+// there is one plan per request, passed down the call chain rather than parked
+// on the service, because two requests are always in flight at once.
+func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, error) {
 	ctx := cc.Ctx
 
 	// 1. Extract City
-	extractedCity, cleanedMessage, err := l.extractCityFromMessage(ctx, cc.Message)
+	extractedCity, cleanedMessage, err := l.extractCityCached(ctx, cc.Message)
 	if err != nil {
-		return fmt.Errorf("failed to parse message: %w", err)
+		return nil, fmt.Errorf("failed to parse message: %w", err)
 	}
 	if extractedCity != "" {
 		cc.CityName = extractedCity
@@ -45,7 +47,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 	// 3. Fetch User Data & Preferences
 	interests, searchProfile, tags, err := l.FetchUserData(ctx, cc.UserID, cc.ProfileID)
 	if err != nil {
-		return fmt.Errorf("failed to fetch user data: %w", err)
+		return nil, fmt.Errorf("failed to fetch user data: %w", err)
 	}
 	// FetchUserData queries three tables; two of those results used to be
 	// discarded here. getUserPreferencesPrompt has always been able to render
@@ -58,16 +60,21 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 		searchProfile.Tags = tags
 	}
 	cc.BasePreferences = getUserPreferencesPrompt(searchProfile)
+	// The structured profile travels alongside the rendered text: each part of
+	// the generation plan renders and hashes its own scoped slice of it, and a
+	// slice cannot be recovered from the finished prose.
+	cc.Profile = searchProfile
 	personalizationEnabled := preference.ExperimentVariant(cc.UserID) != "control"
 	if settings, ok := l.prefVectors.(preference.SettingsReader); ok {
 		enabled, settingsErr := settings.PersonalizationEnabled(ctx, cc.UserID)
 		if settingsErr != nil {
-			return fmt.Errorf("get personalization setting: %w", settingsErr)
+			return nil, fmt.Errorf("get personalization setting: %w", settingsErr)
 		}
 		personalizationEnabled = personalizationEnabled && enabled
 	}
 	if !personalizationEnabled {
 		cc.BasePreferences = ""
+		cc.Profile = nil
 	}
 
 	// Location Fallback
@@ -78,13 +85,16 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 		}
 	}
 
-	// 3b. Retrieve the evidence this turn may speak from.
-	//
-	// Runs before the prompt is built, because the whole point is that the model
-	// sees real rows rather than reconstructing places from memory. Best-effort:
-	// on failure cc.Packet stays nil and generation proceeds ungrounded, which is
-	// the behaviour that predates this step.
-	l.assembleEvidencePacket(cc)
+	// 3b. Resolve the city before the plan is built. The key prefers the city
+	// id over the name — "Funchal" and "Funchal, Madeira" are one city and
+	// should share one cached answer — and this is a database lookup, not a
+	// provider call, so it is cheap enough to do before a cache hit is known.
+	cc.CityID = l.resolveCityID(ctx, cc.CityName)
+
+	// 3c. Plan this turn's parts, look them up, and retrieve evidence only if
+	// something actually has to be generated. Retrieval costs an embedding
+	// call; on a full hit this turn makes no provider call at all.
+	plan := l.resolveGenerationPlan(cc)
 
 	// 4. Resume or create session.
 	// When the client sends a session_id we resume that session (appending the new
@@ -128,76 +138,115 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) error {
 			Status:    "active",
 		}
 		if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
-			return fmt.Errorf("failed to create session: %w", err)
+			return nil, fmt.Errorf("failed to create session: %w", err)
 		}
 	}
 
-	// 5. Generate Cache Key
-	cacheKeyData := map[string]any{
-		"user_id":     cc.UserID.String(),
-		"profile_id":  cc.ProfileID.String(),
-		"city":        normalizeCacheComponent(cc.CityName),
-		"message":     normalizeCacheComponent(cleanedMessage),
-		"domain":      string(cc.Domain),
-		"preferences": cc.BasePreferences,
-		// The packet is part of the prompt, so it is part of the cache identity.
-		// Without this a response generated before grounding — or against a
-		// different candidate set — would be replayed and then recorded against
-		// this turn's evidence, making the audit trail describe an answer that
-		// was never produced from it.
-		"packet_id": packetIDFor(cc),
-	}
-	cacheKeyBytes, err := json.Marshal(cacheKeyData)
-	if err != nil {
-		l.logger.ErrorContext(ctx, "Failed to marshal cache key data", slog.Any("error", err))
-		// Use a fallback cache key
-		cacheKeyBytes = fmt.Appendf(nil, "fallback_%s_%s", cleanedMessage, cc.CityName)
-	}
-	hash := md5.Sum(cacheKeyBytes)
-	cc.CacheKey = hex.EncodeToString(hash[:])
-
-	return nil
+	return plan, nil
 }
+
+// resolveGenerationPlan decides what this turn has to generate.
+//
+// The order is the point. The plan's keys depend on the profile, the request
+// and the model — never on the evidence packet — so every part can be looked
+// up before retrieval runs, and retrieval (which costs an embedding call) is
+// skipped entirely when nothing missed. A turn that hits on every part makes
+// no provider call at all, which is the whole point of the durable layer.
+func (l *ServiceImpl) resolveGenerationPlan(cc *common.ChatContext) []partPlan {
+	// A request pinned to the present moment is answered freshly every time:
+	// "what is open right now" is wrong an hour later. So is the nearby domain,
+	// which reads live rows rather than generating.
+	cc.Cacheable = !hasLiveWords(cc.Message) && cc.Domain != locitypes.DomainNearby
+
+	plan := l.planGeneration(cc)
+	hits := l.lookupGenerations(cc.Ctx, plan)
+
+	// Retrieve the evidence this turn may speak from, unless every part is
+	// already answered. Best-effort: on failure cc.Packet stays nil and
+	// generation proceeds ungrounded, which is the behaviour that predates
+	// evidence packets. Domains with no plan (nearby) keep retrieving, so
+	// their audit trail is unchanged.
+	if len(plan) == 0 || hits < len(plan) {
+		l.assemblePacket(cc)
+	}
+
+	// The client and the interaction row still want one key per request.
+	cc.CacheKey = requestCacheKey(plan)
+	return plan
+}
+
+// assemblePacket runs evidence retrieval through a seam tests can replace, so
+// "a full cache hit retrieves nothing" is an assertion rather than a hope.
+func (l *ServiceImpl) assemblePacket(cc *common.ChatContext) {
+	if l.assembleEvidence != nil {
+		l.assembleEvidence(cc)
+		return
+	}
+	l.assembleEvidencePacket(cc)
+}
+
+// extractCityCached wraps the city extractor in a global, 24-hour cache.
+//
+// Extraction is a provider call that reads nothing but the message text, so
+// the entry carries no user data and can be shared by everyone who types the
+// same thing. It also happens before the generation keys exist, which is why
+// a cache hit on the answer used to cost a provider call anyway. The extractor
+// runs at temperature 0.1 but is not deterministic; caching it also stops the
+// same message from occasionally producing a different cleaned message and so
+// a different generation key.
+func (l *ServiceImpl) extractCityCached(ctx context.Context, message string) (cityName, cleanedMessage string, err error) {
+	type extraction struct {
+		City    string `json:"city"`
+		Message string `json:"message"`
+	}
+
+	key := extractionCacheKey(message)
+	if raw, ok := l.cachedText(key); ok {
+		var e extraction
+		if json.Unmarshal([]byte(raw), &e) == nil {
+			return e.City, e.Message, nil
+		}
+	}
+
+	cityName, cleanedMessage, err = l.extractCityFromMessage(ctx, message)
+	if err != nil {
+		return "", "", err
+	}
+	if raw, mErr := json.Marshal(extraction{City: cityName, Message: cleanedMessage}); mErr == nil && l.cache != nil {
+		l.cache.Set(key, string(raw), extractionCacheTTL)
+	}
+	return cityName, cleanedMessage, nil
+}
+
+// extractionCacheTTL is how long a parsed message stays parsed. Long, because
+// the mapping from a sentence to a city name does not change.
+const extractionCacheTTL = 24 * time.Hour
 
 // aggregateAndParse converts raw strings to structured data using robust parsing logic.
 func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map[string]string) (*locitypes.AiCityResponse, error) {
 	ctx := cc.Ctx
 	data := &locitypes.AiCityResponse{SessionID: cc.SessionID}
 
-	// Helper to parse part robustly
-	parsePart := func(key string, target any, nestedKey string) {
-		str, ok := rawResponses[key]
+	// Parse each part with the same parser the write path validates against, so
+	// what is stored and what is shown can never disagree about whether an
+	// answer was usable.
+	parsePart := func(part generationPart, target any) {
+		raw, ok := rawResponses[string(part)]
 		if !ok {
 			return
 		}
-		clean := extractJSONFromMarkdown(str)
-		if nestedKey != "" {
-			var envelope map[string]json.RawMessage
-			if err := json.Unmarshal([]byte(clean), &envelope); err != nil {
-				l.logger.WarnContext(ctx, "failed to unmarshal raw", "key", key, "err", err)
-				return
-			}
-			nested, exists := envelope[nestedKey]
-			if !exists {
-				return
-			}
-			if err := json.Unmarshal(nested, target); err != nil {
-				l.logger.WarnContext(ctx, "failed to unmarshal nested", "key", key, "err", err)
-			}
-			return
-		}
-		if err := json.Unmarshal([]byte(clean), target); err != nil {
-			l.logger.WarnContext(ctx, "failed to unmarshal", "key", key, "err", err)
+		if err := parseGeneratedPart(part, raw, target); err != nil {
+			l.logger.WarnContext(ctx, "failed to parse generated part",
+				slog.String("part", string(part)), slog.Any("error", err))
 		}
 	}
 
-	// Parse each part
-	parsePart("city_data", &data.GeneralCityData, "")
-	parsePart("general_pois", &data.PointsOfInterest, "points_of_interest")
-	parsePart("itinerary", &data.AIItineraryResponse, "")
-	parsePart("hotels", &data.Hotels, "hotels")
-	parsePart("restaurants", &data.Restaurants, "restaurants")
-	parsePart("activities", &data.Activities, "activities")
+	parsePart(partCityData, &data.GeneralCityData)
+	parsePart(partGeneralPOIs, &data.PointsOfInterest)
+	parsePart(partItinerary, &data.AIItineraryResponse)
+	parsePart(partHotels, &data.Hotels)
+	parsePart(partRestaurants, &data.Restaurants)
+	parsePart(partActivities, &data.Activities)
 
 	// Deduplication Logic
 	allPOIs := make([]locitypes.POIDetailedInfo, 0)
@@ -242,8 +291,13 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	return data, nil
 }
 
-// orchestrateLLMStreams manages the fan-out concurrency to LLM workers.
-func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]string, error) {
+// orchestrateLLMStreams produces every part of the answer, in parallel.
+//
+// A part with a cache hit is replayed from the stored text; a part without one
+// is streamed from the provider against the evidence packet. Both paths emit
+// the same chunk events, so the client sees one uniform stream, and both
+// record a common.PartOutcome so the write path knows what actually happened.
+func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partPlan) (map[string]string, error) {
 	ctx := cc.Ctx
 
 	// workerCtx survives client disconnect so in-flight work can finish and events can flush.
@@ -264,6 +318,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	// Thread-safe map for responses
 	responses := make(map[string]*strings.Builder)
 	partCacheKeys := make(map[string]string)
+	outcomes := make(map[string]common.PartOutcome, len(plan))
 	var responsesMutex sync.Mutex
 
 	// Helper to send events and capture chunks
@@ -292,7 +347,8 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 
 	g, gctx := errgroup.WithContext(workerCtx)
 
-	runStreamWorker := func(partType, prompt, partCacheKey string) {
+	runPart := func(p partPlan) {
+		partType := string(p.Part)
 		g.Go(func() (err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -303,43 +359,38 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 				}
 			}()
 			responsesMutex.Lock()
-			partCacheKeys[partType] = partCacheKey
+			partCacheKeys[partType] = p.CacheKey
 			responsesMutex.Unlock()
-			return l.streamWorkerWithResponseAndCache(gctx, prompt, partType, sendEventWithResponse, cc.Domain, partCacheKey)
+
+			outcome := common.PartOutcome{CacheKey: p.CacheKey, ModelID: p.ModelID}
+			if p.Hit != nil {
+				err = l.replayCachedPart(gctx, p, sendEventWithResponse, cc.Domain)
+				outcome.ServedFrom = p.Hit.Layer
+				outcome.ModelVersion = p.Hit.ModelVersion
+				outcome.TokensOut = p.Hit.TokensOut
+			} else {
+				// The prompt is rendered here and nowhere else, against the
+				// packet retrieval produced for this turn.
+				prompt := p.Prompt(cc.Packet)
+				var res streamResult
+				res, err = l.streamPartFromLLM(gctx, p, prompt, sendEventWithResponse, cc.Domain)
+				outcome.ServedFrom = servedFromLLM
+				outcome.PromptHash = promptHash(prompt)
+				outcome.ModelVersion = res.ModelVersion
+				outcome.TokensIn, outcome.TokensOut = res.TokensIn, res.TokensOut
+			}
+
+			responsesMutex.Lock()
+			outcomes[partType] = outcome
+			responsesMutex.Unlock()
+			return err
 		})
 	}
 
-	// Spawn workers based on Domain.
-	//
-	// Prompts that name places are grounded in the evidence packet; city_data
-	// describes the city itself and has nothing to cite, so it is left alone.
-	switch cc.Domain {
-	case locitypes.DomainItinerary, locitypes.DomainGeneral:
-		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		runStreamWorker("general_pois", groundPrompt(getGeneralPOIPrompt(cc.CityName), cc.Packet), cc.CacheKey+"_general_pois")
-		runStreamWorker("itinerary", groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.BasePreferences), cc.Packet), cc.CacheKey+"_itinerary")
-	case locitypes.DomainAccommodation:
-		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		var lat, lon float64
-		if cc.UserLocation != nil {
-			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		}
-		runStreamWorker("hotels", groundPrompt(getAccommodationPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_hotels")
-	case locitypes.DomainDining:
-		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		var lat, lon float64
-		if cc.UserLocation != nil {
-			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		}
-		runStreamWorker("restaurants", groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_restaurants")
-	case locitypes.DomainActivities:
-		runStreamWorker("city_data", getCityDataPrompt(cc.CityName), cc.CacheKey+"_city_data")
-		var lat, lon float64
-		if cc.UserLocation != nil {
-			lat, lon = cc.UserLocation.UserLat, cc.UserLocation.UserLon
-		}
-		runStreamWorker("activities", groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.BasePreferences), cc.Packet), cc.CacheKey+"_activities")
-	case locitypes.DomainNearby:
+	// Spawn workers based on Domain. Every generated domain is described by the
+	// plan; nearby is answered from PostGIS and has no plan at all.
+	switch {
+	case cc.Domain == locitypes.DomainNearby:
 		g.Go(func() (err error) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -349,8 +400,12 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			}()
 			return l.handleNearbyDomain(gctx, cc, sendEventWithResponse, &responsesMutex, responses, partCacheKeys)
 		})
-	default:
+	case len(plan) == 0:
 		return nil, fmt.Errorf("unhandled domain type: %s", cc.Domain)
+	default:
+		for _, p := range plan {
+			runPart(p)
+		}
 	}
 
 	waitErr := g.Wait()
@@ -370,6 +425,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 			}
 		}
 	}
+	cc.PartOutcomes = outcomes
 	responsesMutex.Unlock()
 
 	finalResponses := make(map[string]string)
@@ -384,9 +440,10 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext) (map[string]
 	return finalResponses, nil
 }
 
-// persistResults handles saving City, Interactions, and Session updates.
+// persistResults handles saving City, generations, Interactions, and Session updates.
 func (l *ServiceImpl) persistResults(
 	cc *common.ChatContext,
+	plan []partPlan,
 	data *locitypes.AiCityResponse,
 	rawResponses map[string]string,
 	startTime time.Time,
@@ -444,6 +501,11 @@ func (l *ServiceImpl) persistResults(
 		}
 	}
 
+	// 1b. Store what the provider produced this turn, so the next identical
+	// request does not have to pay for it again, and tell PostHog what each
+	// part cost or saved.
+	l.persistGenerations(storageCtx, cc, plan, rawResponses, cityID)
+
 	// 2. Save Interaction
 	var fullResponseBuilder strings.Builder
 	for partType, content := range rawResponses {
@@ -454,18 +516,7 @@ func (l *ServiceImpl) persistResults(
 		fullResponse = fmt.Sprintf("Processed %s request for %s", cc.Domain, cc.CityName)
 	}
 
-	interaction := locitypes.LlmInteraction{
-		ID:           uuid.New(),
-		SessionID:    cc.SessionID,
-		UserID:       cc.UserID,
-		ProfileID:    cc.ProfileID,
-		CityName:     cc.CityName,
-		Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", cc.Domain, cc.Message),
-		ResponseText: fullResponse,
-		ModelUsed:    l.model,
-		LatencyMs:    int(time.Since(startTime).Milliseconds()),
-		Timestamp:    startTime,
-	}
+	interaction := l.buildInteractionRow(cc, plan, fullResponse, startTime)
 	savedID, err := l.llmInteractionRepo.SaveInteraction(storageCtx, interaction)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to save interaction", slog.Any("error", err))
@@ -804,7 +855,13 @@ func (l *ServiceImpl) handleNearbyDomain(
 		responsesMutex.Unlock()
 		return fmt.Errorf("marshal nearby POIs: %w", err)
 	}
-	nearbyCacheKey := cc.CacheKey + "_nearby_pois"
+	// The nearby domain has no generation plan and so no request key to hang
+	// this on. It keys itself: the traveller, where they are (to about 110 m,
+	// so GPS jitter does not mint a new entry per request) and how far they
+	// asked. The user id is load-bearing — these rows carry that user's
+	// distances — and its absence would make this entry global.
+	nearbyCacheKey := fmt.Sprintf("nearby:%s:%.3f:%.3f:%.0f",
+		cc.UserID, roundCoord(lat), roundCoord(lon), distance)
 	responses["nearby_pois"].WriteString(string(poisJSON))
 	partCacheKeys["nearby_pois"] = nearbyCacheKey
 	responsesMutex.Unlock()

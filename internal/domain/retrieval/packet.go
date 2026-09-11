@@ -141,6 +141,29 @@ func (p *ContextPacket) Has(id uuid.UUID) bool {
 	return false
 }
 
+// WithoutPersonal returns a copy of the packet with everything that describes
+// the requesting traveller removed: the visited flags Render turns into
+// "ALREADY VISITED by this user" and the learned trait labels. The candidates,
+// their facts and the PacketID are kept, so the copy still cites the same rows
+// and still traces to the same assembly.
+//
+// It exists for answers that are shared across users. The general_pois part is
+// keyed by city alone; grounding it in a packet that names one person's visit
+// history would hand that history to everyone who asks about the city.
+func (p *ContextPacket) WithoutPersonal() *ContextPacket {
+	if p == nil {
+		return nil
+	}
+	shared := *p
+	shared.TraitLabels = nil
+	shared.Evidence = make([]Evidence, len(p.Evidence))
+	for i, e := range p.Evidence {
+		e.Visited = false
+		shared.Evidence[i] = e
+	}
+	return &shared
+}
+
 // computePacketID derives a stable identifier from the inputs that define the
 // packet: the requesting user, the query, the city, and the ordered candidate
 // set. Identical retrieval always yields an identical ID, so the same packet

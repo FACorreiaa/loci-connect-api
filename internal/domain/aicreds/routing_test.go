@@ -275,6 +275,42 @@ func TestModelReportsTheSharedProvider(t *testing.T) {
 	}
 }
 
+// Model is a process-wide label; ModelFor is the per-request answer a cache
+// key needs. With a brought key the two differ, and a key built from Model
+// would file the user's own model's answer under the shared one.
+func TestModelForNamesTheModelThatWillAnswer(t *testing.T) {
+	r, _, _ := newRouter(t)
+	alice := uuid.New()
+	if _, err := r.svc.Save(t.Context(), alice, Input{
+		Provider: "openrouter", APIKey: testKey, Model: "alice-model",
+	}); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if got := r.ModelFor(authed(t, alice)); got != "alice-model" {
+		t.Errorf("ModelFor(alice) = %q, want her own model", got)
+	}
+	if got := r.ModelFor(authed(t, uuid.New())); got != "shared-model" {
+		t.Errorf("ModelFor(no credential) = %q, want the shared model", got)
+	}
+	if got := r.ModelFor(t.Context()); got != "shared-model" {
+		t.Errorf("ModelFor(unauthenticated) = %q, want the shared model", got)
+	}
+	if r.Model() != "shared-model" {
+		t.Errorf("Model = %q; the process-wide label must not follow the caller", r.Model())
+	}
+}
+
+func TestModelForFollowsTheTier(t *testing.T) {
+	r, _, _ := newTieredRouter(t, "free")
+	if got := r.ModelFor(authed(t, uuid.New())); got != "free-model" {
+		t.Errorf("ModelFor(free plan) = %q, want the free chain", got)
+	}
+	if got := r.ModelFor(t.Context()); got != "paid-model" {
+		t.Errorf("ModelFor(unauthenticated) = %q, want the paid chain", got)
+	}
+}
+
 // planStub stands in for the subscription service.
 type planStub struct {
 	plan  string

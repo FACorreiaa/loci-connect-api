@@ -51,7 +51,12 @@ func (l *ServiceImpl) assembleEvidencePacket(cc *common.ChatContext) {
 	}
 	ctx := cc.Ctx
 
-	cc.CityID = l.resolveCityID(ctx, cc.CityName)
+	// The caller resolves the city before planning the generation, because the
+	// cache key prefers the id to the name. Only look it up again when it did
+	// not — one lookup per turn, whichever step needs it first.
+	if cc.CityID == uuid.Nil {
+		cc.CityID = l.resolveCityID(ctx, cc.CityName)
+	}
 	if cc.CityID == uuid.Nil {
 		observability.RecordUngroundedTurn("city_unresolved")
 		return
