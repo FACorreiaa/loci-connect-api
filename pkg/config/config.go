@@ -34,6 +34,11 @@ type CacheConfig struct {
 	LLMTTL     time.Duration
 	GeoTTL     time.Duration
 	CleanupTTL time.Duration
+	// GenerationsEnabled turns the durable generation cache (llm_generations)
+	// on. Off means the chat service neither reads nor writes the table and
+	// the in-memory store is the only cache — the kill-switch if a bad row
+	// ever has to be stopped from being served without a deploy.
+	GenerationsEnabled bool
 }
 
 const (
@@ -304,6 +309,8 @@ func Load() (*Config, error) {
 			LLMTTL:     getEnvAsDurationSeconds("CACHE_LLM_TTL_SEC", 5*time.Minute),
 			GeoTTL:     getEnvAsDurationSeconds("CACHE_GEO_TTL_SEC", 20*time.Minute),
 			CleanupTTL: getEnvAsDurationSeconds("CACHE_CLEANUP_TTL_SEC", 10*time.Minute),
+
+			GenerationsEnabled: getEnvAsBool("CACHE_GENERATIONS_ENABLED", true),
 		},
 		Observability: ObservabilityConfig{
 			MetricsEnabled: getEnvAsBool("METRICS_ENABLED", true),

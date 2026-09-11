@@ -680,3 +680,40 @@ func TestLoad_DevelopmentAllowsOpenRouterAuto(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 }
+
+func TestLoad_CacheGenerationsEnabled(t *testing.T) {
+	setRequired := func(t *testing.T) {
+		t.Helper()
+		t.Setenv("AI_PROVIDER", AIProviderGemini)
+		t.Setenv("GEMINI_API_KEY", "test-key")
+		t.Setenv("GEMINI_MODEL", "gemini-test")
+		t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+	}
+
+	cases := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		// The durable layer is on unless someone turns it off: the whole point
+		// of the table is that it works without configuration.
+		{name: "default on", env: "", want: true},
+		{name: "explicit off", env: "false", want: false},
+		{name: "explicit on", env: "true", want: true},
+		{name: "garbage keeps the default", env: "sometimes", want: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			setRequired(t)
+			t.Setenv("CACHE_GENERATIONS_ENABLED", tc.env)
+
+			cfg, err := Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.Cache.GenerationsEnabled != tc.want {
+				t.Errorf("Cache.GenerationsEnabled = %v, want %v", cfg.Cache.GenerationsEnabled, tc.want)
+			}
+		})
+	}
+}
