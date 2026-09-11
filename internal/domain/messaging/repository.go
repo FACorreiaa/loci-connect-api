@@ -40,6 +40,12 @@ type Link struct {
 	DisplayName string
 	LinkedAt    time.Time
 	LastSeenAt  *time.Time
+
+	// Email is the account's, and is filled in by LinkForChat alone. That is
+	// the only lookup that needs it — metering an inbound message against the
+	// owner's plan — and joining it onto the others would be a second table
+	// read for a field nothing there reads. Empty from every other path.
+	Email string
 }
 
 // Live reports whether the chat has ever been used since it was linked.
@@ -91,10 +97,27 @@ func scanLink(row pgx.Row) (Link, error) {
 	return l, nil
 }
 
-func (r *repository) LinkForChat(ctx context.Context, platform, externalID string) (Link, error) {
-	query := `SELECT ` + linkColumns + ` FROM messaging_links WHERE platform = $1 AND external_id = $2`
+func scanLinkWithEmail(row pgx.Row) (Link, error) {
+	var l Link
+	err := row.Scan(&l.UserID, &l.Platform, &l.ExternalID, &l.DisplayName, &l.LinkedAt, &l.LastSeenAt, &l.Email)
+	if err != nil {
+		return Link{}, err
+	}
+	return l, nil
+}
 
-	l, err := scanLink(r.pgpool.QueryRow(ctx, query, platform, externalID))
+func (r *repository) LinkForChat(ctx context.Context, platform, externalID string) (Link, error) {
+	// Joined rather than looked up separately because this runs once per
+	// inbound message and the account's email is what decides whether the
+	// owner's quota applies to it. An inner join cannot drop a row:
+	// messaging_links.user_id is NOT NULL and references users(id).
+	query := `
+		SELECT l.user_id, l.platform, l.external_id, l.display_name, l.linked_at, l.last_seen_at, u.email::text
+		FROM messaging_links l
+		JOIN users u ON u.id = l.user_id
+		WHERE l.platform = $1 AND l.external_id = $2`
+
+	l, err := scanLinkWithEmail(r.pgpool.QueryRow(ctx, query, platform, externalID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Link{}, ErrNotLinked
 	}

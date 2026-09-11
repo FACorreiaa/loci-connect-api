@@ -207,7 +207,15 @@ Commands the bot answers without spending a generation: `/start`, `/help`,
 
 A message from a linked chat acts as the account it is linked to. That is what
 makes the provider routing apply: if the account brought its own API key, the
-answer runs on it; if it is on the free tier, the free chain answers. Daily
-quota is **not** consumed over Telegram yet — the subscription interceptor runs
-in the Connect chain, which a chat message never enters. That is a known gap,
-not a design.
+answer runs on it; if it is on the free tier, the free chain answers. Both the
+account id and its email address travel with the request, because parts of it
+read one and parts read the other.
+
+Daily quota **is** consumed over Telegram. The subscription interceptor runs in
+the Connect chain, which a chat message never enters, so the bridge meters the
+message itself: asking for an itinerary here costs the same request that asking
+in the app does. Commands — `/start`, `/help`, `/unlink` — do not, and neither
+does anything sent by a chat that is not linked to an account yet.
+
+An account that has used up the day's requests is told so, and told when they
+reset, rather than being answered.

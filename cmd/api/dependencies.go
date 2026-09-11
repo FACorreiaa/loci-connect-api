@@ -385,10 +385,9 @@ func (d *Dependencies) initServices() error {
 	}
 	d.ChatService = chatSvc
 
-	// Both need the same sealer as the credential store, so they are built
-	// after it and are nil for the same reason it is.
+	// Needs the same sealer as the credential store, so it is built after it
+	// and is nil for the same reason it is.
 	d.initIntegrations()
-	d.initMessaging()
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
@@ -403,6 +402,10 @@ func (d *Dependencies) initServices() error {
 	}, d.Config.Subscription.ProEmails)
 	// Freemium list/place caps need EffectivePlan — rebind with the live service.
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService, d.FavoritesRepo, d.PreferenceRecorder)
+	// After SubscriptionService, not before: a message answered over Telegram
+	// now costs the sender a request the same way asking in the app does, and
+	// the bridge cannot meter what does not exist yet.
+	d.initMessaging()
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
 		APIKey:         d.Config.Stripe.APIKey,
@@ -503,7 +506,7 @@ func (d *Dependencies) initMessaging() {
 		chatbridge.New(d.ChatService, d.Logger),
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
-	)
+	).WithQuota(d.SubscriptionService)
 	d.telegramClient = telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil)
 }
 

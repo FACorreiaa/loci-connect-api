@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 )
 
 // PlatformTelegram is the only platform today. Named rather than spelled as a
@@ -47,13 +49,22 @@ type OutboundMessage struct {
 // asked in a chat continues in the web chat and back, because both go through
 // one session rather than two histories that happen to belong to one person.
 type Answerer interface {
-	Answer(ctx context.Context, userID uuid.UUID, text string) (string, error)
+	Answer(ctx context.Context, userID uuid.UUID, email, text string) (string, error)
+}
+
+// Quota meters what a chat costs against the account it is linked to.
+//
+// An interface so this package does not depend on the subscription domain, and
+// so it states the one thing it needs. Satisfied by subscription.Service.
+type Quota interface {
+	ConsumeQuota(ctx context.Context, userID uuid.UUID, email string) error
 }
 
 // Service links chats to accounts and routes what they send.
 type Service struct {
 	repo      Repository
 	answerer  Answerer
+	quota     Quota
 	botHandle string
 	logger    *slog.Logger
 	now       func() time.Time
@@ -75,6 +86,16 @@ func NewService(repo Repository, answerer Answerer, botHandle string, logger *sl
 // WithClock replaces the service's clock, for tests.
 func (s *Service) WithClock(now func() time.Time) *Service {
 	s.now = now
+	return s
+}
+
+// WithQuota meters answered messages against the account's daily plan.
+//
+// A builder rather than a constructor argument so the existing callers and
+// their tests are untouched, and so a nil quota keeps meaning "unmetered",
+// which is what a test that is not about metering wants.
+func (s *Service) WithQuota(q Quota) *Service {
+	s.quota = q
 	return s
 }
 
@@ -147,11 +168,15 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 		s.logger.WarnContext(ctx, "could not record chat activity", slog.String("error", err.Error()))
 	}
 
+	if out, spent := s.spendQuota(ctx, link); !spent {
+		return out, nil
+	}
+
 	if s.answerer == nil {
 		return OutboundMessage{Text: "I cannot answer right now. Try again shortly."}, nil
 	}
 
-	answer, err := s.answerer.Answer(ctx, link.UserID, text)
+	answer, err := s.answerer.Answer(ctx, link.UserID, link.Email, text)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "could not answer a chat message",
 			slog.String("user_id", link.UserID.String()),
@@ -161,6 +186,43 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 		return OutboundMessage{Text: "Something went wrong working that out. Try again in a moment."}, nil
 	}
 	return OutboundMessage{Text: answer}, nil
+}
+
+// spendQuota charges one request to the account behind a chat.
+//
+// It runs after the commands, not before them: Handle's ordering already says
+// that a recognised command never reaches the model, and "/help" must not cost
+// somebody a generation to read instructions.
+//
+// Until now nothing metered this path at all — the webhook is mounted outside
+// the Connect interceptor chain, so a message sent to the bot was a way around
+// the plan limit the same message would have hit in the app. Answering the
+// same question should cost the same wherever it was asked.
+func (s *Service) spendQuota(ctx context.Context, link Link) (OutboundMessage, bool) {
+	if s.quota == nil {
+		return OutboundMessage{}, true
+	}
+
+	err := s.quota.ConsumeQuota(ctx, link.UserID, link.Email)
+	switch {
+	case err == nil:
+		return OutboundMessage{}, true
+
+	case errors.Is(err, subscription.ErrQuotaExceeded):
+		return OutboundMessage{
+			Text: "That is today's requests used up on your plan. They reset at midnight UTC — " +
+				"or open Loci under Settings › Plan to lift the limit.",
+		}, false
+
+	default:
+		// The counter itself failed, which is not the sender's doing. Answering
+		// anyway would make a database blip a free pass, so it refuses, but it
+		// refuses in a way that says to try again rather than to upgrade.
+		s.logger.ErrorContext(ctx, "could not meter a chat message",
+			slog.String("user_id", link.UserID.String()),
+			slog.String("error", err.Error()))
+		return OutboundMessage{Text: "Something went wrong checking your plan. Try again in a moment."}, false
+	}
 }
 
 // handleUnlinked answers a chat that belongs to no account.

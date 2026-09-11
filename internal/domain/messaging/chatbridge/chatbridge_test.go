@@ -70,7 +70,7 @@ func TestAMessageContinuesTheMostRecentConversation(t *testing.T) {
 	existing := uuid.New()
 	chat := &fakeChat{sessions: []locitypes.ChatSession{{ID: existing}}}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "make day two quieter")
+	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "make day two quieter")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestAMessageContinuesTheMostRecentConversation(t *testing.T) {
 func TestTheFirstMessageStartsAConversation(t *testing.T) {
 	chat := &fakeChat{}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon")
+	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestAnExpiredSessionFallsBackToStartingOne(t *testing.T) {
 		continueErr: errors.New("session expired"),
 	}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon")
+	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestAnExpiredSessionFallsBackToStartingOne(t *testing.T) {
 func TestAFailureToListSessionsStillAnswers(t *testing.T) {
 	chat := &fakeChat{listErr: errors.New("database is having a moment")}
 
-	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon"); err != nil {
+	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err != nil {
 		t.Fatalf("answer: %v", err)
 	}
 	if !chat.started {
@@ -140,7 +140,7 @@ func TestAFailureToListSessionsStillAnswers(t *testing.T) {
 func TestAnEmptyModelReplyStillSaysSomething(t *testing.T) {
 	chat := &fakeChat{reply: "   "}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon")
+	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -150,10 +150,10 @@ func TestAnEmptyModelReplyStillSaysSomething(t *testing.T) {
 }
 
 func TestNothingToAnswerIsAnError(t *testing.T) {
-	if _, err := New(&fakeChat{}, nil).Answer(t.Context(), uuid.New(), "   "); err == nil {
+	if _, err := New(&fakeChat{}, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "   "); err == nil {
 		t.Error("an empty message was answered")
 	}
-	if _, err := New(nil, nil).Answer(t.Context(), uuid.New(), "hello"); err == nil {
+	if _, err := New(nil, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "hello"); err == nil {
 		t.Error("a message was answered with no chat service")
 	}
 }
@@ -162,7 +162,7 @@ func TestNothingToAnswerIsAnError(t *testing.T) {
 func TestAFailureToStartIsReported(t *testing.T) {
 	chat := &fakeChat{startErr: errors.New("no provider")}
 
-	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "three days in Lisbon"); err == nil {
+	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err == nil {
 		t.Error("a failure to start a conversation was swallowed")
 	}
 }
@@ -176,7 +176,7 @@ func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
 
 	t.Run("starting", func(t *testing.T) {
 		chat := &fakeChat{}
-		if _, err := New(chat, nil).Answer(t.Context(), userID, "three days in Lisbon"); err != nil {
+		if _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "three days in Lisbon"); err != nil {
 			t.Fatalf("answer: %v", err)
 		}
 		if chat.callerSeen != userID.String() {
@@ -186,7 +186,7 @@ func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
 
 	t.Run("continuing", func(t *testing.T) {
 		chat := &fakeChat{sessions: []locitypes.ChatSession{{ID: uuid.New()}}}
-		if _, err := New(chat, nil).Answer(t.Context(), userID, "make day two quieter"); err != nil {
+		if _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "make day two quieter"); err != nil {
 			t.Fatalf("answer: %v", err)
 		}
 		if chat.callerSeen != userID.String() {
