@@ -22,7 +22,12 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13.0
+          # v2.13.0 hangs. Its staticcheck loops on internal/domain/chat/handler
+          # and internal/domain/chat/service and never returns: runs sat over an
+          # hour and ignored cancellation, which made every PR look stuck on
+          # lint. v2.13.2 lints the same tree in about five seconds. Keep this
+          # in lockstep with .githooks/pre-commit, which runs the same binary.
+          version: v2.13.2
           install-mode: goinstall
           only-new-issues: true
       - name: Go Vet
