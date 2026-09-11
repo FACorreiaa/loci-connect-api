@@ -270,3 +270,59 @@ func TestWithoutPersonalDropsVisitHistoryAndTraits(t *testing.T) {
 		t.Error("nil packet did not stay nil")
 	}
 }
+
+func TestStripCitationReturnsTheNameAndTheID(t *testing.T) {
+	id := uuid.New()
+
+	cases := []struct {
+		name     string
+		in       string
+		wantName string
+		wantID   uuid.UUID
+		wantOK   bool
+	}{
+		{
+			name:     "trailing marker",
+			in:       "Ribeira Brava Town Center [poi:" + id.String() + "]",
+			wantName: "Ribeira Brava Town Center",
+			wantID:   id,
+			wantOK:   true,
+		},
+		{
+			name:     "marker mid-string leaves one space",
+			in:       "Sé Cathedral [poi:" + id.String() + "] (Funchal)",
+			wantName: "Sé Cathedral (Funchal)",
+			wantID:   id,
+			wantOK:   true,
+		},
+		{
+			name:     "no marker is returned unchanged",
+			in:       "Cabo Girão",
+			wantName: "Cabo Girão",
+			wantID:   uuid.Nil,
+			wantOK:   false,
+		},
+		{
+			name:     "a malformed uuid is not a citation",
+			in:       "Pico do Arieiro [poi:not-a-uuid]",
+			wantName: "Pico do Arieiro [poi:not-a-uuid]",
+			wantID:   uuid.Nil,
+			wantOK:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotName, gotID, gotOK := StripCitation(tc.in)
+			if gotName != tc.wantName {
+				t.Errorf("name: got %q, want %q", gotName, tc.wantName)
+			}
+			if gotID != tc.wantID {
+				t.Errorf("id: got %v, want %v", gotID, tc.wantID)
+			}
+			if gotOK != tc.wantOK {
+				t.Errorf("ok: got %v, want %v", gotOK, tc.wantOK)
+			}
+		})
+	}
+}

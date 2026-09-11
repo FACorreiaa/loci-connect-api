@@ -12,10 +12,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -112,11 +114,143 @@ func (a *Answerer) latestSession(ctx context.Context, userID uuid.UUID) (uuid.UU
 }
 
 // reply extracts the text a chat platform can send.
+//
+// Prose wins when the model wrote any: it is the answer to what was asked.
+// With none, the itinerary itself is rendered rather than announced — a
+// traveller who asked in a chat wants the plan in that chat, not a pointer to
+// a browser. The client splits anything past Telegram's limit, so length here
+// costs extra messages rather than a truncated plan.
 func reply(response *locitypes.ChatResponse) string {
-	if response == nil || strings.TrimSpace(response.Message) == "" {
-		// The itinerary is in the app; the model returned no prose to go with
-		// it. Saying so is better than sending an empty message.
+	if response == nil {
 		return "Done — open Loci to see it."
 	}
-	return response.Message
+	if text := strings.TrimSpace(response.Message); text != "" {
+		return text
+	}
+	if itinerary := renderItinerary(response.UpdatedItinerary); itinerary != "" {
+		return itinerary
+	}
+	// Nothing to render: the turn produced neither prose nor a plan.
+	return "Done — open Loci to see it."
+}
+
+// maxRenderedPOIs caps how many places each section of a chat reply carries.
+//
+// A long reply is split across messages rather than cut, so the cap is about
+// what a person will read in a chat, not about Telegram's limit.
+const maxRenderedPOIs = 12
+
+// renderItinerary turns a plan into plain text, or "" when there is none.
+//
+// Two sections: the itinerary's own stops, then the rest of the city worth
+// seeing. A traveller asked one question and wants both answers — the plan to
+// follow, and what else is around — without opening anything.
+func renderItinerary(city *locitypes.AiCityResponse) string {
+	if city == nil {
+		return ""
+	}
+
+	plan := city.AIItineraryResponse
+
+	var b strings.Builder
+	if name := strings.TrimSpace(plan.ItineraryName); name != "" {
+		b.WriteString(name)
+		b.WriteString("\n\n")
+	}
+	if overview := strings.TrimSpace(plan.OverallDescription); overview != "" {
+		b.WriteString(overview)
+		b.WriteString("\n\n")
+	}
+
+	itinerary := byDistance(plan.PointsOfInterest)
+	writePOIs(&b, itinerary)
+
+	// The general list repeats the plan's places often enough to be worth
+	// filtering: the same name twice in one message reads as a mistake.
+	seen := make(map[string]struct{}, len(itinerary))
+	for _, poi := range itinerary {
+		seen[dedupKey(poi.Name)] = struct{}{}
+	}
+	var rest []locitypes.POIDetailedInfo
+	for _, poi := range city.PointsOfInterest {
+		if _, dup := seen[dedupKey(poi.Name)]; dup {
+			continue
+		}
+		rest = append(rest, poi)
+	}
+	if len(rest) > 0 {
+		if b.Len() > 0 {
+			b.WriteString("\nAlso in the city\n")
+		}
+		writePOIs(&b, byDistance(rest))
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+// dedupKey compares places by the name a reader sees, so the same place cited
+// in one list and not the other is still recognised as the same place.
+func dedupKey(name string) string {
+	clean, _, _ := retrieval.StripCitation(name)
+	return strings.ToLower(strings.TrimSpace(clean))
+}
+
+// byDistance orders places nearest first.
+//
+// A distance of zero means "not known" rather than "at the centre" — the
+// field is optional and an ungrounded answer leaves it empty — so those keep
+// their original order at the end instead of claiming the closest spots.
+func byDistance(pois []locitypes.POIDetailedInfo) []locitypes.POIDetailedInfo {
+	ordered := make([]locitypes.POIDetailedInfo, len(pois))
+	copy(ordered, pois)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		a, b := ordered[i].Distance, ordered[j].Distance
+		switch {
+		case a <= 0 && b <= 0:
+			return false // both unknown: leave them as they came
+		case a <= 0:
+			return false // unknown sorts after anything measured
+		case b <= 0:
+			return true
+		default:
+			return a < b
+		}
+	})
+	return ordered
+}
+
+// writePOIs appends one section of places, capped and counted.
+func writePOIs(b *strings.Builder, pois []locitypes.POIDetailedInfo) {
+	for i, poi := range pois {
+		if i == maxRenderedPOIs {
+			fmt.Fprintf(b, "\n…and %d more in Loci.\n", len(pois)-maxRenderedPOIs)
+			return
+		}
+		// A grounded answer carries its [poi:<uuid>] citation in the name.
+		// The reader gets the name; the id is what a map link would use.
+		name, _, _ := retrieval.StripCitation(poi.Name)
+		if name == "" {
+			continue
+		}
+		b.WriteString("• ")
+		b.WriteString(name)
+		if category := strings.TrimSpace(poi.Category); category != "" {
+			b.WriteString(" — ")
+			b.WriteString(category)
+		}
+		if poi.Distance > 0 {
+			fmt.Fprintf(b, " (%.1f km)", poi.Distance)
+		}
+		// DescriptionPOI is the itinerary-specific note; Description is the
+		// POI's general one. Either reads better than the name alone.
+		detail := strings.TrimSpace(poi.DescriptionPOI)
+		if detail == "" {
+			detail = strings.TrimSpace(poi.Description)
+		}
+		if detail != "" {
+			b.WriteString("\n  ")
+			b.WriteString(detail)
+		}
+		b.WriteString("\n")
+	}
 }
