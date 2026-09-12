@@ -436,8 +436,8 @@ func (m *MockLLMInteractionRepository) SaveSinglePOI(ctx context.Context, poi lo
 	return args.Get(0).(uuid.UUID), args.Error(1)
 }
 
-func (m *MockLLMInteractionRepository) GetPOIsBySessionSortedByDistance(ctx context.Context, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
-	args := m.Called(ctx, sessionID, cityID, userLocation)
+func (m *MockLLMInteractionRepository) GetPOIsBySessionSortedByDistance(ctx context.Context, userID, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
+	args := m.Called(ctx, userID, sessionID, cityID, userLocation)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

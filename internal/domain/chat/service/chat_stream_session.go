@@ -231,7 +231,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		}
 
 		if (intent == locitypes.IntentAddPOI || intent == locitypes.IntentModifyItinerary) && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
-			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, sessionID, cityID, *userLocation)
+			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, session.UserID, sessionID, cityID, *userLocation)
 			if err != nil {
 				l.logger.WarnContext(ctx, "Failed to sort POIs by distance", slog.Any("error", err))
 				span.RecordError(err)
