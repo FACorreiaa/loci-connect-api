@@ -115,19 +115,49 @@ func (c *Client) GetWebhookInfo(ctx context.Context) (WebhookInfo, error) {
 	return info, nil
 }
 
+// Recording is a voice note or a round video message.
+//
+// Duration and FileSize are the reason this is decoded at all: they are what
+// let a recording that is too long be refused from the update itself, before
+// anything is downloaded or sent to a model. Refusing afterwards costs a
+// download and a transcription for an answer nobody gets.
+type Recording struct {
+	FileID   string `json:"file_id"`
+	Duration int    `json:"duration"`
+	MIMEType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
+}
+
+// Message is one message from a chat.
+//
+// A named type rather than an anonymous one because the adapter now passes it
+// around — deciding which kind of recording it carries, and whether that one
+// is within limits — and an anonymous struct cannot be a parameter.
+type Message struct {
+	Chat struct {
+		ID int64 `json:"id"`
+	} `json:"chat"`
+	From *struct {
+		FirstName string `json:"first_name"`
+		Username  string `json:"username"`
+	} `json:"from"`
+	Text string `json:"text"`
+	// Caption is what a recording sent with a note carries. Telegram puts
+	// nothing in Text for those, so without this the note is lost.
+	Caption string `json:"caption"`
+	// Voice is a voice note: the "hold to record" bubble, always Opus in an
+	// Ogg container.
+	Voice *Recording `json:"voice"`
+	// VideoNote is the round video message. It carries no mime_type — it is
+	// always MP4 — and is capped more tightly than a voice note because it is
+	// billed as video; see config.VoiceConfig.
+	VideoNote *Recording `json:"video_note"`
+}
+
 // Update is one entry from the bot's update stream.
 type Update struct {
-	UpdateID int64 `json:"update_id"`
-	Message  *struct {
-		Chat struct {
-			ID int64 `json:"id"`
-		} `json:"chat"`
-		From *struct {
-			FirstName string `json:"first_name"`
-			Username  string `json:"username"`
-		} `json:"from"`
-		Text string `json:"text"`
-	} `json:"message"`
+	UpdateID int64    `json:"update_id"`
+	Message  *Message `json:"message"`
 }
 
 // GetUpdates long-polls for messages from offset onwards.
@@ -172,7 +202,17 @@ func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
 // enough that a silent chat looks broken, but failing to say "typing" is not a
 // reason to fail the answer.
 func (c *Client) SendTyping(ctx context.Context, chatID string) {
-	_ = c.call(ctx, "sendChatAction", map[string]any{"chat_id": chatID, "action": "typing"}, nil)
+	c.SendAction(ctx, chatID, "typing")
+}
+
+// SendAction shows one of Telegram's activity indicators.
+//
+// "record_voice" is the one worth having beyond typing: synthesising a spoken
+// reply adds several seconds after the written answer has already arrived, and
+// the indicator is the only thing saying that wait is deliberate rather than
+// the bot having stopped.
+func (c *Client) SendAction(ctx context.Context, chatID, action string) {
+	_ = c.call(ctx, "sendChatAction", map[string]any{"chat_id": chatID, "action": action}, nil)
 }
 
 // call performs one Bot API method.
@@ -212,6 +252,16 @@ func (c *Client) call(ctx context.Context, method string, body map[string]any, o
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	return c.decodeEnvelope(resp, method, out)
+}
+
+// decodeEnvelope reads one Bot API response.
+//
+// Shared by call and by the multipart upload path rather than written twice:
+// the response shape is the same whichever way the request was sent, and so
+// are the three rules about it — bounded read, 409 named rather than retried,
+// and the description sanitised before it can reach a log.
+func (c *Client) decodeEnvelope(resp *http.Response, method string, out any) error {
 	// Bounded: this is somebody else's server, and an unbounded read from it is
 	// a way to run out of memory.
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 )
 
 type fakeRepo struct {
@@ -119,16 +121,18 @@ func (f *fakeRepo) SetCursor(_ context.Context, platform, accountID string, upda
 // spyAnswerer records what reached the model, which is how the tests below
 // prove that commands did not.
 type spyAnswerer struct {
-	calls  int
-	lastID uuid.UUID
-	last   string
-	answer string
-	err    error
+	calls     int
+	lastID    uuid.UUID
+	lastEmail string
+	last      string
+	answer    string
+	err       error
 }
 
-func (s *spyAnswerer) Answer(_ context.Context, userID uuid.UUID, text string) (string, error) {
+func (s *spyAnswerer) Answer(_ context.Context, userID uuid.UUID, email, text string) (string, error) {
 	s.calls++
 	s.lastID = userID
+	s.lastEmail = email
 	s.last = text
 	if s.err != nil {
 		return "", s.err
@@ -149,7 +153,8 @@ func linkChat(t *testing.T, repo *fakeRepo, chatID string) uuid.UUID {
 	t.Helper()
 	userID := uuid.New()
 	repo.links[chatKey(PlatformTelegram, chatID)] = Link{
-		UserID: userID, Platform: PlatformTelegram, ExternalID: chatID, LinkedAt: time.Now(),
+		UserID: userID, Platform: PlatformTelegram, ExternalID: chatID,
+		LinkedAt: time.Now(), Email: "traveller@example.com",
 	}
 	return userID
 }
@@ -387,5 +392,294 @@ func TestIssueCodeRefusesPlatformsLociDoesNotLink(t *testing.T) {
 	svc, _, _ := newService(t)
 	if _, _, err := svc.IssueCode(t.Context(), uuid.New(), "whatsapp"); err == nil {
 		t.Error("a code was issued for a platform with no adapter")
+	}
+}
+
+// spyQuota records what was metered, and can refuse.
+type spyQuota struct {
+	calls  int
+	lastID uuid.UUID
+	last   string
+	err    error
+}
+
+func (q *spyQuota) ConsumeQuota(_ context.Context, userID uuid.UUID, email string) error {
+	q.calls++
+	q.lastID = userID
+	q.last = email
+	return q.err
+}
+
+func newMeteredService(t *testing.T) (*Service, *fakeRepo, *spyAnswerer, *spyQuota) {
+	t.Helper()
+	svc, repo, answerer := newService(t)
+	quota := &spyQuota{}
+	return svc.WithQuota(quota), repo, answerer, quota
+}
+
+// The gap this closes: a question asked over Telegram used to cost nothing,
+// because the webhook is mounted outside the interceptor chain that meters
+// the same question asked in the app.
+func TestAnAnsweredMessageCostsTheOwnerARequest(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	userID := linkChat(t, repo, "555")
+
+	send(t, svc, "555", "three days in Lisbon")
+
+	if quota.calls != 1 {
+		t.Fatalf("quota consumed %d times, want once", quota.calls)
+	}
+	if quota.lastID != userID {
+		t.Errorf("metered %s, want the linked owner %s", quota.lastID, userID)
+	}
+	// The address is what the complimentary-account list is matched on, so a
+	// half-identified caller is metered differently here than in the app.
+	if quota.last != "traveller@example.com" {
+		t.Errorf("metered without the owner's address: %q", quota.last)
+	}
+	if answerer.calls != 1 {
+		t.Errorf("the answerer ran %d times", answerer.calls)
+	}
+}
+
+func TestQuotaIsSpentBeforeTheModelRuns(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	linkChat(t, repo, "555")
+	quota.err = &subscription.QuotaExceededError{Plan: "free", Limit: 10}
+
+	out := send(t, svc, "555", "three days in Lisbon")
+
+	if answerer.calls != 0 {
+		t.Error("a refused message still reached the model")
+	}
+	if !strings.Contains(out.Text, "reset") {
+		t.Errorf("the refusal should say when the limit lifts: %q", out.Text)
+	}
+	if out.Silent {
+		t.Error("the refusal was not sent")
+	}
+}
+
+// Reading the instructions must not cost a generation. That guarantee predates
+// metering; this is what pins it now that there is something to spend.
+func TestCommandsAndCodesAreFree(t *testing.T) {
+	t.Run("a command", func(t *testing.T) {
+		svc, repo, _, quota := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		for _, command := range []string{"/help", "/start"} {
+			send(t, svc, "555", command)
+		}
+		if quota.calls != 0 {
+			t.Errorf("commands consumed %d requests", quota.calls)
+		}
+	})
+
+	t.Run("an unlinked chat", func(t *testing.T) {
+		svc, _, _, quota := newMeteredService(t)
+
+		send(t, svc, "555", "hello?")
+		send(t, svc, "555", "ABCD1234")
+
+		// Nobody to charge, and nothing was spent on their behalf.
+		if quota.calls != 0 {
+			t.Errorf("an unlinked chat consumed %d requests", quota.calls)
+		}
+	})
+
+	t.Run("an empty message", func(t *testing.T) {
+		svc, repo, _, quota := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		send(t, svc, "555", "   ")
+		if quota.calls != 0 {
+			t.Errorf("an empty message consumed %d requests", quota.calls)
+		}
+	})
+}
+
+// A blip in the counter must not become a free pass, but it must not read as
+// "you are out of requests" either.
+func TestAMeteringFailureRefusesWithoutBlamingThePlan(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	linkChat(t, repo, "555")
+	quota.err = errors.New("the database went away")
+
+	out := send(t, svc, "555", "three days in Lisbon")
+
+	if answerer.calls != 0 {
+		t.Error("the model ran despite the counter failing")
+	}
+	if strings.Contains(out.Text, "plan") && strings.Contains(out.Text, "reset") {
+		t.Errorf("a counter failure should not read as a quota refusal: %q", out.Text)
+	}
+	if out.Text == "" {
+		t.Error("the sender was told nothing")
+	}
+}
+
+// A service built without a quota answers as it always did, which is what the
+// tests that are not about metering rely on.
+func TestWithoutAQuotaNothingIsMetered(t *testing.T) {
+	svc, repo, answerer := newService(t)
+	linkChat(t, repo, "555")
+
+	send(t, svc, "555", "three days in Lisbon")
+
+	if answerer.calls != 1 {
+		t.Errorf("the answerer ran %d times, want once", answerer.calls)
+	}
+}
+
+// spokenBy builds an inbound recording whose transcript is text, recording
+// whether it was ever asked for.
+func spokenBy(text string, err error) (InboundMessage, *bool) {
+	asked := new(bool)
+	return InboundMessage{
+		Platform: PlatformTelegram, ChatID: "555", DisplayName: "Fernando",
+		Audio: func(context.Context, uuid.UUID) (string, error) {
+			*asked = true
+			return text, err
+		},
+	}, asked
+}
+
+// The hole this closes: anybody can message a bot. Fetching and transcribing a
+// recording costs money, so a chat with no account behind it must not be able
+// to start that — otherwise a stranger spends the owner's credits a minute of
+// audio at a time, which is worse than the metering gap it would be working
+// around.
+func TestAnUnlinkedChatIsNeverTranscribed(t *testing.T) {
+	svc, _, answerer, quota := newMeteredService(t)
+	in, asked := spokenBy("three days in Lisbon", nil)
+
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if *asked {
+		t.Error("a recording from an unlinked chat was transcribed")
+	}
+	if quota.calls != 0 {
+		t.Error("an unlinked chat spent somebody's quota")
+	}
+	if answerer.calls != 0 {
+		t.Error("an unlinked chat reached the model")
+	}
+	if !strings.Contains(out.Text, "not linked") {
+		t.Errorf("the reply should explain how to link: %q", out.Text)
+	}
+}
+
+func TestARecordingIsPaidForBeforeItIsFetched(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	linkChat(t, repo, "555")
+	quota.err = &subscription.QuotaExceededError{Plan: "free", Limit: 10}
+
+	in, asked := spokenBy("three days in Lisbon", nil)
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	// Out of quota costs nothing: no download, no transcription, no model.
+	if *asked {
+		t.Error("a recording was fetched for an account with no requests left")
+	}
+	if answerer.calls != 0 {
+		t.Error("the model ran for an account with no requests left")
+	}
+	if !strings.Contains(out.Text, "reset") {
+		t.Errorf("the refusal should say when the limit lifts: %q", out.Text)
+	}
+}
+
+func TestARecordingIsAnsweredAsThoughItWereTyped(t *testing.T) {
+	svc, repo, answerer, quota := newMeteredService(t)
+	userID := linkChat(t, repo, "555")
+
+	in, asked := spokenBy("  three days in Lisbon  ", nil)
+	out, err := svc.Handle(t.Context(), in)
+	if err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if !*asked {
+		t.Fatal("the recording was never transcribed")
+	}
+	if quota.calls != 1 {
+		t.Errorf("quota consumed %d times, want once", quota.calls)
+	}
+	if answerer.calls != 1 {
+		t.Fatalf("the model ran %d times", answerer.calls)
+	}
+	// Same session, same account, same everything as typing it would be.
+	if answerer.lastID != userID {
+		t.Errorf("answered as %s, want the linked owner %s", answerer.lastID, userID)
+	}
+	if answerer.last != "three days in Lisbon" {
+		t.Errorf("the model saw %q, want the trimmed transcript", answerer.last)
+	}
+	if out.Text != "here is a plan" {
+		t.Errorf("reply = %q", out.Text)
+	}
+}
+
+func TestSilenceAndFailureAreToldApart(t *testing.T) {
+	t.Run("nothing was said", func(t *testing.T) {
+		svc, repo, answerer, _ := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		in, _ := spokenBy("   ", nil)
+		out, err := svc.Handle(t.Context(), in)
+		if err != nil {
+			t.Fatalf("handle: %v", err)
+		}
+		if answerer.calls != 0 {
+			t.Error("an empty transcript still reached the model")
+		}
+		if !strings.Contains(out.Text, "hear anything") {
+			t.Errorf("reply = %q, want it to say nothing was heard", out.Text)
+		}
+	})
+
+	t.Run("it could not be understood", func(t *testing.T) {
+		svc, repo, answerer, _ := newMeteredService(t)
+		linkChat(t, repo, "555")
+
+		in, _ := spokenBy("", errors.New("the provider went away"))
+		out, err := svc.Handle(t.Context(), in)
+		if err != nil {
+			t.Fatalf("handle: %v", err)
+		}
+		if answerer.calls != 0 {
+			t.Error("a failed transcription still reached the model")
+		}
+		// Different advice: silence means speak again, a failure means the
+		// keyboard is the way through.
+		if !strings.Contains(out.Text, "type it") {
+			t.Errorf("reply = %q, want it to offer typing instead", out.Text)
+		}
+	})
+}
+
+// Nobody says "slash help", so a transcript never carries the slash
+// parseCommand matches on. Running commands over a transcript would only make
+// "help" land as an unanswerable question.
+func TestASpokenMessageIsNotTreatedAsACommand(t *testing.T) {
+	svc, repo, answerer, _ := newMeteredService(t)
+	linkChat(t, repo, "555")
+
+	in, _ := spokenBy("/unlink", nil)
+	if _, err := svc.Handle(t.Context(), in); err != nil {
+		t.Fatalf("handle: %v", err)
+	}
+
+	if answerer.calls != 1 {
+		t.Errorf("the model ran %d times, want the transcript answered as a question", answerer.calls)
+	}
+	if _, err := repo.LinkForChat(t.Context(), PlatformTelegram, "555"); err != nil {
+		t.Error("a spoken \"/unlink\" disconnected the chat")
 	}
 }

@@ -207,7 +207,71 @@ Commands the bot answers without spending a generation: `/start`, `/help`,
 
 A message from a linked chat acts as the account it is linked to. That is what
 makes the provider routing apply: if the account brought its own API key, the
-answer runs on it; if it is on the free tier, the free chain answers. Daily
-quota is **not** consumed over Telegram yet — the subscription interceptor runs
-in the Connect chain, which a chat message never enters. That is a known gap,
-not a design.
+answer runs on it; if it is on the free tier, the free chain answers. Both the
+account id and its email address travel with the request, because parts of it
+read one and parts read the other.
+
+Daily quota **is** consumed over Telegram. The subscription interceptor runs in
+the Connect chain, which a chat message never enters, so the bridge meters the
+message itself: asking for an itinerary here costs the same request that asking
+in the app does. Commands — `/start`, `/help`, `/unlink` — do not, and neither
+does anything sent by a chat that is not linked to an account yet.
+
+An account that has used up the day's requests is told so, and told when they
+reset, rather than being answered.
+
+## Recordings
+
+Send the bot a voice note and it answers the same way it answers a typed
+question: same session, same account, same itinerary. Round video messages work
+too, and can be turned off on their own. Replies come back as text — the bot
+does not speak.
+
+Transcription runs on **the cluster's own speech-to-text service**, not a paid
+API. It costs nothing per request, needs no key, and no audio leaves the
+cluster. See `platform/infra/docs/transcription.md`.
+
+    TRANSCRIBE_PROVIDER_OPENAI_BASEURL=http://whisper.horus.svc.cluster.local:8000/v1
+    TRANSCRIBE_PROVIDER_OPENAI_MODEL=Systran/faster-whisper-small
+
+**Use the multilingual model, not `small.en`.** The English-only one does not
+merely mangle Portuguese, it hallucinates fluent English over it: asked to
+transcribe *"quero passar três dias em Lisboa, no bairro de Alfama"* it answered
+*"I hope you enjoyed this video, and don't forget to like, comment and
+subscribe!"* — which would then be echoed back and planned against.
+
+**The app must be named in `allow-whisper`** in the infra repo's
+`cluster/network-policies/horus.yaml`. `horus` is default-deny ingress, and
+without that entry every request fails in a way that reads exactly like the
+service being down.
+
+What happens to a recording, in order:
+
+1. Its length and size are checked against the update itself. Anything past the
+   cap is refused without being downloaded.
+2. The chat is resolved to an account and the account's quota is spent. **An
+   unlinked chat is never transcribed.**
+3. The account's place names are looked up and sent as a vocabulary hint. This
+   is not decoration — without it *"take me to Cais do Sodré, then Bairro Alto
+   and Belém"* comes back as *"Case 2 Soda, then Baro Alto and Bellum"*.
+4. The recording is transcribed and the transcript is echoed back before the
+   answer is worked out.
+5. The answer is sent.
+
+**Expect seconds, not milliseconds.** The service is CPU-bound on a single
+replica shared with other apps — measured at roughly 2.5× the length of the
+clip. A 45-second cap means up to about two minutes of transcription before
+generation even starts, which is why the typing indicator runs throughout.
+
+A recording cannot carry a link code — a transcript of "A3F9C1D2" read aloud is
+"a three F nine see one D two" — and cannot be a command, because nobody says
+"slash help". A recording is metered whatever it turns out to say: the
+transcript is what would tell us it said "help", and taking it is the expense.
+
+| Symptom | Cause |
+|---|---|
+| Bot says voice is switched off | `TRANSCRIBE_PROVIDER_OPENAI_BASEURL` empty, or the app is not in `allow-whisper`. |
+| "I am behind on voice notes" | The service is queuing — it is one CPU-bound replica shared with other apps. |
+| Fluent English from foreign speech | The model is `small.en`. Use the multilingual one. |
+| Place names mangled | The vocabulary hint is empty, which it is until the account has a session with a city on it. |
+

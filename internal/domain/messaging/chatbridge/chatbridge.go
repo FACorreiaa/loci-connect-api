@@ -53,7 +53,7 @@ func New(chat Chat, logger *slog.Logger) *Answerer {
 // means the same trip; starting a new session would answer a question nobody
 // asked. A message that cannot be continued starts a session rather than
 // failing, so the reply is an itinerary rather than an apology.
-func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, text string) (string, error) {
+func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, email, text string) (string, error) {
 	if a.chat == nil {
 		return "", errors.New("chatbridge: no chat service configured")
 	}
@@ -68,7 +68,12 @@ func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, text string) (s
 	// context to pick their own key and their plan's chain, and with none it
 	// serves Loci's shared provider to everyone. The link already resolved
 	// the account; this is what makes the rest of the request act as it.
-	ctx = interceptors.ContextWithClaims(ctx, &interceptors.Claims{UserID: userID.String()})
+	//
+	// The email travels with the id because parts of the request read one and
+	// parts read the other — the complimentary-account list is matched on the
+	// address — and a caller who is half-identified behaves differently here
+	// than the same person does in the app.
+	ctx = interceptors.ContextWithClaims(ctx, &interceptors.Claims{UserID: userID.String(), Email: email})
 
 	if sessionID, ok := a.latestSession(ctx, userID); ok {
 		response, err := a.chat.ContinueChat(ctx, userID, sessionID, text, "")

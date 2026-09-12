@@ -57,6 +57,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/vocabulary"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
@@ -65,6 +66,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
+	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/google/uuid"
 )
@@ -116,6 +118,13 @@ type Dependencies struct {
 	Integrations *integrations.Service
 	// Messaging is nil when no chat platform is configured.
 	Messaging *messaging.Service
+	// Speech is never nil, but reports itself disabled when nothing is
+	// configured, which is a supported state: the bot answers text and says so
+	// when a recording arrives.
+	Speech *speech.Client
+	// Vocabulary is the place names a speaker is likely to use, which is the
+	// difference between "Cais do Sodré" and "Case 2 Soda".
+	Vocabulary *vocabulary.Places
 	// telegramClient is built once with the service, so the poller and the
 	// webhook — whichever mode runs — share one client and one token.
 	telegramClient *telegram.Client
@@ -385,10 +394,9 @@ func (d *Dependencies) initServices() error {
 	}
 	d.ChatService = chatSvc
 
-	// Both need the same sealer as the credential store, so they are built
-	// after it and are nil for the same reason it is.
+	// Needs the same sealer as the credential store, so it is built after it
+	// and is nil for the same reason it is.
 	d.initIntegrations()
-	d.initMessaging()
 	d.DiscoverSvc = discoverdomain.NewServiceImpl(d.DiscoverRepo, d.Logger)
 	d.StatisticsSvc = statistics.NewService(d.StatisticsRepo, d.Logger)
 	d.RecentsSvc = recents.NewService(d.RecentsRepo, d.Logger)
@@ -403,6 +411,11 @@ func (d *Dependencies) initServices() error {
 	}, d.Config.Subscription.ProEmails)
 	// Freemium list/place caps need EffectivePlan — rebind with the live service.
 	d.ListSvc = itinerarylist.NewServiceImpl(d.ListRepo, d.Logger, d.SubscriptionService, d.FavoritesRepo, d.PreferenceRecorder)
+	// After SubscriptionService, not before: a message answered over Telegram
+	// now costs the sender a request the same way asking in the app does, and
+	// the bridge cannot meter what does not exist yet.
+	d.initSpeech()
+	d.initMessaging()
 	d.APIKeyService = apikey.NewService(d.APIKeyRepo)
 	d.PaymentService = payment.NewService(d.PaymentRepo, d.Logger, d.UsageRepo, d.SubscriptionService, payment.StripeConfig{
 		APIKey:         d.Config.Stripe.APIKey,
@@ -489,6 +502,17 @@ func (d *Dependencies) initIntegrations() {
 	)
 }
 
+// initSpeech wires transcription and synthesis.
+//
+// Separate from the bridge, and built before it, because they are independent:
+// the web app can dictate into its own chat box with no bot configured at all,
+// and the bot answers text with no speech credential. Tying the two together
+// would make either one silently need the other.
+func (d *Dependencies) initSpeech() {
+	d.Speech = speech.NewClient(d.Config.Voice, d.Logger)
+	d.Vocabulary = vocabulary.New(d.DB.Pool, d.Logger)
+}
+
 // initMessaging wires the chat-platform bridge.
 //
 // Absence of a bot token is a supported state and disables the bridge, so the
@@ -503,7 +527,7 @@ func (d *Dependencies) initMessaging() {
 		chatbridge.New(d.ChatService, d.Logger),
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
-	)
+	).WithQuota(d.SubscriptionService)
 	d.telegramClient = telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil)
 }
 
@@ -517,9 +541,13 @@ func (d *Dependencies) TelegramWebhook() http.Handler {
 	if d.Messaging == nil || !d.Config.Messaging.UsesWebhook() {
 		return nil
 	}
-	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret, d.Logger)
+	hook := telegram.NewWebhook(d.telegramClient, d.Messaging, d.Config.Messaging.TelegramWebhookSecret,
+		d.Config.Voice.MaxConcurrentUpdates, d.Logger)
 	if hook == nil {
 		return nil
+	}
+	if d.Speech.Enabled() {
+		hook = hook.WithVoice(d.Speech, d.Vocabulary, d.voiceOptions())
 	}
 	return hook
 }
@@ -558,7 +586,20 @@ func (d *Dependencies) RunTelegram(ctx context.Context) error {
 		d.Messaging,
 		d.Logger,
 	)
+	if d.Speech.Enabled() {
+		poller = poller.WithVoice(d.Speech, d.Vocabulary, d.voiceOptions())
+	}
 	return poller.Run(ctx)
+}
+
+// voiceOptions are the limits the adapter holds a recording to.
+func (d *Dependencies) voiceOptions() telegram.VoiceOptions {
+	return telegram.VoiceOptions{
+		MaxDuration:       d.Config.Voice.MaxDuration,
+		MaxVideoDuration:  d.Config.Voice.MaxVideoDuration,
+		MaxBytes:          d.Config.Voice.MaxBytes,
+		VideoNotesEnabled: d.Config.Voice.VideoNotesEnabled,
+	}
 }
 
 // byokWrapper returns the wrapper that lets a request be served by its

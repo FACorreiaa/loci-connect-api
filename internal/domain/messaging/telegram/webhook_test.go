@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,7 +19,7 @@ const testSecret = "a3f9c1d2e4b5a6c7d8e9f0a1b2c3d4e5"
 
 func newWebhook(t *testing.T, api *fakeAPI, handler Handler) *Webhook {
 	t.Helper()
-	h := NewWebhook(api.client(), handler, testSecret, nil)
+	h := NewWebhook(api.client(), handler, testSecret, 0, nil)
 	if h == nil {
 		t.Fatal("NewWebhook returned nil with a secret configured")
 	}
@@ -65,13 +66,13 @@ func waitFor(t *testing.T, cond func() bool) {
 // produce a handler at all — nil is the signal not to mount the route.
 func TestNoSecretMeansNoWebhook(t *testing.T) {
 	api := newFakeAPI(t)
-	if h := NewWebhook(api.client(), &recordingHandler{}, "", nil); h != nil {
+	if h := NewWebhook(api.client(), &recordingHandler{}, "", 0, nil); h != nil {
 		t.Fatal("a webhook was built with an empty secret")
 	}
-	if h := NewWebhook(nil, &recordingHandler{}, testSecret, nil); h != nil {
+	if h := NewWebhook(nil, &recordingHandler{}, testSecret, 0, nil); h != nil {
 		t.Fatal("a webhook was built with no client")
 	}
-	if h := NewWebhook(api.client(), nil, testSecret, nil); h != nil {
+	if h := NewWebhook(api.client(), nil, testSecret, 0, nil); h != nil {
 		t.Fatal("a webhook was built with no handler")
 	}
 }
@@ -180,16 +181,33 @@ func TestAValidDeliveryIsAcknowledgedAndAnswered(t *testing.T) {
 type blockingHandler struct {
 	release chan struct{}
 	entered chan struct{}
+
+	mu      sync.Mutex
+	started int
 }
 
 func (h *blockingHandler) Handle(ctx context.Context, in messaging.InboundMessage) (messaging.OutboundMessage, error) {
-	h.entered <- struct{}{}
+	h.mu.Lock()
+	h.started++
+	h.mu.Unlock()
+
+	if h.entered != nil {
+		h.entered <- struct{}{}
+	}
 	select {
 	case <-h.release:
 		return messaging.OutboundMessage{Text: "done: " + in.Text}, nil
 	case <-ctx.Done():
 		return messaging.OutboundMessage{}, ctx.Err()
 	}
+}
+
+// inFlight is how many calls have started, which is what a test measuring the
+// in-flight cap needs rather than which messages arrived.
+func (h *blockingHandler) inFlight() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.started
 }
 
 // Telegram retries anything that is not a prompt 200 and an itinerary takes

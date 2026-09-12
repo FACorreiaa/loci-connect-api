@@ -26,6 +26,7 @@ type Config struct {
 	AI            AIConfig
 	Secrets       SecretsConfig
 	Messaging     MessagingConfig
+	Voice         VoiceConfig
 }
 
 type CacheConfig struct {
@@ -219,6 +220,64 @@ type MessagingConfig struct {
 // the poller does not start in this mode; see Dependencies.RunTelegram.
 func (c MessagingConfig) UsesWebhook() bool { return c.TelegramWebhookSecret != "" }
 
+// VoiceConfig holds transcription.
+//
+// Named for the wire format rather than for a vendor, and the variable names
+// match Norviq's so the two apps stay greppable together. The cluster runs its
+// own transcription service — free per request, no key, and no audio leaving
+// the cluster — so the default provider is the self-hosted one and a hosted
+// API is the exception rather than the assumption.
+type VoiceConfig struct {
+	// Provider selects the implementation. "openai_compatible" is anything
+	// serving OpenAI's POST /v1/audio/transcriptions, which is the cluster's
+	// own service and most hosted ones.
+	Provider string
+
+	// BaseURL is what to call. Empty disables transcription, and there is no
+	// guessed default on purpose: a guess would point at a vendor nobody asked
+	// for, and billing somebody by accident is worse than the feature being
+	// off.
+	BaseURL string
+
+	// Model is which model to ask for. The cluster preloads its models and
+	// exits if one is missing, so a typo here is a 404 per request rather than
+	// a silent fallback.
+	Model string
+
+	// APIKey is empty for the cluster's own service, which is guarded by
+	// NetworkPolicy rather than by a credential.
+	APIKey string
+
+	// MaxDuration bounds a voice note, MaxVideoDuration a round video message.
+	// Both are checked against the Telegram update before anything is
+	// downloaded.
+	//
+	// These are tighter than they look because transcription runs on CPU at
+	// roughly two and a half times the length of the clip, on a single replica
+	// shared with other apps. A minute of audio is minutes of somebody else's
+	// queue.
+	MaxDuration      time.Duration
+	MaxVideoDuration time.Duration
+
+	// MaxBytes bounds what is downloaded. Telegram refuses getFile past 20 MB,
+	// so this matches rather than exceeds it.
+	MaxBytes int64
+
+	// VideoNotesEnabled turns round video messages on. Separate from voice
+	// notes because a video message is the same words for several times the
+	// work: the audio has to be pulled out of a video container.
+	VideoNotesEnabled bool
+
+	// MaxConcurrentUpdates bounds how many updates are answered at once in
+	// webhook mode, which is otherwise one unbounded goroutine per delivery.
+	// It is also what this app can hold open against a shared, single-replica
+	// transcription service without starving anything else on it.
+	MaxConcurrentUpdates int
+}
+
+// Enabled reports whether recordings can be understood at all.
+func (c VoiceConfig) Enabled() bool { return c.BaseURL != "" && c.Model != "" }
+
 // SubscriptionConfig holds daily LLM request quotas per plan tier.
 // ProDailyLLMLimit is a hidden fair-use cap; Pro is marketed as unlimited.
 type SubscriptionConfig struct {
@@ -304,6 +363,17 @@ func Load() (*Config, error) {
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
 			TelegramBotHandle:     getEnv("TELEGRAM_BOT_HANDLE", ""),
 			TelegramWebhookSecret: strings.TrimSpace(getEnv("TELEGRAM_WEBHOOK_SECRET", "")),
+		},
+		Voice: VoiceConfig{
+			Provider:             getEnv("TRANSCRIBE_PROVIDER", "openai_compatible"),
+			BaseURL:              strings.TrimSpace(getEnv("TRANSCRIBE_PROVIDER_OPENAI_BASEURL", "")),
+			Model:                getEnv("TRANSCRIBE_PROVIDER_OPENAI_MODEL", ""),
+			APIKey:               strings.TrimSpace(getEnv("TRANSCRIBE_PROVIDER_OPENAI_APIKEY", "")),
+			MaxDuration:          getEnvAsDurationSeconds("TRANSCRIBE_MAX_SECONDS", 45*time.Second),
+			MaxVideoDuration:     getEnvAsDurationSeconds("TRANSCRIBE_MAX_VIDEO_NOTE_SECONDS", 20*time.Second),
+			MaxBytes:             int64(getEnvAsInt("TRANSCRIBE_MAX_BYTES", 20<<20)),
+			VideoNotesEnabled:    getEnvAsBool("TRANSCRIBE_VIDEO_NOTES_ENABLED", true),
+			MaxConcurrentUpdates: getEnvAsInt("TRANSCRIBE_MAX_CONCURRENT_UPDATES", 2),
 		},
 		Stripe: StripeConfig{
 			APIKey:         getEnv("STRIPE_API_KEY", ""),
