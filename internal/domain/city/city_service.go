@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -28,6 +30,24 @@ var ErrCityNotFound = errors.New("city not found")
 type ServiceImpl struct {
 	logger *slog.Logger
 	repo   Repository
+	// Optional, attached via WithGeocoder. Nil means database-only search,
+	// which is what this service did before there was a geocoder.
+	fwd geocode.Forward
+}
+
+// WithGeocoder lets city search fall back to the geocoder.
+//
+// It exists because SearchCities reads the cities table, and that table only
+// ever held cities some earlier conversation had generated content for. A picker
+// backed by it alone offers nothing for most of the world — which is why the
+// client's city search module sat unused: there was nothing useful to show.
+//
+// A builder rather than a constructor argument because it is genuinely
+// optional: search worked without it and must keep working when geocoding is
+// switched off.
+func (s *ServiceImpl) WithGeocoder(fwd geocode.Forward) *ServiceImpl {
+	s.fwd = fwd
+	return s
 }
 
 func NewCityService(repo Repository, logger *slog.Logger) *ServiceImpl {
@@ -126,7 +146,80 @@ func (s *ServiceImpl) SearchCities(ctx context.Context, query string, limit int)
 		return nil, fmt.Errorf("failed to search cities: %w", err)
 	}
 
+	cities = s.mergeGeocoded(ctx, query, limit, cities)
+
 	span.SetAttributes(attribute.Int("cities.count", len(cities)))
 	span.SetStatus(codes.Ok, "Cities searched")
 	return cities, nil
+}
+
+// thinResultThreshold is how few stored matches count as "we have nothing useful
+// to offer", and so when it is worth asking the geocoder.
+const thinResultThreshold = 5
+
+// mergeGeocoded tops up a thin result with places from the geocoder.
+//
+// Three deliberate limits. An empty query is the picker's mount-time browse and
+// never reaches the provider. A healthy set of stored matches is left alone, so
+// the common case stays a single database query. And nothing here is persisted:
+// this runs on every keystroke, and a search field must not write rows. Cities
+// are created when someone actually compares them, through the resolver.
+//
+// Geocoder-only entries carry an empty id, which is both legal on the wire and
+// meaningful to the client: there is no row yet, so send the name and
+// coordinates and let the server create it.
+func (s *ServiceImpl) mergeGeocoded(
+	ctx context.Context,
+	query string,
+	limit int,
+	stored []locitypes.CityDetail,
+) []locitypes.CityDetail {
+	if s.fwd == nil || strings.TrimSpace(query) == "" || len(stored) >= thinResultThreshold {
+		return stored
+	}
+
+	places, err := s.fwd.Search(ctx, query, limit)
+	if err != nil {
+		// Search degrades to whatever is stored. A provider hiccup should not
+		// empty a picker that already had something to show.
+		s.logger.WarnContext(ctx, "city search could not reach the geocoder",
+			slog.String("query", query), slog.Any("error", err))
+		return stored
+	}
+
+	seen := make(map[string]struct{}, len(stored)+len(places))
+	for _, c := range stored {
+		seen[dedupeKey(c.Name, c.Country)] = struct{}{}
+	}
+
+	out := stored
+	for _, p := range places {
+		key := dedupeKey(p.Name, p.CountryCode)
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		// The stored rows carry a country name and the geocoder a code, so
+		// check both spellings before deciding this is a new place.
+		if _, dup := seen[dedupeKey(p.Name, p.Country)]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+
+		lat, lon := p.Lat, p.Lon
+		out = append(out, locitypes.CityDetail{
+			Name:            p.Name,
+			Country:         p.Country,
+			StateProvince:   p.Admin1,
+			CenterLatitude:  &lat,
+			CenterLongitude: &lon,
+		})
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
+func dedupeKey(name, country string) string {
+	return foldName(name) + "|" + foldName(country)
 }

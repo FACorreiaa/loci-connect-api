@@ -268,9 +268,6 @@ func (d *Dependencies) initRepositories() error {
 	d.ProfileRepo = profiles.NewPostgresUserRepo(d.DB.Pool, d.Logger)
 	d.POIRepo = poirepo.NewRepository(d.DB.Pool, d.Logger)
 	d.CityRepo = cityrepo.NewCityRepository(d.DB.Pool, d.Logger)
-	// CityService has existed unregistered while the client already called
-	// SearchCities; wire it so the city picker stops failing.
-	d.CityHandler = cityhandler.NewCityHandler(cityrepo.NewCityService(d.CityRepo, d.Logger))
 	d.ChatRepo = chatrepo.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.DiscoverRepo = discoverdomain.NewRepositoryImpl(d.DB.Pool, d.Logger)
 	d.ListRepo = itinerarylist.NewRepository(d.DB.Pool, d.Logger)
@@ -352,7 +349,17 @@ func (d *Dependencies) initServices() error {
 	// City resolution. Everything that turns a typed city name into a place on
 	// the map goes through this, so /compare and GetGoScore answer for cities
 	// nobody has generated content for yet instead of rejecting them.
-	d.CityResolver = cityrepo.NewResolver(d.CityRepo, newForwardGeocoder(appCache), d.Logger)
+	forwardGeocoder := newForwardGeocoder(appCache)
+	d.CityResolver = cityrepo.NewResolver(d.CityRepo, forwardGeocoder, d.Logger)
+
+	// CityService has existed unregistered while the client already called
+	// SearchCities; wire it so the city picker stops failing. It is built here
+	// rather than beside the repository because the geocoder behind it needs
+	// the shared cache, without which a picker would spend a provider request
+	// per keystroke.
+	d.CityHandler = cityhandler.NewCityHandler(
+		cityrepo.NewCityService(d.CityRepo, d.Logger).WithGeocoder(forwardGeocoder),
+	)
 
 	// Bring-your-own-key. Leaves both services on Loci's own provider when
 	// ENCRYPTION_KEY is unset, exactly as before.
