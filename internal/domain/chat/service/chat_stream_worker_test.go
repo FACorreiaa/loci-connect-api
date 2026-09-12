@@ -216,3 +216,89 @@ type routedClient struct {
 }
 
 func (r *routedClient) ModelFor(context.Context) string { return r.model }
+
+// truncatedResponse is a chunk the provider stopped at because the output
+// budget ran out.
+func truncatedResponse(text string) *genai.GenerateContentResponse {
+	return &genai.GenerateContentResponse{
+		Candidates: []*genai.Candidate{{
+			Content:      &genai.Content{Parts: []*genai.Part{{Text: text}}},
+			FinishReason: genai.FinishReasonMaxTokens,
+		}},
+	}
+}
+
+// A budget that runs out mid-array used to be indistinguishable from a short
+// answer: the loop collected the fragment, logged "streaming completed" and
+// returned nil, so the only trace was a parse warning and an itinerary with
+// no places in it. The provider says why it stopped; refusing the fragment is
+// what turns a blank page into a failure somebody can see.
+func TestStreamWorkerRejectsTruncatedAnswer(t *testing.T) {
+	client := &TestLLMClient{
+		GenerateStreamFn: func(context.Context, string, *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+			return streamOf(
+				chunkResponse(`{"points_of_interest": [{"name": "Sé`, "", 0, 0),
+				truncatedResponse(` Cathedral"`),
+			), nil
+		},
+	}
+	l := newStreamService(t, client)
+
+	var events []locitypes.StreamEvent
+	_, err := l.streamPartFromLLM(t.Context(), partPlan{Part: partGeneralPOIs},
+		"prompt", func(e locitypes.StreamEvent) { events = append(events, e) }, locitypes.DomainGeneral)
+	if err == nil {
+		t.Fatal("a truncated answer was reported as a successful stream")
+	}
+	if !strings.Contains(err.Error(), "truncated") {
+		t.Errorf("error = %v, want it to name the truncation", err)
+	}
+}
+
+// The same budget, spent entirely on reasoning the provider does not send as
+// content: every chunk carries empty text and the stream ends on MAX_TOKENS.
+// This is the shape that produced "total_chunks: 0" in production.
+func TestStreamWorkerRejectsEmptyAnswer(t *testing.T) {
+	client := &TestLLMClient{
+		GenerateStreamFn: func(context.Context, string, *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+			return streamOf(
+				chunkResponse("", "", 0, 0),
+				truncatedResponse(""),
+			), nil
+		},
+	}
+	l := newStreamService(t, client)
+
+	_, err := l.streamPartFromLLM(t.Context(), partPlan{Part: partItinerary},
+		"prompt", func(locitypes.StreamEvent) {}, locitypes.DomainGeneral)
+	if err == nil {
+		t.Fatal("a stream that produced no text at all was reported as a success")
+	}
+}
+
+// A short answer that finished on its own is not a truncation. The city
+// description is one part that is legitimately brief.
+func TestStreamWorkerAcceptsShortCompleteAnswer(t *testing.T) {
+	client := &TestLLMClient{
+		GenerateStreamFn: func(context.Context, string, *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+			return func(yield func(*genai.GenerateContentResponse, error) bool) {
+				yield(&genai.GenerateContentResponse{
+					Candidates: []*genai.Candidate{{
+						Content:      &genai.Content{Parts: []*genai.Part{{Text: `{"city":"Funchal"}`}}},
+						FinishReason: genai.FinishReasonStop,
+					}},
+				}, nil)
+			}, nil
+		},
+	}
+	l := newStreamService(t, client)
+
+	got, err := l.streamPartFromLLM(t.Context(), partPlan{Part: partCityData},
+		"prompt", func(locitypes.StreamEvent) {}, locitypes.DomainGeneral)
+	if err != nil {
+		t.Fatalf("a complete answer was rejected: %v", err)
+	}
+	if got.Text != `{"city":"Funchal"}` {
+		t.Errorf("Text = %q", got.Text)
+	}
+}

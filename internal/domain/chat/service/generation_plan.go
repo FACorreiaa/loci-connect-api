@@ -466,6 +466,12 @@ func (l *ServiceImpl) streamPartFromLLM(
 	var fullResponse strings.Builder
 	var result streamResult
 	chunkCount := 0
+	// Why the provider stopped. Until this was read, a budget that ran out
+	// mid-array was indistinguishable from a model that had said everything it
+	// had to say: the fragment was collected, "streaming completed" was logged
+	// and nil was returned, and the only trace downstream was a parse warning
+	// and an answer with no places in it.
+	finishReason := genai.FinishReasonUnspecified
 	for resp, err := range iter {
 		if ctx.Err() != nil {
 			l.logger.WarnContext(ctx, "Context canceled during streaming",
@@ -496,6 +502,9 @@ func (l *ServiceImpl) streamPartFromLLM(
 			result.TokensOut = int(u.CandidatesTokenCount)
 		}
 		for _, cand := range resp.Candidates {
+			if cand.FinishReason != "" {
+				finishReason = cand.FinishReason
+			}
 			if cand.Content == nil {
 				continue
 			}
@@ -534,8 +543,53 @@ func (l *ServiceImpl) streamPartFromLLM(
 	l.logger.InfoContext(ctx, "LLM streaming completed",
 		slog.String("part_type", partType),
 		slog.Int("total_chunks", chunkCount),
-		slog.Int("total_response_length", fullResponse.Len()))
+		slog.Int("total_response_length", fullResponse.Len()),
+		slog.String("finish_reason", string(finishReason)))
+
+	// A part that was cut off, or that produced no text at all, is not an
+	// answer. Returning it anyway is what put an empty itinerary and an empty
+	// map in front of somebody with no error to explain either: the fragment
+	// failed to parse, the parse failure was a warning, and the request went
+	// on to "succeed" with zero places.
+	if err := truncationError(partType, finishReason, fullResponse.Len()); err != nil {
+		l.logger.ErrorContext(ctx, "LLM answer unusable",
+			slog.String("part_type", partType),
+			slog.Int("total_chunks", chunkCount),
+			slog.Int("total_response_length", fullResponse.Len()),
+			slog.String("finish_reason", string(finishReason)),
+			slog.Int("tokens_out", result.TokensOut))
+		if ctx.Err() == nil {
+			sendEvent(locitypes.StreamEvent{
+				Type:      locitypes.EventTypeError,
+				Error:     "We could not finish writing that answer. Please try again.",
+				ErrorCode: locitypes.StreamErrorNoResults,
+			})
+		}
+		return streamResult{}, err
+	}
 
 	result.Text = fullResponse.String()
 	return result, nil
+}
+
+// truncationError reports why a finished stream cannot be used, or nil when it
+// can.
+//
+// Two shapes, one cause. MAX_TOKENS with text is an answer cut off mid-value;
+// MAX_TOKENS with no text at all is a reasoning model that spent the whole
+// output budget thinking, because on the OpenAI dialect max_tokens bounds
+// thinking and answer together. Either way the bytes collected are not a
+// complete answer, and a caller that parses them gets a shorter list rather
+// than an error.
+func truncationError(partType string, finish genai.FinishReason, length int) error {
+	if finish == genai.FinishReasonMaxTokens {
+		return fmt.Errorf(
+			"%s answer was truncated at the output token budget (%d bytes produced)",
+			partType, length,
+		)
+	}
+	if length == 0 {
+		return fmt.Errorf("%s answer was empty (finish reason %q)", partType, finish)
+	}
+	return nil
 }
