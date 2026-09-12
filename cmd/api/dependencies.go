@@ -522,12 +522,16 @@ func (d *Dependencies) initMessaging() {
 		d.Logger.Info("telegram bridge disabled; TELEGRAM_BOT_TOKEN is not set")
 		return
 	}
+	// One bridge, used as both: it answers questions and it reads pages of the
+	// answers it already gave. Paging is deliberately not metered — see
+	// messaging.Service.HandleAction.
+	bridge := chatbridge.New(d.ChatService, d.Logger)
 	d.Messaging = messaging.NewService(
 		messaging.NewRepository(d.DB.Pool),
-		chatbridge.New(d.ChatService, d.Logger),
+		bridge,
 		d.Config.Messaging.TelegramBotHandle,
 		d.Logger,
-	).WithQuota(d.SubscriptionService)
+	).WithQuota(d.SubscriptionService).WithPaginator(bridge)
 	d.telegramClient = telegram.NewClient(d.Config.Messaging.TelegramBotToken, nil)
 }
 

@@ -25,6 +25,9 @@ type fakeChat struct {
 	startText    string
 	reply        string
 
+	sessionPOIs []locitypes.POIDetailedInfo
+	pageErr     error
+
 	// callerSeen is whoever the context said was calling, as the provider
 	// router downstream would read it.
 	callerSeen string
@@ -50,6 +53,24 @@ func (f *fakeChat) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, mes
 	return &locitypes.ChatResponse{SessionID: sessionID, Message: f.replyOr("an updated plan")}, nil
 }
 
+func (f *fakeChat) GetSessionPOIs(_ context.Context, _, _ uuid.UUID, section locitypes.SessionPOISection, page, pageSize int) (*locitypes.SessionPOIPage, error) {
+	if f.pageErr != nil {
+		return nil, f.pageErr
+	}
+	all := f.sessionPOIs
+	out := &locitypes.SessionPOIPage{
+		Section: section, Total: len(all), Page: page, PageSize: pageSize,
+	}
+	offset := (page - 1) * pageSize
+	if offset >= len(all) {
+		return out, nil
+	}
+	end := min(offset+pageSize, len(all))
+	out.POIs = all[offset:end]
+	out.HasMore = end < len(all)
+	return out, nil
+}
+
 func (f *fakeChat) GetUserChatSessions(context.Context, uuid.UUID, int, int) (*locitypes.ChatSessionsResponse, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
@@ -70,7 +91,7 @@ func TestAMessageContinuesTheMostRecentConversation(t *testing.T) {
 	existing := uuid.New()
 	chat := &fakeChat{sessions: []locitypes.ChatSession{{ID: existing}}}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "make day two quieter")
+	got, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "make day two quieter")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -92,7 +113,7 @@ func TestAMessageContinuesTheMostRecentConversation(t *testing.T) {
 func TestTheFirstMessageStartsAConversation(t *testing.T) {
 	chat := &fakeChat{}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
+	got, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -112,7 +133,7 @@ func TestAnExpiredSessionFallsBackToStartingOne(t *testing.T) {
 		continueErr: errors.New("session expired"),
 	}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
+	got, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -128,7 +149,7 @@ func TestAnExpiredSessionFallsBackToStartingOne(t *testing.T) {
 func TestAFailureToListSessionsStillAnswers(t *testing.T) {
 	chat := &fakeChat{listErr: errors.New("database is having a moment")}
 
-	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err != nil {
+	if _, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err != nil {
 		t.Fatalf("answer: %v", err)
 	}
 	if !chat.started {
@@ -140,7 +161,7 @@ func TestAFailureToListSessionsStillAnswers(t *testing.T) {
 func TestAnEmptyModelReplyStillSaysSomething(t *testing.T) {
 	chat := &fakeChat{reply: "   "}
 
-	got, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
+	got, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon")
 	if err != nil {
 		t.Fatalf("answer: %v", err)
 	}
@@ -150,10 +171,10 @@ func TestAnEmptyModelReplyStillSaysSomething(t *testing.T) {
 }
 
 func TestNothingToAnswerIsAnError(t *testing.T) {
-	if _, err := New(&fakeChat{}, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "   "); err == nil {
+	if _, _, err := New(&fakeChat{}, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "   "); err == nil {
 		t.Error("an empty message was answered")
 	}
-	if _, err := New(nil, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "hello"); err == nil {
+	if _, _, err := New(nil, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "hello"); err == nil {
 		t.Error("a message was answered with no chat service")
 	}
 }
@@ -162,7 +183,7 @@ func TestNothingToAnswerIsAnError(t *testing.T) {
 func TestAFailureToStartIsReported(t *testing.T) {
 	chat := &fakeChat{startErr: errors.New("no provider")}
 
-	if _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err == nil {
+	if _, _, err := New(chat, nil).Answer(t.Context(), uuid.New(), "traveller@example.com", "three days in Lisbon"); err == nil {
 		t.Error("a failure to start a conversation was swallowed")
 	}
 }
@@ -176,7 +197,7 @@ func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
 
 	t.Run("starting", func(t *testing.T) {
 		chat := &fakeChat{}
-		if _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "three days in Lisbon"); err != nil {
+		if _, _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "three days in Lisbon"); err != nil {
 			t.Fatalf("answer: %v", err)
 		}
 		if chat.callerSeen != userID.String() {
@@ -186,7 +207,7 @@ func TestTheRequestActsAsTheLinkedAccount(t *testing.T) {
 
 	t.Run("continuing", func(t *testing.T) {
 		chat := &fakeChat{sessions: []locitypes.ChatSession{{ID: uuid.New()}}}
-		if _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "make day two quieter"); err != nil {
+		if _, _, err := New(chat, nil).Answer(t.Context(), userID, "traveller@example.com", "make day two quieter"); err != nil {
 			t.Fatalf("answer: %v", err)
 		}
 		if chat.callerSeen != userID.String() {
@@ -207,7 +228,7 @@ func TestAPlanWithoutProseIsSentAsText(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	for _, want := range []string{"Four days in Madeira", "Pico do Arieiro", "Viewpoint", "Above the clouds.", "Blandy's Wine Lodge"} {
 		if !strings.Contains(got, want) {
@@ -230,7 +251,7 @@ func TestBothThePlanAndTheRestOfTheCityAreSent(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	if !strings.Contains(got, "Porto Moniz Pools") {
 		t.Errorf("the general city places are missing:\n%s", got)
@@ -252,7 +273,7 @@ func TestPlacesAreOrderedNearestFirst(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	var order []int
 	for _, name := range []string{"Near", "Middle", "Far", "Unknown"} {
@@ -271,7 +292,13 @@ func TestPlacesAreOrderedNearestFirst(t *testing.T) {
 	}
 }
 
-func TestAPlanLongerThanTheCapPointsAtTheApp(t *testing.T) {
+// A plan longer than one message offers the rest rather than announcing it.
+//
+// This used to end with "…and 3 more in Loci." — a line that told the reader
+// there were more places and gave them no way to see any of them. The token
+// returned alongside the text is what the platform turns into a button.
+func TestAPlanLongerThanTheCapOffersTheRest(t *testing.T) {
+	sessionID := uuid.New()
 	pois := make([]locitypes.POIDetailedInfo, maxRenderedPOIs+3)
 	for i := range pois {
 		pois[i] = locitypes.POIDetailedInfo{Name: fmt.Sprintf("Place %d", i)}
@@ -280,18 +307,58 @@ func TestAPlanLongerThanTheCapPointsAtTheApp(t *testing.T) {
 		AIItineraryResponse: locitypes.AIItineraryResponse{PointsOfInterest: pois},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, next := reply(&locitypes.ChatResponse{UpdatedItinerary: plan, SessionID: sessionID})
 
-	if !strings.Contains(got, "and 3 more in Loci.") {
-		t.Errorf("the reply does not say what was left out:\n%s", got)
+	if strings.Contains(got, "more in Loci") {
+		t.Errorf("the reply still points at the app instead of offering the rest:\n%s", got)
 	}
 	if strings.Contains(got, fmt.Sprintf("Place %d", maxRenderedPOIs)) {
 		t.Errorf("the reply went past the cap:\n%s", got)
 	}
+
+	gotID, page, section, ok := decodePage(next)
+	if !ok {
+		t.Fatalf("no usable next-page token: %q", next)
+	}
+	if gotID != sessionID || page != 2 || section != locitypes.SectionItinerary {
+		t.Errorf("token points at %s/%d/%s, want %s/2/itinerary", gotID, page, section, sessionID)
+	}
+}
+
+// A plan that fits offers nothing, so no button is shown on a complete answer.
+func TestAPlanThatFitsOffersNothingMore(t *testing.T) {
+	plan := &locitypes.AiCityResponse{
+		AIItineraryResponse: locitypes.AIItineraryResponse{
+			PointsOfInterest: []locitypes.POIDetailedInfo{{Name: "Só um sítio"}},
+		},
+	}
+	if _, next := reply(&locitypes.ChatResponse{UpdatedItinerary: plan, SessionID: uuid.New()}); next != "" {
+		t.Errorf("a complete answer offered more: %q", next)
+	}
+}
+
+// Prose answers the question, but the places are still there to page through.
+func TestProseStillOffersTheRestOfThePlaces(t *testing.T) {
+	pois := make([]locitypes.POIDetailedInfo, maxRenderedPOIs+1)
+	for i := range pois {
+		pois[i] = locitypes.POIDetailedInfo{Name: fmt.Sprintf("Place %d", i)}
+	}
+	got, next := reply(&locitypes.ChatResponse{
+		Message:          "I made day two quieter.",
+		UpdatedItinerary: &locitypes.AiCityResponse{PointsOfInterest: pois},
+		SessionID:        uuid.New(),
+	})
+
+	if got != "I made day two quieter." {
+		t.Errorf("prose was not used as the reply: %q", got)
+	}
+	if _, _, section, ok := decodePage(next); !ok || section != locitypes.SectionGeneral {
+		t.Errorf("prose did not offer the general list: %q", next)
+	}
 }
 
 func TestAnAnswerWithNeitherProseNorPlanStillSaysSomething(t *testing.T) {
-	if got := reply(&locitypes.ChatResponse{}); got == "" {
+	if got, _ := reply(&locitypes.ChatResponse{}); got == "" {
 		t.Fatal("the reply is empty")
 	}
 }
@@ -308,7 +375,7 @@ func TestACitationIsNotShownToTheReader(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	if strings.Contains(got, "poi:") || strings.Contains(got, "[") {
 		t.Errorf("the citation marker reached the reader:\n%s", got)
@@ -331,7 +398,7 @@ func TestOnlyAGroundedPlaceGetsAMapLink(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	if !strings.Contains(got, "google.com/maps/search/?api=1&query=32.632500,-17.001500") {
 		t.Errorf("a grounded place should carry its pin:\n%s", got)
@@ -358,7 +425,7 @@ func TestAPictureIsSentWithItsCredit(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	if !strings.Contains(got, "https://upload.wikimedia.org/cabo-girao.jpg") {
 		t.Errorf("the picture is missing:\n%s", got)
@@ -383,7 +450,7 @@ func TestAnUncreditedPictureIsNotSent(t *testing.T) {
 		},
 	}
 
-	got := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
+	got, _ := reply(&locitypes.ChatResponse{UpdatedItinerary: plan})
 
 	if strings.Contains(got, "no-credit.jpg") {
 		t.Errorf("an uncreditable picture was sent:\n%s", got)

@@ -78,6 +78,10 @@ type LlmInteractiontService interface {
 	// GetUserChatSessions Chat session management
 	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error)
 	GetChatSession(ctx context.Context, userID, sessionID uuid.UUID) (*locitypes.ChatSession, error)
+	// GetSessionPOIs reads a page of an answer that was already generated. It
+	// is shared by the Connect handler and the Telegram bridge, so both read
+	// the same list in the same order.
+	GetSessionPOIs(ctx context.Context, userID, sessionID uuid.UUID, section locitypes.SessionPOISection, page, pageSize int) (*locitypes.SessionPOIPage, error)
 	EndSession(ctx context.Context, userID, sessionID uuid.UUID) error
 	GetRecentInteractions(ctx context.Context, userID uuid.UUID, pagination *commonpb.PaginationRequest) (*chatv1.GetRecentInteractionsResponse, error)
 }

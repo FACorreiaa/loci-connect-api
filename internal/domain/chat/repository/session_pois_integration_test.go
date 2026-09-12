@@ -42,7 +42,7 @@ func TestGetPOIsBySessionSortedByDistance_ScopedToSessionAndUser(t *testing.T) {
 
 	// Places are laid out west to east from the query point so that "sorted by
 	// distance" has something real to sort: the decoys sit nearer than mine.
-	seed := func(userID uuid.UUID, sessionID uuid.UUID, name string, lon float64) {
+	seed := func(userID, sessionID uuid.UUID, name string, lon float64) {
 		t.Helper()
 		var interactionID uuid.UUID
 		if err := testChatDB.QueryRow(ctx,

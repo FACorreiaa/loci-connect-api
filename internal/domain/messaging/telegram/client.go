@@ -28,6 +28,11 @@ const defaultAPIBase = "https://api.telegram.org"
 // than one delivered in two parts.
 const maxMessageChars = 4096
 
+// maxCallbackDataBytes is Telegram's cap on the payload a button carries back.
+// Telegram enforces it on send, so an oversized one is a failed sendMessage
+// rather than a button that quietly does nothing.
+const maxCallbackDataBytes = 64
+
 // ErrConflict means another process is polling the same bot.
 //
 // Worth its own error: it is what a second deployment against one token looks
@@ -141,7 +146,10 @@ type Message struct {
 		FirstName string `json:"first_name"`
 		Username  string `json:"username"`
 	} `json:"from"`
-	Text string `json:"text"`
+	// MessageID identifies this message, so a keyboard attached to it can be
+	// edited or removed later.
+	MessageID int64  `json:"message_id"`
+	Text      string `json:"text"`
 	// Caption is what a recording sent with a note carries. Telegram puts
 	// nothing in Text for those, so without this the note is lost.
 	Caption string `json:"caption"`
@@ -154,10 +162,33 @@ type Message struct {
 	VideoNote *Recording `json:"video_note"`
 }
 
+// InlineKeyboard is the button grid attached to a message.
+type InlineKeyboard struct {
+	InlineKeyboard [][]InlineButton `json:"inline_keyboard"`
+}
+
+// InlineButton is one button. CallbackData is opaque to this package: the
+// renderer decides what it means, this only enforces Telegram's byte limit.
+type InlineButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data"`
+}
+
+// CallbackQuery is a button press.
+//
+// Message is the message the keyboard was attached to, which is how a press
+// arrives with its own chat and message ids and needs no separate lookup.
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	Message *Message `json:"message"`
+	Data    string   `json:"data"`
+}
+
 // Update is one entry from the bot's update stream.
 type Update struct {
-	UpdateID int64    `json:"update_id"`
-	Message  *Message `json:"message"`
+	UpdateID      int64          `json:"update_id"`
+	Message       *Message       `json:"message"`
+	CallbackQuery *CallbackQuery `json:"callback_query"`
 }
 
 // GetUpdates long-polls for messages from offset onwards.
@@ -166,12 +197,16 @@ type Update struct {
 // send, which is what makes this cheap: an idle bot makes one request a minute
 // rather than sixty.
 func (c *Client) GetUpdates(ctx context.Context, offset int64, timeout time.Duration) ([]Update, error) {
-	// Only messages. Asking for every update type would deliver edits,
-	// reactions and channel posts that this adapter has no handling for, and
-	// each one would still have to be acknowledged to move the watermark past.
+	// Messages and button presses. Everything else — edits, reactions, channel
+	// posts — has no handling here and would still have to be acknowledged to
+	// move the watermark past it.
+	//
+	// Note that this only governs long polling. On the webhook deployment the
+	// equivalent list is stored at Telegram by setWebhook, so adding a type
+	// here does not deliver it there until the webhook is re-registered.
 	body := map[string]any{
 		"timeout":         int(timeout.Seconds()),
-		"allowed_updates": []string{"message"},
+		"allowed_updates": []string{"message", "callback_query"},
 	}
 	if offset > 0 {
 		body["offset"] = offset
@@ -187,13 +222,56 @@ func (c *Client) GetUpdates(ctx context.Context, offset int64, timeout time.Dura
 // SendMessage delivers text to a chat, splitting it if Telegram will not take
 // it in one piece.
 func (c *Client) SendMessage(ctx context.Context, chatID, text string) error {
-	for _, part := range SplitMessage(text, maxMessageChars) {
+	return c.SendMessageWithMarkup(ctx, chatID, text, nil)
+}
+
+// SendMessageWithMarkup is SendMessage with a keyboard.
+//
+// The keyboard goes on the last part only. A reply long enough to be split has
+// its button under text the reader has not reached yet otherwise, which is
+// worse than no button at all.
+func (c *Client) SendMessageWithMarkup(ctx context.Context, chatID, text string, markup *InlineKeyboard) error {
+	parts := SplitMessage(text, maxMessageChars)
+	for i, part := range parts {
 		body := map[string]any{"chat_id": chatID, "text": part}
+		if markup != nil && i == len(parts)-1 {
+			body["reply_markup"] = markup
+		}
 		if err := c.call(ctx, "sendMessage", body, nil); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// AnswerCallbackQuery clears the spinner on a pressed button.
+//
+// Best effort, like SendAction: Telegram spins for several seconds until this
+// arrives, so it is sent before any work begins and its failure is never a
+// reason to withhold the answer. text, when set, shows as a toast rather than
+// as a message in the chat.
+func (c *Client) AnswerCallbackQuery(ctx context.Context, queryID, text string) {
+	body := map[string]any{"callback_query_id": queryID}
+	if text != "" {
+		body["text"] = text
+	}
+	_ = c.call(ctx, "answerCallbackQuery", body, nil)
+}
+
+// EditMessageReplyMarkup replaces the keyboard on a message already sent, or
+// removes it when markup is nil.
+//
+// Used to strip the button off a page once it has been read, so a chat does not
+// accumulate live buttons all pointing at the same stale page. Note that this
+// edits only the markup: an edited *message* is subject to the same 4096-char
+// cap and cannot be split, which is why pages are sent as new messages rather
+// than edited in place.
+func (c *Client) EditMessageReplyMarkup(ctx context.Context, chatID string, messageID int64, markup *InlineKeyboard) error {
+	body := map[string]any{"chat_id": chatID, "message_id": messageID}
+	if markup != nil {
+		body["reply_markup"] = markup
+	}
+	return c.call(ctx, "editMessageReplyMarkup", body, nil)
 }
 
 // SendTyping shows the typing indicator.

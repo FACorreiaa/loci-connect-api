@@ -210,7 +210,7 @@ func TestAConflictIsRecognised(t *testing.T) {
 
 // Asking for every update type would deliver edits, reactions and channel posts
 // this adapter has no handling for.
-func TestOnlyMessagesAreRequested(t *testing.T) {
+func TestMessagesAndButtonPressesAreRequested(t *testing.T) {
 	api := newFakeAPI(t)
 	api.reply["getUpdates"] = []any{}
 
@@ -222,9 +222,12 @@ func TestOnlyMessagesAreRequested(t *testing.T) {
 	if len(calls) != 1 {
 		t.Fatalf("%d calls, want 1", len(calls))
 	}
+	// Button presses arrive as callback_query updates. Without asking for them
+	// Telegram never delivers one to the poller, and every "More" button is
+	// dead on the polling deployment.
 	allowed, _ := calls[0].body["allowed_updates"].([]any)
-	if len(allowed) != 1 || allowed[0] != "message" {
-		t.Errorf("allowed_updates = %v", calls[0].body["allowed_updates"])
+	if len(allowed) != 2 || allowed[0] != "message" || allowed[1] != "callback_query" {
+		t.Errorf("allowed_updates = %v, want [message callback_query]", calls[0].body["allowed_updates"])
 	}
 	if calls[0].body["offset"] != float64(42) {
 		t.Errorf("offset = %v, want 42", calls[0].body["offset"])

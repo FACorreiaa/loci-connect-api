@@ -275,6 +275,17 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	parsePart(partRestaurants, &data.Restaurants)
 	parsePart(partActivities, &data.Activities)
 
+	// Day numbering is decided here, not by the model and not by the clients.
+	// PlannedDays comes from the parsed request rather than from whatever the
+	// model numbered, and normalizeDays makes every stop's day usable — both
+	// clients group on it, so it has to be right before it leaves the server.
+	if cc.TripDays > 0 {
+		data.AIItineraryResponse.PlannedDays = cc.TripDays
+		data.AIItineraryResponse.PointsOfInterest = normalizeDays(
+			data.AIItineraryResponse.PointsOfInterest, cc.TripDays,
+		)
+	}
+
 	// Deduplication Logic
 	allPOIs := make([]locitypes.POIDetailedInfo, 0)
 	seenIDs := make(map[string]bool)

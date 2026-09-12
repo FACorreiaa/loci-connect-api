@@ -395,3 +395,8 @@ func TestTheTimeoutBudgetFitsInsideItsCeiling(t *testing.T) {
 	// how long people speak. Worth knowing how much room is left.
 	t.Logf("longest path %s, ceiling %s, headroom %s", longest, updateTimeout, updateTimeout-longest)
 }
+
+// HandleAction is unused by these tests; the interface needs it.
+func (h *echoingHandler) HandleAction(context.Context, messaging.InboundAction) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{}, nil
+}

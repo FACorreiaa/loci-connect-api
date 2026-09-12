@@ -117,6 +117,12 @@ func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		priority := int32(poi.Priority)
 		resp.Priority = &priority
 	}
+	// Omitted rather than sent as zero when a place is not part of a plan: the
+	// clients read an absent day as "chunk these by index instead", which is
+	// what a search result or a nearby lookup wants.
+	if poi.Day != 0 {
+		resp.Day = proto.Int32(int32(poi.Day))
+	}
 	if !poi.CreatedAt.IsZero() {
 		resp.CreatedAt = timestamppb.New(poi.CreatedAt)
 	}
@@ -148,6 +154,7 @@ func ToAIItineraryResponse(resp locitypes.AIItineraryResponse) *chatv1.AIItinera
 		PointsOfInterest:   ToPOIDetailedInfoSlice(resp.PointsOfInterest),
 		Restaurants:        ToPOIDetailedInfoSlice(resp.Restaurants),
 		Bars:               ToPOIDetailedInfoSlice(resp.Bars),
+		PlannedDays:        int32(resp.PlannedDays),
 	}
 }
 

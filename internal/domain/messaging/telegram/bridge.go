@@ -75,6 +75,23 @@ const chatBurst = 3
 // because rate.Every is a function call.
 var chatEvery = rate.Every(10 * time.Second)
 
+// actionBurst and actionEvery ration button presses, separately from questions
+// and much faster.
+//
+// Sharing the answer limiter would refuse an ordinary "Next, Next, Next" —
+// three in ten seconds is exactly what paging looks like — and would refuse it
+// with copy written for somebody asking too many questions. The justification
+// is pricing: a page is one database read and one sendMessage, on the order of
+// a thousandth of what a generation costs, so metering it at the generation's
+// rate is mispriced rather than careful.
+const actionBurst = 10
+
+var actionEvery = rate.Every(2 * time.Second)
+
+// pageTimeout bounds rendering one page. A page is a read of something already
+// written, so the three minutes an itinerary may take does not apply.
+const pageTimeout = 20 * time.Second
+
 // maxEchoChars caps the transcript echoed back before the answer.
 //
 // The echo is a check on what was heard, not a transcript service, and a
@@ -84,6 +101,9 @@ const maxEchoChars = 300
 // Handler answers an inbound message. Satisfied by messaging.Service.
 type Handler interface {
 	Handle(ctx context.Context, in messaging.InboundMessage) (messaging.OutboundMessage, error)
+	// HandleAction answers a button press. Separate from Handle because a
+	// press is not a question: it names something already produced.
+	HandleAction(ctx context.Context, in messaging.InboundAction) (messaging.OutboundMessage, error)
 }
 
 // Voice is the part of the speech client this adapter uses.
@@ -135,14 +155,17 @@ type bridge struct {
 	// counter and says nothing about a burst; this is what keeps one sender
 	// from spending everybody else's capacity in ten seconds.
 	perChat *chatLimiter
+	// perChatActions rations button presses. See actionBurst.
+	perChatActions *chatLimiter
 }
 
 func newBridge(client *Client, handler Handler, logger *slog.Logger) bridge {
 	return bridge{
-		client:  client,
-		handler: handler,
-		logger:  logger,
-		perChat: newChatLimiter(chatEvery, chatBurst),
+		client:         client,
+		handler:        handler,
+		logger:         logger,
+		perChat:        newChatLimiter(chatEvery, chatBurst),
+		perChatActions: newChatLimiter(actionEvery, actionBurst),
 	}
 }
 
@@ -171,7 +194,104 @@ func (b bridge) handle(ctx context.Context, update Update) {
 
 	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
 	defer cancel()
+
+	if update.CallbackQuery != nil {
+		b.answerCallback(ctx, update.CallbackQuery)
+		return
+	}
 	b.answer(ctx, update)
+}
+
+// answerCallback renders the page a button asked for.
+//
+// The first thing it does is clear the spinner. Telegram keeps a pressed button
+// spinning for several seconds until answerCallbackQuery arrives, so that call
+// is the user-visible clock and it goes before any work — its own failure is
+// never a reason to withhold the page.
+//
+// A page is sent as a new message rather than edited into the old one. An
+// edited message is subject to the same 4096-character cap and cannot be
+// split, so paging in place would have a hard length ceiling that sending does
+// not. The old message's button is removed instead, so a chat does not collect
+// live buttons all pointing at the same stale page.
+func (b bridge) answerCallback(ctx context.Context, q *CallbackQuery) {
+	b.client.AnswerCallbackQuery(ctx, q.ID, "")
+
+	if q.Message == nil {
+		return
+	}
+	chatID := chatIDOf(q.Message.Chat.ID)
+
+	if !b.perChatActions.allow(chatID) {
+		// A toast, not a message: refusing a tap should not add to the chat.
+		b.client.AnswerCallbackQuery(ctx, q.ID, "One moment…")
+		b.logger.InfoContext(ctx, "telegram chat is paging faster than it is served",
+			slog.String("chat_id", chatID))
+		return
+	}
+
+	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
+	out, err := b.handler.HandleAction(pageCtx, messaging.InboundAction{
+		Platform: messaging.PlatformTelegram,
+		ChatID:   chatID,
+		Data:     q.Data,
+	})
+	cancel()
+
+	if err != nil {
+		b.logger.ErrorContext(ctx, "could not handle a telegram button press",
+			slog.String("error", err.Error()))
+		out = messaging.OutboundMessage{Text: "Something went wrong. Try again in a moment."}
+	}
+	if out.Silent || out.Text == "" {
+		return
+	}
+
+	sendCtx, cancelSend := context.WithTimeout(ctx, sendTimeout)
+	defer cancelSend()
+
+	// Strip the button off the page that was just read. Best effort: Telegram
+	// errors when the markup is already what it is being set to, which is the
+	// harmless case of a double tap.
+	if err := b.client.EditMessageReplyMarkup(sendCtx, chatID, q.Message.MessageID, nil); err != nil {
+		b.logger.DebugContext(ctx, "could not clear a telegram keyboard",
+			slog.String("error", err.Error()))
+	}
+	b.sendWithButtons(sendCtx, chatID, out)
+}
+
+// sendWithButtons delivers a reply and whatever it offers next.
+func (b bridge) sendWithButtons(ctx context.Context, chatID string, out messaging.OutboundMessage) {
+	if err := b.client.SendMessageWithMarkup(ctx, chatID, out.Text, keyboardFor(b.logger, out.Buttons)); err != nil {
+		b.logger.ErrorContext(ctx, "could not send a telegram reply",
+			slog.String("error", err.Error()))
+	}
+}
+
+// keyboardFor turns platform-neutral buttons into Telegram's shape, one per
+// row, dropping any whose token Telegram would reject.
+//
+// Dropped rather than truncated: a token cut to 64 bytes still sends, and then
+// decodes to a different page or to nothing at all. Losing the button is
+// recoverable — the text says what it was for — and a button that silently
+// does the wrong thing is not.
+func keyboardFor(logger *slog.Logger, buttons []messaging.Button) *InlineKeyboard {
+	if len(buttons) == 0 {
+		return nil
+	}
+	rows := make([][]InlineButton, 0, len(buttons))
+	for _, button := range buttons {
+		if len(button.Data) > maxCallbackDataBytes {
+			logger.Warn("dropping a telegram button whose token is too long",
+				slog.Int("bytes", len(button.Data)))
+			continue
+		}
+		rows = append(rows, []InlineButton{{Text: button.Label, CallbackData: button.Data}})
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	return &InlineKeyboard{InlineKeyboard: rows}
 }
 
 // busy tells a chat that the bot is at capacity.
@@ -179,11 +299,19 @@ func (b bridge) handle(ctx context.Context, update Update) {
 // Separate from answer because nothing about it should be able to take time:
 // it is the reply sent when there is no capacity to work out a real one.
 func (b bridge) busy(ctx context.Context, update Update) {
+	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
+	defer cancel()
+
+	// A press at capacity has to be answered too. Without this it gets total
+	// silence and a button that spins until Telegram gives up — the one
+	// failure mode worse than a refusal.
+	if q := update.CallbackQuery; q != nil {
+		b.client.AnswerCallbackQuery(ctx, q.ID, "Busy — try that again in a moment.")
+		return
+	}
 	if update.Message == nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, sendTimeout)
-	defer cancel()
 
 	b.send(ctx, chatIDOf(update.Message.Chat.ID),
 		"I have my hands full at the moment. Send that again in a minute.")
@@ -266,10 +394,7 @@ func (b bridge) answer(ctx context.Context, update Update) {
 	// Sent on ctx rather than answerCtx: the answer is ready, and letting the
 	// generation's deadline cancel its own delivery would waste the work.
 	sendCtx, cancelSend := context.WithTimeout(ctx, sendTimeout)
-	if err := b.client.SendMessage(sendCtx, chatID, out.Text); err != nil {
-		b.logger.ErrorContext(ctx, "could not send a telegram reply",
-			slog.String("error", err.Error()))
-	}
+	b.sendWithButtons(sendCtx, chatID, out)
 	cancelSend()
 }
 
