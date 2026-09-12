@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -65,6 +68,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
@@ -90,6 +94,7 @@ type Dependencies struct {
 	ProfileRepo       profiles.Repository
 	POIRepo           poirepo.Repository
 	CityRepo          cityrepo.Repository
+	CityResolver      cityrepo.Resolver
 	ChatRepo          chatrepo.Repository
 	DiscoverRepo      discoverdomain.Repository
 	ListRepo          itinerarylist.Repository
@@ -343,6 +348,11 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize cache: %w", err)
 	}
 	d.AppCache = appCache
+
+	// City resolution. Everything that turns a typed city name into a place on
+	// the map goes through this, so /compare and GetGoScore answer for cities
+	// nobody has generated content for yet instead of rejecting them.
+	d.CityResolver = cityrepo.NewResolver(d.CityRepo, newForwardGeocoder(appCache), d.Logger)
 
 	// Bring-your-own-key. Leaves both services on Loci's own provider when
 	// ENCRYPTION_KEY is unset, exactly as before.
@@ -800,7 +810,7 @@ func (d *Dependencies) initHandlers() error {
 
 	d.LocalContextHandler = localcontext.
 		NewHandler(weather, weatherEst, d.Logger).
-		WithScoring(d.CityRepo, d.POISvc).
+		WithScoring(d.CityResolver, d.POISvc).
 		WithSignals(signals).
 		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre, signals.CountryResolver())
 
@@ -819,7 +829,7 @@ func (d *Dependencies) initHandlers() error {
 		Uber:     uberDL,
 	}
 	compareSvc := compare.NewService(
-		d.CityRepo,
+		d.CityResolver,
 		d.POISvc,
 		weather,
 		weatherEst,
@@ -853,4 +863,30 @@ func (d *Dependencies) Cleanup() {
 		d.Logger.Warn("failed to flush product analytics", slog.Any("error", err))
 	}
 	d.Logger.Info("cleanup completed")
+}
+
+// newForwardGeocoder builds the forward geocoder city resolution falls back on.
+//
+// Returns nil when disabled, which the resolver supports and treats as
+// database-only lookup — the behaviour before there was a geocoder at all.
+//
+//	GEOCODER_ENABLED=false        disable geocoding entirely
+//	OPENMETEO_GEOCODING_BASE_URL  override the endpoint (self-host or test)
+//	OPENMETEO_API_KEY             the existing key, shared with air quality
+//
+// It shares the signals HTTP client so this new host sits under the same
+// outbound rate limit and reports the same external-request metrics as every
+// other provider.
+func newForwardGeocoder(cache cachestore.Store) geocode.Forward {
+	if v := strings.TrimSpace(os.Getenv("GEOCODER_ENABLED")); v != "" {
+		if enabled, err := strconv.ParseBool(v); err == nil && !enabled {
+			return nil
+		}
+	}
+	return geocode.NewOpenMeteo(
+		os.Getenv("OPENMETEO_GEOCODING_BASE_URL"),
+		os.Getenv("OPENMETEO_API_KEY"),
+		localcontext.NewSignalsHTTPClient(),
+		cache,
+	)
 }

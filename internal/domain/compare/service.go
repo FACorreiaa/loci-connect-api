@@ -2,6 +2,7 @@ package compare
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,8 +10,8 @@ import (
 
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
-	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	comparev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
@@ -19,15 +20,39 @@ import (
 
 const maxTopPOIs = 8
 
+// ErrTooFewResolvable means the comparison could not be built because fewer than
+// two candidate cities produced a column. It is a distinct sentinel so the
+// handler can wrap it around whatever actually went wrong underneath.
+var ErrTooFewResolvable = errors.New("need at least 2 resolvable candidate cities")
+
 // PlanChecker resolves subscription plan for freemium gates.
 type PlanChecker interface {
 	EffectivePlan(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
+// CityResolver turns a typed city name into coordinates, creating the row when
+// the city is one nobody has generated content for yet.
+//
+// Declared here, consumer-side and one method wide, for the same reason
+// PlanChecker is: compare needs "name in, coordinates out" and nothing else, and
+// depending on the whole city repository is what made this package untestable.
+type CityResolver interface {
+	Resolve(ctx context.Context, q cityrepo.ResolveQuery) (*cityrepo.Resolved, error)
+}
+
+// POIFinder reports the places we know about in a city.
+//
+// Narrowed from the full POI service for the same reason as CityResolver above:
+// compare reads one method of it, and depending on all twenty-odd meant no test
+// could construct a Service without a mock of everything POI search can do.
+type POIFinder interface {
+	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
+}
+
 // Service compares weekend city candidates.
 type Service struct {
-	cities     cityrepo.Repository
-	pois       poirepo.Service
+	cities     CityResolver
+	pois       POIFinder
 	weather    localcontext.WeatherAdapter
 	transport  localcontext.StubTransportWithDrive
 	booking    localcontext.BookingComDeepLink
@@ -53,8 +78,8 @@ func (s *Service) WithSignals(g *localcontext.Gatherer) *Service {
 }
 
 func NewService(
-	cities cityrepo.Repository,
-	pois poirepo.Service,
+	cities CityResolver,
+	pois POIFinder,
 	weather localcontext.WeatherAdapter,
 	weatherEst bool,
 	transport localcontext.StubTransportWithDrive,
@@ -107,11 +132,17 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 
 	var scores []columnScore
 	var resolved []resolvedCity
+	// Failures are collected rather than only logged. When too few columns
+	// survive, the reason the first one failed is what decides whether this was
+	// the user's input or our geocoder being down — and reporting the latter as
+	// a bad argument is exactly how the original bug stayed invisible.
+	var failures []error
 
 	for _, name := range in.Candidates {
 		col, score, resolvedCity, err := s.buildColumn(ctx, originLat, originLon, name, windowHours, in.Start, in.End)
 		if err != nil {
 			s.logger.WarnContext(ctx, "compare column skipped", slog.String("city", name), slog.Any("error", err))
+			failures = append(failures, err)
 			continue
 		}
 		resp.Columns = append(resp.Columns, col)
@@ -120,7 +151,10 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 	}
 
 	if len(resp.Columns) < 2 {
-		return nil, fmt.Errorf("need at least 2 resolvable candidate cities")
+		if len(failures) > 0 {
+			return nil, fmt.Errorf("%w: %w", ErrTooFewResolvable, failures[0])
+		}
+		return nil, ErrTooFewResolvable
 	}
 
 	// Plan a route through however many cities fit the window. Two-in-a-weekend
@@ -162,20 +196,30 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 }
 
 func (s *Service) resolveOrigin(ctx context.Context, in CompareInput) (lat, lon float64, name string, err error) {
-	if in.OriginLat != 0 || in.OriginLon != 0 {
-		return in.OriginLat, in.OriginLon, in.OriginCity, nil
-	}
-	if in.OriginCity == "" {
+	if in.OriginCity == "" && in.OriginLat == 0 && in.OriginLon == 0 {
 		return 0, 0, "", fmt.Errorf("origin city or coordinates required")
 	}
-	city, err := s.cities.FindCityByFuzzyName(ctx, in.OriginCity)
-	if err != nil || city == nil {
-		return 0, 0, "", fmt.Errorf("origin city not found: %s", in.OriginCity)
+
+	// The resolver handles the coordinate short-circuit itself, and uses the
+	// coordinates to attach a stored city when one is close by — which is what
+	// gives a coordinate-supplied origin a city_id, and therefore its POIs.
+	resolved, err := s.cities.Resolve(ctx, cityrepo.ResolveQuery{
+		Name: in.OriginCity,
+		Lat:  in.OriginLat,
+		Lon:  in.OriginLon,
+	})
+	if err != nil {
+		// %w, not %v: the handler decides between "that is not a place" and
+		// "our geocoder is down" by unwrapping this, and a flattened error
+		// would make every failure look like the user's fault.
+		return 0, 0, "", fmt.Errorf("origin %q: %w", in.OriginCity, err)
 	}
-	if city.CenterLatitude == nil || city.CenterLongitude == nil {
-		return 0, 0, "", fmt.Errorf("origin city missing coordinates")
+
+	name = resolved.City.Name
+	if name == "" {
+		name = in.OriginCity
 	}
-	return *city.CenterLatitude, *city.CenterLongitude, city.Name, nil
+	return resolved.Lat, resolved.Lon, name, nil
 }
 
 func (s *Service) buildColumn(
@@ -187,14 +231,12 @@ func (s *Service) buildColumn(
 	// alone cannot answer "which holidays fall inside it".
 	windowStart, windowEnd time.Time,
 ) (*comparev1.CityCompareColumn, float64, resolvedCity, error) {
-	city, err := s.cities.FindCityByFuzzyName(ctx, cityName)
-	if err != nil || city == nil {
-		return nil, 0, resolvedCity{}, fmt.Errorf("city not found: %w", err)
+	resolved, err := s.cities.Resolve(ctx, cityrepo.ResolveQuery{Name: cityName})
+	if err != nil {
+		return nil, 0, resolvedCity{}, fmt.Errorf("candidate %q: %w", cityName, err)
 	}
-	if city.CenterLatitude == nil || city.CenterLongitude == nil {
-		return nil, 0, resolvedCity{}, fmt.Errorf("city missing coordinates: %s", cityName)
-	}
-	lat, lon := *city.CenterLatitude, *city.CenterLongitude
+	city := resolved.City
+	lat, lon := resolved.Lat, resolved.Lon
 
 	distKm := HaversineKm(originLat, originLon, lat, lon)
 	travelMins := DriveMins(distKm)

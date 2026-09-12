@@ -3,11 +3,14 @@ package localcontext
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"connectrpc.com/connect"
+	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geo"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
@@ -18,12 +21,16 @@ const defaultWindowHours = 48
 
 // CityResolver turns a typed city name into coordinates.
 //
-// Declared here as a narrow interface rather than importing the city domain so
-// this package keeps no dependency on it — the compare domain already imports
-// localcontext, and a two-way dependency between domains is how import cycles
-// start.
+// One method wide on purpose. It used to be a bare fuzzy-name lookup against
+// stored rows, which meant GetGoScore could only answer for cities some earlier
+// conversation had already created — the same defect that made /compare reject
+// Porto. The city domain now owns that cascade, including geocoding a city we
+// hold no row for, so this asks for the whole answer rather than a table lookup.
+//
+// The city package does not import this one, so naming its types here does not
+// create a cycle.
 type CityResolver interface {
-	FindCityByFuzzyName(ctx context.Context, cityName string) (*locitypes.CityDetail, error)
+	Resolve(ctx context.Context, q cityrepo.ResolveQuery) (*cityrepo.Resolved, error)
 }
 
 // POICounter reports how many worthwhile stops we know about for a city.
@@ -51,7 +58,7 @@ func (h *Handler) GetGoScore(
 ) (*connect.Response[lcv1.GetGoScoreResponse], error) {
 	lat, lon, cityName, cityID, err := h.resolveDestination(ctx, req.Msg)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, goScoreError(err)
 	}
 
 	windowHours, days := windowFrom(req.Msg.Start.AsTime(), req.Msg.End.AsTime(), req.Msg.Start != nil && req.Msg.End != nil)
@@ -118,21 +125,23 @@ func (h *Handler) resolveDestination(
 		return *msg.Latitude, *msg.Longitude, msg.GetCityName(), uuid.Nil, nil
 	}
 
+	// Both of these tell the caller to change what it sent, so they carry
+	// ErrBadRequest rather than arriving at the mapper untyped and defaulting
+	// to Internal.
 	if msg.GetCityName() == "" {
-		return 0, 0, "", uuid.Nil, errors.New("city_name or latitude/longitude is required")
+		return 0, 0, "", uuid.Nil, fmt.Errorf("%w: city_name or latitude/longitude is required", locitypes.ErrBadRequest)
 	}
 	if h.cities == nil {
-		return 0, 0, "", uuid.Nil, errors.New("city lookup is unavailable; pass latitude and longitude")
+		return 0, 0, "", uuid.Nil, fmt.Errorf("%w: city lookup is unavailable; pass latitude and longitude", locitypes.ErrBadRequest)
 	}
 
-	city, err := h.cities.FindCityByFuzzyName(ctx, msg.GetCityName())
-	if err != nil || city == nil {
-		return 0, 0, "", uuid.Nil, errors.New("city not found: " + msg.GetCityName())
+	resolved, err := h.cities.Resolve(ctx, cityrepo.ResolveQuery{Name: msg.GetCityName()})
+	if err != nil {
+		// %w so the sentinel survives: whether this was an unknown place or our
+		// geocoder failing decides the status code the caller gets.
+		return 0, 0, "", uuid.Nil, fmt.Errorf("we could not place %q on the map: %w", msg.GetCityName(), err)
 	}
-	if city.CenterLatitude == nil || city.CenterLongitude == nil {
-		return 0, 0, "", uuid.Nil, errors.New("city has no coordinates on file: " + city.Name)
-	}
-	return *city.CenterLatitude, *city.CenterLongitude, city.Name, city.ID, nil
+	return resolved.Lat, resolved.Lon, resolved.City.Name, resolved.City.ID, nil
 }
 
 // windowFrom derives the window length and the forecast horizon it needs.
@@ -173,4 +182,17 @@ func scoreWindow(msg *lcv1.GetGoScoreRequest, windowHours float64) (start, end t
 		end = start.Add(time.Duration(windowHours) * time.Hour)
 	}
 	return start, end
+}
+
+// goScoreError distinguishes a place we cannot find from a provider we cannot
+// reach. Both used to return InvalidArgument, so an outage was reported as the
+// caller's mistake and never showed up as a failure of ours.
+func goScoreError(err error) error {
+	switch {
+	case errors.Is(err, cityrepo.ErrGeocoderUnavailable):
+		return connect.NewError(connect.CodeUnavailable, err)
+	case errors.Is(err, cityrepo.ErrCityUnresolvable):
+		return connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return apierr.ToConnect(err)
 }
