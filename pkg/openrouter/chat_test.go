@@ -126,3 +126,71 @@ func TestChatClientDoesNotRetryPaymentRequired(t *testing.T) {
 		t.Fatalf("requests = %d, want 1", requests)
 	}
 }
+
+// A reasoning model spends max_tokens on thinking before it writes a word, and
+// this package drops those deltas because nothing renders them. Asking for the
+// answer without the thinking is what keeps an output budget a budget for the
+// answer. OpenRouter is the only backend in the chain known to take the knob.
+func TestChatRequestDisablesReasoningForOpenRouter(t *testing.T) {
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"req-1","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	defer server.Close()
+
+	client, err := NewChatClient(testAIConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.baseURL = server.URL
+	if _, err := client.Generate(context.Background(), "hi", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("decode request: %v", err)
+	}
+	reasoning, ok := sent["reasoning"].(map[string]any)
+	if !ok {
+		t.Fatalf("request carried no reasoning field: %s", body)
+	}
+	if reasoning["enabled"] != false {
+		t.Errorf("reasoning.enabled = %v, want false", reasoning["enabled"])
+	}
+}
+
+// Someone else's gateway is not OpenRouter and need not know the field; an
+// unknown key is a 400 on a strict backend, so it only goes where it is read.
+func TestChatRequestOmitsReasoningForOtherBackends(t *testing.T) {
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"req-1","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	defer server.Close()
+
+	client, err := NewCompatibleChatClient(Options{
+		Name:    "custom",
+		BaseURL: server.URL,
+		APIKey:  "k",
+		Model:   "m",
+		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Generate(context.Background(), "hi", nil); err != nil {
+		t.Fatal(err)
+	}
+	var sent map[string]any
+	if err := json.Unmarshal(body, &sent); err != nil {
+		t.Fatalf("decode request: %v", err)
+	}
+	if _, present := sent["reasoning"]; present {
+		t.Errorf("reasoning was sent to a non-OpenRouter backend: %s", body)
+	}
+}

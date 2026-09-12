@@ -152,7 +152,7 @@ func (c *ChatClient) Generate(
 	ctx, cancel := withOptionalTimeout(ctx, c.generateTTL)
 	defer cancel()
 
-	payload := newChatRequest(c.model, prompt, cfg, false)
+	payload := newChatRequest(c.name, c.model, prompt, cfg, false)
 	resp, err := c.sendChatRequest(ctx, payload)
 	if err != nil {
 		return nil, llmerrors.Classify(err)
@@ -187,7 +187,7 @@ func (c *ChatClient) GenerateStream(
 	cfg *genai.GenerateContentConfig,
 ) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
 	streamCtx, cancel := withOptionalTimeout(ctx, c.streamTTL)
-	payload := newChatRequest(c.model, prompt, cfg, true)
+	payload := newChatRequest(c.name, c.model, prompt, cfg, true)
 	resp, err := c.sendChatRequest(streamCtx, payload)
 	if err != nil {
 		cancel()
@@ -313,6 +313,22 @@ type chatRequest struct {
 	FrequencyPenalty *float32        `json:"frequency_penalty,omitempty"`
 	Seed             *int32          `json:"seed,omitempty"`
 	ResponseFormat   *responseFormat `json:"response_format,omitempty"`
+	// Reasoning is OpenRouter's knob for a model's thinking budget. Only sent
+	// to OpenRouter itself; see newChatRequest.
+	Reasoning *reasoningConfig `json:"reasoning,omitempty"`
+}
+
+// reasoningConfig turns a reasoning model's thinking off.
+//
+// It exists because max_tokens on this dialect bounds thinking and answer
+// together, while every caller here sizes that budget for the answer alone.
+// A model that thinks hard enough therefore spends the whole budget before
+// writing a character, and since this package only reads `delta.content` the
+// stream looks like a provider that returned nothing — or, worse, like an
+// answer that simply stopped mid-array. Nothing in this application renders a
+// thought, so the budget buys only the answer.
+type reasoningConfig struct {
+	Enabled bool `json:"enabled"`
 }
 
 type chatMessage struct {
@@ -325,6 +341,7 @@ type responseFormat struct {
 }
 
 func newChatRequest(
+	backend string,
 	model string,
 	prompt string,
 	cfg *genai.GenerateContentConfig,
@@ -339,6 +356,12 @@ func newChatRequest(
 	messages = append(messages, chatMessage{Role: "user", Content: prompt})
 
 	request := chatRequest{Model: model, Messages: messages, Stream: stream}
+	// Only OpenRouter is known to read this. A user's own gateway may reject
+	// an unknown key outright, and the same reasoning is why the attribution
+	// headers are gated on the same name.
+	if backend == "openrouter" {
+		request.Reasoning = &reasoningConfig{Enabled: false}
+	}
 	if cfg == nil {
 		return request
 	}
