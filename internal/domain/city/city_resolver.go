@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/geo"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"golang.org/x/sync/singleflight"
 )
@@ -22,6 +23,17 @@ const nearbyCityRadiusKm = 25
 // suggestions travel in response metadata, which is not the place for a long
 // list.
 const maxSuggestions = 5
+
+// homonymRadiusKm is how far from a caller's own position another city of the
+// same name stops being a plausible answer.
+//
+// City names repeat across the world, and population alone picks the wrong one
+// surprisingly often: asked for "Beja" it returns Béja in Tunisia (61,568)
+// rather than Beja in Portugal (34,760), which is not a weekend trip from Porto
+// under any reading. Generous on purpose — it only has to separate "somewhere
+// you might drive to" from "a different continent", and when no position is
+// known it does nothing at all.
+const homonymRadiusKm = 1500
 
 // ResolveSource records how a city was resolved, for logging and metrics.
 type ResolveSource string
@@ -41,7 +53,14 @@ type ResolveQuery struct {
 	// Lat and Lon are client-supplied coordinates. When either is non-zero they
 	// win outright: coordinates are unambiguous and a name is not.
 	Lat, Lon float64
+	// NearLat and NearLon bias the answer toward somewhere the caller already
+	// knows about — for a comparison, the origin city. It is only a preference
+	// between places of the same name, never a filter: a city genuinely far
+	// away is still returned when it is the only match.
+	NearLat, NearLon float64
 }
+
+func (q ResolveQuery) hasBias() bool { return q.NearLat != 0 || q.NearLon != 0 }
 
 // Resolved is a city that is guaranteed to have coordinates.
 //
@@ -232,7 +251,7 @@ func (r *ResolverImpl) geocodeBest(ctx context.Context, q ResolveQuery) (geocode
 		return geocode.Place{}, fmt.Errorf("geocode %q: %w", q.Name, err)
 	}
 
-	ranked := rankPlaces(places, q.Name, q.CountryCode)
+	ranked := rankPlaces(places, q.Name, q.CountryCode, q)
 	if len(ranked) == 0 {
 		return geocode.Place{}, &AmbiguousCityError{
 			Query:       q.Name,
@@ -337,7 +356,7 @@ func countryMatches(stored, code string) bool {
 }
 
 // rankPlaces orders geocoder hits so the first one is the city a person meant.
-func rankPlaces(places []geocode.Place, name, countryCode string) []geocode.Place {
+func rankPlaces(places []geocode.Place, name, countryCode string, bias ResolveQuery) []geocode.Place {
 	folded := foldName(name)
 	cc := strings.ToUpper(strings.TrimSpace(countryCode))
 
@@ -373,6 +392,15 @@ func rankPlaces(places []geocode.Place, name, countryCode string) []geocode.Plac
 		if li != lj {
 			return li < lj
 		}
+		// Somewhere the caller could plausibly go beats somewhere larger on
+		// another continent. Checked before population, because population is
+		// exactly what gets this wrong.
+		if bias.hasBias() {
+			ni, nj := withinReach(out[i], bias), withinReach(out[j], bias)
+			if ni != nj {
+				return ni
+			}
+		}
 		// Population is the tie-break that makes Porto mean Portugal's second
 		// city rather than a Brazilian village of 1,500 people.
 		return out[i].Population > out[j].Population
@@ -394,6 +422,12 @@ func nameRank(candidate, folded string) int {
 	default:
 		return 3
 	}
+}
+
+// withinReach reports whether a place is close enough to the caller's own
+// position to be the one they meant.
+func withinReach(p geocode.Place, bias ResolveQuery) bool {
+	return geo.HaversineKm(bias.NearLat, bias.NearLon, p.Lat, p.Lon) <= homonymRadiusKm
 }
 
 func toSuggestions(places []geocode.Place) []Suggestion {

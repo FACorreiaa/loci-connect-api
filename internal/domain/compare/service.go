@@ -246,7 +246,14 @@ func (s *Service) buildColumn(
 	// alone cannot answer "which holidays fall inside it".
 	windowStart, windowEnd time.Time,
 ) (*comparev1.CityCompareColumn, float64, resolvedCity, error) {
-	resolved, err := s.cities.Resolve(ctx, cityrepo.ResolveQuery{Name: cityName})
+	// The origin biases the lookup, because city names repeat: asked for "Beja"
+	// on its own the geocoder answers with Béja in Tunisia, which is larger than
+	// Beja in Portugal and not a weekend from Porto under any reading.
+	resolved, err := s.cities.Resolve(ctx, cityrepo.ResolveQuery{
+		Name:    cityName,
+		NearLat: originLat,
+		NearLon: originLon,
+	})
 	if err != nil {
 		return nil, 0, resolvedCity{}, fmt.Errorf("candidate %q: %w", cityName, err)
 	}

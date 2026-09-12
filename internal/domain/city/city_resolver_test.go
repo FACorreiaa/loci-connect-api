@@ -310,6 +310,104 @@ func TestResolve_PrefersHigherPopulation(t *testing.T) {
 	}
 }
 
+// The real case this exists for, with the provider's real numbers: asked for
+// "Beja" the geocoder answers Béja in Tunisia (61,568) ahead of Beja in
+// Portugal (34,760). Population alone therefore sends a weekend from Porto to
+// North Africa — and "Évora or Beja from Porto" is the example the product
+// leads with.
+func TestResolve_PrefersACityTheTravellerCouldReach(t *testing.T) {
+	bejaTN := geocode.Place{
+		Name: "Beja", Country: "Tunisia", CountryCode: "TN",
+		Lat: 36.73, Lon: 9.18, Population: 61568, FeatureCode: "PPLA",
+	}
+	bejaPT := geocode.Place{
+		Name: "Beja", Country: "Portugal", CountryCode: "PT",
+		Lat: 38.01, Lon: -7.86, Population: 34760, FeatureCode: "PPLA",
+	}
+	repo := &fakeRepo{saveID: uuid.New()}
+	r := NewResolver(repo, &fakeForward{places: []geocode.Place{bejaTN, bejaPT}}, quietLogger())
+
+	// Biased from Porto, the way a comparison resolves its candidates.
+	got, err := r.Resolve(context.Background(), ResolveQuery{
+		Name: "Beja", NearLat: 41.14961, NearLon: -8.61099,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.City.Country != "Portugal" {
+		t.Errorf("country: got %q, want Portugal", got.City.Country)
+	}
+}
+
+// The bias is a preference between homonyms, not a filter. Someone comparing
+// from Porto may still legitimately ask about Tokyo.
+func TestResolve_BiasDoesNotRejectADistantCity(t *testing.T) {
+	tokyo := geocode.Place{
+		Name: "Tokyo", Country: "Japan", CountryCode: "JP",
+		Lat: 35.68, Lon: 139.69, Population: 8336599, FeatureCode: "PPLC",
+	}
+	repo := &fakeRepo{saveID: uuid.New()}
+	r := NewResolver(repo, &fakeForward{places: []geocode.Place{tokyo}}, quietLogger())
+
+	got, err := r.Resolve(context.Background(), ResolveQuery{
+		Name: "Tokyo", NearLat: 41.14961, NearLon: -8.61099,
+	})
+	if err != nil {
+		t.Fatalf("a far-away city must still resolve: %v", err)
+	}
+	if got.City.Country != "Japan" {
+		t.Errorf("country: got %q, want Japan", got.City.Country)
+	}
+}
+
+// Without a bias point — GetGoScore asked by name alone — population still
+// decides, which is the best available guess.
+func TestResolve_WithoutBiasPopulationStillDecides(t *testing.T) {
+	bejaTN := geocode.Place{
+		Name: "Beja", Country: "Tunisia", CountryCode: "TN",
+		Lat: 36.73, Lon: 9.18, Population: 61568, FeatureCode: "PPLA",
+	}
+	bejaPT := geocode.Place{
+		Name: "Beja", Country: "Portugal", CountryCode: "PT",
+		Lat: 38.01, Lon: -7.86, Population: 34760, FeatureCode: "PPLA",
+	}
+	repo := &fakeRepo{saveID: uuid.New()}
+	r := NewResolver(repo, &fakeForward{places: []geocode.Place{bejaTN, bejaPT}}, quietLogger())
+
+	got, err := r.Resolve(context.Background(), ResolveQuery{Name: "Beja"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.City.Country != "Tunisia" {
+		t.Errorf("country: got %q, want Tunisia when nothing says otherwise", got.City.Country)
+	}
+}
+
+// An explicit country beats proximity: it is the one thing the caller stated
+// outright.
+func TestResolve_CountryCodeBeatsProximity(t *testing.T) {
+	bejaTN := geocode.Place{
+		Name: "Beja", Country: "Tunisia", CountryCode: "TN",
+		Lat: 36.73, Lon: 9.18, Population: 61568, FeatureCode: "PPLA",
+	}
+	bejaPT := geocode.Place{
+		Name: "Beja", Country: "Portugal", CountryCode: "PT",
+		Lat: 38.01, Lon: -7.86, Population: 34760, FeatureCode: "PPLA",
+	}
+	repo := &fakeRepo{saveID: uuid.New()}
+	r := NewResolver(repo, &fakeForward{places: []geocode.Place{bejaTN, bejaPT}}, quietLogger())
+
+	got, err := r.Resolve(context.Background(), ResolveQuery{
+		Name: "Beja", CountryCode: "TN", NearLat: 41.14961, NearLon: -8.61099,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.City.Country != "Tunisia" {
+		t.Errorf("country: got %q, want Tunisia", got.City.Country)
+	}
+}
+
 func TestResolve_CountryCodeFilterWins(t *testing.T) {
 	repo := &fakeRepo{saveID: uuid.New()}
 	r := NewResolver(repo, &fakeForward{places: []geocode.Place{portoPT, portoBR}}, quietLogger())
