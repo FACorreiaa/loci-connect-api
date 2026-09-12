@@ -333,3 +333,12 @@ func TestAPanicWhileAnsweringDoesNotEscapeTheProcess(t *testing.T) {
 	// the test binary itself would die here.
 	time.Sleep(50 * time.Millisecond)
 }
+
+// HandleAction is unused by these tests; the interface needs it.
+func (h *blockingHandler) HandleAction(context.Context, messaging.InboundAction) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{}, nil
+}
+
+func (panickingHandler) HandleAction(context.Context, messaging.InboundAction) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{}, nil
+}

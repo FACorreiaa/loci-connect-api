@@ -73,6 +73,16 @@ type POIDetailedInfo struct {
 	// did not verify it against its own data, so it must not be presented as
 	// verified. Absent on responses produced before grounding existed.
 	Grounded *bool `protobuf:"varint,33,opt,name=grounded,proto3,oneof" json:"grounded,omitempty"`
+	// day places this POI on a day of the trip, 1-based.
+	//
+	// The server assigns it: a model asked to number N days will skip one,
+	// number from zero, or invent a day 12 in a four-day trip, and the clients
+	// group on this field. It travels on the POI rather than on the itinerary
+	// envelope because a page of POIs is delivered without that envelope.
+	//
+	// Absent for POIs that are not part of a plan (a search result, a nearby
+	// lookup), in which case clients fall back to chunking by index.
+	Day *int32 `protobuf:"varint,35,opt,name=day,proto3,oneof" json:"day,omitempty"`
 	// Pictures with the credit they cannot be shown without.
 	//
 	// Wikimedia Commons content is CC BY-SA and similar: displaying the image
@@ -343,6 +353,13 @@ func (x *POIDetailedInfo) GetGrounded() bool {
 		return *x.Grounded
 	}
 	return false
+}
+
+func (x *POIDetailedInfo) GetDay() int32 {
+	if x != nil && x.Day != nil {
+		return *x.Day
+	}
+	return 0
 }
 
 func (x *POIDetailedInfo) GetImageCredits() []*POIImage {
@@ -1214,7 +1231,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\x8a\x10\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xb4\x10\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1266,7 +1283,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x14recommendation_trace\x18\x1f \x01(\v2(.loci.recommendation.RecommendationTraceH\tR\x13recommendationTrace\x88\x01\x01\x12B\n" +
 	"\x0everified_facts\x18  \x01(\v2\x16.loci.place.PlaceFactsH\n" +
 	"R\rverifiedFacts\x88\x01\x01\x12\x1f\n" +
-	"\bgrounded\x18! \x01(\bH\vR\bgrounded\x88\x01\x01\x12A\n" +
+	"\bgrounded\x18! \x01(\bH\vR\bgrounded\x88\x01\x01\x12 \n" +
+	"\x03day\x18# \x01(\x05B\t\xbaH\x06\x1a\x04\x18<(\x01H\fR\x03day\x88\x01\x01\x12A\n" +
 	"\rimage_credits\x18\" \x03(\v2\x12.loci.poi.POIImageB\b\xbaH\x05\x92\x01\x02\x10\x14R\fimageCredits\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -1283,7 +1301,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x19_recommendation_rationaleB\x17\n" +
 	"\x15_recommendation_traceB\x11\n" +
 	"\x0f_verified_factsB\v\n" +
-	"\t_grounded\"\xd2\x01\n" +
+	"\t_groundedB\x06\n" +
+	"\x04_day\"\xd2\x01\n" +
 	"\bPOIImage\x12\x1f\n" +
 	"\x03url\x18\x01 \x01(\tB\r\xbaH\n" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x03url\x12\x1f\n" +

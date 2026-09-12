@@ -126,21 +126,22 @@ type spyAnswerer struct {
 	lastEmail string
 	last      string
 	answer    string
+	next      string
 	err       error
 }
 
-func (s *spyAnswerer) Answer(_ context.Context, userID uuid.UUID, email, text string) (string, error) {
+func (s *spyAnswerer) Answer(_ context.Context, userID uuid.UUID, email, text string) (string, string, error) {
 	s.calls++
 	s.lastID = userID
 	s.lastEmail = email
 	s.last = text
 	if s.err != nil {
-		return "", s.err
+		return "", "", s.err
 	}
 	if s.answer == "" {
-		return "here is a plan", nil
+		return "here is a plan", s.next, nil
 	}
-	return s.answer, nil
+	return s.answer, s.next, nil
 }
 
 func newService(t *testing.T) (*Service, *fakeRepo, *spyAnswerer) {

@@ -101,6 +101,17 @@ type POIDetailedInfo struct {
 	// memory. False means the suggestion may still be real, but Loci did not
 	// verify it against its own data and must not present it as verified.
 	Grounded bool `json:"grounded,omitempty"`
+
+	// Day is which day of the plan this place belongs to, 1-based, or zero
+	// when it is not part of one.
+	//
+	// The model writes it into the part JSON and the server then corrects it
+	// (see normalizeDays): asked to number four days, a model will skip one,
+	// start at zero, or invent a day twelve. The json tag earns its keep
+	// twice, because current_itinerary stores this same struct — so the day
+	// survives the session round-trip, and a page read back out of it carries
+	// the day without any extra plumbing.
+	Day int `json:"day,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for POIDetailedInfo.

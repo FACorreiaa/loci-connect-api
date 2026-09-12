@@ -112,13 +112,29 @@ openssl rand -hex 32
 # 2. Seal it as TELEGRAM_WEBHOOK_SECRET, then deploy. The server logs
 #    "telegram in webhook mode; not polling" and mounts the route.
 
-# 3. Tell Telegram where to send updates. Only messages are requested:
-#    edits, reactions and channel posts have no handling and would be dropped.
+# 3. Tell Telegram where to send updates. Messages and button presses are
+#    requested; edits, reactions and channel posts have no handling and would
+#    be dropped.
 curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
   -d url="$BASE_URL/webhooks/telegram" \
   -d secret_token="$TELEGRAM_WEBHOOK_SECRET" \
-  -d allowed_updates='["message"]'
+  -d allowed_updates='["message","callback_query"]'
 ```
+
+> **`allowed_updates` lives at Telegram, not in this repository.** It is stored
+> when `setWebhook` is called and is not part of a deploy, so shipping code
+> that handles a new update type does not make Telegram deliver one. A webhook
+> registered before "Show more places" existed asks for `["message"]` only, and
+> every button on that deployment is pressed and nothing happens — no error,
+> no log, because the update never arrives. Re-run the call above after
+> deploying, and confirm with:
+>
+> ```bash
+> curl -s "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo" | jq .result.allowed_updates
+> ```
+>
+> The polling deployment has no such step: it sends the list with every
+> `getUpdates`.
 
 Telegram echoes the secret back in the `X-Telegram-Bot-Api-Secret-Token`
 header on every delivery, and it is the only thing separating a real delivery

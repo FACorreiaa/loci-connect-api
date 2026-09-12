@@ -315,3 +315,33 @@ type ChatSessionsResponse struct {
 	Limit    int           `json:"limit"`
 	HasMore  bool          `json:"has_more"`
 }
+
+// SessionPOISection names which list of a stored answer a page is read from.
+//
+// It is a string rather than the proto enum so the service layer never imports
+// generated code; the handler translates.
+type SessionPOISection string
+
+const (
+	// SectionItinerary is the plan itself, falling back to the general list
+	// when a turn produced no itinerary — the same rule the trip builder uses.
+	SectionItinerary   SessionPOISection = "itinerary"
+	SectionGeneral     SessionPOISection = "general"
+	SectionRestaurants SessionPOISection = "restaurants"
+	SectionHotels      SessionPOISection = "hotels"
+	SectionActivities  SessionPOISection = "activities"
+)
+
+// SessionPOIPage is one page of an answer that was already generated.
+type SessionPOIPage struct {
+	POIs []POIDetailedInfo
+	// Section is what was actually read, so a caller that asked for the
+	// default learns which list it got.
+	Section SessionPOISection
+	// Total is the length of the whole list, not of this page.
+	Total       int
+	Page        int
+	PageSize    int
+	HasMore     bool
+	PlannedDays int
+}

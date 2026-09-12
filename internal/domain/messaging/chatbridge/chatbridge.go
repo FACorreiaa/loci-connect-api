@@ -31,6 +31,10 @@ type Chat interface {
 	StartChat(ctx context.Context, userID, profileID uuid.UUID, cityName, message string, userLocation *locitypes.UserLocation) (*locitypes.ChatResponse, error)
 	ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, cityName string) (*locitypes.ChatResponse, error)
 	GetUserChatSessions(ctx context.Context, userID uuid.UUID, page, limit int) (*locitypes.ChatSessionsResponse, error)
+	// GetSessionPOIs reads a page of an answer already produced. It is the
+	// same method the Connect handler calls, so a page in a chat and a page in
+	// the app are the same places in the same order.
+	GetSessionPOIs(ctx context.Context, userID, sessionID uuid.UUID, section locitypes.SessionPOISection, page, pageSize int) (*locitypes.SessionPOIPage, error)
 }
 
 // Answerer turns a message from a linked chat into a reply.
@@ -53,14 +57,14 @@ func New(chat Chat, logger *slog.Logger) *Answerer {
 // means the same trip; starting a new session would answer a question nobody
 // asked. A message that cannot be continued starts a session rather than
 // failing, so the reply is an itinerary rather than an apology.
-func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, email, text string) (string, error) {
+func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, email, text string) (string, string, error) {
 	if a.chat == nil {
-		return "", errors.New("chatbridge: no chat service configured")
+		return "", "", errors.New("chatbridge: no chat service configured")
 	}
 
 	text = strings.TrimSpace(text)
 	if text == "" {
-		return "", errors.New("chatbridge: nothing to answer")
+		return "", "", errors.New("chatbridge: nothing to answer")
 	}
 
 	// A chat message arrives with no JWT, so nothing below here would know
@@ -78,7 +82,8 @@ func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, email, text str
 	if sessionID, ok := a.latestSession(ctx, userID); ok {
 		response, err := a.chat.ContinueChat(ctx, userID, sessionID, text, "")
 		if err == nil {
-			return reply(response), nil
+			body, next := reply(response)
+			return body, next, nil
 		}
 		// The session may have expired between listing it and using it, which
 		// is ordinary rather than exceptional. Fall through and start a new
@@ -92,9 +97,10 @@ func (a *Answerer) Answer(ctx context.Context, userID uuid.UUID, email, text str
 	// applies the account's own defaults, which is what the app would use.
 	response, err := a.chat.StartChat(ctx, userID, uuid.Nil, "", text, nil)
 	if err != nil {
-		return "", fmt.Errorf("chatbridge: %w", err)
+		return "", "", fmt.Errorf("chatbridge: %w", err)
 	}
-	return reply(response), nil
+	body, next := reply(response)
+	return body, next, nil
 }
 
 // latestSession finds the conversation this message should continue.
@@ -125,18 +131,47 @@ func (a *Answerer) latestSession(ctx context.Context, userID uuid.UUID) (uuid.UU
 // traveller who asked in a chat wants the plan in that chat, not a pointer to
 // a browser. The client splits anything past Telegram's limit, so length here
 // costs extra messages rather than a truncated plan.
-func reply(response *locitypes.ChatResponse) string {
+func reply(response *locitypes.ChatResponse) (text, next string) {
 	if response == nil {
-		return "Done — open Loci to see it."
+		return "Done — open Loci to see it.", ""
 	}
-	if text := strings.TrimSpace(response.Message); text != "" {
-		return text
+
+	// A next-page token is offered whenever the stored answer has more than
+	// one page in it, including alongside prose: the prose answers the
+	// question, and the places are still there to page through.
+	if response.SessionID != uuid.Nil {
+		if pois := planPOIs(response.UpdatedItinerary); len(pois) > maxRenderedPOIs {
+			next = encodePage(response.SessionID, 2, planSection(response.UpdatedItinerary))
+		}
+	}
+
+	if prose := strings.TrimSpace(response.Message); prose != "" {
+		return prose, next
 	}
 	if itinerary := renderItinerary(response.UpdatedItinerary); itinerary != "" {
-		return itinerary
+		return itinerary, next
 	}
 	// Nothing to render: the turn produced neither prose nor a plan.
-	return "Done — open Loci to see it."
+	return "Done — open Loci to see it.", ""
+}
+
+// planPOIs and planSection mirror the service's own rule for "which list is
+// the plan", so the button offers page two of the list page one came from.
+func planPOIs(city *locitypes.AiCityResponse) []locitypes.POIDetailedInfo {
+	if city == nil {
+		return nil
+	}
+	if pois := city.AIItineraryResponse.PointsOfInterest; len(pois) > 0 {
+		return pois
+	}
+	return city.PointsOfInterest
+}
+
+func planSection(city *locitypes.AiCityResponse) locitypes.SessionPOISection {
+	if city != nil && len(city.AIItineraryResponse.PointsOfInterest) > 0 {
+		return locitypes.SectionItinerary
+	}
+	return locitypes.SectionGeneral
 }
 
 // maxRenderedPOIs caps how many places each section of a chat reply carries.
@@ -227,8 +262,10 @@ func byDistance(pois []locitypes.POIDetailedInfo) []locitypes.POIDetailedInfo {
 // writePOIs appends one section of places, capped and counted.
 func writePOIs(b *strings.Builder, pois []locitypes.POIDetailedInfo) {
 	for i, poi := range pois {
+		// Stop at the cap. What used to happen here was a line saying how many
+		// more there were and no way to see any of them; the caller now offers
+		// a button instead.
 		if i == maxRenderedPOIs {
-			fmt.Fprintf(b, "\n…and %d more in Loci.\n", len(pois)-maxRenderedPOIs)
 			return
 		}
 		// A grounded answer carries its [poi:<uuid>] citation in the name.

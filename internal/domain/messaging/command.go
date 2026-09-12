@@ -9,6 +9,7 @@ const (
 	cmdStart
 	cmdHelp
 	cmdUnlink
+	cmdMore
 	cmdUnknown
 )
 
@@ -35,6 +36,8 @@ func parseCommand(text string) (command, string) {
 		return cmdHelp, arg
 	case "unlink", "disconnect":
 		return cmdUnlink, arg
+	case "more":
+		return cmdMore, arg
 	default:
 		return cmdUnknown, arg
 	}

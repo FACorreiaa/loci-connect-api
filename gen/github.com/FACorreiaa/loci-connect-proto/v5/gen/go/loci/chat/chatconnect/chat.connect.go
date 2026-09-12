@@ -48,6 +48,9 @@ const (
 	// ChatServiceGetRecentInteractionsProcedure is the fully-qualified name of the ChatService's
 	// GetRecentInteractions RPC.
 	ChatServiceGetRecentInteractionsProcedure = "/loci.chat.ChatService/GetRecentInteractions"
+	// ChatServiceGetSessionPOIsProcedure is the fully-qualified name of the ChatService's
+	// GetSessionPOIs RPC.
+	ChatServiceGetSessionPOIsProcedure = "/loci.chat.ChatService/GetSessionPOIs"
 	// ChatServiceEndSessionProcedure is the fully-qualified name of the ChatService's EndSession RPC.
 	ChatServiceEndSessionProcedure = "/loci.chat.ChatService/EndSession"
 	// ChatServiceBookmarkPOIProcedure is the fully-qualified name of the ChatService's BookmarkPOI RPC.
@@ -70,6 +73,7 @@ var (
 	chatServiceGetChatSessionMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("GetChatSession")
 	chatServiceGetChatSessionsMethodDescriptor       = chatServiceServiceDescriptor.Methods().ByName("GetChatSessions")
 	chatServiceGetRecentInteractionsMethodDescriptor = chatServiceServiceDescriptor.Methods().ByName("GetRecentInteractions")
+	chatServiceGetSessionPOIsMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("GetSessionPOIs")
 	chatServiceEndSessionMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("EndSession")
 	chatServiceBookmarkPOIMethodDescriptor           = chatServiceServiceDescriptor.Methods().ByName("BookmarkPOI")
 	chatServiceBookmarkItineraryMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("BookmarkItinerary")
@@ -84,6 +88,9 @@ type ChatServiceClient interface {
 	GetChatSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[chat.GetChatSessionResponse], error)
 	GetChatSessions(context.Context, *connect.Request[chat.GetChatSessionsRequest]) (*connect.Response[chat.GetChatSessionsResponse], error)
 	GetRecentInteractions(context.Context, *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error)
+	// Reads a page of a stored answer. Generation stays a single up-front call;
+	// only delivery is paged.
+	GetSessionPOIs(context.Context, *connect.Request[chat.GetSessionPOIsRequest]) (*connect.Response[chat.GetSessionPOIsResponse], error)
 	EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error)
 	// Bookmarking RPCs
 	BookmarkPOI(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
@@ -133,6 +140,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceGetRecentInteractionsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getSessionPOIs: connect.NewClient[chat.GetSessionPOIsRequest, chat.GetSessionPOIsResponse](
+			httpClient,
+			baseURL+ChatServiceGetSessionPOIsProcedure,
+			connect.WithSchema(chatServiceGetSessionPOIsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		endSession: connect.NewClient[chat.GetChatSessionRequest, common.Response](
 			httpClient,
 			baseURL+ChatServiceEndSessionProcedure,
@@ -173,6 +186,7 @@ type chatServiceClient struct {
 	getChatSession        *connect.Client[chat.GetChatSessionRequest, chat.GetChatSessionResponse]
 	getChatSessions       *connect.Client[chat.GetChatSessionsRequest, chat.GetChatSessionsResponse]
 	getRecentInteractions *connect.Client[chat.GetRecentInteractionsRequest, chat.GetRecentInteractionsResponse]
+	getSessionPOIs        *connect.Client[chat.GetSessionPOIsRequest, chat.GetSessionPOIsResponse]
 	endSession            *connect.Client[chat.GetChatSessionRequest, common.Response]
 	bookmarkPOI           *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
 	bookmarkItinerary     *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
@@ -203,6 +217,11 @@ func (c *chatServiceClient) GetChatSessions(ctx context.Context, req *connect.Re
 // GetRecentInteractions calls loci.chat.ChatService.GetRecentInteractions.
 func (c *chatServiceClient) GetRecentInteractions(ctx context.Context, req *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error) {
 	return c.getRecentInteractions.CallUnary(ctx, req)
+}
+
+// GetSessionPOIs calls loci.chat.ChatService.GetSessionPOIs.
+func (c *chatServiceClient) GetSessionPOIs(ctx context.Context, req *connect.Request[chat.GetSessionPOIsRequest]) (*connect.Response[chat.GetSessionPOIsResponse], error) {
+	return c.getSessionPOIs.CallUnary(ctx, req)
 }
 
 // EndSession calls loci.chat.ChatService.EndSession.
@@ -237,6 +256,9 @@ type ChatServiceHandler interface {
 	GetChatSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[chat.GetChatSessionResponse], error)
 	GetChatSessions(context.Context, *connect.Request[chat.GetChatSessionsRequest]) (*connect.Response[chat.GetChatSessionsResponse], error)
 	GetRecentInteractions(context.Context, *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error)
+	// Reads a page of a stored answer. Generation stays a single up-front call;
+	// only delivery is paged.
+	GetSessionPOIs(context.Context, *connect.Request[chat.GetSessionPOIsRequest]) (*connect.Response[chat.GetSessionPOIsResponse], error)
 	EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error)
 	// Bookmarking RPCs
 	BookmarkPOI(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
@@ -282,6 +304,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceGetRecentInteractionsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetSessionPOIsHandler := connect.NewUnaryHandler(
+		ChatServiceGetSessionPOIsProcedure,
+		svc.GetSessionPOIs,
+		connect.WithSchema(chatServiceGetSessionPOIsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	chatServiceEndSessionHandler := connect.NewUnaryHandler(
 		ChatServiceEndSessionProcedure,
 		svc.EndSession,
@@ -324,6 +352,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceGetChatSessionsHandler.ServeHTTP(w, r)
 		case ChatServiceGetRecentInteractionsProcedure:
 			chatServiceGetRecentInteractionsHandler.ServeHTTP(w, r)
+		case ChatServiceGetSessionPOIsProcedure:
+			chatServiceGetSessionPOIsHandler.ServeHTTP(w, r)
 		case ChatServiceEndSessionProcedure:
 			chatServiceEndSessionHandler.ServeHTTP(w, r)
 		case ChatServiceBookmarkPOIProcedure:
@@ -361,6 +391,10 @@ func (UnimplementedChatServiceHandler) GetChatSessions(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) GetRecentInteractions(context.Context, *connect.Request[chat.GetRecentInteractionsRequest]) (*connect.Response[chat.GetRecentInteractionsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.GetRecentInteractions is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetSessionPOIs(context.Context, *connect.Request[chat.GetSessionPOIsRequest]) (*connect.Response[chat.GetSessionPOIsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.GetSessionPOIs is not implemented"))
 }
 
 func (UnimplementedChatServiceHandler) EndSession(context.Context, *connect.Request[chat.GetChatSessionRequest]) (*connect.Response[common.Response], error) {

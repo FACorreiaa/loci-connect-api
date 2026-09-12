@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,12 +58,37 @@ type InboundMessage struct {
 // SpokenBy reports whether this message was spoken rather than typed.
 func (m InboundMessage) SpokenBy() bool { return m.Audio != nil }
 
+// Button is an action offered alongside a reply.
+//
+// Platform-neutral on purpose: no Telegram type may enter this package, which
+// already treats a platform as a string. A platform with no button surface
+// ignores these, so the text has to stand on its own without them.
+type Button struct {
+	Label string
+	// Data is an opaque token the platform hands back on a press. Telegram
+	// caps it at 64 bytes.
+	Data string
+}
+
 // OutboundMessage is the reply.
 type OutboundMessage struct {
 	Text string
 	// Silent suppresses the reply entirely. Used where answering would be
 	// noise — a message this deployment has already handled.
 	Silent bool
+	// Buttons are offered under the reply, where the platform supports them.
+	Buttons []Button
+}
+
+// InboundAction is a button press.
+//
+// It carries no text, because a press is not a question: it names something
+// already produced, and answering it is a read.
+type InboundAction struct {
+	Platform string
+	ChatID   string
+	// Data is the token the button was created with.
+	Data string
 }
 
 // Answerer turns a question from a linked account into an answer.
@@ -71,8 +97,28 @@ type OutboundMessage struct {
 // implementation can be the same conversation the web app uses: a question
 // asked in a chat continues in the web chat and back, because both go through
 // one session rather than two histories that happen to belong to one person.
+// It returns primitives rather than an OutboundMessage so the dependency runs
+// one way only: this package defines the interface, the bridge implements it,
+// and the bridge never imports this package.
+//
+// next is an opaque token for the rest of the answer, empty when there is no
+// rest. The first reply is page one, which is why it rides on the ordinary
+// answer rather than on a call of its own.
 type Answerer interface {
-	Answer(ctx context.Context, userID uuid.UUID, email, text string) (string, error)
+	Answer(ctx context.Context, userID uuid.UUID, email, text string) (reply, next string, err error)
+}
+
+// Paginator renders a page of an answer that was already produced.
+//
+// Separate from Answerer because the two cost differently: an answer is a
+// generation, a page is a read of what that generation already wrote.
+type Paginator interface {
+	Page(ctx context.Context, userID uuid.UUID, email, token string) (text, next string, err error)
+	// LatestPage renders a page of the most recent answer, for a caller with
+	// no token: somebody who typed "/more" rather than pressing a button.
+	// It is the fallback for when a keyboard renders badly, when the message
+	// has scrolled away, or on a client that handles buttons poorly.
+	LatestPage(ctx context.Context, userID uuid.UUID, email string, page int) (text, next string, err error)
 }
 
 // Quota meters what a chat costs against the account it is linked to.
@@ -87,6 +133,7 @@ type Quota interface {
 type Service struct {
 	repo      Repository
 	answerer  Answerer
+	paginator Paginator
 	quota     Quota
 	botHandle string
 	logger    *slog.Logger
@@ -119,6 +166,16 @@ func (s *Service) WithClock(now func() time.Time) *Service {
 // which is what a test that is not about metering wants.
 func (s *Service) WithQuota(q Quota) *Service {
 	s.quota = q
+	return s
+}
+
+// WithPaginator lets a chat read more of an answer it has already been given.
+//
+// A builder for the same reason WithQuota is one: a nil paginator means "no
+// pages", which is what every existing caller and test wants without being
+// changed.
+func (s *Service) WithPaginator(p Paginator) *Service {
+	s.paginator = p
 	return s
 }
 
@@ -232,7 +289,7 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 		text = strings.TrimSpace(spoken)
 	}
 
-	answer, err := s.answerer.Answer(ctx, link.UserID, link.Email, text)
+	answer, next, err := s.answerer.Answer(ctx, link.UserID, link.Email, text)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "could not answer a chat message",
 			slog.String("user_id", link.UserID.String()),
@@ -243,7 +300,80 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 			Text: "Something went wrong working that out. Try again in a moment.",
 		}, nil
 	}
-	return OutboundMessage{Text: answer}, nil
+	return OutboundMessage{Text: answer, Buttons: moreButton(next)}, nil
+}
+
+// moreButton offers the rest of an answer, or nothing when there is no rest.
+func moreButton(next string) []Button {
+	if next == "" {
+		return nil
+	}
+	return []Button{{Label: "Show more places", Data: next}}
+}
+
+// HandleAction answers a button press.
+//
+// It renders a page of an answer that was already generated and already paid
+// for, so it deliberately never calls spendQuota and never reaches the model.
+// Charging for it would be charging twice for one generation; the press is a
+// read of what that generation wrote.
+func (s *Service) HandleAction(ctx context.Context, in InboundAction) (OutboundMessage, error) {
+	link, err := s.repo.LinkForChat(ctx, in.Platform, in.ChatID)
+	switch {
+	case errors.Is(err, ErrNotLinked):
+		// The same instruction an unlinked chat gets for anything else. A
+		// button pressed from an unlinked chat is a chat that was unlinked
+		// after the button was sent.
+		return OutboundMessage{Text: linkInstructions}, nil
+	case err != nil:
+		return OutboundMessage{}, err
+	}
+
+	if s.paginator == nil {
+		return OutboundMessage{Text: "I cannot look that up right now. Try again shortly."}, nil
+	}
+
+	if err := s.repo.TouchLink(ctx, in.Platform, in.ChatID, ""); err != nil {
+		s.logger.WarnContext(ctx, "could not record chat activity", slog.String("error", err.Error()))
+	}
+
+	text, next, err := s.paginator.Page(ctx, link.UserID, link.Email, in.Data)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "could not render a page",
+			slog.String("user_id", link.UserID.String()),
+			slog.String("error", err.Error()))
+		return OutboundMessage{Text: "I could not find the rest of that. Ask me again and I will redo it."}, nil
+	}
+	return OutboundMessage{Text: text, Buttons: moreButton(next)}, nil
+}
+
+// morePage answers a typed "/more".
+//
+// Like a button press it is a read of an answer already produced, so it sits
+// with the commands, above spendQuota, and never reaches the model. "/more 3"
+// jumps to a page; bare "/more" means the one after the first.
+func (s *Service) morePage(ctx context.Context, link Link, arg string) OutboundMessage {
+	if s.paginator == nil {
+		return OutboundMessage{Text: "I cannot look that up right now. Try again shortly."}
+	}
+
+	page := 2
+	if arg != "" {
+		n, err := strconv.Atoi(strings.TrimSpace(arg))
+		if err != nil || n < 1 {
+			return OutboundMessage{Text: "Send /more, or /more 3 for the third page."}
+		}
+		page = n
+	}
+
+	text, next, err := s.paginator.LatestPage(ctx, link.UserID, link.Email, page)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "could not render a page",
+			slog.String("user_id", link.UserID.String()),
+			slog.String("error", err.Error()))
+		return OutboundMessage{Text: "I could not find the rest of that. Ask me again and I will redo it."}
+	}
+	return OutboundMessage{Text: text, Buttons: moreButton(next)}
 }
 
 // spendQuota charges one request to the account behind a chat.
@@ -323,17 +453,18 @@ func (s *Service) handleUnlinked(ctx context.Context, in InboundMessage, text st
 	// nobody to charge it to, and a code cannot be spoken anyway: a transcript
 	// of "A3F9C1D2" read aloud is "a three F nine see one D two", in some
 	// spelling that cannot be normalised back.
-	return OutboundMessage{
-		Text: "This chat is not linked to a Loci account yet. Open Loci, go to Settings › Connections, and send me the code it gives you.",
-	}, nil
+	return OutboundMessage{Text: linkInstructions}, nil
 }
+
+// linkInstructions is what an unlinked chat is told, wherever it is told it.
+const linkInstructions = "This chat is not linked to a Loci account yet. Open Loci, go to Settings › Connections, and send me the code it gives you."
 
 // handleCommand runs a command from a linked chat.
 //
 // None of these reach the model. A command is a fixed answer, and letting
 // "/help" cost a generation would be charging somebody's daily quota to read
 // instructions.
-func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Link, cmd command, _ string) (OutboundMessage, error) {
+func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Link, cmd command, arg string) (OutboundMessage, error) {
 	switch cmd {
 	case cmdStart:
 		return OutboundMessage{
@@ -346,8 +477,12 @@ func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Lin
 			"",
 			"What you ask here and what you ask in the Loci app are the same conversation.",
 			"",
+			"/more — the next few places from your last answer.",
 			"/unlink — disconnect this chat from your Loci account.",
 		}, "\n")}, nil
+
+	case cmdMore:
+		return s.morePage(ctx, link, arg), nil
 
 	case cmdUnlink:
 		if err := s.repo.UnlinkChat(ctx, in.Platform, in.ChatID); err != nil && !errors.Is(err, ErrNotLinked) {

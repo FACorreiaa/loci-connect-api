@@ -279,3 +279,8 @@ func TestCancellationIsNotAFailure(t *testing.T) {
 		t.Fatal("the poller did not stop")
 	}
 }
+
+// HandleAction is unused by these tests; the interface needs it.
+func (h *recordingHandler) HandleAction(context.Context, messaging.InboundAction) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{}, nil
+}

@@ -78,6 +78,11 @@ type AIItineraryResponse struct {
 	PointsOfInterest   []POIDetailedInfo `json:"points_of_interest"`
 	Restaurants        []POIDetailedInfo `json:"restaurants,omitempty"`
 	Bars               []POIDetailedInfo `json:"bars,omitempty"`
+
+	// PlannedDays is how many days this itinerary covers. Set from the
+	// duration parsed out of the request, never from whatever the model wrote
+	// in its day numbers.
+	PlannedDays int `json:"planned_days,omitempty"`
 }
 
 type GeneralCityData struct {
