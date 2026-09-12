@@ -16,6 +16,21 @@ import (
 
 // defaultSemanticWeight is the semantic/spatial blend used when retrieving
 // evidence, matching the weight ContinueSessionStreamed already uses.
+// evidenceHeadroom is how many more candidates a packet carries than the answer
+// needs. A model asked for forty places out of exactly forty candidates has no
+// room to honour the category mix, skip somewhere already visited, or drop a
+// bad fit — it has to use all of them or invent.
+const evidenceHeadroom = 10
+
+// evidenceLimitFor sizes the packet to the answer. A zero target means no
+// caller decided, which is what DefaultEvidence is for.
+func evidenceLimitFor(target int) int {
+	if target <= 0 {
+		return retrieval.DefaultEvidence
+	}
+	return min(target+evidenceHeadroom, retrieval.MaxEvidence)
+}
+
 const defaultSemanticWeight = 0.6
 
 // resolveCityID looks up the city for this turn, exact match first and trigram
@@ -77,6 +92,7 @@ func (l *ServiceImpl) assembleEvidencePacket(cc *common.ChatContext) {
 		CityName:   cc.CityName,
 		Candidates: candidates,
 		Reasons:    reasons,
+		Limit:      evidenceLimitFor(cc.POITarget),
 	})
 	if err != nil {
 		l.logger.WarnContext(ctx, "packet assembly failed; turn will generate ungrounded",
@@ -134,8 +150,12 @@ func (l *ServiceImpl) retrieveCandidates(
 		lanes = append(lanes, retrieval.Ranked{Reason: retrieval.MatchLexical, IDs: ids})
 	}
 
+	// The lanes are candidate pools, not the answer: they are ranked and fused
+	// down to the packet limit afterwards, so they ask for the search ceiling
+	// rather than for the target.
 	semantic, err := l.generateSemanticPOIRecommendations(
 		ctx, cc.Message, cc.CityID, cc.UserID, cc.UserLocation, defaultSemanticWeight,
+		retrieval.MaxSearchResults,
 	)
 	if err != nil {
 		l.logger.WarnContext(ctx, "semantic retrieval lane failed",

@@ -416,3 +416,79 @@ func TestExtractionCacheKeyIsGlobalAndTrimmed(t *testing.T) {
 		t.Errorf("unexpected prefix: %q", a)
 	}
 }
+
+// The resolved count is in the key because it depends on the caller's plan: a
+// free caller asks for forty places and a Pro caller for fifty, from the same
+// words. Without this component the first answer to arrive would be replayed to
+// both.
+func TestPOITargetSeparatesKeysForThePartsThatRenderIt(t *testing.T) {
+	base := generationKeyInput{
+		Domain:    locitypes.DomainItinerary,
+		CityID:    uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		ModelID:   "gemini-test",
+		Query:     "a month in madeira",
+		UserID:    uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		POITarget: 40,
+	}
+
+	for _, part := range []generationPart{partGeneralPOIs, partItinerary, partRestaurants, partActivities} {
+		free, pro := base, base
+		free.Part, pro.Part = part, part
+		pro.POITarget = 50
+		if buildGenerationKey(free) == buildGenerationKey(pro) {
+			t.Errorf("%s: a 40-place and a 50-place answer share a key", part)
+		}
+	}
+
+	// City data is one description of a city however long the stay, and a
+	// month-long stay is still one hotel. Putting the count in either key would
+	// fragment their entries for no gain.
+	for _, part := range []generationPart{partCityData, partHotels} {
+		free, pro := base, base
+		free.Part, pro.Part = part, part
+		pro.POITarget = 50
+		if buildGenerationKey(free) != buildGenerationKey(pro) {
+			t.Errorf("%s: the count fragments a key whose prompt does not render it", part)
+		}
+	}
+}
+
+// Every part that carries the count in its key must render it in its prompt,
+// and vice versa. The two lists drifting apart is what made general_pois store
+// duplicate lists for months: its key varied with the request text that its
+// prompt ignored.
+func TestPartUsesPOITargetMatchesThePrompts(t *testing.T) {
+	rendersCount := map[generationPart]bool{
+		partCityData:    false,
+		partGeneralPOIs: true,
+		partItinerary:   true,
+		partHotels:      false,
+		partRestaurants: true,
+		partActivities:  true,
+	}
+	for part, want := range rendersCount {
+		if got := partUsesPOITarget(part); got != want {
+			t.Errorf("partUsesPOITarget(%s) = %v, want %v", part, got, want)
+		}
+	}
+}
+
+// A golden key pins where the count sits in the hash. Appending a component in
+// the wrong place silently reshuffles every key, which is a cache miss for
+// everybody rather than a test failure.
+func TestGenerationKeyIsStable(t *testing.T) {
+	in := generationKeyInput{
+		Part:         partItinerary,
+		Domain:       locitypes.DomainItinerary,
+		CityID:       uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		ModelID:      "gemini-test",
+		Query:        "4 days in madeira",
+		SnapshotHash: "snapshot",
+		UserID:       uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		POITarget:    24,
+	}
+	const want = "gen:51867f217e7ee71437afc20dc2d3507132e35f78f9cbaa6224e480524bd15049"
+	if got := buildGenerationKey(in); got != want {
+		t.Errorf("generation key = %q, want %q", got, want)
+	}
+}

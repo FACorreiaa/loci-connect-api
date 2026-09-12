@@ -15,7 +15,14 @@ const (
 	MaxNearbyResults = 50
 	// MaxEvidence bounds how many candidates may enter a single ContextPacket.
 	// This is the real token guard on the prompt path.
-	MaxEvidence = 20
+	//
+	// It is above the largest answer anyone can ask for, deliberately. The
+	// packet is the pool the model chooses from, not the answer: honouring a
+	// mix of categories and stepping over places already visited both need
+	// more candidates than places wanted. At twenty, an answer sized to a
+	// week could only be grounded in twenty rows and the rest came from the
+	// model's memory.
+	MaxEvidence = 60
 	// MaxFactsPerEvidence bounds the crowd-verified facts attached per POI.
 	MaxFactsPerEvidence = 6
 	// MaxTraitLabels bounds how many taste-trait labels are rendered.
@@ -28,7 +35,10 @@ const (
 )
 
 // DefaultEvidence is the packet size used when a caller does not ask for one.
-const DefaultEvidence = 10
+// It matches what an unstated trip length is sized to, so a caller that
+// supplies no limit behaves like an ordinary short request rather than like an
+// unrelated round number.
+const DefaultEvidence = 12
 
 // ValidateLimit clamps a caller-supplied limit into [MinLimit, maximum],
 // returning an error when the value is out of range rather than silently

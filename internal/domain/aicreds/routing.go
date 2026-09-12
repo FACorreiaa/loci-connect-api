@@ -324,6 +324,47 @@ func (r *Router) Model() string { return r.shared.Model() }
 // answer under another's name.
 func (r *Router) ModelFor(ctx context.Context) string { return r.clientFor(ctx).Model() }
 
+// PlanFor names the plan a call made with ctx would be billed under, by the
+// same rules chainForPlan applies and out of the same short-lived cache.
+//
+// It exists because the size of an answer now depends on the plan — Pro asks
+// the model for more places than free — and that resolved number goes into the
+// generation cache key. Reading the plan through this method rather than
+// separately is what keeps the two decisions consistent: a request routed to
+// the Pro chain is a request sized for Pro.
+//
+// Ordinarily this costs nothing. Any turn that has already chosen a model has
+// populated planCache, and planTTL is a minute. Where free-tier routing is not
+// configured, chainForPlan returns before it ever reads a plan, so this is the
+// first caller and does pay one read per user per minute — bounded, and worth
+// stating rather than claiming a guarantee that does not hold everywhere.
+//
+// Every uncertainty resolves to free, for the reason chainForPlan gives:
+// serving a slightly shorter list on a database error is a better mistake than
+// billing somebody for a longer one.
+func (r *Router) PlanFor(ctx context.Context) string {
+	rawID, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok {
+		return subscription.PlanFree
+	}
+	userID, err := uuid.Parse(rawID)
+	if err != nil {
+		return subscription.PlanFree
+	}
+	if r.plans == nil {
+		return subscription.PlanFree
+	}
+
+	plan, err := r.effectivePlan(ctx, userID)
+	if err != nil {
+		r.logger.WarnContext(ctx, "could not read the caller's plan; sizing the answer for free",
+			slog.String("user_id", userID.String()),
+			slog.String("error", err.Error()))
+		return subscription.PlanFree
+	}
+	return plan
+}
+
 // Close closes the shared client and every client built for a user.
 func (r *Router) Close() error {
 	r.mu.Lock()

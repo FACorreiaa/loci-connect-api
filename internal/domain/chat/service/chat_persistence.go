@@ -16,7 +16,9 @@ import (
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/tripspan"
 )
 
 func (l *ServiceImpl) CollectResults(resultCh <-chan locitypes.GenAIResponse) (itinerary locitypes.AiCityResponse, llmInteractionID uuid.UUID, rawPersonalisedPOIs []locitypes.POIDetailedInfo, errors []error) {
@@ -144,7 +146,11 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	startTime := time.Now()
 
 	// Create enhanced prompt based on domain
-	prompt := l.getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData, domain)
+	// This path carries no parsed duration, so it asks for what an unstated
+	// trip length is worth. The plan still applies: a Pro caller is not sized
+	// for free here either.
+	target := resolvePOITarget(tripspan.DefaultDays, subscription.IsProPlan(l.planFor(ctx)))
+	prompt := l.getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData, domain, target)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 
 	response, err := l.aiClient.Generate(ctx, prompt, config)

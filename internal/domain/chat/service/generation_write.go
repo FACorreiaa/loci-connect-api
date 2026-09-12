@@ -69,10 +69,32 @@ func parseGeneratedPart(part generationPart, raw string, target any) error {
 // stream, then replayed and re-persisted for the rest of its lifetime. A
 // durable layer makes that a much longer mistake, so nothing is written until
 // it has been read back as the structure it claims to be.
-func validateGeneratedPart(part generationPart, raw string) bool {
+// minKeepableCount is the fewest places an answer may carry and still be worth
+// storing for a fortnight.
+//
+// Emptiness used to be the only bar, which was tolerable while every answer was
+// about ten places and is not now that one can be asked for fifty: a parseable
+// four-item reply to a forty-item request would be cached and replayed for two
+// weeks. The floor is deliberately generous — a quarter of what was asked for —
+// because a genuinely thin city returning nine good places is a correct answer,
+// not a failed one.
+//
+// This gates the write, never the turn. Whatever came back is still shown; it
+// is simply not preserved.
+func minKeepableCount(target int) int {
+	floor := poiTargetMin / 2
+	if quarter := target / 4; quarter > floor {
+		return quarter
+	}
+	return floor
+}
+
+func validateGeneratedPart(part generationPart, raw string, target int) bool {
 	if strings.TrimSpace(raw) == "" {
 		return false
 	}
+	enough := func(n int) bool { return n > 0 && n >= minKeepableCount(target) }
+
 	switch part {
 	case partCityData:
 		var city locitypes.GeneralCityData
@@ -82,16 +104,18 @@ func validateGeneratedPart(part generationPart, raw string) bool {
 		if parseGeneratedPart(part, raw, &itinerary) != nil {
 			return false
 		}
-		return itinerary.ItineraryName != "" || len(itinerary.PointsOfInterest) > 0
+		return enough(len(itinerary.PointsOfInterest))
 	case partGeneralPOIs, partActivities:
 		var pois []locitypes.POIDetailedInfo
-		return parseGeneratedPart(part, raw, &pois) == nil && len(pois) > 0
+		return parseGeneratedPart(part, raw, &pois) == nil && enough(len(pois))
 	case partHotels:
+		// Accommodation asks for a fixed ten and does not scale, so it keeps
+		// the old bar.
 		var hotels []locitypes.HotelDetailedInfo
 		return parseGeneratedPart(part, raw, &hotels) == nil && len(hotels) > 0
 	case partRestaurants:
 		var restaurants []locitypes.RestaurantDetailedInfo
-		return parseGeneratedPart(part, raw, &restaurants) == nil && len(restaurants) > 0
+		return parseGeneratedPart(part, raw, &restaurants) == nil && enough(len(restaurants))
 	}
 	return false
 }
@@ -128,7 +152,7 @@ func (l *ServiceImpl) persistGenerations(
 			continue
 		}
 		text := rawResponses[name]
-		if !validateGeneratedPart(p.Part, text) {
+		if !validateGeneratedPart(p.Part, text, p.POITarget) {
 			// Counted, because a part that keeps failing validation is a
 			// prompt or a model problem, and it will miss forever otherwise.
 			observability.RecordLLMCacheLookup(name,

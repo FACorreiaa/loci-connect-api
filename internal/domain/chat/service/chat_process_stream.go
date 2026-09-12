@@ -16,9 +16,12 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
+	"github.com/FACorreiaa/loci-connect-api/pkg/tripspan"
 )
 
 // prepareChatContext handles extracting city, intent detection, fetching user profile,
@@ -29,6 +32,24 @@ import (
 // on the service, because two requests are always in flight at once.
 func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, error) {
 	ctx := cc.Ctx
+
+	// 0. Read the trip length out of the raw request, before anything rewrites
+	// it. Step 1 replaces cc.Message with an LLM-cleaned string whose prompt
+	// only promises to strip the city name, but whose own examples also shorten
+	// the sentence ("Find restaurants in Barcelona" -> "Find restaurants").
+	// Assuming "4 days" survives that is a guess, and it is the kind of guess
+	// that fails quietly: the request still works, it is just sized for two
+	// days.
+	span := tripspan.Parse(cc.Message)
+	cc.TripDays, cc.TripDaysSource = span.Days, string(span.Source)
+	observability.RecordTripDurationParse(cc.TripDaysSource, cc.TripDays)
+	if !span.Parsed() {
+		// The raw text behind these is the copy for a future "did you mean 4
+		// days?" prompt, so it is logged rather than merely counted.
+		l.logger.InfoContext(ctx, "no trip duration in the request; assuming a short sample",
+			slog.String("message", cc.Message),
+			slog.Int("assumed_days", cc.TripDays))
+	}
 
 	// 1. Extract City
 	extractedCity, cleanedMessage, err := l.extractCityCached(ctx, cc.Message)
@@ -90,6 +111,12 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 	// should share one cached answer — and this is a database lookup, not a
 	// provider call, so it is cheap enough to do before a cache hit is known.
 	cc.CityID = l.resolveCityID(ctx, cc.CityName)
+
+	// 3b-ii. Size the answer. This has to happen before the plan is built: the
+	// target reaches both the prompts and the cache key, and the key is minted
+	// inside resolveGenerationPlan.
+	cc.POITarget = resolvePOITarget(cc.TripDays, subscription.IsProPlan(l.planFor(ctx)))
+	observability.RecordPOITarget(cc.POITarget)
 
 	// 3c. Plan this turn's parts, look them up, and retrieve evidence only if
 	// something actually has to be generated. Retrieval costs an embedding
@@ -281,6 +308,21 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 
 	l.logger.InfoContext(ctx, "Consolidated and deduplicated POIs",
 		slog.Int("total_unique_pois", len(allPOIs)))
+
+	// What was asked for against what arrived. Retrieval can only ground as
+	// many places as the corpus holds, and the prompt tells the model to
+	// return fewer rather than invent, so a thin city is expected to fall
+	// short — this is what makes that shortfall legible as an ingest problem
+	// for one city rather than as a prompt bug. Without it an honest short
+	// answer and a padded one look identical from the outside.
+	observability.RecordPOIShortfall(cc.POITarget, len(allPOIs))
+	if cc.POITarget > 0 && len(allPOIs) < cc.POITarget {
+		l.logger.InfoContext(ctx, "fewer places than asked for",
+			slog.Int("target", cc.POITarget),
+			slog.Int("delivered", len(allPOIs)),
+			slog.String("city_name", cc.CityName),
+			slog.Int("trip_days", cc.TripDays))
+	}
 
 	// Check the answer against the evidence it was given, and strip any
 	// identifier the model invented. This must happen before persistResults

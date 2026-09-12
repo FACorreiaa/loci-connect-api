@@ -22,6 +22,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -175,6 +176,33 @@ func (l *ServiceImpl) modelFor(ctx context.Context) string {
 		}
 	}
 	return l.model
+}
+
+// planResolver is what a client wrapper that routes per request exposes, so the
+// service can learn which plan this request is billed under without importing
+// the router. aicreds.Router satisfies it.
+type planResolver interface {
+	PlanFor(ctx context.Context) string
+}
+
+// planFor names the plan this request is billed under. It decides how many
+// places the answer asks for, and that number goes into the generation cache
+// key, so it is read from the same place — and the same short-lived cache — the
+// model routing uses.
+//
+// A wrapper that does not route per request means there is no per-user plan to
+// read, and free is the right answer: it is what the router itself falls back
+// to, and a slightly shorter list is the cheaper mistake.
+func (l *ServiceImpl) planFor(ctx context.Context) string {
+	if l == nil {
+		return subscription.PlanFree
+	}
+	if r, ok := l.aiClient.(planResolver); ok {
+		if plan := r.PlanFor(ctx); plan != "" {
+			return plan
+		}
+	}
+	return subscription.PlanFree
 }
 
 func applyOptions(client generativeAI.ChatClient, opts []Option) generativeAI.ChatClient {

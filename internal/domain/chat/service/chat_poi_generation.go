@@ -18,6 +18,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
@@ -386,7 +387,7 @@ func (l *ServiceImpl) generatePOIData(ctx context.Context, poiName, cityName str
 
 // generateSemanticPOIRecommendations generates POI recommendations using semantic search
 
-func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID, userID uuid.UUID, userLocation *locitypes.UserLocation, semanticWeight float64) ([]locitypes.POIDetailedInfo, error) {
+func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, userMessage string, cityID, userID uuid.UUID, userLocation *locitypes.UserLocation, semanticWeight float64, limit int) ([]locitypes.POIDetailedInfo, error) {
 	ctx, span := otel.Tracer("LlmInteractionService").Start(ctx, "generateSemanticPOIRecommendations", trace.WithAttributes(
 		attribute.String("user.message", userMessage),
 		attribute.String("city.id", cityID.String()),
@@ -445,7 +446,13 @@ func (l *ServiceImpl) generateSemanticPOIRecommendations(ctx context.Context, us
 
 	// If hybrid search failed or no location available, use semantic-only search
 	if len(pois) == 0 {
-		semanticPOIs, err := l.poiRepo.FindSimilarPOIsByCity(ctx, queryEmbedding, cityID, 10)
+		// This lane used to ask for ten whatever the caller wanted, which
+		// quietly capped every ungrounded-fallback answer at ten places. The
+		// limit is the caller's now, and every call site states one.
+		if limit <= 0 {
+			limit = retrieval.DefaultEvidence
+		}
+		semanticPOIs, err := l.poiRepo.FindSimilarPOIsByCity(ctx, queryEmbedding, cityID, limit)
 		if err != nil {
 			l.logger.ErrorContext(ctx, "Failed to find similar POIs", slog.Any("error", err))
 			span.RecordError(err)
