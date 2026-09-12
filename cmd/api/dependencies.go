@@ -846,6 +846,11 @@ func (d *Dependencies) initHandlers() error {
 		d.SubscriptionService,
 		d.Logger,
 	).WithSignals(signals)
+	// Filling in a city that has no places costs an LLM call, so it has its own
+	// switch, independent of the geocoding that creates such cities.
+	if envFlag("COMPARE_DISCOVERY_ENABLED", true) {
+		compareSvc = compareSvc.WithDiscovery(d.POISvc)
+	}
 	d.CompareHandler = compare.NewHandler(compareSvc)
 	d.Logger.Info("handlers initialized")
 	return nil
@@ -885,10 +890,8 @@ func (d *Dependencies) Cleanup() {
 // outbound rate limit and reports the same external-request metrics as every
 // other provider.
 func newForwardGeocoder(cache cachestore.Store) geocode.Forward {
-	if v := strings.TrimSpace(os.Getenv("GEOCODER_ENABLED")); v != "" {
-		if enabled, err := strconv.ParseBool(v); err == nil && !enabled {
-			return nil
-		}
+	if !envFlag("GEOCODER_ENABLED", true) {
+		return nil
 	}
 	return geocode.NewOpenMeteo(
 		os.Getenv("OPENMETEO_GEOCODING_BASE_URL"),
@@ -896,4 +899,19 @@ func newForwardGeocoder(cache cachestore.Store) geocode.Forward {
 		localcontext.NewSignalsHTTPClient(),
 		cache,
 	)
+}
+
+// envFlag reads a boolean switch, falling back to def when unset or unparseable.
+// Unparseable counts as unset on purpose: a typo in a deployment variable should
+// not silently disable a feature.
+func envFlag(key string, def bool) bool {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	parsed, err := strconv.ParseBool(v)
+	if err != nil {
+		return def
+	}
+	return parsed
 }

@@ -64,6 +64,11 @@ type Service struct {
 	// Optional, attached via WithSignals. Nil is supported and means the
 	// columns score without a disruption dimension, exactly as before.
 	signals *localcontext.Gatherer
+
+	// Optional, attached via WithDiscovery. Nil means a city with no places
+	// stored simply shows a thin column, which is what happened before.
+	discoverer POIDiscoverer
+	discovery  *discoveryState
 }
 
 // WithSignals attaches live alert sources so a compared city is penalised for
@@ -137,6 +142,7 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 	// the user's input or our geocoder being down — and reporting the latter as
 	// a bad argument is exactly how the original bug stayed invisible.
 	var failures []error
+	discoveries := 0
 
 	for _, name := range in.Candidates {
 		col, score, resolvedCity, err := s.buildColumn(ctx, originLat, originLon, name, windowHours, in.Start, in.End)
@@ -148,6 +154,15 @@ func (s *Service) CompareWeekend(ctx context.Context, in CompareInput) (*compare
 		resp.Columns = append(resp.Columns, col)
 		scores = append(scores, columnScore{name: name, score: score})
 		resolved = append(resolved, resolvedCity)
+
+		// A city we have only just placed on the map has nothing to do in it
+		// yet. Fill it in for next time, in the background and capped, so one
+		// page load cannot fan out into eight LLM generations.
+		if resolvedCity.poiCount == 0 && discoveries < maxDiscoveriesPerRequest {
+			if s.maybeDiscover(resolvedCity.uuid, resolvedCity.name) {
+				discoveries++
+			}
+		}
 	}
 
 	if len(resp.Columns) < 2 {
@@ -241,9 +256,12 @@ func (s *Service) buildColumn(
 	distKm := HaversineKm(originLat, originLon, lat, lon)
 	travelMins := DriveMins(distKm)
 
-	pois, err := s.pois.GetPOIsByCityID(ctx, city.ID)
-	if err != nil {
-		s.logger.WarnContext(ctx, "poi fetch failed", slog.Any("error", err))
+	var pois []locitypes.POIDetailedInfo
+	if city.ID != uuid.Nil {
+		pois, err = s.pois.GetPOIsByCityID(ctx, city.ID)
+		if err != nil {
+			s.logger.WarnContext(ctx, "poi fetch failed", slog.Any("error", err))
+		}
 	}
 	if len(pois) > maxTopPOIs {
 		pois = pois[:maxTopPOIs]
@@ -339,6 +357,7 @@ func (s *Service) buildColumn(
 
 	return col, score, resolvedCity{
 		id:       city.ID.String(),
+		uuid:     city.ID,
 		name:     city.Name,
 		lat:      lat,
 		lon:      lon,

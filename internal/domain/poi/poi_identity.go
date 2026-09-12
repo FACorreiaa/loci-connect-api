@@ -161,6 +161,27 @@ func (s *ServiceImpl) persistGeneratedPOIs(
 		return
 	}
 
+	s.persistGeneratedPOIsForCity(ctx, pois, cityID, cityName)
+}
+
+// persistGeneratedPOIsForCity saves a batch against a city row the caller has
+// already resolved.
+//
+// Separate from persistGeneratedPOIs because that one resolves the city by
+// *name*, which is right when all you have is an LLM result, and wrong when the
+// caller is holding the exact row the places belong to. Re-resolving a known id
+// by name is how a batch ends up attached to a different row than the one the
+// caller is about to read back from.
+func (s *ServiceImpl) persistGeneratedPOIsForCity(
+	ctx context.Context,
+	pois []locitypes.POIDetailedInfo,
+	cityID uuid.UUID,
+	cityName string,
+) {
+	if len(pois) == 0 || cityID == uuid.Nil {
+		return
+	}
+
 	res := s.poiRepository.PersistGeneratedPOIs(ctx, pois, cityID)
 	s.logger.InfoContext(ctx, "gave generated POIs stable identities",
 		slog.String("city", cityName),
