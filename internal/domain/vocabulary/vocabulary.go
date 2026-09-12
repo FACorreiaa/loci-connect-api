@@ -74,18 +74,41 @@ func (p *Places) For(ctx context.Context, userID uuid.UUID) string {
 	return strings.Join(dedupe(names), ", ")
 }
 
-// recentCities are the places this user has been asking about.
+// notACity is the value a session carries when the question was about where
+// somebody is standing rather than about a place by name.
+//
+// It is a routing marker, not somewhere anybody has been: see routeType in the
+// chat service. Left in, the hint would offer the decoder the literal word
+// "nearme", which is both useless and a word no speaker will say. Seven of the
+// nineteen sessions in production carry it.
+const notACity = "nearme"
+
+// recentCities are the places this user has been asking about, most recent
+// first.
+//
+// Ordered, because the hint window only holds a couple of hundred tokens and
+// the trip somebody is planning now is worth more of it than one from a month
+// ago. An unordered DISTINCT would have taken whichever rows the planner
+// happened to return.
 func (p *Places) recentCities(ctx context.Context, userID uuid.UUID) []string {
 	const query = `
-		SELECT DISTINCT city_name
+		SELECT city_name
 		FROM chat_sessions
-		WHERE user_id = $1 AND COALESCE(city_name, '') <> ''
-		LIMIT $2`
+		WHERE user_id = $1
+		  AND COALESCE(city_name, '') <> ''
+		  AND LOWER(city_name) <> $2
+		GROUP BY city_name
+		ORDER BY MAX(updated_at) DESC
+		LIMIT $3`
 
-	return p.strings(ctx, "recent cities", query, userID, maxCities)
+	return p.strings(ctx, "recent cities", query, userID, notACity, maxCities)
 }
 
 // placesIn are the named places in those cities.
+//
+// Not every city somebody asks about has rows here — a place discovered in
+// conversation may never have become a city row — and that is fine: the city
+// name on its own is still worth offering.
 func (p *Places) placesIn(ctx context.Context, cities []string) []string {
 	const query = `
 		SELECT poi.name
