@@ -29,6 +29,13 @@ type Repository interface {
 	GetCityByID(ctx context.Context, cityID uuid.UUID) (*locitypes.CityDetail, error)
 	SearchCitiesByName(ctx context.Context, query string, limit int) ([]locitypes.CityDetail, error)
 
+	// Resolution support. These exist because name lookup used to be a single
+	// fuzzy query that either hit or failed the request outright; see
+	// city_repository_resolve.go.
+	FindCityCandidates(ctx context.Context, name string, limit int) ([]locitypes.CityDetail, error)
+	EnrichCity(ctx context.Context, cityID uuid.UUID, lat, lon float64, country, stateProvince string) error
+	FindCityNear(ctx context.Context, lat, lon, radiusKm float64) (*locitypes.CityDetail, error)
+
 	// Vector similarity search methods
 	FindSimilarCities(ctx context.Context, queryEmbedding []float32, limit int) ([]locitypes.CityDetail, error)
 	UpdateCityEmbedding(ctx context.Context, cityID uuid.UUID, embedding []float32) error
