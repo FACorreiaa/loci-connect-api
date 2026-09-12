@@ -151,6 +151,27 @@ func (m *MockCityRepository) SearchCitiesByName(ctx context.Context, query strin
 	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
 }
 
+func (m *MockCityRepository) FindCityCandidates(ctx context.Context, name string, limit int) ([]locitypes.CityDetail, error) {
+	args := m.Called(ctx, name, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.CityDetail), args.Error(1)
+}
+
+func (m *MockCityRepository) EnrichCity(ctx context.Context, cityID uuid.UUID, lat, lon float64, country, stateProvince string) error {
+	args := m.Called(ctx, cityID, lat, lon, country, stateProvince)
+	return args.Error(0)
+}
+
+func (m *MockCityRepository) FindCityNear(ctx context.Context, lat, lon, radiusKm float64) (*locitypes.CityDetail, error) {
+	args := m.Called(ctx, lat, lon, radiusKm)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*locitypes.CityDetail), args.Error(1)
+}
+
 // MockPOIRepository is a mock implementation of POIRepository
 type MockPOIRepository struct {
 	mock.Mock

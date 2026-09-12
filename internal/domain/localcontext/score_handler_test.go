@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 	"github.com/google/uuid"
@@ -29,8 +30,19 @@ type fakeCities struct {
 	err  error
 }
 
-func (f fakeCities) FindCityByFuzzyName(context.Context, string) (*locitypes.CityDetail, error) {
-	return f.city, f.err
+func (f fakeCities) Resolve(_ context.Context, _ cityrepo.ResolveQuery) (*cityrepo.Resolved, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.city == nil {
+		return nil, cityrepo.ErrCityUnresolvable
+	}
+	return &cityrepo.Resolved{
+		City:   *f.city,
+		Lat:    *f.city.CenterLatitude,
+		Lon:    *f.city.CenterLongitude,
+		Source: cityrepo.ResolvedFromDB,
+	}, nil
 }
 
 type fakePOIs struct {

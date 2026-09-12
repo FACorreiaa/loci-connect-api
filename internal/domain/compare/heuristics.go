@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
+
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -92,7 +94,11 @@ func scoreColumn(poiCount int, distanceKm float64, weatherClear bool) float64 {
 }
 
 type resolvedCity struct {
-	id   string
+	id string
+	// uuid is the same id, unparsed. The planner wants the string form and
+	// discovery wants the uuid, and re-parsing a value we already had is how a
+	// nil id quietly becomes a lookup for the zero uuid.
+	uuid uuid.UUID
 	name string
 	lat  float64
 	lon  float64

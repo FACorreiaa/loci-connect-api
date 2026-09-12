@@ -34,6 +34,10 @@ type Service interface {
 	GetPOI(ctx context.Context, poiID uuid.UUID) (*locitypes.POIDetailedInfo, error)
 	GetPOIsByCityID(ctx context.Context, cityID uuid.UUID) ([]locitypes.POIDetailedInfo, error)
 
+	// DiscoverPOIsForCity generates and persists places for a city that has
+	// none, so a city we have only just placed on the map stops looking empty.
+	DiscoverPOIsForCity(ctx context.Context, cityID uuid.UUID, cityName string) error
+
 	// SearchPOIs Traditional search
 	SearchPOIs(ctx context.Context, filter locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error)
 
