@@ -374,3 +374,24 @@ func TestACaptionIsTreatedAsTypedText(t *testing.T) {
 		t.Errorf("sent %v, want just the answer", texts)
 	}
 }
+
+// The ceiling has to be bigger than the legs it contains.
+//
+// Getting this wrong does not fail a test or a build: it produces an update
+// that is cancelled after minutes of real work, just before the answer is
+// sent, which is worse than either finishing or failing fast. The budget was
+// briefly wrong in exactly that direction, which is why this is pinned.
+func TestTheTimeoutBudgetFitsInsideItsCeiling(t *testing.T) {
+	// The longest path an update can take: fetch, download, transcribe,
+	// generate, then deliver.
+	longest := getFileTimeout + downloadTimeout + transcribeTimeout + answerTimeout + sendTimeout
+
+	if longest >= updateTimeout {
+		t.Errorf("the legs add up to %s but the ceiling is %s — the slowest update "+
+			"would be cancelled just before its answer was sent", longest, updateTimeout)
+	}
+
+	// Transcription is the leg most likely to be raised, since it scales with
+	// how long people speak. Worth knowing how much room is left.
+	t.Logf("longest path %s, ceiling %s, headroom %s", longest, updateTimeout, updateTimeout-longest)
+}

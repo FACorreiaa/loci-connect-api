@@ -35,7 +35,12 @@ func timed[T any](stage string, fn func() (T, error)) (T, error) {
 // backstop: without it a wedged leg holds one of four in-flight slots forever,
 // which is a quarter of the bot.
 const (
-	updateTimeout = 8 * time.Minute
+	// updateTimeout is the ceiling for everything one update can cost, and it
+	// has to exceed the legs below added together — otherwise the worst case is
+	// a deadline firing after seven minutes of work and before the reply is
+	// sent, which is the one outcome worse than being slow. See the test that
+	// pins this.
+	updateTimeout = 10 * time.Minute
 
 	getFileTimeout  = 10 * time.Second
 	downloadTimeout = 30 * time.Second
