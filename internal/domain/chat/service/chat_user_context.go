@@ -67,7 +67,7 @@ func (l *ServiceImpl) PreparePromptData(interests []*locitypes.Interest, tags []
 }
 
 // getEnhancedPersonalizedPOIPrompt creates a domain-aware prompt for personalized POI generation
-func (l *ServiceImpl) getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData string, domain locitypes.DomainType) string {
+func (l *ServiceImpl) getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData string, domain locitypes.DomainType, target int) string {
 	domainFocus := ""
 	switch domain {
 	case locitypes.DomainAccommodation:
@@ -108,18 +108,21 @@ Format the response in JSON with the following structure:
             "description": "Detailed description explaining why this POI matches the user's specific preferences and filters"
         }
     ]
-}`, cityName, enhancedPromptData, domainFocus, getBasePersonalizedPromptInstructions())
+}`, cityName, enhancedPromptData, domainFocus, getBasePersonalizedPromptInstructions(target))
 
 	return prompt
 }
 
-func getBasePersonalizedPromptInstructions() string {
-	return `
+// The count is a parameter rather than the "Maximum 8-10" this used to hard-code.
+// That ceiling predates sizing an answer to the trip, and a stale cap left in a
+// live file is how the behaviour creeps back.
+func getBasePersonalizedPromptInstructions(target int) string {
+	return fmt.Sprintf(`
 **Instructions:**
 - Prioritize POIs that directly align with user preferences and filters
 - Explain in descriptions how each POI matches their specific preferences
 - Ensure variety while maintaining preference alignment
 - Include practical details like accessibility if relevant to user preferences
 - Consider user's pace and planning style preferences in the selection
-- Maximum 8-10 POIs to maintain quality over quantity`
+- Aim for %d POIs, and prefer returning fewer over padding the list`, target)
 }

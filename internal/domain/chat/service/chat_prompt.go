@@ -366,9 +366,10 @@ Respond ONLY WITH with JSON:
 }`, cityName, cityName)
 }
 
-func getGeneralPOIPrompt(cityName string) string {
+func getGeneralPOIPrompt(cityName, request string, target, days int, assumed bool) string {
 	return fmt.Sprintf(`
 List general points of interest in %s.
+%s%s
 Respond ONLY WITH with JSON:
 {
     "points_of_interest": [
@@ -383,7 +384,7 @@ Respond ONLY WITH with JSON:
             "opening_hours": "e.g., 'Mon-Fri 9:00-17:00'"
         }
     ]
-}`, cityName)
+}`, cityName, requestBlock(request), countBlock(target, days, assumed, poiMix))
 }
 
 // requestBlock renders the traveller's own words into a personal prompt.
@@ -404,10 +405,53 @@ Plan specifically around this request: honour any dates, season, occasion, durat
 `, request)
 }
 
-func getPersonalizedItineraryPrompt(cityName, request, basePreferences string) string {
+// poiMix and diningMix describe the shape a set of places has to have.
+//
+// The mix matters more than the number. A model handed only a count produces
+// the same trip repeated — forty museums is not a longer stay, it is one
+// afternoon copied out — so the proportions are stated, and a ceiling per
+// category stops any one of them taking over.
+const (
+	poiMix = `MIX - these must cover a real trip, not one category:
+- about 45%% anchors: the sights, viewpoints, museums and landmarks this place is known for
+- about 30%% food and drink: a market, a cafe, a bakery, somewhere for dinner
+- about 25%% neighbourhood time: a walkable street, a park, a beach, a lookout, a shop worth the detour
+No more than three of any single category. Spread them across the area rather than stacking one district.`
+
+	diningMix = `MIX - a week of eating, not one price bracket:
+- mostly everyday places locals would actually use
+- a few mid-range rooms worth booking
+- at most one special-occasion restaurant
+- include a cafe and a market or food hall`
+)
+
+// countBlock states how many places an answer must carry, over what horizon,
+// and in what proportions.
+//
+// The honesty line at the end is load-bearing. Retrieval can only ground as
+// many places as the corpus holds, so a thin city asked for forty will pad;
+// telling the model that a short list is an acceptable answer is what makes the
+// shortfall visible as a shortfall rather than as forty confident inventions.
+func countBlock(target, days int, assumed bool, mix string) string {
+	horizon := fmt.Sprintf("DURATION: %d days. Pace the list accordingly.", days)
+	if assumed {
+		horizon = "DURATION: none was given. Assume a 2-day sample: prefer iconic and high-fit places, not an exhaustive list."
+	}
+
+	return fmt.Sprintf(`HOW MANY:
+Return %d places. Fewer is acceptable only if this city genuinely has no more worth the traveller's time - never pad with repeats or filler.
+
+`+mix+`
+
+%s
+If you cannot find %d places of real quality, return fewer. A short honest list beats a long invented one.
+`, target, horizon, target)
+}
+
+func getPersonalizedItineraryPrompt(cityName, request, basePreferences string, target, days int, assumed bool) string {
 	return fmt.Sprintf(`
 You are a travel planning assistant. Create a personalized itinerary for %s based on user preferences.
-%sUSER PREFERENCES:
+%s%sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
 {
@@ -424,10 +468,15 @@ Respond ONLY WITH with JSON:
             "website": "",
                 		"opening_hours": "Opening hours as string (e.g., 'Mon-Fri 9:00-17:00, Sat 10:00-15:00')"
 ,
-            "distance": <float>
+            "distance": <float>,
+            "day": <int, 1-based>
         }
     ]
-}`, cityName, requestBlock(request), basePreferences)
+}
+
+Spread the places over the %d days in a sensible walking order: each day should
+hold places near one another, and "day" must be between 1 and %d.`,
+		cityName, requestBlock(request), countBlock(target, days, assumed, poiMix), basePreferences, days, days)
 }
 
 func getAccommodationPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
@@ -442,6 +491,7 @@ func getAccommodationPrompt(cityName string, lat, lon float64, request, basePref
 
 	return fmt.Sprintf(`
 You are a hotel recommendation assistant. Find suitable accommodation %s.
+Return 10 options: a stay is one hotel, so this does not grow with the trip.
 %sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
@@ -468,7 +518,7 @@ Respond ONLY WITH with JSON:
 }`, locationDesc, requestBlock(request), basePreferences, cityName)
 }
 
-func getDiningPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
+func getDiningPrompt(cityName string, lat, lon float64, request, basePreferences string, target, days int, assumed bool) string {
 	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
 	var locationDesc string
 	if lat != 0 || lon != 0 {
@@ -478,8 +528,8 @@ func getDiningPrompt(cityName string, lat, lon float64, request, basePreferences
 	}
 
 	return fmt.Sprintf(`
-Find 10 dining options %s.
-%sUSER PREFERENCES:
+Find dining options %s.
+%s%sUSER PREFERENCES:
 %s
 Respond with JSON:
 {
@@ -503,10 +553,10 @@ Respond with JSON:
             "distance": <float>
         }
     ]
-}`, locationDesc, requestBlock(request), basePreferences, cityName)
+}`, locationDesc, requestBlock(request), countBlock(target, days, assumed, diningMix), basePreferences, cityName)
 }
 
-func getActivitiesPrompt(cityName string, lat, lon float64, request, basePreferences string) string {
+func getActivitiesPrompt(cityName string, lat, lon float64, request, basePreferences string, target, days int, assumed bool) string {
 	// When coordinates are (0,0), don't include them in the prompt as they confuse the LLM
 	var locationDesc string
 	if lat != 0 || lon != 0 {
@@ -517,7 +567,7 @@ func getActivitiesPrompt(cityName string, lat, lon float64, request, basePrefere
 
 	return fmt.Sprintf(`
 You are an activity recommendation assistant. Find activities %s.
-%sUSER PREFERENCES:
+%s%sUSER PREFERENCES:
 %s
 Respond ONLY WITH with JSON:
 {
@@ -539,5 +589,5 @@ Respond ONLY WITH with JSON:
             "distance": <float>
         }
     ]
-}`, locationDesc, requestBlock(request), basePreferences, cityName)
+}`, locationDesc, requestBlock(request), countBlock(target, days, assumed, poiMix), basePreferences, cityName)
 }

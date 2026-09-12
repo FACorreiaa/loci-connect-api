@@ -18,6 +18,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 )
@@ -101,7 +102,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		Data: map[string]any{"status": "generating_semantic_context", "progress": 20},
 	}, 3)
 
-	semanticPOIs, err := l.generateSemanticPOIRecommendations(ctx, message, cityID, session.UserID, userLocation, 0.6)
+	semanticPOIs, err := l.generateSemanticPOIRecommendations(ctx, message, cityID, session.UserID, userLocation, 0.6, retrieval.MaxSearchResults)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to generate semantic POI recommendations for streaming session", slog.Any("error", err))
 		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
@@ -231,7 +232,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		}
 
 		if (intent == locitypes.IntentAddPOI || intent == locitypes.IntentModifyItinerary) && userLocation.UserLat != 0 && userLocation.UserLon != 0 {
-			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, sessionID, cityID, *userLocation)
+			sortedPOIs, err := l.llmInteractionRepo.GetPOIsBySessionSortedByDistance(ctx, session.UserID, sessionID, cityID, *userLocation)
 			if err != nil {
 				l.logger.WarnContext(ctx, "Failed to sort POIs by distance", slog.Any("error", err))
 				span.RecordError(err)

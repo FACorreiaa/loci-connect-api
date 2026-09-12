@@ -249,6 +249,22 @@ type ChatContext struct {
 	CacheKey        string
 	BasePreferences string
 
+	// TripDays is how long this request is planned over, read from the
+	// traveller's own words before the city extractor rewrote them. Never
+	// zero: an unparseable request is planned over tripspan.DefaultDays,
+	// because refusing to plan is a worse answer than planning a sample.
+	TripDays int
+
+	// TripDaysSource records how TripDays was decided (see tripspan.Source), so
+	// a rising share of "default" reads as a parser gap rather than a shrug.
+	TripDaysSource string
+
+	// POITarget is how many places this turn asks the model for. It is in the
+	// generation cache key, because it depends on the caller's plan: without
+	// it, a free caller's forty places would be replayed to somebody paying
+	// for fifty.
+	POITarget int
+
 	// Packet is the evidence this turn is allowed to speak from: real POI rows
 	// retrieved before generation, enriched with crowd-verified facts and the
 	// user's visit history. It is rendered into the prompt and kept afterwards

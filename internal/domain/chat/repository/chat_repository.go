@@ -134,7 +134,7 @@ type Repository interface {
 
 	//
 	SaveSinglePOI(ctx context.Context, poi locitypes.POIDetailedInfo, userID, cityID, llmInteractionID uuid.UUID) (uuid.UUID, error)
-	GetPOIsBySessionSortedByDistance(ctx context.Context, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
+	GetPOIsBySessionSortedByDistance(ctx context.Context, userID, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error)
 	GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo locitypes.POIDetailedInfo, cityID, sourceInteractionID uuid.UUID) (uuid.UUID, error)
 	SaveItineraryPOIs(ctx context.Context, itineraryID uuid.UUID, pois []locitypes.POIDetailedInfo) error
 
@@ -1679,19 +1679,40 @@ func (r *RepositoryImpl) SaveSinglePOI(ctx context.Context, poi locitypes.POIDet
 	return returnedID, nil
 }
 
-func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(ctx context.Context, _, cityID uuid.UUID, userLocation locitypes.UserLocation) ([]locitypes.POIDetailedInfo, error) {
+// GetPOIsBySessionSortedByDistance returns the POIs this session suggested,
+// nearest first.
+//
+// It is scoped by session and by user. It used to filter on city alone — the
+// session argument was discarded — so it returned every POI ever suggested for
+// a city, by anyone, and the caller assigns the result straight onto the
+// session's itinerary. llm_suggested_pois has no session column of its own, so
+// the session reaches it through llm_interactions.session_id. The user filter
+// is belt and braces: a session already belongs to one user.
+//
+// Ordering breaks ties on id so that two calls over the same rows agree, which
+// matters once callers page this list rather than taking all of it.
+func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(
+	ctx context.Context, userID, sessionID, cityID uuid.UUID, userLocation locitypes.UserLocation,
+) ([]locitypes.POIDetailedInfo, error) {
 	query := `
-        SELECT id, name, latitude, longitude, category, description_poi,
+        SELECT p.id, p.name, p.latitude, p.longitude, p.category, p.description_poi,
                ST_Distance(
-                   ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
-                   location::geography  -- Use the actual geometry column for distance
+                   ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+                   p.location::geography
                ) AS distance
-        FROM llm_suggested_pois  -- Assuming this is the correct table to query for session POIs
-        WHERE city_id = $1
-        -- Add AND llm_interaction_id IN (SELECT ...) if POIs are tied to specific interactions of the session
-        ORDER BY distance ASC;
-    `
-	rows, err := r.pgpool.Query(ctx, query, cityID, userLocation.UserLon, userLocation.UserLat)
+        FROM llm_suggested_pois p
+        JOIN llm_interactions i ON i.id = p.llm_interaction_id
+        WHERE i.session_id = $1
+          AND p.user_id = $2 `
+
+	args := []any{sessionID, userID, userLocation.UserLon, userLocation.UserLat}
+	if cityID != uuid.Nil {
+		query += "AND p.city_id = $5 "
+		args = append(args, cityID)
+	}
+	query += "ORDER BY distance ASC, p.id ASC"
+
+	rows, err := r.pgpool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query POIs for session: %w", err)
 	}

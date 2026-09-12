@@ -14,6 +14,12 @@ const (
 	fixtureRequest = "3 days in winter with my parents"
 	fixtureLat     = 32.65
 	fixtureLon     = -16.91
+
+	// The sizing a rendered template is pinned under. Fixed values, so a
+	// fingerprint only moves when the template text does.
+	fixtureTarget  = 24
+	fixtureDays    = 4
+	fixtureAssumed = false
 )
 
 // fixtureProfile is a fully populated profile with nothing random in it, so
@@ -93,10 +99,10 @@ func personalPrompts(request string, profile *locitypes.UserPreferenceProfileRes
 		return getUserPreferencesPrompt(scopeProfileForPart(part, profile))
 	}
 	return map[generationPart]string{
-		partItinerary:   getPersonalizedItineraryPrompt(fixtureCity, request, prefs(partItinerary)),
+		partItinerary:   getPersonalizedItineraryPrompt(fixtureCity, request, prefs(partItinerary), fixtureTarget, fixtureDays, fixtureAssumed),
 		partHotels:      getAccommodationPrompt(fixtureCity, fixtureLat, fixtureLon, request, prefs(partHotels)),
-		partRestaurants: getDiningPrompt(fixtureCity, fixtureLat, fixtureLon, request, prefs(partRestaurants)),
-		partActivities:  getActivitiesPrompt(fixtureCity, fixtureLat, fixtureLon, request, prefs(partActivities)),
+		partRestaurants: getDiningPrompt(fixtureCity, fixtureLat, fixtureLon, request, prefs(partRestaurants), fixtureTarget, fixtureDays, fixtureAssumed),
+		partActivities:  getActivitiesPrompt(fixtureCity, fixtureLat, fixtureLon, request, prefs(partActivities), fixtureTarget, fixtureDays, fixtureAssumed),
 	}
 }
 
@@ -133,13 +139,31 @@ func TestAnEmptyRequestRendersNoBlock(t *testing.T) {
 	}
 }
 
-// The city templates take no request and no profile; their text must not
-// change because personal prompts learned to.
-func TestCityPromptsAreUnchangedByTheRequest(t *testing.T) {
-	for _, prompt := range []string{getCityDataPrompt(fixtureCity), getGeneralPOIPrompt(fixtureCity)} {
-		if strings.Contains(prompt, "TRAVELLER'S REQUEST") || strings.Contains(prompt, "USER PREFERENCES") {
-			t.Error("a city prompt carries personal sections")
+// getCityDataPrompt describes a city, not a trip: no request, no profile, and
+// no count. It is the one part whose key carries none of those either.
+func TestCityDataPromptIsUnchangedByTheRequest(t *testing.T) {
+	prompt := getCityDataPrompt(fixtureCity)
+	for _, section := range []string{"TRAVELLER'S REQUEST", "USER PREFERENCES", "HOW MANY"} {
+		if strings.Contains(prompt, section) {
+			t.Errorf("the city_data prompt carries %s", section)
 		}
+	}
+}
+
+// general_pois is keyed on the normalised request text and on the resolved
+// count, so its prompt has to render both. While it rendered neither, "3 days
+// in Funchal" and "5 days in Funchal" hashed to different keys and stored two
+// identical lists.
+func TestGeneralPOIPromptRendersWhatItsKeyCovers(t *testing.T) {
+	prompt := getGeneralPOIPrompt(fixtureCity, fixtureRequest, fixtureTarget, fixtureDays, fixtureAssumed)
+	for _, section := range []string{"TRAVELLER'S REQUEST", fixtureRequest, "HOW MANY", "24"} {
+		if !strings.Contains(prompt, section) {
+			t.Errorf("the general_pois prompt is missing %q", section)
+		}
+	}
+	// It is still a shared answer: no traveller's profile may reach it.
+	if strings.Contains(prompt, "USER PREFERENCES") {
+		t.Error("the general_pois prompt carries a profile")
 	}
 }
 
@@ -199,21 +223,21 @@ func TestEachPartRendersOnlyItsOwnSection(t *testing.T) {
 // pinnedTemplateVersion is the generationTemplateVersion these fingerprints
 // were taken under. When a template changes, bump generationTemplateVersion
 // in generation_key.go, then set this and the hashes below to the new values.
-const pinnedTemplateVersion = "v2"
+const pinnedTemplateVersion = "v3"
 
 var pinnedTemplateFingerprints = map[generationPart]string{
 	partCityData:    "8584eec11a770e0268d1d25fb68b0d1e91fcefd20fe39fe2cb1673d8a63268c8",
-	partGeneralPOIs: "869a3a24de7e4ddebe6f6dfb3c3066f2004533d1eefa55e757e952455f5ea3a7",
-	partItinerary:   "362e6e492a9c48bd52e61afb85992735c228669517b90ec239aae11121cd22f1",
-	partHotels:      "d077111663a08cc09d67dab184957d328c9eee3d11a1cf07dbe3103b5a370e01",
-	partRestaurants: "62b5abde8f95a29f14fa1366c6e5176d710e3846bb8cec1ae5117df5ae12ef12",
-	partActivities:  "5ae4c11c99d428024e4b8892cc535839934e78b24636152eaea657be3c867d79",
+	partGeneralPOIs: "fd64c21a365a5b7c8ba0e420c126b61a44a083e0498e1da621bf03a7a87bd8f1",
+	partItinerary:   "3e12ee27ca39d270f7d636422ec98f44708392eabc14e740b42c2040238d62e7",
+	partHotels:      "8674f47c7d6334b224833f922def2cc7352c7a379d9192b56626c4abac523344",
+	partRestaurants: "da8ae369da2b7d7e045ec16552c85c26429ef4e474a227eb05588bf0336cc892",
+	partActivities:  "b44b4f30cb1bfabb94ebba67d1fea60f0204176543e519007ca0c4be4ac61244",
 }
 
 func templateFingerprints() map[generationPart]string {
 	out := personalPrompts(fixtureRequest, fixtureProfile())
 	out[partCityData] = getCityDataPrompt(fixtureCity)
-	out[partGeneralPOIs] = getGeneralPOIPrompt(fixtureCity)
+	out[partGeneralPOIs] = getGeneralPOIPrompt(fixtureCity, fixtureRequest, fixtureTarget, fixtureDays, fixtureAssumed)
 	for part, prompt := range out {
 		sum := sha256.Sum256([]byte(prompt))
 		out[part] = hex.EncodeToString(sum[:])
@@ -242,5 +266,56 @@ func TestGenerationTemplateFingerprint(t *testing.T) {
 	if generationTemplateVersion != pinnedTemplateVersion {
 		t.Errorf("generationTemplateVersion is %q but the fingerprints were pinned under %q; update pinnedTemplateVersion",
 			generationTemplateVersion, pinnedTemplateVersion)
+	}
+}
+
+// The count block has to carry three things the answer's size depends on: how
+// many places, over how long, and in what proportions. A model given only a
+// number returns one category repeated.
+func TestCountBlockCarriesTargetAndMix(t *testing.T) {
+	prompt := getPersonalizedItineraryPrompt(
+		fixtureCity, fixtureRequest, "", fixtureTarget, fixtureDays, false,
+	)
+
+	for _, want := range []string{
+		"Return 24 places",
+		"MIX",
+		"DURATION: 4 days",
+		"If you cannot find 24 places of real quality, return fewer",
+		`"day": <int, 1-based>`,
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("the itinerary prompt is missing %q", want)
+		}
+	}
+	if strings.Contains(prompt, "assume a 2-day sample") {
+		t.Error("a request with a stated duration still says the duration was assumed")
+	}
+}
+
+// When nothing in the request said how long the trip is, the prompt must say
+// so. Asking for a fixed number of places without that line reads as a request
+// for a complete itinerary, and the model fills it in rather than sampling.
+func TestCountBlockSaysWhenTheDurationWasAssumed(t *testing.T) {
+	prompt := getPersonalizedItineraryPrompt(fixtureCity, "things to do", "", 12, 2, true)
+
+	if !strings.Contains(prompt, "Assume a 2-day sample") {
+		t.Error("an assumed duration is not declared in the prompt")
+	}
+	if strings.Contains(prompt, "DURATION: 2 days. Pace") {
+		t.Error("an assumed duration is stated as though the traveller gave it")
+	}
+}
+
+// Hotels do not scale with trip length — a month-long stay is still one hotel —
+// so the accommodation prompt must not carry a target. This is also why its
+// cache key does not carry one.
+func TestAccommodationPromptDoesNotScale(t *testing.T) {
+	prompt := getAccommodationPrompt(fixtureCity, fixtureLat, fixtureLon, fixtureRequest, "")
+	if !strings.Contains(prompt, "Return 10 options") {
+		t.Error("the accommodation prompt lost its fixed count")
+	}
+	if strings.Contains(prompt, "HOW MANY") {
+		t.Error("the accommodation prompt carries a scaling count block")
 	}
 }

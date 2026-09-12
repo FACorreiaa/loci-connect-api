@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 // written; serving it under a new template would replay text the new prompt
 // would never have produced. TestGenerationTemplateFingerprint pins the
 // rendered templates and fails until this constant moves.
-const generationTemplateVersion = "v2"
+const generationTemplateVersion = "v3"
 
 // generationLanguage is the language every template is written in today. It
 // sits in the key so that localised templates, when they exist, cannot serve
@@ -65,6 +66,25 @@ func isPersonalPart(p generationPart) bool {
 func partUsesLocation(p generationPart) bool {
 	switch p {
 	case partHotels, partRestaurants, partActivities:
+		return true
+	}
+	return false
+}
+
+// partUsesPOITarget reports whether the part's prompt renders the resolved
+// count, and so whether its key has to carry it.
+//
+// City data does not: one description of a city is one description whatever
+// the trip length, and folding the count in would fragment a 30-day entry into
+// one row per target for nothing. Accommodation does not either — a month-long
+// stay is still one hotel, so that prompt asks for a fixed ten.
+//
+// The count belongs in the key at all because it depends on the caller's plan.
+// Without it, a free caller's forty places would be replayed to somebody paying
+// for fifty.
+func partUsesPOITarget(p generationPart) bool {
+	switch p {
+	case partGeneralPOIs, partItinerary, partRestaurants, partActivities:
 		return true
 	}
 	return false
@@ -342,6 +362,9 @@ type generationKeyInput struct {
 	// supplied. Only parts whose prompt interpolates them include them.
 	Lat, Lon    float64
 	HasLocation bool
+	// POITarget is how many places the answer was asked for. Only parts whose
+	// prompt renders it include it; see partUsesPOITarget.
+	POITarget int
 }
 
 // buildGenerationKey derives the cache key for one part of one answer:
@@ -377,6 +400,9 @@ func buildGenerationKey(in generationKeyInput) string {
 	}
 	if isPersonalPart(in.Part) {
 		components = append(components, in.UserID.String())
+	}
+	if partUsesPOITarget(in.Part) {
+		components = append(components, strconv.Itoa(in.POITarget))
 	}
 	if partUsesLocation(in.Part) && in.HasLocation {
 		components = append(components,

@@ -20,6 +20,7 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
+	"github.com/FACorreiaa/loci-connect-api/pkg/tripspan"
 )
 
 // servedFromLLM marks a part the provider answered. The cache layers use the
@@ -42,6 +43,28 @@ const (
 	replayChunkSize = 1024
 	replayChunkPace = 2 * time.Millisecond
 )
+
+// Output budget for one part.
+//
+// The streaming path used to send no MaxOutputTokens at all, which was fine
+// while an answer was ten places and is not fine at fifty: that is past the
+// 8192-token default several providers apply, and a response cut off
+// mid-array parses as a shorter list rather than as an error. Sizing the
+// budget to what was asked for is what keeps a truncation impossible rather
+// than merely unlikely.
+const (
+	baseOutputTokens   = 2048
+	tokensPerPlace     = 320
+	maxOutputTokensCap = 32768
+)
+
+func outputTokenBudget(target int) int32 {
+	budget := baseOutputTokens + tokensPerPlace*target
+	if budget > maxOutputTokensCap {
+		budget = maxOutputTokensCap
+	}
+	return int32(budget)
+}
 
 // partPlan is everything needed to produce one part of an answer: where a
 // cached copy would live, how to render the prompt if there is none, and what
@@ -69,6 +92,11 @@ type partPlan struct {
 	// over the part's scoped preference text, which is the same value its
 	// snapshot hash was taken from.
 	Prompt func(packet *retrieval.ContextPacket) string
+	// POITarget is how many places this part was asked for. It sizes the
+	// output budget: the JSON for fifty places does not fit in a default
+	// response, and a truncated one is indistinguishable from a short answer
+	// by the time it reaches the parser.
+	POITarget int
 	// Hit is the cached answer when the lookup found one, nil on a miss.
 	Hit *cachedPart
 }
@@ -101,6 +129,11 @@ type cachedPart struct {
 func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 	modelID := l.modelFor(cc.Ctx)
 
+	// assumedDays says the horizon was a fallback rather than something the
+	// traveller stated, which changes what the prompt asks for: a sample of
+	// the iconic rather than a filled-in itinerary.
+	assumedDays := cc.TripDaysSource == string(tripspan.SourceDefault)
+
 	var lat, lon float64
 	hasLocation := cc.UserLocation != nil
 	if hasLocation {
@@ -111,7 +144,8 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 		scoped := scopeProfileForPart(p, cc.Profile)
 		prefs := getUserPreferencesPrompt(scoped)
 		return partPlan{
-			Part: p,
+			Part:      p,
+			POITarget: cc.POITarget,
 			CacheKey: buildGenerationKey(generationKeyInput{
 				Part:         p,
 				Domain:       cc.Domain,
@@ -124,6 +158,7 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 				Lat:          lat,
 				Lon:          lon,
 				HasLocation:  hasLocation,
+				POITarget:    cc.POITarget,
 			}),
 			TTL:       partTTL(p),
 			Cacheable: cc.Cacheable,
@@ -145,10 +180,10 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 			// The shared POI list is grounded in the depersonalised packet: a
 			// global answer must never carry one traveller's visited flags.
 			part(partGeneralPOIs, func(_ string, packet *retrieval.ContextPacket) string {
-				return groundPrompt(getGeneralPOIPrompt(cc.CityName), packet.WithoutPersonal())
+				return groundPrompt(getGeneralPOIPrompt(cc.CityName, cc.Message, cc.POITarget, cc.TripDays, assumedDays), packet.WithoutPersonal())
 			}),
 			part(partItinerary, func(prefs string, packet *retrieval.ContextPacket) string {
-				return groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.Message, prefs), packet)
+				return groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.Message, prefs, cc.POITarget, cc.TripDays, assumedDays), packet)
 			}),
 		}
 	case locitypes.DomainAccommodation:
@@ -162,14 +197,14 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 		return []partPlan{
 			cityData,
 			part(partRestaurants, func(prefs string, packet *retrieval.ContextPacket) string {
-				return groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.Message, prefs), packet)
+				return groundPrompt(getDiningPrompt(cc.CityName, lat, lon, cc.Message, prefs, cc.POITarget, cc.TripDays, assumedDays), packet)
 			}),
 		}
 	case locitypes.DomainActivities:
 		return []partPlan{
 			cityData,
 			part(partActivities, func(prefs string, packet *retrieval.ContextPacket) string {
-				return groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.Message, prefs), packet)
+				return groundPrompt(getActivitiesPrompt(cc.CityName, lat, lon, cc.Message, prefs, cc.POITarget, cc.TripDays, assumedDays), packet)
 			}),
 		}
 	default:
@@ -390,7 +425,10 @@ func (l *ServiceImpl) streamPartFromLLM(
 	}
 	defer release()
 
-	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](defaultTemperature)})
+	iter, err := l.aiClient.GenerateStream(ctx, prompt, &genai.GenerateContentConfig{
+		Temperature:     genai.Ptr[float32](defaultTemperature),
+		MaxOutputTokens: outputTokenBudget(p.POITarget),
+	})
 	if err != nil {
 		l.logger.ErrorContext(ctx, "LLM stream call failed",
 			slog.String("part_type", partType),
