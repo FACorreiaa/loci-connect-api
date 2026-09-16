@@ -1,9 +1,12 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	c "connectrpc.com/cors"
@@ -449,6 +452,30 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 
 // registerUtilityRoutes registers health check, metrics, and other utility routes
 func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
+	// Internal operator endpoint: total user count for the portfolio dashboard.
+	// Guarded by METRICS_SECRET; never behind the Connect interceptor chain.
+	mux.HandleFunc("/internal/metrics", func(w http.ResponseWriter, r *http.Request) {
+		secret := deps.Config.Server.MetricsSecret
+		if secret == "" {
+			http.Error(w, "metrics endpoint not configured", http.StatusInternalServerError)
+			return
+		}
+		presented, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !found || !secretEqual(presented, secret) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		var count int64
+		if err := deps.DB.Pool.QueryRow(r.Context(), "SELECT COUNT(*) FROM users").Scan(&count); err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprintf(w, `{"users":%d}`, count); err != nil {
+			deps.Logger.Error("failed to write metrics response", slog.Any("error", err))
+		}
+	})
+	deps.Logger.Info("registered internal metrics", "path", "/internal/metrics")
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		if err := deps.DB.Health(); err != nil {
@@ -524,4 +551,9 @@ func registerUtilityRoutes(mux *http.ServeMux, deps *Dependencies) {
 		mux.Handle("/metrics", promhttp.Handler())
 		deps.Logger.Info("registered metrics endpoint", "path", "/metrics")
 	}
+}
+
+// secretEqual compares two strings in constant time to prevent timing attacks.
+func secretEqual(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }

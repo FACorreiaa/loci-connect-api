@@ -133,6 +133,10 @@ type ServerConfig struct {
 	ChatStreamMaxTimeout time.Duration
 	// AllowedOrigins are the CORS origins permitted for browser clients.
 	AllowedOrigins []string
+
+	// MetricsSecret guards the /internal/metrics endpoint used by the
+	// portfolio dashboard at facorreia.com/apps. Empty disables the route.
+	MetricsSecret string
 }
 
 type DatabaseConfig struct {
@@ -328,6 +332,7 @@ func Load() (*Config, error) {
 			ChatRPCTimeout:          getEnvAsDurationSeconds("CHAT_RPC_TIMEOUT_SEC", 3*time.Minute),
 			ChatStreamMaxTimeout:    getEnvAsDurationSeconds("CHAT_STREAM_MAX_TIMEOUT_SEC", 10*time.Minute),
 			AllowedOrigins:          getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
+			MetricsSecret:           getEnv("METRICS_SECRET", ""),
 		},
 		Database: DatabaseConfig{
 			Host:            getEnv("DB_HOST", "localhost"),
