@@ -1111,6 +1111,301 @@ func (x *EstimateDriveCostResponse) GetEstimate() *DriveCostEstimate {
 	return nil
 }
 
+// LocalContextService surfaces trip-time context: weather, plus live alerts
+// from public-holiday and natural-hazard providers.
+// NewsTickerItem is one breaking-news headline for the traveller's desk:
+// title, source, time and a link out. Never a body — the ticker links to the
+// publisher rather than republishing.
+type NewsTickerItem struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title       string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Url         string                 `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
+	Source      string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	PublishedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=published_at,json=publishedAt,proto3" json:"published_at,omitempty"`
+	// ISO 3166-1 alpha-2 of the country this headline was selected for, or
+	// empty for a feed not tied to one.
+	CountryCode   string `protobuf:"bytes,6,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NewsTickerItem) Reset() {
+	*x = NewsTickerItem{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NewsTickerItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NewsTickerItem) ProtoMessage() {}
+
+func (x *NewsTickerItem) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NewsTickerItem.ProtoReflect.Descriptor instead.
+func (*NewsTickerItem) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *NewsTickerItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *NewsTickerItem) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *NewsTickerItem) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *NewsTickerItem) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *NewsTickerItem) GetPublishedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PublishedAt
+	}
+	return nil
+}
+
+func (x *NewsTickerItem) GetCountryCode() string {
+	if x != nil {
+		return x.CountryCode
+	}
+	return ""
+}
+
+type GetNewsTickerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNewsTickerRequest) Reset() {
+	*x = GetNewsTickerRequest{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNewsTickerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNewsTickerRequest) ProtoMessage() {}
+
+func (x *GetNewsTickerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNewsTickerRequest.ProtoReflect.Descriptor instead.
+func (*GetNewsTickerRequest) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetNewsTickerRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type GetNewsTickerResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Items []*NewsTickerItem      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	// False when the person switched the ticker off; items is then empty.
+	Enabled bool `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// True when at least one feed is serving cached headlines after a failed
+	// fetch upstream.
+	Stale bool `protobuf:"varint,3,opt,name=stale,proto3" json:"stale,omitempty"`
+	// The countries whose news was selected: home, next trip, recently visited.
+	CountryCodes  []string `protobuf:"bytes,4,rep,name=country_codes,json=countryCodes,proto3" json:"country_codes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNewsTickerResponse) Reset() {
+	*x = GetNewsTickerResponse{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNewsTickerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNewsTickerResponse) ProtoMessage() {}
+
+func (x *GetNewsTickerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNewsTickerResponse.ProtoReflect.Descriptor instead.
+func (*GetNewsTickerResponse) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetNewsTickerResponse) GetItems() []*NewsTickerItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *GetNewsTickerResponse) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *GetNewsTickerResponse) GetStale() bool {
+	if x != nil {
+		return x.Stale
+	}
+	return false
+}
+
+func (x *GetNewsTickerResponse) GetCountryCodes() []string {
+	if x != nil {
+		return x.CountryCodes
+	}
+	return nil
+}
+
+type SetNewsTickerEnabledRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNewsTickerEnabledRequest) Reset() {
+	*x = SetNewsTickerEnabledRequest{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNewsTickerEnabledRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNewsTickerEnabledRequest) ProtoMessage() {}
+
+func (x *SetNewsTickerEnabledRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNewsTickerEnabledRequest.ProtoReflect.Descriptor instead.
+func (*SetNewsTickerEnabledRequest) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *SetNewsTickerEnabledRequest) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+type SetNewsTickerEnabledResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetNewsTickerEnabledResponse) Reset() {
+	*x = SetNewsTickerEnabledResponse{}
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetNewsTickerEnabledResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetNewsTickerEnabledResponse) ProtoMessage() {}
+
+func (x *SetNewsTickerEnabledResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_localcontext_localcontext_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetNewsTickerEnabledResponse.ProtoReflect.Descriptor instead.
+func (*SetNewsTickerEnabledResponse) Descriptor() ([]byte, []int) {
+	return file_loci_localcontext_localcontext_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *SetNewsTickerEnabledResponse) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
 var File_loci_localcontext_localcontext_proto protoreflect.FileDescriptor
 
 const file_loci_localcontext_localcontext_proto_rawDesc = "" +
@@ -1213,7 +1508,25 @@ const file_loci_localcontext_localcontext_proto_rawDesc = "" +
 	"\bcurrency\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18\x03H\x00R\bcurrency\x88\x01\x01B\v\n" +
 	"\t_currency\"]\n" +
 	"\x19EstimateDriveCostResponse\x12@\n" +
-	"\bestimate\x18\x01 \x01(\v2$.loci.localcontext.DriveCostEstimateR\bestimate*\xd2\x01\n" +
+	"\bestimate\x18\x01 \x01(\v2$.loci.localcontext.DriveCostEstimateR\bestimate\"\xdd\x01\n" +
+	"\x0eNewsTickerItem\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x02id\x12\x1d\n" +
+	"\x05title\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05title\x12\x10\n" +
+	"\x03url\x18\x03 \x01(\tR\x03url\x12\x16\n" +
+	"\x06source\x18\x04 \x01(\tR\x06source\x12=\n" +
+	"\fpublished_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vpublishedAt\x12*\n" +
+	"\fcountry_code\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x18\x02R\vcountryCode\"7\n" +
+	"\x14GetNewsTickerRequest\x12\x1f\n" +
+	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x00R\x05limit\"\xa5\x01\n" +
+	"\x15GetNewsTickerResponse\x127\n" +
+	"\x05items\x18\x01 \x03(\v2!.loci.localcontext.NewsTickerItemR\x05items\x12\x18\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x12\x14\n" +
+	"\x05stale\x18\x03 \x01(\bR\x05stale\x12#\n" +
+	"\rcountry_codes\x18\x04 \x03(\tR\fcountryCodes\"7\n" +
+	"\x1bSetNewsTickerEnabledRequest\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled\"8\n" +
+	"\x1cSetNewsTickerEnabledResponse\x12\x18\n" +
+	"\aenabled\x18\x01 \x01(\bR\aenabled*\xd2\x01\n" +
 	"\tAlertKind\x12\x1a\n" +
 	"\x16ALERT_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12ALERT_KIND_CLOSURE\x10\x01\x12\x16\n" +
@@ -1222,14 +1535,16 @@ const file_loci_localcontext_localcontext_proto_rawDesc = "" +
 	"\x11ALERT_KIND_HAZARD\x10\x04\x12\x1a\n" +
 	"\x16ALERT_KIND_AIR_QUALITY\x10\x05\x12\x16\n" +
 	"\x12ALERT_KIND_TRANSIT\x10\x06\x12\x17\n" +
-	"\x13ALERT_KIND_ADVISORY\x10\a2\x9a\x03\n" +
+	"\x13ALERT_KIND_ADVISORY\x10\a2\xf7\x04\n" +
 	"\x13LocalContextService\x12]\n" +
 	"\x0fGetLocalContext\x12).loci.localcontext.GetLocalContextRequest\x1a\x1f.loci.localcontext.LocalContext\x12Y\n" +
 	"\n" +
 	"GetGoScore\x12$.loci.localcontext.GetGoScoreRequest\x1a%.loci.localcontext.GetGoScoreResponse\x12Y\n" +
 	"\n" +
 	"GetFxRates\x12$.loci.localcontext.GetFxRatesRequest\x1a%.loci.localcontext.GetFxRatesResponse\x12n\n" +
-	"\x11EstimateDriveCost\x12+.loci.localcontext.EstimateDriveCostRequest\x1a,.loci.localcontext.EstimateDriveCostResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext;localcontextb\x06proto3"
+	"\x11EstimateDriveCost\x12+.loci.localcontext.EstimateDriveCostRequest\x1a,.loci.localcontext.EstimateDriveCostResponse\x12b\n" +
+	"\rGetNewsTicker\x12'.loci.localcontext.GetNewsTickerRequest\x1a(.loci.localcontext.GetNewsTickerResponse\x12w\n" +
+	"\x14SetNewsTickerEnabled\x12..loci.localcontext.SetNewsTickerEnabledRequest\x1a/.loci.localcontext.SetNewsTickerEnabledResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext;localcontextb\x06proto3"
 
 var (
 	file_loci_localcontext_localcontext_proto_rawDescOnce sync.Once
@@ -1244,51 +1559,62 @@ func file_loci_localcontext_localcontext_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_localcontext_localcontext_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_localcontext_localcontext_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_loci_localcontext_localcontext_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_loci_localcontext_localcontext_proto_goTypes = []any{
-	(AlertKind)(0),                    // 0: loci.localcontext.AlertKind
-	(*WeatherDay)(nil),                // 1: loci.localcontext.WeatherDay
-	(*LocalAlert)(nil),                // 2: loci.localcontext.LocalAlert
-	(*GetLocalContextRequest)(nil),    // 3: loci.localcontext.GetLocalContextRequest
-	(*LocalContext)(nil),              // 4: loci.localcontext.LocalContext
-	(*ScoreFactor)(nil),               // 5: loci.localcontext.ScoreFactor
-	(*GoScore)(nil),                   // 6: loci.localcontext.GoScore
-	(*GetGoScoreRequest)(nil),         // 7: loci.localcontext.GetGoScoreRequest
-	(*GetGoScoreResponse)(nil),        // 8: loci.localcontext.GetGoScoreResponse
-	(*FxRate)(nil),                    // 9: loci.localcontext.FxRate
-	(*GetFxRatesRequest)(nil),         // 10: loci.localcontext.GetFxRatesRequest
-	(*GetFxRatesResponse)(nil),        // 11: loci.localcontext.GetFxRatesResponse
-	(*DriveCostEstimate)(nil),         // 12: loci.localcontext.DriveCostEstimate
-	(*EstimateDriveCostRequest)(nil),  // 13: loci.localcontext.EstimateDriveCostRequest
-	(*EstimateDriveCostResponse)(nil), // 14: loci.localcontext.EstimateDriveCostResponse
-	(*timestamppb.Timestamp)(nil),     // 15: google.protobuf.Timestamp
+	(AlertKind)(0),                       // 0: loci.localcontext.AlertKind
+	(*WeatherDay)(nil),                   // 1: loci.localcontext.WeatherDay
+	(*LocalAlert)(nil),                   // 2: loci.localcontext.LocalAlert
+	(*GetLocalContextRequest)(nil),       // 3: loci.localcontext.GetLocalContextRequest
+	(*LocalContext)(nil),                 // 4: loci.localcontext.LocalContext
+	(*ScoreFactor)(nil),                  // 5: loci.localcontext.ScoreFactor
+	(*GoScore)(nil),                      // 6: loci.localcontext.GoScore
+	(*GetGoScoreRequest)(nil),            // 7: loci.localcontext.GetGoScoreRequest
+	(*GetGoScoreResponse)(nil),           // 8: loci.localcontext.GetGoScoreResponse
+	(*FxRate)(nil),                       // 9: loci.localcontext.FxRate
+	(*GetFxRatesRequest)(nil),            // 10: loci.localcontext.GetFxRatesRequest
+	(*GetFxRatesResponse)(nil),           // 11: loci.localcontext.GetFxRatesResponse
+	(*DriveCostEstimate)(nil),            // 12: loci.localcontext.DriveCostEstimate
+	(*EstimateDriveCostRequest)(nil),     // 13: loci.localcontext.EstimateDriveCostRequest
+	(*EstimateDriveCostResponse)(nil),    // 14: loci.localcontext.EstimateDriveCostResponse
+	(*NewsTickerItem)(nil),               // 15: loci.localcontext.NewsTickerItem
+	(*GetNewsTickerRequest)(nil),         // 16: loci.localcontext.GetNewsTickerRequest
+	(*GetNewsTickerResponse)(nil),        // 17: loci.localcontext.GetNewsTickerResponse
+	(*SetNewsTickerEnabledRequest)(nil),  // 18: loci.localcontext.SetNewsTickerEnabledRequest
+	(*SetNewsTickerEnabledResponse)(nil), // 19: loci.localcontext.SetNewsTickerEnabledResponse
+	(*timestamppb.Timestamp)(nil),        // 20: google.protobuf.Timestamp
 }
 var file_loci_localcontext_localcontext_proto_depIdxs = []int32{
-	15, // 0: loci.localcontext.WeatherDay.date:type_name -> google.protobuf.Timestamp
+	20, // 0: loci.localcontext.WeatherDay.date:type_name -> google.protobuf.Timestamp
 	0,  // 1: loci.localcontext.LocalAlert.kind:type_name -> loci.localcontext.AlertKind
-	15, // 2: loci.localcontext.LocalAlert.date:type_name -> google.protobuf.Timestamp
+	20, // 2: loci.localcontext.LocalAlert.date:type_name -> google.protobuf.Timestamp
 	1,  // 3: loci.localcontext.LocalContext.weather:type_name -> loci.localcontext.WeatherDay
 	2,  // 4: loci.localcontext.LocalContext.alerts:type_name -> loci.localcontext.LocalAlert
 	5,  // 5: loci.localcontext.GoScore.factors:type_name -> loci.localcontext.ScoreFactor
-	15, // 6: loci.localcontext.GetGoScoreRequest.start:type_name -> google.protobuf.Timestamp
-	15, // 7: loci.localcontext.GetGoScoreRequest.end:type_name -> google.protobuf.Timestamp
+	20, // 6: loci.localcontext.GetGoScoreRequest.start:type_name -> google.protobuf.Timestamp
+	20, // 7: loci.localcontext.GetGoScoreRequest.end:type_name -> google.protobuf.Timestamp
 	6,  // 8: loci.localcontext.GetGoScoreResponse.score:type_name -> loci.localcontext.GoScore
-	15, // 9: loci.localcontext.FxRate.as_of:type_name -> google.protobuf.Timestamp
+	20, // 9: loci.localcontext.FxRate.as_of:type_name -> google.protobuf.Timestamp
 	9,  // 10: loci.localcontext.GetFxRatesResponse.rates:type_name -> loci.localcontext.FxRate
 	12, // 11: loci.localcontext.EstimateDriveCostResponse.estimate:type_name -> loci.localcontext.DriveCostEstimate
-	3,  // 12: loci.localcontext.LocalContextService.GetLocalContext:input_type -> loci.localcontext.GetLocalContextRequest
-	7,  // 13: loci.localcontext.LocalContextService.GetGoScore:input_type -> loci.localcontext.GetGoScoreRequest
-	10, // 14: loci.localcontext.LocalContextService.GetFxRates:input_type -> loci.localcontext.GetFxRatesRequest
-	13, // 15: loci.localcontext.LocalContextService.EstimateDriveCost:input_type -> loci.localcontext.EstimateDriveCostRequest
-	4,  // 16: loci.localcontext.LocalContextService.GetLocalContext:output_type -> loci.localcontext.LocalContext
-	8,  // 17: loci.localcontext.LocalContextService.GetGoScore:output_type -> loci.localcontext.GetGoScoreResponse
-	11, // 18: loci.localcontext.LocalContextService.GetFxRates:output_type -> loci.localcontext.GetFxRatesResponse
-	14, // 19: loci.localcontext.LocalContextService.EstimateDriveCost:output_type -> loci.localcontext.EstimateDriveCostResponse
-	16, // [16:20] is the sub-list for method output_type
-	12, // [12:16] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	20, // 12: loci.localcontext.NewsTickerItem.published_at:type_name -> google.protobuf.Timestamp
+	15, // 13: loci.localcontext.GetNewsTickerResponse.items:type_name -> loci.localcontext.NewsTickerItem
+	3,  // 14: loci.localcontext.LocalContextService.GetLocalContext:input_type -> loci.localcontext.GetLocalContextRequest
+	7,  // 15: loci.localcontext.LocalContextService.GetGoScore:input_type -> loci.localcontext.GetGoScoreRequest
+	10, // 16: loci.localcontext.LocalContextService.GetFxRates:input_type -> loci.localcontext.GetFxRatesRequest
+	13, // 17: loci.localcontext.LocalContextService.EstimateDriveCost:input_type -> loci.localcontext.EstimateDriveCostRequest
+	16, // 18: loci.localcontext.LocalContextService.GetNewsTicker:input_type -> loci.localcontext.GetNewsTickerRequest
+	18, // 19: loci.localcontext.LocalContextService.SetNewsTickerEnabled:input_type -> loci.localcontext.SetNewsTickerEnabledRequest
+	4,  // 20: loci.localcontext.LocalContextService.GetLocalContext:output_type -> loci.localcontext.LocalContext
+	8,  // 21: loci.localcontext.LocalContextService.GetGoScore:output_type -> loci.localcontext.GetGoScoreResponse
+	11, // 22: loci.localcontext.LocalContextService.GetFxRates:output_type -> loci.localcontext.GetFxRatesResponse
+	14, // 23: loci.localcontext.LocalContextService.EstimateDriveCost:output_type -> loci.localcontext.EstimateDriveCostResponse
+	17, // 24: loci.localcontext.LocalContextService.GetNewsTicker:output_type -> loci.localcontext.GetNewsTickerResponse
+	19, // 25: loci.localcontext.LocalContextService.SetNewsTickerEnabled:output_type -> loci.localcontext.SetNewsTickerEnabledResponse
+	20, // [20:26] is the sub-list for method output_type
+	14, // [14:20] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_loci_localcontext_localcontext_proto_init() }
@@ -1306,7 +1632,7 @@ func file_loci_localcontext_localcontext_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_localcontext_localcontext_proto_rawDesc), len(file_loci_localcontext_localcontext_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
