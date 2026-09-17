@@ -50,14 +50,14 @@ func (h *UserHandler) GetUserProfile(
 	ctx context.Context,
 	req *connect.Request[userpb.GetUserProfileRequest],
 ) (*connect.Response[userpb.GetUserProfileResponse], error) {
-	// Get user ID from request or from context (authenticated user)
-	userIDStr := req.Msg.GetUserId()
-	if userIDStr == "" {
-		var ok bool
-		userIDStr, ok = interceptors.GetUserIDFromContext(ctx)
-		if !ok || userIDStr == "" {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-		}
+	// The subject is whoever the token says it is, never whoever the request
+	// body says it is. This used to read req.Msg.GetUserId() first and fall
+	// back to the token, which let any authenticated caller read any other
+	// user's profile by putting their id in the body. The proto field stays —
+	// clients still send it — but it is not trusted for anything.
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
 	userID, err := uuid.Parse(userIDStr)
