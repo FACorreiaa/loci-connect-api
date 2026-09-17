@@ -39,6 +39,9 @@ type Handler struct {
 	// Resolves coordinates to a country for GetFxRates. Shared with the
 	// Gatherer so both use one geocoder and one cache.
 	fxCountry CountryResolver
+
+	// Optional, attached via WithNewsTicker. Nil answers "disabled".
+	news *NewsTickerService
 }
 
 // WithSignals attaches the live alert sources (holidays, and later hazards and

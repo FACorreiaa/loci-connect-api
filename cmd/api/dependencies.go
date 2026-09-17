@@ -815,11 +815,21 @@ func (d *Dependencies) initHandlers() error {
 	// metrics cover it.
 	fxAdapter, fxBase, litresPer100Km, pricePerLitre := localcontext.NewFXFromEnv(localcontext.NewSignalsHTTPClient(), signalCache)
 
+	// The desk's breaking-news strip. Nil without FEEDS_BASE_URL, which the
+	// handler answers as "disabled".
+	newsTicker := localcontext.NewNewsTickerFromEnv(d.Logger, signalCache,
+		newsHomeAdapter{users: d.UserRepo},
+		newsNextTripAdapter{trips: d.TripRepo, cities: d.CityResolver},
+		newsVisitedAdapter{history: d.TravelHistoryRepo},
+		localcontext.NewPostgresNewsTickerPrefs(d.DB.Pool),
+	)
+
 	d.LocalContextHandler = localcontext.
 		NewHandler(weather, weatherEst, d.Logger).
 		WithScoring(d.CityResolver, d.POISvc).
 		WithSignals(signals).
-		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre, signals.CountryResolver())
+		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre, signals.CountryResolver()).
+		WithNewsTicker(newsTicker)
 
 	// Give the trip handler the same forecast source, so a packing list can be
 	// derived from the trip's actual weather rather than generic advice.
