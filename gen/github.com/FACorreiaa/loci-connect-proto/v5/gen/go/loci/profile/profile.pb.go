@@ -190,8 +190,16 @@ func (TransportPreference) EnumDescriptor() ([]byte, []int) {
 
 // AccommodationPreferences represents accommodation-specific filters
 type AccommodationPreferences struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
 	UserPreferenceId   string                 `protobuf:"bytes,2,opt,name=user_preference_id,json=userPreferenceId,proto3" json:"user_preference_id,omitempty"`
 	AccommodationType  []string               `protobuf:"bytes,3,rep,name=accommodation_type,json=accommodationType,proto3" json:"accommodation_type,omitempty"`
 	StarRating         *common.RangeFilter    `protobuf:"bytes,4,opt,name=star_rating,json=starRating,proto3,oneof" json:"star_rating,omitempty"`
@@ -323,8 +331,16 @@ func (x *AccommodationPreferences) GetUpdatedAt() *timestamppb.Timestamp {
 
 // DiningPreferences represents dining-specific filters
 type DiningPreferences struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
 	UserPreferenceId        string                 `protobuf:"bytes,2,opt,name=user_preference_id,json=userPreferenceId,proto3" json:"user_preference_id,omitempty"`
 	CuisineTypes            []string               `protobuf:"bytes,3,rep,name=cuisine_types,json=cuisineTypes,proto3" json:"cuisine_types,omitempty"`
 	MealTypes               []string               `protobuf:"bytes,4,rep,name=meal_types,json=mealTypes,proto3" json:"meal_types,omitempty"`
@@ -480,8 +496,16 @@ func (x *DiningPreferences) GetUpdatedAt() *timestamppb.Timestamp {
 
 // ActivityPreferences represents activity-specific filters
 type ActivityPreferences struct {
-	state                    protoimpl.MessageState `protogen:"open.v1"`
-	Id                       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
 	UserPreferenceId         string                 `protobuf:"bytes,2,opt,name=user_preference_id,json=userPreferenceId,proto3" json:"user_preference_id,omitempty"`
 	ActivityCategories       []string               `protobuf:"bytes,3,rep,name=activity_categories,json=activityCategories,proto3" json:"activity_categories,omitempty"`
 	PhysicalActivityLevel    *string                `protobuf:"bytes,4,opt,name=physical_activity_level,json=physicalActivityLevel,proto3,oneof" json:"physical_activity_level,omitempty"`
@@ -629,8 +653,16 @@ func (x *ActivityPreferences) GetUpdatedAt() *timestamppb.Timestamp {
 
 // ItineraryPreferences represents itinerary planning-specific filters
 type ItineraryPreferences struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	Id                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Assigned by the server. Left empty on an update, so an empty value skips
+	// validation while a supplied one is still bounded: this message is both a
+	// response and a field of the create/update requests, and a client has no id
+	// to send.
 	UserPreferenceId      string                 `protobuf:"bytes,2,opt,name=user_preference_id,json=userPreferenceId,proto3" json:"user_preference_id,omitempty"`
 	PlanningStyle         *string                `protobuf:"bytes,3,opt,name=planning_style,json=planningStyle,proto3,oneof" json:"planning_style,omitempty"`
 	PreferredPace         *string                `protobuf:"bytes,4,opt,name=preferred_pace,json=preferredPace,proto3,oneof" json:"preferred_pace,omitempty"`
@@ -2070,10 +2102,12 @@ var File_loci_profile_profile_proto protoreflect.FileDescriptor
 
 const file_loci_profile_profile_proto_rawDesc = "" +
 	"\n" +
-	"\x1aloci/profile/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a\x1cloci/interest/interest.proto\"\xbc\x06\n" +
-	"\x18AccommodationPreferences\x12\x19\n" +
-	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12?\n" +
+	"\x1aloci/profile/profile.proto\x12\floci.profile\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a\x1cloci/interest/interest.proto\"\xae\x06\n" +
+	"\x18AccommodationPreferences\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x02id\x128\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x10userPreferenceId\x12?\n" +
 	"\x12accommodation_type\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\n" +
 	"\"\x06r\x04\x10\x01\x18dR\x11accommodationType\x12>\n" +
@@ -2089,18 +2123,20 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x13cancellation_policy\x18\t \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x05\"\x06r\x04\x10\x01\x18dR\x12cancellationPolicy\x12?\n" +
 	"\x13booking_flexibility\x18\n" +
-	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\x12bookingFlexibility\x88\x01\x01\x12A\n" +
+	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x03R\x12bookingFlexibility\x88\x01\x01\x129\n" +
 	"\n" +
-	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x0e\n" +
+	"updated_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\x0e\n" +
 	"\f_star_ratingB\x18\n" +
 	"\x16_price_range_per_nightB\x13\n" +
 	"\x11_chain_preferenceB\x16\n" +
-	"\x14_booking_flexibility\"\xf9\x06\n" +
-	"\x11DiningPreferences\x12\x19\n" +
-	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x125\n" +
+	"\x14_booking_flexibility\"\xeb\x06\n" +
+	"\x11DiningPreferences\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x02id\x128\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x10userPreferenceId\x125\n" +
 	"\rcuisine_types\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x14\"\x06r\x04\x10\x01\x18dR\fcuisineTypes\x12/\n" +
 	"\n" +
@@ -2120,16 +2156,18 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	" \x01(\bR\x14localRecommendations\x124\n" +
 	"\x0echain_vs_local\x18\v \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\fchainVsLocal\x88\x01\x01\x12-\n" +
 	"\x12organic_preference\x18\f \x01(\bR\x11organicPreference\x12:\n" +
-	"\x19outdoor_seating_preferred\x18\r \x01(\bR\x17outdoorSeatingPreferred\x12A\n" +
+	"\x19outdoor_seating_preferred\x18\r \x01(\bR\x17outdoorSeatingPreferred\x129\n" +
 	"\n" +
-	"created_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
+	"created_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x19\n" +
+	"updated_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\x19\n" +
 	"\x17_price_range_per_personB\x11\n" +
-	"\x0f_chain_vs_local\"\xf6\a\n" +
-	"\x13ActivityPreferences\x12\x19\n" +
-	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x12A\n" +
+	"\x0f_chain_vs_local\"\xe8\a\n" +
+	"\x13ActivityPreferences\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x02id\x128\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x10userPreferenceId\x12A\n" +
 	"\x13activity_categories\x18\x03 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x12activityCategories\x12F\n" +
 	"\x17physical_activity_level\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x15physicalActivityLevel\x88\x01\x01\x12J\n" +
@@ -2143,18 +2181,20 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x18seasonSpecificActivities\x12!\n" +
 	"\favoid_crowds\x18\v \x01(\bR\vavoidCrowds\x12D\n" +
 	"\x15local_events_interest\x18\f \x03(\tB\x10\xbaH\r\x92\x01\n" +
-	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x13localEventsInterest\x12A\n" +
+	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x13localEventsInterest\x129\n" +
 	"\n" +
-	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
+	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x1a\n" +
+	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\x1a\n" +
 	"\x18_physical_activity_levelB\x1c\n" +
 	"\x1a_indoor_outdoor_preferenceB\x1b\n" +
 	"\x19_cultural_immersion_levelB\x1a\n" +
-	"\x18_must_see_vs_hidden_gems\"\xae\a\n" +
-	"\x14ItineraryPreferences\x12\x19\n" +
-	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x127\n" +
-	"\x12user_preference_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x10userPreferenceId\x125\n" +
+	"\x18_must_see_vs_hidden_gems\"\xa0\a\n" +
+	"\x14ItineraryPreferences\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x02id\x128\n" +
+	"\x12user_preference_id\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x10userPreferenceId\x125\n" +
 	"\x0eplanning_style\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\rplanningStyle\x88\x01\x01\x125\n" +
 	"\x0epreferred_pace\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x01R\rpreferredPace\x88\x01\x01\x129\n" +
 	"\x10time_flexibility\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x02R\x0ftimeFlexibility\x88\x01\x01\x12<\n" +
@@ -2165,11 +2205,11 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x11avoid_peak_season\x18\t \x01(\bR\x0favoidPeakSeason\x12F\n" +
 	"\x17adventure_vs_relaxation\x18\n" +
 	" \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x05R\x15adventureVsRelaxation\x88\x01\x01\x12D\n" +
-	"\x16spontaneous_vs_planned\x18\v \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x06R\x14spontaneousVsPlanned\x88\x01\x01\x12A\n" +
+	"\x16spontaneous_vs_planned\x18\v \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x06R\x14spontaneousVsPlanned\x88\x01\x01\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
+	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x11\n" +
+	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\x11\n" +
 	"\x0f_planning_styleB\x11\n" +
 	"\x0f_preferred_paceB\x13\n" +
 	"\x11_time_flexibilityB\x15\n" +
