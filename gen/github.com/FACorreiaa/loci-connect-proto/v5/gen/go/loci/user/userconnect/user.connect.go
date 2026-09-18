@@ -46,15 +46,23 @@ const (
 	// UserServiceDeleteAccountProcedure is the fully-qualified name of the UserService's DeleteAccount
 	// RPC.
 	UserServiceDeleteAccountProcedure = "/loci.user.UserService/DeleteAccount"
+	// UserServiceGetNotificationSettingsProcedure is the fully-qualified name of the UserService's
+	// GetNotificationSettings RPC.
+	UserServiceGetNotificationSettingsProcedure = "/loci.user.UserService/GetNotificationSettings"
+	// UserServiceUpdateNotificationSettingsProcedure is the fully-qualified name of the UserService's
+	// UpdateNotificationSettings RPC.
+	UserServiceUpdateNotificationSettingsProcedure = "/loci.user.UserService/UpdateNotificationSettings"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	userServiceServiceDescriptor                 = user.File_loci_user_user_proto.Services().ByName("UserService")
-	userServiceGetUserProfileMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("GetUserProfile")
-	userServiceUpdateUserProfileMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("UpdateUserProfile")
-	userServiceExportUserDataMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("ExportUserData")
-	userServiceDeleteAccountMethodDescriptor     = userServiceServiceDescriptor.Methods().ByName("DeleteAccount")
+	userServiceServiceDescriptor                          = user.File_loci_user_user_proto.Services().ByName("UserService")
+	userServiceGetUserProfileMethodDescriptor             = userServiceServiceDescriptor.Methods().ByName("GetUserProfile")
+	userServiceUpdateUserProfileMethodDescriptor          = userServiceServiceDescriptor.Methods().ByName("UpdateUserProfile")
+	userServiceExportUserDataMethodDescriptor             = userServiceServiceDescriptor.Methods().ByName("ExportUserData")
+	userServiceDeleteAccountMethodDescriptor              = userServiceServiceDescriptor.Methods().ByName("DeleteAccount")
+	userServiceGetNotificationSettingsMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("GetNotificationSettings")
+	userServiceUpdateNotificationSettingsMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("UpdateNotificationSettings")
 )
 
 // UserServiceClient is a client for the loci.user.UserService service.
@@ -64,6 +72,9 @@ type UserServiceClient interface {
 	// Data controls (GDPR-style self-service).
 	ExportUserData(context.Context, *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error)
 	DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error)
+	// Notification switches, stored against the account rather than the browser.
+	GetNotificationSettings(context.Context, *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
+	UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
 }
 
 // NewUserServiceClient constructs a client for the loci.user.UserService service. By default, it
@@ -100,15 +111,29 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceDeleteAccountMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getNotificationSettings: connect.NewClient[user.GetNotificationSettingsRequest, user.NotificationSettings](
+			httpClient,
+			baseURL+UserServiceGetNotificationSettingsProcedure,
+			connect.WithSchema(userServiceGetNotificationSettingsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		updateNotificationSettings: connect.NewClient[user.UpdateNotificationSettingsRequest, user.NotificationSettings](
+			httpClient,
+			baseURL+UserServiceUpdateNotificationSettingsProcedure,
+			connect.WithSchema(userServiceUpdateNotificationSettingsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	getUserProfile    *connect.Client[user.GetUserProfileRequest, user.GetUserProfileResponse]
-	updateUserProfile *connect.Client[user.UpdateUserProfileRequest, common.Response]
-	exportUserData    *connect.Client[user.ExportUserDataRequest, user.ExportUserDataResponse]
-	deleteAccount     *connect.Client[user.DeleteAccountRequest, common.Response]
+	getUserProfile             *connect.Client[user.GetUserProfileRequest, user.GetUserProfileResponse]
+	updateUserProfile          *connect.Client[user.UpdateUserProfileRequest, common.Response]
+	exportUserData             *connect.Client[user.ExportUserDataRequest, user.ExportUserDataResponse]
+	deleteAccount              *connect.Client[user.DeleteAccountRequest, common.Response]
+	getNotificationSettings    *connect.Client[user.GetNotificationSettingsRequest, user.NotificationSettings]
+	updateNotificationSettings *connect.Client[user.UpdateNotificationSettingsRequest, user.NotificationSettings]
 }
 
 // GetUserProfile calls loci.user.UserService.GetUserProfile.
@@ -131,6 +156,16 @@ func (c *userServiceClient) DeleteAccount(ctx context.Context, req *connect.Requ
 	return c.deleteAccount.CallUnary(ctx, req)
 }
 
+// GetNotificationSettings calls loci.user.UserService.GetNotificationSettings.
+func (c *userServiceClient) GetNotificationSettings(ctx context.Context, req *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error) {
+	return c.getNotificationSettings.CallUnary(ctx, req)
+}
+
+// UpdateNotificationSettings calls loci.user.UserService.UpdateNotificationSettings.
+func (c *userServiceClient) UpdateNotificationSettings(ctx context.Context, req *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error) {
+	return c.updateNotificationSettings.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the loci.user.UserService service.
 type UserServiceHandler interface {
 	GetUserProfile(context.Context, *connect.Request[user.GetUserProfileRequest]) (*connect.Response[user.GetUserProfileResponse], error)
@@ -138,6 +173,9 @@ type UserServiceHandler interface {
 	// Data controls (GDPR-style self-service).
 	ExportUserData(context.Context, *connect.Request[user.ExportUserDataRequest]) (*connect.Response[user.ExportUserDataResponse], error)
 	DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error)
+	// Notification switches, stored against the account rather than the browser.
+	GetNotificationSettings(context.Context, *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
+	UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -170,6 +208,18 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceDeleteAccountMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceGetNotificationSettingsHandler := connect.NewUnaryHandler(
+		UserServiceGetNotificationSettingsProcedure,
+		svc.GetNotificationSettings,
+		connect.WithSchema(userServiceGetNotificationSettingsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceUpdateNotificationSettingsHandler := connect.NewUnaryHandler(
+		UserServiceUpdateNotificationSettingsProcedure,
+		svc.UpdateNotificationSettings,
+		connect.WithSchema(userServiceUpdateNotificationSettingsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.user.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetUserProfileProcedure:
@@ -180,6 +230,10 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceExportUserDataHandler.ServeHTTP(w, r)
 		case UserServiceDeleteAccountProcedure:
 			userServiceDeleteAccountHandler.ServeHTTP(w, r)
+		case UserServiceGetNotificationSettingsProcedure:
+			userServiceGetNotificationSettingsHandler.ServeHTTP(w, r)
+		case UserServiceUpdateNotificationSettingsProcedure:
+			userServiceUpdateNotificationSettingsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -203,4 +257,12 @@ func (UnimplementedUserServiceHandler) ExportUserData(context.Context, *connect.
 
 func (UnimplementedUserServiceHandler) DeleteAccount(context.Context, *connect.Request[user.DeleteAccountRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.DeleteAccount is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetNotificationSettings(context.Context, *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.GetNotificationSettings is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.UpdateNotificationSettings is not implemented"))
 }

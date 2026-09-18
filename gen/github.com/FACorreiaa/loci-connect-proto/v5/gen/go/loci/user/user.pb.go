@@ -855,6 +855,165 @@ func (x *DeleteAccountRequest) GetConfirmation() string {
 	return ""
 }
 
+// NotificationSettings are the per-account notification switches.
+//
+// These lived in localStorage, keyed by user id, because no RPC existed for
+// them — so they did not follow the account to another browser, and nothing
+// server-side could read them. The two flags mirror what the quick-settings
+// panel has always offered.
+//
+// This stores the preference. Delivery — actually sending a push or an email —
+// is a separate piece of work, and the UI must not imply otherwise while these
+// are only recorded.
+type NotificationSettings struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Recommendations bool                   `protobuf:"varint,1,opt,name=recommendations,proto3" json:"recommendations,omitempty"`
+	TripReminders   bool                   `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3" json:"trip_reminders,omitempty"`
+	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *NotificationSettings) Reset() {
+	*x = NotificationSettings{}
+	mi := &file_loci_user_user_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotificationSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotificationSettings) ProtoMessage() {}
+
+func (x *NotificationSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotificationSettings.ProtoReflect.Descriptor instead.
+func (*NotificationSettings) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *NotificationSettings) GetRecommendations() bool {
+	if x != nil {
+		return x.Recommendations
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetTripReminders() bool {
+	if x != nil {
+		return x.TripReminders
+	}
+	return false
+}
+
+func (x *NotificationSettings) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type GetNotificationSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetNotificationSettingsRequest) Reset() {
+	*x = GetNotificationSettingsRequest{}
+	mi := &file_loci_user_user_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetNotificationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetNotificationSettingsRequest) ProtoMessage() {}
+
+func (x *GetNotificationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetNotificationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetNotificationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{10}
+}
+
+type UpdateNotificationSettingsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absent means "leave this switch as it is".
+	Recommendations *bool `protobuf:"varint,1,opt,name=recommendations,proto3,oneof" json:"recommendations,omitempty"`
+	TripReminders   *bool `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3,oneof" json:"trip_reminders,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UpdateNotificationSettingsRequest) Reset() {
+	*x = UpdateNotificationSettingsRequest{}
+	mi := &file_loci_user_user_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateNotificationSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateNotificationSettingsRequest) ProtoMessage() {}
+
+func (x *UpdateNotificationSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateNotificationSettingsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateNotificationSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *UpdateNotificationSettingsRequest) GetRecommendations() bool {
+	if x != nil && x.Recommendations != nil {
+		return *x.Recommendations
+	}
+	return false
+}
+
+func (x *UpdateNotificationSettingsRequest) GetTripReminders() bool {
+	if x != nil && x.TripReminders != nil {
+		return *x.TripReminders
+	}
+	return false
+}
+
 var File_loci_user_user_proto protoreflect.FileDescriptor
 
 const file_loci_user_user_proto_rawDesc = "" +
@@ -1004,12 +1163,25 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\bfilename\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\bfilename\"E\n" +
 	"\x14DeleteAccountRequest\x12-\n" +
-	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation2\xd5\x02\n" +
+	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xa2\x01\n" +
+	"\x14NotificationSettings\x12(\n" +
+	"\x0frecommendations\x18\x01 \x01(\bR\x0frecommendations\x12%\n" +
+	"\x0etrip_reminders\x18\x02 \x01(\bR\rtripReminders\x129\n" +
+	"\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\" \n" +
+	"\x1eGetNotificationSettingsRequest\"\xa5\x01\n" +
+	"!UpdateNotificationSettingsRequest\x12-\n" +
+	"\x0frecommendations\x18\x01 \x01(\bH\x00R\x0frecommendations\x88\x01\x01\x12*\n" +
+	"\x0etrip_reminders\x18\x02 \x01(\bH\x01R\rtripReminders\x88\x01\x01B\x12\n" +
+	"\x10_recommendationsB\x11\n" +
+	"\x0f_trip_reminders2\xa9\x04\n" +
 	"\vUserService\x12U\n" +
 	"\x0eGetUserProfile\x12 .loci.user.GetUserProfileRequest\x1a!.loci.user.GetUserProfileResponse\x12O\n" +
 	"\x11UpdateUserProfile\x12#.loci.user.UpdateUserProfileRequest\x1a\x15.loci.common.Response\x12U\n" +
 	"\x0eExportUserData\x12 .loci.user.ExportUserDataRequest\x1a!.loci.user.ExportUserDataResponse\x12G\n" +
-	"\rDeleteAccount\x12\x1f.loci.user.DeleteAccountRequest\x1a\x15.loci.common.ResponseBCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user;userb\x06proto3"
+	"\rDeleteAccount\x12\x1f.loci.user.DeleteAccountRequest\x1a\x15.loci.common.Response\x12e\n" +
+	"\x17GetNotificationSettings\x12).loci.user.GetNotificationSettingsRequest\x1a\x1f.loci.user.NotificationSettings\x12k\n" +
+	"\x1aUpdateNotificationSettings\x12,.loci.user.UpdateNotificationSettingsRequest\x1a\x1f.loci.user.NotificationSettingsBCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user;userb\x06proto3"
 
 var (
 	file_loci_user_user_proto_rawDescOnce sync.Once
@@ -1023,42 +1195,50 @@ func file_loci_user_user_proto_rawDescGZIP() []byte {
 	return file_loci_user_user_proto_rawDescData
 }
 
-var file_loci_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_loci_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_loci_user_user_proto_goTypes = []any{
-	(*UserStats)(nil),                // 0: loci.user.UserStats
-	(*UserProfile)(nil),              // 1: loci.user.UserProfile
-	(*UpdateProfileParams)(nil),      // 2: loci.user.UpdateProfileParams
-	(*GetUserProfileRequest)(nil),    // 3: loci.user.GetUserProfileRequest
-	(*GetUserProfileResponse)(nil),   // 4: loci.user.GetUserProfileResponse
-	(*UpdateUserProfileRequest)(nil), // 5: loci.user.UpdateUserProfileRequest
-	(*ExportUserDataRequest)(nil),    // 6: loci.user.ExportUserDataRequest
-	(*ExportUserDataResponse)(nil),   // 7: loci.user.ExportUserDataResponse
-	(*DeleteAccountRequest)(nil),     // 8: loci.user.DeleteAccountRequest
-	(*timestamppb.Timestamp)(nil),    // 9: google.protobuf.Timestamp
-	(*common.Response)(nil),          // 10: loci.common.Response
+	(*UserStats)(nil),                         // 0: loci.user.UserStats
+	(*UserProfile)(nil),                       // 1: loci.user.UserProfile
+	(*UpdateProfileParams)(nil),               // 2: loci.user.UpdateProfileParams
+	(*GetUserProfileRequest)(nil),             // 3: loci.user.GetUserProfileRequest
+	(*GetUserProfileResponse)(nil),            // 4: loci.user.GetUserProfileResponse
+	(*UpdateUserProfileRequest)(nil),          // 5: loci.user.UpdateUserProfileRequest
+	(*ExportUserDataRequest)(nil),             // 6: loci.user.ExportUserDataRequest
+	(*ExportUserDataResponse)(nil),            // 7: loci.user.ExportUserDataResponse
+	(*DeleteAccountRequest)(nil),              // 8: loci.user.DeleteAccountRequest
+	(*NotificationSettings)(nil),              // 9: loci.user.NotificationSettings
+	(*GetNotificationSettingsRequest)(nil),    // 10: loci.user.GetNotificationSettingsRequest
+	(*UpdateNotificationSettingsRequest)(nil), // 11: loci.user.UpdateNotificationSettingsRequest
+	(*timestamppb.Timestamp)(nil),             // 12: google.protobuf.Timestamp
+	(*common.Response)(nil),                   // 13: loci.common.Response
 }
 var file_loci_user_user_proto_depIdxs = []int32{
-	9,  // 0: loci.user.UserProfile.joined_date:type_name -> google.protobuf.Timestamp
+	12, // 0: loci.user.UserProfile.joined_date:type_name -> google.protobuf.Timestamp
 	0,  // 1: loci.user.UserProfile.stats:type_name -> loci.user.UserStats
-	9,  // 2: loci.user.UserProfile.email_verified_at:type_name -> google.protobuf.Timestamp
-	9,  // 3: loci.user.UserProfile.last_login_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: loci.user.UserProfile.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 5: loci.user.UserProfile.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 2: loci.user.UserProfile.email_verified_at:type_name -> google.protobuf.Timestamp
+	12, // 3: loci.user.UserProfile.last_login_at:type_name -> google.protobuf.Timestamp
+	12, // 4: loci.user.UserProfile.created_at:type_name -> google.protobuf.Timestamp
+	12, // 5: loci.user.UserProfile.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 6: loci.user.GetUserProfileResponse.profile:type_name -> loci.user.UserProfile
 	2,  // 7: loci.user.UpdateUserProfileRequest.params:type_name -> loci.user.UpdateProfileParams
-	3,  // 8: loci.user.UserService.GetUserProfile:input_type -> loci.user.GetUserProfileRequest
-	5,  // 9: loci.user.UserService.UpdateUserProfile:input_type -> loci.user.UpdateUserProfileRequest
-	6,  // 10: loci.user.UserService.ExportUserData:input_type -> loci.user.ExportUserDataRequest
-	8,  // 11: loci.user.UserService.DeleteAccount:input_type -> loci.user.DeleteAccountRequest
-	4,  // 12: loci.user.UserService.GetUserProfile:output_type -> loci.user.GetUserProfileResponse
-	10, // 13: loci.user.UserService.UpdateUserProfile:output_type -> loci.common.Response
-	7,  // 14: loci.user.UserService.ExportUserData:output_type -> loci.user.ExportUserDataResponse
-	10, // 15: loci.user.UserService.DeleteAccount:output_type -> loci.common.Response
-	12, // [12:16] is the sub-list for method output_type
-	8,  // [8:12] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	12, // 8: loci.user.NotificationSettings.updated_at:type_name -> google.protobuf.Timestamp
+	3,  // 9: loci.user.UserService.GetUserProfile:input_type -> loci.user.GetUserProfileRequest
+	5,  // 10: loci.user.UserService.UpdateUserProfile:input_type -> loci.user.UpdateUserProfileRequest
+	6,  // 11: loci.user.UserService.ExportUserData:input_type -> loci.user.ExportUserDataRequest
+	8,  // 12: loci.user.UserService.DeleteAccount:input_type -> loci.user.DeleteAccountRequest
+	10, // 13: loci.user.UserService.GetNotificationSettings:input_type -> loci.user.GetNotificationSettingsRequest
+	11, // 14: loci.user.UserService.UpdateNotificationSettings:input_type -> loci.user.UpdateNotificationSettingsRequest
+	4,  // 15: loci.user.UserService.GetUserProfile:output_type -> loci.user.GetUserProfileResponse
+	13, // 16: loci.user.UserService.UpdateUserProfile:output_type -> loci.common.Response
+	7,  // 17: loci.user.UserService.ExportUserData:output_type -> loci.user.ExportUserDataResponse
+	13, // 18: loci.user.UserService.DeleteAccount:output_type -> loci.common.Response
+	9,  // 19: loci.user.UserService.GetNotificationSettings:output_type -> loci.user.NotificationSettings
+	9,  // 20: loci.user.UserService.UpdateNotificationSettings:output_type -> loci.user.NotificationSettings
+	15, // [15:21] is the sub-list for method output_type
+	9,  // [9:15] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_loci_user_user_proto_init() }
@@ -1070,13 +1250,14 @@ func file_loci_user_user_proto_init() {
 	file_loci_user_user_proto_msgTypes[2].OneofWrappers = []any{}
 	file_loci_user_user_proto_msgTypes[3].OneofWrappers = []any{}
 	file_loci_user_user_proto_msgTypes[5].OneofWrappers = []any{}
+	file_loci_user_user_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_user_user_proto_rawDesc), len(file_loci_user_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -618,6 +618,56 @@ func (x *GetUserInterestsResponse) GetInterests() []*Interest {
 	return nil
 }
 
+// DeleteInterest removes one of the caller's own custom interests.
+//
+// Deactivating an interest via UpdateInterest is a different thing: it stays in
+// the list, switched off. The client offered a delete button that called
+// UpdateInterest with active=false and reported "Interest deleted", which left
+// the interest exactly where it was.
+type DeleteInterestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InterestId    string                 `protobuf:"bytes,1,opt,name=interest_id,json=interestId,proto3" json:"interest_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteInterestRequest) Reset() {
+	*x = DeleteInterestRequest{}
+	mi := &file_loci_interest_interest_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteInterestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteInterestRequest) ProtoMessage() {}
+
+func (x *DeleteInterestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_interest_interest_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteInterestRequest.ProtoReflect.Descriptor instead.
+func (*DeleteInterestRequest) Descriptor() ([]byte, []int) {
+	return file_loci_interest_interest_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DeleteInterestRequest) GetInterestId() string {
+	if x != nil {
+		return x.InterestId
+	}
+	return ""
+}
+
 var File_loci_interest_interest_proto protoreflect.FileDescriptor
 
 const file_loci_interest_interest_proto_rawDesc = "" +
@@ -690,14 +740,18 @@ const file_loci_interest_interest_proto_rawDesc = "" +
 	"\n" +
 	"\b_user_id\"Q\n" +
 	"\x18GetUserInterestsResponse\x125\n" +
-	"\tinterests\x18\x01 \x03(\v2\x17.loci.interest.InterestR\tinterests2\x99\x04\n" +
+	"\tinterests\x18\x01 \x03(\v2\x17.loci.interest.InterestR\tinterests\"C\n" +
+	"\x15DeleteInterestRequest\x12*\n" +
+	"\vinterest_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\n" +
+	"interestId2\xe8\x04\n" +
 	"\x0fInterestService\x12W\n" +
 	"\fGetInterests\x12\".loci.interest.GetInterestsRequest\x1a#.loci.interest.GetInterestsResponse\x12c\n" +
 	"\x10GetUserInterests\x12&.loci.interest.GetUserInterestsRequest\x1a'.loci.interest.GetUserInterestsResponse\x12M\n" +
 	"\x0eCreateInterest\x12$.loci.interest.CreateInterestRequest\x1a\x15.loci.common.Response\x12M\n" +
 	"\x0eUpdateInterest\x12$.loci.interest.UpdateInterestRequest\x1a\x15.loci.common.Response\x12M\n" +
 	"\x11AddInterestToUser\x12!.loci.interest.AddInterestRequest\x1a\x15.loci.common.Response\x12[\n" +
-	"\x15UpdatePreferenceLevel\x12+.loci.interest.UpdatePreferenceLevelRequest\x1a\x15.loci.common.ResponseBKZIgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest;interestb\x06proto3"
+	"\x15UpdatePreferenceLevel\x12+.loci.interest.UpdatePreferenceLevelRequest\x1a\x15.loci.common.Response\x12M\n" +
+	"\x0eDeleteInterest\x12$.loci.interest.DeleteInterestRequest\x1a\x15.loci.common.ResponseBKZIgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest;interestb\x06proto3"
 
 var (
 	file_loci_interest_interest_proto_rawDescOnce sync.Once
@@ -711,7 +765,7 @@ func file_loci_interest_interest_proto_rawDescGZIP() []byte {
 	return file_loci_interest_interest_proto_rawDescData
 }
 
-var file_loci_interest_interest_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_loci_interest_interest_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_loci_interest_interest_proto_goTypes = []any{
 	(*Interest)(nil),                     // 0: loci.interest.Interest
 	(*Tags)(nil),                         // 1: loci.interest.Tags
@@ -723,14 +777,15 @@ var file_loci_interest_interest_proto_goTypes = []any{
 	(*GetInterestsResponse)(nil),         // 7: loci.interest.GetInterestsResponse
 	(*GetUserInterestsRequest)(nil),      // 8: loci.interest.GetUserInterestsRequest
 	(*GetUserInterestsResponse)(nil),     // 9: loci.interest.GetUserInterestsResponse
-	(*timestamppb.Timestamp)(nil),        // 10: google.protobuf.Timestamp
-	(*common.Response)(nil),              // 11: loci.common.Response
+	(*DeleteInterestRequest)(nil),        // 10: loci.interest.DeleteInterestRequest
+	(*timestamppb.Timestamp)(nil),        // 11: google.protobuf.Timestamp
+	(*common.Response)(nil),              // 12: loci.common.Response
 }
 var file_loci_interest_interest_proto_depIdxs = []int32{
-	10, // 0: loci.interest.Interest.created_at:type_name -> google.protobuf.Timestamp
-	10, // 1: loci.interest.Interest.updated_at:type_name -> google.protobuf.Timestamp
-	10, // 2: loci.interest.Tags.created_at:type_name -> google.protobuf.Timestamp
-	10, // 3: loci.interest.Tags.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 0: loci.interest.Interest.created_at:type_name -> google.protobuf.Timestamp
+	11, // 1: loci.interest.Interest.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 2: loci.interest.Tags.created_at:type_name -> google.protobuf.Timestamp
+	11, // 3: loci.interest.Tags.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: loci.interest.GetInterestsResponse.interests:type_name -> loci.interest.Interest
 	0,  // 5: loci.interest.GetUserInterestsResponse.interests:type_name -> loci.interest.Interest
 	6,  // 6: loci.interest.InterestService.GetInterests:input_type -> loci.interest.GetInterestsRequest
@@ -739,14 +794,16 @@ var file_loci_interest_interest_proto_depIdxs = []int32{
 	3,  // 9: loci.interest.InterestService.UpdateInterest:input_type -> loci.interest.UpdateInterestRequest
 	4,  // 10: loci.interest.InterestService.AddInterestToUser:input_type -> loci.interest.AddInterestRequest
 	5,  // 11: loci.interest.InterestService.UpdatePreferenceLevel:input_type -> loci.interest.UpdatePreferenceLevelRequest
-	7,  // 12: loci.interest.InterestService.GetInterests:output_type -> loci.interest.GetInterestsResponse
-	9,  // 13: loci.interest.InterestService.GetUserInterests:output_type -> loci.interest.GetUserInterestsResponse
-	11, // 14: loci.interest.InterestService.CreateInterest:output_type -> loci.common.Response
-	11, // 15: loci.interest.InterestService.UpdateInterest:output_type -> loci.common.Response
-	11, // 16: loci.interest.InterestService.AddInterestToUser:output_type -> loci.common.Response
-	11, // 17: loci.interest.InterestService.UpdatePreferenceLevel:output_type -> loci.common.Response
-	12, // [12:18] is the sub-list for method output_type
-	6,  // [6:12] is the sub-list for method input_type
+	10, // 12: loci.interest.InterestService.DeleteInterest:input_type -> loci.interest.DeleteInterestRequest
+	7,  // 13: loci.interest.InterestService.GetInterests:output_type -> loci.interest.GetInterestsResponse
+	9,  // 14: loci.interest.InterestService.GetUserInterests:output_type -> loci.interest.GetUserInterestsResponse
+	12, // 15: loci.interest.InterestService.CreateInterest:output_type -> loci.common.Response
+	12, // 16: loci.interest.InterestService.UpdateInterest:output_type -> loci.common.Response
+	12, // 17: loci.interest.InterestService.AddInterestToUser:output_type -> loci.common.Response
+	12, // 18: loci.interest.InterestService.UpdatePreferenceLevel:output_type -> loci.common.Response
+	12, // 19: loci.interest.InterestService.DeleteInterest:output_type -> loci.common.Response
+	13, // [13:20] is the sub-list for method output_type
+	6,  // [6:13] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name
 	6,  // [6:6] is the sub-list for extension extendee
 	0,  // [0:6] is the sub-list for field type_name
@@ -769,7 +826,7 @@ func file_loci_interest_interest_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_interest_interest_proto_rawDesc), len(file_loci_interest_interest_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
