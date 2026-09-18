@@ -18,7 +18,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/crypto/bcrypt"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -33,7 +32,6 @@ type UserRepo interface {
 	// Returns locitypes.ErrNotFound if the user doesn't exist or is inactive.
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*locitypes.UserProfile, error)
 
-	ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error
 	// UpdateProfile updates mutable fields on a user's profile.
 	// It takes the userID and a struct containing only the fields to be updated (use pointers).
 	// Returns locitypes.ErrNotFound if the user doesn't exist.
@@ -66,56 +64,6 @@ func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *PostgresUs
 		logger: logger,
 		pgpool: pgxpool,
 	}
-}
-
-// changePasswordRow is used for ChangePassword query
-type changePasswordRow struct {
-	ID           string `db:"id"`
-	PasswordHash string `db:"password_hash"`
-}
-
-func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error {
-	rows, err := r.pgpool.Query(ctx,
-		"SELECT id, password_hash FROM users WHERE email = $1",
-		email)
-	if err != nil {
-		return fmt.Errorf("failed to query user: %w", err)
-	}
-
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[changePasswordRow])
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
-		}
-		return fmt.Errorf("user not found: %w", err)
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(oldPassword))
-	if err != nil {
-		return errors.New("invalid old password")
-	}
-
-	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
-	}
-
-	_, err = r.pgpool.Exec(ctx,
-		"UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
-		string(newHashedPassword), time.Now(), row.ID)
-	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
-
-	// Invalidate all refresh tokens
-	_, err = r.pgpool.Exec(ctx,
-		"UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL",
-		time.Now(), row.ID)
-	if err != nil {
-		fmt.Printf("Warning: failed to invalidate refresh tokens: %v\n", err)
-	}
-
-	return nil
 }
 
 // userProfileRow is a local struct for GetUserByID query that includes stats fields
@@ -566,20 +514,18 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 			return fmt.Errorf("database error deactivating user: %w", err)
 		}
 
-		// Invalidate all refresh tokens
-		if _, err := tx.Exec(ctx, "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL", time.Now(), userID); err != nil {
-			l.ErrorContext(ctx, "Failed to invalidate refresh tokens", slog.Any("error", err))
+		// Sign the user out.
+		//
+		// This used to mark rows in refresh_tokens and sessions, neither of
+		// which has ever had a row inserted into it: both were superseded by
+		// user_sessions and left behind. So deactivating an account updated
+		// nothing, reported success, and the account's refresh tokens went on
+		// working until they expired on their own.
+		if _, err := tx.Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userID); err != nil {
+			l.ErrorContext(ctx, "Failed to end user sessions", slog.Any("error", err))
 			span.RecordError(err)
-			span.SetStatus(codes.Error, "DB UPDATE failed")
-			return fmt.Errorf("database error invalidating refresh tokens: %w", err)
-		}
-
-		// Invalidate all sessions
-		if _, err := tx.Exec(ctx, "UPDATE sessions SET invalidated_at = $1 WHERE user_id = $2 AND invalidated_at IS NULL", time.Now(), userID); err != nil {
-			l.ErrorContext(ctx, "Failed to invalidate sessions", slog.Any("error", err))
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "DB UPDATE failed")
-			return fmt.Errorf("database error invalidating sessions: %w", err)
+			span.SetStatus(codes.Error, "DB DELETE failed")
+			return fmt.Errorf("database error ending user sessions: %w", err)
 		}
 		return nil
 	}); err != nil {
