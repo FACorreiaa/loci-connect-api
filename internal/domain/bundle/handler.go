@@ -12,6 +12,7 @@ import (
 	bundlev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	poipb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	trippb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
@@ -142,6 +143,29 @@ func toDayPB(d Day) *bundlev1.BundleDay {
 			v := int32(*s.DurationMinutes)
 			ts.DurationMinutes = &v
 		}
+		// The snapshot is hydrated into the POI field because TripStop itself
+		// carries no coordinates. Without this a pack reaches the client with
+		// no position on any stop: the map cannot draw, and the publish-time
+		// coordinate check would be guarding something that never renders.
+		// It is built from the pack's own columns, not from points_of_interest,
+		// so a merged-away POI changes nothing here.
+		if s.Latitude != nil && s.Longitude != nil {
+			ts.Poi = &poipb.POIDetailedInfo{
+				Name:        s.Name,
+				Latitude:    s.Latitude,
+				Longitude:   s.Longitude,
+				Category:    s.Category,
+				Description: s.Description,
+				Address:     s.Address,
+			}
+			if s.POIID != nil {
+				ts.Poi.Id = s.POIID.String()
+			}
+			if s.Website != nil {
+				ts.Poi.Website = *s.Website
+			}
+		}
+
 		stops = append(stops, ts)
 	}
 	return &bundlev1.BundleDay{
