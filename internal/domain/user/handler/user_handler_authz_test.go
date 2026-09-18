@@ -16,7 +16,8 @@ import (
 // recordingUserService captures the id the handler asked for, which is the
 // only thing these tests care about.
 type recordingUserService struct {
-	askedFor uuid.UUID
+	askedFor           uuid.UUID
+	notificationParams locitypes.UpdateNotificationSettingsParams
 }
 
 func (r *recordingUserService) GetUserProfile(_ context.Context, userID uuid.UUID) (*locitypes.UserProfile, error) {
@@ -109,5 +110,47 @@ func TestToProtoProfileCarriesAvatarAndStats(t *testing.T) {
 	}
 	if got := out.GetStats().GetListsCreated(); got != 3 {
 		t.Errorf("lists created = %d, want 3", got)
+	}
+}
+
+func (r *recordingUserService) GetNotificationSettings(context.Context, uuid.UUID) (*locitypes.NotificationSettings, error) {
+	return &locitypes.NotificationSettings{}, nil
+}
+
+func (r *recordingUserService) UpdateNotificationSettings(_ context.Context, _ uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
+	r.notificationParams = params
+	return &locitypes.NotificationSettings{}, nil
+}
+
+// A request that mentions one switch must not silently switch the other off.
+// The client sends whichever toggle the person actually moved.
+func TestUpdateNotificationSettingsIsAPartialUpdate(t *testing.T) {
+	caller := uuid.New()
+	svc := &recordingUserService{}
+	h := NewUserHandler(svc)
+
+	ctx := context.WithValue(context.Background(), interceptors.UserIDKey, caller.String())
+	on := true
+	if _, err := h.UpdateNotificationSettings(ctx, connect.NewRequest(&userpb.UpdateNotificationSettingsRequest{
+		Recommendations: &on,
+	})); err != nil {
+		t.Fatalf("UpdateNotificationSettings: %v", err)
+	}
+
+	if svc.notificationParams.Recommendations == nil || !*svc.notificationParams.Recommendations {
+		t.Error("recommendations should have been set to true")
+	}
+	if svc.notificationParams.TripReminders != nil {
+		t.Error("trip reminders were not mentioned and must stay nil, not be switched off")
+	}
+}
+
+// Notification settings are the caller's own, taken from the token.
+func TestNotificationSettingsRequireAToken(t *testing.T) {
+	h := NewUserHandler(&recordingUserService{})
+
+	_, err := h.GetNotificationSettings(context.Background(), connect.NewRequest(&userpb.GetNotificationSettingsRequest{}))
+	if code := connect.CodeOf(err); code != connect.CodeUnauthenticated {
+		t.Errorf("code = %v, want %v", code, connect.CodeUnauthenticated)
 	}
 }

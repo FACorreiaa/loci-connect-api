@@ -358,3 +358,21 @@ type CombinedFilters struct {
 	ItineraryPreferences     *ItineraryPreferences          `json:"itinerary_preferences,omitempty"`
 	InferredFilters          map[string]any                 `json:"inferred_filters,omitempty"`
 }
+
+// NotificationSettings are the per-account notification switches.
+//
+// These lived in browser localStorage keyed by user id, so they did not follow
+// the account to a second browser or a phone and nothing server-side could read
+// them. This records the preference; sending anything is separate work.
+type NotificationSettings struct {
+	Recommendations bool      `json:"recommendations"`
+	TripReminders   bool      `json:"trip_reminders"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// UpdateNotificationSettingsParams is a partial update: a nil field means the
+// request did not mention that switch and it keeps its stored value.
+type UpdateNotificationSettingsParams struct {
+	Recommendations *bool `json:"recommendations,omitempty"`
+	TripReminders   *bool `json:"trip_reminders,omitempty"`
+}

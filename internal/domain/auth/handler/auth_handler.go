@@ -164,9 +164,30 @@ func (h *AuthHandler) ChangeEmail(ctx context.Context, req *connect.Request[auth
 		return nil, h.toConnectError(err)
 	}
 
-	// TODO: trigger an email-change verification once a dedicated mailer template
-	// (e.g. SendEmailChangeConfirmation) is added to service.EmailSender.
-	msg := "Email changed successfully"
+	// The address has not moved yet, and the message must not claim it has:
+	// this used to say "Email changed successfully" while no confirmation of
+	// any kind had been sent.
+	msg := "Check your new email address for a confirmation link. Your account keeps its current address until you follow it."
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
+}
+
+// ConfirmEmailChange completes an email change.
+//
+// Unauthenticated by design: the token from the confirmation mail is the
+// credential, and the link may be opened in a browser that is not signed in.
+func (h *AuthHandler) ConfirmEmailChange(ctx context.Context, req *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[commonpb.Response], error) {
+	if req.Msg.GetToken() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("token is required"))
+	}
+
+	if err := h.service.ConfirmEmailChange(ctx, req.Msg.GetToken()); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	msg := "Email address confirmed. Sign in again with your new address."
 	return connect.NewResponse(&commonpb.Response{
 		Success: true,
 		Message: &msg,

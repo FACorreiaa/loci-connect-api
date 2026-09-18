@@ -5,7 +5,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -71,6 +73,10 @@ type MockEmailSender struct {
 	verificationSent atomic.Bool
 	resetSent        atomic.Bool
 	welcomeSent      atomic.Bool
+
+	mu               sync.Mutex
+	emailChangeTo    string
+	emailChangeToken string
 }
 
 func (m *MockEmailSender) SendVerificationEmail(_, _, _ string) error {
@@ -86,6 +92,25 @@ func (m *MockEmailSender) SendPasswordResetEmail(_, _, _ string) error {
 func (m *MockEmailSender) SendWelcomeEmail(_, _ string) error {
 	m.welcomeSent.Store(true)
 	return nil
+}
+
+// Captures the address and token so a test can assert the confirmation went to
+// the new address rather than the current one, which is the property that
+// makes the flow worth having.
+func (m *MockEmailSender) SendEmailChangeConfirmation(toEmail, _, token string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.emailChangeTo = toEmail
+	m.emailChangeToken = token
+	return nil
+}
+
+// EmailChangeConfirmation returns the address and token of the last
+// confirmation sent, or empty strings if none was.
+func (m *MockEmailSender) EmailChangeConfirmation() (string, string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.emailChangeTo, m.emailChangeToken
 }
 
 func (m *MockEmailSender) VerificationSent() bool {
@@ -104,6 +129,10 @@ func (m *MockEmailSender) ResetFlags() {
 	m.verificationSent.Store(false)
 	m.resetSent.Store(false)
 	m.welcomeSent.Store(false)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.emailChangeTo = ""
+	m.emailChangeToken = ""
 }
 
 // MockAuthRepo is an in-memory AuthRepository.
@@ -111,13 +140,16 @@ type MockAuthRepo struct {
 	Users    map[string]*repository.User
 	Sessions map[string]*repository.UserSession
 	Tokens   map[string]*repository.UserToken
+	// Staged email changes, keyed by user id.
+	pendingEmails map[uuid.UUID]string
 }
 
 func NewMockAuthRepo() *MockAuthRepo {
 	return &MockAuthRepo{
-		Users:    make(map[string]*repository.User),
-		Sessions: make(map[string]*repository.UserSession),
-		Tokens:   make(map[string]*repository.UserToken),
+		Users:         make(map[string]*repository.User),
+		Sessions:      make(map[string]*repository.UserSession),
+		Tokens:        make(map[string]*repository.UserToken),
+		pendingEmails: make(map[uuid.UUID]string),
 	}
 }
 
@@ -348,4 +380,54 @@ func AddUser(repo *MockAuthRepo, t *testing.T, email string, active bool, hashed
 	}
 	repo.Users[email] = user
 	return user
+}
+
+func (m *MockAuthRepo) ListUserSessions(_ context.Context, userID uuid.UUID) ([]repository.UserSession, error) {
+	var out []repository.UserSession
+	for _, session := range m.Sessions {
+		if session.UserID == userID && session.ExpiresAt.After(time.Now()) {
+			out = append(out, *session)
+		}
+	}
+	// Newest first, matching the repository's ORDER BY.
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
+}
+
+func (m *MockAuthRepo) DeleteUserSessionByID(_ context.Context, userID, sessionID uuid.UUID) error {
+	for token, session := range m.Sessions {
+		if session.UserID == userID && session.ID == sessionID {
+			delete(m.Sessions, token)
+			return nil
+		}
+	}
+	return common.ErrSessionNotFound
+}
+
+func (m *MockAuthRepo) DeleteOtherUserSessions(_ context.Context, userID uuid.UUID, keepHashedToken string) error {
+	for token, session := range m.Sessions {
+		if session.UserID == userID && token != keepHashedToken {
+			delete(m.Sessions, token)
+		}
+	}
+	return nil
+}
+
+func (m *MockAuthRepo) SetPendingEmail(_ context.Context, userID uuid.UUID, email string) error {
+	for _, user := range m.Users {
+		if user.ID == userID {
+			m.pendingEmails[userID] = email
+			return nil
+		}
+	}
+	return common.ErrUserNotFound
+}
+
+func (m *MockAuthRepo) GetPendingEmail(_ context.Context, userID uuid.UUID) (string, error) {
+	for _, user := range m.Users {
+		if user.ID == userID {
+			return m.pendingEmails[userID], nil
+		}
+	}
+	return "", common.ErrUserNotFound
 }

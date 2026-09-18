@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -381,8 +382,12 @@ func TestAuthHandler_ChangePassword_MissingClaims(t *testing.T) {
 	}
 }
 
-func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
-	svc, repo, _, _ := servicetest.NewTestAuthService()
+// ChangeEmail stages the new address and sends a confirmation to it. It used
+// to write straight to users.email and report "Email changed successfully",
+// which meant a typo locked the person out of their own account and a stolen
+// session could move the account to an attacker's inbox.
+func TestAuthHandler_ChangeEmail_StagesAndSendsConfirmation(t *testing.T) {
+	svc, repo, _, mailer := servicetest.NewTestAuthService()
 	handler := NewAuthHandler(svc, slog.Default())
 
 	password := "Str0ng!Pass"
@@ -407,17 +412,83 @@ func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
 	if resp.Msg == nil || !resp.Msg.Success {
 		t.Fatalf("expected success response, got %#v", resp.Msg)
 	}
-	if _, ok := repo.Users["new-rpc@example.com"]; !ok {
-		t.Fatalf("user should be reindexed under new email")
+
+	// Nothing has moved yet.
+	if _, ok := repo.Users["changeemail-rpc@example.com"]; !ok {
+		t.Error("the account should keep its current address until confirmation")
 	}
-	if _, ok := repo.Users["changeemail-rpc@example.com"]; ok {
-		t.Fatalf("old email key should be removed")
+	if _, ok := repo.Users["new-rpc@example.com"]; ok {
+		t.Error("the new address must not be live before it is confirmed")
 	}
-	if updated := repo.Users["new-rpc@example.com"]; updated.EmailVerifiedAt != nil {
-		t.Fatalf("email_verified_at should be cleared after change")
+	if len(repo.Sessions) != 1 {
+		t.Errorf("sessions = %d, want 1: nothing about the account has changed yet", len(repo.Sessions))
+	}
+
+	// The confirmation goes to the address being claimed, not the current one.
+	to, token := mailer.EmailChangeConfirmation()
+	if to != "new-rpc@example.com" {
+		t.Errorf("confirmation sent to %q, want the new address", to)
+	}
+	if token == "" {
+		t.Fatal("no confirmation token was issued")
+	}
+
+	// And the message must not claim the change already happened.
+	if strings.Contains(strings.ToLower(resp.Msg.GetMessage()), "changed successfully") {
+		t.Errorf("message = %q, which tells the user something that is not true yet", resp.Msg.GetMessage())
+	}
+}
+
+// Following the link is what actually moves the address.
+func TestAuthHandler_ConfirmEmailChange(t *testing.T) {
+	svc, repo, _, mailer := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	password := "Str0ng!Pass"
+	user := servicetest.AddUser(repo, t, "before@example.com", true, servicetest.MustHash(t, password))
+	verified := time.Now()
+	user.EmailVerifiedAt = &verified
+	repo.Sessions["session-token"] = &repository.UserSession{
+		ID:        user.ID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	if _, err := handler.ChangeEmail(ctx, connect.NewRequest(&auth.ChangeEmailRequest{
+		Password: password,
+		NewEmail: "after@example.com",
+	})); err != nil {
+		t.Fatalf("ChangeEmail: %v", err)
+	}
+	_, token := mailer.EmailChangeConfirmation()
+
+	// Unauthenticated on purpose: the link may be opened in a browser that is
+	// not signed in, and the token is the credential.
+	if _, err := handler.ConfirmEmailChange(context.Background(), connect.NewRequest(&auth.ConfirmEmailChangeRequest{
+		Token: token,
+	})); err != nil {
+		t.Fatalf("ConfirmEmailChange: %v", err)
+	}
+
+	if _, ok := repo.Users["after@example.com"]; !ok {
+		t.Error("user should be reindexed under the new email")
+	}
+	if _, ok := repo.Users["before@example.com"]; ok {
+		t.Error("old email key should be removed")
+	}
+	if updated := repo.Users["after@example.com"]; updated.EmailVerifiedAt != nil {
+		t.Error("email_verified_at should be cleared after the change")
 	}
 	if len(repo.Sessions) != 0 {
-		t.Fatalf("sessions should be invalidated, got %d", len(repo.Sessions))
+		t.Errorf("sessions = %d, want 0: the address identifying the account changed", len(repo.Sessions))
+	}
+
+	// The token is single use.
+	if _, err := handler.ConfirmEmailChange(context.Background(), connect.NewRequest(&auth.ConfirmEmailChangeRequest{
+		Token: token,
+	})); err == nil {
+		t.Error("a spent confirmation token should not work a second time")
 	}
 }
 

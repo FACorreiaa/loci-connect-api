@@ -49,6 +49,15 @@ type UserRepo interface {
 	// ReactivateUser marks a user as active.
 	ReactivateUser(ctx context.Context, userID uuid.UUID) error
 
+	// GetNotificationSettings returns the account's notification switches,
+	// creating the default row on first read so callers never have to special
+	// case "this user has never touched these".
+	GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error)
+
+	// UpdateNotificationSettings applies a partial update and returns the
+	// stored result.
+	UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error)
+
 	// DeleteUser permanently removes the user row. Owned data cascades via FK
 	// ON DELETE CASCADE (self-service account deletion). Irreversible.
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
@@ -603,4 +612,44 @@ func (r *PostgresUserRepo) DeleteUser(ctx context.Context, userID uuid.UUID) err
 		return fmt.Errorf("user not found")
 	}
 	return nil
+}
+
+// GetNotificationSettings returns the account's switches, inserting the default
+// row on first read.
+func (r *PostgresUserRepo) GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error) {
+	// Upsert-on-read so every caller gets a row rather than having to treat
+	// "never configured" as a separate state. personalization_settings does the
+	// same thing for the same reason.
+	query := `
+		INSERT INTO notification_settings (user_id)
+		VALUES ($1)
+		ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
+		RETURNING recommendations, trip_reminders, updated_at`
+
+	var out locitypes.NotificationSettings
+	if err := r.pgpool.QueryRow(ctx, query, userID).
+		Scan(&out.Recommendations, &out.TripReminders, &out.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("read notification settings: %w", err)
+	}
+	return &out, nil
+}
+
+// UpdateNotificationSettings applies a partial update. A nil field is a switch
+// the request did not mention and keeps whatever is stored.
+func (r *PostgresUserRepo) UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
+	query := `
+		INSERT INTO notification_settings (user_id, recommendations, trip_reminders, updated_at)
+		VALUES ($1, COALESCE($2, FALSE), COALESCE($3, FALSE), NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			recommendations = COALESCE($2, notification_settings.recommendations),
+			trip_reminders  = COALESCE($3, notification_settings.trip_reminders),
+			updated_at      = NOW()
+		RETURNING recommendations, trip_reminders, updated_at`
+
+	var out locitypes.NotificationSettings
+	if err := r.pgpool.QueryRow(ctx, query, userID, params.Recommendations, params.TripReminders).
+		Scan(&out.Recommendations, &out.TripReminders, &out.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("update notification settings: %w", err)
+	}
+	return &out, nil
 }

@@ -20,6 +20,7 @@ import (
 const (
 	tokenTypeEmailVerification = "email_verification"
 	tokenTypePasswordReset     = "password_reset"
+	tokenTypeEmailChange       = "email_change"
 
 	defaultSessionTTL = 30 * 24 * time.Hour
 )
@@ -475,11 +476,85 @@ func (s *AuthService) ChangeEmail(ctx context.Context, userID, currentPassword, 
 		return err
 	}
 
-	if err := s.repo.UpdateEmail(ctx, userUUID, newEmail); err != nil {
+	// Stage it. The address does not move until whoever asked proves they can
+	// read mail there: this used to write straight to users.email, so a typo
+	// locked the person out of their own account and a stolen session could
+	// walk the account over to an attacker's inbox.
+	if err := s.repo.SetPendingEmail(ctx, userUUID, newEmail); err != nil {
 		return err
 	}
 
-	_ = s.repo.DeleteAllUserSessions(ctx, userUUID)
+	changeToken, err := GeneratePasswordResetToken()
+	if err != nil {
+		return err
+	}
+	if err := s.repo.CreateUserToken(ctx, userUUID, hashToken(changeToken), tokenTypeEmailChange, time.Now().Add(time.Hour)); err != nil {
+		return err
+	}
+
+	// To the new address, never the current one — that is what makes this
+	// worth doing at all.
+	if s.emailService != nil {
+		if err := s.emailService.SendEmailChangeConfirmation(newEmail, user.DisplayName, changeToken); err != nil {
+			return err
+		}
+	}
+
+	// Sessions stay alive: nothing about the account has changed yet.
+	return nil
+}
+
+// ConfirmEmailChange completes a change started by ChangeEmail.
+//
+// The token is the only credential, because the person may open the link in a
+// browser that is not signed in.
+func (s *AuthService) ConfirmEmailChange(ctx context.Context, changeToken string) error {
+	if changeToken == "" {
+		return fmt.Errorf("confirmation token required")
+	}
+
+	hashedToken := hashToken(changeToken)
+	userToken, err := s.repo.GetUserTokenByHash(ctx, hashedToken, tokenTypeEmailChange)
+	if err != nil {
+		return err
+	}
+
+	pending, err := s.repo.GetPendingEmail(ctx, userToken.UserID)
+	if err != nil {
+		return err
+	}
+	if pending == "" {
+		// The change was cancelled or already completed; the token is spent.
+		_ = s.repo.DeleteUserToken(ctx, hashedToken)
+		return common.ErrInvalidToken
+	}
+
+	// Re-check the collision here rather than trusting the check made when the
+	// change was staged: somebody else may have taken the address in between,
+	// and this is the moment it becomes decisive.
+	if existing, err := s.repo.GetUserByEmail(ctx, pending); err == nil {
+		if existing.ID != userToken.UserID {
+			_ = s.repo.SetPendingEmail(ctx, userToken.UserID, "")
+			_ = s.repo.DeleteUserToken(ctx, hashedToken)
+			return common.ErrUserAlreadyExists
+		}
+	} else if !errors.Is(err, common.ErrUserNotFound) {
+		return err
+	}
+
+	if err := s.repo.UpdateEmail(ctx, userToken.UserID, pending); err != nil {
+		return err
+	}
+	if err := s.repo.SetPendingEmail(ctx, userToken.UserID, ""); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteUserToken(ctx, hashedToken); err != nil {
+		return err
+	}
+
+	// The address that identifies the account has changed, so every existing
+	// session is signed out — including whoever made the change.
+	_ = s.repo.DeleteAllUserSessions(ctx, userToken.UserID)
 	return nil
 }
 

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"connectrpc.com/connect"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
@@ -102,5 +103,40 @@ func (h *InterestHandler) UpdateInterest(ctx context.Context, req *connect.Reque
 	}
 
 	msg := "interest updated"
+	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
+}
+
+// DeleteInterest removes one of the caller's own custom interests.
+//
+// Deactivating and deleting are different things and only the first existed, so
+// the client's delete button called UpdateInterest with active=false, said
+// "Interest deleted successfully!", and left the interest in the list. The
+// service and repository have always had a real user-scoped DELETE behind
+// RemoveInterests; there was no RPC reaching it.
+func (h *InterestHandler) DeleteInterest(ctx context.Context, req *connect.Request[interestv1.DeleteInterestRequest]) (*connect.Response[commonpb.Response], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	interestID, err := uuid.Parse(req.Msg.GetInterestId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	// Scoped by user id in the repository, so another user's interest id is a
+	// no-op that reports not-found rather than deleting anything.
+	if err := h.service.RemoveInterests(ctx, userID, interestID); err != nil {
+		if errors.Is(err, locitypes.ErrNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	msg := "interest deleted"
 	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
 }
