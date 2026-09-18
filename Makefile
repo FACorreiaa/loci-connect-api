@@ -70,6 +70,9 @@ docker-compose-restart: ## Restart all services
 	docker-compose restart
 
 # Database commands
+check-migrations: ## Fail if two migrations claim the same version number
+	./scripts/check-migrations.sh
+
 migrate-up: ## Run database migrations
 	psql $(DATABASE_URL) -f migrations/001_create_myservice_table.sql
 
