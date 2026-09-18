@@ -53,7 +53,7 @@ func (h *ProfileHandler) GetUserPreferenceProfiles(ctx context.Context, req *con
 
 	profilesResp, err := h.service.GetSearchProfiles(ctx, userID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	return connect.NewResponse(&profilev1.GetUserPreferenceProfilesResponse{
@@ -73,7 +73,7 @@ func (h *ProfileHandler) CreateUserPreferenceProfile(ctx context.Context, req *c
 	}
 
 	if _, err := h.service.CreateSearchProfile(ctx, userID, params); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	msg := "profile created"
@@ -97,7 +97,7 @@ func (h *ProfileHandler) UpdateUserPreferenceProfile(ctx context.Context, req *c
 	}
 
 	if err := h.service.UpdateSearchProfile(ctx, userID, profileID, params); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	msg := "profile updated"

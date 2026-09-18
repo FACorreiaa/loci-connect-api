@@ -618,3 +618,41 @@ func TestSetDefaultSearchProfileNotFound(t *testing.T) {
 		t.Errorf("unmet expectations: %v", err)
 	}
 }
+
+// The precheck and the write are not in the same transaction, so a profile can
+// still be deleted between them. Salvaged from the settings-audit branch and
+// adapted to the EXISTS precheck: the shape of the first query differs, the
+// race it covers does not.
+func TestSetDefaultSearchProfileRollsBackWhenProfileVanishes(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock.NewPool: %v", err)
+	}
+	defer mock.Close()
+
+	userID := uuid.New()
+	profileID := uuid.New()
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM user_preference_profiles WHERE id = $1 AND user_id = $2)")).
+		WithArgs(profileID, userID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE user_preference_profiles SET is_default = FALSE WHERE user_id = $1")).
+		WithArgs(userID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE user_preference_profiles SET is_default = TRUE WHERE id = $1 AND user_id = $2")).
+		WithArgs(profileID, userID).
+		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
+	mock.ExpectRollback()
+
+	repo := NewPostgresUserRepo(mock, slog.Default())
+	err = repo.SetDefaultSearchProfile(context.Background(), userID, profileID)
+	if err == nil {
+		t.Fatal("expected error when the profile disappears mid-flight")
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("unmet expectations: %v", err)
+	}
+}

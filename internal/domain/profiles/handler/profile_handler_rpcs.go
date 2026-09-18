@@ -41,10 +41,21 @@ func callerAndProfile(ctx context.Context, profileID string) (uuid.UUID, uuid.UU
 
 // asConnectError maps a domain error onto the closest Connect code, so a missing
 // profile reads as NotFound rather than an opaque Internal.
+//
+// The cases that matter are the ones the person can act on. Mapping everything
+// to Internal makes "that profile is gone" and "the database is down" look
+// identical to the client, and hides refusals the UI could explain -- deleting
+// your default profile is a thing you fix by making another one default first.
 func asConnectError(err error) error {
 	switch {
+	case err == nil:
+		return nil
 	case errors.Is(err, locitypes.ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, locitypes.ErrBadRequest):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
+	case errors.Is(err, locitypes.ErrForbidden):
+		return connect.NewError(connect.CodePermissionDenied, err)
 	case errors.Is(err, locitypes.ErrConflict):
 		return connect.NewError(connect.CodeAlreadyExists, err)
 	default:

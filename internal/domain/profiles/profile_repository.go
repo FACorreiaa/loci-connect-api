@@ -665,7 +665,10 @@ func (r *RepositoryImpl) DeleteSearchProfile(ctx context.Context, userID, profil
 	}
 
 	if isDefault {
-		err := errors.New("cannot delete default profile")
+		// Actionable, so say what to do about it: the caller can make another
+		// profile the default and try again. As a bare error this reached the
+		// client as an opaque Internal.
+		err := fmt.Errorf("cannot delete the default travel profile - make another profile the default first: %w", locitypes.ErrBadRequest)
 		l.WarnContext(ctx, "Attempted to delete default preference profile")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Cannot delete default profile")
