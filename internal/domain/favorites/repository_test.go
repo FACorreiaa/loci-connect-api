@@ -60,12 +60,12 @@ func TestAddAndIsFavorited(t *testing.T) {
 	require.NotEqual(t, uuid.Nil, got.ID)
 	assert.False(t, got.AddedAt.IsZero(), "added_at should be set")
 
-	favorited, err := repo.IsFavorited(ctx, userID, itemID, "poi")
+	favorited, err := repo.IsFavorited(ctx, userID, itemID.String(), "poi")
 	require.NoError(t, err)
 	assert.True(t, favorited)
 
 	// Different content type for same item is not favorited.
-	favorited, err = repo.IsFavorited(ctx, userID, itemID, "hotel")
+	favorited, err = repo.IsFavorited(ctx, userID, itemID.String(), "hotel")
 	require.NoError(t, err)
 	assert.False(t, favorited)
 }
@@ -128,12 +128,34 @@ func TestRemoveFavorite(t *testing.T) {
 	_, err := repo.AddFavorite(ctx, newFavorite(userID, itemID, "poi", "ToRemove"))
 	require.NoError(t, err)
 
-	require.NoError(t, repo.RemoveFavorite(ctx, userID, itemID, "poi"))
+	require.NoError(t, repo.RemoveFavorite(ctx, userID, itemID.String(), "poi"))
 
-	favorited, err := repo.IsFavorited(ctx, userID, itemID, "poi")
+	favorited, err := repo.IsFavorited(ctx, userID, itemID.String(), "poi")
 	require.NoError(t, err)
 	assert.False(t, favorited)
 
 	// Removing a non-existent favorite is a no-op, not an error.
-	require.NoError(t, repo.RemoveFavorite(ctx, userID, uuid.New(), "poi"))
+	require.NoError(t, repo.RemoveFavorite(ctx, userID, uuid.New().String(), "poi"))
+}
+
+func TestFavoriteWithNonUUIDItemID(t *testing.T) {
+	repo, pool := newFavoritesRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+
+	fav := newFavorite(userID, uuid.New(), "hotel", "Hotel Avenida Palace")
+	fav.ItemID = "Hotel Avenida Palace"
+
+	_, err := repo.AddFavorite(ctx, fav)
+	require.NoError(t, err)
+
+	favorited, err := repo.IsFavorited(ctx, userID, "Hotel Avenida Palace", "hotel")
+	require.NoError(t, err)
+	assert.True(t, favorited, "a name-keyed favorite must report as favorited")
+
+	require.NoError(t, repo.RemoveFavorite(ctx, userID, "Hotel Avenida Palace", "hotel"))
+
+	favorited, err = repo.IsFavorited(ctx, userID, "Hotel Avenida Palace", "hotel")
+	require.NoError(t, err)
+	assert.False(t, favorited, "a name-keyed favorite must actually delete")
 }

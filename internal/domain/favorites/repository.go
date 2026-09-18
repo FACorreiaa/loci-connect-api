@@ -13,9 +13,9 @@ import (
 // Repository interface for favorites operations
 type Repository interface {
 	AddFavorite(ctx context.Context, fav *locitypes.FavoriteItem) (*locitypes.FavoriteItem, error)
-	RemoveFavorite(ctx context.Context, userID, itemID uuid.UUID, contentType string) error
+	RemoveFavorite(ctx context.Context, userID uuid.UUID, itemID, contentType string) error
 	GetFavorites(ctx context.Context, userID uuid.UUID, contentType string, limit, offset int) ([]locitypes.FavoriteItem, int, error)
-	IsFavorited(ctx context.Context, userID, itemID uuid.UUID, contentType string) (bool, error)
+	IsFavorited(ctx context.Context, userID uuid.UUID, itemID, contentType string) (bool, error)
 	GetFavoritesCount(ctx context.Context, userID uuid.UUID, contentType string) (int, error)
 }
 
@@ -87,7 +87,7 @@ func (r *RepositoryImpl) AddFavorite(ctx context.Context, fav *locitypes.Favorit
 }
 
 // RemoveFavorite removes an item from favorites
-func (r *RepositoryImpl) RemoveFavorite(ctx context.Context, userID, itemID uuid.UUID, contentType string) error {
+func (r *RepositoryImpl) RemoveFavorite(ctx context.Context, userID uuid.UUID, itemID, contentType string) error {
 	l := r.logger.With(slog.String("method", "RemoveFavorite"))
 
 	query := `
@@ -95,7 +95,7 @@ func (r *RepositoryImpl) RemoveFavorite(ctx context.Context, userID, itemID uuid
 		WHERE user_id = $1 AND item_id = $2 AND content_type = $3
 	`
 
-	result, err := r.db.Exec(ctx, query, userID, itemID.String(), contentType)
+	result, err := r.db.Exec(ctx, query, userID, itemID, contentType)
 	if err != nil {
 		l.ErrorContext(ctx, "failed to remove favorite", slog.Any("error", err))
 		return err
@@ -103,7 +103,7 @@ func (r *RepositoryImpl) RemoveFavorite(ctx context.Context, userID, itemID uuid
 
 	l.InfoContext(ctx, "removed favorite",
 		slog.String("user_id", userID.String()),
-		slog.String("item_id", itemID.String()),
+		slog.String("item_id", itemID),
 		slog.Int64("rows_affected", result.RowsAffected()))
 
 	return nil
@@ -192,7 +192,7 @@ func (r *RepositoryImpl) GetFavorites(ctx context.Context, userID uuid.UUID, con
 }
 
 // IsFavorited checks if an item is favorited
-func (r *RepositoryImpl) IsFavorited(ctx context.Context, userID, itemID uuid.UUID, contentType string) (bool, error) {
+func (r *RepositoryImpl) IsFavorited(ctx context.Context, userID uuid.UUID, itemID, contentType string) (bool, error) {
 	l := r.logger.With(slog.String("method", "IsFavorited"))
 
 	query := `
@@ -203,7 +203,7 @@ func (r *RepositoryImpl) IsFavorited(ctx context.Context, userID, itemID uuid.UU
 	`
 
 	var exists bool
-	err := r.db.QueryRow(ctx, query, userID, itemID.String(), contentType).Scan(&exists)
+	err := r.db.QueryRow(ctx, query, userID, itemID, contentType).Scan(&exists)
 	if err != nil {
 		l.ErrorContext(ctx, "failed to check favorite", slog.Any("error", err))
 		return false, err
