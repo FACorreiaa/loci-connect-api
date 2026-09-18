@@ -63,6 +63,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/vocabulary"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -809,7 +810,9 @@ func (d *Dependencies) initHandlers() error {
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
-	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger)
+	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger).
+		WithCityResolver(placeCityResolverAdapter{resolver: d.CityResolver}).
+		WithPOIUpserter(placePOIUpserterAdapter{repo: d.POIRepo})
 
 	// Local context (weather now; booking/transport stubbed). Open-Meteo is the
 	// keyless default, so a deployment that configures nothing still gets real
@@ -949,4 +952,41 @@ func envFlag(key string, def bool) bool {
 		return def
 	}
 	return parsed
+}
+
+// placeCityResolverAdapter narrows cityrepo.Resolver (the interface d.CityResolver
+// already satisfies) to the one method placeintel needs, so a user-submitted
+// place can be filed against a real, geocoded city row instead of a bare name.
+type placeCityResolverAdapter struct{ resolver cityrepo.Resolver }
+
+func (a placeCityResolverAdapter) ResolveCity(ctx context.Context, name, country string) (uuid.UUID, string, error) {
+	resolved, err := a.resolver.Resolve(ctx, cityrepo.ResolveQuery{Name: name, CountryCode: country})
+	if err != nil {
+		return uuid.Nil, "", err
+	}
+	return resolved.City.ID, resolved.City.Name, nil
+}
+
+// placePOIUpserterAdapter narrows poirepo.Repository to the promotion call a
+// confirmed place submission needs.
+//
+// It also owns the decision placeintel's handler cannot make for itself: the
+// handler reads NULL latitude/longitude off a submission as 0,0, which is Null
+// Island in the Gulf of Guinea, not "unknown". Promoting straight through would
+// silently pin a real place in the ocean. This refuses instead, since the
+// narrow poiUpserter interface it implements has no way to reach the city's
+// centre coordinates as a fallback — only (name, cityID, lat, lng) cross this
+// seam.
+type placePOIUpserterAdapter struct{ repo poirepo.Repository }
+
+func (a placePOIUpserterAdapter) UpsertPOIByIdentity(ctx context.Context, name string, cityID uuid.UUID, lat, lng float64) (uuid.UUID, error) {
+	if lat == 0 && lng == 0 {
+		return uuid.Nil, fmt.Errorf("place %q needs coordinates before it can be promoted", name)
+	}
+	id, _, err := a.repo.UpsertPOIByIdentity(ctx, locitypes.POIDetailedInfo{
+		Name:      name,
+		Latitude:  lat,
+		Longitude: lng,
+	}, cityID)
+	return id, err
 }

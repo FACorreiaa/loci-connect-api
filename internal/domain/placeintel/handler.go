@@ -45,10 +45,26 @@ const (
 	pendingFactConfidence = 0.3
 )
 
+// cityResolver turns what a user typed into a city row, creating it when the
+// city is genuinely new. Narrowed to the one method this package needs so the
+// tests can stub it without standing up the geocoder.
+type cityResolver interface {
+	ResolveCity(ctx context.Context, name, country string) (uuid.UUID, string, error)
+}
+
+// poiUpserter promotes a confirmed submission into a real place. Narrowed to
+// one method, and satisfied in production by poi.RepositoryImpl, so the
+// identity rules live in one place rather than being restated here.
+type poiUpserter interface {
+	UpsertPOIByIdentity(ctx context.Context, name string, cityID uuid.UUID, lat, lng float64) (uuid.UUID, error)
+}
+
 type Handler struct {
 	placeconnect.UnimplementedPlaceIntelligenceServiceHandler
 	db     *pgxpool.Pool
 	logger *slog.Logger
+	cities cityResolver
+	pois   poiUpserter
 }
 
 func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
@@ -56,6 +72,20 @@ func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
 		logger = slog.Default()
 	}
 	return &Handler{db: db, logger: logger.With(slog.String("component", "place-intelligence"))}
+}
+
+// WithCityResolver supplies the resolver used when a submitted place names a
+// city. Separate from NewHandler so the existing call sites keep working.
+func (h *Handler) WithCityResolver(cities cityResolver) *Handler {
+	h.cities = cities
+	return h
+}
+
+// WithPOIUpserter supplies the promotion path used when a submission is
+// confirmed.
+func (h *Handler) WithPOIUpserter(pois poiUpserter) *Handler {
+	h.pois = pois
+	return h
 }
 
 func userID(ctx context.Context) (uuid.UUID, error) {
@@ -610,6 +640,86 @@ func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value str
 	return nil
 }
 
+func (h *Handler) SubmitPlace(ctx context.Context, req *connect.Request[placev1.SubmitPlaceRequest]) (*connect.Response[placev1.SubmitPlaceResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.cities == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("city resolution is not configured"))
+	}
+
+	name := strings.TrimSpace(req.Msg.GetName())
+	if name == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("a place needs a name"))
+	}
+
+	cityID, _, err := h.cities.ResolveCity(ctx, req.Msg.GetCityName(), req.Msg.GetCountry())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("could not place %q in a city: %w", name, err))
+	}
+
+	// Already on the guide is a different answer from "new", and the client can
+	// act on it — open the place rather than propose a twin.
+	if existing, found, err := h.existingPOIByIdentity(ctx, cityID, name); err != nil {
+		return nil, err
+	} else if found {
+		return nil, connect.NewError(connect.CodeAlreadyExists,
+			fmt.Errorf("%q is already on the guide (%s)", name, existing))
+	}
+
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("begin submission: %w", err))
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+
+	id, err := h.insertSubmission(ctx, tx, submission{
+		UserID:   uid,
+		CityID:   cityID,
+		Name:     name,
+		Category: optionalString(req.Msg.Category),
+		Address:  optionalString(req.Msg.Address),
+		Website:  optionalString(req.Msg.Website),
+		Lat:      req.Msg.Latitude,
+		Lng:      req.Msg.Longitude,
+	}, req.Msg.GetClientSubmissionId())
+	if err != nil {
+		return nil, err
+	}
+
+	var confirmations int32
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*)::integer FROM place_submission_confirmations WHERE submission_id = $1`, id).
+		Scan(&confirmations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("count confirmations: %w", err))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit submission: %w", err))
+	}
+	h.logger.InfoContext(ctx, "place submitted", slog.String("submission_id", id.String()))
+
+	return connect.NewResponse(&placev1.SubmitPlaceResponse{
+		SubmissionId:        id.String(),
+		Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING,
+		ConfirmationsNeeded: confirmationsNeeded(confirmations),
+	}), nil
+}
+
+// optionalString normalises an absent-or-blank proto field to a nil column.
+func optionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
 func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Request[placev1.GetMyContributorProfileRequest]) (*connect.Response[placev1.ContributorProfile], error) {
 	uid, err := userID(ctx)
 	if err != nil {
@@ -627,4 +737,173 @@ func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get contributor profile: %w", err))
 	}
 	return connect.NewResponse(profile), nil
+}
+
+func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1.ConfirmPlaceRequest]) (*connect.Response[placev1.ConfirmPlaceResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	submissionID, err := uuid.Parse(req.Msg.GetSubmissionId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("unknown submission"))
+	}
+
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("begin confirmation: %w", err))
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+
+	var (
+		submitter uuid.UUID
+		cityID    uuid.UUID
+		name      string
+		status    string
+		poiID     *uuid.UUID
+		lat, lng  *float64
+	)
+	err = tx.QueryRow(ctx, `
+		SELECT user_id, city_id, name, status, poi_id, latitude, longitude
+		FROM place_submissions WHERE id = $1 FOR UPDATE`, submissionID).
+		Scan(&submitter, &cityID, &name, &status, &poiID, &lat, &lng)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("unknown submission"))
+	}
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("load submission: %w", err))
+	}
+
+	// Already promoted: say so rather than counting another vote.
+	if status == "accepted" && poiID != nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit confirmation: %w", err))
+		}
+		id := poiID.String()
+		return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+			Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED,
+			ConfirmationsNeeded: 0,
+			PoiId:               &id,
+		}), nil
+	}
+
+	// Corroboration means somebody else. Letting a submitter confirm their own
+	// place would make the whole gate decorative.
+	if submitter == uid {
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("a place needs somebody else to confirm it"))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO place_submission_confirmations (submission_id, user_id)
+		VALUES ($1, $2) ON CONFLICT DO NOTHING`, submissionID, uid); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("record confirmation: %w", err))
+	}
+
+	var confirmations int32
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*)::integer FROM place_submission_confirmations WHERE submission_id = $1`, submissionID).
+		Scan(&confirmations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("count confirmations: %w", err))
+	}
+
+	if needed := confirmationsNeeded(confirmations); needed > 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit confirmation: %w", err))
+		}
+		return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+			Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING,
+			ConfirmationsNeeded: needed,
+		}), nil
+	}
+
+	if h.pois == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("promotion is not configured"))
+	}
+	var latitude, longitude float64
+	if lat != nil {
+		latitude = *lat
+	}
+	if lng != nil {
+		longitude = *lng
+	}
+	promoted, err := h.pois.UpsertPOIByIdentity(ctx, name, cityID, latitude, longitude)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("promote submission: %w", err))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE place_submissions
+		SET status = 'accepted', poi_id = $2, updated_at = NOW()
+		WHERE id = $1`, submissionID, promoted); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("accept submission: %w", err))
+	}
+
+	if err := creditPlaceContributors(ctx, tx, submissionID, submitter); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit promotion: %w", err))
+	}
+	h.logger.InfoContext(ctx, "place promoted",
+		slog.String("submission_id", submissionID.String()), slog.String("poi_id", promoted.String()))
+
+	id := promoted.String()
+	return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+		Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED,
+		ConfirmationsNeeded: 0,
+		PoiId:               &id,
+	}), nil
+}
+
+// ListPendingPlaces is the corroboration feed: places somebody else says exist
+// and that this user has not already spoken for.
+func (h *Handler) ListPendingPlaces(ctx context.Context, req *connect.Request[placev1.ListPendingPlacesRequest]) (*connect.Response[placev1.ListPendingPlacesResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	limit := int(req.Msg.GetLimit())
+	if limit <= 0 {
+		limit = 10
+	}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT s.id::text, s.name, c.name, s.category, s.address,
+		       (SELECT COUNT(*)::integer FROM place_submission_confirmations f WHERE f.submission_id = s.id)
+		FROM place_submissions s
+		JOIN cities c ON c.id = s.city_id
+		WHERE s.status = 'pending'
+		  AND s.user_id <> $1
+		  AND NOT EXISTS (
+		      SELECT 1 FROM place_submission_confirmations f
+		      WHERE f.submission_id = s.id AND f.user_id = $1
+		  )
+		ORDER BY s.created_at DESC
+		LIMIT $2`, uid, limit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list pending places: %w", err))
+	}
+	defer rows.Close()
+
+	places := make([]*placev1.PendingPlace, 0, limit)
+	for rows.Next() {
+		var (
+			place         placev1.PendingPlace
+			category      *string
+			address       *string
+			confirmations int32
+		)
+		if err := rows.Scan(&place.SubmissionId, &place.Name, &place.CityName, &category, &address, &confirmations); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("scan pending place: %w", err))
+		}
+		place.Category = category
+		place.Address = address
+		place.ConfirmationsNeeded = confirmationsNeeded(confirmations)
+		places = append(places, &place)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("iterate pending places: %w", err))
+	}
+	return connect.NewResponse(&placev1.ListPendingPlacesResponse{Places: places}), nil
 }
