@@ -1,0 +1,479 @@
+[
+  {
+    "city": "Tromsø",
+    "country_code": "NO",
+    "months": [
+      1,
+      2,
+      11,
+      12
+    ],
+    "hook": "the northern lights",
+    "days": 4,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Madeira",
+    "country_code": "PT",
+    "months": [
+      1,
+      2
+    ],
+    "hook": "a mild winter escape",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Seville",
+    "country_code": "ES",
+    "months": [
+      1,
+      2
+    ],
+    "hook": "the orange harvest",
+    "days": 3,
+    "theme": "food"
+  },
+  {
+    "city": "Vienna",
+    "country_code": "AT",
+    "months": [
+      1
+    ],
+    "hook": "ball season",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Innsbruck",
+    "country_code": "AT",
+    "months": [
+      1,
+      2
+    ],
+    "hook": "a ski weekend",
+    "days": 3,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Venice",
+    "country_code": "IT",
+    "months": [
+      2
+    ],
+    "hook": "carnival",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Valencia",
+    "country_code": "ES",
+    "months": [
+      2,
+      3
+    ],
+    "hook": "Las Fallas",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Marrakech",
+    "country_code": "MA",
+    "months": [
+      2,
+      3,
+      11
+    ],
+    "hook": "the mild season",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Kyoto",
+    "country_code": "JP",
+    "months": [
+      3,
+      4
+    ],
+    "hook": "early blossom",
+    "days": 5,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Lisbon",
+    "country_code": "PT",
+    "months": [
+      3,
+      4
+    ],
+    "hook": "the first spring light",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Dublin",
+    "country_code": "IE",
+    "months": [
+      3
+    ],
+    "hook": "St Patrick's week",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Rome",
+    "country_code": "IT",
+    "months": [
+      3,
+      4,
+      10
+    ],
+    "hook": "shoulder season",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Amsterdam",
+    "country_code": "NL",
+    "months": [
+      4
+    ],
+    "hook": "tulip season",
+    "days": 3,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Seville",
+    "country_code": "ES",
+    "months": [
+      4
+    ],
+    "hook": "Feria de Abril",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Paris",
+    "country_code": "FR",
+    "months": [
+      4,
+      5
+    ],
+    "hook": "spring in the parks",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Istanbul",
+    "country_code": "TR",
+    "months": [
+      4,
+      5,
+      10
+    ],
+    "hook": "the tulip festival",
+    "days": 3,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Lisbon",
+    "country_code": "PT",
+    "months": [
+      5,
+      6
+    ],
+    "hook": "the jacarandas",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Porto",
+    "country_code": "PT",
+    "months": [
+      5,
+      6
+    ],
+    "hook": "São João",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Amalfi",
+    "country_code": "IT",
+    "months": [
+      5,
+      6,
+      9
+    ],
+    "hook": "the coast before the crowds",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Crete",
+    "country_code": "GR",
+    "months": [
+      5,
+      6,
+      9,
+      10
+    ],
+    "hook": "warm sea, quiet beaches",
+    "days": 5,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Reykjavik",
+    "country_code": "IS",
+    "months": [
+      6,
+      7
+    ],
+    "hook": "the midnight sun",
+    "days": 4,
+    "theme": "local_life"
+  },
+  {
+    "city": "Stockholm",
+    "country_code": "SE",
+    "months": [
+      6
+    ],
+    "hook": "Midsummer",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Sintra",
+    "country_code": "PT",
+    "months": [
+      6,
+      7,
+      8
+    ],
+    "hook": "cool hills above Lisbon",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Dubrovnik",
+    "country_code": "HR",
+    "months": [
+      7,
+      8
+    ],
+    "hook": "the summer festival",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Avignon",
+    "country_code": "FR",
+    "months": [
+      7
+    ],
+    "hook": "the theatre festival",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Bergen",
+    "country_code": "NO",
+    "months": [
+      7,
+      8
+    ],
+    "hook": "long fjord days",
+    "days": 4,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Azores",
+    "country_code": "PT",
+    "months": [
+      7,
+      8,
+      9
+    ],
+    "hook": "hydrangeas and whales",
+    "days": 5,
+    "theme": "outdoors"
+  },
+  {
+    "city": "Edinburgh",
+    "country_code": "GB",
+    "months": [
+      8
+    ],
+    "hook": "the Fringe",
+    "days": 4,
+    "theme": "nightlife"
+  },
+  {
+    "city": "Salzburg",
+    "country_code": "AT",
+    "months": [
+      8
+    ],
+    "hook": "the summer festival",
+    "days": 3,
+    "theme": "nightlife"
+  },
+  {
+    "city": "San Sebastián",
+    "country_code": "ES",
+    "months": [
+      8,
+      9
+    ],
+    "hook": "Semana Grande and pintxos",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Porto",
+    "country_code": "PT",
+    "months": [
+      9,
+      10
+    ],
+    "hook": "the harvest season",
+    "days": 3,
+    "theme": "food"
+  },
+  {
+    "city": "Munich",
+    "country_code": "DE",
+    "months": [
+      9,
+      10
+    ],
+    "hook": "Oktoberfest",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Ljubljana",
+    "country_code": "SI",
+    "months": [
+      9,
+      10
+    ],
+    "hook": "the golden hour",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Bordeaux",
+    "country_code": "FR",
+    "months": [
+      9,
+      10
+    ],
+    "hook": "the vendanges",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Barcelona",
+    "country_code": "ES",
+    "months": [
+      9
+    ],
+    "hook": "La Mercè",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Douro Valley",
+    "country_code": "PT",
+    "months": [
+      10
+    ],
+    "hook": "the grape harvest",
+    "days": 2,
+    "theme": "food"
+  },
+  {
+    "city": "Boston",
+    "country_code": "US",
+    "months": [
+      10
+    ],
+    "hook": "New England foliage",
+    "days": 5,
+    "theme": "local_life"
+  },
+  {
+    "city": "Alsace",
+    "country_code": "FR",
+    "months": [
+      10,
+      11
+    ],
+    "hook": "wine villages in autumn",
+    "days": 3,
+    "theme": "food"
+  },
+  {
+    "city": "Madrid",
+    "country_code": "ES",
+    "months": [
+      11
+    ],
+    "hook": "the museum season",
+    "days": 3,
+    "theme": "art"
+  },
+  {
+    "city": "Bruges",
+    "country_code": "BE",
+    "months": [
+      11,
+      12
+    ],
+    "hook": "misty canals",
+    "days": 3,
+    "theme": "local_life"
+  },
+  {
+    "city": "Malta",
+    "country_code": "MT",
+    "months": [
+      11
+    ],
+    "hook": "late sun",
+    "days": 4,
+    "theme": "local_life"
+  },
+  {
+    "city": "Vienna",
+    "country_code": "AT",
+    "months": [
+      12
+    ],
+    "hook": "the Christmas markets",
+    "days": 3,
+    "theme": "food"
+  },
+  {
+    "city": "Strasbourg",
+    "country_code": "FR",
+    "months": [
+      12
+    ],
+    "hook": "the Christmas market",
+    "days": 3,
+    "theme": "food"
+  },
+  {
+    "city": "Copenhagen",
+    "country_code": "DK",
+    "months": [
+      12
+    ],
+    "hook": "hygge season",
+    "days": 3,
+    "theme": "local_life"
+  }
+]
