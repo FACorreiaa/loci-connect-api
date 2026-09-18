@@ -52,6 +52,9 @@ const (
 	// InterestServiceUpdatePreferenceLevelProcedure is the fully-qualified name of the
 	// InterestService's UpdatePreferenceLevel RPC.
 	InterestServiceUpdatePreferenceLevelProcedure = "/loci.interest.InterestService/UpdatePreferenceLevel"
+	// InterestServiceDeleteInterestProcedure is the fully-qualified name of the InterestService's
+	// DeleteInterest RPC.
+	InterestServiceDeleteInterestProcedure = "/loci.interest.InterestService/DeleteInterest"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -63,6 +66,7 @@ var (
 	interestServiceUpdateInterestMethodDescriptor        = interestServiceServiceDescriptor.Methods().ByName("UpdateInterest")
 	interestServiceAddInterestToUserMethodDescriptor     = interestServiceServiceDescriptor.Methods().ByName("AddInterestToUser")
 	interestServiceUpdatePreferenceLevelMethodDescriptor = interestServiceServiceDescriptor.Methods().ByName("UpdatePreferenceLevel")
+	interestServiceDeleteInterestMethodDescriptor        = interestServiceServiceDescriptor.Methods().ByName("DeleteInterest")
 )
 
 // InterestServiceClient is a client for the loci.interest.InterestService service.
@@ -73,6 +77,7 @@ type InterestServiceClient interface {
 	UpdateInterest(context.Context, *connect.Request[interest.UpdateInterestRequest]) (*connect.Response[common.Response], error)
 	AddInterestToUser(context.Context, *connect.Request[interest.AddInterestRequest]) (*connect.Response[common.Response], error)
 	UpdatePreferenceLevel(context.Context, *connect.Request[interest.UpdatePreferenceLevelRequest]) (*connect.Response[common.Response], error)
+	DeleteInterest(context.Context, *connect.Request[interest.DeleteInterestRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewInterestServiceClient constructs a client for the loci.interest.InterestService service. By
@@ -121,6 +126,12 @@ func NewInterestServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(interestServiceUpdatePreferenceLevelMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		deleteInterest: connect.NewClient[interest.DeleteInterestRequest, common.Response](
+			httpClient,
+			baseURL+InterestServiceDeleteInterestProcedure,
+			connect.WithSchema(interestServiceDeleteInterestMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -132,6 +143,7 @@ type interestServiceClient struct {
 	updateInterest        *connect.Client[interest.UpdateInterestRequest, common.Response]
 	addInterestToUser     *connect.Client[interest.AddInterestRequest, common.Response]
 	updatePreferenceLevel *connect.Client[interest.UpdatePreferenceLevelRequest, common.Response]
+	deleteInterest        *connect.Client[interest.DeleteInterestRequest, common.Response]
 }
 
 // GetInterests calls loci.interest.InterestService.GetInterests.
@@ -164,6 +176,11 @@ func (c *interestServiceClient) UpdatePreferenceLevel(ctx context.Context, req *
 	return c.updatePreferenceLevel.CallUnary(ctx, req)
 }
 
+// DeleteInterest calls loci.interest.InterestService.DeleteInterest.
+func (c *interestServiceClient) DeleteInterest(ctx context.Context, req *connect.Request[interest.DeleteInterestRequest]) (*connect.Response[common.Response], error) {
+	return c.deleteInterest.CallUnary(ctx, req)
+}
+
 // InterestServiceHandler is an implementation of the loci.interest.InterestService service.
 type InterestServiceHandler interface {
 	GetInterests(context.Context, *connect.Request[interest.GetInterestsRequest]) (*connect.Response[interest.GetInterestsResponse], error)
@@ -172,6 +189,7 @@ type InterestServiceHandler interface {
 	UpdateInterest(context.Context, *connect.Request[interest.UpdateInterestRequest]) (*connect.Response[common.Response], error)
 	AddInterestToUser(context.Context, *connect.Request[interest.AddInterestRequest]) (*connect.Response[common.Response], error)
 	UpdatePreferenceLevel(context.Context, *connect.Request[interest.UpdatePreferenceLevelRequest]) (*connect.Response[common.Response], error)
+	DeleteInterest(context.Context, *connect.Request[interest.DeleteInterestRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewInterestServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -216,6 +234,12 @@ func NewInterestServiceHandler(svc InterestServiceHandler, opts ...connect.Handl
 		connect.WithSchema(interestServiceUpdatePreferenceLevelMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	interestServiceDeleteInterestHandler := connect.NewUnaryHandler(
+		InterestServiceDeleteInterestProcedure,
+		svc.DeleteInterest,
+		connect.WithSchema(interestServiceDeleteInterestMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.interest.InterestService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case InterestServiceGetInterestsProcedure:
@@ -230,6 +254,8 @@ func NewInterestServiceHandler(svc InterestServiceHandler, opts ...connect.Handl
 			interestServiceAddInterestToUserHandler.ServeHTTP(w, r)
 		case InterestServiceUpdatePreferenceLevelProcedure:
 			interestServiceUpdatePreferenceLevelHandler.ServeHTTP(w, r)
+		case InterestServiceDeleteInterestProcedure:
+			interestServiceDeleteInterestHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -261,4 +287,8 @@ func (UnimplementedInterestServiceHandler) AddInterestToUser(context.Context, *c
 
 func (UnimplementedInterestServiceHandler) UpdatePreferenceLevel(context.Context, *connect.Request[interest.UpdatePreferenceLevelRequest]) (*connect.Response[common.Response], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.interest.InterestService.UpdatePreferenceLevel is not implemented"))
+}
+
+func (UnimplementedInterestServiceHandler) DeleteInterest(context.Context, *connect.Request[interest.DeleteInterestRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.interest.InterestService.DeleteInterest is not implemented"))
 }
