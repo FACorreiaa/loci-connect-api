@@ -45,10 +45,18 @@ const (
 	pendingFactConfidence = 0.3
 )
 
+// cityResolver turns what a user typed into a city row, creating it when the
+// city is genuinely new. Narrowed to the one method this package needs so the
+// tests can stub it without standing up the geocoder.
+type cityResolver interface {
+	ResolveCity(ctx context.Context, name, country string) (uuid.UUID, string, error)
+}
+
 type Handler struct {
 	placeconnect.UnimplementedPlaceIntelligenceServiceHandler
 	db     *pgxpool.Pool
 	logger *slog.Logger
+	cities cityResolver
 }
 
 func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
@@ -56,6 +64,13 @@ func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
 		logger = slog.Default()
 	}
 	return &Handler{db: db, logger: logger.With(slog.String("component", "place-intelligence"))}
+}
+
+// WithCityResolver supplies the resolver used when a submitted place names a
+// city. Separate from NewHandler so the existing call sites keep working.
+func (h *Handler) WithCityResolver(cities cityResolver) *Handler {
+	h.cities = cities
+	return h
 }
 
 func userID(ctx context.Context) (uuid.UUID, error) {
@@ -608,6 +623,86 @@ func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value str
 		return connect.NewError(connect.CodeInternal, fmt.Errorf("reward contributors: %w", err))
 	}
 	return nil
+}
+
+func (h *Handler) SubmitPlace(ctx context.Context, req *connect.Request[placev1.SubmitPlaceRequest]) (*connect.Response[placev1.SubmitPlaceResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.cities == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("city resolution is not configured"))
+	}
+
+	name := strings.TrimSpace(req.Msg.GetName())
+	if name == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("a place needs a name"))
+	}
+
+	cityID, _, err := h.cities.ResolveCity(ctx, req.Msg.GetCityName(), req.Msg.GetCountry())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument,
+			fmt.Errorf("could not place %q in a city: %w", name, err))
+	}
+
+	// Already on the guide is a different answer from "new", and the client can
+	// act on it — open the place rather than propose a twin.
+	if existing, found, err := h.existingPOIByIdentity(ctx, cityID, name); err != nil {
+		return nil, err
+	} else if found {
+		return nil, connect.NewError(connect.CodeAlreadyExists,
+			fmt.Errorf("%q is already on the guide (%s)", name, existing))
+	}
+
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("begin submission: %w", err))
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+
+	id, err := h.insertSubmission(ctx, tx, submission{
+		UserID:   uid,
+		CityID:   cityID,
+		Name:     name,
+		Category: optionalString(req.Msg.Category),
+		Address:  optionalString(req.Msg.Address),
+		Website:  optionalString(req.Msg.Website),
+		Lat:      req.Msg.Latitude,
+		Lng:      req.Msg.Longitude,
+	}, req.Msg.GetClientSubmissionId())
+	if err != nil {
+		return nil, err
+	}
+
+	var confirmations int32
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*)::integer FROM place_submission_confirmations WHERE submission_id = $1`, id).
+		Scan(&confirmations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("count confirmations: %w", err))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit submission: %w", err))
+	}
+	h.logger.InfoContext(ctx, "place submitted", slog.String("submission_id", id.String()))
+
+	return connect.NewResponse(&placev1.SubmitPlaceResponse{
+		SubmissionId:        id.String(),
+		Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING,
+		ConfirmationsNeeded: confirmationsNeeded(confirmations),
+	}), nil
+}
+
+// optionalString normalises an absent-or-blank proto field to a nil column.
+func optionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Request[placev1.GetMyContributorProfileRequest]) (*connect.Response[placev1.ContributorProfile], error) {

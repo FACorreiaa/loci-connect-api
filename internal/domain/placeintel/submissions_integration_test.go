@@ -3,9 +3,15 @@
 package placeintel
 
 import (
+	"context"
 	"testing"
 
+	"connectrpc.com/connect"
+	placev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // The submitter is the first voice, so a fresh submission needs exactly one
@@ -15,4 +21,119 @@ func TestConfirmationsNeeded(t *testing.T) {
 	assert.Equal(t, int32(1), confirmationsNeeded(0), "submitter counts as one")
 	assert.Equal(t, int32(0), confirmationsNeeded(1), "one confirmation is enough")
 	assert.Equal(t, int32(0), confirmationsNeeded(5), "never negative")
+}
+
+func TestSubmitPlaceIsPendingAndInvisible(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID := seedCity(t, pool)
+	alice := seedScout(t, pool)
+
+	response, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "Tasca do Fernando",
+		CityName:           cityNameFor(t, pool, cityID),
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING, response.Msg.GetStatus())
+	assert.Equal(t, int32(1), response.Msg.GetConfirmationsNeeded())
+
+	// The safety property: nothing the generator reads has been touched.
+	var pois int
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)::int FROM points_of_interest WHERE lower(btrim(name)) = 'tasca do fernando'`).Scan(&pois))
+	assert.Equal(t, 0, pois, "a pending place must not be in points_of_interest")
+}
+
+func TestSubmitPlaceIsIdempotent(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID := seedCity(t, pool)
+	alice := seedScout(t, pool)
+	clientID := uuid.NewString()
+
+	req := func() *connect.Request[placev1.SubmitPlaceRequest] {
+		return connect.NewRequest(&placev1.SubmitPlaceRequest{
+			ClientSubmissionId: clientID,
+			Name:               "Padaria Nova",
+			CityName:           cityNameFor(t, pool, cityID),
+		})
+	}
+	first, err := handler.SubmitPlace(ctxAs(alice), req())
+	require.NoError(t, err)
+	second, err := handler.SubmitPlace(ctxAs(alice), req())
+	require.NoError(t, err)
+	assert.Equal(t, first.Msg.GetSubmissionId(), second.Msg.GetSubmissionId(), "a retry must not create a second row")
+}
+
+func TestSubmitPlaceRejectsOneAlreadyOnTheGuide(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID, poiID := seedPlaceInCity(t, pool)
+	_ = poiID
+	alice := seedScout(t, pool)
+
+	_, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "  test cafe  ", // same place, sloppier typing
+		CityName:           cityNameFor(t, pool, cityID),
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeAlreadyExists, connect.CodeOf(err))
+}
+
+// newSubmissionHandler builds a Handler with the city resolver stubbed to a
+// city that already exists, because resolving a city is not what these tests
+// are about.
+func newSubmissionHandler(t *testing.T, pool *pgxpool.Pool) *Handler {
+	t.Helper()
+	h := NewHandler(pool, nil)
+	h.cities = stubResolver{pool: pool}
+	return h
+}
+
+type stubResolver struct{ pool *pgxpool.Pool }
+
+func (s stubResolver) ResolveCity(ctx context.Context, name, country string) (uuid.UUID, string, error) {
+	var id uuid.UUID
+	var found string
+	err := s.pool.QueryRow(ctx, `SELECT id, name FROM cities WHERE name = $1`, name).Scan(&id, &found)
+	return id, found, err
+}
+
+func seedCity(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO cities (id, name, country, center_location)
+		VALUES ($1, $2, 'Testland', ST_SetSRID(ST_MakePoint(0, 0), 4326))`,
+		id, "Testville-"+id.String()[:8])
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM cities WHERE id = $1`, id)
+	})
+	return id
+}
+
+func cityNameFor(t *testing.T, pool *pgxpool.Pool, cityID uuid.UUID) string {
+	t.Helper()
+	var name string
+	require.NoError(t, pool.QueryRow(context.Background(),
+		`SELECT name FROM cities WHERE id = $1`, cityID).Scan(&name))
+	return name
+}
+
+// seedPlaceInCity creates a city and a POI named "Test Cafe" inside it.
+func seedPlaceInCity(t *testing.T, pool *pgxpool.Pool) (uuid.UUID, uuid.UUID) {
+	t.Helper()
+	cityID := seedCity(t, pool)
+	poiID := uuid.New()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO points_of_interest (id, name, location, city_id)
+		VALUES ($1, 'Test Cafe', ST_SetSRID(ST_MakePoint(0, 0), 4326), $2)`, poiID, cityID)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM points_of_interest WHERE id = $1`, poiID)
+	})
+	return cityID, poiID
 }
