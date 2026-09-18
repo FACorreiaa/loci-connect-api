@@ -267,17 +267,23 @@ func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 //
 // provider has a column default ('google'), so an empty string is sent as
 // NULL to let the default apply rather than recording a blank provider.
+//
+// intent and search_type are written only by the user-facing chat stream. A
+// NULL intent is how the recents feed tells an internal POI lookup apart from
+// something a person actually asked for.
 const saveInteractionQuery = `
         INSERT INTO llm_interactions (
             user_id, session_id, prompt, response, model_name, latency_ms, city_name,
             cache_key, cache_hit, prompt_hash, provider,
             prompt_tokens, completion_tokens, total_tokens,
-            is_streaming, response_payload
+            is_streaming, response_payload,
+            intent, search_type, city_id
         ) VALUES (
             $1, $2, $3, $4, $5, $6, $7,
             $8, $9, $10, COALESCE($11, 'google'),
             $12, $13, $14,
-            $15, $16
+            $15, $16,
+            $17, $18, $19
         )
         RETURNING id
     `
@@ -332,6 +338,9 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 			interaction.TotalTokens,
 			interaction.IsStreaming,
 			nullIfEmptyJSON(interaction.ResponsePayload),
+			nullIfEmpty(interaction.Intent),
+			nullIfEmpty(interaction.SearchType),
+			interaction.CityID,
 		).Scan(&interactionID)
 		if err != nil {
 			span.RecordError(err)

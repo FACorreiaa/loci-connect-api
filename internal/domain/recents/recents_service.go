@@ -20,6 +20,7 @@ var _ Service = (*ServiceImpl)(nil)
 type Service interface {
 	GetUserRecentInteractions(ctx context.Context, userID uuid.UUID, page, limit int, filterOptions *locitypes.RecentInteractionsFilter) (*locitypes.RecentInteractionsResponse, error)
 	GetCityDetailsForUser(ctx context.Context, userID uuid.UUID, cityName string) (*locitypes.CityInteractions, error)
+	GetUserActivityFeed(ctx context.Context, userID uuid.UUID, limit, offset int, filter locitypes.ActivityFeedFilter) ([]locitypes.ActivityEntry, bool, error)
 }
 
 type ServiceImpl struct {
@@ -227,6 +228,65 @@ func (s *ServiceImpl) GetCityDetailsForUser(ctx context.Context, userID uuid.UUI
 	span.SetStatus(codes.Ok, "City details retrieved")
 
 	return cityDetails, nil
+}
+
+// activityFeedMaxLimit matches the ceiling the GetInteractionHistory request
+// message declares, so a caller cannot ask the database for more than the RPC
+// would have let through.
+const activityFeedMaxLimit = 200
+
+// GetUserActivityFeed returns one page of the recents activity feed, and
+// whether another page follows.
+//
+// There is no total count by design — see the repository method. To know
+// whether to offer "load more" it asks for one row more than the caller wanted,
+// drops it, and reports its existence as hasMore. That costs one row instead of
+// a full scan of three tables.
+func (s *ServiceImpl) GetUserActivityFeed(ctx context.Context, userID uuid.UUID, limit, offset int, filter locitypes.ActivityFeedFilter) ([]locitypes.ActivityEntry, bool, error) {
+	ctx, span := otel.Tracer("RecentsService").Start(ctx, "GetUserActivityFeed", trace.WithAttributes(
+		attribute.String("user_id", userID.String()),
+		attribute.Int("limit", limit),
+		attribute.Int("offset", offset),
+	))
+	defer span.End()
+
+	l := s.logger.With(slog.String("method", "GetUserActivityFeed"))
+
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > activityFeedMaxLimit {
+		limit = activityFeedMaxLimit
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	entries, err := s.repo.GetUserActivityFeed(ctx, userID, limit+1, offset, filter)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to get activity feed", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to get activity feed")
+		return nil, false, fmt.Errorf("failed to get activity feed: %w", err)
+	}
+
+	hasMore := len(entries) > limit
+	if hasMore {
+		entries = entries[:limit]
+	}
+
+	l.InfoContext(ctx, "Successfully retrieved activity feed",
+		slog.String("user_id", userID.String()),
+		slog.Int("entries", len(entries)),
+		slog.Bool("has_more", hasMore))
+
+	span.SetAttributes(
+		attribute.Int("results.entries", len(entries)),
+		attribute.Bool("results.has_more", hasMore),
+	)
+	span.SetStatus(codes.Ok, "Activity feed retrieved")
+
+	return entries, hasMore, nil
 }
 
 // Helper function to convert POIDetailedInfo to POIDetail for consistency with existing types

@@ -439,7 +439,21 @@ func TestInteractionRowRecordsWhatTheTurnCost(t *testing.T) {
 		},
 	}
 
-	row := l.buildInteractionRow(cc, plan, "response text", time.Now().Add(-2*time.Second))
+	cityID := uuid.New()
+	row := l.buildInteractionRow(cc, plan, "response text", time.Now().Add(-2*time.Second), cityID)
+
+	// intent, search_type and city_id are what the recents activity feed reads.
+	// The first two had columns since migration 0043 and the third since the
+	// table was created, and none of them were ever written, so a feed row had
+	// no way to say what kind of request it came from.
+	switch {
+	case row.Intent != string(cc.Domain):
+		t.Errorf("Intent = %q, want the domain the request was routed as (%q)", row.Intent, cc.Domain)
+	case row.SearchType == "":
+		t.Error("SearchType is empty, want the parts the request was planned on")
+	case row.CityID == nil || *row.CityID != cityID:
+		t.Errorf("CityID = %v, want the resolved city %s", row.CityID, cityID)
+	}
 
 	switch {
 	case row.ModelUsed != "deepseek-v4-flash":
@@ -501,7 +515,7 @@ func TestInteractionRowFlagsAFullCacheHit(t *testing.T) {
 		}
 	}
 
-	row := l.buildInteractionRow(cc, plan, "response text", time.Now())
+	row := l.buildInteractionRow(cc, plan, "response text", time.Now(), uuid.Nil)
 	if !row.CacheHit {
 		t.Error("CacheHit is false although every part was replayed")
 	}

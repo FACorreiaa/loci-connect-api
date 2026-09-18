@@ -35,6 +35,7 @@ type Repository interface {
 	GetCityRestaurantsByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.RestaurantDetailedInfo, error)
 	GetCityItinerariesByInteraction(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.UserSavedItinerary, error)
 	GetCityFavorites(ctx context.Context, userID uuid.UUID, cityName string) ([]locitypes.POIDetailedInfo, error)
+	GetUserActivityFeed(ctx context.Context, userID uuid.UUID, limit, offset int, filter locitypes.ActivityFeedFilter) ([]locitypes.ActivityEntry, error)
 }
 
 type RepositoryImpl struct {
@@ -59,6 +60,20 @@ type cityInteractionRow struct {
 	SessionID        uuid.UUID `db:"session_id"`
 	Title            string    `db:"title"`
 	POICount         int       `db:"poi_count"`
+}
+
+// activityFeedRow is one row of activityFeedQuery. Every column is coalesced to
+// a non-NULL value in SQL so this can stay free of pointers: a feed row with no
+// city is a feed row with an empty city, not a missing one.
+type activityFeedRow struct {
+	Kind       string    `db:"kind"`
+	ID         string    `db:"id"`
+	RefID      string    `db:"ref_id"`
+	Detail     string    `db:"detail"`
+	CityName   string    `db:"city_name"`
+	CityID     string    `db:"city_id"`
+	Label      string    `db:"label"`
+	OccurredAt time.Time `db:"occurred_at"`
 }
 
 // recentInteractionRow is used for getCityInteractions query
@@ -860,4 +875,220 @@ func (r *RepositoryImpl) GetCityFavorites(ctx context.Context, userID uuid.UUID,
 	span.SetStatus(codes.Ok, "City favorites retrieved")
 
 	return pois, nil
+}
+
+// activityFeedQuery is the recents feed: everything the user did, newest
+// first, in one pass.
+//
+// Three sources, because "what did I do" is not one table:
+//
+//   - llm_interactions — one row per prompt the unified chat stream handled, so
+//     one row per thing the user asked for. This is the bulk of the feed.
+//   - user_saved_itineraries — the trips they kept.
+//   - user_favorites — the places they starred.
+//
+// Four things here are load-bearing.
+//
+// **The prompt branch is an allowlist, not a denylist.** llm_interactions also
+// holds internal model calls — POI detail lookups written by the chat service's
+// own helpers — which are not activities anybody performed. Matching the exact
+// prefix buildInteractionRow writes means any future internal prompt is
+// excluded by default rather than by being enumerated. `intent IS NOT NULL` is
+// the same allowlist for rows written since intent started being recorded;
+// nothing but the user-facing stream sets it.
+//
+// **The COALESCE on intent** reads the domain back out of that prefix for rows
+// written before the column was populated, so the feed is not blank on the day
+// this ships. Migration 0088 backfills them; this stays as the safety net.
+//
+// **Each branch carries its own LIMIT.** The global newest-N is necessarily a
+// subset of the union of the per-branch newest-N, so limiting inside each
+// branch is correct and bounds the merge to three pages instead of making
+// Postgres materialise every row the user has ever produced and sort it. The
+// branch limit is limit+offset, because page two's rows are in the first
+// limit+offset of each branch.
+//
+// **The ordering is (timestamp, id), never timestamp alone.** Favourites added
+// in one batch share added_at to the microsecond. With a bare timestamp sort
+// those ties are free to reorder between two page fetches, which duplicates
+// some rows and silently drops others.
+//
+// Every filter is a fixed placeholder tested with `$n IS NULL OR ...`, so the
+// query is a constant and the planner sees the same shape every time.
+const activityFeedQuery = `
+WITH prompts AS (
+    SELECT
+        l.id                                    AS id,
+        'prompt'::text                          AS kind,
+        COALESCE(l.session_id::text, '')::text  AS ref_id,
+        COALESCE(
+            NULLIF(l.intent, ''),
+            substring(l.prompt from '^Unified Chat Stream - Domain:\s*(\w+),'),
+            ''
+        )::text                                 AS detail,
+        COALESCE(l.city_name, '')::text         AS city_name,
+        COALESCE(l.city_id::text, '')::text     AS city_id,
+        l.prompt::text                          AS label,
+        l.created_at                            AS occurred_at
+    FROM llm_interactions l
+    WHERE l.user_id = $1
+      AND (l.intent IS NOT NULL OR l.prompt LIKE 'Unified Chat Stream - Domain: %%')
+      AND ($5::text[] IS NULL OR 'prompt' = ANY($5))
+      AND ($6::text[] IS NULL OR COALESCE(NULLIF(l.intent, ''), substring(l.prompt from '^Unified Chat Stream - Domain:\s*(\w+),'), '') = ANY($6))
+      AND ($7::text IS NULL OR l.prompt ILIKE '%%' || $7 || '%%')
+      AND ($8::text IS NULL OR LOWER(l.city_name) = LOWER($8))
+      AND ($9::timestamptz IS NULL OR l.created_at >= $9)
+      AND ($10::timestamptz IS NULL OR l.created_at <= $10)
+    ORDER BY l.created_at %[1]s, l.id %[1]s
+    LIMIT $2
+),
+saved AS (
+    SELECT
+        s.id,
+        'saved_itinerary'::text,
+        COALESCE(s.session_id::text, '')::text,
+        'itinerary'::text,
+        COALESCE(c.name, '')::text,
+        COALESCE(s.primary_city_id::text, '')::text,
+        s.title::text,
+        s.created_at
+    FROM user_saved_itineraries s
+    LEFT JOIN cities c ON c.id = s.primary_city_id
+    WHERE s.user_id = $1
+      AND ($5::text[] IS NULL OR 'saved_itinerary' = ANY($5))
+      AND ($6::text[] IS NULL OR 'itinerary' = ANY($6))
+      AND ($7::text IS NULL OR s.title ILIKE '%%' || $7 || '%%')
+      AND ($8::text IS NULL OR LOWER(c.name) = LOWER($8))
+      AND ($9::timestamptz IS NULL OR s.created_at >= $9)
+      AND ($10::timestamptz IS NULL OR s.created_at <= $10)
+    ORDER BY s.created_at %[1]s, s.id %[1]s
+    LIMIT $2
+),
+favourites AS (
+    SELECT
+        f.id,
+        'favourite'::text,
+        f.item_id::text,
+        COALESCE(NULLIF(f.content_type, ''), 'poi')::text,
+        COALESCE(f.city_name, '')::text,
+        ''::text,
+        f.item_name::text,
+        f.added_at
+    FROM user_favorites f
+    WHERE f.user_id = $1
+      AND ($5::text[] IS NULL OR 'favourite' = ANY($5))
+      AND ($6::text[] IS NULL OR COALESCE(NULLIF(f.content_type, ''), 'poi') = ANY($6))
+      AND ($7::text IS NULL OR f.item_name ILIKE '%%' || $7 || '%%')
+      AND ($8::text IS NULL OR LOWER(f.city_name) = LOWER($8))
+      AND ($9::timestamptz IS NULL OR f.added_at >= $9)
+      AND ($10::timestamptz IS NULL OR f.added_at <= $10)
+    ORDER BY f.added_at %[1]s, f.id %[1]s
+    LIMIT $2
+)
+SELECT kind, id::text AS id, ref_id, detail, city_name, city_id, label, occurred_at
+FROM (
+    SELECT * FROM prompts
+    UNION ALL SELECT * FROM saved
+    UNION ALL SELECT * FROM favourites
+) feed
+-- Qualified on purpose: unqualified "id" would bind to the text alias in the
+-- select list, and text ordering of a UUID is not the ordering each branch
+-- used to pick its rows.
+ORDER BY feed.occurred_at %[1]s, feed.id %[1]s
+LIMIT $3 OFFSET $4
+`
+
+// GetUserActivityFeed returns one page of the recents feed.
+//
+// It deliberately returns no total. Counting a three-way union means running
+// every branch to completion with no limit to short-circuit it — a full scan of
+// the user's entire history on every page request, for a number that only ever
+// renders as a label. Callers ask for one row more than they need instead, and
+// read the extra row's existence as "there is another page".
+func (r *RepositoryImpl) GetUserActivityFeed(ctx context.Context, userID uuid.UUID, limit, offset int, filter locitypes.ActivityFeedFilter) ([]locitypes.ActivityEntry, error) {
+	ctx, span := otel.Tracer("RecentsRepository").Start(ctx, "GetUserActivityFeed", trace.WithAttributes(
+		attribute.String("user_id", userID.String()),
+		attribute.Int("limit", limit),
+		attribute.Int("offset", offset),
+	))
+	defer span.End()
+
+	l := r.logger.With(slog.String("method", "GetUserActivityFeed"))
+
+	direction := "DESC"
+	if filter.Ascending {
+		direction = "ASC"
+	}
+	query := fmt.Sprintf(activityFeedQuery, direction)
+
+	rows, err := r.pgpool.Query(ctx, query,
+		userID,
+		limit+offset, // $2: how deep each branch has to reach to cover this page
+		limit,
+		offset,
+		nilIfEmptySlice(filter.Kinds),
+		nilIfEmptySlice(filter.Details),
+		nilIfEmptyString(filter.Search),
+		nilIfEmptyString(filter.CityName),
+		nilIfZeroTime(filter.Since),
+		nilIfZeroTime(filter.Until),
+	)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to query activity feed", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database query failed")
+		return nil, fmt.Errorf("failed to query activity feed: %w", err)
+	}
+
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[activityFeedRow])
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to collect activity feed rows", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Database read failed")
+		return nil, fmt.Errorf("failed to read activity feed: %w", err)
+	}
+
+	entries := make([]locitypes.ActivityEntry, 0, len(dbRows))
+	for _, row := range dbRows {
+		entries = append(entries, locitypes.ActivityEntry{
+			Kind:       locitypes.ActivityKind(row.Kind),
+			ID:         row.ID,
+			RefID:      row.RefID,
+			Detail:     row.Detail,
+			CityName:   row.CityName,
+			CityID:     row.CityID,
+			Label:      row.Label,
+			OccurredAt: row.OccurredAt,
+		})
+	}
+
+	span.SetAttributes(attribute.Int("results.entries", len(entries)))
+	span.SetStatus(codes.Ok, "Activity feed retrieved")
+
+	return entries, nil
+}
+
+// The three helpers below turn an unset filter field into a SQL NULL, which is
+// what every `$n IS NULL OR ...` test in activityFeedQuery reads as "do not
+// narrow on this".
+
+func nilIfEmptySlice(v []string) []string {
+	if len(v) == 0 {
+		return nil
+	}
+	return v
+}
+
+func nilIfEmptyString(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func nilIfZeroTime(v time.Time) *time.Time {
+	if v.IsZero() {
+		return nil
+	}
+	return &v
 }

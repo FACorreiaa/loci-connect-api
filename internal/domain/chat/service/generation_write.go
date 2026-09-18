@@ -230,6 +230,7 @@ func (l *ServiceImpl) buildInteractionRow(
 	plan []partPlan,
 	fullResponse string,
 	startTime time.Time,
+	cityID uuid.UUID,
 ) locitypes.LlmInteraction {
 	modelID := l.model
 	if len(plan) > 0 && plan[0].ModelID != "" {
@@ -240,8 +241,10 @@ func (l *ServiceImpl) buildInteractionRow(
 	cacheHit := len(plan) > 0
 	parts := make(map[string]any, len(plan))
 	hashes := make([]string, 0, len(plan))
+	partNames := make([]string, 0, len(plan))
 	for _, p := range plan {
 		name := string(p.Part)
+		partNames = append(partNames, name)
 		outcome := cc.PartOutcomes[name]
 		tokensIn += outcome.TokensIn
 		tokensOut += outcome.TokensOut
@@ -265,20 +268,27 @@ func (l *ServiceImpl) buildInteractionRow(
 	}
 
 	interaction := locitypes.LlmInteraction{
-		ID:               uuid.New(),
-		SessionID:        cc.SessionID,
-		UserID:           cc.UserID,
-		ProfileID:        cc.ProfileID,
-		CityName:         cc.CityName,
-		Prompt:           fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", cc.Domain, cc.Message),
-		ResponseText:     fullResponse,
-		ModelUsed:        modelID,
-		LatencyMs:        int(time.Since(startTime).Milliseconds()),
-		Timestamp:        startTime,
-		CacheKey:         cc.CacheKey,
-		CacheHit:         cacheHit,
-		PromptHash:       combinedPromptHash(hashes),
-		Provider:         providerForModel(modelID, l.provider),
+		ID:           uuid.New(),
+		SessionID:    cc.SessionID,
+		UserID:       cc.UserID,
+		ProfileID:    cc.ProfileID,
+		CityName:     cc.CityName,
+		Prompt:       fmt.Sprintf("Unified Chat Stream - Domain: %s, Message: %s", cc.Domain, cc.Message),
+		ResponseText: fullResponse,
+		ModelUsed:    modelID,
+		LatencyMs:    int(time.Since(startTime).Milliseconds()),
+		Timestamp:    startTime,
+		CacheKey:     cc.CacheKey,
+		CacheHit:     cacheHit,
+		PromptHash:   combinedPromptHash(hashes),
+		Provider:     providerForModel(modelID, l.provider),
+		// The columns migration 0043 added for exactly this and then never
+		// wrote. Intent is what makes a row legible as an activity — a chat, an
+		// itinerary request, an activity search — without re-parsing the prompt
+		// wrapper below.
+		Intent:           string(cc.Domain),
+		SearchType:       strings.Join(partNames, ","),
+		CityID:           cityIDOrNil(cityID),
 		PromptTokens:     tokensIn,
 		CompletionTokens: tokensOut,
 		TotalTokens:      tokensIn + tokensOut,
@@ -332,4 +342,14 @@ func providerForModel(modelID, configured string) string {
 		return "xai"
 	}
 	return configured
+}
+
+// cityIDOrNil keeps uuid.Nil out of the city_id column. The column is a
+// foreign key into cities, so the zero UUID would be a dangling reference
+// rather than "unknown"; absence is the honest value.
+func cityIDOrNil(id uuid.UUID) *uuid.UUID {
+	if id == uuid.Nil {
+		return nil
+	}
+	return &id
 }
