@@ -15,6 +15,8 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/aicreds/aicredsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+
+	authhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city/cityconnect"
@@ -128,6 +130,14 @@ func SetupRouter(deps *Dependencies) http.Handler {
 			"request behind a proxy on the proxy's own address. Set it to the pod network " +
 			"(10.42.0.0/16 on k3s) when running behind an ingress.")
 	}
+
+	// Sessions are recorded against the same address the limiter keys on.
+	// Without this they were recorded against req.Peer().Addr, which behind the
+	// ingress is the proxy pod — so every entry on the signed-in-devices screen
+	// read 10.42.x.x and nobody could tell their devices apart.
+	authhandler.SetClientIPResolver(func(header http.Header, peerAddr string) string {
+		return interceptors.ClientIP(header, peerAddr, trustedProxies)
+	})
 
 	ipRateLimiter := interceptors.NewIPRateLimitInterceptor(
 		deps.Config.Server.IPRateLimitPerSecond,

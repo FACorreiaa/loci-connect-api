@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
 
 	"connectrpc.com/connect"
 	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
@@ -251,8 +252,31 @@ func (h *AuthHandler) Logout(ctx context.Context, req *connect.Request[auth.Logo
 func metadataFromRequest[T any](req *connect.Request[T]) service.SessionMetadata {
 	return service.SessionMetadata{
 		UserAgent: req.Header().Get("User-Agent"),
-		ClientIP:  req.Peer().Addr,
+		ClientIP:  resolveClientIP(req.Header(), req.Peer().Addr),
 	}
+}
+
+// clientIPResolver turns a request into the address to record against a
+// session. Package-level because metadataFromRequest is generic over the
+// request type and so cannot hang off the handler.
+//
+// Default: the peer address, which is what this always used. Behind the ingress
+// that is the proxy pod, so every session on the signed-in-devices screen showed
+// the same 10.42.x.x and the screen could not answer the one question it exists
+// for. router.go replaces this with the trusted-proxy-aware resolver the rate
+// limiter already uses.
+var clientIPResolver = func(_ http.Header, peerAddr string) string { return peerAddr }
+
+// SetClientIPResolver installs the resolver used to record session addresses.
+// Called once at startup, from where the trusted proxies are parsed.
+func SetClientIPResolver(fn func(http.Header, string) string) {
+	if fn != nil {
+		clientIPResolver = fn
+	}
+}
+
+func resolveClientIP(header http.Header, peerAddr string) string {
+	return clientIPResolver(header, peerAddr)
 }
 
 func (h *AuthHandler) toConnectError(err error) error {
