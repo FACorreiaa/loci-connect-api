@@ -574,7 +574,7 @@ func (l *ServiceImpl) persistResults(
 		fullResponse = fmt.Sprintf("Processed %s request for %s", cc.Domain, cc.CityName)
 	}
 
-	interaction := l.buildInteractionRow(cc, plan, fullResponse, startTime)
+	interaction := l.buildInteractionRow(cc, plan, fullResponse, startTime, cityID)
 	savedID, err := l.llmInteractionRepo.SaveInteraction(storageCtx, interaction)
 	if err != nil {
 		l.logger.WarnContext(ctx, "Failed to save interaction", slog.Any("error", err))

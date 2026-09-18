@@ -47,6 +47,22 @@ type LlmInteraction struct {
 	PromptHash  string `json:"prompt_hash,omitempty"`
 	Provider    string `json:"provider,omitempty"`
 	IsStreaming bool   `json:"is_streaming"`
+
+	// Intent and SearchType are the intent columns from migration 0043. Intent
+	// is the DomainType the request was routed as (general, itinerary,
+	// activities, ...); SearchType names the answer parts that were planned for
+	// it. Both had existed unwritten since 0043, which left the recents feed
+	// with no way to tell a chat from a hotel search except by re-parsing the
+	// prompt string. Only the user-facing chat stream sets them: an internal
+	// POI lookup is not an activity anybody did.
+	Intent     string `json:"intent,omitempty"`
+	SearchType string `json:"search_type,omitempty"`
+
+	// CityID is the resolved city for this turn. The column has existed since
+	// the table was created and was never written, so every chat row carried a
+	// city name and a NULL city id, and anything joining on the id found
+	// nothing. Nil when the city could not be resolved.
+	CityID *uuid.UUID `json:"city_id,omitempty"`
 }
 
 // LLMGeneration is one row of llm_generations: a single cached part of an
@@ -636,4 +652,59 @@ type RecentInteractionsFilter struct {
 	Search          string `json:"search"`           // Search term for city name
 	MinInteractions int    `json:"min_interactions"` // Minimum number of interactions
 	MaxInteractions int    `json:"max_interactions"` // Maximum number of interactions
+}
+
+// ActivityKind is what produced one row of the recents activity feed.
+type ActivityKind string
+
+const (
+	// ActivityKindPrompt is one thing the user asked for: a chat turn, a
+	// discover search, an itinerary or activity request. One row of
+	// llm_interactions, written by the unified chat stream.
+	ActivityKindPrompt ActivityKind = "prompt"
+	// ActivityKindSavedItinerary is a row of user_saved_itineraries.
+	ActivityKindSavedItinerary ActivityKind = "saved_itinerary"
+	// ActivityKindFavourite is a row of user_favorites.
+	ActivityKindFavourite ActivityKind = "favourite"
+)
+
+// ActivityEntry is one entry of the recents feed, whichever table it came from.
+//
+// The feed exists because grouping by city — what the recents repository did
+// and still does for the city view — cannot answer "what did I do", only "where
+// have I been". Every field here is what a feed row needs to render itself and
+// link back to the thing it describes; nothing more is read.
+type ActivityEntry struct {
+	Kind ActivityKind `json:"kind"`
+	ID   string       `json:"id"`
+	// RefID is what the client navigates with: the chat session id for a prompt
+	// or a saved itinerary, the item id for a favourite.
+	RefID string `json:"ref_id,omitempty"`
+	// Detail narrows the kind. For a prompt it is the DomainType it was routed
+	// as; for a favourite it is the content type (poi, hotel, restaurant,
+	// itinerary); for a saved itinerary it is always "itinerary".
+	Detail     string    `json:"detail,omitempty"`
+	CityName   string    `json:"city_name,omitempty"`
+	CityID     string    `json:"city_id,omitempty"`
+	Label      string    `json:"label"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+// ActivityFeedFilter narrows the feed. Every field is optional; the zero value
+// asks for everything.
+type ActivityFeedFilter struct {
+	// Kinds limits to feed kinds ("prompt", "saved_itinerary", "favourite").
+	Kinds []string `json:"kinds,omitempty"`
+	// Details limits to detail values — the domain of a prompt, the content
+	// type of a favourite. Applied after Kinds, and independently of it.
+	Details []string `json:"details,omitempty"`
+	// Search matches the label, case-insensitively.
+	Search string `json:"search,omitempty"`
+	// Since and Until bound OccurredAt. Zero means unbounded.
+	Since time.Time `json:"since,omitempty"`
+	Until time.Time `json:"until,omitempty"`
+	// CityName matches exactly, case-insensitively.
+	CityName string `json:"city_name,omitempty"`
+	// Ascending flips the default newest-first ordering.
+	Ascending bool `json:"ascending,omitempty"`
 }

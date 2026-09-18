@@ -46,6 +46,25 @@ func (h *Handler) getUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	return userID, true
 }
 
+// resolveUserID takes the caller's id from the auth interceptor's context, and
+// falls back to the one in the request body. The fallback exists because the
+// request messages carry user_id and older callers still set it; the context is
+// authoritative when both are present.
+func (h *Handler) resolveUserID(ctx context.Context, fromRequest string) (uuid.UUID, error) {
+	if userID, ok := h.getUserIDFromContext(ctx); ok {
+		return userID, nil
+	}
+	if fromRequest == "" {
+		return uuid.UUID{}, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(fromRequest)
+	if err != nil {
+		h.logger.Error("invalid user ID format", slog.Any("error", err))
+		return uuid.UUID{}, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID format"))
+	}
+	return userID, nil
+}
+
 // GetRecentInteractions returns the user's recent interactions
 func (h *Handler) GetRecentInteractions(
 	ctx context.Context,
@@ -234,61 +253,62 @@ func (h *Handler) RecordInteraction(
 	}), nil
 }
 
-// GetInteractionHistory returns historical interaction data
+// GetInteractionHistory returns the recents activity feed: one flat,
+// reverse-chronological page of everything the user did — every prompt they
+// sent, every itinerary they saved, every place they favourited.
+//
+// This used to delegate to GetUserRecentInteractions, which groups by city and
+// keeps five interactions per city, and then threw the request's filters away.
+// Grouping by city can only answer "where have I been"; the feed has to answer
+// "what did I do", so it reads the three sources directly.
+//
+// TotalCount is a floor, not a total. Counting a three-way union means running
+// every branch with no limit on every page request, so the service fetches one
+// row past the page instead and reports its existence here: when another page
+// exists TotalCount is one more than what has been served, and a client's test
+// for "is there more" is offset+len(interactions) < total_count.
 func (h *Handler) GetInteractionHistory(
 	ctx context.Context,
 	req *connect.Request[recentsv1.GetInteractionHistoryRequest],
 ) (*connect.Response[recentsv1.GetInteractionHistoryResponse], error) {
 	l := h.logger.With(slog.String("method", "GetInteractionHistory"))
 
-	// Get user ID
-	var userID uuid.UUID
-	var ok bool
-
-	userID, ok = h.getUserIDFromContext(ctx)
-	if !ok {
-		if req.Msg.UserId != "" {
-			var err error
-			userID, err = uuid.Parse(req.Msg.UserId)
-			if err != nil {
-				return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID format"))
-			}
-		} else {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-		}
+	userID, err := h.resolveUserID(ctx, req.Msg.GetUserId())
+	if err != nil {
+		return nil, err
 	}
 
-	limit := int(req.Msg.Limit)
+	limit := int(req.Msg.GetLimit())
 	if limit <= 0 {
 		limit = 50
 	}
+	offset := int(req.Msg.GetOffset())
 
-	offset := int(req.Msg.Offset)
-	page := (offset / limit) + 1
+	filter := activityFilterFromProto(req.Msg.GetFilter(), req.Msg.GetSortOrder())
 
-	response, err := h.service.GetUserRecentInteractions(ctx, userID, page, limit, nil)
+	entries, hasMore, err := h.service.GetUserActivityFeed(ctx, userID, limit, offset, filter)
 	if err != nil {
 		l.ErrorContext(ctx, "failed to get interaction history", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
-	// Convert to proto
-	interactions := make([]*recentsv1.RecentInteraction, 0)
-	for _, city := range response.Cities {
-		for _, interaction := range city.Interactions {
-			interactions = append(interactions, &recentsv1.RecentInteraction{
-				Id:          interaction.ID.String(),
-				UserId:      interaction.UserID.String(),
-				CityName:    city.CityName,
-				Description: interaction.Prompt,
-				CreatedAt:   timestamppb.New(interaction.CreatedAt),
-			})
-		}
+	interactions := make([]*recentsv1.RecentInteraction, 0, len(entries))
+	for _, e := range entries {
+		interactions = append(interactions, activityEntryToProto(userID.String(), e))
 	}
+
+	total := offset + len(interactions)
+	if hasMore {
+		total++
+	}
+
+	l.InfoContext(ctx, "successfully retrieved interaction history",
+		slog.Int("count", len(interactions)),
+		slog.Bool("has_more", hasMore))
 
 	return connect.NewResponse(&recentsv1.GetInteractionHistoryResponse{
 		Interactions: interactions,
-		TotalCount:   int32(response.Total),
+		TotalCount:   int32(total),
 	}), nil
 }
 
