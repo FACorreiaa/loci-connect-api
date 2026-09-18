@@ -148,6 +148,58 @@ func (PlaceClaimStatus) EnumDescriptor() ([]byte, []int) {
 	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{1}
 }
 
+type PlaceSubmissionStatus int32
+
+const (
+	PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_UNSPECIFIED PlaceSubmissionStatus = 0
+	PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING     PlaceSubmissionStatus = 1
+	PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED    PlaceSubmissionStatus = 2
+	PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_REJECTED    PlaceSubmissionStatus = 3
+)
+
+// Enum value maps for PlaceSubmissionStatus.
+var (
+	PlaceSubmissionStatus_name = map[int32]string{
+		0: "PLACE_SUBMISSION_STATUS_UNSPECIFIED",
+		1: "PLACE_SUBMISSION_STATUS_PENDING",
+		2: "PLACE_SUBMISSION_STATUS_ACCEPTED",
+		3: "PLACE_SUBMISSION_STATUS_REJECTED",
+	}
+	PlaceSubmissionStatus_value = map[string]int32{
+		"PLACE_SUBMISSION_STATUS_UNSPECIFIED": 0,
+		"PLACE_SUBMISSION_STATUS_PENDING":     1,
+		"PLACE_SUBMISSION_STATUS_ACCEPTED":    2,
+		"PLACE_SUBMISSION_STATUS_REJECTED":    3,
+	}
+)
+
+func (x PlaceSubmissionStatus) Enum() *PlaceSubmissionStatus {
+	p := new(PlaceSubmissionStatus)
+	*p = x
+	return p
+}
+
+func (x PlaceSubmissionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PlaceSubmissionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_place_place_intelligence_proto_enumTypes[2].Descriptor()
+}
+
+func (PlaceSubmissionStatus) Type() protoreflect.EnumType {
+	return &file_loci_place_place_intelligence_proto_enumTypes[2]
+}
+
+func (x PlaceSubmissionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PlaceSubmissionStatus.Descriptor instead.
+func (PlaceSubmissionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{2}
+}
+
 type PlaceFact struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Field            PlaceFactField         `protobuf:"varint,1,opt,name=field,proto3,enum=loci.place.PlaceFactField" json:"field,omitempty"`
@@ -716,6 +768,453 @@ func (*GetMyContributorProfileRequest) Descriptor() ([]byte, []int) {
 	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{9}
 }
 
+type SubmitPlaceRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	ClientSubmissionId string                 `protobuf:"bytes,1,opt,name=client_submission_id,json=clientSubmissionId,proto3" json:"client_submission_id,omitempty"`
+	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Resolved server-side; the client cannot be relied on to know a city id.
+	CityName      string   `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Country       *string  `protobuf:"bytes,4,opt,name=country,proto3,oneof" json:"country,omitempty"`
+	Category      *string  `protobuf:"bytes,5,opt,name=category,proto3,oneof" json:"category,omitempty"`
+	Latitude      *float64 `protobuf:"fixed64,6,opt,name=latitude,proto3,oneof" json:"latitude,omitempty"`
+	Longitude     *float64 `protobuf:"fixed64,7,opt,name=longitude,proto3,oneof" json:"longitude,omitempty"`
+	Address       *string  `protobuf:"bytes,8,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	Website       *string  `protobuf:"bytes,9,opt,name=website,proto3,oneof" json:"website,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitPlaceRequest) Reset() {
+	*x = SubmitPlaceRequest{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitPlaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitPlaceRequest) ProtoMessage() {}
+
+func (x *SubmitPlaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitPlaceRequest.ProtoReflect.Descriptor instead.
+func (*SubmitPlaceRequest) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SubmitPlaceRequest) GetClientSubmissionId() string {
+	if x != nil {
+		return x.ClientSubmissionId
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetCountry() string {
+	if x != nil && x.Country != nil {
+		return *x.Country
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetCategory() string {
+	if x != nil && x.Category != nil {
+		return *x.Category
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetLatitude() float64 {
+	if x != nil && x.Latitude != nil {
+		return *x.Latitude
+	}
+	return 0
+}
+
+func (x *SubmitPlaceRequest) GetLongitude() float64 {
+	if x != nil && x.Longitude != nil {
+		return *x.Longitude
+	}
+	return 0
+}
+
+func (x *SubmitPlaceRequest) GetAddress() string {
+	if x != nil && x.Address != nil {
+		return *x.Address
+	}
+	return ""
+}
+
+func (x *SubmitPlaceRequest) GetWebsite() string {
+	if x != nil && x.Website != nil {
+		return *x.Website
+	}
+	return ""
+}
+
+type SubmitPlaceResponse struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId string                 `protobuf:"bytes,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	Status       PlaceSubmissionStatus  `protobuf:"varint,2,opt,name=status,proto3,enum=loci.place.PlaceSubmissionStatus" json:"status,omitempty"`
+	// How many more distinct people must confirm before this becomes a place.
+	ConfirmationsNeeded int32 `protobuf:"varint,3,opt,name=confirmations_needed,json=confirmationsNeeded,proto3" json:"confirmations_needed,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *SubmitPlaceResponse) Reset() {
+	*x = SubmitPlaceResponse{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitPlaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitPlaceResponse) ProtoMessage() {}
+
+func (x *SubmitPlaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitPlaceResponse.ProtoReflect.Descriptor instead.
+func (*SubmitPlaceResponse) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SubmitPlaceResponse) GetSubmissionId() string {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return ""
+}
+
+func (x *SubmitPlaceResponse) GetStatus() PlaceSubmissionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_UNSPECIFIED
+}
+
+func (x *SubmitPlaceResponse) GetConfirmationsNeeded() int32 {
+	if x != nil {
+		return x.ConfirmationsNeeded
+	}
+	return 0
+}
+
+type ConfirmPlaceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId  string                 `protobuf:"bytes,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmPlaceRequest) Reset() {
+	*x = ConfirmPlaceRequest{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmPlaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmPlaceRequest) ProtoMessage() {}
+
+func (x *ConfirmPlaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmPlaceRequest.ProtoReflect.Descriptor instead.
+func (*ConfirmPlaceRequest) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ConfirmPlaceRequest) GetSubmissionId() string {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return ""
+}
+
+type ConfirmPlaceResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Status              PlaceSubmissionStatus  `protobuf:"varint,1,opt,name=status,proto3,enum=loci.place.PlaceSubmissionStatus" json:"status,omitempty"`
+	ConfirmationsNeeded int32                  `protobuf:"varint,2,opt,name=confirmations_needed,json=confirmationsNeeded,proto3" json:"confirmations_needed,omitempty"`
+	// Set once promoted, so the client can link straight to the new place.
+	PoiId         *string `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3,oneof" json:"poi_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConfirmPlaceResponse) Reset() {
+	*x = ConfirmPlaceResponse{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConfirmPlaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConfirmPlaceResponse) ProtoMessage() {}
+
+func (x *ConfirmPlaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConfirmPlaceResponse.ProtoReflect.Descriptor instead.
+func (*ConfirmPlaceResponse) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ConfirmPlaceResponse) GetStatus() PlaceSubmissionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_UNSPECIFIED
+}
+
+func (x *ConfirmPlaceResponse) GetConfirmationsNeeded() int32 {
+	if x != nil {
+		return x.ConfirmationsNeeded
+	}
+	return 0
+}
+
+func (x *ConfirmPlaceResponse) GetPoiId() string {
+	if x != nil && x.PoiId != nil {
+		return *x.PoiId
+	}
+	return ""
+}
+
+type PendingPlace struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	SubmissionId        string                 `protobuf:"bytes,1,opt,name=submission_id,json=submissionId,proto3" json:"submission_id,omitempty"`
+	Name                string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	CityName            string                 `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Category            *string                `protobuf:"bytes,4,opt,name=category,proto3,oneof" json:"category,omitempty"`
+	Address             *string                `protobuf:"bytes,5,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	ConfirmationsNeeded int32                  `protobuf:"varint,6,opt,name=confirmations_needed,json=confirmationsNeeded,proto3" json:"confirmations_needed,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *PendingPlace) Reset() {
+	*x = PendingPlace{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PendingPlace) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PendingPlace) ProtoMessage() {}
+
+func (x *PendingPlace) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PendingPlace.ProtoReflect.Descriptor instead.
+func (*PendingPlace) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PendingPlace) GetSubmissionId() string {
+	if x != nil {
+		return x.SubmissionId
+	}
+	return ""
+}
+
+func (x *PendingPlace) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PendingPlace) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *PendingPlace) GetCategory() string {
+	if x != nil && x.Category != nil {
+		return *x.Category
+	}
+	return ""
+}
+
+func (x *PendingPlace) GetAddress() string {
+	if x != nil && x.Address != nil {
+		return *x.Address
+	}
+	return ""
+}
+
+func (x *PendingPlace) GetConfirmationsNeeded() int32 {
+	if x != nil {
+		return x.ConfirmationsNeeded
+	}
+	return 0
+}
+
+type ListPendingPlacesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPendingPlacesRequest) Reset() {
+	*x = ListPendingPlacesRequest{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPendingPlacesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPendingPlacesRequest) ProtoMessage() {}
+
+func (x *ListPendingPlacesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPendingPlacesRequest.ProtoReflect.Descriptor instead.
+func (*ListPendingPlacesRequest) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListPendingPlacesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListPendingPlacesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Places        []*PendingPlace        `protobuf:"bytes,1,rep,name=places,proto3" json:"places,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPendingPlacesResponse) Reset() {
+	*x = ListPendingPlacesResponse{}
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPendingPlacesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPendingPlacesResponse) ProtoMessage() {}
+
+func (x *ListPendingPlacesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_place_place_intelligence_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPendingPlacesResponse.ProtoReflect.Descriptor instead.
+func (*ListPendingPlacesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_place_place_intelligence_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListPendingPlacesResponse) GetPlaces() []*PendingPlace {
+	if x != nil {
+		return x.Places
+	}
+	return nil
+}
+
 var File_loci_place_place_intelligence_proto protoreflect.FileDescriptor
 
 const file_loci_place_place_intelligence_proto_rawDesc = "" +
@@ -770,7 +1269,54 @@ const file_loci_place_place_intelligence_proto_rawDesc = "" +
 	"\x0faccepted_claims\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0eacceptedClaims\x12(\n" +
 	"\x06badges\x18\x04 \x03(\tB\x10\xbaH\r\x92\x01\n" +
 	"\x10\x14\"\x06r\x04\x10\x01\x18dR\x06badges\" \n" +
-	"\x1eGetMyContributorProfileRequest*\xe1\x02\n" +
+	"\x1eGetMyContributorProfileRequest\"\xdd\x03\n" +
+	"\x12SubmitPlaceRequest\x12>\n" +
+	"\x14client_submission_id\x18\x01 \x01(\tB\f\xbaH\tr\a\x10\x01\x18d\xb0\x01\x01R\x12clientSubmissionId\x12\x1e\n" +
+	"\x04name\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x02\x18\xac\x02R\x04name\x12'\n" +
+	"\tcity_name\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcityName\x12\x1d\n" +
+	"\acountry\x18\x04 \x01(\tH\x00R\acountry\x88\x01\x01\x12\x1f\n" +
+	"\bcategory\x18\x05 \x01(\tH\x01R\bcategory\x88\x01\x01\x128\n" +
+	"\blatitude\x18\x06 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x02R\blatitude\x88\x01\x01\x12:\n" +
+	"\tlongitude\x18\a \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x03R\tlongitude\x88\x01\x01\x12\x1d\n" +
+	"\aaddress\x18\b \x01(\tH\x04R\aaddress\x88\x01\x01\x12\x1d\n" +
+	"\awebsite\x18\t \x01(\tH\x05R\awebsite\x88\x01\x01B\n" +
+	"\n" +
+	"\b_countryB\v\n" +
+	"\t_categoryB\v\n" +
+	"\t_latitudeB\f\n" +
+	"\n" +
+	"_longitudeB\n" +
+	"\n" +
+	"\b_addressB\n" +
+	"\n" +
+	"\b_website\"\xa8\x01\n" +
+	"\x13SubmitPlaceResponse\x12#\n" +
+	"\rsubmission_id\x18\x01 \x01(\tR\fsubmissionId\x129\n" +
+	"\x06status\x18\x02 \x01(\x0e2!.loci.place.PlaceSubmissionStatusR\x06status\x121\n" +
+	"\x14confirmations_needed\x18\x03 \x01(\x05R\x13confirmationsNeeded\"H\n" +
+	"\x13ConfirmPlaceRequest\x121\n" +
+	"\rsubmission_id\x18\x01 \x01(\tB\f\xbaH\tr\a\x10\x01\x18d\xb0\x01\x01R\fsubmissionId\"\xab\x01\n" +
+	"\x14ConfirmPlaceResponse\x129\n" +
+	"\x06status\x18\x01 \x01(\x0e2!.loci.place.PlaceSubmissionStatusR\x06status\x121\n" +
+	"\x14confirmations_needed\x18\x02 \x01(\x05R\x13confirmationsNeeded\x12\x1a\n" +
+	"\x06poi_id\x18\x03 \x01(\tH\x00R\x05poiId\x88\x01\x01B\t\n" +
+	"\a_poi_id\"\xf0\x01\n" +
+	"\fPendingPlace\x12#\n" +
+	"\rsubmission_id\x18\x01 \x01(\tR\fsubmissionId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
+	"\tcity_name\x18\x03 \x01(\tR\bcityName\x12\x1f\n" +
+	"\bcategory\x18\x04 \x01(\tH\x00R\bcategory\x88\x01\x01\x12\x1d\n" +
+	"\aaddress\x18\x05 \x01(\tH\x01R\aaddress\x88\x01\x01\x121\n" +
+	"\x14confirmations_needed\x18\x06 \x01(\x05R\x13confirmationsNeededB\v\n" +
+	"\t_categoryB\n" +
+	"\n" +
+	"\b_address\";\n" +
+	"\x18ListPendingPlacesRequest\x12\x1f\n" +
+	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x182(\x01R\x05limit\"M\n" +
+	"\x19ListPendingPlacesResponse\x120\n" +
+	"\x06places\x18\x01 \x03(\v2\x18.loci.place.PendingPlaceR\x06places*\xe1\x02\n" +
 	"\x0ePlaceFactField\x12 \n" +
 	"\x1cPLACE_FACT_FIELD_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1ePLACE_FACT_FIELD_OPENING_HOURS\x10\x01\x12 \n" +
@@ -787,12 +1333,20 @@ const file_loci_place_place_intelligence_proto_rawDesc = "" +
 	"\x1aPLACE_CLAIM_STATUS_PENDING\x10\x01\x12\x1f\n" +
 	"\x1bPLACE_CLAIM_STATUS_ACCEPTED\x10\x02\x12#\n" +
 	"\x1fPLACE_CLAIM_STATUS_CONTRADICTED\x10\x03\x12\x1e\n" +
-	"\x1aPLACE_CLAIM_STATUS_EXPIRED\x10\x042\x99\x03\n" +
+	"\x1aPLACE_CLAIM_STATUS_EXPIRED\x10\x04*\xb1\x01\n" +
+	"\x15PlaceSubmissionStatus\x12'\n" +
+	"#PLACE_SUBMISSION_STATUS_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fPLACE_SUBMISSION_STATUS_PENDING\x10\x01\x12$\n" +
+	" PLACE_SUBMISSION_STATUS_ACCEPTED\x10\x02\x12$\n" +
+	" PLACE_SUBMISSION_STATUS_REJECTED\x10\x032\x9e\x05\n" +
 	"\x18PlaceIntelligenceService\x12I\n" +
 	"\rGetPlaceFacts\x12 .loci.place.GetPlaceFactsRequest\x1a\x16.loci.place.PlaceFacts\x12l\n" +
 	"\x15ListVerificationTasks\x12(.loci.place.ListVerificationTasksRequest\x1a).loci.place.ListVerificationTasksResponse\x12]\n" +
 	"\x10SubmitPlaceClaim\x12#.loci.place.SubmitPlaceClaimRequest\x1a$.loci.place.SubmitPlaceClaimResponse\x12e\n" +
-	"\x17GetMyContributorProfile\x12*.loci.place.GetMyContributorProfileRequest\x1a\x1e.loci.place.ContributorProfileBEZCgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place;placeb\x06proto3"
+	"\x17GetMyContributorProfile\x12*.loci.place.GetMyContributorProfileRequest\x1a\x1e.loci.place.ContributorProfile\x12N\n" +
+	"\vSubmitPlace\x12\x1e.loci.place.SubmitPlaceRequest\x1a\x1f.loci.place.SubmitPlaceResponse\x12Q\n" +
+	"\fConfirmPlace\x12\x1f.loci.place.ConfirmPlaceRequest\x1a .loci.place.ConfirmPlaceResponse\x12`\n" +
+	"\x11ListPendingPlaces\x12$.loci.place.ListPendingPlacesRequest\x1a%.loci.place.ListPendingPlacesResponseBEZCgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place;placeb\x06proto3"
 
 var (
 	file_loci_place_place_intelligence_proto_rawDescOnce sync.Once
@@ -806,47 +1360,64 @@ func file_loci_place_place_intelligence_proto_rawDescGZIP() []byte {
 	return file_loci_place_place_intelligence_proto_rawDescData
 }
 
-var file_loci_place_place_intelligence_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_loci_place_place_intelligence_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_loci_place_place_intelligence_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_loci_place_place_intelligence_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_loci_place_place_intelligence_proto_goTypes = []any{
 	(PlaceFactField)(0),                    // 0: loci.place.PlaceFactField
 	(PlaceClaimStatus)(0),                  // 1: loci.place.PlaceClaimStatus
-	(*PlaceFact)(nil),                      // 2: loci.place.PlaceFact
-	(*PlaceFacts)(nil),                     // 3: loci.place.PlaceFacts
-	(*GetPlaceFactsRequest)(nil),           // 4: loci.place.GetPlaceFactsRequest
-	(*VerificationTask)(nil),               // 5: loci.place.VerificationTask
-	(*ListVerificationTasksRequest)(nil),   // 6: loci.place.ListVerificationTasksRequest
-	(*ListVerificationTasksResponse)(nil),  // 7: loci.place.ListVerificationTasksResponse
-	(*SubmitPlaceClaimRequest)(nil),        // 8: loci.place.SubmitPlaceClaimRequest
-	(*SubmitPlaceClaimResponse)(nil),       // 9: loci.place.SubmitPlaceClaimResponse
-	(*ContributorProfile)(nil),             // 10: loci.place.ContributorProfile
-	(*GetMyContributorProfileRequest)(nil), // 11: loci.place.GetMyContributorProfileRequest
-	(*timestamppb.Timestamp)(nil),          // 12: google.protobuf.Timestamp
+	(PlaceSubmissionStatus)(0),             // 2: loci.place.PlaceSubmissionStatus
+	(*PlaceFact)(nil),                      // 3: loci.place.PlaceFact
+	(*PlaceFacts)(nil),                     // 4: loci.place.PlaceFacts
+	(*GetPlaceFactsRequest)(nil),           // 5: loci.place.GetPlaceFactsRequest
+	(*VerificationTask)(nil),               // 6: loci.place.VerificationTask
+	(*ListVerificationTasksRequest)(nil),   // 7: loci.place.ListVerificationTasksRequest
+	(*ListVerificationTasksResponse)(nil),  // 8: loci.place.ListVerificationTasksResponse
+	(*SubmitPlaceClaimRequest)(nil),        // 9: loci.place.SubmitPlaceClaimRequest
+	(*SubmitPlaceClaimResponse)(nil),       // 10: loci.place.SubmitPlaceClaimResponse
+	(*ContributorProfile)(nil),             // 11: loci.place.ContributorProfile
+	(*GetMyContributorProfileRequest)(nil), // 12: loci.place.GetMyContributorProfileRequest
+	(*SubmitPlaceRequest)(nil),             // 13: loci.place.SubmitPlaceRequest
+	(*SubmitPlaceResponse)(nil),            // 14: loci.place.SubmitPlaceResponse
+	(*ConfirmPlaceRequest)(nil),            // 15: loci.place.ConfirmPlaceRequest
+	(*ConfirmPlaceResponse)(nil),           // 16: loci.place.ConfirmPlaceResponse
+	(*PendingPlace)(nil),                   // 17: loci.place.PendingPlace
+	(*ListPendingPlacesRequest)(nil),       // 18: loci.place.ListPendingPlacesRequest
+	(*ListPendingPlacesResponse)(nil),      // 19: loci.place.ListPendingPlacesResponse
+	(*timestamppb.Timestamp)(nil),          // 20: google.protobuf.Timestamp
 }
 var file_loci_place_place_intelligence_proto_depIdxs = []int32{
 	0,  // 0: loci.place.PlaceFact.field:type_name -> loci.place.PlaceFactField
-	12, // 1: loci.place.PlaceFact.verified_at:type_name -> google.protobuf.Timestamp
-	12, // 2: loci.place.PlaceFact.expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 3: loci.place.PlaceFacts.facts:type_name -> loci.place.PlaceFact
+	20, // 1: loci.place.PlaceFact.verified_at:type_name -> google.protobuf.Timestamp
+	20, // 2: loci.place.PlaceFact.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 3: loci.place.PlaceFacts.facts:type_name -> loci.place.PlaceFact
 	0,  // 4: loci.place.VerificationTask.requested_fields:type_name -> loci.place.PlaceFactField
-	12, // 5: loci.place.VerificationTask.oldest_fact_at:type_name -> google.protobuf.Timestamp
-	5,  // 6: loci.place.ListVerificationTasksResponse.tasks:type_name -> loci.place.VerificationTask
+	20, // 5: loci.place.VerificationTask.oldest_fact_at:type_name -> google.protobuf.Timestamp
+	6,  // 6: loci.place.ListVerificationTasksResponse.tasks:type_name -> loci.place.VerificationTask
 	0,  // 7: loci.place.SubmitPlaceClaimRequest.field:type_name -> loci.place.PlaceFactField
-	12, // 8: loci.place.SubmitPlaceClaimRequest.observed_at:type_name -> google.protobuf.Timestamp
+	20, // 8: loci.place.SubmitPlaceClaimRequest.observed_at:type_name -> google.protobuf.Timestamp
 	1,  // 9: loci.place.SubmitPlaceClaimResponse.status:type_name -> loci.place.PlaceClaimStatus
-	4,  // 10: loci.place.PlaceIntelligenceService.GetPlaceFacts:input_type -> loci.place.GetPlaceFactsRequest
-	6,  // 11: loci.place.PlaceIntelligenceService.ListVerificationTasks:input_type -> loci.place.ListVerificationTasksRequest
-	8,  // 12: loci.place.PlaceIntelligenceService.SubmitPlaceClaim:input_type -> loci.place.SubmitPlaceClaimRequest
-	11, // 13: loci.place.PlaceIntelligenceService.GetMyContributorProfile:input_type -> loci.place.GetMyContributorProfileRequest
-	3,  // 14: loci.place.PlaceIntelligenceService.GetPlaceFacts:output_type -> loci.place.PlaceFacts
-	7,  // 15: loci.place.PlaceIntelligenceService.ListVerificationTasks:output_type -> loci.place.ListVerificationTasksResponse
-	9,  // 16: loci.place.PlaceIntelligenceService.SubmitPlaceClaim:output_type -> loci.place.SubmitPlaceClaimResponse
-	10, // 17: loci.place.PlaceIntelligenceService.GetMyContributorProfile:output_type -> loci.place.ContributorProfile
-	14, // [14:18] is the sub-list for method output_type
-	10, // [10:14] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	2,  // 10: loci.place.SubmitPlaceResponse.status:type_name -> loci.place.PlaceSubmissionStatus
+	2,  // 11: loci.place.ConfirmPlaceResponse.status:type_name -> loci.place.PlaceSubmissionStatus
+	17, // 12: loci.place.ListPendingPlacesResponse.places:type_name -> loci.place.PendingPlace
+	5,  // 13: loci.place.PlaceIntelligenceService.GetPlaceFacts:input_type -> loci.place.GetPlaceFactsRequest
+	7,  // 14: loci.place.PlaceIntelligenceService.ListVerificationTasks:input_type -> loci.place.ListVerificationTasksRequest
+	9,  // 15: loci.place.PlaceIntelligenceService.SubmitPlaceClaim:input_type -> loci.place.SubmitPlaceClaimRequest
+	12, // 16: loci.place.PlaceIntelligenceService.GetMyContributorProfile:input_type -> loci.place.GetMyContributorProfileRequest
+	13, // 17: loci.place.PlaceIntelligenceService.SubmitPlace:input_type -> loci.place.SubmitPlaceRequest
+	15, // 18: loci.place.PlaceIntelligenceService.ConfirmPlace:input_type -> loci.place.ConfirmPlaceRequest
+	18, // 19: loci.place.PlaceIntelligenceService.ListPendingPlaces:input_type -> loci.place.ListPendingPlacesRequest
+	4,  // 20: loci.place.PlaceIntelligenceService.GetPlaceFacts:output_type -> loci.place.PlaceFacts
+	8,  // 21: loci.place.PlaceIntelligenceService.ListVerificationTasks:output_type -> loci.place.ListVerificationTasksResponse
+	10, // 22: loci.place.PlaceIntelligenceService.SubmitPlaceClaim:output_type -> loci.place.SubmitPlaceClaimResponse
+	11, // 23: loci.place.PlaceIntelligenceService.GetMyContributorProfile:output_type -> loci.place.ContributorProfile
+	14, // 24: loci.place.PlaceIntelligenceService.SubmitPlace:output_type -> loci.place.SubmitPlaceResponse
+	16, // 25: loci.place.PlaceIntelligenceService.ConfirmPlace:output_type -> loci.place.ConfirmPlaceResponse
+	19, // 26: loci.place.PlaceIntelligenceService.ListPendingPlaces:output_type -> loci.place.ListPendingPlacesResponse
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_loci_place_place_intelligence_proto_init() }
@@ -855,13 +1426,16 @@ func file_loci_place_place_intelligence_proto_init() {
 		return
 	}
 	file_loci_place_place_intelligence_proto_msgTypes[3].OneofWrappers = []any{}
+	file_loci_place_place_intelligence_proto_msgTypes[10].OneofWrappers = []any{}
+	file_loci_place_place_intelligence_proto_msgTypes[13].OneofWrappers = []any{}
+	file_loci_place_place_intelligence_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_place_place_intelligence_proto_rawDesc), len(file_loci_place_place_intelligence_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   10,
+			NumEnums:      3,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
