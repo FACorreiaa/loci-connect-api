@@ -79,7 +79,7 @@ Proto changes are a release, not an edit: merged, tagged, `go get` on the
 server, `buf push` plus a `package.json` bump on the client. See the workspace
 `CLAUDE.md`.
 
-### Storage — migration 0090
+### Storage — migration 0094
 
 ```sql
 CREATE TABLE place_submissions (
@@ -88,7 +88,6 @@ CREATE TABLE place_submissions (
     user_id              UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     city_id              UUID NOT NULL REFERENCES cities (id) ON DELETE CASCADE,
     name                 TEXT NOT NULL,
-    normalised_name      TEXT NOT NULL,
     category             TEXT,
     latitude             DOUBLE PRECISION,
     longitude            DOUBLE PRECISION,
@@ -104,8 +103,14 @@ CREATE TABLE place_submissions (
 -- Two people submitting the same place race to the same row rather than
 -- creating twins. Partial, so a rejected submission does not block a later
 -- honest one.
+--
+-- The expression is copied verbatim from migration 0068's index on
+-- points_of_interest, which is what UpsertPOIByIdentity conflicts on. Sharing
+-- the expression is what makes "the same place" mean the same thing in both
+-- tables; a separate normalised_name column would be a second definition free
+-- to drift from the first.
 CREATE UNIQUE INDEX idx_place_submissions_identity
-    ON place_submissions (city_id, normalised_name)
+    ON place_submissions (city_id, lower(btrim(name)))
     WHERE status <> 'rejected';
 
 CREATE TABLE place_submission_confirmations (
@@ -121,9 +126,9 @@ expressed as a constraint: one person cannot confirm the same place twice, so
 `COUNT(*)` is already a count of distinct people. The claims flow spends a
 `COUNT(DISTINCT user_id)` at read time to get the same guarantee; here it is free.
 
-`normalised_name` is produced by the existing normalisation in
-`city/city_normalize.go`, so submissions and POIs agree on what "the same name"
-means.
+Identity is therefore `(city_id, lower(btrim(name)))` in both tables. There is no
+Go-side normalisation helper to keep in step, because there is no second
+definition.
 
 ### Promotion
 
@@ -148,8 +153,8 @@ All four steps run in one transaction, as `SubmitPlaceClaim` does.
 
 ### Dedupe on submit
 
-Before inserting, normalise the name and check whether
-`(city_id, normalised_name)` already exists in `points_of_interest`. If it does,
+Before inserting, check whether `(city_id, lower(btrim(name)))` already exists in
+`points_of_interest`. If it does,
 return `AlreadyExists` with the existing POI id, so the client can say "this
 place is already on the guide" and offer to open it — rather than creating a
 duplicate that `UpsertPOIByIdentity` would later silently merge.
