@@ -647,6 +647,10 @@ func (s *service) CreateCheckoutSession(ctx context.Context, req *CreateCheckout
 		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		SuccessURL:        stripe.String(req.SuccessURL),
 		CancelURL:         stripe.String(req.CancelURL),
+		// Stripe renders and validates the promotion-code field itself. This
+		// replaces a client-side promo box that matched against a hardcoded
+		// list and granted a plan that does not exist.
+		AllowPromotionCodes: stripe.Bool(true),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
 				Price:    stripe.String(req.PriceID),
