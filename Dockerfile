@@ -20,7 +20,8 @@ COPY . .
 
 # Build the application with optimizations
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o server ./cmd/server \
- && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o preference-rerank ./cmd/preference-rerank
+ && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o preference-rerank ./cmd/preference-rerank \
+ && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o bundle-forge ./cmd/bundle-forge
 
 # Runtime stage
 FROM alpine:latest
@@ -34,6 +35,9 @@ WORKDIR /app
 # Copy binaries from builder
 COPY --from=builder /app/server .
 COPY --from=builder /app/preference-rerank .
+# City Packs are authored by a job out of this same image, the way the
+# rerank job is: same config loader, same migrations, no second build.
+COPY --from=builder /app/bundle-forge .
 
 # Expose ports (API:8080, Metrics:9090, pprof:6060)
 EXPOSE 8080 9090 6060

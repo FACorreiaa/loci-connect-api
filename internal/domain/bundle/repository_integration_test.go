@@ -228,3 +228,83 @@ func TestPurchasedBundleCannotBeDeleted(t *testing.T) {
 	_, err := testDB.Exec(ctx(), "DELETE FROM bundles WHERE id = $1", id)
 	require.Error(t, err, "ON DELETE RESTRICT must refuse to erase a bought pack")
 }
+
+func TestAuthoringPipeline(t *testing.T) {
+	lat, lon := 38.72, -9.14
+	slug := "forge-" + uuid.NewString()[:8]
+
+	id, err := testRepo.CreateDraft(ctx(), Draft{
+		Slug: slug, Title: "Three days in Lisbon", Summary: "why",
+		CityName: "Lisbon", CountryCode: "PT", Theme: "food",
+		Months: []int16{9, 10}, IsPaid: true,
+		SourcePrompt: "p", SourceModel: "m",
+		Days: []Day{
+			{DayNumber: 1, Title: "Alfama", Stops: []Stop{
+				{OrderIndex: 0, Name: "Miradouro", Latitude: &lat, Longitude: &lon, Notes: "the view"},
+				{OrderIndex: 1, Name: "Time Out", Latitude: &lat, Longitude: &lon, Notes: "lunch"},
+			}},
+			{DayNumber: 2, Title: "Belém", Stops: []Stop{
+				{OrderIndex: 0, Name: "Jerónimos", Latitude: &lat, Longitude: &lon, Notes: "go early"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+
+	// A draft is invisible to the catalog until it is published.
+	_, err = testRepo.GetPublishedBySlug(ctx(), slug)
+	assert.ErrorIs(t, err, ErrNotFound, "a draft must not be reachable by slug")
+
+	drafts, err := testRepo.ListByStatus(ctx(), StatusDraft)
+	require.NoError(t, err)
+	found := false
+	for _, b := range drafts {
+		if b.ID == id {
+			found = true
+			assert.Equal(t, 2, b.DayCount)
+			assert.Equal(t, 3, b.StopCount, "stop_count is derived, not trusted from the caller")
+		}
+	}
+	assert.True(t, found, "the draft must be listed for review")
+
+	exists, err := testRepo.SlugExists(ctx(), slug)
+	require.NoError(t, err)
+	assert.True(t, exists, "a re-run must be able to see it has already generated this")
+
+	require.NoError(t, testRepo.SetStatus(ctx(), id, StatusApproved, "someone@example.test"))
+	b, err := testRepo.GetAnyBySlug(ctx(), slug)
+	require.NoError(t, err)
+	assert.Equal(t, StatusApproved, b.Status)
+	assert.Equal(t, "someone@example.test", b.ApprovedBy)
+	require.NotNil(t, b.ApprovedAt)
+	require.NotNil(t, b.VerifiedAt, "approving is when we last checked it against reality")
+
+	require.NoError(t, testRepo.SetStatus(ctx(), id, StatusPublished, ""))
+	pub, err := testRepo.GetPublishedBySlug(ctx(), slug)
+	require.NoError(t, err)
+	require.NotNil(t, pub.PublishedAt)
+	assert.Equal(t, "someone@example.test", pub.ApprovedBy,
+		"publishing must not erase who approved it")
+
+	days, err := testRepo.LoadDays(ctx(), id, 0)
+	require.NoError(t, err)
+	require.Len(t, days, 2)
+	assert.Equal(t, "Miradouro", days[0].Stops[0].Name, "stops keep their authored order")
+	assert.Equal(t, "Time Out", days[0].Stops[1].Name)
+}
+
+func TestCreateDraft_IsAllOrNothing(t *testing.T) {
+	slug := "atomic-" + uuid.NewString()[:8]
+
+	// An unnamed stop violates the CHECK on bundle_stops.name. The pack must
+	// not be left half-written: a review that shows something the generator
+	// never produced is worse than a pack that is missing.
+	_, err := testRepo.CreateDraft(ctx(), Draft{
+		Slug: slug, Title: "Broken", CityName: "Lisbon",
+		Days: []Day{{DayNumber: 1, Stops: []Stop{{OrderIndex: 0, Name: ""}}}},
+	})
+	require.Error(t, err)
+
+	exists, err := testRepo.SlugExists(ctx(), slug)
+	require.NoError(t, err)
+	assert.False(t, exists, "the failed draft must have rolled back entirely")
+}
