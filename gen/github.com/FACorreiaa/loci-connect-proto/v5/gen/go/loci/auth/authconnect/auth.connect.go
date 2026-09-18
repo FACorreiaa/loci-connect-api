@@ -73,6 +73,18 @@ const (
 	// AuthServiceGetMFAStatusProcedure is the fully-qualified name of the AuthService's GetMFAStatus
 	// RPC.
 	AuthServiceGetMFAStatusProcedure = "/loci.auth.AuthService/GetMFAStatus"
+	// AuthServiceConfirmEmailChangeProcedure is the fully-qualified name of the AuthService's
+	// ConfirmEmailChange RPC.
+	AuthServiceConfirmEmailChangeProcedure = "/loci.auth.AuthService/ConfirmEmailChange"
+	// AuthServiceListSessionsProcedure is the fully-qualified name of the AuthService's ListSessions
+	// RPC.
+	AuthServiceListSessionsProcedure = "/loci.auth.AuthService/ListSessions"
+	// AuthServiceRevokeSessionProcedure is the fully-qualified name of the AuthService's RevokeSession
+	// RPC.
+	AuthServiceRevokeSessionProcedure = "/loci.auth.AuthService/RevokeSession"
+	// AuthServiceRevokeOtherSessionsProcedure is the fully-qualified name of the AuthService's
+	// RevokeOtherSessions RPC.
+	AuthServiceRevokeOtherSessionsProcedure = "/loci.auth.AuthService/RevokeOtherSessions"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -93,6 +105,10 @@ var (
 	authServiceDisableMFAMethodDescriptor              = authServiceServiceDescriptor.Methods().ByName("DisableMFA")
 	authServiceRegenerateRecoveryCodesMethodDescriptor = authServiceServiceDescriptor.Methods().ByName("RegenerateRecoveryCodes")
 	authServiceGetMFAStatusMethodDescriptor            = authServiceServiceDescriptor.Methods().ByName("GetMFAStatus")
+	authServiceConfirmEmailChangeMethodDescriptor      = authServiceServiceDescriptor.Methods().ByName("ConfirmEmailChange")
+	authServiceListSessionsMethodDescriptor            = authServiceServiceDescriptor.Methods().ByName("ListSessions")
+	authServiceRevokeSessionMethodDescriptor           = authServiceServiceDescriptor.Methods().ByName("RevokeSession")
+	authServiceRevokeOtherSessionsMethodDescriptor     = authServiceServiceDescriptor.Methods().ByName("RevokeOtherSessions")
 )
 
 // AuthServiceClient is a client for the loci.auth.AuthService service.
@@ -118,6 +134,15 @@ type AuthServiceClient interface {
 	DisableMFA(context.Context, *connect.Request[auth.DisableMFARequest]) (*connect.Response[common.Response], error)
 	RegenerateRecoveryCodes(context.Context, *connect.Request[auth.RegenerateRecoveryCodesRequest]) (*connect.Response[auth.RegenerateRecoveryCodesResponse], error)
 	GetMFAStatus(context.Context, *connect.Request[auth.GetMFAStatusRequest]) (*connect.Response[auth.GetMFAStatusResponse], error)
+	// Completes an email change started by ChangeEmail. Unauthenticated: the
+	// token from the confirmation mail is the credential, and the person may be
+	// opening the link in a browser that is not signed in.
+	ConfirmEmailChange(context.Context, *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[common.Response], error)
+	// Signed-in devices. The session rows have always carried user_agent and
+	// client_ip; these are what let somebody see and end them.
+	ListSessions(context.Context, *connect.Request[auth.ListSessionsRequest]) (*connect.Response[auth.ListSessionsResponse], error)
+	RevokeSession(context.Context, *connect.Request[auth.RevokeSessionRequest]) (*connect.Response[common.Response], error)
+	RevokeOtherSessions(context.Context, *connect.Request[auth.RevokeOtherSessionsRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewAuthServiceClient constructs a client for the loci.auth.AuthService service. By default, it
@@ -220,6 +245,30 @@ func NewAuthServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(authServiceGetMFAStatusMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		confirmEmailChange: connect.NewClient[auth.ConfirmEmailChangeRequest, common.Response](
+			httpClient,
+			baseURL+AuthServiceConfirmEmailChangeProcedure,
+			connect.WithSchema(authServiceConfirmEmailChangeMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listSessions: connect.NewClient[auth.ListSessionsRequest, auth.ListSessionsResponse](
+			httpClient,
+			baseURL+AuthServiceListSessionsProcedure,
+			connect.WithSchema(authServiceListSessionsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		revokeSession: connect.NewClient[auth.RevokeSessionRequest, common.Response](
+			httpClient,
+			baseURL+AuthServiceRevokeSessionProcedure,
+			connect.WithSchema(authServiceRevokeSessionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		revokeOtherSessions: connect.NewClient[auth.RevokeOtherSessionsRequest, common.Response](
+			httpClient,
+			baseURL+AuthServiceRevokeOtherSessionsProcedure,
+			connect.WithSchema(authServiceRevokeOtherSessionsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -240,6 +289,10 @@ type authServiceClient struct {
 	disableMFA              *connect.Client[auth.DisableMFARequest, common.Response]
 	regenerateRecoveryCodes *connect.Client[auth.RegenerateRecoveryCodesRequest, auth.RegenerateRecoveryCodesResponse]
 	getMFAStatus            *connect.Client[auth.GetMFAStatusRequest, auth.GetMFAStatusResponse]
+	confirmEmailChange      *connect.Client[auth.ConfirmEmailChangeRequest, common.Response]
+	listSessions            *connect.Client[auth.ListSessionsRequest, auth.ListSessionsResponse]
+	revokeSession           *connect.Client[auth.RevokeSessionRequest, common.Response]
+	revokeOtherSessions     *connect.Client[auth.RevokeOtherSessionsRequest, common.Response]
 }
 
 // Login calls loci.auth.AuthService.Login.
@@ -317,6 +370,26 @@ func (c *authServiceClient) GetMFAStatus(ctx context.Context, req *connect.Reque
 	return c.getMFAStatus.CallUnary(ctx, req)
 }
 
+// ConfirmEmailChange calls loci.auth.AuthService.ConfirmEmailChange.
+func (c *authServiceClient) ConfirmEmailChange(ctx context.Context, req *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[common.Response], error) {
+	return c.confirmEmailChange.CallUnary(ctx, req)
+}
+
+// ListSessions calls loci.auth.AuthService.ListSessions.
+func (c *authServiceClient) ListSessions(ctx context.Context, req *connect.Request[auth.ListSessionsRequest]) (*connect.Response[auth.ListSessionsResponse], error) {
+	return c.listSessions.CallUnary(ctx, req)
+}
+
+// RevokeSession calls loci.auth.AuthService.RevokeSession.
+func (c *authServiceClient) RevokeSession(ctx context.Context, req *connect.Request[auth.RevokeSessionRequest]) (*connect.Response[common.Response], error) {
+	return c.revokeSession.CallUnary(ctx, req)
+}
+
+// RevokeOtherSessions calls loci.auth.AuthService.RevokeOtherSessions.
+func (c *authServiceClient) RevokeOtherSessions(ctx context.Context, req *connect.Request[auth.RevokeOtherSessionsRequest]) (*connect.Response[common.Response], error) {
+	return c.revokeOtherSessions.CallUnary(ctx, req)
+}
+
 // AuthServiceHandler is an implementation of the loci.auth.AuthService service.
 type AuthServiceHandler interface {
 	Login(context.Context, *connect.Request[auth.LoginRequest]) (*connect.Response[auth.LoginResponse], error)
@@ -340,6 +413,15 @@ type AuthServiceHandler interface {
 	DisableMFA(context.Context, *connect.Request[auth.DisableMFARequest]) (*connect.Response[common.Response], error)
 	RegenerateRecoveryCodes(context.Context, *connect.Request[auth.RegenerateRecoveryCodesRequest]) (*connect.Response[auth.RegenerateRecoveryCodesResponse], error)
 	GetMFAStatus(context.Context, *connect.Request[auth.GetMFAStatusRequest]) (*connect.Response[auth.GetMFAStatusResponse], error)
+	// Completes an email change started by ChangeEmail. Unauthenticated: the
+	// token from the confirmation mail is the credential, and the person may be
+	// opening the link in a browser that is not signed in.
+	ConfirmEmailChange(context.Context, *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[common.Response], error)
+	// Signed-in devices. The session rows have always carried user_agent and
+	// client_ip; these are what let somebody see and end them.
+	ListSessions(context.Context, *connect.Request[auth.ListSessionsRequest]) (*connect.Response[auth.ListSessionsResponse], error)
+	RevokeSession(context.Context, *connect.Request[auth.RevokeSessionRequest]) (*connect.Response[common.Response], error)
+	RevokeOtherSessions(context.Context, *connect.Request[auth.RevokeOtherSessionsRequest]) (*connect.Response[common.Response], error)
 }
 
 // NewAuthServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -438,6 +520,30 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(authServiceGetMFAStatusMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	authServiceConfirmEmailChangeHandler := connect.NewUnaryHandler(
+		AuthServiceConfirmEmailChangeProcedure,
+		svc.ConfirmEmailChange,
+		connect.WithSchema(authServiceConfirmEmailChangeMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	authServiceListSessionsHandler := connect.NewUnaryHandler(
+		AuthServiceListSessionsProcedure,
+		svc.ListSessions,
+		connect.WithSchema(authServiceListSessionsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	authServiceRevokeSessionHandler := connect.NewUnaryHandler(
+		AuthServiceRevokeSessionProcedure,
+		svc.RevokeSession,
+		connect.WithSchema(authServiceRevokeSessionMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	authServiceRevokeOtherSessionsHandler := connect.NewUnaryHandler(
+		AuthServiceRevokeOtherSessionsProcedure,
+		svc.RevokeOtherSessions,
+		connect.WithSchema(authServiceRevokeOtherSessionsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.auth.AuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AuthServiceLoginProcedure:
@@ -470,6 +576,14 @@ func NewAuthServiceHandler(svc AuthServiceHandler, opts ...connect.HandlerOption
 			authServiceRegenerateRecoveryCodesHandler.ServeHTTP(w, r)
 		case AuthServiceGetMFAStatusProcedure:
 			authServiceGetMFAStatusHandler.ServeHTTP(w, r)
+		case AuthServiceConfirmEmailChangeProcedure:
+			authServiceConfirmEmailChangeHandler.ServeHTTP(w, r)
+		case AuthServiceListSessionsProcedure:
+			authServiceListSessionsHandler.ServeHTTP(w, r)
+		case AuthServiceRevokeSessionProcedure:
+			authServiceRevokeSessionHandler.ServeHTTP(w, r)
+		case AuthServiceRevokeOtherSessionsProcedure:
+			authServiceRevokeOtherSessionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -537,4 +651,20 @@ func (UnimplementedAuthServiceHandler) RegenerateRecoveryCodes(context.Context, 
 
 func (UnimplementedAuthServiceHandler) GetMFAStatus(context.Context, *connect.Request[auth.GetMFAStatusRequest]) (*connect.Response[auth.GetMFAStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.GetMFAStatus is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) ConfirmEmailChange(context.Context, *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.ConfirmEmailChange is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) ListSessions(context.Context, *connect.Request[auth.ListSessionsRequest]) (*connect.Response[auth.ListSessionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.ListSessions is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) RevokeSession(context.Context, *connect.Request[auth.RevokeSessionRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.RevokeSession is not implemented"))
+}
+
+func (UnimplementedAuthServiceHandler) RevokeOtherSessions(context.Context, *connect.Request[auth.RevokeOtherSessionsRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.auth.AuthService.RevokeOtherSessions is not implemented"))
 }

@@ -772,13 +772,17 @@ type InteractionFilter struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	InteractionTypes []InteractionType      `protobuf:"varint,1,rep,packed,name=interaction_types,json=interactionTypes,proto3,enum=loci.recents.InteractionType" json:"interaction_types,omitempty"`
 	EntityTypes      []string               `protobuf:"bytes,2,rep,name=entity_types,json=entityTypes,proto3" json:"entity_types,omitempty"`
-	CityId           string                 `protobuf:"bytes,3,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
-	StartDate        *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
-	EndDate          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
-	SearchQuery      string                 `protobuf:"bytes,6,opt,name=search_query,json=searchQuery,proto3" json:"search_query,omitempty"`
-	Categories       []string               `protobuf:"bytes,7,rep,name=categories,proto3" json:"categories,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// city_id and search_query are optional narrowings, so an unset one has to
+	// stay legal. Without IGNORE_IF_ZERO_VALUE the min_len rule fires on the
+	// empty default, and a caller filtering only by entity_types — the activity
+	// feed's type chips — is rejected for leaving these two blank.
+	CityId        string                 `protobuf:"bytes,3,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	StartDate     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=start_date,json=startDate,proto3" json:"start_date,omitempty"`
+	EndDate       *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=end_date,json=endDate,proto3" json:"end_date,omitempty"`
+	SearchQuery   string                 `protobuf:"bytes,6,opt,name=search_query,json=searchQuery,proto3" json:"search_query,omitempty"`
+	Categories    []string               `protobuf:"bytes,7,rep,name=categories,proto3" json:"categories,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InteractionFilter) Reset() {
@@ -1549,14 +1553,16 @@ func (x *RecordInteractionResponse) GetMessage() string {
 }
 
 type GetInteractionHistoryRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Filter           *InteractionFilter     `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
-	Limit            int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset           int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
-	SortBy           string                 `protobuf:"bytes,5,opt,name=sort_by,json=sortBy,proto3" json:"sort_by,omitempty"`          // "date", "frequency", "relevance"
-	SortOrder        string                 `protobuf:"bytes,6,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"` // "asc", "desc"
-	IncludeAnalytics bool                   `protobuf:"varint,7,opt,name=include_analytics,json=includeAnalytics,proto3" json:"include_analytics,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Filter *InteractionFilter     `protobuf:"bytes,2,opt,name=filter,proto3" json:"filter,omitempty"`
+	Limit  int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`
+	// Both default to the server's choice (date, descending) when unset, so an
+	// empty string has to pass. The `in` rule alone rejects it.
+	SortBy           string `protobuf:"bytes,5,opt,name=sort_by,json=sortBy,proto3" json:"sort_by,omitempty"`          // "date", "frequency", "relevance"
+	SortOrder        string `protobuf:"bytes,6,opt,name=sort_order,json=sortOrder,proto3" json:"sort_order,omitempty"` // "asc", "desc"
+	IncludeAnalytics bool   `protobuf:"varint,7,opt,name=include_analytics,json=includeAnalytics,proto3" json:"include_analytics,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -2122,17 +2128,17 @@ const file_loci_recents_recents_proto_rawDesc = "" +
 	"last_visit\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tlastVisit\x12B\n" +
 	"\x15visit_frequency_score\x18\f \x01(\x01B\x0e\xbaH\v\x12\t)\x00\x00\x00\x00\x00\x00\x00\x00R\x13visitFrequencyScore\x12Y\n" +
 	"\x11interaction_types\x18\r \x03(\x0e2\x1d.loci.recents.InteractionTypeB\r\xbaH\n" +
-	"\x92\x01\a\"\x05\x82\x01\x02\x10\x01R\x10interactionTypes\"\xf6\x02\n" +
+	"\x92\x01\a\"\x05\x82\x01\x02\x10\x01R\x10interactionTypes\"\xfc\x02\n" +
 	"\x11InteractionFilter\x12Y\n" +
 	"\x11interaction_types\x18\x01 \x03(\x0e2\x1d.loci.recents.InteractionTypeB\r\xbaH\n" +
 	"\x92\x01\a\"\x05\x82\x01\x02\x10\x01R\x10interactionTypes\x12!\n" +
-	"\fentity_types\x18\x02 \x03(\tR\ventityTypes\x12\"\n" +
-	"\acity_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06cityId\x129\n" +
+	"\fentity_types\x18\x02 \x03(\tR\ventityTypes\x12%\n" +
+	"\acity_id\x18\x03 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x10\x01\x18dR\x06cityId\x129\n" +
 	"\n" +
 	"start_date\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tstartDate\x125\n" +
-	"\bend_date\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\x12-\n" +
-	"\fsearch_query\x18\x06 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\vsearchQuery\x12\x1e\n" +
+	"\bend_date\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\aendDate\x120\n" +
+	"\fsearch_query\x18\x06 \x01(\tB\r\xbaH\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01R\vsearchQuery\x12\x1e\n" +
 	"\n" +
 	"categories\x18\a \x03(\tR\n" +
 	"categories\"\xe1\x01\n" +
@@ -2199,16 +2205,16 @@ const file_loci_recents_recents_proto_rawDesc = "" +
 	"\x19RecordInteractionResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12%\n" +
 	"\x0einteraction_id\x18\x02 \x01(\tR\rinteractionId\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\xd8\x02\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xde\x02\n" +
 	"\x1cGetInteractionHistoryRequest\x12\"\n" +
 	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x127\n" +
 	"\x06filter\x18\x02 \x01(\v2\x1f.loci.recents.InteractionFilterR\x06filter\x12 \n" +
 	"\x05limit\x18\x03 \x01(\x05B\n" +
 	"\xbaH\a\x1a\x05\x18\xc8\x01(\x01R\x05limit\x12\x1f\n" +
-	"\x06offset\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12:\n" +
-	"\asort_by\x18\x05 \x01(\tB!\xbaH\x1er\x1cR\x04dateR\tfrequencyR\trelevanceR\x06sortBy\x12/\n" +
+	"\x06offset\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12=\n" +
+	"\asort_by\x18\x05 \x01(\tB$\xbaH!\xd8\x01\x01r\x1cR\x04dateR\tfrequencyR\trelevanceR\x06sortBy\x122\n" +
 	"\n" +
-	"sort_order\x18\x06 \x01(\tB\x10\xbaH\rr\vR\x03ascR\x04descR\tsortOrder\x12+\n" +
+	"sort_order\x18\x06 \x01(\tB\x13\xbaH\x10\xd8\x01\x01r\vR\x03ascR\x04descR\tsortOrder\x12+\n" +
 	"\x11include_analytics\x18\a \x01(\bR\x10includeAnalytics\"\xf8\x01\n" +
 	"\x1dGetInteractionHistoryResponse\x12C\n" +
 	"\finteractions\x18\x01 \x03(\v2\x1f.loci.recents.RecentInteractionR\finteractions\x12\x1f\n" +
