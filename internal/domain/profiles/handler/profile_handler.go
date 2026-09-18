@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	profilev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile"
@@ -25,25 +26,34 @@ func NewProfileHandler(svc profiles.Service) *ProfileHandler {
 	return &ProfileHandler{service: svc}
 }
 
-func (h *ProfileHandler) GetUserPreferenceProfiles(ctx context.Context, req *connect.Request[profilev1.GetUserPreferenceProfilesRequest]) (*connect.Response[profilev1.GetUserPreferenceProfilesResponse], error) {
-	// The authenticated identity is the only one that counts. This used to
-	// prefer req.Msg.user_id when set, which let any caller read any other
-	// user's preference profiles by passing their id.
+// callerID resolves the authenticated subject from the token claims.
+//
+// Every RPC on this service acts on the caller's own data. Requests carry a
+// user_id field and several handlers used to read it, falling back to the
+// token only when it was empty — which let any authenticated caller pass
+// somebody else's id and read their travel profiles. The field is now ignored
+// everywhere; the token is the only authority on who is asking.
+func callerID(ctx context.Context) (uuid.UUID, error) {
 	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
 	if !ok || userIDStr == "" {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-	}
-	if requested := req.Msg.GetUserId(); requested != "" && requested != userIDStr {
-		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("cannot read another user's profiles"))
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 	userID, err := presenter.ParseUUID(userIDStr)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+		return uuid.Nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+	}
+	return userID, nil
+}
+
+func (h *ProfileHandler) GetUserPreferenceProfiles(ctx context.Context, req *connect.Request[profilev1.GetUserPreferenceProfilesRequest]) (*connect.Response[profilev1.GetUserPreferenceProfilesResponse], error) {
+	userID, err := callerID(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	profilesResp, err := h.service.GetSearchProfiles(ctx, userID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	return connect.NewResponse(&profilev1.GetUserPreferenceProfilesResponse{
@@ -52,13 +62,9 @@ func (h *ProfileHandler) GetUserPreferenceProfiles(ctx context.Context, req *con
 }
 
 func (h *ProfileHandler) CreateUserPreferenceProfile(ctx context.Context, req *connect.Request[profilev1.CreateUserPreferenceProfileRequest]) (*connect.Response[commonpb.Response], error) {
-	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
-	if !ok || userIDStr == "" {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-	}
-	userID, err := presenter.ParseUUID(userIDStr)
+	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+		return nil, err
 	}
 
 	params, err := presenter.FromCreateProto(req.Msg)
@@ -67,7 +73,7 @@ func (h *ProfileHandler) CreateUserPreferenceProfile(ctx context.Context, req *c
 	}
 
 	if _, err := h.service.CreateSearchProfile(ctx, userID, params); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	msg := "profile created"
@@ -75,13 +81,9 @@ func (h *ProfileHandler) CreateUserPreferenceProfile(ctx context.Context, req *c
 }
 
 func (h *ProfileHandler) UpdateUserPreferenceProfile(ctx context.Context, req *connect.Request[profilev1.UpdateUserPreferenceProfileRequest]) (*connect.Response[commonpb.Response], error) {
-	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
-	if !ok || userIDStr == "" {
-		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-	}
-	userID, err := presenter.ParseUUID(userIDStr)
+	userID, err := callerID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+		return nil, err
 	}
 
 	profileID, err := presenter.ParseUUID(req.Msg.GetProfileId())
@@ -95,7 +97,7 @@ func (h *ProfileHandler) UpdateUserPreferenceProfile(ctx context.Context, req *c
 	}
 
 	if err := h.service.UpdateSearchProfile(ctx, userID, profileID, params); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, asConnectError(err)
 	}
 
 	msg := "profile updated"

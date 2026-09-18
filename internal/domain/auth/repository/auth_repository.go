@@ -385,3 +385,71 @@ func (r *PostgresAuthRepository) CreateUserWithPhone(ctx context.Context, phone,
 
 	return user, nil
 }
+
+// ListUserSessions returns the caller's live sessions, newest first.
+//
+// Expired rows are filtered out rather than shown as dead entries: a session
+// that can no longer refresh is not somewhere the account is signed in.
+func (r *PostgresAuthRepository) ListUserSessions(ctx context.Context, userID uuid.UUID) ([]UserSession, error) {
+	query := `
+		SELECT id, user_id, hashed_refresh_token, user_agent, client_ip, expires_at, created_at
+		FROM user_sessions
+		WHERE user_id = $1 AND expires_at > $2
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.pgpool.Query(ctx, query, userID, time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	return pgx.CollectRows(rows, pgx.RowToStructByName[UserSession])
+}
+
+// DeleteUserSessionByID ends one session belonging to this user.
+func (r *PostgresAuthRepository) DeleteUserSessionByID(ctx context.Context, userID, sessionID uuid.UUID) error {
+	query := `DELETE FROM user_sessions WHERE id = $1 AND user_id = $2`
+	tag, err := r.pgpool.Exec(ctx, query, sessionID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return common.ErrSessionNotFound
+	}
+	return nil
+}
+
+// DeleteOtherUserSessions ends every session for this user except the one
+// presenting keepHashedToken.
+func (r *PostgresAuthRepository) DeleteOtherUserSessions(ctx context.Context, userID uuid.UUID, keepHashedToken string) error {
+	query := `DELETE FROM user_sessions WHERE user_id = $1 AND hashed_refresh_token <> $2`
+	_, err := r.pgpool.Exec(ctx, query, userID, keepHashedToken)
+	return err
+}
+
+// SetPendingEmail stages an email change. An empty address clears it.
+func (r *PostgresAuthRepository) SetPendingEmail(ctx context.Context, userID uuid.UUID, email string) error {
+	var pending *string
+	if email != "" {
+		pending = &email
+	}
+	query := `UPDATE users SET pending_email = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.pgpool.Exec(ctx, query, pending, time.Now(), userID)
+	return err
+}
+
+// GetPendingEmail returns the staged address, or "" when nothing is staged.
+func (r *PostgresAuthRepository) GetPendingEmail(ctx context.Context, userID uuid.UUID) (string, error) {
+	var pending *string
+	err := r.pgpool.QueryRow(ctx, `SELECT pending_email FROM users WHERE id = $1`, userID).Scan(&pending)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", common.ErrUserNotFound
+		}
+		return "", err
+	}
+	if pending == nil {
+		return "", nil
+	}
+	return *pending, nil
+}

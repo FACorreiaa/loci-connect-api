@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -381,8 +382,12 @@ func TestAuthHandler_ChangePassword_MissingClaims(t *testing.T) {
 	}
 }
 
-func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
-	svc, repo, _, _ := servicetest.NewTestAuthService()
+// ChangeEmail stages the new address and sends a confirmation to it. It used
+// to write straight to users.email and report "Email changed successfully",
+// which meant a typo locked the person out of their own account and a stolen
+// session could move the account to an attacker's inbox.
+func TestAuthHandler_ChangeEmail_StagesAndSendsConfirmation(t *testing.T) {
+	svc, repo, _, mailer := servicetest.NewTestAuthService()
 	handler := NewAuthHandler(svc, slog.Default())
 
 	password := "Str0ng!Pass"
@@ -407,17 +412,83 @@ func TestAuthHandler_ChangeEmail_Success(t *testing.T) {
 	if resp.Msg == nil || !resp.Msg.Success {
 		t.Fatalf("expected success response, got %#v", resp.Msg)
 	}
-	if _, ok := repo.Users["new-rpc@example.com"]; !ok {
-		t.Fatalf("user should be reindexed under new email")
+
+	// Nothing has moved yet.
+	if _, ok := repo.Users["changeemail-rpc@example.com"]; !ok {
+		t.Error("the account should keep its current address until confirmation")
 	}
-	if _, ok := repo.Users["changeemail-rpc@example.com"]; ok {
-		t.Fatalf("old email key should be removed")
+	if _, ok := repo.Users["new-rpc@example.com"]; ok {
+		t.Error("the new address must not be live before it is confirmed")
 	}
-	if updated := repo.Users["new-rpc@example.com"]; updated.EmailVerifiedAt != nil {
-		t.Fatalf("email_verified_at should be cleared after change")
+	if len(repo.Sessions) != 1 {
+		t.Errorf("sessions = %d, want 1: nothing about the account has changed yet", len(repo.Sessions))
+	}
+
+	// The confirmation goes to the address being claimed, not the current one.
+	to, token := mailer.EmailChangeConfirmation()
+	if to != "new-rpc@example.com" {
+		t.Errorf("confirmation sent to %q, want the new address", to)
+	}
+	if token == "" {
+		t.Fatal("no confirmation token was issued")
+	}
+
+	// And the message must not claim the change already happened.
+	if strings.Contains(strings.ToLower(resp.Msg.GetMessage()), "changed successfully") {
+		t.Errorf("message = %q, which tells the user something that is not true yet", resp.Msg.GetMessage())
+	}
+}
+
+// Following the link is what actually moves the address.
+func TestAuthHandler_ConfirmEmailChange(t *testing.T) {
+	svc, repo, _, mailer := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	password := "Str0ng!Pass"
+	user := servicetest.AddUser(repo, t, "before@example.com", true, servicetest.MustHash(t, password))
+	verified := time.Now()
+	user.EmailVerifiedAt = &verified
+	repo.Sessions["session-token"] = &repository.UserSession{
+		ID:        user.ID,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour),
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	if _, err := handler.ChangeEmail(ctx, connect.NewRequest(&auth.ChangeEmailRequest{
+		Password: password,
+		NewEmail: "after@example.com",
+	})); err != nil {
+		t.Fatalf("ChangeEmail: %v", err)
+	}
+	_, token := mailer.EmailChangeConfirmation()
+
+	// Unauthenticated on purpose: the link may be opened in a browser that is
+	// not signed in, and the token is the credential.
+	if _, err := handler.ConfirmEmailChange(context.Background(), connect.NewRequest(&auth.ConfirmEmailChangeRequest{
+		Token: token,
+	})); err != nil {
+		t.Fatalf("ConfirmEmailChange: %v", err)
+	}
+
+	if _, ok := repo.Users["after@example.com"]; !ok {
+		t.Error("user should be reindexed under the new email")
+	}
+	if _, ok := repo.Users["before@example.com"]; ok {
+		t.Error("old email key should be removed")
+	}
+	if updated := repo.Users["after@example.com"]; updated.EmailVerifiedAt != nil {
+		t.Error("email_verified_at should be cleared after the change")
 	}
 	if len(repo.Sessions) != 0 {
-		t.Fatalf("sessions should be invalidated, got %d", len(repo.Sessions))
+		t.Errorf("sessions = %d, want 0: the address identifying the account changed", len(repo.Sessions))
+	}
+
+	// The token is single use.
+	if _, err := handler.ConfirmEmailChange(context.Background(), connect.NewRequest(&auth.ConfirmEmailChangeRequest{
+		Token: token,
+	})); err == nil {
+		t.Error("a spent confirmation token should not work a second time")
 	}
 }
 
@@ -465,4 +536,127 @@ func TestAuthHandler_ChangeEmail_MissingClaims(t *testing.T) {
 func hashTestToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+// Signed-in devices. user_sessions has recorded user_agent and client_ip since
+// it was created and nothing read them back, so nobody could see where their
+// account was signed in, let alone end a session.
+func TestAuthHandler_ListSessions(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "sessions@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+
+	// Two devices. The hashed token is what the table stores, so the fake
+	// stores hashes too and "which one is mine" is decided the same way.
+	here := "refresh-here"
+	there := "refresh-there"
+	for _, tok := range []string{here, there} {
+		if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken(tok),
+			"Firefox on Linux", "203.0.113.9", time.Now().Add(time.Hour)); err != nil {
+			t.Fatalf("CreateUserSession: %v", err)
+		}
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	resp, err := handler.ListSessions(ctx, connect.NewRequest(&auth.ListSessionsRequest{
+		RefreshToken: &here,
+	}))
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if got := len(resp.Msg.GetSessions()); got != 2 {
+		t.Fatalf("sessions = %d, want 2", got)
+	}
+
+	var current int
+	for _, s := range resp.Msg.GetSessions() {
+		if s.GetCurrent() {
+			current++
+		}
+		if s.GetUserAgent() == "" || s.GetClientIp() == "" {
+			t.Error("a session came back without the user agent or IP the table has been storing all along")
+		}
+	}
+	if current != 1 {
+		t.Errorf("sessions marked current = %d, want exactly 1", current)
+	}
+}
+
+// The whole point of the refresh token on this RPC: revoking "the others" must
+// not revoke the device in the caller's hand.
+func TestAuthHandler_RevokeOtherSessionsSparesTheCaller(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "revoke@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	here := "refresh-here"
+	for _, tok := range []string{here, "refresh-phone", "refresh-laptop"} {
+		if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken(tok),
+			"ua", "ip", time.Now().Add(time.Hour)); err != nil {
+			t.Fatalf("CreateUserSession: %v", err)
+		}
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	if _, err := handler.RevokeOtherSessions(ctx, connect.NewRequest(&auth.RevokeOtherSessionsRequest{
+		RefreshToken: here,
+	})); err != nil {
+		t.Fatalf("RevokeOtherSessions: %v", err)
+	}
+
+	if len(repo.Sessions) != 1 {
+		t.Fatalf("sessions left = %d, want 1", len(repo.Sessions))
+	}
+	if _, ok := repo.Sessions[servicetest.HashToken(here)]; !ok {
+		t.Fatal("the caller's own session was revoked — this signs somebody out of the device they are holding")
+	}
+}
+
+// Without the token there is no "other" to define, and guessing is the one
+// thing this must not do.
+func TestAuthHandler_RevokeOtherSessionsRefusesWithoutToken(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "norevoke@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken("t"),
+		"ua", "ip", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("CreateUserSession: %v", err)
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	_, err := handler.RevokeOtherSessions(ctx, connect.NewRequest(&auth.RevokeOtherSessionsRequest{}))
+	if code := connect.CodeOf(err); code != connect.CodeInvalidArgument {
+		t.Errorf("code = %v, want %v", code, connect.CodeInvalidArgument)
+	}
+	if len(repo.Sessions) != 1 {
+		t.Error("a refused revoke must not have removed anything")
+	}
+}
+
+// A session id belonging to somebody else is not revocable.
+func TestAuthHandler_RevokeSessionIsScopedToTheOwner(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	mine := servicetest.AddUser(repo, t, "mine@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	theirs := servicetest.AddUser(repo, t, "theirs@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+
+	victim, err := repo.CreateUserSession(context.Background(), theirs.ID, servicetest.HashToken("victim"),
+		"ua", "ip", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("CreateUserSession: %v", err)
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: mine.ID.String()})
+	_, err = handler.RevokeSession(ctx, connect.NewRequest(&auth.RevokeSessionRequest{
+		SessionId: victim.ID.String(),
+	}))
+	if err == nil {
+		t.Fatal("revoking another user's session should fail")
+	}
+	if _, ok := repo.Sessions[servicetest.HashToken("victim")]; !ok {
+		t.Fatal("another user's session was revoked")
+	}
 }

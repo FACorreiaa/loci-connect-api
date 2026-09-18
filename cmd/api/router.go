@@ -77,6 +77,9 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		authconnect.AuthServiceValidateSessionProcedure,
 		authconnect.AuthServiceForgotPasswordProcedure,
 		authconnect.AuthServiceResetPasswordProcedure,
+		// The confirmation link is opened from an email client, often in a
+		// browser with no session. The token in the link is the credential.
+		authconnect.AuthServiceConfirmEmailChangeProcedure,
 		// VerifyMFA completes a login, so the caller has no access token yet. It
 		// authenticates with the challenge token from Login instead — the handler
 		// accepts nothing else.

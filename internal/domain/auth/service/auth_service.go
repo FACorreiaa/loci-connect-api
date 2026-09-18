@@ -20,6 +20,7 @@ import (
 const (
 	tokenTypeEmailVerification = "email_verification"
 	tokenTypePasswordReset     = "password_reset"
+	tokenTypeEmailChange       = "email_change"
 
 	defaultSessionTTL = 30 * 24 * time.Hour
 )
@@ -475,11 +476,85 @@ func (s *AuthService) ChangeEmail(ctx context.Context, userID, currentPassword, 
 		return err
 	}
 
-	if err := s.repo.UpdateEmail(ctx, userUUID, newEmail); err != nil {
+	// Stage it. The address does not move until whoever asked proves they can
+	// read mail there: this used to write straight to users.email, so a typo
+	// locked the person out of their own account and a stolen session could
+	// walk the account over to an attacker's inbox.
+	if err := s.repo.SetPendingEmail(ctx, userUUID, newEmail); err != nil {
 		return err
 	}
 
-	_ = s.repo.DeleteAllUserSessions(ctx, userUUID)
+	changeToken, err := GeneratePasswordResetToken()
+	if err != nil {
+		return err
+	}
+	if err := s.repo.CreateUserToken(ctx, userUUID, hashToken(changeToken), tokenTypeEmailChange, time.Now().Add(time.Hour)); err != nil {
+		return err
+	}
+
+	// To the new address, never the current one — that is what makes this
+	// worth doing at all.
+	if s.emailService != nil {
+		if err := s.emailService.SendEmailChangeConfirmation(newEmail, user.DisplayName, changeToken); err != nil {
+			return err
+		}
+	}
+
+	// Sessions stay alive: nothing about the account has changed yet.
+	return nil
+}
+
+// ConfirmEmailChange completes a change started by ChangeEmail.
+//
+// The token is the only credential, because the person may open the link in a
+// browser that is not signed in.
+func (s *AuthService) ConfirmEmailChange(ctx context.Context, changeToken string) error {
+	if changeToken == "" {
+		return fmt.Errorf("confirmation token required")
+	}
+
+	hashedToken := hashToken(changeToken)
+	userToken, err := s.repo.GetUserTokenByHash(ctx, hashedToken, tokenTypeEmailChange)
+	if err != nil {
+		return err
+	}
+
+	pending, err := s.repo.GetPendingEmail(ctx, userToken.UserID)
+	if err != nil {
+		return err
+	}
+	if pending == "" {
+		// The change was cancelled or already completed; the token is spent.
+		_ = s.repo.DeleteUserToken(ctx, hashedToken)
+		return common.ErrInvalidToken
+	}
+
+	// Re-check the collision here rather than trusting the check made when the
+	// change was staged: somebody else may have taken the address in between,
+	// and this is the moment it becomes decisive.
+	if existing, err := s.repo.GetUserByEmail(ctx, pending); err == nil {
+		if existing.ID != userToken.UserID {
+			_ = s.repo.SetPendingEmail(ctx, userToken.UserID, "")
+			_ = s.repo.DeleteUserToken(ctx, hashedToken)
+			return common.ErrUserAlreadyExists
+		}
+	} else if !errors.Is(err, common.ErrUserNotFound) {
+		return err
+	}
+
+	if err := s.repo.UpdateEmail(ctx, userToken.UserID, pending); err != nil {
+		return err
+	}
+	if err := s.repo.SetPendingEmail(ctx, userToken.UserID, ""); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteUserToken(ctx, hashedToken); err != nil {
+		return err
+	}
+
+	// The address that identifies the account has changed, so every existing
+	// session is signed out — including whoever made the change.
+	_ = s.repo.DeleteAllUserSessions(ctx, userToken.UserID)
 	return nil
 }
 
@@ -707,4 +782,81 @@ func generateUsername(nickname, email string) string {
 // generateShortID creates a short unique identifier
 func generateShortID() string {
 	return uuid.New().String()[:8]
+}
+
+// SessionView is one signed-in session, as the owner sees it.
+type SessionView struct {
+	ID        uuid.UUID
+	UserAgent *string
+	ClientIP  *string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	// Current marks the session making the request, so the UI can label it and
+	// warn before signing itself out.
+	Current bool
+}
+
+// ListSessions returns the user's live sessions.
+//
+// currentRefreshToken may be empty: a caller that only wants the list gets one
+// with nothing marked current, rather than an error.
+func (s *AuthService) ListSessions(ctx context.Context, userID, currentRefreshToken string) ([]SessionView, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions, err := s.repo.ListUserSessions(ctx, userUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compared as a hash because that is all the table stores; the raw token
+	// never has to be held alongside the list.
+	var currentHash string
+	if currentRefreshToken != "" {
+		currentHash = hashToken(currentRefreshToken)
+	}
+
+	out := make([]SessionView, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, SessionView{
+			ID:        session.ID,
+			UserAgent: session.UserAgent,
+			ClientIP:  session.ClientIP,
+			CreatedAt: session.CreatedAt,
+			ExpiresAt: session.ExpiresAt,
+			Current:   currentHash != "" && session.HashedRefreshToken == currentHash,
+		})
+	}
+	return out, nil
+}
+
+// RevokeSession ends one of the user's sessions.
+func (s *AuthService) RevokeSession(ctx context.Context, userID, sessionID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+	sessionUUID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteUserSessionByID(ctx, userUUID, sessionUUID)
+}
+
+// RevokeOtherSessions ends every session except the caller's own.
+//
+// The refresh token is required. Without it there is no way to tell which
+// session to spare, and signing the caller out of the device in their hand is
+// the one outcome this must never produce.
+func (s *AuthService) RevokeOtherSessions(ctx context.Context, userID, currentRefreshToken string) error {
+	if currentRefreshToken == "" {
+		return fmt.Errorf("refresh token required")
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteOtherUserSessions(ctx, userUUID, hashToken(currentRefreshToken))
 }

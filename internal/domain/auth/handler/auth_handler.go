@@ -9,6 +9,7 @@ import (
 	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/presenter"
@@ -164,9 +165,30 @@ func (h *AuthHandler) ChangeEmail(ctx context.Context, req *connect.Request[auth
 		return nil, h.toConnectError(err)
 	}
 
-	// TODO: trigger an email-change verification once a dedicated mailer template
-	// (e.g. SendEmailChangeConfirmation) is added to service.EmailSender.
-	msg := "Email changed successfully"
+	// The address has not moved yet, and the message must not claim it has:
+	// this used to say "Email changed successfully" while no confirmation of
+	// any kind had been sent.
+	msg := "Check your new email address for a confirmation link. Your account keeps its current address until you follow it."
+	return connect.NewResponse(&commonpb.Response{
+		Success: true,
+		Message: &msg,
+	}), nil
+}
+
+// ConfirmEmailChange completes an email change.
+//
+// Unauthenticated by design: the token from the confirmation mail is the
+// credential, and the link may be opened in a browser that is not signed in.
+func (h *AuthHandler) ConfirmEmailChange(ctx context.Context, req *connect.Request[auth.ConfirmEmailChangeRequest]) (*connect.Response[commonpb.Response], error) {
+	if req.Msg.GetToken() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("token is required"))
+	}
+
+	if err := h.service.ConfirmEmailChange(ctx, req.Msg.GetToken()); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	msg := "Email address confirmed. Sign in again with your new address."
 	return connect.NewResponse(&commonpb.Response{
 		Success: true,
 		Message: &msg,
@@ -254,4 +276,74 @@ func (h *AuthHandler) toConnectError(err error) error {
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
+}
+
+// ListSessions returns the caller's signed-in devices.
+//
+// user_sessions has recorded user_agent and client_ip since the table was
+// created and nothing ever read them back, so there was no way to see where an
+// account was signed in. ChangePassword's copy apologised for it.
+func (h *AuthHandler) ListSessions(ctx context.Context, req *connect.Request[auth.ListSessionsRequest]) (*connect.Response[auth.ListSessionsResponse], error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	sessions, err := h.service.ListSessions(ctx, claims.UserID, req.Msg.GetRefreshToken())
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	out := make([]*auth.DeviceSession, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, &auth.DeviceSession{
+			Id:        session.ID.String(),
+			UserAgent: session.UserAgent,
+			ClientIp:  session.ClientIP,
+			CreatedAt: timestamppb.New(session.CreatedAt),
+			ExpiresAt: timestamppb.New(session.ExpiresAt),
+			Current:   session.Current,
+		})
+	}
+
+	return connect.NewResponse(&auth.ListSessionsResponse{Sessions: out}), nil
+}
+
+// RevokeSession ends one of the caller's sessions.
+func (h *AuthHandler) RevokeSession(ctx context.Context, req *connect.Request[auth.RevokeSessionRequest]) (*connect.Response[commonpb.Response], error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if req.Msg.GetSessionId() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("session id is required"))
+	}
+
+	if err := h.service.RevokeSession(ctx, claims.UserID, req.Msg.GetSessionId()); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	// Worth being plain about: revoking a session stops it refreshing, but the
+	// access token it already holds is a stateless JWT and stays valid until it
+	// expires on its own.
+	msg := "Signed out of that device. Its access may take a few minutes to lapse."
+	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
+}
+
+// RevokeOtherSessions signs the caller out everywhere except here.
+func (h *AuthHandler) RevokeOtherSessions(ctx context.Context, req *connect.Request[auth.RevokeOtherSessionsRequest]) (*connect.Response[commonpb.Response], error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	if req.Msg.GetRefreshToken() == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("refresh token is required to identify the session to keep"))
+	}
+
+	if err := h.service.RevokeOtherSessions(ctx, claims.UserID, req.Msg.GetRefreshToken()); err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	msg := "Signed out of your other devices. Their access may take a few minutes to lapse."
+	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
 }

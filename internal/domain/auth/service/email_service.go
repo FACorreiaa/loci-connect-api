@@ -30,6 +30,9 @@ type EmailSender interface {
 	SendVerificationEmail(toEmail, toName, token string) error
 	SendPasswordResetEmail(toEmail, toName, token string) error
 	SendWelcomeEmail(toEmail, toName string) error
+	// SendEmailChangeConfirmation goes to the *new* address. That is the whole
+	// point: it is what proves the person asking can receive mail there.
+	SendEmailChangeConfirmation(toEmail, toName, token string) error
 }
 
 type smtpEmailService struct {
@@ -141,6 +144,30 @@ func (s *smtpEmailService) resetBody(toName, token string) string {
 			`<p style="margin:24px 0 0;font-size:13px;color:%s;">This link expires in one hour. `+
 			`If you didn't ask to reset your password, ignore this email — your password has not changed.</p>`,
 		toName, button(link, "Choose a new password"), fallbackLink(link), brandMuted,
+	)
+}
+
+// SendEmailChangeConfirmation confirms a pending email change.
+//
+// Sent to the address being claimed, never to the current one, so a change
+// cannot complete unless whoever asked for it can read mail at the new
+// address.
+func (s *smtpEmailService) SendEmailChangeConfirmation(toEmail, toName, token string) error {
+	return s.sendEmail(toEmail, "Confirm your new email address - Loci",
+		layout("Confirm your new email address", s.emailChangeBody(toName, token)))
+}
+
+func (s *smtpEmailService) emailChangeBody(toName, token string) string {
+	link := fmt.Sprintf("%s/auth/confirm-email-change?token=%s", s.frontendURL, token)
+	return fmt.Sprintf(
+		`<p style="margin:0 0 8px;">Hi %s,</p>`+
+			`<p style="margin:0;">Confirm this address to finish moving your Loci account to it. `+
+			`Until you do, your account keeps its current email.</p>`+
+			`%s%s`+
+			`<p style="margin:24px 0 0;font-size:13px;color:%s;">This link expires in one hour. `+
+			`If you didn't ask to change your email, ignore this — nothing has changed, and `+
+			`whoever asked cannot proceed without this link.</p>`,
+		toName, button(link, "Confirm this address"), fallbackLink(link), brandMuted,
 	)
 }
 
