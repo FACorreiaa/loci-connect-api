@@ -116,6 +116,24 @@ func seedCity(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	return id
 }
 
+// seedCityAt is a sibling of seedCity for tests that need a city with a real,
+// non-zero centre — seedCity itself is pinned to (0, 0), which is exactly the
+// value the promotion adapter treats as "no coordinates", so it cannot be
+// reused to prove a fallback to the city's centre actually happened.
+func seedCityAt(t *testing.T, pool *pgxpool.Pool, lat, lng float64) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO cities (id, name, country, center_location)
+		VALUES ($1, $2, 'Testland', ST_SetSRID(ST_MakePoint($3, $4), 4326))`,
+		id, "Testville-"+id.String()[:8], lng, lat)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM cities WHERE id = $1`, id)
+	})
+	return id
+}
+
 func cityNameFor(t *testing.T, pool *pgxpool.Pool, cityID uuid.UUID) string {
 	t.Helper()
 	var name string
@@ -175,6 +193,42 @@ func TestSecondPersonPromotesThePlace(t *testing.T) {
 			SELECT accepted_claims FROM contributor_profiles WHERE user_id = $1`, scout).Scan(&accepted))
 		assert.Equal(t, int32(1), accepted, "scout %s was not credited", scout)
 	}
+}
+
+// A submission with no coordinates of its own must inherit its city's centre
+// at promotion time, not fall through to (0, 0) — Null Island — which the
+// promotion adapter refuses. seedCity's city sits at (0, 0) itself, so this
+// needs a city with a real centre for the assertion to mean anything.
+func TestConfirmPlaceFallsBackToCityCentreWhenSubmissionHasNoCoordinates(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	const cityLat, cityLng = 38.7223, -9.1393 // Lisbon
+	cityID := seedCityAt(t, pool, cityLat, cityLng)
+	alice, bob := seedScout(t, pool), seedScout(t, pool)
+
+	submitted, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "Elevador Novo",
+		CityName:           cityNameFor(t, pool, cityID),
+		// Latitude/Longitude deliberately omitted.
+	}))
+	require.NoError(t, err)
+
+	confirmed, err := handler.ConfirmPlace(ctxAs(bob), connect.NewRequest(&placev1.ConfirmPlaceRequest{
+		SubmissionId: submitted.Msg.GetSubmissionId(),
+	}))
+	require.NoError(t, err)
+
+	assert.Equal(t, placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED, confirmed.Msg.GetStatus())
+	require.NotEmpty(t, confirmed.Msg.GetPoiId(), "promotion must succeed by inheriting the city's centre")
+
+	var poiLat, poiLng float64
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		SELECT ST_Y(location::geometry), ST_X(location::geometry)
+		FROM points_of_interest WHERE id = $1`,
+		uuid.MustParse(confirmed.Msg.GetPoiId())).Scan(&poiLat, &poiLng))
+	assert.InDelta(t, cityLat, poiLat, 0.0001, "promoted place must carry the city's latitude, not 0")
+	assert.InDelta(t, cityLng, poiLng, 0.0001, "promoted place must carry the city's longitude, not 0")
 }
 
 func TestConfirmingYourOwnSubmissionFails(t *testing.T) {

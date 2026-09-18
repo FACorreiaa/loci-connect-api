@@ -756,17 +756,21 @@ func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
 
 	var (
-		submitter uuid.UUID
-		cityID    uuid.UUID
-		name      string
-		status    string
-		poiID     *uuid.UUID
-		lat, lng  *float64
+		submitter        uuid.UUID
+		cityID           uuid.UUID
+		name             string
+		status           string
+		poiID            *uuid.UUID
+		lat, lng         *float64
+		cityLat, cityLng *float64
 	)
 	err = tx.QueryRow(ctx, `
-		SELECT user_id, city_id, name, status, poi_id, latitude, longitude
-		FROM place_submissions WHERE id = $1 FOR UPDATE`, submissionID).
-		Scan(&submitter, &cityID, &name, &status, &poiID, &lat, &lng)
+		SELECT s.user_id, s.city_id, s.name, s.status, s.poi_id, s.latitude, s.longitude,
+		       ST_Y(c.center_location::geometry), ST_X(c.center_location::geometry)
+		FROM place_submissions s
+		JOIN cities c ON c.id = s.city_id
+		WHERE s.id = $1 FOR UPDATE OF s`, submissionID).
+		Scan(&submitter, &cityID, &name, &status, &poiID, &lat, &lng, &cityLat, &cityLng)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("unknown submission"))
 	}
@@ -820,12 +824,16 @@ func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1
 	if h.pois == nil {
 		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("promotion is not configured"))
 	}
+	// The submitter's own coordinates win when given; otherwise the place
+	// inherits its city's centre. If neither exists, latitude/longitude stay
+	// zero and the adapter's own zero-check refuses the promotion — the last
+	// resort, not the common path.
 	var latitude, longitude float64
-	if lat != nil {
-		latitude = *lat
-	}
-	if lng != nil {
-		longitude = *lng
+	switch {
+	case lat != nil && lng != nil:
+		latitude, longitude = *lat, *lng
+	case cityLat != nil && cityLng != nil:
+		latitude, longitude = *cityLat, *cityLng
 	}
 	promoted, err := h.pois.UpsertPOIByIdentity(ctx, name, cityID, latitude, longitude)
 	if err != nil {
