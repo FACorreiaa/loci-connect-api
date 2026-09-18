@@ -16,6 +16,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/bundle"
 	chathandler "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/handler"
 	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
@@ -179,6 +180,7 @@ type Dependencies struct {
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
+	BundleHandler            *bundle.Handler
 	POIHandler               *poihandler.POIHandler
 	CustomAuthHandler        *customauthhandler.CustomAuthHandler
 	ReviewHandler            *reviewdomain.Handler
@@ -764,6 +766,29 @@ func (d *Dependencies) initHandlers() error {
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
 	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger)
+
+	// City Packs. The catalog serves whether or not Stripe is configured; an
+	// empty STRIPE_PRICE_ID_CITY_PACK leaves checkout refusing rather than
+	// charging an amount nobody set.
+	bundleRepo := bundle.NewRepository(d.DB.Pool, d.Logger)
+	bundleSvc := bundle.NewService(
+		bundleRepo,
+		d.TripRepo,
+		bundle.NewCheckoutAdapter(d.PaymentService),
+		bundle.NewUserEmailLookup(d.UserRepo),
+		bundle.Config{
+			PriceID:    d.Config.Stripe.PriceIDCityPack,
+			PriceCents: d.Config.Stripe.CityPackPriceCents,
+			Currency:   d.Config.Stripe.CityPackCurrency,
+		},
+		d.Logger,
+	)
+	d.BundleHandler = bundle.NewHandler(bundleSvc, d.Logger)
+	// The webhook grants packs through this. Registered after construction
+	// because the fulfiller is built from the payment service it reports to.
+	if d.PaymentService != nil {
+		d.PaymentService.SetPurchaseFulfiller(bundleSvc)
+	}
 
 	// A confirmed visit becomes a travel-history row. Best-effort: the recorder
 	// swallows its own failures so recording an event never fails because a

@@ -29,6 +29,10 @@ type UserService interface {
 
 	// DeleteAccount permanently deletes the user and cascaded data. Irreversible.
 	DeleteAccount(ctx context.Context, userID uuid.UUID) error
+
+	// Notification switches, stored against the account rather than a browser.
+	GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error)
+	UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error)
 }
 
 // ServiceUserImpl provides the implementation for UserService.
@@ -142,4 +146,14 @@ func (s *ServiceUserImpl) DeleteAccount(ctx context.Context, userID uuid.UUID) e
 		return fmt.Errorf("delete account: %w", err)
 	}
 	return nil
+}
+
+// GetNotificationSettings returns the account's notification switches.
+func (s *ServiceUserImpl) GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error) {
+	return s.repo.GetNotificationSettings(ctx, userID)
+}
+
+// UpdateNotificationSettings applies a partial update to them.
+func (s *ServiceUserImpl) UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
+	return s.repo.UpdateNotificationSettings(ctx, userID, params)
 }

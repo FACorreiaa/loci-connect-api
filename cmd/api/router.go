@@ -15,6 +15,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/aicreds/aicredsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city/cityconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/compare/v1/comparev1connect"
@@ -76,6 +77,9 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		authconnect.AuthServiceValidateSessionProcedure,
 		authconnect.AuthServiceForgotPasswordProcedure,
 		authconnect.AuthServiceResetPasswordProcedure,
+		// The confirmation link is opened from an email client, often in a
+		// browser with no session. The token in the link is the credential.
+		authconnect.AuthServiceConfirmEmailChangeProcedure,
 		// VerifyMFA completes a login, so the caller has no access token yet. It
 		// authenticates with the challenge token from Login instead — the handler
 		// accepts nothing else.
@@ -88,6 +92,14 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		customauthconnect.CustomAuthServiceOAuthCallbackProcedure,
 		customauthconnect.CustomAuthServiceSendPhoneVerificationProcedure,
 		customauthconnect.CustomAuthServiceVerifyPhoneProcedure,
+
+		// The City Packs catalog is a marketing surface: it has to render for
+		// somebody who has never signed in, and it is the only page here meant
+		// to be indexed. These are optional-auth, not unauthenticated — a token
+		// that is present is still validated, which is how one endpoint serves
+		// a teaser to a stranger and the whole pack to whoever bought it.
+		bundlev1connect.BundleServiceListBundlesProcedure,
+		bundlev1connect.BundleServiceGetBundleProcedure,
 	}
 
 	tracer := otel.GetTracerProvider().Tracer("loci/api")
@@ -257,6 +269,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		profilePath, profileHandler := profileconnect.NewProfileServiceHandler(deps.ProfileHandler, opts)
 		mux.Handle(profilePath, profileHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", profilePath)
+	}
+
+	if deps.BundleHandler != nil {
+		bundlePath, bundleHandler := bundlev1connect.NewBundleServiceHandler(deps.BundleHandler, opts)
+		mux.Handle(bundlePath, bundleHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", bundlePath)
 	}
 
 	if deps.ItineraryHandler != nil {

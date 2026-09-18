@@ -50,14 +50,14 @@ func (h *UserHandler) GetUserProfile(
 	ctx context.Context,
 	req *connect.Request[userpb.GetUserProfileRequest],
 ) (*connect.Response[userpb.GetUserProfileResponse], error) {
-	// Get user ID from request or from context (authenticated user)
-	userIDStr := req.Msg.GetUserId()
-	if userIDStr == "" {
-		var ok bool
-		userIDStr, ok = interceptors.GetUserIDFromContext(ctx)
-		if !ok || userIDStr == "" {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-		}
+	// The subject is whoever the token says it is, never whoever the request
+	// body says it is. This used to read req.Msg.GetUserId() first and fall
+	// back to the token, which let any authenticated caller read any other
+	// user's profile by putting their id in the body. The proto field stays —
+	// clients still send it — but it is not trusted for anything.
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
 
 	userID, err := uuid.Parse(userIDStr)
@@ -181,6 +181,23 @@ func toProtoProfile(p *locitypes.UserProfile) *userpb.UserProfile {
 	proto.JoinedDate = timestamppb.New(p.JoinedDate)
 	proto.Interests = p.Interests
 	proto.Badges = p.Badges
+
+	// The repository fills Avatar and Stats on every profile it loads and this
+	// mapper dropped both, so the fields were null on the wire for every user.
+	// The avatar in particular meant the client had to fall back to
+	// profile_image_url and could never tell the two apart.
+	if p.Avatar != nil {
+		proto.Avatar = p.Avatar
+	}
+	if p.Stats != nil {
+		proto.Stats = &userpb.UserStats{
+			PlacesVisited:  int32(p.Stats.PlacesVisited),
+			ReviewsWritten: int32(p.Stats.ReviewsWritten),
+			ListsCreated:   int32(p.Stats.ListsCreated),
+			Followers:      int32(p.Stats.Followers),
+			Following:      int32(p.Stats.Following),
+		}
+	}
 
 	return proto
 }
@@ -346,4 +363,71 @@ func (h *UserHandler) DeleteAccount(
 
 	msg := "account permanently deleted"
 	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
+}
+
+// GetNotificationSettings returns the caller's notification switches.
+//
+// These lived in browser localStorage keyed by user id, so they did not follow
+// the account between devices and nothing server-side could read them.
+func (h *UserHandler) GetNotificationSettings(
+	ctx context.Context,
+	_ *connect.Request[userpb.GetNotificationSettingsRequest],
+) (*connect.Response[userpb.NotificationSettings], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := h.service.GetNotificationSettings(ctx, userID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(toProtoNotificationSettings(settings)), nil
+}
+
+// UpdateNotificationSettings applies a partial update and returns the result.
+func (h *UserHandler) UpdateNotificationSettings(
+	ctx context.Context,
+	req *connect.Request[userpb.UpdateNotificationSettingsRequest],
+) (*connect.Response[userpb.NotificationSettings], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Absent means the request did not mention that switch, which is different
+	// from switching it off.
+	settings, err := h.service.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
+		Recommendations: req.Msg.Recommendations,
+		TripReminders:   req.Msg.TripReminders,
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(toProtoNotificationSettings(settings)), nil
+}
+
+func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.NotificationSettings {
+	if s == nil {
+		return &userpb.NotificationSettings{}
+	}
+	return &userpb.NotificationSettings{
+		Recommendations: s.Recommendations,
+		TripReminders:   s.TripReminders,
+		UpdatedAt:       timestamppb.New(s.UpdatedAt),
+	}
+}
+
+// callerUserID resolves the authenticated subject from the token claims. The
+// request body is never consulted for identity on this service.
+func callerUserID(ctx context.Context) (uuid.UUID, error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return uuid.Nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid user id: %w", err))
+	}
+	return userID, nil
 }

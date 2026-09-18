@@ -62,6 +62,17 @@ type AuthRepository interface {
 	GetUserSessionByToken(ctx context.Context, hashedToken string) (*UserSession, error)
 	DeleteUserSession(ctx context.Context, hashedToken string) error
 	DeleteAllUserSessions(ctx context.Context, userID uuid.UUID) error
+	// ListUserSessions backs the signed-in-devices screen. The rows have
+	// carried user_agent and client_ip since the table was created and nothing
+	// ever read them back, so there was no way to see where an account was
+	// signed in, let alone end one of those sessions.
+	ListUserSessions(ctx context.Context, userID uuid.UUID) ([]UserSession, error)
+	// DeleteUserSessionByID ends one session. Scoped by user id so a session
+	// id belonging to somebody else cannot be revoked.
+	DeleteUserSessionByID(ctx context.Context, userID, sessionID uuid.UUID) error
+	// DeleteOtherUserSessions ends every session except the one the caller is
+	// using, identified by its hashed refresh token.
+	DeleteOtherUserSessions(ctx context.Context, userID uuid.UUID, keepHashedToken string) error
 
 	CreateUserToken(ctx context.Context, userID uuid.UUID, tokenHash, tokenType string, expiresAt time.Time) error
 	GetUserTokenByHash(ctx context.Context, tokenHash, tokenType string) (*UserToken, error)
@@ -70,6 +81,11 @@ type AuthRepository interface {
 	VerifyEmail(ctx context.Context, userID uuid.UUID) error
 	UpdatePassword(ctx context.Context, userID uuid.UUID, hashedPassword string) error
 	UpdateEmail(ctx context.Context, userID uuid.UUID, email string) error
+	// SetPendingEmail stages an address change until the new address confirms
+	// it can receive mail. Passing an empty string clears the pending change.
+	SetPendingEmail(ctx context.Context, userID uuid.UUID, email string) error
+	// GetPendingEmail returns the staged address, or "" if none is staged.
+	GetPendingEmail(ctx context.Context, userID uuid.UUID) (string, error)
 
 	CreateOrUpdateOAuthIdentity(ctx context.Context, providerName, providerUserID string, userID uuid.UUID, accessToken, refreshToken *string) error
 	GetUserByOAuthIdentity(ctx context.Context, providerName, providerUserID string) (*User, error)

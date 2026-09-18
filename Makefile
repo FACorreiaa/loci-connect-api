@@ -1,4 +1,4 @@
-.PHONY: help generate build run test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine hooks lint-go
+.PHONY: help generate build run bundle-forge test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine hooks lint-go
 
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -14,6 +14,9 @@ build: ## Build the application
 
 preference-rerank: ## Backfill POI embeddings and recompute preference vectors (-lookback=168h)
 	go run ./cmd/preference-rerank -lookback=168h
+
+bundle-forge: ## List City Pack drafts (see cmd/bundle-forge for generate/review/approve/publish)
+	go run ./cmd/bundle-forge -mode=list -status=draft
 
 run: ## Run the application
 	go run cmd/server/main.go
@@ -67,6 +70,9 @@ docker-compose-restart: ## Restart all services
 	docker-compose restart
 
 # Database commands
+check-migrations: ## Fail if two migrations claim the same version number
+	./scripts/check-migrations.sh
+
 migrate-up: ## Run database migrations
 	psql $(DATABASE_URL) -f migrations/001_create_myservice_table.sql
 

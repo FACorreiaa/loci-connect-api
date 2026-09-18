@@ -7,6 +7,18 @@ on:
   pull_request:
 
 jobs:
+  # Deliberately depends on nothing. A version collision breaks migrations at
+  # boot, so it should be reported even when the proto or build jobs are red --
+  # those have their own failure modes and one should not mask the other.
+  migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check migration versions are unique
+        run: ./scripts/check-migrations.sh
+
   proto:
     runs-on: ubuntu-latest
     env:

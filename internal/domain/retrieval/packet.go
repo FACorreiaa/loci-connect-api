@@ -334,6 +334,15 @@ func Render(p *ContextPacket) string {
 			fmt.Fprintf(&b, "    Address: %s\n", e.Address)
 		}
 		for _, f := range e.Facts {
+			// A single uncorroborated claim is now stored as a low-confidence
+			// fact so the scout who filed it can see it land. Calling that
+			// "Verified" to the generator would be a lie, so one contributor
+			// is described as a report rather than a verification.
+			if f.ContributorCount < 2 {
+				fmt.Fprintf(&b, "    Reported %s: %s (unconfirmed, 1 contributor, %s)\n",
+					f.Field, f.Value, f.VerifiedAt.Format("2006-01-02"))
+				continue
+			}
 			fmt.Fprintf(&b, "    Verified %s: %s (%d contributors, verified %s)\n",
 				f.Field, f.Value, f.ContributorCount, f.VerifiedAt.Format("2006-01-02"))
 		}

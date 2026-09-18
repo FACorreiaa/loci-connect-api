@@ -65,6 +65,22 @@ func (m *MockUserRepo) ReactivateUser(ctx context.Context, userID uuid.UUID) err
 	return args.Error(0)
 }
 
+func (m *MockUserRepo) GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error) {
+	args := m.Called(ctx, userID)
+	if settings, ok := args.Get(0).(*locitypes.NotificationSettings); ok {
+		return settings, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *MockUserRepo) UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
+	args := m.Called(ctx, userID, params)
+	if settings, ok := args.Get(0).(*locitypes.NotificationSettings); ok {
+		return settings, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 // ChangePassword
 func (m *MockUserRepo) ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error {
 	args := m.Called(ctx, email, oldPassword, newPassword)

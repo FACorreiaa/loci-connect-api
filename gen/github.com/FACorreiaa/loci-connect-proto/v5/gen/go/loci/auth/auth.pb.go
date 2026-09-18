@@ -1324,8 +1324,20 @@ func (x *DeviceSession) GetCurrent() bool {
 	return false
 }
 
+// The caller's own refresh token, so the session it belongs to can be marked
+// current.
+//
+// Access tokens are stateless JWTs and carry nothing that maps back to a
+// session row, so without this there is no way to tell which of the listed
+// sessions is the one asking. A "sign out my other devices" button that cannot
+// identify the current session signs the user out of the device they are
+// holding.
+//
+// Optional: a caller that only wants the list can omit it and get no session
+// marked current.
 type ListSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	RefreshToken  *string                `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1358,6 +1370,13 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
 	return file_loci_auth_auth_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ListSessionsRequest) GetRefreshToken() string {
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
+	}
+	return ""
 }
 
 type ListSessionsResponse struct {
@@ -1449,8 +1468,13 @@ func (x *RevokeSessionRequest) GetSessionId() string {
 }
 
 // RevokeOtherSessions signs out everywhere except the caller's own session.
+//
+// The refresh token is required here rather than optional: without it the RPC
+// cannot tell which session to spare, and the only safe reading of "revoke the
+// others" with no "others" defined is to revoke nothing.
 type RevokeOtherSessionsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1483,6 +1507,13 @@ func (x *RevokeOtherSessionsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use RevokeOtherSessionsRequest.ProtoReflect.Descriptor instead.
 func (*RevokeOtherSessionsRequest) Descriptor() ([]byte, []int) {
 	return file_loci_auth_auth_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *RevokeOtherSessionsRequest) GetRefreshToken() string {
+	if x != nil {
+		return x.RefreshToken
+	}
+	return ""
 }
 
 // LogoutRequest for logout
@@ -1920,14 +1951,17 @@ const file_loci_auth_auth_proto_rawDesc = "" +
 	"\acurrent\x18\x06 \x01(\bR\acurrentB\r\n" +
 	"\v_user_agentB\f\n" +
 	"\n" +
-	"_client_ip\"\x15\n" +
-	"\x13ListSessionsRequest\"L\n" +
+	"_client_ip\"Z\n" +
+	"\x13ListSessionsRequest\x121\n" +
+	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10H\x00R\frefreshToken\x88\x01\x01B\x10\n" +
+	"\x0e_refresh_token\"L\n" +
 	"\x14ListSessionsResponse\x124\n" +
 	"\bsessions\x18\x01 \x03(\v2\x18.loci.auth.DeviceSessionR\bsessions\"@\n" +
 	"\x14RevokeSessionRequest\x12(\n" +
 	"\n" +
-	"session_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tsessionId\"\x1c\n" +
-	"\x1aRevokeOtherSessionsRequest\"=\n" +
+	"session_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tsessionId\"J\n" +
+	"\x1aRevokeOtherSessionsRequest\x12,\n" +
+	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"=\n" +
 	"\rLogoutRequest\x12,\n" +
 	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"6\n" +
 	"\x15ForgotPasswordRequest\x12\x1d\n" +
@@ -2091,6 +2125,7 @@ func file_loci_auth_auth_proto_init() {
 	file_loci_auth_auth_proto_msgTypes[13].OneofWrappers = []any{}
 	file_loci_auth_auth_proto_msgTypes[17].OneofWrappers = []any{}
 	file_loci_auth_auth_proto_msgTypes[21].OneofWrappers = []any{}
+	file_loci_auth_auth_proto_msgTypes[22].OneofWrappers = []any{}
 	file_loci_auth_auth_proto_msgTypes[30].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

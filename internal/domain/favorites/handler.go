@@ -185,17 +185,12 @@ func (h *Handler) RemoveFromFavorites(
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 
-	// Parse item ID - it might be a UUID or a name string
-	itemUUID, err := uuid.Parse(req.Msg.ItemId)
-	if err != nil {
-		// If not a valid UUID, use uuid.Nil and we'll match by string item_id
-		itemUUID = uuid.Nil
-	}
-
+	// item_id is a TEXT column: AddToFavorites stores whatever the client sent,
+	// which is a place id for some sources and a name for others. Coercing it
+	// through uuid.Parse here matched nothing and deleted no rows.
 	contentType := contentTypeToString(req.Msg.ContentType)
 
-	// Pass the original item ID string for matching
-	err = h.repo.RemoveFavorite(ctx, userID, itemUUID, contentType)
+	err = h.repo.RemoveFavorite(ctx, userID, req.Msg.ItemId, contentType)
 	if err != nil {
 		l.ErrorContext(ctx, "failed to remove favorite", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to remove favorite"))
@@ -291,15 +286,10 @@ func (h *Handler) IsFavorited(
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 
-	// Parse item ID
-	itemUUID, err := uuid.Parse(req.Msg.ItemId)
-	if err != nil {
-		itemUUID = uuid.Nil
-	}
-
+	// Compared as the text it is stored as; see RemoveFromFavorites.
 	contentType := contentTypeToString(req.Msg.ContentType)
 
-	isFavorited, err := h.repo.IsFavorited(ctx, userID, itemUUID, contentType)
+	isFavorited, err := h.repo.IsFavorited(ctx, userID, req.Msg.ItemId, contentType)
 	if err != nil {
 		l.ErrorContext(ctx, "failed to check favorite", slog.Any("error", err))
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to check favorite"))

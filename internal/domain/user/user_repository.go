@@ -18,7 +18,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/crypto/bcrypt"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -33,7 +32,6 @@ type UserRepo interface {
 	// Returns locitypes.ErrNotFound if the user doesn't exist or is inactive.
 	GetUserByID(ctx context.Context, userID uuid.UUID) (*locitypes.UserProfile, error)
 
-	ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error
 	// UpdateProfile updates mutable fields on a user's profile.
 	// It takes the userID and a struct containing only the fields to be updated (use pointers).
 	// Returns locitypes.ErrNotFound if the user doesn't exist.
@@ -51,6 +49,15 @@ type UserRepo interface {
 	// ReactivateUser marks a user as active.
 	ReactivateUser(ctx context.Context, userID uuid.UUID) error
 
+	// GetNotificationSettings returns the account's notification switches,
+	// creating the default row on first read so callers never have to special
+	// case "this user has never touched these".
+	GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error)
+
+	// UpdateNotificationSettings applies a partial update and returns the
+	// stored result.
+	UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error)
+
 	// DeleteUser permanently removes the user row. Owned data cascades via FK
 	// ON DELETE CASCADE (self-service account deletion). Irreversible.
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
@@ -66,56 +73,6 @@ func NewPostgresUserRepo(pgxpool *pgxpool.Pool, logger *slog.Logger) *PostgresUs
 		logger: logger,
 		pgpool: pgxpool,
 	}
-}
-
-// changePasswordRow is used for ChangePassword query
-type changePasswordRow struct {
-	ID           string `db:"id"`
-	PasswordHash string `db:"password_hash"`
-}
-
-func (r *PostgresUserRepo) ChangePassword(ctx context.Context, email, oldPassword, newPassword string) error {
-	rows, err := r.pgpool.Query(ctx,
-		"SELECT id, password_hash FROM users WHERE email = $1",
-		email)
-	if err != nil {
-		return fmt.Errorf("failed to query user: %w", err)
-	}
-
-	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[changePasswordRow])
-	if err != nil {
-		if err == pgx.ErrNoRows {
-			return fmt.Errorf("user not found: %w", locitypes.ErrNotFound)
-		}
-		return fmt.Errorf("user not found: %w", err)
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(oldPassword))
-	if err != nil {
-		return errors.New("invalid old password")
-	}
-
-	newHashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("failed to hash new password: %w", err)
-	}
-
-	_, err = r.pgpool.Exec(ctx,
-		"UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3",
-		string(newHashedPassword), time.Now(), row.ID)
-	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
-	}
-
-	// Invalidate all refresh tokens
-	_, err = r.pgpool.Exec(ctx,
-		"UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL",
-		time.Now(), row.ID)
-	if err != nil {
-		fmt.Printf("Warning: failed to invalidate refresh tokens: %v\n", err)
-	}
-
-	return nil
 }
 
 // userProfileRow is a local struct for GetUserByID query that includes stats fields
@@ -165,10 +122,18 @@ func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*
 		       -- silently. Counting the rows costs an index scan and is correct
 		       -- by construction. See internal/domain/travelhistory.
 		       (SELECT COUNT(*) FROM user_visited_cities v WHERE v.user_id = users.id) as places_visited,
-		       COALESCE(reviews_written, 0) as reviews_written,
-		       COALESCE(lists_created, 0) as lists_created, 
-		       COALESCE(followers, 0) as followers, 
-		       COALESCE(following, 0) as following,
+		       -- Same story as places_visited above: users.lists_created is a
+		       -- counter column that no code path has ever incremented, so it
+		       -- read 0 for every user forever. Counted from the rows instead.
+		       (SELECT COUNT(*) FROM lists l WHERE l.user_id = users.id) as lists_created,
+		       -- reviews_written, followers and following are counters for
+		       -- features that do not exist yet: there is no reviews table and
+		       -- no social graph, so nothing can write them and nothing does.
+		       -- They stay 0 here rather than pretending, and the profile screen
+		       -- no longer renders them as though they were real numbers.
+		       0 as reviews_written,
+		       0 as followers,
+		       0 as following,
 		       is_active, last_login_at, theme, language,
 		       timezone, units, currency, created_at, updated_at
 		FROM users WHERE id = $1 AND is_active = TRUE
@@ -558,20 +523,18 @@ func (r *PostgresUserRepo) DeactivateUser(ctx context.Context, userID uuid.UUID)
 			return fmt.Errorf("database error deactivating user: %w", err)
 		}
 
-		// Invalidate all refresh tokens
-		if _, err := tx.Exec(ctx, "UPDATE refresh_tokens SET revoked_at = $1 WHERE user_id = $2 AND revoked_at IS NULL", time.Now(), userID); err != nil {
-			l.ErrorContext(ctx, "Failed to invalidate refresh tokens", slog.Any("error", err))
+		// Sign the user out.
+		//
+		// This used to mark rows in refresh_tokens and sessions, neither of
+		// which has ever had a row inserted into it: both were superseded by
+		// user_sessions and left behind. So deactivating an account updated
+		// nothing, reported success, and the account's refresh tokens went on
+		// working until they expired on their own.
+		if _, err := tx.Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userID); err != nil {
+			l.ErrorContext(ctx, "Failed to end user sessions", slog.Any("error", err))
 			span.RecordError(err)
-			span.SetStatus(codes.Error, "DB UPDATE failed")
-			return fmt.Errorf("database error invalidating refresh tokens: %w", err)
-		}
-
-		// Invalidate all sessions
-		if _, err := tx.Exec(ctx, "UPDATE sessions SET invalidated_at = $1 WHERE user_id = $2 AND invalidated_at IS NULL", time.Now(), userID); err != nil {
-			l.ErrorContext(ctx, "Failed to invalidate sessions", slog.Any("error", err))
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "DB UPDATE failed")
-			return fmt.Errorf("database error invalidating sessions: %w", err)
+			span.SetStatus(codes.Error, "DB DELETE failed")
+			return fmt.Errorf("database error ending user sessions: %w", err)
 		}
 		return nil
 	}); err != nil {
@@ -649,4 +612,44 @@ func (r *PostgresUserRepo) DeleteUser(ctx context.Context, userID uuid.UUID) err
 		return fmt.Errorf("user not found")
 	}
 	return nil
+}
+
+// GetNotificationSettings returns the account's switches, inserting the default
+// row on first read.
+func (r *PostgresUserRepo) GetNotificationSettings(ctx context.Context, userID uuid.UUID) (*locitypes.NotificationSettings, error) {
+	// Upsert-on-read so every caller gets a row rather than having to treat
+	// "never configured" as a separate state. personalization_settings does the
+	// same thing for the same reason.
+	query := `
+		INSERT INTO notification_settings (user_id)
+		VALUES ($1)
+		ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
+		RETURNING recommendations, trip_reminders, updated_at`
+
+	var out locitypes.NotificationSettings
+	if err := r.pgpool.QueryRow(ctx, query, userID).
+		Scan(&out.Recommendations, &out.TripReminders, &out.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("read notification settings: %w", err)
+	}
+	return &out, nil
+}
+
+// UpdateNotificationSettings applies a partial update. A nil field is a switch
+// the request did not mention and keeps whatever is stored.
+func (r *PostgresUserRepo) UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
+	query := `
+		INSERT INTO notification_settings (user_id, recommendations, trip_reminders, updated_at)
+		VALUES ($1, COALESCE($2, FALSE), COALESCE($3, FALSE), NOW())
+		ON CONFLICT (user_id) DO UPDATE SET
+			recommendations = COALESCE($2, notification_settings.recommendations),
+			trip_reminders  = COALESCE($3, notification_settings.trip_reminders),
+			updated_at      = NOW()
+		RETURNING recommendations, trip_reminders, updated_at`
+
+	var out locitypes.NotificationSettings
+	if err := r.pgpool.QueryRow(ctx, query, userID, params.Recommendations, params.TripReminders).
+		Scan(&out.Recommendations, &out.TripReminders, &out.UpdatedAt); err != nil {
+		return nil, fmt.Errorf("update notification settings: %w", err)
+	}
+	return &out, nil
 }

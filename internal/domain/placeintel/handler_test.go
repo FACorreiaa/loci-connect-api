@@ -19,3 +19,32 @@ func TestFieldRoundTrip(t *testing.T) {
 	field := placev1.PlaceFactField_PLACE_FACT_FIELD_CHILD_FRIENDLY
 	assert.Equal(t, field, parseField(fieldName(field)))
 }
+
+func TestMissingFieldsExcludesWhatIsAlreadyKnown(t *testing.T) {
+	t.Parallel()
+	candidate := candidatePOI{
+		id:               "00000000-0000-0000-0000-000000000001",
+		name:             "Cafe",
+		hasOpeningHours:  true,
+		hasPriceLevel:    true,
+		hasAccessibility: false,
+	}
+	covered := coverage{fields: map[string]struct{}{"vibe": {}}}
+
+	missing := missingFields(candidate, covered)
+
+	assert.NotContains(t, missing, placev1.PlaceFactField_PLACE_FACT_FIELD_OPENING_HOURS,
+		"the POI's own opening_hours column already answers this")
+	assert.NotContains(t, missing, placev1.PlaceFactField_PLACE_FACT_FIELD_PRICE_LEVEL,
+		"the POI's own price_level column already answers this")
+	assert.NotContains(t, missing, placev1.PlaceFactField_PLACE_FACT_FIELD_VIBE,
+		"a live fact already answers this")
+	assert.Contains(t, missing, placev1.PlaceFactField_PLACE_FACT_FIELD_ACCESSIBILITY)
+	assert.Contains(t, missing, placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL)
+}
+
+func TestMissingFieldsAsksEverythingForAnUnknownPlace(t *testing.T) {
+	t.Parallel()
+	missing := missingFields(candidatePOI{id: "x", name: "New"}, coverage{})
+	assert.Equal(t, contributableFields, missing)
+}

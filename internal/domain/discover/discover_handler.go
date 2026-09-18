@@ -95,16 +95,12 @@ func (h *Handler) GetRecentDiscoveries(
 	ctx context.Context,
 	req *connect.Request[discoverv1.GetRecentDiscoveriesRequest],
 ) (*connect.Response[discoverv1.GetRecentDiscoveriesResponse], error) {
+	// The request carries a user_id and this used to fall back to it whenever
+	// the context had no authenticated user. That branch is unreachable today
+	// because the procedure is not in publicProcedures, but it would turn into
+	// an unauthenticated read of somebody else's discovery history the moment
+	// it were. Recent discoveries are the caller's own, full stop.
 	userID := h.userIDFromContext(ctx)
-
-	// Allow explicitly provided user_id only when no authenticated user is present.
-	if userID == uuid.Nil && req.Msg.GetUserId() != "" {
-		parsed, err := uuid.Parse(req.Msg.GetUserId())
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user_id"))
-		}
-		userID = parsed
-	}
 
 	if userID == uuid.Nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))

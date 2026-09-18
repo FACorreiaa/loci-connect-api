@@ -2,7 +2,6 @@ package profiles
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -149,6 +148,25 @@ func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID
 		profiles = append(profiles, row.toResponse())
 	}
 
+	// The list endpoint is what the client calls; it previously returned the
+	// base row only, so every editor it fed fell back to hard-coded defaults.
+	refs := make([]*locitypes.UserPreferenceProfileResponse, len(profiles))
+	for i := range profiles {
+		refs[i] = &profiles[i]
+	}
+	if err := r.loadDomainPreferencesBatch(ctx, refs); err != nil {
+		l.ErrorContext(ctx, "Failed to load domain preferences", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, err
+	}
+	if err := r.attachAssociations(ctx, refs); err != nil {
+		l.ErrorContext(ctx, "Failed to load profile interests and tags", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "DB read failed")
+		return nil, err
+	}
+
 	l.DebugContext(ctx, "Fetched user preference profiles successfully", slog.Int("count", len(profiles)))
 	span.SetStatus(codes.Ok, "Preference profiles fetched")
 	return profiles, nil
@@ -198,6 +216,9 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
 	response := row.toResponse()
 	if err := r.loadDomainPreferences(ctx, response.ID, &response); err != nil {
 		l.WarnContext(ctx, "profile loaded without domain preferences", slog.Any("error", err))
+	}
+	if err := r.attachAssociations(ctx, []*locitypes.UserPreferenceProfileResponse{&response}); err != nil {
+		l.WarnContext(ctx, "profile loaded without interests and tags", slog.Any("error", err))
 	}
 	l.DebugContext(ctx, "Fetched user preference profile successfully")
 	span.SetStatus(codes.Ok, "Preference profile fetched")
@@ -250,6 +271,9 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
 		// The base profile is usable without them; losing the whole profile over
 		// the optional part would be the worse failure.
 		l.WarnContext(ctx, "default profile loaded without domain preferences", slog.Any("error", err))
+	}
+	if err := r.attachAssociations(ctx, []*locitypes.UserPreferenceProfileResponse{&response}); err != nil {
+		l.WarnContext(ctx, "default profile loaded without interests and tags", slog.Any("error", err))
 	}
 	l.DebugContext(ctx, "Fetched default user preference profile successfully")
 	span.SetStatus(codes.Ok, "Default preference profile fetched")
@@ -389,93 +413,41 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 
 	p := row.toResponse()
 
-	// Insert domain-specific preferences if provided
+	// Domain preferences go through the same upsert helpers the update path
+	// uses. They cannot be plain INSERTs: trigger
+	// trigger_create_default_domain_preferences_after_insert (migration 0018)
+	// has already seeded a row for this profile by the time we get here, and
+	// migration 0073 added UNIQUE (user_preference_profile_id), so an INSERT
+	// here is a guaranteed 23505.
 	if params.AccommodationPreferences != nil {
-		accommodationJSON, err := json.Marshal(params.AccommodationPreferences)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to marshal accommodation preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to marshal accommodation preferences: %w", err)
-		}
-		insertQuery := `
-            INSERT INTO user_accommodation_preferences (user_preference_profile_id, accommodation_filters)
-            VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, insertQuery, p.ID, accommodationJSON)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to insert accommodation preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to insert accommodation preferences: %w", err)
+		if err := r.updateAccommodationPreferencesInTx(ctx, tx, p.ID, params.AccommodationPreferences); err != nil {
+			return nil, rollback(ctx, l, tx, fmt.Errorf("failed to write accommodation preferences: %w", err))
 		}
 	}
-
 	if params.DiningPreferences != nil {
-		diningJSON, err := json.Marshal(params.DiningPreferences)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to marshal dining preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to marshal dining preferences: %w", err)
-		}
-		insertQuery := `
-            INSERT INTO user_dining_preferences (user_preference_profile_id, dining_filters)
-            VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, insertQuery, p.ID, diningJSON)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to insert dining preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to insert dining preferences: %w", err)
+		if err := r.updateDiningPreferencesInTx(ctx, tx, p.ID, params.DiningPreferences); err != nil {
+			return nil, rollback(ctx, l, tx, fmt.Errorf("failed to write dining preferences: %w", err))
 		}
 	}
-
 	if params.ActivityPreferences != nil {
-		activityJSON, err := json.Marshal(params.ActivityPreferences)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to marshal activity preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to marshal activity preferences: %w", err)
+		if err := r.updateActivityPreferencesInTx(ctx, tx, p.ID, params.ActivityPreferences); err != nil {
+			return nil, rollback(ctx, l, tx, fmt.Errorf("failed to write activity preferences: %w", err))
 		}
-		insertQuery := `
-            INSERT INTO user_activity_preferences (user_preference_profile_id, activity_filters)
-            VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, insertQuery, p.ID, activityJSON)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to insert activity preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to insert activity preferences: %w", err)
+	}
+	if params.ItineraryPreferences != nil {
+		if err := r.updateItineraryPreferencesInTx(ctx, tx, p.ID, params.ItineraryPreferences); err != nil {
+			return nil, rollback(ctx, l, tx, fmt.Errorf("failed to write itinerary preferences: %w", err))
 		}
 	}
 
-	if params.ItineraryPreferences != nil {
-		itineraryJSON, err := json.Marshal(params.ItineraryPreferences)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to marshal itinerary preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to marshal itinerary preferences: %w", err)
-		}
-		insertQuery := `
-            INSERT INTO user_itinerary_preferences (user_preference_profile_id, itinerary_filters)
-            VALUES ($1, $2)`
-		_, err = tx.Exec(ctx, insertQuery, p.ID, itineraryJSON)
-		if err != nil {
-			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-				l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
-			}
-			l.ErrorContext(ctx, "Failed to insert itinerary preferences", slog.Any("error", err))
-			return nil, fmt.Errorf("failed to insert itinerary preferences: %w", err)
-		}
+	// Interests and tags are what the user actually picked in the UI. They were
+	// parsed out of the request and then dropped here, which is why a saved
+	// profile always came back with empty chips.
+	if err := replaceProfileInterestsInTx(ctx, tx, p.ID, params.Interests); err != nil {
+		return nil, rollback(ctx, l, tx, err)
+	}
+	if err := replaceProfileTagsInTx(ctx, tx, userID, p.ID, params.Tags); err != nil {
+		return nil, rollback(ctx, l, tx, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -512,8 +484,8 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 
 	var hasUpdates bool
 
-	if params.ProfileName != "" {
-		updateBuilder = updateBuilder.Set("profile_name", params.ProfileName)
+	if params.ProfileName != nil {
+		updateBuilder = updateBuilder.Set("profile_name", *params.ProfileName)
 		hasUpdates = true
 	}
 	if params.IsDefault != nil {
@@ -644,6 +616,14 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 		}
 	}
 
+	// Interest and tag links are replaced, not merged -- see FromUpdateProto.
+	if err := replaceProfileInterestsInTx(ctx, tx, profileID, params.Interests); err != nil {
+		return rollback(ctx, l, tx, err)
+	}
+	if err := replaceProfileTagsInTx(ctx, tx, userID, profileID, params.Tags); err != nil {
+		return rollback(ctx, l, tx, err)
+	}
+
 	// Commit transaction
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -685,7 +665,10 @@ func (r *RepositoryImpl) DeleteSearchProfile(ctx context.Context, userID, profil
 	}
 
 	if isDefault {
-		err := errors.New("cannot delete default profile")
+		// Actionable, so say what to do about it: the caller can make another
+		// profile the default and try again. As a bare error this reached the
+		// client as an opaque Internal.
+		err := fmt.Errorf("cannot delete the default travel profile - make another profile the default first: %w", locitypes.ErrBadRequest)
 		l.WarnContext(ctx, "Attempted to delete default preference profile")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Cannot delete default profile")
@@ -727,20 +710,27 @@ func (r *RepositoryImpl) SetDefaultSearchProfile(ctx context.Context, userID, pr
 	l := r.logger.With(slog.String("method", "SetDefaultUserPreferenceProfile"), slog.String("profileID", profileID.String()))
 	l.DebugContext(ctx, "Setting profile as default")
 
-	// First get the user ID for this profile
-	err := r.pgpool.QueryRow(ctx, "SELECT user_id FROM user_preference_profiles WHERE user_id = $1", userID).Scan(&userID)
+	// Confirm the profile exists and belongs to this user. The previous version
+	// selected user_id WHERE user_id = $1 and scanned it back over itself, so it
+	// never looked at profileID at all -- it passed for any user who had any
+	// profile. The UPDATE below is still scoped to both, so this is a clearer
+	// error rather than a missing check.
+	var owned bool
+	err := r.pgpool.QueryRow(ctx,
+		"SELECT EXISTS (SELECT 1 FROM user_preference_profiles WHERE id = $1 AND user_id = $2)",
+		profileID, userID).Scan(&owned)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
-			l.WarnContext(ctx, "Attempted to set non-existent profile as default")
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Profile not found")
-			return err
-		}
-		l.ErrorContext(ctx, "Failed to get user ID for profile", slog.Any("error", err))
+		l.ErrorContext(ctx, "Failed to check profile ownership", slog.Any("error", err))
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "DB query failed")
 		return fmt.Errorf("database error getting profile: %w", err)
+	}
+	if !owned {
+		err := fmt.Errorf("preference profile not found: %w", locitypes.ErrNotFound)
+		l.WarnContext(ctx, "Attempted to set non-existent profile as default")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Profile not found")
+		return err
 	}
 
 	// Begin a transaction
