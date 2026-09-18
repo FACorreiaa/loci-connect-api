@@ -855,3 +855,55 @@ func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1
 		PoiId:               &id,
 	}), nil
 }
+
+// ListPendingPlaces is the corroboration feed: places somebody else says exist
+// and that this user has not already spoken for.
+func (h *Handler) ListPendingPlaces(ctx context.Context, req *connect.Request[placev1.ListPendingPlacesRequest]) (*connect.Response[placev1.ListPendingPlacesResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	limit := int(req.Msg.GetLimit())
+	if limit <= 0 {
+		limit = 10
+	}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT s.id::text, s.name, c.name, s.category, s.address,
+		       (SELECT COUNT(*)::integer FROM place_submission_confirmations f WHERE f.submission_id = s.id)
+		FROM place_submissions s
+		JOIN cities c ON c.id = s.city_id
+		WHERE s.status = 'pending'
+		  AND s.user_id <> $1
+		  AND NOT EXISTS (
+		      SELECT 1 FROM place_submission_confirmations f
+		      WHERE f.submission_id = s.id AND f.user_id = $1
+		  )
+		ORDER BY s.created_at DESC
+		LIMIT $2`, uid, limit)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list pending places: %w", err))
+	}
+	defer rows.Close()
+
+	places := make([]*placev1.PendingPlace, 0, limit)
+	for rows.Next() {
+		var (
+			place         placev1.PendingPlace
+			category      *string
+			address       *string
+			confirmations int32
+		)
+		if err := rows.Scan(&place.SubmissionId, &place.Name, &place.CityName, &category, &address, &confirmations); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("scan pending place: %w", err))
+		}
+		place.Category = category
+		place.Address = address
+		place.ConfirmationsNeeded = confirmationsNeeded(confirmations)
+		places = append(places, &place)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("iterate pending places: %w", err))
+	}
+	return connect.NewResponse(&placev1.ListPendingPlacesResponse{Places: places}), nil
+}

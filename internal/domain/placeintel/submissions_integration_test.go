@@ -198,6 +198,41 @@ func TestConfirmingYourOwnSubmissionFails(t *testing.T) {
 		"corroboration has to come from somebody else")
 }
 
+// The feed is for corroboration, so it must never hand somebody their own
+// submission, and it must hand it to everybody else.
+func TestPendingPlacesExcludeYourOwn(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID := seedCity(t, pool)
+	alice, bob := seedScout(t, pool), seedScout(t, pool)
+
+	_, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "Quiosque do Parque",
+		CityName:           cityNameFor(t, pool, cityID),
+	}))
+	require.NoError(t, err)
+
+	mine, err := handler.ListPendingPlaces(ctxAs(alice),
+		connect.NewRequest(&placev1.ListPendingPlacesRequest{Limit: 20}))
+	require.NoError(t, err)
+	for _, p := range mine.Msg.GetPlaces() {
+		assert.NotEqual(t, "Quiosque do Parque", p.GetName(), "you cannot confirm your own place")
+	}
+
+	theirs, err := handler.ListPendingPlaces(ctxAs(bob),
+		connect.NewRequest(&placev1.ListPendingPlacesRequest{Limit: 20}))
+	require.NoError(t, err)
+	found := false
+	for _, p := range theirs.Msg.GetPlaces() {
+		if p.GetName() == "Quiosque do Parque" {
+			found = true
+			assert.Equal(t, int32(1), p.GetConfirmationsNeeded())
+		}
+	}
+	assert.True(t, found, "somebody else should be asked to confirm it")
+}
+
 type stubUpserter struct{ pool *pgxpool.Pool }
 
 func (s stubUpserter) UpsertPOIByIdentity(ctx context.Context, name string, cityID uuid.UUID, lat, lng float64) (uuid.UUID, error) {
