@@ -2,6 +2,7 @@ package profiles
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"regexp"
 	"testing"
@@ -24,6 +25,8 @@ func TestGetSearchProfiles(t *testing.T) {
 	userID := uuid.New()
 	profileID1 := uuid.New()
 	profileID2 := uuid.New()
+	interestID := uuid.New()
+	tagID := uuid.New()
 	now := time.Now()
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
@@ -50,10 +53,50 @@ func TestGetSearchProfiles(t *testing.T) {
 					[]string{"lively"}, "public", []string{}, now, now),
 		)
 
+	// The list endpoint now also loads the four domain-preference blobs and the
+	// interest/tag links. It used to return the base row alone, which is why every
+	// editor it fed fell back to hard-coded defaults.
+	mock.ExpectQuery(`SELECT[\s\S]*accommodation_filters[\s\S]*FROM user_preference_profiles p`).
+		WithArgs([]uuid.UUID{profileID1, profileID2}).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"id", "accommodation_filters", "dining_filters", "activity_filters", "itinerary_filters"}).
+				AddRow(profileID1, []byte(`{"accommodation_type":["hostel"]}`), []byte(nil), []byte(nil), []byte(nil)).
+				AddRow(profileID2, []byte(nil), []byte(nil), []byte(nil), []byte(nil)),
+		)
+
+	mock.ExpectQuery(`FROM user_profile_interests upi`).
+		WithArgs([]uuid.UUID{profileID1, profileID2}).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"profile_id", "id", "name", "description", "active", "created_at", "updated_at"}).
+				AddRow(profileID1, interestID, "History", (*string)(nil), (*bool)(nil), now, (*time.Time)(nil)),
+		)
+
+	mock.ExpectQuery(`FROM user_personal_tags`).
+		WithArgs([]uuid.UUID{profileID1, profileID2}).
+		WillReturnRows(
+			pgxmock.NewRows([]string{"profile_id", "id", "name", "tag_type", "description", "active", "created_at", "updated_at"}).
+				AddRow(profileID1, tagID, "Crowded", "personal", (*string)(nil), (*bool)(nil), now, (*time.Time)(nil)),
+		)
+
 	repo := NewPostgresUserRepo(mock, slog.Default())
 	profiles, err := repo.GetSearchProfiles(context.Background(), userID)
 	if err != nil {
 		t.Fatalf("GetSearchProfiles: %v", err)
+	}
+
+	if profiles[0].AccommodationPreferences == nil ||
+		len(profiles[0].AccommodationPreferences.AccommodationType) != 1 ||
+		profiles[0].AccommodationPreferences.AccommodationType[0] != "hostel" {
+		t.Errorf("first profile lost its accommodation preferences: %+v", profiles[0].AccommodationPreferences)
+	}
+	if len(profiles[0].Interests) != 1 || profiles[0].Interests[0].Name != "History" {
+		t.Errorf("first profile lost its interests: %+v", profiles[0].Interests)
+	}
+	if len(profiles[0].Tags) != 1 || profiles[0].Tags[0].Name != "Crowded" {
+		t.Errorf("first profile lost its tags: %+v", profiles[0].Tags)
+	}
+	if profiles[1].AccommodationPreferences != nil {
+		t.Errorf("second profile should have no accommodation preferences")
 	}
 
 	if len(profiles) != 2 {
@@ -519,10 +562,11 @@ func TestSetDefaultSearchProfile(t *testing.T) {
 	userID := uuid.New()
 	profileID := uuid.New()
 
-	// Query to check user exists
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT user_id FROM user_preference_profiles WHERE user_id = $1")).
-		WithArgs(userID).
-		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow(userID))
+	// The ownership check is on (id, user_id) now; it used to look up user_id by
+	// user_id and never consider the profile at all.
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM user_preference_profiles WHERE id = $1 AND user_id = $2)")).
+		WithArgs(profileID, userID).
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(true))
 
 	mock.ExpectBegin()
 	// Reset all defaults for user
@@ -558,28 +602,16 @@ func TestSetDefaultSearchProfileNotFound(t *testing.T) {
 	userID := uuid.New()
 	profileID := uuid.New()
 
-	// Query to check user exists
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT user_id FROM user_preference_profiles WHERE user_id = $1")).
-		WithArgs(userID).
-		WillReturnRows(pgxmock.NewRows([]string{"user_id"}).AddRow(userID))
-
-	mock.ExpectBegin()
-	// Reset all defaults for user
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE user_preference_profiles SET is_default = FALSE WHERE user_id = $1")).
-		WithArgs(userID).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 1))
-
-	// Set new default - profile not found
-	mock.ExpectExec(regexp.QuoteMeta("UPDATE user_preference_profiles SET is_default = TRUE WHERE id = $1 AND user_id = $2")).
+	// A profile that is not this user's fails the ownership check, so no
+	// transaction is opened at all.
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT EXISTS (SELECT 1 FROM user_preference_profiles WHERE id = $1 AND user_id = $2)")).
 		WithArgs(profileID, userID).
-		WillReturnResult(pgxmock.NewResult("UPDATE", 0))
-
-	mock.ExpectRollback()
+		WillReturnRows(pgxmock.NewRows([]string{"exists"}).AddRow(false))
 
 	repo := NewPostgresUserRepo(mock, slog.Default())
 	err = repo.SetDefaultSearchProfile(context.Background(), userID, profileID)
-	if err == nil {
-		t.Fatal("expected error for not found profile")
+	if !errors.Is(err, locitypes.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {

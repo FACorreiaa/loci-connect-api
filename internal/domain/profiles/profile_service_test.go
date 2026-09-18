@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types" // Adjust path
 	"github.com/google/uuid"                                          // For mocking transaction
 
@@ -301,7 +303,7 @@ func TestProfilesServiceImpl_UpdateSearchProfile(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		params := locitypes.UpdateSearchProfileParams{
-			ProfileName: "Updated Profile",
+			ProfileName: proto.String("Updated Profile"),
 		}
 		mockPrefRepo.On("UpdateSearchProfile", mock.Anything, userID, profileID, params).Return(nil).Once()
 
@@ -312,7 +314,7 @@ func TestProfilesServiceImpl_UpdateSearchProfile(t *testing.T) {
 
 	t.Run("repository error", func(t *testing.T) {
 		params := locitypes.UpdateSearchProfileParams{
-			ProfileName: "Updated Profile",
+			ProfileName: proto.String("Updated Profile"),
 		}
 		repoErr := errors.New("db error updating profile")
 		mockPrefRepo.On("UpdateSearchProfile", mock.Anything, userID, profileID, params).Return(repoErr).Once()
@@ -498,12 +500,4 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 	// using a library like pgxmock if your prefRepo exposes its pgxpool.Pool.
 	// Or, the transaction logic should ideally be *within* the repository method itself,
 	// making the service easier to test (service just calls repo.CreateProfileWithAssociations).
-}
-
-// Unit test for CreateSearchProfileCC (the transactional version)
-// Note: This is a simplified test that doesn't mock the transaction directly
-func TestProfilesServiceImpl_CreateSearchProfileCC(t *testing.T) {
-	// Skip this test for now as it requires more complex mocking of transactions
-	// TODO: Implement proper transaction mocking for this test
-	t.Skip("Skipping test for CreateSearchProfileCC as it requires complex transaction mocking")
 }

@@ -39,6 +39,9 @@ func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (locityp
 	}
 	if req.BudgetLevel != nil {
 		val := int(req.GetBudgetLevel())
+		if err := validateBudgetLevel(val); err != nil {
+			return locitypes.CreateUserPreferenceProfileParams{}, err
+		}
 		params.BudgetLevel = &val
 	}
 	if req.PreferredPace != nil {
@@ -74,13 +77,18 @@ func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (locityp
 		params.Interests = interestIDs
 	}
 
+	params.AccommodationPreferences = fromProtoAccommodationPreferences(req.GetAccommodationPreferences())
+	params.DiningPreferences = fromProtoDiningPreferences(req.GetDiningPreferences())
+	params.ActivityPreferences = fromProtoActivityPreferences(req.GetActivityPreferences())
+	params.ItineraryPreferences = fromProtoItineraryPreferences(req.GetItineraryPreferences())
+
 	return params, nil
 }
 
 func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (locitypes.UpdateSearchProfileParams, error) {
 	params := locitypes.UpdateSearchProfileParams{}
 	if req.ProfileName != nil {
-		params.ProfileName = req.GetProfileName()
+		params.ProfileName = proto.String(req.GetProfileName())
 	}
 	if req.IsDefault != nil {
 		params.IsDefault = proto.Bool(req.GetIsDefault())
@@ -94,6 +102,9 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (locityp
 	}
 	if req.BudgetLevel != nil {
 		val := int(req.GetBudgetLevel())
+		if err := validateBudgetLevel(val); err != nil {
+			return locitypes.UpdateSearchProfileParams{}, err
+		}
 		params.BudgetLevel = &val
 	}
 	if req.PreferredPace != nil {
@@ -114,26 +125,32 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (locityp
 		params.PreferredTransport = &v
 	}
 
-	if len(req.TagIds) > 0 {
-		tagIDs, err := parseUUIDList(req.TagIds)
-		if err != nil {
-			return locitypes.UpdateSearchProfileParams{}, err
-		}
-		for _, id := range tagIDs {
-			v := id.String()
-			params.Tags = append(params.Tags, &v)
-		}
+	// An update replaces the list-valued fields wholesale rather than merging
+	// them. A proto3 `repeated` field has no presence, so an omitted list and a
+	// list the user emptied arrive identically as nil -- with merge semantics,
+	// deselecting your last interest or vibe would silently do nothing. The
+	// price is that a partial caller must send the lists it wants to keep;
+	// useUpdateSettingsMutation on the client merges against the cached profile
+	// for exactly that reason.
+	tagIDs, err := parseUUIDList(req.TagIds)
+	if err != nil {
+		return locitypes.UpdateSearchProfileParams{}, err
 	}
-	if len(req.InterestIds) > 0 {
-		interestIDs, err := parseUUIDList(req.InterestIds)
-		if err != nil {
-			return locitypes.UpdateSearchProfileParams{}, err
-		}
-		for _, id := range interestIDs {
-			v := id.String()
-			params.Interests = append(params.Interests, &v)
-		}
+	params.Tags = tagIDs
+
+	interestIDs, err := parseUUIDList(req.InterestIds)
+	if err != nil {
+		return locitypes.UpdateSearchProfileParams{}, err
 	}
+	params.Interests = interestIDs
+
+	params.PreferredVibes = orEmpty(req.GetPreferredVibes())
+	params.DietaryNeeds = orEmpty(req.GetDietaryNeeds())
+
+	params.AccommodationPreferences = fromProtoAccommodationPreferences(req.GetAccommodationPreferences())
+	params.DiningPreferences = fromProtoDiningPreferences(req.GetDiningPreferences())
+	params.ActivityPreferences = fromProtoActivityPreferences(req.GetActivityPreferences())
+	params.ItineraryPreferences = fromProtoItineraryPreferences(req.GetItineraryPreferences())
 
 	return params, nil
 }
@@ -171,7 +188,34 @@ func ToProtoProfile(p locitypes.UserPreferenceProfileResponse) *profilev1.UserPr
 	if p.UserLongitude != nil {
 		resp.UserLongitude = p.UserLongitude
 	}
+	resp.Interests = toProtoInterests(p.Interests)
+	resp.Tags = toProtoTags(p.Tags)
+	resp.AccommodationPreferences = ToProtoAccommodationPreferences(p.AccommodationPreferences)
+	resp.DiningPreferences = ToProtoDiningPreferences(p.DiningPreferences)
+	resp.ActivityPreferences = ToProtoActivityPreferences(p.ActivityPreferences)
+	resp.ItineraryPreferences = ToProtoItineraryPreferences(p.ItineraryPreferences)
 	return resp
+}
+
+// validateBudgetLevel mirrors the CHECK on user_preference_profiles.budget_level
+// (migration 0008). The proto rule still allows 0..10, so without this guard a
+// value of 5-10 passes validation and then fails at the database as an opaque
+// CodeInternal. Narrow the proto rule on the next loci-connect-proto release and
+// this becomes belt-and-braces.
+func validateBudgetLevel(v int) error {
+	if v < 0 || v > 4 {
+		return fmt.Errorf("budget_level must be between 0 and 4, got %d", v)
+	}
+	return nil
+}
+
+// orEmpty normalises a nil slice to an empty one, so the repository's
+// "supplied?" check fires and the column is written.
+func orEmpty(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
 }
 
 func parseUUIDList(ids []string) ([]uuid.UUID, error) {

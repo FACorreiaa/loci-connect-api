@@ -233,7 +233,10 @@ type Tags struct {
 // UpdateSearchProfileParams defines fields allowed for updating a profile.
 // Pointers allow partial updates.
 type UpdateSearchProfileParams struct {
-	ProfileName          string               `json:"profile_name" binding:"required"`
+	// A nil ProfileName means "not supplied". A non-nil empty string is a
+	// rename the caller actually asked for, and is rejected upstream rather
+	// than silently ignored as it used to be.
+	ProfileName          *string              `json:"profile_name,omitempty"`
 	IsDefault            *bool                `json:"is_default,omitempty"` // Default is FALSE in DB
 	SearchRadiusKm       *float64             `json:"search_radius_km,omitempty"`
 	PreferredTime        *DayPreference       `json:"preferred_time,omitempty"`
@@ -245,8 +248,8 @@ type UpdateSearchProfileParams struct {
 	PreferredVibes       []string             `json:"preferred_vibes,omitempty"` // Use empty slice if not provided?
 	PreferredTransport   *TransportPreference `json:"preferred_transport,omitempty"`
 	DietaryNeeds         []string             `json:"dietary_needs,omitempty"`
-	Tags                 []*string            `json:"tags,omitempty"`
-	Interests            []*string            `json:"interests,omitempty"`
+	Tags                 []uuid.UUID          `json:"tags,omitempty"`
+	Interests            []uuid.UUID          `json:"interests,omitempty"`
 	// Enhanced domain-specific preferences
 	AccommodationPreferences *AccommodationPreferences `json:"accommodation_preferences,omitempty"`
 	DiningPreferences        *DiningPreferences        `json:"dining_preferences,omitempty"`

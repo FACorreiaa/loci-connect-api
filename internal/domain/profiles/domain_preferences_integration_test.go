@@ -138,3 +138,116 @@ func TestGetSearchProfile_MalformedBlobDoesNotFailTheProfile(t *testing.T) {
 	require.Equal(t, profileID, got.ID)
 	require.Nil(t, got.DiningPreferences, "unreadable blob should be skipped, not partially applied")
 }
+
+// A profile created with domain preferences used to be impossible to express
+// over RPC, and once the presenter started carrying them the create path would
+// have failed anyway: it did a bare INSERT into tables a trigger had already
+// seeded, against the UNIQUE constraint migration 0073 added.
+func TestCreateSearchProfileWritesDomainPreferences(t *testing.T) {
+	ctx := context.Background()
+	repo := prefsRepo()
+	userID := createTestUserForProfileTests(t, "create-domain-prefs")
+
+	created, err := repo.CreateSearchProfile(ctx, userID, locitypes.CreateUserPreferenceProfileParams{
+		ProfileName: "Hostels and hikes",
+		AccommodationPreferences: &locitypes.AccommodationPreferences{
+			AccommodationType: []string{"hostel"},
+		},
+		DiningPreferences: &locitypes.DiningPreferences{
+			CuisineTypes: []string{"portuguese"},
+		},
+	})
+	require.NoError(t, err, "create must not collide with the trigger-seeded rows")
+	require.NotNil(t, created)
+
+	read, err := repo.GetSearchProfile(ctx, userID, created.ID)
+	require.NoError(t, err)
+	require.NotNil(t, read.AccommodationPreferences)
+	require.Equal(t, []string{"hostel"}, read.AccommodationPreferences.AccommodationType)
+	require.NotNil(t, read.DiningPreferences)
+	require.Equal(t, []string{"portuguese"}, read.DiningPreferences.CuisineTypes)
+}
+
+// Interests picked in the UI were parsed out of the request and then never
+// written, so a saved profile always read back with no interests at all.
+func TestCreateSearchProfileRoundTripsInterests(t *testing.T) {
+	ctx := context.Background()
+	repo := prefsRepo()
+	userID := createTestUserForProfileTests(t, "create-interests")
+
+	var interestID uuid.UUID
+	err := testUserProfileDB.QueryRow(ctx,
+		`SELECT id FROM interests ORDER BY name LIMIT 1`).Scan(&interestID)
+	require.NoError(t, err, "migration 0004 seeds the interests catalogue")
+
+	created, err := repo.CreateSearchProfile(ctx, userID, locitypes.CreateUserPreferenceProfileParams{
+		ProfileName: "Curious",
+		Interests:   []uuid.UUID{interestID},
+	})
+	require.NoError(t, err)
+
+	read, err := repo.GetSearchProfile(ctx, userID, created.ID)
+	require.NoError(t, err)
+	require.Len(t, read.Interests, 1)
+	require.Equal(t, interestID, read.Interests[0].ID)
+
+	// The list endpoint is the one the client actually calls.
+	all, err := repo.GetSearchProfiles(ctx, userID)
+	require.NoError(t, err)
+	var found bool
+	for _, p := range all {
+		if p.ID == created.ID {
+			found = true
+			require.Len(t, p.Interests, 1, "the list endpoint must carry interests too")
+		}
+	}
+	require.True(t, found, "created profile missing from the list")
+}
+
+// Updating replaces the interest set rather than appending to it, so
+// deselecting works.
+func TestUpdateSearchProfileReplacesInterests(t *testing.T) {
+	ctx := context.Background()
+	repo := prefsRepo()
+	userID := createTestUserForProfileTests(t, "update-interests")
+
+	var first, second uuid.UUID
+	rows, err := testUserProfileDB.Query(ctx, `SELECT id FROM interests ORDER BY name LIMIT 2`)
+	require.NoError(t, err)
+	ids := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		require.NoError(t, rows.Scan(&id))
+		ids = append(ids, id)
+	}
+	rows.Close()
+	require.Len(t, ids, 2)
+	first, second = ids[0], ids[1]
+
+	created, err := repo.CreateSearchProfile(ctx, userID, locitypes.CreateUserPreferenceProfileParams{
+		ProfileName: "Switcher",
+		Interests:   []uuid.UUID{first},
+	})
+	require.NoError(t, err)
+
+	err = repo.UpdateSearchProfile(ctx, userID, created.ID, locitypes.UpdateSearchProfileParams{
+		Interests: []uuid.UUID{second},
+		Tags:      []uuid.UUID{},
+	})
+	require.NoError(t, err)
+
+	read, err := repo.GetSearchProfile(ctx, userID, created.ID)
+	require.NoError(t, err)
+	require.Len(t, read.Interests, 1)
+	require.Equal(t, second, read.Interests[0].ID, "update must replace, not append")
+
+	// An explicitly empty list clears them.
+	err = repo.UpdateSearchProfile(ctx, userID, created.ID, locitypes.UpdateSearchProfileParams{
+		Interests: []uuid.UUID{},
+		Tags:      []uuid.UUID{},
+	})
+	require.NoError(t, err)
+	read, err = repo.GetSearchProfile(ctx, userID, created.ID)
+	require.NoError(t, err)
+	require.Empty(t, read.Interests, "deselecting the last interest must clear it")
+}
