@@ -537,3 +537,126 @@ func hashTestToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
+
+// Signed-in devices. user_sessions has recorded user_agent and client_ip since
+// it was created and nothing read them back, so nobody could see where their
+// account was signed in, let alone end a session.
+func TestAuthHandler_ListSessions(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "sessions@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+
+	// Two devices. The hashed token is what the table stores, so the fake
+	// stores hashes too and "which one is mine" is decided the same way.
+	here := "refresh-here"
+	there := "refresh-there"
+	for _, tok := range []string{here, there} {
+		if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken(tok),
+			"Firefox on Linux", "203.0.113.9", time.Now().Add(time.Hour)); err != nil {
+			t.Fatalf("CreateUserSession: %v", err)
+		}
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	resp, err := handler.ListSessions(ctx, connect.NewRequest(&auth.ListSessionsRequest{
+		RefreshToken: &here,
+	}))
+	if err != nil {
+		t.Fatalf("ListSessions: %v", err)
+	}
+	if got := len(resp.Msg.GetSessions()); got != 2 {
+		t.Fatalf("sessions = %d, want 2", got)
+	}
+
+	var current int
+	for _, s := range resp.Msg.GetSessions() {
+		if s.GetCurrent() {
+			current++
+		}
+		if s.GetUserAgent() == "" || s.GetClientIp() == "" {
+			t.Error("a session came back without the user agent or IP the table has been storing all along")
+		}
+	}
+	if current != 1 {
+		t.Errorf("sessions marked current = %d, want exactly 1", current)
+	}
+}
+
+// The whole point of the refresh token on this RPC: revoking "the others" must
+// not revoke the device in the caller's hand.
+func TestAuthHandler_RevokeOtherSessionsSparesTheCaller(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "revoke@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	here := "refresh-here"
+	for _, tok := range []string{here, "refresh-phone", "refresh-laptop"} {
+		if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken(tok),
+			"ua", "ip", time.Now().Add(time.Hour)); err != nil {
+			t.Fatalf("CreateUserSession: %v", err)
+		}
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	if _, err := handler.RevokeOtherSessions(ctx, connect.NewRequest(&auth.RevokeOtherSessionsRequest{
+		RefreshToken: here,
+	})); err != nil {
+		t.Fatalf("RevokeOtherSessions: %v", err)
+	}
+
+	if len(repo.Sessions) != 1 {
+		t.Fatalf("sessions left = %d, want 1", len(repo.Sessions))
+	}
+	if _, ok := repo.Sessions[servicetest.HashToken(here)]; !ok {
+		t.Fatal("the caller's own session was revoked — this signs somebody out of the device they are holding")
+	}
+}
+
+// Without the token there is no "other" to define, and guessing is the one
+// thing this must not do.
+func TestAuthHandler_RevokeOtherSessionsRefusesWithoutToken(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	user := servicetest.AddUser(repo, t, "norevoke@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	if _, err := repo.CreateUserSession(context.Background(), user.ID, servicetest.HashToken("t"),
+		"ua", "ip", time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("CreateUserSession: %v", err)
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: user.ID.String()})
+	_, err := handler.RevokeOtherSessions(ctx, connect.NewRequest(&auth.RevokeOtherSessionsRequest{}))
+	if code := connect.CodeOf(err); code != connect.CodeInvalidArgument {
+		t.Errorf("code = %v, want %v", code, connect.CodeInvalidArgument)
+	}
+	if len(repo.Sessions) != 1 {
+		t.Error("a refused revoke must not have removed anything")
+	}
+}
+
+// A session id belonging to somebody else is not revocable.
+func TestAuthHandler_RevokeSessionIsScopedToTheOwner(t *testing.T) {
+	svc, repo, _, _ := servicetest.NewTestAuthService()
+	handler := NewAuthHandler(svc, slog.Default())
+
+	mine := servicetest.AddUser(repo, t, "mine@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+	theirs := servicetest.AddUser(repo, t, "theirs@example.com", true, servicetest.MustHash(t, "Str0ng!Pass"))
+
+	victim, err := repo.CreateUserSession(context.Background(), theirs.ID, servicetest.HashToken("victim"),
+		"ua", "ip", time.Now().Add(time.Hour))
+	if err != nil {
+		t.Fatalf("CreateUserSession: %v", err)
+	}
+
+	ctx := interceptors.ContextWithClaims(context.Background(), &interceptors.Claims{UserID: mine.ID.String()})
+	_, err = handler.RevokeSession(ctx, connect.NewRequest(&auth.RevokeSessionRequest{
+		SessionId: victim.ID.String(),
+	}))
+	if err == nil {
+		t.Fatal("revoking another user's session should fail")
+	}
+	if _, ok := repo.Sessions[servicetest.HashToken("victim")]; !ok {
+		t.Fatal("another user's session was revoked")
+	}
+}

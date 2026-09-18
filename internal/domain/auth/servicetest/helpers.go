@@ -2,6 +2,8 @@ package servicetest
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"log/slog"
@@ -430,4 +432,14 @@ func (m *MockAuthRepo) GetPendingEmail(_ context.Context, userID uuid.UUID) (str
 		}
 	}
 	return "", common.ErrUserNotFound
+}
+
+// HashToken mirrors how the service hashes a refresh token before storing it.
+//
+// Tests that seed sessions directly have to store the hash, not the token, or
+// "is this session the one making the call" compares a raw token against a
+// hashed column and silently never matches.
+func HashToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }

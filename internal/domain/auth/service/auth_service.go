@@ -783,3 +783,80 @@ func generateUsername(nickname, email string) string {
 func generateShortID() string {
 	return uuid.New().String()[:8]
 }
+
+// SessionView is one signed-in session, as the owner sees it.
+type SessionView struct {
+	ID        uuid.UUID
+	UserAgent *string
+	ClientIP  *string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	// Current marks the session making the request, so the UI can label it and
+	// warn before signing itself out.
+	Current bool
+}
+
+// ListSessions returns the user's live sessions.
+//
+// currentRefreshToken may be empty: a caller that only wants the list gets one
+// with nothing marked current, rather than an error.
+func (s *AuthService) ListSessions(ctx context.Context, userID, currentRefreshToken string) ([]SessionView, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	sessions, err := s.repo.ListUserSessions(ctx, userUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compared as a hash because that is all the table stores; the raw token
+	// never has to be held alongside the list.
+	var currentHash string
+	if currentRefreshToken != "" {
+		currentHash = hashToken(currentRefreshToken)
+	}
+
+	out := make([]SessionView, 0, len(sessions))
+	for _, session := range sessions {
+		out = append(out, SessionView{
+			ID:        session.ID,
+			UserAgent: session.UserAgent,
+			ClientIP:  session.ClientIP,
+			CreatedAt: session.CreatedAt,
+			ExpiresAt: session.ExpiresAt,
+			Current:   currentHash != "" && session.HashedRefreshToken == currentHash,
+		})
+	}
+	return out, nil
+}
+
+// RevokeSession ends one of the user's sessions.
+func (s *AuthService) RevokeSession(ctx context.Context, userID, sessionID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+	sessionUUID, err := uuid.Parse(sessionID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteUserSessionByID(ctx, userUUID, sessionUUID)
+}
+
+// RevokeOtherSessions ends every session except the caller's own.
+//
+// The refresh token is required. Without it there is no way to tell which
+// session to spare, and signing the caller out of the device in their hand is
+// the one outcome this must never produce.
+func (s *AuthService) RevokeOtherSessions(ctx context.Context, userID, currentRefreshToken string) error {
+	if currentRefreshToken == "" {
+		return fmt.Errorf("refresh token required")
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteOtherUserSessions(ctx, userUUID, hashToken(currentRefreshToken))
+}
