@@ -31,8 +31,10 @@ type fieldKind int
 const (
 	// kindSingle is one token from the vocabulary.
 	kindSingle fieldKind = iota
-	// kindMulti is a set of tokens, serialised sorted and comma-joined so that
-	// two scouts who pick the same set produce a byte-identical string.
+	// kindMulti is a field that can hold several answers at once. Each answer is
+	// submitted as its own claim so that it corroborates on its own: two scouts
+	// who both say a place is vegan agree about vegan, whatever else either of
+	// them also said.
 	kindMulti
 	// kindStructured is a canonical serialised form validated by pattern, not
 	// by a token list.
@@ -143,33 +145,17 @@ func normalizeValue(field placev1.PlaceFactField, raw string) (string, error) {
 		return value, nil
 
 	case kindMulti:
-		parts := strings.Split(value, ",")
-		seen := make(map[string]struct{}, len(parts))
-		tokens := make([]string, 0, len(parts))
-		for _, part := range parts {
-			token := strings.TrimSpace(part)
-			if token == "" {
-				continue
-			}
-			if !contains(vocab.tokens, token) {
-				return "", fmt.Errorf("%q is not a valid %s value", token, fieldName(field))
-			}
-			if _, duplicate := seen[token]; duplicate {
-				continue
-			}
-			seen[token] = struct{}{}
-			tokens = append(tokens, token)
+		// One answer per claim. A claim carrying a whole set could only ever be
+		// corroborated by an identical set, which is the situation this design
+		// exists to avoid, so a set arriving as one value is a caller that has
+		// not fanned out.
+		if strings.Contains(value, ",") {
+			return "", fmt.Errorf("%s takes one answer per report", fieldName(field))
 		}
-		if len(tokens) == 0 {
-			return "", errEmptyValue
+		if !contains(vocab.tokens, value) {
+			return "", fmt.Errorf("%q is not a valid %s value", value, fieldName(field))
 		}
-		// "none" is a statement that the set is empty, so it cannot be combined
-		// with the very things it denies.
-		if len(tokens) > 1 && contains(tokens, "none") {
-			return "", fmt.Errorf("%s cannot be both \"none\" and something else", fieldName(field))
-		}
-		sort.Strings(tokens)
-		return strings.Join(tokens, ","), nil
+		return value, nil
 
 	case kindStructured:
 		return normalizeOpeningHours(value)
@@ -210,4 +196,13 @@ func contains(tokens []string, value string) bool {
 		}
 	}
 	return false
+}
+
+// isExclusiveField says whether a place can only have one answer for this
+// field. Crowd level, price and opening hours are single facts about a place;
+// dietary options, access features and vibe are lists it can hold several of at
+// once.
+func isExclusiveField(field placev1.PlaceFactField) bool {
+	vocab, ok := claimVocabulary[field]
+	return ok && vocab.kind != kindMulti
 }

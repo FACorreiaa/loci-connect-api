@@ -371,10 +371,14 @@ func (h *Handler) fallbackCityIDs(ctx context.Context) ([]uuid.UUID, error) {
 
 // liveCoverage reports which fields already have an unexpired fact, per POI.
 func (h *Handler) liveCoverage(ctx context.Context, poiIDs []string) (map[string]coverage, error) {
+	// Only a corroborated fact closes a question. A single pending report must
+	// keep its field on the list, or the second scout who would confirm it is
+	// never asked and it can never become true.
 	rows, err := h.db.Query(ctx, `
 		SELECT poi_id, field, verified_at
 		FROM place_facts
-		WHERE poi_id = ANY($1) AND expires_at > NOW()`, poiIDs)
+		WHERE poi_id = ANY($1) AND expires_at > NOW() AND contributor_count >= $2`,
+		poiIDs, claimsRequiredForVerification)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("load fact coverage: %w", err))
 	}
@@ -492,26 +496,56 @@ func (h *Handler) SubmitPlaceClaim(ctx context.Context, req *connect.Request[pla
 		lifetime = factLifetime(field)
 	}
 
+	// A lone voice must not contradict a settled one. Facts are now per answer,
+	// so a dissenter no longer overwrites the agreed row — they would sit beside
+	// it, and a place would read as both quiet and packed. Their claim is still
+	// recorded, and becomes the fact if a second scout backs it up.
+	writeFact := true
+	if isExclusiveField(field) && contributorCount < claimsRequiredForVerification {
+		var settled bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS(
+				SELECT 1 FROM place_facts
+				WHERE poi_id = $1 AND field = $2 AND value <> $3
+				  AND expires_at > NOW() AND contributor_count >= $4
+			)`, poiID, fieldName(field), value, claimsRequiredForVerification).Scan(&settled); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("check settled fact: %w", err))
+		}
+		writeFact = !settled
+	}
+
 	// A single claim still becomes a fact, at a low confidence and a shortened
 	// life, so one scout's report is visible rather than silently discarded.
-	// The WHERE on the conflict clause stops a later lone dissenter from
-	// overwriting something several scouts agreed on.
-	if _, err := tx.Exec(ctx, `
+	// The WHERE on the conflict clause keeps a re-reported answer from losing
+	// the support it has already gathered.
+	if writeFact {
+		if _, err := tx.Exec(ctx, `
 		INSERT INTO place_facts (poi_id, field, value, confidence, contributor_count, verified_at, expires_at)
 		VALUES ($1, $2, $3, $4, $5, NOW(), $6)
-		ON CONFLICT (poi_id, field) DO UPDATE SET
-			value = EXCLUDED.value,
+		ON CONFLICT (poi_id, field, value) DO UPDATE SET
 			confidence = EXCLUDED.confidence,
 			contributor_count = EXCLUDED.contributor_count,
 			verified_at = NOW(),
 			expires_at = EXCLUDED.expires_at,
 			updated_at = NOW()
 		WHERE EXCLUDED.contributor_count >= place_facts.contributor_count`,
-		poiID, fieldName(field), value, confidence, contributorCount, time.Now().Add(lifetime)); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("upsert place fact: %w", err))
+			poiID, fieldName(field), value, confidence, contributorCount, time.Now().Add(lifetime)); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("upsert place fact: %w", err))
+		}
 	}
 
 	if status == placev1.PlaceClaimStatus_PLACE_CLAIM_STATUS_ACCEPTED {
+		// Facts are stored per answer so that each one corroborates on its own.
+		// For a field that can only have one answer, that means the answers it
+		// beat have to go, or a place would claim to be both quiet and packed.
+		if isExclusiveField(field) {
+			if _, err := tx.Exec(ctx, `
+				DELETE FROM place_facts
+				WHERE poi_id = $1 AND field = $2 AND value <> $3`,
+				poiID, fieldName(field), value); err != nil {
+				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("clear superseded facts: %w", err))
+			}
+		}
 		if err := creditCorroborators(ctx, tx, poiID, fieldName(field), value); err != nil {
 			return nil, err
 		}

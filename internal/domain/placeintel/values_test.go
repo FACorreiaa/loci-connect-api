@@ -30,23 +30,19 @@ func TestNormalizeValueSingleChoice(t *testing.T) {
 	}
 }
 
-// Two scouts picking the same set in a different order must produce the same
-// string, because corroboration is an exact match on it.
-func TestNormalizeValueMultiChoiceIsOrderIndependent(t *testing.T) {
+// A multi-answer field takes one answer per claim, so that each answer can be
+// corroborated on its own rather than only as part of an identical set.
+func TestNormalizeValueMultiChoiceTakesOneAnswer(t *testing.T) {
 	t.Parallel()
-	first, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "vegan,gluten_free")
+	got, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "  VEGAN ")
 	require.NoError(t, err)
-	second, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, " Gluten_Free , VEGAN ")
-	require.NoError(t, err)
-	assert.Equal(t, first, second)
-	assert.Equal(t, "gluten_free,vegan", first)
+	assert.Equal(t, "vegan", got)
 }
 
-func TestNormalizeValueMultiChoiceDeduplicates(t *testing.T) {
+func TestNormalizeValueMultiChoiceRejectsASet(t *testing.T) {
 	t.Parallel()
-	got, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_VIBE, "cosy,cosy,local")
-	require.NoError(t, err)
-	assert.Equal(t, "cosy,local", got)
+	_, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "vegan,gluten_free")
+	require.Error(t, err, "a set arriving as one value is a caller that has not fanned out")
 }
 
 func TestNormalizeValueRejectsUnknownTokens(t *testing.T) {
@@ -54,7 +50,7 @@ func TestNormalizeValueRejectsUnknownTokens(t *testing.T) {
 	_, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL, "rammed")
 	require.Error(t, err)
 
-	_, err = normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_ACCESSIBILITY, "step_free,ramp")
+	_, err = normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_ACCESSIBILITY, "ramp")
 	require.Error(t, err)
 }
 
@@ -64,15 +60,20 @@ func TestNormalizeValueRejectsEmpty(t *testing.T) {
 	require.ErrorIs(t, err, errEmptyValue)
 }
 
-// "none" denies the very things it would be listed beside.
-func TestNormalizeValueRejectsNoneWithOthers(t *testing.T) {
+// "none" is an answer in its own right: the scout looked and found none of them.
+func TestNormalizeValueAcceptsNone(t *testing.T) {
 	t.Parallel()
-	_, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "none,vegan")
-	require.Error(t, err)
-
 	got, err := normalizeValue(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "none")
 	require.NoError(t, err)
 	assert.Equal(t, "none", got)
+}
+
+func TestExclusiveFields(t *testing.T) {
+	t.Parallel()
+	assert.True(t, isExclusiveField(placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL))
+	assert.True(t, isExclusiveField(placev1.PlaceFactField_PLACE_FACT_FIELD_OPENING_HOURS))
+	assert.False(t, isExclusiveField(placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY))
+	assert.False(t, isExclusiveField(placev1.PlaceFactField_PLACE_FACT_FIELD_VIBE))
 }
 
 func TestNormalizeValueRejectsUnspecifiedField(t *testing.T) {

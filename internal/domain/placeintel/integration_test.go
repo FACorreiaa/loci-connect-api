@@ -154,18 +154,86 @@ func TestVerifiedFactIsNotDowngradedByOneDissenter(t *testing.T) {
 	assert.Equal(t, int32(2), contributors)
 }
 
-// Two scouts who pick the same set in a different order must corroborate.
-func TestMultiSelectOrderDoesNotPreventCorroboration(t *testing.T) {
+// The reason facts are stored per answer: two scouts who overlap on one answer
+// agree about that answer, even though their full lists differ.
+func TestOverlappingAnswersCorroborateIndependently(t *testing.T) {
+	pool := testPool(t)
+	handler := NewHandler(pool, nil)
+	_, poiID := seedPlace(t, pool)
+	alice, bob := seedScout(t, pool), seedScout(t, pool)
+	ctx := context.Background()
+
+	// Alice reports two things about the place, Bob only one of them.
+	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "vegan")
+	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "gluten_free")
+	second := submit(t, handler, bob, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "vegan")
+
+	assert.Equal(t, placev1.PlaceClaimStatus_PLACE_CLAIM_STATUS_ACCEPTED, second.Status)
+
+	var contributors int32
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT contributor_count FROM place_facts
+		WHERE poi_id = $1 AND field = 'dietary' AND value = 'vegan'`, poiID.String()).Scan(&contributors))
+	assert.Equal(t, int32(2), contributors, "the answer they share is verified")
+
+	require.NoError(t, pool.QueryRow(ctx, `
+		SELECT contributor_count FROM place_facts
+		WHERE poi_id = $1 AND field = 'dietary' AND value = 'gluten_free'`, poiID.String()).Scan(&contributors))
+	assert.Equal(t, int32(1), contributors, "the answer only Alice gave still waits, and is not lost")
+}
+
+// A field that can hold only one answer must not end up holding two.
+func TestExclusiveFieldKeepsOneAnswer(t *testing.T) {
 	pool := testPool(t)
 	handler := NewHandler(pool, nil)
 	_, poiID := seedPlace(t, pool)
 	alice, bob := seedScout(t, pool), seedScout(t, pool)
 
-	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "vegan,gluten_free")
-	second := submit(t, handler, bob, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_DIETARY, "gluten_free,vegan")
+	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL, "quiet")
+	submit(t, handler, bob, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL, "busy")
+	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL, "busy")
 
-	assert.Equal(t, placev1.PlaceClaimStatus_PLACE_CLAIM_STATUS_ACCEPTED, second.Status,
-		"the same set written two ways must be one claim")
+	rows := 0
+	var value string
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)::int, MIN(value) FROM place_facts WHERE poi_id = $1 AND field = 'crowd_level'`,
+		poiID.String()).Scan(&rows, &value))
+	assert.Equal(t, 1, rows, "the superseded answer is cleared")
+	assert.Equal(t, "busy", value)
+}
+
+// A pending report must keep its question on the list, or the second scout who
+// would confirm it is never asked.
+func TestPendingFactDoesNotCloseItsQuestion(t *testing.T) {
+	pool := testPool(t)
+	handler := NewHandler(pool, nil)
+	_, poiID := seedPlace(t, pool)
+	alice := seedScout(t, pool)
+	ctx := context.Background()
+
+	_, err := pool.Exec(ctx, `
+		INSERT INTO poi_interactions
+			(id, user_id, poi_id, poi_name, poi_category, interaction_type,
+			 user_latitude, user_longitude, poi_latitude, poi_longitude, distance)
+		VALUES ($1, $2, $3, 'Test Cafe', 'cafe', 'view', 0, 0, 0, 0, 0)`,
+		uuid.New(), alice, poiID.String())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM poi_interactions WHERE user_id = $1`, alice)
+	})
+
+	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL, "busy")
+
+	response, err := handler.ListVerificationTasks(ctxAs(alice),
+		connect.NewRequest(&placev1.ListVerificationTasksRequest{Limit: 20}))
+	require.NoError(t, err)
+	for _, task := range response.Msg.GetTasks() {
+		if task.GetPoiId() == poiID.String() {
+			assert.Contains(t, task.GetRequestedFields(),
+				placev1.PlaceFactField_PLACE_FACT_FIELD_CROWD_LEVEL,
+				"still needs a second opinion, so it is still asked")
+		}
+	}
 }
 
 func TestSubmitRejectsValuesOutsideTheVocabulary(t *testing.T) {
@@ -235,8 +303,10 @@ func TestVerificationTasksFollowRecentInteractions(t *testing.T) {
 	assert.ElementsMatch(t, contributableFields, found.GetRequestedFields(),
 		"a place with no facts should be asked about everything")
 
-	// Once a fact is known, that question stops being asked.
+	// Once a fact is corroborated, that question stops being asked.
+	bob := seedScout(t, pool)
 	submit(t, handler, alice, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_VIBE, "cosy")
+	submit(t, handler, bob, poiID, placev1.PlaceFactField_PLACE_FACT_FIELD_VIBE, "cosy")
 	response, err = handler.ListVerificationTasks(ctxAs(alice),
 		connect.NewRequest(&placev1.ListVerificationTasksRequest{Limit: 20}))
 	require.NoError(t, err)
