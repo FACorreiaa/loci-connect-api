@@ -39,6 +39,12 @@ if [[ -n "${staged_go}" ]]; then
   echo "pre-commit: re-staged previously staged .go files after gofumpt"
 fi
 
+# Cheap directory scan, so it runs on every commit rather than only when a
+# migration is staged: the collision is between your file and somebody else's,
+# and theirs can arrive on main in a commit that touches nothing of yours.
+echo "pre-commit: check-migrations"
+"${ROOT}/scripts/check-migrations.sh"
+
 echo "pre-commit: golangci-lint run"
 # --allow-parallel-runners: golangci-lint takes a global lock, so a lint
 # running in another checkout — a second editor, another agent session,
