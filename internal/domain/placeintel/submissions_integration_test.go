@@ -89,6 +89,7 @@ func newSubmissionHandler(t *testing.T, pool *pgxpool.Pool) *Handler {
 	t.Helper()
 	h := NewHandler(pool, nil)
 	h.cities = stubResolver{pool: pool}
+	h.pois = stubUpserter{pool: pool}
 	return h
 }
 
@@ -136,4 +137,75 @@ func seedPlaceInCity(t *testing.T, pool *pgxpool.Pool) (uuid.UUID, uuid.UUID) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM points_of_interest WHERE id = $1`, poiID)
 	})
 	return cityID, poiID
+}
+
+func TestSecondPersonPromotesThePlace(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID := seedCity(t, pool)
+	alice, bob := seedScout(t, pool), seedScout(t, pool)
+
+	submitted, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "Miradouro Novo",
+		CityName:           cityNameFor(t, pool, cityID),
+	}))
+	require.NoError(t, err)
+
+	confirmed, err := handler.ConfirmPlace(ctxAs(bob), connect.NewRequest(&placev1.ConfirmPlaceRequest{
+		SubmissionId: submitted.Msg.GetSubmissionId(),
+	}))
+	require.NoError(t, err)
+
+	assert.Equal(t, placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED, confirmed.Msg.GetStatus())
+	assert.Equal(t, int32(0), confirmed.Msg.GetConfirmationsNeeded())
+	require.NotEmpty(t, confirmed.Msg.GetPoiId(), "promotion must return the new place")
+
+	// Now — and only now — it exists where the generator can find it.
+	var pois int
+	require.NoError(t, pool.QueryRow(context.Background(), `
+		SELECT COUNT(*)::int FROM points_of_interest WHERE id = $1`,
+		uuid.MustParse(confirmed.Msg.GetPoiId())).Scan(&pois))
+	assert.Equal(t, 1, pois)
+
+	// Both people are credited, not just whoever acted last.
+	for _, scout := range []uuid.UUID{alice, bob} {
+		var accepted int32
+		require.NoError(t, pool.QueryRow(context.Background(), `
+			SELECT accepted_claims FROM contributor_profiles WHERE user_id = $1`, scout).Scan(&accepted))
+		assert.Equal(t, int32(1), accepted, "scout %s was not credited", scout)
+	}
+}
+
+func TestConfirmingYourOwnSubmissionFails(t *testing.T) {
+	pool := testPool(t)
+	handler := newSubmissionHandler(t, pool)
+	cityID := seedCity(t, pool)
+	alice := seedScout(t, pool)
+
+	submitted, err := handler.SubmitPlace(ctxAs(alice), connect.NewRequest(&placev1.SubmitPlaceRequest{
+		ClientSubmissionId: uuid.NewString(),
+		Name:               "Solo Bar",
+		CityName:           cityNameFor(t, pool, cityID),
+	}))
+	require.NoError(t, err)
+
+	_, err = handler.ConfirmPlace(ctxAs(alice), connect.NewRequest(&placev1.ConfirmPlaceRequest{
+		SubmissionId: submitted.Msg.GetSubmissionId(),
+	}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeFailedPrecondition, connect.CodeOf(err),
+		"corroboration has to come from somebody else")
+}
+
+type stubUpserter struct{ pool *pgxpool.Pool }
+
+func (s stubUpserter) UpsertPOIByIdentity(ctx context.Context, name string, cityID uuid.UUID, lat, lng float64) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO points_of_interest (id, name, location, city_id)
+		VALUES (gen_random_uuid(), $1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $4)
+		ON CONFLICT (city_id, lower(btrim(name))) DO UPDATE SET updated_at = NOW()
+		RETURNING id`, name, lng, lat, cityID).Scan(&id)
+	return id, err
 }

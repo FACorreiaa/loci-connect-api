@@ -52,11 +52,19 @@ type cityResolver interface {
 	ResolveCity(ctx context.Context, name, country string) (uuid.UUID, string, error)
 }
 
+// poiUpserter promotes a confirmed submission into a real place. Narrowed to
+// one method, and satisfied in production by poi.RepositoryImpl, so the
+// identity rules live in one place rather than being restated here.
+type poiUpserter interface {
+	UpsertPOIByIdentity(ctx context.Context, name string, cityID uuid.UUID, lat, lng float64) (uuid.UUID, error)
+}
+
 type Handler struct {
 	placeconnect.UnimplementedPlaceIntelligenceServiceHandler
 	db     *pgxpool.Pool
 	logger *slog.Logger
 	cities cityResolver
+	pois   poiUpserter
 }
 
 func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
@@ -70,6 +78,13 @@ func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
 // city. Separate from NewHandler so the existing call sites keep working.
 func (h *Handler) WithCityResolver(cities cityResolver) *Handler {
 	h.cities = cities
+	return h
+}
+
+// WithPOIUpserter supplies the promotion path used when a submission is
+// confirmed.
+func (h *Handler) WithPOIUpserter(pois poiUpserter) *Handler {
+	h.pois = pois
 	return h
 }
 
@@ -722,4 +737,121 @@ func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Reques
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get contributor profile: %w", err))
 	}
 	return connect.NewResponse(profile), nil
+}
+
+func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1.ConfirmPlaceRequest]) (*connect.Response[placev1.ConfirmPlaceResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	submissionID, err := uuid.Parse(req.Msg.GetSubmissionId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("unknown submission"))
+	}
+
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("begin confirmation: %w", err))
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+
+	var (
+		submitter uuid.UUID
+		cityID    uuid.UUID
+		name      string
+		status    string
+		poiID     *uuid.UUID
+		lat, lng  *float64
+	)
+	err = tx.QueryRow(ctx, `
+		SELECT user_id, city_id, name, status, poi_id, latitude, longitude
+		FROM place_submissions WHERE id = $1 FOR UPDATE`, submissionID).
+		Scan(&submitter, &cityID, &name, &status, &poiID, &lat, &lng)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("unknown submission"))
+	}
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("load submission: %w", err))
+	}
+
+	// Already promoted: say so rather than counting another vote.
+	if status == "accepted" && poiID != nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit confirmation: %w", err))
+		}
+		id := poiID.String()
+		return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+			Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED,
+			ConfirmationsNeeded: 0,
+			PoiId:               &id,
+		}), nil
+	}
+
+	// Corroboration means somebody else. Letting a submitter confirm their own
+	// place would make the whole gate decorative.
+	if submitter == uid {
+		return nil, connect.NewError(connect.CodeFailedPrecondition,
+			errors.New("a place needs somebody else to confirm it"))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO place_submission_confirmations (submission_id, user_id)
+		VALUES ($1, $2) ON CONFLICT DO NOTHING`, submissionID, uid); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("record confirmation: %w", err))
+	}
+
+	var confirmations int32
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*)::integer FROM place_submission_confirmations WHERE submission_id = $1`, submissionID).
+		Scan(&confirmations); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("count confirmations: %w", err))
+	}
+
+	if needed := confirmationsNeeded(confirmations); needed > 0 {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit confirmation: %w", err))
+		}
+		return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+			Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_PENDING,
+			ConfirmationsNeeded: needed,
+		}), nil
+	}
+
+	if h.pois == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errors.New("promotion is not configured"))
+	}
+	var latitude, longitude float64
+	if lat != nil {
+		latitude = *lat
+	}
+	if lng != nil {
+		longitude = *lng
+	}
+	promoted, err := h.pois.UpsertPOIByIdentity(ctx, name, cityID, latitude, longitude)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("promote submission: %w", err))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE place_submissions
+		SET status = 'accepted', poi_id = $2, updated_at = NOW()
+		WHERE id = $1`, submissionID, promoted); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("accept submission: %w", err))
+	}
+
+	if err := creditPlaceContributors(ctx, tx, submissionID, submitter); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit promotion: %w", err))
+	}
+	h.logger.InfoContext(ctx, "place promoted",
+		slog.String("submission_id", submissionID.String()), slog.String("poi_id", promoted.String()))
+
+	id := promoted.String()
+	return connect.NewResponse(&placev1.ConfirmPlaceResponse{
+		Status:              placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED,
+		ConfirmationsNeeded: 0,
+		PoiId:               &id,
+	}), nil
 }

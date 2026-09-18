@@ -84,3 +84,45 @@ func (h *Handler) insertSubmission(ctx context.Context, tx pgx.Tx, s submission,
 	}
 	return id, nil
 }
+
+// creditPlaceContributors rewards the submitter and everybody who confirmed.
+//
+// Deliberately the same shape as creditCorroborators: reputation used to go
+// only to whoever acted last, even though their vote was worth nothing without
+// the others it agreed with.
+func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submitter uuid.UUID) error {
+	rows, err := tx.Query(ctx, `
+		SELECT user_id FROM place_submission_confirmations WHERE submission_id = $1`, submissionID)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("list confirmers: %w", err))
+	}
+	defer rows.Close()
+
+	credited := []uuid.UUID{submitter}
+	seen := map[uuid.UUID]struct{}{submitter: {}}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return connect.NewError(connect.CodeInternal, fmt.Errorf("scan confirmer: %w", err))
+		}
+		if _, duplicate := seen[id]; duplicate {
+			continue
+		}
+		seen[id] = struct{}{}
+		credited = append(credited, id)
+	}
+	if err := rows.Err(); err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("iterate confirmers: %w", err))
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO contributor_profiles (user_id, submitted_claims, accepted_claims, reputation)
+		SELECT unnest($1::uuid[]), 0, 1, 3
+		ON CONFLICT (user_id) DO UPDATE SET
+			accepted_claims = contributor_profiles.accepted_claims + 1,
+			reputation = LEAST(100, contributor_profiles.reputation + 3),
+			updated_at = NOW()`, credited); err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("credit place contributors: %w", err))
+	}
+	return nil
+}
