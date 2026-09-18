@@ -139,6 +139,7 @@ jobs:
             apps/loci/data/postgres.yaml
             apps/loci/data/preference-rerank-cronjob.yaml
             apps/loci/data/backup-cronjob.yaml
+            apps/loci/data/bundle-forge-job.yaml
           )
 
           # sed rather than yq: both files carry the reasoning for what they do
