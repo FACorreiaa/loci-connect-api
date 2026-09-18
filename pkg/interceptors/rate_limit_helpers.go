@@ -160,3 +160,16 @@ func userIDFromContext(ctx context.Context) string {
 	}
 	return userID
 }
+
+// ClientIP is clientIPFromHeader, exported for callers outside this package.
+//
+// Anything that records who made a request wants the same answer the rate
+// limiter uses: the caller's own address, not the ingress pod's. Pass the value
+// ParseTrustedProxies returned — the slice's element type stays unexported, so
+// the rules about what may be believed cannot be constructed anywhere else.
+//
+// The port is dropped along the way, which is what you want when the value is
+// going to be shown to somebody: a source port says nothing about a device.
+func ClientIP(header http.Header, peerAddr string, trustedProxies []*trustedNet) string {
+	return clientIPFromHeader(header, peerAddr, trustedProxies)
+}

@@ -27,6 +27,7 @@ func main() {
 	interval := flag.Duration("interval", 0, "repeat interval (0 = run once)")
 	embeddingBatch := flag.Int("embedding-batch", 50, "backfill this many missing POI embeddings before reranking (0 = disabled)")
 	imageBatch := flag.Int("image-batch", 50, "look up Wikimedia images for this many POIs that have none (0 = disabled)")
+	dbWait := flag.Duration("db-wait", 15*time.Minute, "how long to keep waiting for the database before giving up")
 	flag.Parse()
 
 	_ = godotenv.Load()
@@ -41,18 +42,30 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	database, err := db.New(db.Config{
+	dbCfg := db.Config{
 		DSN:             cfg.Database.DSN(),
 		MaxConns:        4,
 		MinConns:        1,
 		MaxConnLifetime: cfg.Database.MaxConnLifetime,
 		MaxConnIdleTime: cfg.Database.MaxConnIdleTime,
-	}, logger)
+	}
+
+	// db.New gives up after about two seconds, which is right for the API and
+	// wrong here: this job has the whole night, and the database is routinely
+	// away for a minute or so when it starts.
+	database, err := connectWithin(ctx, dbCfg, *dbWait, logger)
 	if err != nil {
 		logger.Error("db connect failed", "error", err)
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	// Connecting is not the same as being able to work: at 03:15 the ping
+	// succeeded and the next write died. Wait until a real query runs.
+	if err := waitForDatabase(ctx, database.Pool, *dbWait, logger); err != nil {
+		logger.Error("database never became ready", "error", err)
+		os.Exit(1)
+	}
 
 	// Run records make these jobs observable. Until now a job that died and a
 	// job with nothing to do left identical evidence: none.
@@ -152,7 +165,7 @@ func main() {
 		return nil
 	}
 
-	if err := run(); err != nil {
+	if err := runWithDatabaseRetry(ctx, run, database.Pool, *dbWait, logger); err != nil {
 		logger.Error("preference re-rank failed", "error", err)
 		if *interval <= 0 {
 			os.Exit(1)
@@ -171,7 +184,7 @@ func main() {
 			logger.Info("preference re-rank scheduler stopped")
 			return
 		case <-ticker.C:
-			if err := run(); err != nil {
+			if err := runWithDatabaseRetry(ctx, run, database.Pool, *dbWait, logger); err != nil {
 				logger.Error("scheduled preference re-rank failed", "error", err)
 			}
 		}
