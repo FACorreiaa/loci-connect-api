@@ -182,6 +182,23 @@ func toProtoProfile(p *locitypes.UserProfile) *userpb.UserProfile {
 	proto.Interests = p.Interests
 	proto.Badges = p.Badges
 
+	// The repository fills Avatar and Stats on every profile it loads and this
+	// mapper dropped both, so the fields were null on the wire for every user.
+	// The avatar in particular meant the client had to fall back to
+	// profile_image_url and could never tell the two apart.
+	if p.Avatar != nil {
+		proto.Avatar = p.Avatar
+	}
+	if p.Stats != nil {
+		proto.Stats = &userpb.UserStats{
+			PlacesVisited:  int32(p.Stats.PlacesVisited),
+			ReviewsWritten: int32(p.Stats.ReviewsWritten),
+			ListsCreated:   int32(p.Stats.ListsCreated),
+			Followers:      int32(p.Stats.Followers),
+			Following:      int32(p.Stats.Following),
+		}
+	}
+
 	return proto
 }
 

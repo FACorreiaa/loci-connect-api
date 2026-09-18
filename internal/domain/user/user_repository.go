@@ -165,10 +165,18 @@ func (r *PostgresUserRepo) GetUserByID(ctx context.Context, userID uuid.UUID) (*
 		       -- silently. Counting the rows costs an index scan and is correct
 		       -- by construction. See internal/domain/travelhistory.
 		       (SELECT COUNT(*) FROM user_visited_cities v WHERE v.user_id = users.id) as places_visited,
-		       COALESCE(reviews_written, 0) as reviews_written,
-		       COALESCE(lists_created, 0) as lists_created, 
-		       COALESCE(followers, 0) as followers, 
-		       COALESCE(following, 0) as following,
+		       -- Same story as places_visited above: users.lists_created is a
+		       -- counter column that no code path has ever incremented, so it
+		       -- read 0 for every user forever. Counted from the rows instead.
+		       (SELECT COUNT(*) FROM lists l WHERE l.user_id = users.id) as lists_created,
+		       -- reviews_written, followers and following are counters for
+		       -- features that do not exist yet: there is no reviews table and
+		       -- no social graph, so nothing can write them and nothing does.
+		       -- They stay 0 here rather than pretending, and the profile screen
+		       -- no longer renders them as though they were real numbers.
+		       0 as reviews_written,
+		       0 as followers,
+		       0 as following,
 		       is_active, last_login_at, theme, language,
 		       timezone, units, currency, created_at, updated_at
 		FROM users WHERE id = $1 AND is_active = TRUE

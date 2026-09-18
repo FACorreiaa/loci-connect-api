@@ -79,3 +79,35 @@ func TestGetUserProfileWithoutTokenIsUnauthenticated(t *testing.T) {
 		t.Errorf("code = %v, want %v", code, connect.CodeUnauthenticated)
 	}
 }
+
+// toProtoProfile populated neither Avatar nor Stats, although the repository
+// sets both on every profile it loads, so both were null on the wire for every
+// user. The profile screen worked around the missing avatar by reading
+// profile_image_url and filled the missing stats with hardcoded zeros.
+func TestToProtoProfileCarriesAvatarAndStats(t *testing.T) {
+	avatar := "https://example.test/a.png"
+	p := &locitypes.UserProfile{
+		ID:     uuid.New(),
+		Email:  "someone@example.test",
+		Avatar: &avatar,
+		Stats: &locitypes.UserStats{
+			PlacesVisited: 7,
+			ListsCreated:  3,
+		},
+	}
+
+	out := toProtoProfile(p)
+
+	if out.GetAvatar() != avatar {
+		t.Errorf("avatar = %q, want %q", out.GetAvatar(), avatar)
+	}
+	if out.GetStats() == nil {
+		t.Fatal("stats were dropped")
+	}
+	if got := out.GetStats().GetPlacesVisited(); got != 7 {
+		t.Errorf("places visited = %d, want 7", got)
+	}
+	if got := out.GetStats().GetListsCreated(); got != 3 {
+		t.Errorf("lists created = %d, want 3", got)
+	}
+}
