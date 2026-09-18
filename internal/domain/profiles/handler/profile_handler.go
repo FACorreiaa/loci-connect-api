@@ -26,13 +26,15 @@ func NewProfileHandler(svc profiles.Service) *ProfileHandler {
 }
 
 func (h *ProfileHandler) GetUserPreferenceProfiles(ctx context.Context, req *connect.Request[profilev1.GetUserPreferenceProfilesRequest]) (*connect.Response[profilev1.GetUserPreferenceProfilesResponse], error) {
-	userIDStr := req.Msg.GetUserId()
-	if userIDStr == "" {
-		var ok bool
-		userIDStr, ok = interceptors.GetUserIDFromContext(ctx)
-		if !ok || userIDStr == "" {
-			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
-		}
+	// The authenticated identity is the only one that counts. This used to
+	// prefer req.Msg.user_id when set, which let any caller read any other
+	// user's preference profiles by passing their id.
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	if requested := req.Msg.GetUserId(); requested != "" && requested != userIDStr {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("cannot read another user's profiles"))
 	}
 	userID, err := presenter.ParseUUID(userIDStr)
 	if err != nil {

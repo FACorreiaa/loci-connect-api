@@ -584,11 +584,15 @@ func (r *RepositoryImpl) GetTagsForProfile(ctx context.Context, profileID uuid.U
 	l := r.logger.With(slog.String("method", "GetTagsForProfile"), slog.String("profileID", profileID.String()))
 	l.DebugContext(ctx, "Fetching tags for profile")
 
+	// Straight off user_personal_tags. This used to join global_tags to
+	// user_personal_tags on id -- two independent id spaces, so the join matched
+	// nothing and every caller got an empty list. That is why the prompt's
+	// "Tags to Avoid" branch never rendered even for profiles with tags linked.
+	// Only personal tags can be profile-scoped: global_tags has no profile_id.
 	query := `
-        SELECT g.id, g.name, g.tag_type, g.description, g.created_at
-        FROM global_tags g
-        JOIN user_personal_tags upt ON g.id = upt.id
-        WHERE upt.profile_id = $1`
+        SELECT id, name, tag_type, description, created_at, updated_at
+        FROM user_personal_tags
+        WHERE profile_id = $1`
 
 	rows, err := r.pgpool.Query(ctx, query, profileID)
 	if err != nil {

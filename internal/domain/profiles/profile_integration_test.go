@@ -10,6 +10,8 @@ import (
 	"os"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
 	interestsdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	tagsdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
@@ -117,7 +119,7 @@ func TestProfilesServiceImpl_Integration(t *testing.T) {
 	t.Run("UpdateSearchProfile", func(t *testing.T) {
 		err := testUserProfileService.UpdateSearchProfile(ctx, userID1, profileID1,
 			locitypes.UpdateSearchProfileParams{
-				ProfileName:    "Updated Weekend Adventure",
+				ProfileName:    proto.String("Updated Weekend Adventure"),
 				SearchRadiusKm: f64p(15.5),
 			})
 		require.NoError(t, err)
