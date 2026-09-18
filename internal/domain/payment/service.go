@@ -36,6 +36,14 @@ type Service interface {
 
 	// Checkout & Portal
 	CreateCheckoutSession(ctx context.Context, req *CreateCheckoutSessionParams) (*CreateCheckoutSessionResult, error)
+	// CreateOneTimeCheckoutSession opens a non-recurring session. Unlike the
+	// RPC above it is not reachable from a client: callers resolve the price
+	// from a row the server owns. See onetime.go.
+	CreateOneTimeCheckoutSession(ctx context.Context, p OneTimeCheckoutParams) (*CreateCheckoutSessionResult, error)
+	// SetPurchaseFulfiller registers what grants a one-time purchase once
+	// Stripe confirms it. Optional: nil leaves payment-mode sessions logged
+	// and unfulfilled rather than failing the webhook.
+	SetPurchaseFulfiller(f PurchaseFulfiller)
 	CreateCustomerPortalSession(ctx context.Context, userID uuid.UUID, returnURL string) (*CustomerPortalResult, error)
 }
 
@@ -59,13 +67,30 @@ type StripeConfig struct {
 	FreeDailyLimit int
 }
 
+// PurchaseFulfiller grants whatever a one-time payment bought. It is declared
+// here, and implemented elsewhere, so that payment never has to import the
+// domain it is fulfilling for.
+type PurchaseFulfiller interface {
+	// FulfilPurchase is called once a payment-mode checkout session completes.
+	// It must be safe to call more than once for the same session.
+	FulfilPurchase(ctx context.Context, kind string, meta map[string]string, sessionID, paymentIntentID string, amountCents int64, currency string) error
+	// RevokePurchase is called when a charge is refunded.
+	RevokePurchase(ctx context.Context, paymentIntentID string) error
+}
+
 type service struct {
 	repo        Repository
 	logger      *slog.Logger
 	quota       QuotaReader
 	invalidator PlanInvalidator
 	cfg         StripeConfig
+	fulfiller   PurchaseFulfiller
 }
+
+// SetPurchaseFulfiller registers the one-time purchase fulfiller. It is set
+// after construction because the domain that fulfils purchases is built from
+// this service, so the two cannot be wired in one direction alone.
+func (s *service) SetPurchaseFulfiller(f PurchaseFulfiller) { s.fulfiller = f }
 
 func NewService(repo Repository, logger *slog.Logger, quota QuotaReader, invalidator PlanInvalidator, cfg StripeConfig) Service {
 	stripe.Key = cfg.APIKey
@@ -482,8 +507,38 @@ func (s *service) processStripeEvent(ctx context.Context, event stripe.Event) er
 		if err := s.repo.SetStripeCustomerID(ctx, uid, sess.Customer.ID); err != nil {
 			return fmt.Errorf("failed to link stripe customer: %w", err)
 		}
-		s.invalidatePlan(uid)
 		s.logger.Info("Linked Stripe customer", "user_id", uid, "customer", sess.Customer.ID)
+
+		// A one-time purchase is not a plan change. Invalidating the cached
+		// plan here would be harmless but misleading; worse, treating the two
+		// alike is how a pack purchase ends up granting Pro. Packs are a
+		// separate purchase (PRICING.md:90), so the two paths stay apart.
+		if sess.Mode == stripe.CheckoutSessionModePayment {
+			return s.fulfilOneTimePurchase(ctx, &sess)
+		}
+
+		s.invalidatePlan(uid)
+
+	case "charge.refunded":
+		// Without this a refund returns the money and leaves the customer
+		// holding the pack. Subscriptions do not need it — cancelling one ends
+		// a recurring plan — but a one-time purchase has no lifecycle of its
+		// own to fall out of.
+		var ch stripe.Charge
+		if err := json.Unmarshal(event.Data.Raw, &ch); err != nil {
+			return fmt.Errorf("error parsing charge refunded event: %w", err)
+		}
+		if ch.PaymentIntent == nil || ch.PaymentIntent.ID == "" {
+			s.logger.Warn("charge.refunded without a payment intent", "charge", ch.ID)
+			return nil
+		}
+		if s.fulfiller == nil {
+			return nil
+		}
+		if err := s.fulfiller.RevokePurchase(ctx, ch.PaymentIntent.ID); err != nil {
+			return fmt.Errorf("revoke refunded purchase: %w", err)
+		}
+		s.logger.Info("refunded purchase revoked", "payment_intent", ch.PaymentIntent.ID)
 
 	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		var stripeSub stripe.Subscription
@@ -735,4 +790,34 @@ func (s *service) getOrCreateStripeCustomer(email, userID string) (string, error
 		return "", err
 	}
 	return cust.ID, nil
+}
+
+// fulfilOneTimePurchase grants what a payment-mode checkout bought.
+//
+// An unknown kind is logged and accepted. Returning an error would make Stripe
+// retry the same event forever, and a delivery we do not recognise is not a
+// delivery that gets better on the tenth attempt.
+func (s *service) fulfilOneTimePurchase(ctx context.Context, sess *stripe.CheckoutSession) error {
+	kind := sess.Metadata["loci_purchase_kind"]
+	if kind == "" {
+		s.logger.Warn("one-time checkout completed with no purchase kind", "session", sess.ID)
+		return nil
+	}
+	if s.fulfiller == nil {
+		s.logger.Warn("one-time checkout completed with no fulfiller registered",
+			"session", sess.ID, "kind", kind)
+		return nil
+	}
+
+	intentID := ""
+	if sess.PaymentIntent != nil {
+		intentID = sess.PaymentIntent.ID
+	}
+
+	if err := s.fulfiller.FulfilPurchase(ctx, kind, sess.Metadata, sess.ID, intentID,
+		sess.AmountTotal, string(sess.Currency)); err != nil {
+		return fmt.Errorf("fulfil one-time purchase: %w", err)
+	}
+	s.logger.Info("one-time purchase fulfilled", "session", sess.ID, "kind", kind)
+	return nil
 }

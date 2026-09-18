@@ -294,12 +294,22 @@ type SubscriptionConfig struct {
 	ProEmails []string
 }
 
-// StripeConfig holds Stripe API credentials and the two Pro price IDs.
+// StripeConfig holds Stripe API credentials, the two Pro price IDs, and the
+// single price every City Pack is sold at.
 type StripeConfig struct {
 	APIKey         string
 	WebhookSecret  string
 	PriceIDMonthly string
 	PriceIDAnnual  string
+
+	// PriceIDCityPack is the one-time price shared by every City Pack. Empty
+	// means packs cannot be bought: the catalog still serves and checkout
+	// refuses, which is the right behaviour before Stripe is set up. The
+	// amount below is for display only and must agree with the price above —
+	// the charge always comes from Stripe, never from this number.
+	PriceIDCityPack    string
+	CityPackPriceCents int
+	CityPackCurrency   string
 }
 
 type ObservabilityConfig struct {
@@ -385,6 +395,10 @@ func Load() (*Config, error) {
 			WebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
 			PriceIDMonthly: getEnv("STRIPE_PRICE_ID_MONTHLY", ""),
 			PriceIDAnnual:  getEnv("STRIPE_PRICE_ID_ANNUAL", ""),
+
+			PriceIDCityPack:    getEnv("STRIPE_PRICE_ID_CITY_PACK", ""),
+			CityPackPriceCents: getEnvAsInt("CITY_PACK_PRICE_CENTS", 499),
+			CityPackCurrency:   getEnv("CITY_PACK_CURRENCY", "usd"),
 		},
 		Cache: CacheConfig{
 			RedisURL:   getEnv("REDIS_URL", ""),

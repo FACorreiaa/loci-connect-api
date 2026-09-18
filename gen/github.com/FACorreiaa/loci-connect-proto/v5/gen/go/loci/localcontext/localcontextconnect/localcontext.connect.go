@@ -45,15 +45,23 @@ const (
 	// LocalContextServiceEstimateDriveCostProcedure is the fully-qualified name of the
 	// LocalContextService's EstimateDriveCost RPC.
 	LocalContextServiceEstimateDriveCostProcedure = "/loci.localcontext.LocalContextService/EstimateDriveCost"
+	// LocalContextServiceGetNewsTickerProcedure is the fully-qualified name of the
+	// LocalContextService's GetNewsTicker RPC.
+	LocalContextServiceGetNewsTickerProcedure = "/loci.localcontext.LocalContextService/GetNewsTicker"
+	// LocalContextServiceSetNewsTickerEnabledProcedure is the fully-qualified name of the
+	// LocalContextService's SetNewsTickerEnabled RPC.
+	LocalContextServiceSetNewsTickerEnabledProcedure = "/loci.localcontext.LocalContextService/SetNewsTickerEnabled"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	localContextServiceServiceDescriptor                 = localcontext.File_loci_localcontext_localcontext_proto.Services().ByName("LocalContextService")
-	localContextServiceGetLocalContextMethodDescriptor   = localContextServiceServiceDescriptor.Methods().ByName("GetLocalContext")
-	localContextServiceGetGoScoreMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetGoScore")
-	localContextServiceGetFxRatesMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetFxRates")
-	localContextServiceEstimateDriveCostMethodDescriptor = localContextServiceServiceDescriptor.Methods().ByName("EstimateDriveCost")
+	localContextServiceServiceDescriptor                    = localcontext.File_loci_localcontext_localcontext_proto.Services().ByName("LocalContextService")
+	localContextServiceGetLocalContextMethodDescriptor      = localContextServiceServiceDescriptor.Methods().ByName("GetLocalContext")
+	localContextServiceGetGoScoreMethodDescriptor           = localContextServiceServiceDescriptor.Methods().ByName("GetGoScore")
+	localContextServiceGetFxRatesMethodDescriptor           = localContextServiceServiceDescriptor.Methods().ByName("GetFxRates")
+	localContextServiceEstimateDriveCostMethodDescriptor    = localContextServiceServiceDescriptor.Methods().ByName("EstimateDriveCost")
+	localContextServiceGetNewsTickerMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetNewsTicker")
+	localContextServiceSetNewsTickerEnabledMethodDescriptor = localContextServiceServiceDescriptor.Methods().ByName("SetNewsTickerEnabled")
 )
 
 // LocalContextServiceClient is a client for the loci.localcontext.LocalContextService service.
@@ -65,6 +73,11 @@ type LocalContextServiceClient interface {
 	GetFxRates(context.Context, *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error)
 	// EstimateDriveCost prices the fuel for a driving leg.
 	EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error)
+	// GetNewsTicker is the breaking-news strip for the signed-in traveller:
+	// headlines for their home country, next destination and recent visits.
+	GetNewsTicker(context.Context, *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error)
+	// SetNewsTickerEnabled is the per-user switch for that strip.
+	SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error)
 }
 
 // NewLocalContextServiceClient constructs a client for the loci.localcontext.LocalContextService
@@ -101,15 +114,29 @@ func NewLocalContextServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(localContextServiceEstimateDriveCostMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getNewsTicker: connect.NewClient[localcontext.GetNewsTickerRequest, localcontext.GetNewsTickerResponse](
+			httpClient,
+			baseURL+LocalContextServiceGetNewsTickerProcedure,
+			connect.WithSchema(localContextServiceGetNewsTickerMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setNewsTickerEnabled: connect.NewClient[localcontext.SetNewsTickerEnabledRequest, localcontext.SetNewsTickerEnabledResponse](
+			httpClient,
+			baseURL+LocalContextServiceSetNewsTickerEnabledProcedure,
+			connect.WithSchema(localContextServiceSetNewsTickerEnabledMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // localContextServiceClient implements LocalContextServiceClient.
 type localContextServiceClient struct {
-	getLocalContext   *connect.Client[localcontext.GetLocalContextRequest, localcontext.LocalContext]
-	getGoScore        *connect.Client[localcontext.GetGoScoreRequest, localcontext.GetGoScoreResponse]
-	getFxRates        *connect.Client[localcontext.GetFxRatesRequest, localcontext.GetFxRatesResponse]
-	estimateDriveCost *connect.Client[localcontext.EstimateDriveCostRequest, localcontext.EstimateDriveCostResponse]
+	getLocalContext      *connect.Client[localcontext.GetLocalContextRequest, localcontext.LocalContext]
+	getGoScore           *connect.Client[localcontext.GetGoScoreRequest, localcontext.GetGoScoreResponse]
+	getFxRates           *connect.Client[localcontext.GetFxRatesRequest, localcontext.GetFxRatesResponse]
+	estimateDriveCost    *connect.Client[localcontext.EstimateDriveCostRequest, localcontext.EstimateDriveCostResponse]
+	getNewsTicker        *connect.Client[localcontext.GetNewsTickerRequest, localcontext.GetNewsTickerResponse]
+	setNewsTickerEnabled *connect.Client[localcontext.SetNewsTickerEnabledRequest, localcontext.SetNewsTickerEnabledResponse]
 }
 
 // GetLocalContext calls loci.localcontext.LocalContextService.GetLocalContext.
@@ -132,6 +159,16 @@ func (c *localContextServiceClient) EstimateDriveCost(ctx context.Context, req *
 	return c.estimateDriveCost.CallUnary(ctx, req)
 }
 
+// GetNewsTicker calls loci.localcontext.LocalContextService.GetNewsTicker.
+func (c *localContextServiceClient) GetNewsTicker(ctx context.Context, req *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error) {
+	return c.getNewsTicker.CallUnary(ctx, req)
+}
+
+// SetNewsTickerEnabled calls loci.localcontext.LocalContextService.SetNewsTickerEnabled.
+func (c *localContextServiceClient) SetNewsTickerEnabled(ctx context.Context, req *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error) {
+	return c.setNewsTickerEnabled.CallUnary(ctx, req)
+}
+
 // LocalContextServiceHandler is an implementation of the loci.localcontext.LocalContextService
 // service.
 type LocalContextServiceHandler interface {
@@ -142,6 +179,11 @@ type LocalContextServiceHandler interface {
 	GetFxRates(context.Context, *connect.Request[localcontext.GetFxRatesRequest]) (*connect.Response[localcontext.GetFxRatesResponse], error)
 	// EstimateDriveCost prices the fuel for a driving leg.
 	EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error)
+	// GetNewsTicker is the breaking-news strip for the signed-in traveller:
+	// headlines for their home country, next destination and recent visits.
+	GetNewsTicker(context.Context, *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error)
+	// SetNewsTickerEnabled is the per-user switch for that strip.
+	SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error)
 }
 
 // NewLocalContextServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -174,6 +216,18 @@ func NewLocalContextServiceHandler(svc LocalContextServiceHandler, opts ...conne
 		connect.WithSchema(localContextServiceEstimateDriveCostMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	localContextServiceGetNewsTickerHandler := connect.NewUnaryHandler(
+		LocalContextServiceGetNewsTickerProcedure,
+		svc.GetNewsTicker,
+		connect.WithSchema(localContextServiceGetNewsTickerMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	localContextServiceSetNewsTickerEnabledHandler := connect.NewUnaryHandler(
+		LocalContextServiceSetNewsTickerEnabledProcedure,
+		svc.SetNewsTickerEnabled,
+		connect.WithSchema(localContextServiceSetNewsTickerEnabledMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.localcontext.LocalContextService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LocalContextServiceGetLocalContextProcedure:
@@ -184,6 +238,10 @@ func NewLocalContextServiceHandler(svc LocalContextServiceHandler, opts ...conne
 			localContextServiceGetFxRatesHandler.ServeHTTP(w, r)
 		case LocalContextServiceEstimateDriveCostProcedure:
 			localContextServiceEstimateDriveCostHandler.ServeHTTP(w, r)
+		case LocalContextServiceGetNewsTickerProcedure:
+			localContextServiceGetNewsTickerHandler.ServeHTTP(w, r)
+		case LocalContextServiceSetNewsTickerEnabledProcedure:
+			localContextServiceSetNewsTickerEnabledHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -207,4 +265,12 @@ func (UnimplementedLocalContextServiceHandler) GetFxRates(context.Context, *conn
 
 func (UnimplementedLocalContextServiceHandler) EstimateDriveCost(context.Context, *connect.Request[localcontext.EstimateDriveCostRequest]) (*connect.Response[localcontext.EstimateDriveCostResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.EstimateDriveCost is not implemented"))
+}
+
+func (UnimplementedLocalContextServiceHandler) GetNewsTicker(context.Context, *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.GetNewsTicker is not implemented"))
+}
+
+func (UnimplementedLocalContextServiceHandler) SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.SetNewsTickerEnabled is not implemented"))
 }
