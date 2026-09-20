@@ -25,6 +25,15 @@ linters:
         path: internal/domain/apikey/handler\.go
         text: '(var-naming|ST1003): method (Create|List|Revoke)Api'
 
+      # Same constraint as ApiKey: the method name is the proto RPC
+      # GetTripCalendarFeedUrl. Renaming it here would fail to implement
+      # CalendarServiceHandler.
+      - linters:
+          - revive
+          - staticcheck
+        path: internal/domain/calendar/handler\.go
+        text: '(var-naming|ST1003): method GetTripCalendarFeedUrl'
+
       # revive/exported flags trip.TripStop, compare.CompareInput and friends
       # as stuttering. They are correct that Stop and Input read better, but
       # these are exported types used across packages; renaming them is an API

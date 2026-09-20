@@ -15,6 +15,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/aicreds/aicredsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/apikey/apikeyv1connect"
 	authconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/calendar/calendarv1connect"
 
 	authhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
@@ -407,6 +408,13 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		tripPath, tripHandler := tripconnect.NewTripServiceHandler(deps.TripHandler, opts)
 		mux.Handle(tripPath, tripHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", tripPath)
+	}
+
+	if deps.CalendarHandler != nil {
+		calPath, calHandler := calendarv1connect.NewCalendarServiceHandler(deps.CalendarHandler, opts)
+		mux.Handle(calPath, calHandler)
+		mux.Handle("/calendar/feed/", deps.CalendarHandler.FeedHandler())
+		deps.Logger.Info("registered Connect RPC service", "path", calPath)
 	}
 
 	if deps.TravelHistoryHandler != nil {

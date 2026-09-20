@@ -311,6 +311,10 @@ func stringPtrOrNil(s string) *string {
 // buildICS renders a trip as a minimal but valid iCalendar. Stops with a day
 // date and a start_minute become timed VEVENTs; others are skipped (an .ics with
 // no usable times still opens cleanly, just empty).
+// BuildICS is the iCalendar body for one trip. Calendar subscribe feeds call
+// this; ExportTrip uses it too.
+func BuildICS(t *Trip) string { return buildICS(t) }
+
 func buildICS(t *Trip) string {
 	var b strings.Builder
 	b.WriteString("BEGIN:VCALENDAR\r\n")

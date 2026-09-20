@@ -8,6 +8,8 @@ cloud.google.com/go v0.123.0 h1:2NAUJwPR47q+E35uaJeYoNhuNEM9kM8SjgRgdeOJUSE=
 cloud.google.com/go v0.123.0/go.mod h1:xBoMV08QcqUGuPW65Qfm1o9Y4zKZBpGS+7bImXLTAZU=
 cloud.google.com/go/auth v0.23.1 h1:1tPpBPG02lQHmoiAvs9egyCASqXP0xgobptjZzov/Jg=
 cloud.google.com/go/auth v0.23.1/go.mod h1:4DhBRcqvtljQN3dJ57qtqbib5ZGCYE5f2crfiiC2EM0=
+cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIiLpZnkHRbnc=
+cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
 cloud.google.com/go/compute/metadata v0.9.0 h1:pDUj4QMoPejqq20dK0Pg2N4yG9zIkYGdBtwLoEkH9Zs=
 cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCBSM6qQI1yTBdEb3C10=
 connectrpc.com/connect v1.20.0 h1:6TNDAB+WeNd2uolWNlYczB5E0KNNaVMNUEx8JEUsPmQ=
@@ -26,6 +28,8 @@ github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0 h1:k16WuCRiPDRNmLXALZ3dcQ9QBJbg3rSl
 github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0/go.mod h1:wldQdJFlTpRdf8MiQ/kMwTc7NwhwbeHi2PGtFHlEkUQ=
 github.com/FACorreiaa/loci-connect-proto/v5 v5.17.0 h1:ACYOrs4/je4bsncJ99Oy0fIXLxqTyUURBW1Rgs+3+vM=
 github.com/FACorreiaa/loci-connect-proto/v5 v5.17.0/go.mod h1:aFO5vPipG4CFtMg4YoX5HmHQxeofuIazgdUyA4PgYek=
+github.com/FACorreiaa/loci-connect-proto/v5 v5.19.0 h1:A6pB9M6pAMGKXAtT7qmoseo5yNbCeVcuaf0/eKeKm9g=
+github.com/FACorreiaa/loci-connect-proto/v5 v5.19.0/go.mod h1:aFO5vPipG4CFtMg4YoX5HmHQxeofuIazgdUyA4PgYek=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

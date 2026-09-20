@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/bundle"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/calendar"
 	chathandler "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/handler"
 	chatrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/repository"
 	chatservice "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
@@ -181,6 +182,7 @@ type Dependencies struct {
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
+	CalendarHandler          *calendar.Handler
 	BundleHandler            *bundle.Handler
 	POIHandler               *poihandler.POIHandler
 	CustomAuthHandler        *customauthhandler.CustomAuthHandler
@@ -766,6 +768,13 @@ func (d *Dependencies) initHandlers() error {
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
+	if d.DB != nil && d.TripRepo != nil {
+		d.CalendarHandler = calendar.NewHandler(
+			d.TripRepo,
+			calendar.NewStore(d.DB.Pool),
+			d.Config.Server.BaseURL,
+		).WithOAuth(calendar.LoadOAuthConfigFromEnv()).WithSealer(d.sealer).WithPlans(d.SubscriptionService)
+	}
 	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger)
 
 	// City Packs. The catalog serves whether or not Stripe is configured; an

@@ -32,10 +32,33 @@ https://lociai.fyi/auth/oauth/google/callback
 https://lociai.fyi/auth/oauth/apple/callback
 ```
 
+Calendar connect (Google Calendar API and Calendly) uses the same origin and
+the same callback page, with extra paths. Register these too:
+
+```
+https://lociai.fyi/auth/oauth/google-calendar/callback
+https://lociai.fyi/auth/oauth/calendly/callback
+```
+
+Enable the Google Calendar API on the project. Scopes are
+`calendar.events` and `userinfo.email` — they are **not** added to sign-in.
+Optional env overrides: `GOOGLE_CALENDAR_CLIENT_ID` /
+`GOOGLE_CALENDAR_CLIENT_SECRET`, `CALENDLY_CLIENT_ID` /
+`CALENDLY_CLIENT_SECRET`. Empty Google calendar vars reuse the sign-in client.
+
 and locally, with the client on Vinxi's default port:
 
 ```
 OAUTH_CALLBACK_URL=http://localhost:3000/auth/oauth
+```
+
+which makes the local redirect URIs:
+
+```
+http://localhost:3000/auth/oauth/google/callback
+http://localhost:3000/auth/oauth/apple/callback
+http://localhost:3000/auth/oauth/google-calendar/callback
+http://localhost:3000/auth/oauth/calendly/callback
 ```
 
 ---
