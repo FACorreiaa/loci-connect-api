@@ -31,3 +31,4 @@ bin
 /server
 .DS_Store
 .posthog-wizard-cache/
+*.p8
