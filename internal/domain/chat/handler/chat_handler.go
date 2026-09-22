@@ -25,6 +25,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/resumebuf"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -32,10 +33,12 @@ import (
 // ChatHandler implements the ChatServiceHandler interface.
 type ChatHandler struct {
 	chatconnect.UnimplementedChatServiceHandler
-	service   service.LlmInteractiontService
-	logger    *slog.Logger
-	resumeBuf *resumebuf.Buffer
-	issuer    AttributionIssuer
+	service     service.LlmInteractiontService
+	logger      *slog.Logger
+	resumeBuf   *resumebuf.Buffer
+	issuer      AttributionIssuer
+	runs        runs.Store
+	onRunFinish runs.FinishListener
 }
 
 // AttributionIssuer persists the exact traces emitted to an authenticated user.
@@ -51,6 +54,13 @@ func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger
 		logger:    logger,
 		issuer:    issuer,
 	}
+}
+
+// WithRuns records each generation and announces its end to onFinish.
+func (h *ChatHandler) WithRuns(store runs.Store, onFinish runs.FinishListener) *ChatHandler {
+	h.runs = store
+	h.onRunFinish = onFinish
+	return h
 }
 
 func (h *ChatHandler) StartChat(
@@ -193,9 +203,17 @@ func (h *ChatHandler) StreamChat(
 		}
 	}
 
-	// appendEvent records live events for future resume, capturing the minted
-	// session id from the start event when we didn't already know it.
-	appendEvent := func(ev locitypes.StreamEvent) {
+	var tracker *runs.Tracker
+	if res, ok := runs.ReservationFrom(ctx); ok && h.runs != nil {
+		res.Claim()
+		tracker = runs.NewTracker(h.runs, res.RunID, h.onRunFinish, h.logger)
+	}
+
+	// record observes each live event for the run tracker, then buffers it for
+	// future resume, capturing the minted session id from the start event when
+	// we didn't already know it.
+	record := func(ev locitypes.StreamEvent) {
+		tracker.Observe(ev)
 		if h.resumeBuf == nil {
 			return
 		}
@@ -241,10 +259,11 @@ func (h *ChatHandler) StreamChat(
 		case event, ok := <-eventCh:
 			if !ok {
 				h.logger.Info("Event channel closed, stream finished successfully")
+				tracker.Close()
 				return nil
 			}
 
-			appendEvent(event)
+			record(event)
 
 			resp, err := h.mapEventToProto(ctx, event, userID)
 			if err != nil {
@@ -259,14 +278,24 @@ func (h *ChatHandler) StreamChat(
 				// Keep buffering the rest so a reconnect can resume from the buffer.
 				go func() {
 					for ev := range eventCh {
-						appendEvent(ev)
+						record(ev)
 					}
+					tracker.Close()
 				}()
 				return nil
 			}
 
 			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
 				h.logger.Info("Stream completed", "event_type", event.Type)
+				// The pipeline goroutine still closes eventCh after this; keep
+				// draining so any trailing events are recorded and the tracker
+				// closes (a no-op if the terminal event already finished it).
+				go func() {
+					for ev := range eventCh {
+						record(ev)
+					}
+					tracker.Close()
+				}()
 				return nil
 			}
 
@@ -276,8 +305,9 @@ func (h *ChatHandler) StreamChat(
 			// Keep buffering so a reconnect can resume from the buffer.
 			go func() {
 				for ev := range eventCh {
-					appendEvent(ev)
+					record(ev)
 				}
+				tracker.Close()
 			}()
 			return nil
 		}

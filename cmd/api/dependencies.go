@@ -740,7 +740,7 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler.WithMFA(d.MFAService)
 	}
 	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, nil)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
