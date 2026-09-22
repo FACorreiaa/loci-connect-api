@@ -21,7 +21,7 @@
     ],
     "hook": "a mild winter escape",
     "days": 3,
-    "theme": "local_life"
+    "theme": "outdoors"
   },
   {
     "city": "Seville",
@@ -56,6 +56,32 @@
     "theme": "outdoors"
   },
   {
+    "city": "Bangkok",
+    "country_code": "TH",
+    "months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "hook": "the cool season",
+    "days": 4,
+    "theme": "food"
+  },
+  {
+    "city": "Cape Town",
+    "country_code": "ZA",
+    "months": [
+      11,
+      12,
+      1,
+      2
+    ],
+    "hook": "the southern summer",
+    "days": 4,
+    "theme": "outdoors"
+  },
+  {
     "city": "Venice",
     "country_code": "IT",
     "months": [
@@ -86,7 +112,19 @@
     ],
     "hook": "the mild season",
     "days": 3,
-    "theme": "local_life"
+    "theme": "architecture"
+  },
+  {
+    "city": "Singapore",
+    "country_code": "SG",
+    "months": [
+      2,
+      3,
+      7
+    ],
+    "hook": "gardens, zoos and hawker centres",
+    "days": 3,
+    "theme": "family"
   },
   {
     "city": "Kyoto",
@@ -108,7 +146,7 @@
     ],
     "hook": "the first spring light",
     "days": 3,
-    "theme": "local_life"
+    "theme": "architecture"
   },
   {
     "city": "Dublin",
@@ -118,7 +156,7 @@
     ],
     "hook": "St Patrick's week",
     "days": 3,
-    "theme": "local_life"
+    "theme": "nightlife"
   },
   {
     "city": "Rome",
@@ -130,7 +168,33 @@
     ],
     "hook": "shoulder season",
     "days": 3,
-    "theme": "local_life"
+    "theme": "art"
+  },
+  {
+    "city": "Tokyo",
+    "country_code": "JP",
+    "months": [
+      3,
+      4,
+      10,
+      11
+    ],
+    "hook": "depachika, izakaya and ramen alleys",
+    "days": 5,
+    "theme": "food"
+  },
+  {
+    "city": "Buenos Aires",
+    "country_code": "AR",
+    "months": [
+      3,
+      4,
+      10,
+      11
+    ],
+    "hook": "tango nights",
+    "days": 4,
+    "theme": "nightlife"
   },
   {
     "city": "Amsterdam",
@@ -150,7 +214,7 @@
     ],
     "hook": "Feria de Abril",
     "days": 3,
-    "theme": "local_life"
+    "theme": "nightlife"
   },
   {
     "city": "Paris",
@@ -161,7 +225,7 @@
     ],
     "hook": "spring in the parks",
     "days": 3,
-    "theme": "local_life"
+    "theme": "art"
   },
   {
     "city": "Istanbul",
@@ -174,6 +238,17 @@
     "hook": "the tulip festival",
     "days": 3,
     "theme": "outdoors"
+  },
+  {
+    "city": "Seoul",
+    "country_code": "KR",
+    "months": [
+      4,
+      10
+    ],
+    "hook": "palaces in autumn colour",
+    "days": 4,
+    "theme": "architecture"
   },
   {
     "city": "Lisbon",
@@ -195,7 +270,7 @@
     ],
     "hook": "São João",
     "days": 3,
-    "theme": "local_life"
+    "theme": "nightlife"
   },
   {
     "city": "Amalfi",
@@ -207,7 +282,7 @@
     ],
     "hook": "the coast before the crowds",
     "days": 3,
-    "theme": "local_life"
+    "theme": "food"
   },
   {
     "city": "Crete",
@@ -223,6 +298,18 @@
     "theme": "outdoors"
   },
   {
+    "city": "London",
+    "country_code": "GB",
+    "months": [
+      5,
+      6,
+      12
+    ],
+    "hook": "free museums and big parks",
+    "days": 4,
+    "theme": "family"
+  },
+  {
     "city": "Reykjavik",
     "country_code": "IS",
     "months": [
@@ -231,7 +318,7 @@
     ],
     "hook": "the midnight sun",
     "days": 4,
-    "theme": "local_life"
+    "theme": "outdoors"
   },
   {
     "city": "Stockholm",
@@ -253,7 +340,19 @@
     ],
     "hook": "cool hills above Lisbon",
     "days": 3,
-    "theme": "local_life"
+    "theme": "architecture"
+  },
+  {
+    "city": "Chicago",
+    "country_code": "US",
+    "months": [
+      6,
+      7,
+      8
+    ],
+    "hook": "skyscrapers from the river",
+    "days": 3,
+    "theme": "architecture"
   },
   {
     "city": "Dubrovnik",
@@ -328,7 +427,7 @@
     ],
     "hook": "Semana Grande and pintxos",
     "days": 3,
-    "theme": "local_life"
+    "theme": "food"
   },
   {
     "city": "Porto",
@@ -350,7 +449,7 @@
     ],
     "hook": "Oktoberfest",
     "days": 3,
-    "theme": "local_life"
+    "theme": "nightlife"
   },
   {
     "city": "Ljubljana",
@@ -361,7 +460,7 @@
     ],
     "hook": "the golden hour",
     "days": 3,
-    "theme": "local_life"
+    "theme": "architecture"
   },
   {
     "city": "Bordeaux",
@@ -372,7 +471,7 @@
     ],
     "hook": "the vendanges",
     "days": 3,
-    "theme": "local_life"
+    "theme": "food"
   },
   {
     "city": "Barcelona",
@@ -382,7 +481,18 @@
     ],
     "hook": "La Mercè",
     "days": 3,
-    "theme": "local_life"
+    "theme": "family"
+  },
+  {
+    "city": "New York",
+    "country_code": "US",
+    "months": [
+      9,
+      10
+    ],
+    "hook": "autumn in the museums",
+    "days": 4,
+    "theme": "art"
   },
   {
     "city": "Douro Valley",
@@ -402,7 +512,7 @@
     ],
     "hook": "New England foliage",
     "days": 5,
-    "theme": "local_life"
+    "theme": "outdoors"
   },
   {
     "city": "Alsace",
@@ -414,6 +524,17 @@
     "hook": "wine villages in autumn",
     "days": 3,
     "theme": "food"
+  },
+  {
+    "city": "Mexico City",
+    "country_code": "MX",
+    "months": [
+      10,
+      11
+    ],
+    "hook": "Día de Muertos",
+    "days": 4,
+    "theme": "local_life"
   },
   {
     "city": "Madrid",
@@ -434,7 +555,7 @@
     ],
     "hook": "misty canals",
     "days": 3,
-    "theme": "local_life"
+    "theme": "architecture"
   },
   {
     "city": "Malta",
