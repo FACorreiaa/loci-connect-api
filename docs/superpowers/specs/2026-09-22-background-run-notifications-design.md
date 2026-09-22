@@ -337,6 +337,32 @@ After each client merge, check the live bundle for `api.lociai.fyi` (the
 Workers Builds race). Once the proto is tagged, send the final RPC and
 message names to the iOS session.
 
+## Revisions made while planning (2026-09-22)
+
+Reading the code for the implementation plan changed six details. The plan
+(`docs/superpowers/plans/2026-09-22-background-run-notifications.md`) is
+authoritative where it differs from this document.
+
+1. **The cap is an interceptor, and the table key is a run id.** Quota is spent
+   by an interceptor before the handler runs, with no refund, so the cap
+   interceptor sits between auth and quota. It reserves a row keyed by run
+   `id`, and `session_id` (`UNIQUE NULL`) is attached at the start event.
+2. **The handler tracks the run.** A tracker fed by the handler's live loop
+   and drain goroutine writes `done` / `failed`. `COMPLETE` is sent after both
+   persistence calls, so it means "saved".
+3. **Event ids are already unique.** The four `recommendationRunID` sites are
+   cases of one `switch`, so the fix is dropped.
+4. **The service worker uses `workbox.importScripts`.** `public/push-sw.js`
+   carries the handlers instead of switching to `injectManifest`, and the
+   precache config is unchanged.
+5. **Result pages load from the server.** Completed sessions become a keyed
+   `sessionStorage` map. `/activities`, `/hotels`, `/restaurants` and
+   `/nearme` load a finished session via `GetChatSession` + `GetSessionPOIs`
+   before ever re-running a search, so a notification that opens a fresh tab
+   costs nothing.
+6. **One result-URL builder.** `runs.ResultPath` serves both the stream's
+   complete event and the push payload.
+
 ## Out of scope
 
 - APNs sending and the iOS client (separate spec; `platform = apns` and the
