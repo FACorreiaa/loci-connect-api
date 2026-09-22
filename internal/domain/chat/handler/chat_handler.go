@@ -182,24 +182,54 @@ func (h *ChatHandler) StreamChat(
 		bufSessionID = requestedSessionID.String()
 	}
 
-	// Resume path: replay what the client missed instead of re-running the LLM.
-	// The original generation goroutine keeps buffering after a disconnect, so the
-	// buffer holds events produced while the client was gone. On a buffer miss
-	// (evicted/unknown) we fall through to a fresh generation (session_id honored).
-	if h.resumeBuf != nil && cc.ResumeToken != "" && bufSessionID != "" {
-		if events, found := h.resumeBuf.Replay(bufSessionID, cc.ResumeToken); found {
-			llmCancel()
-			for _, ev := range events {
-				resp, mErr := h.mapEventToProto(ctx, ev, userID)
-				if mErr != nil {
-					continue
+	// Resume path: replay what the client missed, then follow the run live until
+	// its terminal event instead of re-running the LLM. The original generation
+	// goroutine keeps buffering after a disconnect, so the buffer holds events
+	// produced while the client was gone and keeps receiving new ones. With no
+	// buffer (evicted, or another pod) a finished run points the client at its
+	// stored result; otherwise we fall through to a fresh generation
+	// (session_id honored).
+	if cc.ResumeToken != "" && bufSessionID != "" {
+		if h.resumeBuf != nil {
+			if backlog, live, cancel, found := h.resumeBuf.Subscribe(bufSessionID, cc.ResumeToken); found {
+				llmCancel()
+				defer cancel()
+				send := func(ev locitypes.StreamEvent) bool {
+					resp, mErr := h.mapEventToProto(ctx, ev, userID)
+					if mErr != nil {
+						return true
+					}
+					return stream.Send(resp) == nil
 				}
-				if sErr := stream.Send(resp); sErr != nil {
-					return nil
+				for _, ev := range backlog {
+					if !send(ev) {
+						return nil
+					}
+				}
+				for {
+					select {
+					case ev, open := <-live:
+						if !open {
+							h.logger.Info("resumed stream to its end", "session_id", bufSessionID, "replayed", len(backlog))
+							return nil
+						}
+						if !send(ev) {
+							return nil
+						}
+					case <-ctx.Done():
+						return nil
+					}
 				}
 			}
-			h.logger.Info("resumed stream from buffer", "session_id", bufSessionID, "replayed", len(events))
-			return nil
+		}
+		// No buffer (evicted, or another pod). If this session's run already
+		// ended, point the client at the stored result instead of generating
+		// the whole answer again.
+		if h.runs != nil {
+			if run, found, rErr := h.runs.FindBySession(ctx, userID, requestedSessionID); rErr == nil && found && run.Status != runs.StatusRunning {
+				llmCancel()
+				return h.sendLoadFromSession(stream, run)
+			}
 		}
 	}
 
@@ -334,6 +364,41 @@ func (h *ChatHandler) toConnectError(err error) error {
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
+}
+
+// sendLoadFromSession ends a resume whose events are gone: the run finished,
+// so its result is stored and GetChatSession / GetSessionPOIs can load it.
+// Navigation carries the same relative path shape the live complete event does.
+func (h *ChatHandler) sendLoadFromSession(stream *connect.ServerStream[chatv1.StreamEvent], run runs.Run) error {
+	if run.Status == runs.StatusFailed {
+		code := run.ErrorCode
+		if code == "" {
+			code = "internal" // StreamError.internal_code has min_len 1
+		}
+		return stream.Send(&chatv1.StreamEvent{
+			Timestamp: timestamppb.Now(),
+			EventId:   uuid.NewString(),
+			IsFinal:   true,
+			EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
+			Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
+				UserMessage:  "This search didn't finish. Try it again.",
+				InternalCode: code,
+				Retryable:    true,
+			}},
+		})
+	}
+	path, routeType, query := runs.ResultPath(run.Domain, run.SessionID, run.CityName, uuid.Nil)
+	return stream.Send(&chatv1.StreamEvent{
+		Timestamp:  timestamppb.Now(),
+		EventId:    uuid.NewString(),
+		IsFinal:    true,
+		EventType:  chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE,
+		Navigation: &chatv1.NavigationData{Url: path, RouteType: routeType, QueryParams: query},
+		Payload: &chatv1.StreamEvent_Complete{Complete: &chatv1.CompletePayload{
+			SessionId:       run.SessionID.String(),
+			LoadFromSession: true,
+		}},
+	})
 }
 
 // mapEventToProto translates an internal StreamEvent onto the typed proto
