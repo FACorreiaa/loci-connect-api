@@ -105,6 +105,33 @@ func TestStaleRunDoesNotCountAndReadsFailed(t *testing.T) {
 	require.Equal(t, ErrorCodeDeadline, got[0].ErrorCode)
 }
 
+// A row already stale must not be resurrected by a late Finish call — a
+// reader who already saw it as failed/deadline_exceeded must not have that
+// flip back to a real completion racing in behind them.
+func TestFinishDoesNotMoveAStaleRun(t *testing.T) {
+	pool := testPool(t)
+	s := NewPostgresStore(pool)
+	ctx := context.Background()
+	user := seedUser(t, pool)
+
+	runID, err := s.Reserve(ctx, user)
+	require.NoError(t, err)
+	session := uuid.New()
+	require.NoError(t, s.Attach(ctx, runID, session, "itinerary", "Crete"))
+	_, err = pool.Exec(ctx, `UPDATE generation_runs SET started_at = NOW() - interval '11 minutes' WHERE id = $1`, runID)
+	require.NoError(t, err)
+
+	_, moved, err := s.Finish(ctx, runID, StatusDone, "")
+	require.NoError(t, err)
+	require.False(t, moved, "a stale run must not be moved by a late Finish")
+
+	got, err := s.Statuses(ctx, user, []uuid.UUID{session})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, StatusFailed, got[0].Status)
+	require.Equal(t, ErrorCodeDeadline, got[0].ErrorCode)
+}
+
 func TestFinishMovesOnceAndClaimIsExactlyOnce(t *testing.T) {
 	pool := testPool(t)
 	s := NewPostgresStore(pool)

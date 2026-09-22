@@ -44,7 +44,7 @@ type Run struct {
 
 // effective reports a stale running row as the failure it is.
 func (r Run) effective(now time.Time) Run {
-	if r.Status == StatusRunning && now.Sub(r.StartedAt) > StaleAfter {
+	if r.Status == StatusRunning && now.Sub(r.StartedAt) >= StaleAfter {
 		r.Status = StatusFailed
 		r.ErrorCode = ErrorCodeDeadline
 	}

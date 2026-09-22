@@ -93,11 +93,14 @@ func (s *PostgresStore) Attach(ctx context.Context, runID, sessionID uuid.UUID, 
 	return nil
 }
 
+// Finish only moves a row that is both still "running" and not yet stale —
+// a row readers already see as failed/deadline_exceeded (via Run.effective)
+// must not be resurrected into a real completion out from under them.
 func (s *PostgresStore) Finish(ctx context.Context, runID uuid.UUID, status Status, errorCode string) (Run, bool, error) {
 	run, err := scanRun(s.pool.QueryRow(ctx, `
 		UPDATE generation_runs SET status = $2, error_code = $3, finished_at = NOW()
-		WHERE id = $1 AND status = 'running'
-		RETURNING `+runColumns, runID, string(status), errorCode))
+		WHERE id = $1 AND status = 'running' AND started_at > NOW() - make_interval(secs => $4)
+		RETURNING `+runColumns, runID, string(status), errorCode, StaleAfter.Seconds()))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Run{}, false, nil
 	}
