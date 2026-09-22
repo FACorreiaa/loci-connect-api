@@ -1,11 +1,16 @@
 package placeintel
 
 import (
+	"context"
+	"fmt"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	placev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place"
 	"github.com/stretchr/testify/assert"
+
+	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 )
 
 func TestFactLifetime(t *testing.T) {
@@ -47,4 +52,26 @@ func TestMissingFieldsAsksEverythingForAnUnknownPlace(t *testing.T) {
 	t.Parallel()
 	missing := missingFields(candidatePOI{id: "x", name: "New"}, coverage{})
 	assert.Equal(t, contributableFields, missing)
+}
+
+// A geocoder outage is not the user's typo. Reporting it as a bad argument
+// told people their correctly-spelled city was wrong.
+func TestResolveCityErrorKeepsOutagesApartFromBadInput(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		err  error
+		want connect.Code
+	}{
+		{"geocoder down", fmt.Errorf("lookup: %w", cityrepo.ErrGeocoderUnavailable), connect.CodeUnavailable},
+		{"no such city", cityrepo.ErrCityUnresolvable, connect.CodeInvalidArgument},
+		{"ambiguous city", &cityrepo.AmbiguousCityError{Query: "Beja"}, connect.CodeInvalidArgument},
+		{"cancelled", context.Canceled, connect.CodeCanceled},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, connect.CodeOf(resolveCityError("Tasca", tc.err)))
+		})
+	}
 }

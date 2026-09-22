@@ -8,6 +8,9 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
+	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 )
 
 // placesRequiredForPromotion is how many distinct people must say a place
@@ -61,28 +64,70 @@ func (h *Handler) existingPOIByIdentity(ctx context.Context, cityID uuid.UUID, n
 	return id, true, nil
 }
 
-// insertSubmission records the proposal, or returns the existing row when this
-// client id has been seen before so a retry cannot create a second one.
-func (h *Handler) insertSubmission(ctx context.Context, tx pgx.Tx, s submission, clientID string) (uuid.UUID, error) {
+// insertSubmission records the proposal and returns the row it now lives in,
+// with that row's owner.
+//
+// Two conflicts are expected and neither is an error. A client id seen before
+// is a retry, and gets its own row back. A place already pending in the same
+// city under the same name is somebody else's proposal of the same place; the
+// caller treats that as a confirmation, since the owner it gets back is not the
+// person asking.
+func (h *Handler) insertSubmission(ctx context.Context, tx pgx.Tx, s submission, clientID string) (uuid.UUID, uuid.UUID, error) {
 	var id uuid.UUID
 	err := tx.QueryRow(ctx, `
 		INSERT INTO place_submissions
 			(client_submission_id, user_id, city_id, name, category, latitude, longitude, address, website)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (client_submission_id) DO NOTHING
+		ON CONFLICT DO NOTHING
 		RETURNING id`,
 		clientID, s.UserID, s.CityID, s.Name, s.Category, s.Lat, s.Lng, s.Address, s.Website).Scan(&id)
+	if err == nil {
+		return id, s.UserID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, uuid.Nil, connect.NewError(connect.CodeInternal, fmt.Errorf("insert submission: %w", err))
+	}
+
+	var owner uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id, user_id FROM place_submissions
+		WHERE client_submission_id = $1 AND user_id = $2`, clientID, s.UserID).Scan(&id, &owner)
+	if err == nil {
+		return id, owner, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, uuid.Nil, connect.NewError(connect.CodeInternal, fmt.Errorf("read retried submission: %w", err))
+	}
+
+	// The identity expression and predicate match idx_place_submissions_identity.
+	err = tx.QueryRow(ctx, `
+		SELECT id, user_id FROM place_submissions
+		WHERE city_id = $1 AND lower(btrim(name)) = lower(btrim($2)) AND status <> 'rejected'`,
+		s.CityID, s.Name).Scan(&id, &owner)
 	if errors.Is(err, pgx.ErrNoRows) {
-		if err := tx.QueryRow(ctx, `
-			SELECT id FROM place_submissions WHERE client_submission_id = $1`, clientID).Scan(&id); err != nil {
-			return uuid.Nil, connect.NewError(connect.CodeInternal, fmt.Errorf("read duplicate submission: %w", err))
-		}
-		return id, nil
+		// The only unique column left is client_submission_id, held by another
+		// account. A client that reuses ids across accounts is broken.
+		return uuid.Nil, uuid.Nil, connect.NewError(connect.CodeInvalidArgument,
+			errors.New("client_submission_id is already in use"))
 	}
 	if err != nil {
-		return uuid.Nil, connect.NewError(connect.CodeInternal, fmt.Errorf("insert submission: %w", err))
+		return uuid.Nil, uuid.Nil, connect.NewError(connect.CodeInternal, fmt.Errorf("read matching submission: %w", err))
 	}
-	return id, nil
+	return id, owner, nil
+}
+
+// resolveCityError keeps the resolver's two failure kinds apart. A name we
+// cannot find is the user's to fix; a geocoder outage is not, and calling it a
+// bad argument would tell them their correctly-spelled city is wrong.
+func resolveCityError(name string, err error) error {
+	wrapped := fmt.Errorf("could not place %q in a city: %w", name, err)
+	switch {
+	case errors.Is(err, cityrepo.ErrGeocoderUnavailable):
+		return connect.NewError(connect.CodeUnavailable, wrapped)
+	case errors.Is(err, cityrepo.ErrCityUnresolvable):
+		return connect.NewError(connect.CodeInvalidArgument, wrapped)
+	}
+	return apierr.ToConnect(wrapped)
 }
 
 // creditPlaceContributors rewards the submitter and everybody who confirmed.
