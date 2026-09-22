@@ -57,6 +57,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
@@ -157,6 +158,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	tracingInterceptor := interceptors.NewTracingInterceptor(tracer)
 	validationInterceptor := validate.NewInterceptor()
 	subscriptionInterceptor := subscription.NewRateLimitInterceptor(deps.SubscriptionService)
+	runCapInterceptor := runs.NewCapInterceptor(deps.RunStore, deps.Logger)
 	authInterceptor := interceptors.NewAuthInterceptor(jwtSecret, publicProcedures...)
 	timeoutInterceptor := interceptors.NewTimeoutInterceptor(interceptors.TimeoutConfig{
 		Default:   deps.Config.Server.DefaultRPCTimeout,
@@ -178,6 +180,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		interceptors.NewLoggingInterceptor(deps.Logger),
 		authInterceptor,
 		userRateLimiter,
+		runCapInterceptor, // after auth (needs the user), before quota (a refusal costs nothing)
 		subscriptionInterceptor,
 		observability.NewMetricsInterceptor(),
 	)

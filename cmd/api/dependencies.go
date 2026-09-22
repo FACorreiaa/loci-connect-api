@@ -52,6 +52,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
@@ -112,6 +113,8 @@ type Dependencies struct {
 	ShareRepo         share.Repository
 	TripRepo          trip.Repository
 	TravelHistoryRepo travelhistory.Repository
+	// RunStore backs the cap interceptor and the run-status/notification RPCs.
+	RunStore runs.Store
 
 	// Services
 	TokenManager service.TokenManager
@@ -290,6 +293,7 @@ func (d *Dependencies) initRepositories() error {
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
+	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
 
 	d.Logger.Info("repositories initialized")
 	return nil
