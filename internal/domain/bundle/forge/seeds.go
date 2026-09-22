@@ -36,10 +36,10 @@ func ValidTheme(t string) bool {
 // and what the pack is about.
 //
 // The list is ported from SEASONAL_PICKS in the client, which already decided
-// which cities are worth showing and in which months. Themes were assigned
-// from each hook by keyword and are the weakest part of the file — a good many
-// landed on local_life. Correcting one is an edit here, and the review step
-// before publishing is where a wrong one should be caught.
+// which cities are worth showing and in which months, plus a set of the most
+// visited cities outside Europe. Themes were assigned by hand from each hook.
+// Correcting one is an edit here, and the review step before publishing is
+// where a wrong one should be caught.
 type Seed struct {
 	City        string `json:"city"`
 	CountryCode string `json:"country_code"`
