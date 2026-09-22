@@ -18,6 +18,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/johnfercher/maroto/v2 v2.4.1
 	github.com/joho/godotenv v1.5.1
+	github.com/lestrrat-go/jwx v1.2.31
 	github.com/markbates/goth v1.82.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
@@ -112,7 +113,6 @@ require (
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx v1.2.31 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect

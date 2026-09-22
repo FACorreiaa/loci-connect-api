@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -19,21 +20,24 @@ import (
 // CustomAuthHandler implements the CustomAuthService Connect handlers
 type CustomAuthHandler struct {
 	customauthconnect.UnimplementedCustomAuthServiceHandler
-	oauthService *service.OAuthService
-	phoneService *service.PhoneService
-	authService  *authservice.AuthService
+	oauthService    *service.OAuthService
+	idTokenVerifier *service.IDTokenVerifier
+	phoneService    *service.PhoneService
+	authService     *authservice.AuthService
 }
 
 // NewCustomAuthHandler creates a new handler for custom authentication methods
 func NewCustomAuthHandler(
 	oauthSvc *service.OAuthService,
+	idTokenVerifier *service.IDTokenVerifier,
 	phoneSvc *service.PhoneService,
 	authSvc *authservice.AuthService,
 ) *CustomAuthHandler {
 	return &CustomAuthHandler{
-		oauthService: oauthSvc,
-		phoneService: phoneSvc,
-		authService:  authSvc,
+		oauthService:    oauthSvc,
+		idTokenVerifier: idTokenVerifier,
+		phoneService:    phoneSvc,
+		authService:     authSvc,
 	}
 }
 
@@ -83,6 +87,67 @@ func (h *CustomAuthHandler) OAuthCallback(
 	}
 
 	// Find or create user via auth service
+	result, isNew, err := h.authService.LoginOrRegisterOAuth(ctx, provider, gothUser, meta)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+
+	return connect.NewResponse(&customauth.OAuthCallbackResponse{
+		AccessToken:  result.Tokens.AccessToken,
+		RefreshToken: result.Tokens.RefreshToken,
+		UserId:       result.User.ID.String(),
+		Email:        result.User.Email,
+		Username:     result.User.Username,
+		IsNewUser:    isNew,
+	}), nil
+}
+
+// SignInWithIDToken signs in with an ID token from a native sheet (iOS Apple
+// and Google). The token replaces the code exchange; everything after it —
+// finding or creating the account, issuing a session — is the OAuth path.
+func (h *CustomAuthHandler) SignInWithIDToken(
+	ctx context.Context,
+	req *connect.Request[customauth.SignInWithIDTokenRequest],
+) (*connect.Response[customauth.OAuthCallbackResponse], error) {
+	provider := providerToString(req.Msg.Provider)
+
+	if !h.idTokenVerifier.IsConfigured(provider) {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, cacommon.ErrOAuthProviderNotConfigured)
+	}
+
+	claims, err := h.idTokenVerifier.Verify(ctx, provider, req.Msg.IdToken, req.Msg.Nonce)
+	if err != nil {
+		if errors.Is(err, service.ErrIDTokenInvalid) {
+			slog.WarnContext(ctx, "native sign-in token refused",
+				slog.String("provider", provider), slog.String("error", err.Error()))
+			return nil, connect.NewError(connect.CodeUnauthenticated, service.ErrIDTokenInvalid)
+		}
+		// The provider's key endpoint was unreachable: not the caller's fault.
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+
+	// Both providers put a verified email in every ID token. Without one,
+	// LoginOrRegisterOAuth would look an unknown subject up by the empty
+	// email and could link it to an account that has none, such as a phone
+	// sign-up. Refuse instead.
+	if claims.Email == "" {
+		slog.WarnContext(ctx, "native sign-in token has no verified email", slog.String("provider", provider))
+		return nil, connect.NewError(connect.CodeUnauthenticated, service.ErrIDTokenInvalid)
+	}
+
+	// Keyed on the subject, like the web flow, so this is the same account.
+	gothUser := &goth.User{
+		Provider: provider,
+		UserID:   claims.Subject,
+		Email:    claims.Email,
+		Name:     strings.TrimSpace(req.Msg.FullName),
+	}
+
+	meta := authservice.SessionMetadata{
+		UserAgent: req.Header().Get("User-Agent"),
+		ClientIP:  req.Peer().Addr,
+	}
+
 	result, isNew, err := h.authService.LoginOrRegisterOAuth(ctx, provider, gothUser, meta)
 	if err != nil {
 		return nil, h.toConnectError(err)
