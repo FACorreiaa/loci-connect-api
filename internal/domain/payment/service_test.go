@@ -465,3 +465,32 @@ func TestGetSubscription_FreeStaysFreeWhenPlansAgree(t *testing.T) {
 		t.Fatalf("plan = %q, want free", got.Subscription.Plan)
 	}
 }
+
+func TestAllowedPrice_RefusesEverythingWhenNoPricesConfigured(t *testing.T) {
+	svc := NewService(&fakePaymentRepo{}, slog.New(slog.NewTextHandler(io.Discard, nil)), nil, nil, StripeConfig{
+		APIKey: "sk_test_dummy",
+	}).(*service)
+
+	// With no prices configured, any non-empty id used to pass, so a client
+	// could check out against a price the server never chose.
+	for _, id := range []string{"", "price_attacker_chosen"} {
+		if svc.allowedPrice(id) {
+			t.Errorf("allowedPrice(%q) = true with no prices configured", id)
+		}
+	}
+}
+
+func TestAllowedPrice_OnlyConfiguredPrices(t *testing.T) {
+	svc := newTestService(&fakePaymentRepo{}).(*service)
+
+	for id, want := range map[string]bool{
+		"price_monthly": true,
+		"price_annual":  true,
+		"price_other":   false,
+		"":              false,
+	} {
+		if got := svc.allowedPrice(id); got != want {
+			t.Errorf("allowedPrice(%q) = %v, want %v", id, got, want)
+		}
+	}
+}

@@ -619,12 +619,15 @@ func (s *service) processStripeEvent(ctx context.Context, event stripe.Event) er
 }
 
 // allowedPrice restricts checkout to the configured Pro prices so clients
-// cannot pass arbitrary price IDs. When no prices are configured (local dev
-// without Stripe setup), validation is skipped with a warning.
+// cannot pass arbitrary price IDs. With no prices configured it refuses every
+// id: failing open would let a client name its own price.
 func (s *service) allowedPrice(priceID string) bool {
+	if priceID == "" {
+		return false
+	}
 	if s.cfg.PriceIDMonthly == "" && s.cfg.PriceIDAnnual == "" {
-		s.logger.Warn("no Stripe price IDs configured; skipping price validation")
-		return priceID != ""
+		s.logger.Warn("no Stripe price IDs configured; refusing checkout")
+		return false
 	}
 	return priceID == s.cfg.PriceIDMonthly || priceID == s.cfg.PriceIDAnnual
 }
