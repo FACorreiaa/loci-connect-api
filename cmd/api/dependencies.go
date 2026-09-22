@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -746,7 +747,18 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler.WithMFA(d.MFAService)
 	}
 	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, nil)
+	// A finished run becomes a web push, unless VAPID isn't configured — in
+	// which case runs, the cap and in-app toasts still work, and the log
+	// line below is the only sign anything is missing.
+	var onRunFinish runs.FinishListener
+	if d.Config.Push.Enabled() {
+		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices,
+			push.NewWebPushSender(d.Config.Push, &http.Client{Timeout: 10 * time.Second}), d.Logger)
+		onRunFinish = notifier.OnRunFinished
+	} else {
+		d.Logger.Info("web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT not all set")
+	}
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
