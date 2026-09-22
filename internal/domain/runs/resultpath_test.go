@@ -20,12 +20,25 @@ func TestResultPath(t *testing.T) {
 		{"dining", "/restaurants?sessionId=" + sid.String() + "&cityName=Crete&domain=restaurants", "restaurants", uuid.Nil},
 		{"activities", "/activities?sessionId=" + sid.String() + "&cityName=Crete&domain=activities", "activities", uuid.Nil},
 		{"nearby", "/nearme?sessionId=" + sid.String() + "&cityName=Crete&domain=nearme", "nearme", uuid.Nil},
+		{"accommodation", "/hotels?sessionId=" + sid.String() + "&cityName=Crete&domain=hotels", "hotels", trip},
+		{"dining", "/restaurants?sessionId=" + sid.String() + "&cityName=Crete&domain=restaurants", "restaurants", trip},
+		{"activities", "/activities?sessionId=" + sid.String() + "&cityName=Crete&domain=activities", "activities", trip},
+		{"nearby", "/nearme?sessionId=" + sid.String() + "&cityName=Crete&domain=nearme", "nearme", trip},
 		{"itinerary", "/itinerary?sessionId=" + sid.String() + "&cityName=Crete&domain=itinerary&tripId=" + trip.String(), "itinerary", trip},
 	}
 	for _, c := range cases {
-		got, route, _ := ResultPath(c.domain, sid, "Crete", c.trip)
+		got, route, query := ResultPath(c.domain, sid, "Crete", c.trip)
 		require.Equal(t, c.want, got, c.domain)
 		require.Equal(t, c.route, route, c.domain)
+		// Verify tripId only appears for itinerary routes
+		if route != "itinerary" {
+			require.NotContains(t, got, "tripId", "tripId should not appear for non-itinerary routes")
+			_, hasTripID := query["tripId"]
+			require.False(t, hasTripID, "tripId should not be in query map for non-itinerary routes")
+		} else if c.trip != uuid.Nil {
+			require.Contains(t, got, "tripId="+c.trip.String(), "itinerary route with tripId should include tripId in path")
+			require.Equal(t, c.trip.String(), query["tripId"], "itinerary route with tripId should have tripId in query map")
+		}
 	}
 	got, _, _ := ResultPath("itinerary", sid, "Rio de Janeiro", uuid.Nil)
 	require.Contains(t, got, "cityName=Rio+de+Janeiro")

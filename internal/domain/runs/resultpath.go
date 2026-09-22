@@ -31,7 +31,7 @@ func ResultPath(domain string, sessionID uuid.UUID, cityName string, tripID uuid
 	}
 	path = fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s",
 		base, sessionID.String(), url.QueryEscape(cityName), routeType)
-	if tripID != uuid.Nil {
+	if tripID != uuid.Nil && routeType == "itinerary" {
 		query["tripId"] = tripID.String()
 		path += "&tripId=" + tripID.String()
 	}
