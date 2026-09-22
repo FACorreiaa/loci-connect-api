@@ -78,6 +78,15 @@ func (b *Buffer) Append(sessionID string, ev locitypes.StreamEvent) {
 		b.sessions[sessionID] = s
 	}
 	s.lastAccess = now
+	terminal := isTerminal(ev)
+	if s.done && !terminal {
+		// A follow-up turn on the same session (it opens with a non-terminal
+		// event such as session_validated or start). A resume only ever targets
+		// the current turn, so forget the finished one; otherwise Subscribe
+		// would see done and hand the new turn's follower a closed stream.
+		s.done = false
+		s.events = s.events[:0]
+	}
 	s.events = append(s.events, ev)
 	if len(s.events) > b.maxEvents {
 		// Drop the oldest, keep the most recent maxEvents.
@@ -86,18 +95,30 @@ func (b *Buffer) Append(sessionID string, ev locitypes.StreamEvent) {
 	for ch := range s.subs {
 		select {
 		case ch <- ev:
-		default: // a subscriber too slow for a 64-event buffer re-syncs on its next resume
+		default:
+			// Too slow for a 64-event buffer. Skipping the event would leave a
+			// silent gap (or lose the terminal event), so end this follower
+			// instead: its closed channel tells it to re-subscribe from the
+			// last event it actually sent.
+			delete(s.subs, ch)
+			close(ch)
 		}
 	}
-	if ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError {
+	if terminal {
 		s.done = true
 		s.closeSubsLocked()
 	}
 }
 
+func isTerminal(ev locitypes.StreamEvent) bool {
+	return ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError
+}
+
 // Subscribe is Replay that keeps going: the backlog after afterEventID, then
 // every event appended until the run's terminal event, when live closes. live
-// also closes on cancel, or when the session is dropped or reaped. ok is false
+// also closes on cancel, when the session is dropped or reaped, or when the
+// follower falls a full channel behind (it must then re-subscribe from the last
+// event it handled; a close without a terminal event means exactly that). ok is false
 // for an unknown session. cancel is always safe to call, more than once.
 func (b *Buffer) Subscribe(sessionID, afterEventID string) (backlog []locitypes.StreamEvent, live <-chan locitypes.StreamEvent, cancel func(), ok bool) {
 	b.mu.Lock()

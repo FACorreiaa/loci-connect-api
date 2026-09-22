@@ -99,3 +99,90 @@ func TestDropClosesSubscribers(t *testing.T) {
 	require.False(t, open)
 	require.NotPanics(t, cancel)
 }
+
+// A follow-up turn reuses the session id. Its follower must get a live stream
+// of the new turn, not a closed one left over from the finished turn.
+func TestFollowUpTurnReopensTheSession(t *testing.T) {
+	b := New()
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "t1-start"})
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeComplete, EventID: "t1-done"})
+
+	b.Append("s1", locitypes.StreamEvent{Type: "session_validated", EventID: "t2-a"})
+	backlog, live, cancel, ok := b.Subscribe("s1", "t2-a")
+	defer cancel()
+	require.True(t, ok)
+	require.Empty(t, backlog)
+
+	full, _ := b.Replay("s1", "")
+	require.Len(t, full, 1, "the ring holds only the current turn")
+	require.Equal(t, "t2-a", full[0].EventID)
+
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeProgress, EventID: "t2-b"})
+	select {
+	case ev, open := <-live:
+		require.True(t, open, "live must stay open for the new turn")
+		require.Equal(t, "t2-b", ev.EventID)
+	case <-time.After(time.Second):
+		t.Fatal("new turn's event was not delivered live")
+	}
+}
+
+// A trailing terminal event after a turn's complete must not wipe that turn.
+func TestTerminalAfterDoneKeepsTheTurn(t *testing.T) {
+	b := New()
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "e1"})
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeComplete, EventID: "e2"})
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeError, EventID: "e3"})
+	full, _ := b.Replay("s1", "")
+	require.Len(t, full, 3)
+}
+
+// A follower that never reads past its 64-slot buffer is closed rather than
+// silently skipped. Re-subscribing from the last event it got continues with no
+// gap and ends with the terminal event.
+func TestSlowFollowerIsClosedAndResumesWithoutGap(t *testing.T) {
+	b := New()
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "e0"})
+	_, live, cancel, ok := b.Subscribe("s1", "e0")
+	require.True(t, ok)
+	defer cancel()
+
+	const n = 100
+	want := make([]string, 0, n+1)
+	for i := range n {
+		id := "t" + string(rune('A'+i/26)) + string(rune('a'+i%26))
+		want = append(want, id)
+		b.Append("s1", locitypes.StreamEvent{Type: "token", EventID: id})
+	}
+
+	// The run is still going: the overflowed follower must already be closed,
+	// not left open with a silent hole in its stream.
+	var got []string
+	func() {
+		for {
+			select {
+			case ev, open := <-live:
+				if !open {
+					return
+				}
+				got = append(got, ev.EventID)
+			case <-time.After(time.Second):
+				t.Fatal("an overflowed follower must be closed while the run is still going")
+			}
+		}
+	}()
+	require.Len(t, got, 64, "the follower gets exactly what fit, then a close")
+
+	want = append(want, "done")
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeComplete, EventID: "done"})
+
+	backlog, live2, cancel2, ok := b.Subscribe("s1", got[len(got)-1])
+	require.True(t, ok)
+	defer cancel2()
+	for _, ev := range backlog {
+		got = append(got, ev.EventID)
+	}
+	_, open := <-live2
+	require.False(t, open, "the run has ended, so the re-subscription is already closed")
+	require.Equal(t, want, got, "no gap, no duplicate, terminal last")
+}
