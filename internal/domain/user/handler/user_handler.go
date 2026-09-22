@@ -369,6 +369,8 @@ func (h *UserHandler) DeleteAccount(
 //
 // These lived in browser localStorage keyed by user id, so they did not follow
 // the account between devices and nothing server-side could read them.
+// search_finished is delivered as a push to the account's registered devices;
+// the others still just record a preference.
 func (h *UserHandler) GetNotificationSettings(
 	ctx context.Context,
 	_ *connect.Request[userpb.GetNotificationSettingsRequest],
@@ -400,6 +402,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 	settings, err := h.service.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
 		Recommendations: req.Msg.Recommendations,
 		TripReminders:   req.Msg.TripReminders,
+		SearchFinished:  req.Msg.SearchFinished,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -414,6 +417,7 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 	return &userpb.NotificationSettings{
 		Recommendations: s.Recommendations,
 		TripReminders:   s.TripReminders,
+		SearchFinished:  s.SearchFinished,
 		UpdatedAt:       timestamppb.New(s.UpdatedAt),
 	}
 }

@@ -367,6 +367,7 @@ type CombinedFilters struct {
 type NotificationSettings struct {
 	Recommendations bool      `json:"recommendations"`
 	TripReminders   bool      `json:"trip_reminders"`
+	SearchFinished  bool      `json:"search_finished"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
@@ -375,4 +376,5 @@ type NotificationSettings struct {
 type UpdateNotificationSettingsParams struct {
 	Recommendations *bool `json:"recommendations,omitempty"`
 	TripReminders   *bool `json:"trip_reminders,omitempty"`
+	SearchFinished  *bool `json:"search_finished,omitempty"`
 }
