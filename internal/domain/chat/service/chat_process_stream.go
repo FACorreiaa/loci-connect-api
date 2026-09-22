@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
@@ -755,48 +755,7 @@ func (l *ServiceImpl) persistResults(
 // When an itinerary was auto-persisted, prefer deep-linking to /trips/:id so
 // the client can offer an "Edit trip" CTA without a second lookup.
 func (l *ServiceImpl) sendCompletionEvent(cc *common.ChatContext) {
-	var routeType string
-	var baseURL string
-	queryParams := map[string]string{
-		"sessionId": cc.SessionID.String(),
-		"cityName":  cc.CityName,
-	}
-
-	switch cc.Domain {
-	case locitypes.DomainAccommodation:
-		routeType = "hotels"
-		baseURL = "/hotels"
-	case locitypes.DomainDining:
-		routeType = "restaurants"
-		baseURL = "/restaurants"
-	case locitypes.DomainActivities:
-		routeType = "activities"
-		baseURL = "/activities"
-	case locitypes.DomainNearby:
-		routeType = "nearme"
-		baseURL = "/nearme"
-	default:
-		if cc.TripID != uuid.Nil {
-			routeType = "itinerary"
-			baseURL = "/itinerary"
-			queryParams["tripId"] = cc.TripID.String()
-			queryParams["domain"] = "itinerary"
-		} else {
-			routeType = "itinerary"
-			baseURL = "/itinerary"
-			queryParams["domain"] = "itinerary"
-		}
-	}
-	if _, ok := queryParams["domain"]; !ok {
-		queryParams["domain"] = routeType
-	}
-
-	navURL := fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=%s",
-		baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), queryParams["domain"])
-	if tripID, ok := queryParams["tripId"]; ok {
-		navURL = fmt.Sprintf("%s?sessionId=%s&cityName=%s&domain=itinerary&tripId=%s",
-			baseURL, cc.SessionID.String(), url.QueryEscape(cc.CityName), tripID)
-	}
+	navURL, routeType, queryParams := runs.ResultPath(string(cc.Domain), cc.SessionID, cc.CityName, cc.TripID)
 
 	// Use context.Background() to bypass cancelled context - we MUST deliver this event
 	l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
