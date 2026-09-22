@@ -93,6 +93,7 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		// Custom auth flows happen before a session exists
 		customauthconnect.CustomAuthServiceGetOAuthURLProcedure,
 		customauthconnect.CustomAuthServiceOAuthCallbackProcedure,
+		customauthconnect.CustomAuthServiceSignInWithIDTokenProcedure,
 		customauthconnect.CustomAuthServiceSendPhoneVerificationProcedure,
 		customauthconnect.CustomAuthServiceVerifyPhoneProcedure,
 

@@ -324,6 +324,82 @@ func (x *OAuthCallbackResponse) GetIsNewUser() bool {
 	return false
 }
 
+// SignInWithIDTokenRequest is native sign-in (the iOS Apple and Google
+// sheets). The device already holds an ID token signed by the provider, so
+// there is no code to exchange: the server verifies the token against the
+// provider's published keys and signs the person in by its subject.
+type SignInWithIDTokenRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Provider OAuthProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=loci.custom_auth.OAuthProvider" json:"provider,omitempty"`
+	IdToken  string                 `protobuf:"bytes,2,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	// The raw nonce the app generated for this attempt. Google puts it in the
+	// token as-is; Apple puts its SHA-256 hex digest.
+	Nonce string `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	// Apple hands over the person's name once, on first consent, and never puts
+	// it in the token. Empty otherwise.
+	FullName      string `protobuf:"bytes,4,opt,name=full_name,json=fullName,proto3" json:"full_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignInWithIDTokenRequest) Reset() {
+	*x = SignInWithIDTokenRequest{}
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignInWithIDTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignInWithIDTokenRequest) ProtoMessage() {}
+
+func (x *SignInWithIDTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignInWithIDTokenRequest.ProtoReflect.Descriptor instead.
+func (*SignInWithIDTokenRequest) Descriptor() ([]byte, []int) {
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *SignInWithIDTokenRequest) GetProvider() OAuthProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return OAuthProvider_OAUTH_PROVIDER_UNSPECIFIED
+}
+
+func (x *SignInWithIDTokenRequest) GetIdToken() string {
+	if x != nil {
+		return x.IdToken
+	}
+	return ""
+}
+
+func (x *SignInWithIDTokenRequest) GetNonce() string {
+	if x != nil {
+		return x.Nonce
+	}
+	return ""
+}
+
+func (x *SignInWithIDTokenRequest) GetFullName() string {
+	if x != nil {
+		return x.FullName
+	}
+	return ""
+}
+
 // SendPhoneVerificationRequest for initiating phone auth
 type SendPhoneVerificationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -334,7 +410,7 @@ type SendPhoneVerificationRequest struct {
 
 func (x *SendPhoneVerificationRequest) Reset() {
 	*x = SendPhoneVerificationRequest{}
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[4]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -346,7 +422,7 @@ func (x *SendPhoneVerificationRequest) String() string {
 func (*SendPhoneVerificationRequest) ProtoMessage() {}
 
 func (x *SendPhoneVerificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[4]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -359,7 +435,7 @@ func (x *SendPhoneVerificationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendPhoneVerificationRequest.ProtoReflect.Descriptor instead.
 func (*SendPhoneVerificationRequest) Descriptor() ([]byte, []int) {
-	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{4}
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SendPhoneVerificationRequest) GetPhoneNumber() string {
@@ -380,7 +456,7 @@ type SendPhoneVerificationResponse struct {
 
 func (x *SendPhoneVerificationResponse) Reset() {
 	*x = SendPhoneVerificationResponse{}
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[5]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -392,7 +468,7 @@ func (x *SendPhoneVerificationResponse) String() string {
 func (*SendPhoneVerificationResponse) ProtoMessage() {}
 
 func (x *SendPhoneVerificationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[5]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -405,7 +481,7 @@ func (x *SendPhoneVerificationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendPhoneVerificationResponse.ProtoReflect.Descriptor instead.
 func (*SendPhoneVerificationResponse) Descriptor() ([]byte, []int) {
-	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{5}
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SendPhoneVerificationResponse) GetSuccess() bool {
@@ -433,7 +509,7 @@ type VerifyPhoneRequest struct {
 
 func (x *VerifyPhoneRequest) Reset() {
 	*x = VerifyPhoneRequest{}
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[6]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -445,7 +521,7 @@ func (x *VerifyPhoneRequest) String() string {
 func (*VerifyPhoneRequest) ProtoMessage() {}
 
 func (x *VerifyPhoneRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[6]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -458,7 +534,7 @@ func (x *VerifyPhoneRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyPhoneRequest.ProtoReflect.Descriptor instead.
 func (*VerifyPhoneRequest) Descriptor() ([]byte, []int) {
-	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{6}
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *VerifyPhoneRequest) GetPhoneNumber() string {
@@ -488,7 +564,7 @@ type VerifyPhoneResponse struct {
 
 func (x *VerifyPhoneResponse) Reset() {
 	*x = VerifyPhoneResponse{}
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[7]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -500,7 +576,7 @@ func (x *VerifyPhoneResponse) String() string {
 func (*VerifyPhoneResponse) ProtoMessage() {}
 
 func (x *VerifyPhoneResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[7]
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -513,7 +589,7 @@ func (x *VerifyPhoneResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifyPhoneResponse.ProtoReflect.Descriptor instead.
 func (*VerifyPhoneResponse) Descriptor() ([]byte, []int) {
-	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{7}
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *VerifyPhoneResponse) GetAccessToken() string {
@@ -568,7 +644,15 @@ const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x1a\n" +
 	"\busername\x18\x05 \x01(\tR\busername\x12\x1e\n" +
-	"\vis_new_user\x18\x06 \x01(\bR\tisNewUser\"_\n" +
+	"\vis_new_user\x18\x06 \x01(\bR\tisNewUser\"\xd3\x01\n" +
+	"\x18SignInWithIDTokenRequest\x12G\n" +
+	"\bprovider\x18\x01 \x01(\x0e2\x1f.loci.custom_auth.OAuthProviderB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bprovider\x12%\n" +
+	"\bid_token\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80@R\aidToken\x12 \n" +
+	"\x05nonce\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x10\x18\x80\x02R\x05nonce\x12%\n" +
+	"\tfull_name\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bfullName\"_\n" +
 	"\x1cSendPhoneVerificationRequest\x12?\n" +
 	"\fphone_number\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\n" +
 	"\x18\x142\x11^\\+[1-9]\\d{1,14}$R\vphoneNumber\"S\n" +
@@ -587,10 +671,11 @@ const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
 	"\rOAuthProvider\x12\x1e\n" +
 	"\x1aOAUTH_PROVIDER_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15OAUTH_PROVIDER_GOOGLE\x10\x01\x12\x18\n" +
-	"\x14OAUTH_PROVIDER_APPLE\x10\x022\xa7\x03\n" +
+	"\x14OAUTH_PROVIDER_APPLE\x10\x022\x91\x04\n" +
 	"\x11CustomAuthService\x12Z\n" +
 	"\vGetOAuthURL\x12$.loci.custom_auth.GetOAuthURLRequest\x1a%.loci.custom_auth.GetOAuthURLResponse\x12`\n" +
-	"\rOAuthCallback\x12&.loci.custom_auth.OAuthCallbackRequest\x1a'.loci.custom_auth.OAuthCallbackResponse\x12x\n" +
+	"\rOAuthCallback\x12&.loci.custom_auth.OAuthCallbackRequest\x1a'.loci.custom_auth.OAuthCallbackResponse\x12h\n" +
+	"\x11SignInWithIDToken\x12*.loci.custom_auth.SignInWithIDTokenRequest\x1a'.loci.custom_auth.OAuthCallbackResponse\x12x\n" +
 	"\x15SendPhoneVerification\x12..loci.custom_auth.SendPhoneVerificationRequest\x1a/.loci.custom_auth.SendPhoneVerificationResponse\x12Z\n" +
 	"\vVerifyPhone\x12$.loci.custom_auth.VerifyPhoneRequest\x1a%.loci.custom_auth.VerifyPhoneResponseBPZNgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth;customauthb\x06proto3"
 
@@ -607,34 +692,38 @@ func file_loci_custom_auth_custom_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_custom_auth_custom_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_custom_auth_custom_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_loci_custom_auth_custom_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_loci_custom_auth_custom_auth_proto_goTypes = []any{
 	(OAuthProvider)(0),                    // 0: loci.custom_auth.OAuthProvider
 	(*GetOAuthURLRequest)(nil),            // 1: loci.custom_auth.GetOAuthURLRequest
 	(*GetOAuthURLResponse)(nil),           // 2: loci.custom_auth.GetOAuthURLResponse
 	(*OAuthCallbackRequest)(nil),          // 3: loci.custom_auth.OAuthCallbackRequest
 	(*OAuthCallbackResponse)(nil),         // 4: loci.custom_auth.OAuthCallbackResponse
-	(*SendPhoneVerificationRequest)(nil),  // 5: loci.custom_auth.SendPhoneVerificationRequest
-	(*SendPhoneVerificationResponse)(nil), // 6: loci.custom_auth.SendPhoneVerificationResponse
-	(*VerifyPhoneRequest)(nil),            // 7: loci.custom_auth.VerifyPhoneRequest
-	(*VerifyPhoneResponse)(nil),           // 8: loci.custom_auth.VerifyPhoneResponse
+	(*SignInWithIDTokenRequest)(nil),      // 5: loci.custom_auth.SignInWithIDTokenRequest
+	(*SendPhoneVerificationRequest)(nil),  // 6: loci.custom_auth.SendPhoneVerificationRequest
+	(*SendPhoneVerificationResponse)(nil), // 7: loci.custom_auth.SendPhoneVerificationResponse
+	(*VerifyPhoneRequest)(nil),            // 8: loci.custom_auth.VerifyPhoneRequest
+	(*VerifyPhoneResponse)(nil),           // 9: loci.custom_auth.VerifyPhoneResponse
 }
 var file_loci_custom_auth_custom_auth_proto_depIdxs = []int32{
 	0, // 0: loci.custom_auth.GetOAuthURLRequest.provider:type_name -> loci.custom_auth.OAuthProvider
 	0, // 1: loci.custom_auth.OAuthCallbackRequest.provider:type_name -> loci.custom_auth.OAuthProvider
-	1, // 2: loci.custom_auth.CustomAuthService.GetOAuthURL:input_type -> loci.custom_auth.GetOAuthURLRequest
-	3, // 3: loci.custom_auth.CustomAuthService.OAuthCallback:input_type -> loci.custom_auth.OAuthCallbackRequest
-	5, // 4: loci.custom_auth.CustomAuthService.SendPhoneVerification:input_type -> loci.custom_auth.SendPhoneVerificationRequest
-	7, // 5: loci.custom_auth.CustomAuthService.VerifyPhone:input_type -> loci.custom_auth.VerifyPhoneRequest
-	2, // 6: loci.custom_auth.CustomAuthService.GetOAuthURL:output_type -> loci.custom_auth.GetOAuthURLResponse
-	4, // 7: loci.custom_auth.CustomAuthService.OAuthCallback:output_type -> loci.custom_auth.OAuthCallbackResponse
-	6, // 8: loci.custom_auth.CustomAuthService.SendPhoneVerification:output_type -> loci.custom_auth.SendPhoneVerificationResponse
-	8, // 9: loci.custom_auth.CustomAuthService.VerifyPhone:output_type -> loci.custom_auth.VerifyPhoneResponse
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 2: loci.custom_auth.SignInWithIDTokenRequest.provider:type_name -> loci.custom_auth.OAuthProvider
+	1, // 3: loci.custom_auth.CustomAuthService.GetOAuthURL:input_type -> loci.custom_auth.GetOAuthURLRequest
+	3, // 4: loci.custom_auth.CustomAuthService.OAuthCallback:input_type -> loci.custom_auth.OAuthCallbackRequest
+	5, // 5: loci.custom_auth.CustomAuthService.SignInWithIDToken:input_type -> loci.custom_auth.SignInWithIDTokenRequest
+	6, // 6: loci.custom_auth.CustomAuthService.SendPhoneVerification:input_type -> loci.custom_auth.SendPhoneVerificationRequest
+	8, // 7: loci.custom_auth.CustomAuthService.VerifyPhone:input_type -> loci.custom_auth.VerifyPhoneRequest
+	2, // 8: loci.custom_auth.CustomAuthService.GetOAuthURL:output_type -> loci.custom_auth.GetOAuthURLResponse
+	4, // 9: loci.custom_auth.CustomAuthService.OAuthCallback:output_type -> loci.custom_auth.OAuthCallbackResponse
+	4, // 10: loci.custom_auth.CustomAuthService.SignInWithIDToken:output_type -> loci.custom_auth.OAuthCallbackResponse
+	7, // 11: loci.custom_auth.CustomAuthService.SendPhoneVerification:output_type -> loci.custom_auth.SendPhoneVerificationResponse
+	9, // 12: loci.custom_auth.CustomAuthService.VerifyPhone:output_type -> loci.custom_auth.VerifyPhoneResponse
+	8, // [8:13] is the sub-list for method output_type
+	3, // [3:8] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_loci_custom_auth_custom_auth_proto_init() }
@@ -648,7 +737,7 @@ func file_loci_custom_auth_custom_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_custom_auth_custom_auth_proto_rawDesc), len(file_loci_custom_auth_custom_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

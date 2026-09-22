@@ -39,6 +39,9 @@ const (
 	// CustomAuthServiceOAuthCallbackProcedure is the fully-qualified name of the CustomAuthService's
 	// OAuthCallback RPC.
 	CustomAuthServiceOAuthCallbackProcedure = "/loci.custom_auth.CustomAuthService/OAuthCallback"
+	// CustomAuthServiceSignInWithIDTokenProcedure is the fully-qualified name of the
+	// CustomAuthService's SignInWithIDToken RPC.
+	CustomAuthServiceSignInWithIDTokenProcedure = "/loci.custom_auth.CustomAuthService/SignInWithIDToken"
 	// CustomAuthServiceSendPhoneVerificationProcedure is the fully-qualified name of the
 	// CustomAuthService's SendPhoneVerification RPC.
 	CustomAuthServiceSendPhoneVerificationProcedure = "/loci.custom_auth.CustomAuthService/SendPhoneVerification"
@@ -52,6 +55,7 @@ var (
 	customAuthServiceServiceDescriptor                     = custom_auth.File_loci_custom_auth_custom_auth_proto.Services().ByName("CustomAuthService")
 	customAuthServiceGetOAuthURLMethodDescriptor           = customAuthServiceServiceDescriptor.Methods().ByName("GetOAuthURL")
 	customAuthServiceOAuthCallbackMethodDescriptor         = customAuthServiceServiceDescriptor.Methods().ByName("OAuthCallback")
+	customAuthServiceSignInWithIDTokenMethodDescriptor     = customAuthServiceServiceDescriptor.Methods().ByName("SignInWithIDToken")
 	customAuthServiceSendPhoneVerificationMethodDescriptor = customAuthServiceServiceDescriptor.Methods().ByName("SendPhoneVerification")
 	customAuthServiceVerifyPhoneMethodDescriptor           = customAuthServiceServiceDescriptor.Methods().ByName("VerifyPhone")
 )
@@ -61,6 +65,7 @@ type CustomAuthServiceClient interface {
 	// OAuth authentication
 	GetOAuthURL(context.Context, *connect.Request[custom_auth.GetOAuthURLRequest]) (*connect.Response[custom_auth.GetOAuthURLResponse], error)
 	OAuthCallback(context.Context, *connect.Request[custom_auth.OAuthCallbackRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error)
+	SignInWithIDToken(context.Context, *connect.Request[custom_auth.SignInWithIDTokenRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error)
 	// Phone authentication
 	SendPhoneVerification(context.Context, *connect.Request[custom_auth.SendPhoneVerificationRequest]) (*connect.Response[custom_auth.SendPhoneVerificationResponse], error)
 	VerifyPhone(context.Context, *connect.Request[custom_auth.VerifyPhoneRequest]) (*connect.Response[custom_auth.VerifyPhoneResponse], error)
@@ -88,6 +93,12 @@ func NewCustomAuthServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(customAuthServiceOAuthCallbackMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		signInWithIDToken: connect.NewClient[custom_auth.SignInWithIDTokenRequest, custom_auth.OAuthCallbackResponse](
+			httpClient,
+			baseURL+CustomAuthServiceSignInWithIDTokenProcedure,
+			connect.WithSchema(customAuthServiceSignInWithIDTokenMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		sendPhoneVerification: connect.NewClient[custom_auth.SendPhoneVerificationRequest, custom_auth.SendPhoneVerificationResponse](
 			httpClient,
 			baseURL+CustomAuthServiceSendPhoneVerificationProcedure,
@@ -107,6 +118,7 @@ func NewCustomAuthServiceClient(httpClient connect.HTTPClient, baseURL string, o
 type customAuthServiceClient struct {
 	getOAuthURL           *connect.Client[custom_auth.GetOAuthURLRequest, custom_auth.GetOAuthURLResponse]
 	oAuthCallback         *connect.Client[custom_auth.OAuthCallbackRequest, custom_auth.OAuthCallbackResponse]
+	signInWithIDToken     *connect.Client[custom_auth.SignInWithIDTokenRequest, custom_auth.OAuthCallbackResponse]
 	sendPhoneVerification *connect.Client[custom_auth.SendPhoneVerificationRequest, custom_auth.SendPhoneVerificationResponse]
 	verifyPhone           *connect.Client[custom_auth.VerifyPhoneRequest, custom_auth.VerifyPhoneResponse]
 }
@@ -119,6 +131,11 @@ func (c *customAuthServiceClient) GetOAuthURL(ctx context.Context, req *connect.
 // OAuthCallback calls loci.custom_auth.CustomAuthService.OAuthCallback.
 func (c *customAuthServiceClient) OAuthCallback(ctx context.Context, req *connect.Request[custom_auth.OAuthCallbackRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error) {
 	return c.oAuthCallback.CallUnary(ctx, req)
+}
+
+// SignInWithIDToken calls loci.custom_auth.CustomAuthService.SignInWithIDToken.
+func (c *customAuthServiceClient) SignInWithIDToken(ctx context.Context, req *connect.Request[custom_auth.SignInWithIDTokenRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error) {
+	return c.signInWithIDToken.CallUnary(ctx, req)
 }
 
 // SendPhoneVerification calls loci.custom_auth.CustomAuthService.SendPhoneVerification.
@@ -136,6 +153,7 @@ type CustomAuthServiceHandler interface {
 	// OAuth authentication
 	GetOAuthURL(context.Context, *connect.Request[custom_auth.GetOAuthURLRequest]) (*connect.Response[custom_auth.GetOAuthURLResponse], error)
 	OAuthCallback(context.Context, *connect.Request[custom_auth.OAuthCallbackRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error)
+	SignInWithIDToken(context.Context, *connect.Request[custom_auth.SignInWithIDTokenRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error)
 	// Phone authentication
 	SendPhoneVerification(context.Context, *connect.Request[custom_auth.SendPhoneVerificationRequest]) (*connect.Response[custom_auth.SendPhoneVerificationResponse], error)
 	VerifyPhone(context.Context, *connect.Request[custom_auth.VerifyPhoneRequest]) (*connect.Response[custom_auth.VerifyPhoneResponse], error)
@@ -159,6 +177,12 @@ func NewCustomAuthServiceHandler(svc CustomAuthServiceHandler, opts ...connect.H
 		connect.WithSchema(customAuthServiceOAuthCallbackMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	customAuthServiceSignInWithIDTokenHandler := connect.NewUnaryHandler(
+		CustomAuthServiceSignInWithIDTokenProcedure,
+		svc.SignInWithIDToken,
+		connect.WithSchema(customAuthServiceSignInWithIDTokenMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	customAuthServiceSendPhoneVerificationHandler := connect.NewUnaryHandler(
 		CustomAuthServiceSendPhoneVerificationProcedure,
 		svc.SendPhoneVerification,
@@ -177,6 +201,8 @@ func NewCustomAuthServiceHandler(svc CustomAuthServiceHandler, opts ...connect.H
 			customAuthServiceGetOAuthURLHandler.ServeHTTP(w, r)
 		case CustomAuthServiceOAuthCallbackProcedure:
 			customAuthServiceOAuthCallbackHandler.ServeHTTP(w, r)
+		case CustomAuthServiceSignInWithIDTokenProcedure:
+			customAuthServiceSignInWithIDTokenHandler.ServeHTTP(w, r)
 		case CustomAuthServiceSendPhoneVerificationProcedure:
 			customAuthServiceSendPhoneVerificationHandler.ServeHTTP(w, r)
 		case CustomAuthServiceVerifyPhoneProcedure:
@@ -196,6 +222,10 @@ func (UnimplementedCustomAuthServiceHandler) GetOAuthURL(context.Context, *conne
 
 func (UnimplementedCustomAuthServiceHandler) OAuthCallback(context.Context, *connect.Request[custom_auth.OAuthCallbackRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.custom_auth.CustomAuthService.OAuthCallback is not implemented"))
+}
+
+func (UnimplementedCustomAuthServiceHandler) SignInWithIDToken(context.Context, *connect.Request[custom_auth.SignInWithIDTokenRequest]) (*connect.Response[custom_auth.OAuthCallbackResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.custom_auth.CustomAuthService.SignInWithIDToken is not implemented"))
 }
 
 func (UnimplementedCustomAuthServiceHandler) SendPhoneVerification(context.Context, *connect.Request[custom_auth.SendPhoneVerificationRequest]) (*connect.Response[custom_auth.SendPhoneVerificationResponse], error) {

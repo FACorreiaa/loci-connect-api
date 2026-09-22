@@ -318,6 +318,51 @@ printenv | grep -c APPLE_`).
 
 ---
 
+## Native iOS sign-in (`SignInWithIDToken`)
+
+The iOS app does not use the web code flow. The Apple sheet
+(`ASAuthorizationAppleIDProvider`) and the Google SDK (`GIDSignIn`) each hand
+the app an **ID token** signed by the provider. The app sends it to
+`CustomAuthService.SignInWithIDToken` with the raw nonce it generated, and the
+server verifies it in `service/idtoken_verifier.go` against the provider's
+published keys:
+
+| Check | Google | Apple |
+|---|---|---|
+| Keys | `googleapis.com/oauth2/v3/certs` | `appleid.apple.com/auth/keys` |
+| `iss` | `https://accounts.google.com` or `accounts.google.com` | `https://appleid.apple.com` |
+| `aud` must be in | `GOOGLE_IOS_CLIENT_IDS` | `APPLE_BUNDLE_IDS` |
+| `nonce` in token | the raw nonce | SHA-256 hex of the raw nonce |
+
+Both also require RS256, an unexpired `exp` (60s skew) and a subject. A token
+with no verified email is refused, because `LoginOrRegisterOAuth` falls back
+to an email lookup for an unknown subject.
+
+The account is keyed on `sub`, the same value goth resolves in the web flow,
+so native and web sign-in land on the **same account**. For Apple this holds
+only if the App IDs are grouped with the web Services ID under one primary
+App ID for Sign in with Apple.
+
+Configuration is **not secret**, so it lives in the Loci configmap
+(`platform/infra/apps/loci/data/config.yaml`), not in `loci-env`:
+
+```yaml
+GOOGLE_IOS_CLIENT_IDS: 1062609475304-00i5dpghpvgrbjalksnklg8cddgih8b3.apps.googleusercontent.com
+APPLE_BUNDLE_IDS: com.fernandocorreia.loci,com.fernandocorreia.loci.beta
+```
+
+A provider with an empty list is off, and the RPC answers
+`failed_precondition` for it. Before that works:
+
+- **Google:** the iOS OAuth client must be in the same Google Cloud project as
+  the web client, with the bundle ID the app actually ships as.
+- **Apple:** turn on Sign in with Apple for each App ID, and add the
+  `com.apple.developer.applesignin` entitlement to the app.
+
+To check a deploy, send an unauthenticated call with a garbage token. It
+should answer `unauthenticated`. `unimplemented` means the new server is not
+running yet.
+
 ## Known gap: the OAuth `state` is not verified
 
 Worth knowing before this carries real traffic. `GetAuthURL` passes the

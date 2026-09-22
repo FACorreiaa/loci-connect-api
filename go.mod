@@ -8,7 +8,7 @@ require (
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.6.0
 	github.com/FACorreiaa/go-genai-sdk/v2 v2.1.0
-	github.com/FACorreiaa/loci-connect-proto/v5 v5.20.0
+	github.com/FACorreiaa/loci-connect-proto/v5 v5.20.2
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -18,6 +18,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/johnfercher/maroto/v2 v2.4.1
 	github.com/joho/godotenv v1.5.1
+	github.com/lestrrat-go/jwx v1.2.31
 	github.com/markbates/goth v1.82.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/pashagolub/pgxmock/v4 v4.9.0
@@ -112,7 +113,6 @@ require (
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx v1.2.31 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.10 // indirect

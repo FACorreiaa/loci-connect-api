@@ -153,6 +153,7 @@ type Dependencies struct {
 	APIKeyService       apikey.Service
 	PaymentService      payment.Service
 	OAuthService        *customauthservice.OAuthService
+	IDTokenVerifier     *customauthservice.IDTokenVerifier
 	PhoneService        *customauthservice.PhoneService
 	ReviewSvc           reviewdomain.Service
 
@@ -459,6 +460,12 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("oauth: %w", err)
 	}
 	d.OAuthService = oauthSvc
+	// Native iOS sign-in. Off per provider until its audiences are set
+	// (GOOGLE_IOS_CLIENT_IDS, APPLE_BUNDLE_IDS). The key refresh runs for the
+	// life of the process.
+	d.IDTokenVerifier = customauthservice.NewIDTokenVerifier(
+		context.Background(), customauthservice.LoadIDTokenConfigFromEnv(),
+	)
 	d.PhoneService = customauthservice.NewPhoneService(customauthservice.LoadTwilioConfigFromEnv())
 	d.ReviewSvc = reviewdomain.NewService(d.ReviewRepo, d.Logger)
 
@@ -816,7 +823,7 @@ func (d *Dependencies) initHandlers() error {
 	// SuggestPacking is wired below, once the weather adapter exists — a packing
 	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
-	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.PhoneService, d.AuthService)
+	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService)
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger).
