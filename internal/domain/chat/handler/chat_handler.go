@@ -191,45 +191,14 @@ func (h *ChatHandler) StreamChat(
 	// (session_id honored).
 	if cc.ResumeToken != "" && bufSessionID != "" {
 		if h.resumeBuf != nil {
-			if backlog, live, cancel, found := h.resumeBuf.Subscribe(bufSessionID, cc.ResumeToken); found {
+			if handled, rErr := h.followResume(ctx, stream, userID, requestedSessionID, bufSessionID, cc.ResumeToken); handled {
 				llmCancel()
-				defer cancel()
-				send := func(ev locitypes.StreamEvent) bool {
-					resp, mErr := h.mapEventToProto(ctx, ev, userID)
-					if mErr != nil {
-						return true
-					}
-					return stream.Send(resp) == nil
-				}
-				for _, ev := range backlog {
-					if !send(ev) {
-						return nil
-					}
-				}
-				for {
-					select {
-					case ev, open := <-live:
-						if !open {
-							h.logger.Info("resumed stream to its end", "session_id", bufSessionID, "replayed", len(backlog))
-							return nil
-						}
-						if !send(ev) {
-							return nil
-						}
-					case <-ctx.Done():
-						return nil
-					}
-				}
+				return rErr
 			}
 		}
-		// No buffer (evicted, or another pod). If this session's run already
-		// ended, point the client at the stored result instead of generating
-		// the whole answer again.
-		if h.runs != nil {
-			if run, found, rErr := h.runs.FindBySession(ctx, userID, requestedSessionID); rErr == nil && found && run.Status != runs.StatusRunning {
-				llmCancel()
-				return h.sendLoadFromSession(stream, run)
-			}
+		if run, found := h.finishedRun(ctx, userID, requestedSessionID); found {
+			llmCancel()
+			return h.sendLoadFromSession(stream, run)
 		}
 	}
 
@@ -364,6 +333,122 @@ func (h *ChatHandler) toConnectError(err error) error {
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
+}
+
+// maxResubscribes bounds how often one resume re-attaches to the buffer after
+// its follower was closed without a terminal event (it fell behind, or the
+// session was dropped), so a pathological run cannot spin the handler.
+const maxResubscribes = 3
+
+// followResume replays a session's buffered events after token and follows the
+// run live until a terminal event reaches the client. handled is false when the
+// buffer does not know the session, so the caller can try the run store.
+//
+// A live channel that closes before a COMPLETE or ERROR was sent means the
+// follower was cut off, not that the run ended: re-subscribe from the last event
+// actually sent. If the session has left the buffer, answer from the run store,
+// and if that cannot say the run is over, tell the client to retry.
+func (h *ChatHandler) followResume(
+	ctx context.Context,
+	stream *connect.ServerStream[chatv1.StreamEvent],
+	userID, sessionID uuid.UUID,
+	bufSessionID, token string,
+) (handled bool, err error) {
+	backlog, live, cancel, found := h.resumeBuf.Subscribe(bufSessionID, token)
+	if !found {
+		return false, nil
+	}
+	defer func() { cancel() }()
+
+	lastSentID := token
+	sentTerminal := false
+	// send reports false once the client is gone. An event that fails to map
+	// counts as not sent, so a lost terminal event still reaches the fallback.
+	send := func(ev locitypes.StreamEvent) bool {
+		resp, mErr := h.mapEventToProto(ctx, ev, userID)
+		if mErr != nil {
+			return true
+		}
+		if stream.Send(resp) != nil {
+			return false
+		}
+		if ev.EventID != "" {
+			lastSentID = ev.EventID
+		}
+		if ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError {
+			sentTerminal = true
+		}
+		return true
+	}
+
+	for attempt := 0; ; attempt++ {
+		for _, ev := range backlog {
+			if !send(ev) {
+				return true, nil
+			}
+		}
+	follow:
+		for {
+			select {
+			case ev, open := <-live:
+				if !open {
+					break follow
+				}
+				if !send(ev) {
+					return true, nil
+				}
+			case <-ctx.Done():
+				return true, nil
+			}
+		}
+		cancel()
+		if sentTerminal {
+			h.logger.Info("resumed stream to its end", "session_id", bufSessionID, "resubscribes", attempt)
+			return true, nil
+		}
+		if attempt >= maxResubscribes {
+			h.logger.Warn("resume kept losing its follower; giving up", "session_id", bufSessionID, "last_event_id", lastSentID)
+			break
+		}
+		h.logger.Info("resume follower closed before the run ended; resubscribing",
+			"session_id", bufSessionID, "last_event_id", lastSentID)
+		backlog, live, cancel, found = h.resumeBuf.Subscribe(bufSessionID, lastSentID)
+		if !found {
+			break
+		}
+	}
+
+	if run, ok := h.finishedRun(ctx, userID, sessionID); ok {
+		return true, h.sendLoadFromSession(stream, run)
+	}
+	return true, stream.Send(&chatv1.StreamEvent{
+		Timestamp: timestamppb.Now(),
+		EventId:   uuid.NewString(),
+		IsFinal:   true,
+		EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
+		Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
+			UserMessage:  "This search is still running. Try again in a moment.",
+			InternalCode: "resume_lost",
+			Retryable:    true,
+		}},
+	})
+}
+
+// finishedRun looks up the session's latest run and returns it when it has
+// ended (done or failed). A lookup error is logged and treated as "unknown".
+func (h *ChatHandler) finishedRun(ctx context.Context, userID, sessionID uuid.UUID) (runs.Run, bool) {
+	if h.runs == nil || sessionID == uuid.Nil {
+		return runs.Run{}, false
+	}
+	run, found, err := h.runs.FindBySession(ctx, userID, sessionID)
+	if err != nil {
+		h.logger.Warn("resume: run lookup failed", "session_id", sessionID, "error", err)
+		return runs.Run{}, false
+	}
+	if !found || run.Status == runs.StatusRunning {
+		return runs.Run{}, false
+	}
+	return run, true
 }
 
 // sendLoadFromSession ends a resume whose events are gone: the run finished,

@@ -1,11 +1,16 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -161,4 +166,138 @@ func TestResumeBufferGoneRunFailedSaysTryAgain(t *testing.T) {
 	require.True(t, ev.GetError().GetRetryable())
 	require.Equal(t, "This search didn't finish. Try it again.", ev.GetError().GetUserMessage())
 	require.Equal(t, "internal", ev.GetError().GetInternalCode(), "empty ErrorCode falls back to a non-empty code")
+}
+
+// syncBuffer is a goroutine-safe log sink.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
+}
+
+// A resumed client that falls behind (large events, a reader that does not keep
+// up) overflows its live buffer. It must still get every event, in order, and
+// end on the terminal event; the handler re-subscribes rather than skipping.
+func TestResumeSlowFollowerSeesNoGapAndEndsOnTerminal(t *testing.T) {
+	logs := &syncBuffer{}
+	logger := slog.New(slog.NewTextHandler(logs, nil))
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil)
+	h.resumeBuf = resumebuf.New()
+	sid := uuid.New()
+	h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "e1"})
+	h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: "token", EventID: "e2"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	stream, err := resumeClient(t, h).StreamChat(ctx, resumeRequest(sid, "e1"))
+	require.NoError(t, err)
+
+	require.True(t, stream.Receive())
+	require.Equal(t, "e2", stream.Msg().GetEventId())
+
+	// The handler is now following live. Append far more than its 64-slot
+	// channel holds, each large enough that the socket pushes back, before
+	// the client reads any of them.
+	const n = 150
+	want := []string{"e2"}
+	for i := range n {
+		raw := make([]byte, 32<<10)
+		_, _ = rand.Read(raw)
+		id := fmt.Sprintf("tok-%03d", i)
+		want = append(want, id)
+		h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: "token", EventID: id, Message: hex.EncodeToString(raw)})
+	}
+	want = append(want, "done")
+	h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: locitypes.EventTypeComplete, EventID: "done", IsFinal: true})
+
+	got := []string{"e2"}
+	var last chatv1.StreamEventType
+	for stream.Receive() {
+		got = append(got, stream.Msg().GetEventId())
+		last = stream.Msg().GetEventType()
+	}
+	require.NoError(t, stream.Err())
+	require.Equal(t, want, got, "every event, once, in order")
+	require.Equal(t, chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE, last)
+	require.Contains(t, logs.String(), "resubscribing", "the follower overflowed and the handler re-subscribed")
+}
+
+// followUntilDropped resumes, waits for the backlog, then drops the session from
+// the buffer mid-follow (as eviction would) and returns what the client got next.
+func followUntilDropped(t *testing.T, h *ChatHandler, sid uuid.UUID) []*chatv1.StreamEvent {
+	t.Helper()
+	h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "e1"})
+	h.resumeBuf.Append(sid.String(), locitypes.StreamEvent{Type: "token", EventID: "e2"})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream, err := resumeClient(t, h).StreamChat(ctx, resumeRequest(sid, "e1"))
+	require.NoError(t, err)
+	require.True(t, stream.Receive())
+	require.Equal(t, "e2", stream.Msg().GetEventId())
+
+	h.resumeBuf.Drop(sid.String())
+
+	var got []*chatv1.StreamEvent
+	for stream.Receive() {
+		got = append(got, proto.Clone(stream.Msg()).(*chatv1.StreamEvent))
+	}
+	require.NoError(t, stream.Err())
+	return got
+}
+
+func TestResumeFollowerDroppedRunDoneLoadsFromSession(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	sid := uuid.New()
+	store := &sessionRunStore{found: true, run: runs.Run{
+		Status: runs.StatusDone, SessionID: sid, Domain: "itinerary", CityName: "Crete",
+	}}
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil).WithRuns(store, nil)
+	h.resumeBuf = resumebuf.New()
+
+	got := followUntilDropped(t, h, sid)
+	require.Len(t, got, 1)
+	require.Equal(t, chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE, got[0].GetEventType())
+	require.True(t, got[0].GetComplete().GetLoadFromSession())
+}
+
+func TestResumeFollowerDroppedRunStillRunningSaysRetry(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	sid := uuid.New()
+	store := &sessionRunStore{found: true, run: runs.Run{
+		Status: runs.StatusRunning, SessionID: sid, Domain: "itinerary", CityName: "Crete",
+	}}
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil).WithRuns(store, nil)
+	h.resumeBuf = resumebuf.New()
+
+	got := followUntilDropped(t, h, sid)
+	require.Len(t, got, 1)
+	ev := got[0]
+	require.Equal(t, chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR, ev.GetEventType())
+	require.True(t, ev.GetIsFinal())
+	require.True(t, ev.GetError().GetRetryable())
+	require.Equal(t, "resume_lost", ev.GetError().GetInternalCode())
+	require.Equal(t, "This search is still running. Try again in a moment.", ev.GetError().GetUserMessage())
+}
+
+// With no run store at all, a lost follower still ends on a retryable error.
+func TestResumeFollowerDroppedNoRunStoreSaysRetry(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil)
+	h.resumeBuf = resumebuf.New()
+
+	got := followUntilDropped(t, h, uuid.New())
+	require.Len(t, got, 1)
+	require.Equal(t, "resume_lost", got[0].GetError().GetInternalCode())
 }
