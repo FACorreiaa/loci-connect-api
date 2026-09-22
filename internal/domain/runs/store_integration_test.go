@@ -189,3 +189,39 @@ func TestReleaseOnlyDeletesUnattachedRows(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, found)
 }
+
+// A session has one run per turn. With an older finished turn and a newer
+// running one, both readers must report the newer run.
+func TestSessionWithTwoTurnsReportsTheNewest(t *testing.T) {
+	pool := testPool(t)
+	s := NewPostgresStore(pool)
+	ctx := context.Background()
+	user := seedUser(t, pool)
+	session := uuid.New()
+
+	first, err := s.Reserve(ctx, user)
+	require.NoError(t, err)
+	require.NoError(t, s.Attach(ctx, first, session, "itinerary", "Crete"))
+	_, moved, err := s.Finish(ctx, first, StatusDone, "")
+	require.NoError(t, err)
+	require.True(t, moved)
+	_, err = pool.Exec(ctx, `UPDATE generation_runs SET started_at = NOW() - interval '1 minute' WHERE id = $1`, first)
+	require.NoError(t, err)
+
+	second, err := s.Reserve(ctx, user)
+	require.NoError(t, err)
+	require.NoError(t, s.Attach(ctx, second, session, "itinerary", "Crete"),
+		"a second turn on the same session must attach")
+
+	run, found, err := s.FindBySession(ctx, user, session)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, second, run.ID)
+	require.Equal(t, StatusRunning, run.Status)
+
+	statuses, err := s.Statuses(ctx, user, []uuid.UUID{session})
+	require.NoError(t, err)
+	require.Len(t, statuses, 1, "one row per session, not one per turn")
+	require.Equal(t, second, statuses[0].ID)
+	require.Equal(t, StatusRunning, statuses[0].Status)
+}

@@ -110,10 +110,12 @@ func (s *PostgresStore) Finish(ctx context.Context, runID uuid.UUID, status Stat
 	return run, true, nil
 }
 
+// Statuses reports the newest run of each session (a session has one run per turn).
 func (s *PostgresStore) Statuses(ctx context.Context, userID uuid.UUID, sessionIDs []uuid.UUID) ([]Run, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+runColumns+` FROM generation_runs
-		WHERE user_id = $1 AND session_id = ANY($2)`, userID, sessionIDs)
+		SELECT DISTINCT ON (session_id) `+runColumns+` FROM generation_runs
+		WHERE user_id = $1 AND session_id = ANY($2)
+		ORDER BY session_id, started_at DESC`, userID, sessionIDs)
 	if err != nil {
 		return nil, fmt.Errorf("run statuses: %w", err)
 	}
@@ -130,9 +132,11 @@ func (s *PostgresStore) Statuses(ctx context.Context, userID uuid.UUID, sessionI
 	return out, rows.Err()
 }
 
+// FindBySession returns the session's newest run, i.e. its current turn.
 func (s *PostgresStore) FindBySession(ctx context.Context, userID, sessionID uuid.UUID) (Run, bool, error) {
 	r, err := scanRun(s.pool.QueryRow(ctx, `
-		SELECT `+runColumns+` FROM generation_runs WHERE user_id = $1 AND session_id = $2`, userID, sessionID))
+		SELECT `+runColumns+` FROM generation_runs WHERE user_id = $1 AND session_id = $2
+		ORDER BY started_at DESC LIMIT 1`, userID, sessionID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Run{}, false, nil
 	}
