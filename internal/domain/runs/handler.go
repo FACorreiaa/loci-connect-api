@@ -1,6 +1,8 @@
 package runs
 
 import (
+	"strings"
+
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
@@ -14,20 +16,23 @@ var protoStatus = map[Status]chatv1.RunStatus{
 	StatusFailed:  chatv1.RunStatus_RUN_STATUS_FAILED,
 }
 
-// domainToProto mirrors chat/handler's own mapper, which is unexported and
-// lives in a different package, so it can't be imported here.
-func domainToProto(d string) chatv1.DomainType {
-	switch d {
-	case "itinerary":
-		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
-	case "general", "nearby":
-		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
+// DomainToProto is the single string->DomainType mapper for the chat domain.
+// It used to be duplicated (unexported) in chat/handler/chat_handler.go;
+// that copy now calls this one instead.
+func DomainToProto(d string) chatv1.DomainType {
+	switch strings.ToLower(d) {
 	case "accommodation":
 		return chatv1.DomainType_DOMAIN_TYPE_ACCOMMODATION
 	case "dining":
 		return chatv1.DomainType_DOMAIN_TYPE_DINING
 	case "activities":
 		return chatv1.DomainType_DOMAIN_TYPE_ACTIVITIES
+	case "itinerary":
+		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
+	case "transport":
+		return chatv1.DomainType_DOMAIN_TYPE_TRANSPORT
+	case "general", "nearby":
+		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
 	default:
 		return chatv1.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
@@ -43,7 +48,7 @@ func StatusesToProto(runs []Run) []*chatv1.RunInfo {
 		path, _, _ := ResultPath(r.Domain, r.SessionID, r.CityName, uuid.Nil)
 		info := &chatv1.RunInfo{
 			SessionId: r.SessionID.String(),
-			Domain:    domainToProto(r.Domain),
+			Domain:    DomainToProto(r.Domain),
 			CityName:  r.CityName,
 			Status:    protoStatus[r.Status],
 			ErrorCode: r.ErrorCode,

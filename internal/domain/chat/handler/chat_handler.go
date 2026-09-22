@@ -531,7 +531,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		decodeData(event.Data, &sd)
 		resp.Payload = &chatv1.StreamEvent_Start{Start: &chatv1.StartPayload{
 			SessionId: sd.SessionID,
-			Domain:    domainToProto(sd.Domain),
+			Domain:    runs.DomainToProto(sd.Domain),
 			CityName:  optString(sd.City),
 		}}
 
@@ -759,25 +759,6 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
-	}
-}
-
-func domainToProto(d string) chatv1.DomainType {
-	switch strings.ToLower(d) {
-	case "accommodation":
-		return chatv1.DomainType_DOMAIN_TYPE_ACCOMMODATION
-	case "dining":
-		return chatv1.DomainType_DOMAIN_TYPE_DINING
-	case "activities":
-		return chatv1.DomainType_DOMAIN_TYPE_ACTIVITIES
-	case "itinerary":
-		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
-	case "transport":
-		return chatv1.DomainType_DOMAIN_TYPE_TRANSPORT
-	case "general", "nearby":
-		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
-	default:
-		return chatv1.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
 }
 
