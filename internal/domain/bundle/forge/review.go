@@ -88,12 +88,29 @@ func Validate(b *bundle.Bundle, days []bundle.Day) []string {
 		issues = append(issues, "pack has no summary; the catalog card would be blank")
 	}
 
+	start, end := DayWindow(b.Theme)
 	for _, d := range days {
 		if len(d.Stops) == 0 {
 			issues = append(issues, fmt.Sprintf("day %d has no stops", d.DayNumber))
 			continue
 		}
+		prev := -1
 		for _, s := range d.Stops {
+			if s.StartMinute != nil {
+				m := *s.StartMinute
+				if m < start || m > end {
+					issues = append(issues, fmt.Sprintf(
+						"day %d: %q starts at %s, outside %s to %s for a %s pack",
+						d.DayNumber, s.Name, clock(m), clock(start), clock(end), b.Theme,
+					))
+				}
+				if m < prev {
+					issues = append(issues, fmt.Sprintf(
+						"day %d: %q starts at %s, before the stop above it", d.DayNumber, s.Name, clock(m),
+					))
+				}
+				prev = m
+			}
 			if strings.TrimSpace(s.Name) == "" {
 				issues = append(issues, fmt.Sprintf("day %d has a stop with no name", d.DayNumber))
 			}

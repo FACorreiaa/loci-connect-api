@@ -159,3 +159,93 @@ func TestRender_FlagsAProblemWhereTheReaderIsLooking(t *testing.T) {
 	assert.Contains(t, out, "NO COORDINATES")
 	assert.Contains(t, out, "Blocking issues")
 }
+
+func TestValidate_RefusesAStopOutsideItsThemesDay(t *testing.T) {
+	lat, lon := 41.1, -8.6
+	at := func(m int) *int { return &m }
+	stop := func(name string, start int) bundle.Stop {
+		return bundle.Stop{Name: name, Latitude: &lat, Longitude: &lon, Notes: "why", StartMinute: at(start)}
+	}
+
+	cases := []struct {
+		name  string
+		theme string
+		stops []bundle.Stop
+		wants string
+	}{
+		{
+			// The Porto draft: a bar at 09:00 in a nightlife pack.
+			name:  "a nightlife stop in the morning",
+			theme: "nightlife",
+			stops: []bundle.Stop{stop("Café Majestic", 9*60)},
+			wants: "starts at 09:00",
+		},
+		{
+			name:  "an art stop after the day has ended",
+			theme: "art",
+			stops: []bundle.Stop{stop("Late museum", 23*60)},
+			wants: "starts at 23:00",
+		},
+		{
+			name:  "stops that run backwards in time",
+			theme: "food",
+			stops: []bundle.Stop{stop("Lunch", 13*60), stop("Breakfast", 10*60)},
+			wants: "before the stop above it",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			b := &bundle.Bundle{Summary: "s", DayCount: 1, Theme: tc.theme}
+			issues := Validate(b, []bundle.Day{{DayNumber: 1, Stops: tc.stops}})
+			require.NotEmpty(t, issues)
+			assert.Contains(t, strings.Join(issues, "\n"), tc.wants)
+		})
+	}
+}
+
+func TestValidate_AcceptsALateNightlifeStop(t *testing.T) {
+	lat, lon := 41.1, -8.6
+	start := 23*60 + 30
+	b := &bundle.Bundle{Summary: "s", DayCount: 1, Theme: "nightlife"}
+	days := []bundle.Day{{DayNumber: 1, Stops: []bundle.Stop{
+		{Name: "Plano B", Latitude: &lat, Longitude: &lon, Notes: "why", StartMinute: &start},
+	}}}
+	assert.Empty(t, Validate(b, days))
+}
+
+func TestPrompt_GivesNightlifeAnEveningWindow(t *testing.T) {
+	night := Prompt(Seed{City: "Porto", Theme: "nightlife", Hook: "São João", Days: 3})
+	assert.Contains(t, night, "between 14:00 and 23:59")
+	day := Prompt(Seed{City: "Paris", Theme: "art", Hook: "spring", Days: 3})
+	assert.Contains(t, day, "between 09:00 and 22:00")
+}
+
+func TestParsePlan_UnescapesHTMLEntitiesTheModelAdds(t *testing.T) {
+	raw := `{"summary":"Tapas &amp; wine","days":[{"day_number":1,"title":"Ribeira &amp; River Views","summary":"s",
+		"stops":[{"name":"Caf&eacute; Majestic","address":"Rua &quot;A&quot;","notes":"n &lt;3","description":"d &#39;x&#39;"}]}]}`
+	p, err := ParsePlan(raw)
+	require.NoError(t, err)
+	assert.Equal(t, "Tapas & wine", p.Summary)
+	assert.Equal(t, "Ribeira & River Views", p.Days[0].Title)
+	st := p.Days[0].Stops[0]
+	assert.Equal(t, "Café Majestic", st.Name)
+	assert.Equal(t, `Rua "A"`, st.Address)
+	assert.Equal(t, "n <3", st.Notes)
+	assert.Equal(t, "d 'x'", st.Description)
+}
+
+func TestLoadSeeds_FestivalsOnlyInTheirMonths(t *testing.T) {
+	seeds, err := LoadSeeds()
+	require.NoError(t, err)
+	// A dated event sold for a month it does not happen in is a false product.
+	want := map[string][]int{
+		"the tulip festival": {4},
+		"São João":           {6},
+		"Las Fallas":         {3},
+	}
+	for _, s := range seeds {
+		if m, ok := want[s.Hook]; ok {
+			assert.Equal(t, m, s.Months, "%s: %s", s.City, s.Hook)
+		}
+	}
+}

@@ -22,6 +22,23 @@ var Themes = []string{
 	"food", "art", "outdoors", "architecture", "nightlife", "family", "local_life",
 }
 
+// DayWindow is when a pack's stops may start, in minutes from midnight.
+//
+// Nightlife gets the evening. Asking every theme for 09:00 to 22:00 made the
+// model squeeze a night out into office hours: a bar at 09:00 and a club "until
+// 3 AM" slotted at 13:45. The window ends at 23:59 rather than past midnight
+// because the client prints minutes as HH:MM and 1500 would read as 25:00; a
+// late stop's duration carries the night on from there.
+func DayWindow(theme string) (start, end int) {
+	if theme == "nightlife" {
+		return 14 * 60, 23*60 + 59
+	}
+	return 9 * 60, 22 * 60
+}
+
+// clock renders minutes from midnight as HH:MM.
+func clock(m int) string { return fmt.Sprintf("%02d:%02d", m/60, m%60) }
+
 // ValidTheme reports whether a theme is in the vocabulary.
 func ValidTheme(t string) bool {
 	for _, v := range Themes {
