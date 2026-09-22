@@ -123,7 +123,7 @@ func TestRegisterPushDeviceRejectsUnspecifiedPlatform(t *testing.T) {
 
 	_, err := h.RegisterPushDevice(authedCtx(uuid.New()), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
 		Platform: userpb.PushPlatform_PUSH_PLATFORM_UNSPECIFIED,
-		Endpoint: "https://push.example.test/x",
+		Endpoint: "https://fcm.googleapis.com/fcm/send/abc123",
 	}))
 	if err == nil {
 		t.Fatal("RegisterPushDevice with UNSPECIFIED = nil error, want InvalidArgument")
@@ -144,13 +144,38 @@ func TestRegisterPushDeviceRejectsWebPushWithoutKeys(t *testing.T) {
 
 	_, err := h.RegisterPushDevice(authedCtx(uuid.New()), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
 		Platform: userpb.PushPlatform_PUSH_PLATFORM_WEB_PUSH,
-		Endpoint: "https://push.example.test/x",
+		Endpoint: "https://fcm.googleapis.com/fcm/send/abc123",
 	}))
 	if code := connect.CodeOf(err); code != connect.CodeInvalidArgument {
 		t.Errorf("code = %v, want %v", code, connect.CodeInvalidArgument)
 	}
 	if store.upsertCalled {
 		t.Error("store.Upsert was called for web push with no p256dh/auth")
+	}
+}
+
+// A signed-in caller controls the endpoint field. Anything outside the known
+// push-service hosts must be refused before it can ever be stored and later
+// dialed by the sender — otherwise an internal cluster address registered
+// here is an SSRF from inside the auth boundary.
+func TestRegisterPushDeviceRejectsUnsupportedEndpoint(t *testing.T) {
+	store := &fakeDeviceStore{}
+	h := NewUserHandler(&recordingUserService{}).WithPush(store, config.PushConfig{})
+
+	_, err := h.RegisterPushDevice(authedCtx(uuid.New()), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
+		Platform: userpb.PushPlatform_PUSH_PLATFORM_WEB_PUSH,
+		Endpoint: "https://whisper.horus.svc.cluster.local:8000/v1/audio/transcriptions",
+		P256Dh:   "p256dh-key",
+		Auth:     "auth-key",
+	}))
+	if err == nil {
+		t.Fatal("RegisterPushDevice with an internal endpoint = nil error, want InvalidArgument")
+	}
+	if code := connect.CodeOf(err); code != connect.CodeInvalidArgument {
+		t.Errorf("code = %v, want %v", code, connect.CodeInvalidArgument)
+	}
+	if store.upsertCalled {
+		t.Error("store.Upsert was called for an unsupported endpoint")
 	}
 }
 
@@ -162,7 +187,7 @@ func TestRegisterPushDeviceValidCallUpserts(t *testing.T) {
 	caller := uuid.New()
 	_, err := h.RegisterPushDevice(authedCtx(caller), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
 		Platform: userpb.PushPlatform_PUSH_PLATFORM_WEB_PUSH,
-		Endpoint: "https://push.example.test/x",
+		Endpoint: "https://fcm.googleapis.com/fcm/send/abc123",
 		P256Dh:   "p256dh-key",
 		Auth:     "auth-key",
 	}))
@@ -178,7 +203,7 @@ func TestRegisterPushDeviceValidCallUpserts(t *testing.T) {
 	if store.upsertedUserID != caller {
 		t.Errorf("upserted user = %s, want caller %s", store.upsertedUserID, caller)
 	}
-	if store.upsertedEndpoint != "https://push.example.test/x" {
+	if store.upsertedEndpoint != "https://fcm.googleapis.com/fcm/send/abc123" {
 		t.Errorf("upserted endpoint = %q", store.upsertedEndpoint)
 	}
 }

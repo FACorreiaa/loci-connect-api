@@ -443,6 +443,10 @@ var platformNames = map[userpb.PushPlatform]string{
 	userpb.PushPlatform_PUSH_PLATFORM_APNS:     "apns",
 }
 
+// maxUserAgentLen bounds what a client-supplied User-Agent header can cost us
+// to store; nothing legitimate needs more than this.
+const maxUserAgentLen = 512
+
 // RegisterPushDevice records where the caller's finished searches should be
 // announced. Re-registering refreshes it.
 func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Request[userpb.RegisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
@@ -457,10 +461,23 @@ func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Reque
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unknown platform"))
 	}
-	if platform == "web_push" && (req.Msg.GetP256Dh() == "" || req.Msg.GetAuth() == "") {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
+	if platform == "web_push" {
+		// The endpoint is client-supplied. Without this allow-list a signed-in
+		// user could register an internal cluster address here and have the
+		// sender POST to it on their behalf — an SSRF from inside the auth
+		// boundary rather than outside it.
+		if !push.ValidWebPushEndpoint(req.Msg.GetEndpoint()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unsupported push endpoint"))
+		}
+		if req.Msg.GetP256Dh() == "" || req.Msg.GetAuth() == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
+		}
 	}
-	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), req.Header().Get("User-Agent")); err != nil {
+	userAgent := req.Header().Get("User-Agent")
+	if len(userAgent) > maxUserAgentLen {
+		userAgent = userAgent[:maxUserAgentLen]
+	}
+	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), userAgent); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&commonpb.Response{Success: true}), nil
