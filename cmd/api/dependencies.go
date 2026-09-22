@@ -48,6 +48,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
@@ -115,6 +116,10 @@ type Dependencies struct {
 	TravelHistoryRepo travelhistory.Repository
 	// RunStore backs the cap interceptor and the run-status/notification RPCs.
 	RunStore runs.Store
+	// PushDevices backs device registration. Rows can be written even with no
+	// VAPID key configured; whether anything is ever sent to them is decided
+	// by Config.Push.Enabled(), not by whether a device is registered.
+	PushDevices push.DeviceStore
 
 	// Services
 	TokenManager service.TokenManager
@@ -294,6 +299,7 @@ func (d *Dependencies) initRepositories() error {
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
 	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
+	d.PushDevices = push.NewPostgresDeviceStore(d.DB.Pool)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -755,7 +761,7 @@ func (d *Dependencies) initHandlers() error {
 		d.Logger,
 	)
 
-	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
+	d.UserHandler = userhandler.NewUserHandler(d.UserSvc).WithPush(d.PushDevices, d.Config.Push)
 	// The self-service export previously returned the profile alone, while the
 	// account also held trips, lists, favorites, itineraries, travel history,
 	// chat sessions and the learned taste profile.

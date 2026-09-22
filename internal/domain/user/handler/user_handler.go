@@ -15,9 +15,11 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -28,6 +30,10 @@ type UserHandler struct {
 	// exporter assembles the full self-service data export. Optional: without
 	// it the export falls back to the profile-only payload it used to return.
 	exporter *userdata.Exporter
+	// devices is nil until WithPush is called, which is how the handler knows
+	// push was never configured rather than merely misconfigured.
+	devices push.DeviceStore
+	pushCfg config.PushConfig
 }
 
 // NewUserHandler constructs a new handler.
@@ -43,6 +49,16 @@ func (h *UserHandler) SetExporter(e *userdata.Exporter) {
 	if h != nil {
 		h.exporter = e
 	}
+}
+
+// WithPush enables device registration and hands the handler the VAPID
+// config GetPushConfig serves at runtime. Without it, RegisterPushDevice and
+// UnregisterPushDevice report the service unavailable and GetPushConfig
+// always returns an empty key.
+func (h *UserHandler) WithPush(devices push.DeviceStore, cfg config.PushConfig) *UserHandler {
+	h.devices = devices
+	h.pushCfg = cfg
+	return h
 }
 
 // GetUserProfile retrieves the user's profile.
@@ -420,6 +436,62 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		SearchFinished:  s.SearchFinished,
 		UpdatedAt:       timestamppb.New(s.UpdatedAt),
 	}
+}
+
+var platformNames = map[userpb.PushPlatform]string{
+	userpb.PushPlatform_PUSH_PLATFORM_WEB_PUSH: "web_push",
+	userpb.PushPlatform_PUSH_PLATFORM_APNS:     "apns",
+}
+
+// RegisterPushDevice records where the caller's finished searches should be
+// announced. Re-registering refreshes it.
+func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Request[userpb.RegisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.devices == nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("push is not configured"))
+	}
+	platform, ok := platformNames[req.Msg.GetPlatform()]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unknown platform"))
+	}
+	if platform == "web_push" && (req.Msg.GetP256Dh() == "" || req.Msg.GetAuth() == "") {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
+	}
+	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), req.Header().Get("User-Agent")); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&commonpb.Response{Success: true}), nil
+}
+
+// UnregisterPushDevice stops announcing finished searches to one endpoint.
+func (h *UserHandler) UnregisterPushDevice(ctx context.Context, req *connect.Request[userpb.UnregisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.devices != nil {
+		if err := h.devices.Remove(ctx, userID, req.Msg.GetEndpoint()); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+	return connect.NewResponse(&commonpb.Response{Success: true}), nil
+}
+
+// GetPushConfig hands out the VAPID public key at runtime rather than as a
+// build variable: the Workers Builds deploy has no env and races the
+// Actions one, so a baked-in key would vanish whenever it won.
+func (h *UserHandler) GetPushConfig(ctx context.Context, _ *connect.Request[userpb.GetPushConfigRequest]) (*connect.Response[userpb.PushConfig], error) {
+	if _, err := callerUserID(ctx); err != nil {
+		return nil, err
+	}
+	key := ""
+	if h.pushCfg.Enabled() {
+		key = h.pushCfg.VAPIDPublicKey
+	}
+	return connect.NewResponse(&userpb.PushConfig{VapidPublicKey: key}), nil
 }
 
 // callerUserID resolves the authenticated subject from the token claims. The
