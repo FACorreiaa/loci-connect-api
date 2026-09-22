@@ -63,6 +63,9 @@ const (
 	ChatServiceRemoveBookmarkProcedure = "/loci.chat.ChatService/RemoveBookmark"
 	// ChatServiceStreamChatProcedure is the fully-qualified name of the ChatService's StreamChat RPC.
 	ChatServiceStreamChatProcedure = "/loci.chat.ChatService/StreamChat"
+	// ChatServiceGetRunStatusProcedure is the fully-qualified name of the ChatService's GetRunStatus
+	// RPC.
+	ChatServiceGetRunStatusProcedure = "/loci.chat.ChatService/GetRunStatus"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -79,6 +82,7 @@ var (
 	chatServiceBookmarkItineraryMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("BookmarkItinerary")
 	chatServiceRemoveBookmarkMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("RemoveBookmark")
 	chatServiceStreamChatMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("StreamChat")
+	chatServiceGetRunStatusMethodDescriptor          = chatServiceServiceDescriptor.Methods().ByName("GetRunStatus")
 )
 
 // ChatServiceClient is a client for the loci.chat.ChatService service.
@@ -98,6 +102,9 @@ type ChatServiceClient interface {
 	RemoveBookmark(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
 	// Streaming RPC for real-time chat responses
 	StreamChat(context.Context, *connect.Request[chat.ChatRequest]) (*connect.ServerStreamForClient[chat.StreamEvent], error)
+	// Where the caller's runs are: running, done or failed. Used after a
+	// reload or on returning to the app to settle runs nobody was listening to.
+	GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error)
 }
 
 // NewChatServiceClient constructs a client for the loci.chat.ChatService service. By default, it
@@ -176,6 +183,12 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceStreamChatMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getRunStatus: connect.NewClient[chat.GetRunStatusRequest, chat.GetRunStatusResponse](
+			httpClient,
+			baseURL+ChatServiceGetRunStatusProcedure,
+			connect.WithSchema(chatServiceGetRunStatusMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -192,6 +205,7 @@ type chatServiceClient struct {
 	bookmarkItinerary     *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
 	removeBookmark        *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
 	streamChat            *connect.Client[chat.ChatRequest, chat.StreamEvent]
+	getRunStatus          *connect.Client[chat.GetRunStatusRequest, chat.GetRunStatusResponse]
 }
 
 // StartChat calls loci.chat.ChatService.StartChat.
@@ -249,6 +263,11 @@ func (c *chatServiceClient) StreamChat(ctx context.Context, req *connect.Request
 	return c.streamChat.CallServerStream(ctx, req)
 }
 
+// GetRunStatus calls loci.chat.ChatService.GetRunStatus.
+func (c *chatServiceClient) GetRunStatus(ctx context.Context, req *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error) {
+	return c.getRunStatus.CallUnary(ctx, req)
+}
+
 // ChatServiceHandler is an implementation of the loci.chat.ChatService service.
 type ChatServiceHandler interface {
 	StartChat(context.Context, *connect.Request[chat.StartChatRequest]) (*connect.Response[chat.ChatResponse], error)
@@ -266,6 +285,9 @@ type ChatServiceHandler interface {
 	RemoveBookmark(context.Context, *connect.Request[chat.BookmarkRequest]) (*connect.Response[chat.BookmarkResponse], error)
 	// Streaming RPC for real-time chat responses
 	StreamChat(context.Context, *connect.Request[chat.ChatRequest], *connect.ServerStream[chat.StreamEvent]) error
+	// Where the caller's runs are: running, done or failed. Used after a
+	// reload or on returning to the app to settle runs nobody was listening to.
+	GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error)
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -340,6 +362,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceStreamChatMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceGetRunStatusHandler := connect.NewUnaryHandler(
+		ChatServiceGetRunStatusProcedure,
+		svc.GetRunStatus,
+		connect.WithSchema(chatServiceGetRunStatusMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.chat.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatServiceStartChatProcedure:
@@ -364,6 +392,8 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceRemoveBookmarkHandler.ServeHTTP(w, r)
 		case ChatServiceStreamChatProcedure:
 			chatServiceStreamChatHandler.ServeHTTP(w, r)
+		case ChatServiceGetRunStatusProcedure:
+			chatServiceGetRunStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -415,4 +445,8 @@ func (UnimplementedChatServiceHandler) RemoveBookmark(context.Context, *connect.
 
 func (UnimplementedChatServiceHandler) StreamChat(context.Context, *connect.Request[chat.ChatRequest], *connect.ServerStream[chat.StreamEvent]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.StreamChat is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.GetRunStatus is not implemented"))
 }
