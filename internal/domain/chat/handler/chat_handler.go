@@ -1026,3 +1026,36 @@ func (h *ChatHandler) EndSession(
 	msg := "session ended"
 	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
 }
+
+// GetRunStatus reports the caller's runs among session_ids.
+func (h *ChatHandler) GetRunStatus(
+	ctx context.Context,
+	req *connect.Request[chatv1.GetRunStatusRequest],
+) (*connect.Response[chatv1.GetRunStatusResponse], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
+	}
+
+	if h.runs == nil {
+		return connect.NewResponse(&chatv1.GetRunStatusResponse{}), nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.Msg.GetSessionIds()))
+	for _, s := range req.Msg.GetSessionIds() {
+		if id, pErr := uuid.Parse(s); pErr == nil {
+			ids = append(ids, id)
+		}
+	}
+
+	found, err := h.runs.Statuses(ctx, userID, ids)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&chatv1.GetRunStatusResponse{Runs: runs.StatusesToProto(found)}), nil
+}
