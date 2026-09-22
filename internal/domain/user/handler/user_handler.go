@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -447,6 +448,18 @@ var platformNames = map[userpb.PushPlatform]string{
 // to store; nothing legitimate needs more than this.
 const maxUserAgentLen = 512
 
+// truncateUTF8 caps s at maxBytes, backing off to the nearest rune boundary.
+// Slicing a string by byte count alone can split a multi-byte rune in half;
+// Postgres's UTF8 encoding then rejects the insert outright, which is how a
+// User-Agent header that happened to end mid-emoji turned "truncate for
+// safety" into a 500 on RegisterPushDevice.
+func truncateUTF8(s string, maxBytes int) string {
+	if len(s) <= maxBytes {
+		return s
+	}
+	return strings.ToValidUTF8(s[:maxBytes], "")
+}
+
 // RegisterPushDevice records where the caller's finished searches should be
 // announced. Re-registering refreshes it.
 func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Request[userpb.RegisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
@@ -473,10 +486,7 @@ func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Reque
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
 		}
 	}
-	userAgent := req.Header().Get("User-Agent")
-	if len(userAgent) > maxUserAgentLen {
-		userAgent = userAgent[:maxUserAgentLen]
-	}
+	userAgent := truncateUTF8(req.Header().Get("User-Agent"), maxUserAgentLen)
 	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), userAgent); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}

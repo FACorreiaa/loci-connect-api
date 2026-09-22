@@ -2,7 +2,9 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -236,5 +238,35 @@ func TestGetPushConfigEnabledReturnsKey(t *testing.T) {
 	}
 	if got := resp.Msg.GetVapidPublicKey(); got != "pub-key" {
 		t.Errorf("VapidPublicKey = %q, want %q", got, "pub-key")
+	}
+}
+
+// Slicing a string by byte count alone can cut a multi-byte rune in half.
+// Postgres's UTF8 encoding then rejects the insert, which is how a
+// User-Agent header ending mid-rune turned into a 500 rather than a
+// harmlessly shortened string.
+func TestTruncateUTF8DoesNotSplitARune(t *testing.T) {
+	// 511 ASCII bytes plus a 3-byte rune (€) is 514 bytes total; slicing at
+	// 512 lands one byte into the rune.
+	prefix := strings.Repeat("a", 511)
+	s := prefix + "€"
+
+	got := truncateUTF8(s, 512)
+
+	if !utf8.ValidString(got) {
+		t.Fatalf("truncateUTF8(%d bytes, 512) = %q, not valid UTF-8", len(s), got)
+	}
+	if len(got) > 512 {
+		t.Errorf("len(got) = %d, want <= 512", len(got))
+	}
+	if got != prefix {
+		t.Errorf("got = %q, want the ASCII prefix with the split rune dropped", got)
+	}
+}
+
+// A string that already fits is returned unchanged.
+func TestTruncateUTF8LeavesShortStringsAlone(t *testing.T) {
+	if got := truncateUTF8("Mozilla/5.0", 512); got != "Mozilla/5.0" {
+		t.Errorf("got = %q, want unchanged", got)
 	}
 }

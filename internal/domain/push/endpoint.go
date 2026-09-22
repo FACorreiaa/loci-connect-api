@@ -18,7 +18,9 @@ var webPushAllowedHosts = map[string]bool{
 }
 
 // webPushAllowedSuffixes covers the per-tenant subdomains WNS and APNs web
-// push use (e.g. "xyz.notify.windows.com", "xyz.push.apple.com").
+// push use (e.g. "xyz.notify.windows.com", "xyz.push.apple.com"). The suffix
+// includes the leading ".", so the bare parent domain ("notify.windows.com",
+// "push.apple.com") does not match — it is not itself a push host.
 var webPushAllowedSuffixes = []string{
 	".notify.windows.com",
 	".push.apple.com",
