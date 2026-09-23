@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 
@@ -20,9 +21,22 @@ type WebPushSender struct {
 	client *http.Client
 }
 
+// NewHTTPClient is the client pushes go out on. It never follows a redirect:
+// the endpoint was checked against the push-service allow-list, and a 3xx
+// from it must not steer the server's request anywhere else. The sender
+// treats the 3xx itself as a failed send.
+func NewHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
 func NewWebPushSender(cfg config.PushConfig, client *http.Client) *WebPushSender {
 	if client == nil {
-		client = http.DefaultClient
+		client = NewHTTPClient()
 	}
 	return &WebPushSender{cfg: cfg, client: client}
 }

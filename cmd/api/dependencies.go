@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -753,7 +752,7 @@ func (d *Dependencies) initHandlers() error {
 	var onRunFinish runs.FinishListener
 	if d.Config.Push.Enabled() {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices,
-			push.NewWebPushSender(d.Config.Push, &http.Client{Timeout: 10 * time.Second}), d.Logger)
+			push.NewWebPushSender(d.Config.Push, push.NewHTTPClient()), d.Logger)
 		onRunFinish = notifier.OnRunFinished
 	} else {
 		d.Logger.Info("web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT not all set")

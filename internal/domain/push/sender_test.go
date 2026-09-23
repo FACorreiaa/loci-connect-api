@@ -93,3 +93,27 @@ func TestSenderSendServerError(t *testing.T) {
 	require.Error(t, err)
 	require.False(t, gone)
 }
+
+// A push endpoint passed the allow-list; a redirect from it must not send the
+// server's request to a host that never did.
+func TestSenderDoesNotFollowRedirects(t *testing.T) {
+	p256dh, auth := testSubscription(t)
+	hits := 0
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer elsewhere.Close()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, elsewhere.URL, http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+
+	sender := NewWebPushSender(testPushConfig(t), NewHTTPClient())
+	d := Device{ID: uuid.New(), Endpoint: srv.URL, P256dh: p256dh, Auth: auth}
+
+	gone, err := sender.Send(context.Background(), d, []byte(`{"title":"hi"}`))
+	require.Error(t, err, "a 3xx is not a delivered push")
+	require.False(t, gone)
+	require.Zero(t, hits, "the redirect target was never contacted")
+}
