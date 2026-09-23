@@ -832,20 +832,12 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 	}
 }
 
-// progressPayload builds a ProgressPayload, preferring a "status" string from a
-// map-shaped Data when present, else falling back to the event type.
+// progressPayload builds a ProgressPayload whose stage is a short, human verb
+// phrase ("searching places") that reads after the assistant's name in the
+// chat header: "Loci is searching places". Raw event types and status codes
+// never reach the client; see progressStage.
 func progressPayload(event locitypes.StreamEvent) *chatv1.ProgressPayload {
-	stage := event.Type
-	var m map[string]any
-	if decodeData(event.Data, &m) {
-		if s, ok := m["status"].(string); ok && s != "" {
-			stage = s
-		}
-	}
-	if stage == "" {
-		stage = "progress"
-	}
-	return &chatv1.ProgressPayload{Stage: stage}
+	return &chatv1.ProgressPayload{Stage: progressStage(event)}
 }
 
 // streamErrorFromEvent maps an error event onto a typed StreamError, classifying
