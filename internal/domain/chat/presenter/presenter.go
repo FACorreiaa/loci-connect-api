@@ -195,7 +195,18 @@ func ToConversationMessage(msg locitypes.ConversationMessage) *chatv1.Conversati
 		Content:     msg.Content,
 		MessageType: msgType,
 		Timestamp:   timestamppb.New(msg.Timestamp),
+		Origin:      ToMessageOrigin(msg.Origin),
+		SourceLabel: msg.SourceLabel,
 	}
+}
+
+// ToMessageOrigin maps a stored origin to the wire. Messages stored before
+// origins existed carry none and are replies.
+func ToMessageOrigin(o locitypes.MessageOrigin) chatv1.MessageOrigin {
+	if o == locitypes.OriginProactive {
+		return chatv1.MessageOrigin_MESSAGE_ORIGIN_PROACTIVE
+	}
+	return chatv1.MessageOrigin_MESSAGE_ORIGIN_REPLY
 }
 
 func ToConversationMessages(msgs []locitypes.ConversationMessage) []*chatv1.ConversationMessage {

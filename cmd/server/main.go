@@ -135,6 +135,17 @@ func main() {
 		}
 	})
 
+	// Post due standing tasks into their chat threads.
+	//
+	// Returns immediately when there is no model to run them on, so this is
+	// started unconditionally.
+	concurrency.Run(logger, func() {
+		if err := deps.RunWatches(backgroundCtx); err != nil {
+			// Standing tasks stopping is not the API failing.
+			logger.Error("standing-task runner stopped", "error", err)
+		}
+	})
+
 	// Start HTTP server
 	if err := runServer(cfg, logger, handler); err != nil {
 		logger.Error("server error", "error", err)
