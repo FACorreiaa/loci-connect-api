@@ -42,6 +42,9 @@ type Handler struct {
 
 	// Optional, attached via WithNewsTicker. Nil answers "disabled".
 	news *NewsTickerService
+
+	// Optional, attached via WithPlaces. Nil leaves the here brief unnamed.
+	places PlaceResolver
 }
 
 // WithSignals attaches the live alert sources (holidays, and later hazards and
@@ -78,15 +81,7 @@ func (h *Handler) GetLocalContext(
 		return connect.NewResponse(out), nil
 	}
 
-	for _, d := range fc {
-		out.Weather = append(out.Weather, &lcv1.WeatherDay{
-			Date:       timestamppb.New(d.Date),
-			HighC:      d.HighC,
-			LowC:       d.LowC,
-			Condition:  d.Condition,
-			PrecipProb: d.PrecipProb,
-		})
-	}
+	out.Weather = toWeatherDaysProto(fc)
 
 	// Alerts cover the same span the forecast does, so a holiday shows up
 	// alongside the day it falls on. Gather never returns an error — a failing
@@ -103,4 +98,18 @@ func (h *Handler) GetLocalContext(
 	}
 
 	return connect.NewResponse(out), nil
+}
+
+func toWeatherDaysProto(fc []WeatherDay) []*lcv1.WeatherDay {
+	out := make([]*lcv1.WeatherDay, 0, len(fc))
+	for _, d := range fc {
+		out = append(out, &lcv1.WeatherDay{
+			Date:       timestamppb.New(d.Date),
+			HighC:      d.HighC,
+			LowC:       d.LowC,
+			Condition:  d.Condition,
+			PrecipProb: d.PrecipProb,
+		})
+	}
+	return out
 }

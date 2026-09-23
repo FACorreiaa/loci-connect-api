@@ -45,8 +45,63 @@ func NewBigDataCloudGeocoder(baseURL string, client *httpx.Client, cache *signal
 }
 
 type bigDataCloudResponse struct {
-	CountryCode string `json:"countryCode"`
-	CountryName string `json:"countryName"`
+	CountryCode          string `json:"countryCode"`
+	CountryName          string `json:"countryName"`
+	City                 string `json:"city"`
+	Locality             string `json:"locality"`
+	PrincipalSubdivision string `json:"principalSubdivision"`
+}
+
+// sourcePlace namespaces town-level cache entries apart from the country ones:
+// same upstream, different key precision.
+const sourcePlace = SourceGeocode + "-place"
+
+// Place is a coordinate named at town level. Any field may be empty.
+type Place struct {
+	Locality    string
+	Region      string
+	CountryCode string
+	CountryName string
+}
+
+// PlaceResolver names the town a coordinate sits in.
+type PlaceResolver interface {
+	Place(ctx context.Context, lat, lon float64) (Place, error)
+}
+
+func (g *BigDataCloudGeocoder) lookup(ctx context.Context, lat, lon float64) (bigDataCloudResponse, error) {
+	q := url.Values{}
+	q.Set("latitude", fmt.Sprintf("%f", lat))
+	q.Set("longitude", fmt.Sprintf("%f", lon))
+	q.Set("localityLanguage", "en")
+
+	endpoint := g.baseURL + "/data/reverse-geocode-client?" + q.Encode()
+	return httpx.GetJSON[bigDataCloudResponse](ctx, g.client, SourceGeocode, endpoint)
+}
+
+// Place names the town. Keyed at 0.01° (~1 km), not the 0.1° CountryCode
+// uses: at ~11 km the town is often the neighbouring one.
+func (g *BigDataCloudGeocoder) Place(ctx context.Context, lat, lon float64) (Place, error) {
+	key := fmt.Sprintf("%.2f,%.2f", lat, lon)
+	if p, ok := cacheGet[Place](g.cache, sourcePlace, key); ok {
+		return p, nil
+	}
+	body, err := g.lookup(ctx, lat, lon)
+	if err != nil {
+		return Place{}, err
+	}
+	locality := strings.TrimSpace(body.City)
+	if locality == "" {
+		locality = strings.TrimSpace(body.Locality)
+	}
+	p := Place{
+		Locality:    locality,
+		Region:      strings.TrimSpace(body.PrincipalSubdivision),
+		CountryCode: strings.ToUpper(strings.TrimSpace(body.CountryCode)),
+		CountryName: strings.TrimSpace(body.CountryName),
+	}
+	cacheSet(g.cache, sourcePlace, key, p, ttlGeocode)
+	return p, nil
 }
 
 func (g *BigDataCloudGeocoder) CountryCode(ctx context.Context, lat, lon float64) (string, error) {
@@ -56,13 +111,7 @@ func (g *BigDataCloudGeocoder) CountryCode(ctx context.Context, lat, lon float64
 		return code, nil
 	}
 
-	q := url.Values{}
-	q.Set("latitude", fmt.Sprintf("%f", lat))
-	q.Set("longitude", fmt.Sprintf("%f", lon))
-	q.Set("localityLanguage", "en")
-
-	endpoint := g.baseURL + "/data/reverse-geocode-client?" + q.Encode()
-	body, err := httpx.GetJSON[bigDataCloudResponse](ctx, g.client, SourceGeocode, endpoint)
+	body, err := g.lookup(ctx, lat, lon)
 	if err != nil {
 		return "", err
 	}
