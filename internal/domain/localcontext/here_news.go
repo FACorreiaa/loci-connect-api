@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -93,16 +94,39 @@ func (s *NewsTickerService) Here(ctx context.Context, userID uuid.UUID, p Place)
 	if cached, ok := cacheGet[HereNews](s.d.Cache, sourceHereNews, key); ok {
 		return cached, nil
 	}
-	plain := make([]newsFeed, len(feeds))
+	// One aggregator call per feed. The local query is a superset of the
+	// other two, and the aggregator's cross-feed dedupe would otherwise credit
+	// most disruption and what's-on items to the local feed.
+	docs := make([]jsonFeedDoc, len(feeds))
+	var wg sync.WaitGroup
 	for i, f := range feeds {
-		plain[i] = f.newsFeed
+		wg.Go(func() {
+			doc, err := s.fetch(ctx, []newsFeed{f.newsFeed}, 2*hereNewsPerList)
+			if err != nil {
+				s.d.Logger.WarnContext(ctx, "here news: aggregator failed; list left empty",
+					slog.String("list", f.Kind), slog.String("error", redactErr(err)))
+				return
+			}
+			docs[i] = doc
+		})
 	}
-	doc, err := s.fetch(ctx, plain, 3*hereNewsPerList*2)
-	if err != nil {
-		s.d.Logger.WarnContext(ctx, "here news: aggregator failed; returning empty", slog.Any("error", err))
-		return HereNews{}, nil
+	wg.Wait()
+
+	var merged jsonFeedDoc
+	warming := false
+	for _, d := range docs {
+		merged.Items = append(merged.Items, d.Items...)
+		merged.Feeds.Stale = append(merged.Feeds.Stale, d.Feeds.Stale...)
+		warming = warming || len(d.Feeds.Warming) > 0
 	}
-	out := splitHereItems(doc, feeds)
+	out := splitHereItems(merged, feeds)
+	if warming {
+		// A feed the aggregator has never polled answers empty. Caching that
+		// would hide a new town's headlines for the whole TTL; flag it instead
+		// so the client asks again shortly.
+		out.Stale = true
+		return out, nil
+	}
 	cacheSet(s.d.Cache, sourceHereNews, key, out, ttlHereNews)
 	return out, nil
 }

@@ -1,9 +1,13 @@
 package localcontext
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,5 +106,58 @@ func TestGetHereBriefDegradesPerPart(t *testing.T) {
 	resp2, err := h2.GetHereBrief(authed(), connect.NewRequest(&lcv1.GetHereBriefRequest{Latitude: 41.69, Longitude: -8.83}))
 	if err != nil || len(resp2.Msg.GetWeather()) != 1 {
 		t.Errorf("weather must survive a geocoder failure: %+v %v", resp2.Msg, err)
+	}
+}
+
+type slowPlaces struct{}
+
+func (slowPlaces) Place(ctx context.Context, _, _ float64) (Place, error) {
+	select {
+	case <-ctx.Done():
+		return Place{}, ctx.Err()
+	case <-time.After(2 * time.Second):
+		return Place{}, errors.New("geocoder timed out")
+	}
+}
+
+// Only news needs the place. A hanging geocoder must neither delay the
+// weather nor hold the RPC past its own short deadline.
+func TestGetHereBriefSlowGeocoderDoesNotHoldWeather(t *testing.T) {
+	old := herePlaceTimeout
+	herePlaceTimeout = 100 * time.Millisecond
+	t.Cleanup(func() { herePlaceTimeout = old })
+
+	h := NewHandler(&countingWeather{days: []WeatherDay{{Date: time.Now(), Condition: "Clear"}}}, false, quietLogger()).
+		WithPlaces(slowPlaces{})
+	started := time.Now()
+	resp, err := h.GetHereBrief(authed(), connect.NewRequest(&lcv1.GetHereBriefRequest{Latitude: 41.69, Longitude: -8.83}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Errorf("slow geocoder held the brief for %v", elapsed)
+	}
+	if len(resp.Msg.GetWeather()) != 1 {
+		t.Errorf("weather missing: %+v", resp.Msg)
+	}
+}
+
+// Transport errors carry the request URL, and the URL carries the caller's
+// position. None of it may reach the logs.
+func TestGetHereBriefLogsNoCoordinates(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	leak := &url.Error{Op: "Get", URL: "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=41.690000&longitude=-8.830000", Err: errors.New("i/o timeout")}
+	h := NewHandler(&countingWeather{err: fmt.Errorf("open-meteo request: %w", &url.Error{Op: "Get", URL: "https://api.open-meteo.com/v1/forecast?latitude=41.69&longitude=-8.83", Err: errors.New("i/o timeout")})}, false, logger).
+		WithPlaces(&fakePlaces{err: fmt.Errorf("bigdatacloud request: %w", leak)})
+	if _, err := h.GetHereBrief(authed(), connect.NewRequest(&lcv1.GetHereBriefRequest{Latitude: 41.69, Longitude: -8.83})); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "latitude") || strings.Contains(out, "41.69") {
+		t.Errorf("coordinates leaked into logs:\n%s", out)
+	}
+	if !strings.Contains(out, "i/o timeout") {
+		t.Errorf("the failure itself should still be logged:\n%s", out)
 	}
 }

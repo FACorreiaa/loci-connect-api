@@ -14,6 +14,9 @@ import (
 // hereWeatherDays is today plus the next two.
 const hereWeatherDays = 3
 
+// herePlaceTimeout bounds the geocoder: only the headlines need the place.
+var herePlaceTimeout = 2 * time.Second
+
 // WithPlaces attaches the town-level geocoder for GetHereBrief. Optional:
 // without it the brief has no place name and no news (the news queries need
 // a town or region).
@@ -39,17 +42,9 @@ func (h *Handler) GetHereBrief(
 	}
 	lat, lon := roundCoord(req.Msg.GetLatitude()), roundCoord(req.Msg.GetLongitude())
 
-	var place Place
-	if h.places != nil {
-		if p, err := h.places.Place(ctx, lat, lon); err != nil {
-			h.logger.WarnContext(ctx, "here brief: place lookup failed", slog.Any("error", err))
-		} else {
-			place = p
-		}
-	}
-
 	var (
 		wg     sync.WaitGroup
+		place  Place
 		fc     []WeatherDay
 		alerts []Alert
 		news   HereNews
@@ -57,7 +52,7 @@ func (h *Handler) GetHereBrief(
 	wg.Go(func() {
 		days, err := h.weather.Forecast(ctx, lat, lon, hereWeatherDays)
 		if err != nil {
-			h.logger.WarnContext(ctx, "here brief: weather failed", slog.Any("error", err))
+			h.logger.WarnContext(ctx, "here brief: weather failed", slog.String("error", redactErr(err)))
 			return
 		}
 		fc = days
@@ -68,16 +63,20 @@ func (h *Handler) GetHereBrief(
 			alerts = h.signals.Gather(ctx, lat, lon, start, start.AddDate(0, 0, hereWeatherDays))
 		})
 	}
-	if h.news != nil {
-		wg.Go(func() {
-			n, err := h.news.Here(ctx, userID, place)
-			if err != nil {
-				h.logger.WarnContext(ctx, "here brief: news failed", slog.Any("error", err))
-				return
-			}
-			news = n
-		})
-	}
+	// Only the headlines need the place, so the lookup runs beside the weather
+	// rather than in front of it, under its own short deadline.
+	wg.Go(func() {
+		place = h.lookupPlace(ctx, lat, lon)
+		if h.news == nil {
+			return
+		}
+		n, err := h.news.Here(ctx, userID, place)
+		if err != nil {
+			h.logger.WarnContext(ctx, "here brief: news failed", slog.String("error", redactErr(err)))
+			return
+		}
+		news = n
+	})
 	wg.Wait()
 
 	return connect.NewResponse(&lcv1.HereBrief{
@@ -93,4 +92,18 @@ func (h *Handler) GetHereBrief(
 		WhatsOn:            toNewsItemsProto(news.WhatsOn),
 		Stale:              news.Stale,
 	}), nil
+}
+
+func (h *Handler) lookupPlace(ctx context.Context, lat, lon float64) Place {
+	if h.places == nil {
+		return Place{}
+	}
+	ctx, cancel := context.WithTimeout(ctx, herePlaceTimeout)
+	defer cancel()
+	p, err := h.places.Place(ctx, lat, lon)
+	if err != nil {
+		h.logger.WarnContext(ctx, "here brief: place lookup failed", slog.String("error", redactErr(err)))
+		return Place{}
+	}
+	return p
 }

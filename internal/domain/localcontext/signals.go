@@ -206,7 +206,7 @@ func (g *Gatherer) Gather(ctx context.Context, lat, lon float64, start, end time
 		code, err := g.country.CountryCode(ctx, lat, lon)
 		if err != nil {
 			g.logf(ctx, slog.LevelWarn, "signals: country lookup failed; country-scoped sources will be skipped",
-				slog.Any("error", err))
+				slog.String("error", redactErr(err)))
 		} else {
 			req.CountryCode = code
 		}
@@ -235,7 +235,7 @@ func (g *Gatherer) Gather(ctx context.Context, lat, lon float64, start, end time
 			g.recordResult(ctx, src.Name(), err)
 			if err != nil {
 				g.logf(ctx, slog.LevelWarn, "signals: source failed; continuing without it",
-					slog.String("source", src.Name()), slog.Any("error", err))
+					slog.String("source", src.Name()), slog.String("error", redactErr(err)))
 				return
 			}
 			if len(alerts) == 0 {
