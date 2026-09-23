@@ -50,12 +50,7 @@ func (h *Handler) GetNewsTicker(
 		return connect.NewResponse(&lcv1.GetNewsTickerResponse{Enabled: true, Stale: true}), nil
 	}
 	out := &lcv1.GetNewsTickerResponse{Enabled: ticker.Enabled, Stale: ticker.Stale, CountryCodes: ticker.CountryCodes}
-	for _, it := range ticker.Items {
-		out.Items = append(out.Items, &lcv1.NewsTickerItem{
-			Id: it.ID, Title: it.Title, Url: it.URL, Source: it.Source,
-			PublishedAt: timestamppb.New(it.PublishedAt), CountryCode: it.CountryCode,
-		})
-	}
+	out.Items = toNewsItemsProto(ticker.Items)
 	return connect.NewResponse(out), nil
 }
 
@@ -74,4 +69,15 @@ func (h *Handler) SetNewsTickerEnabled(
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&lcv1.SetNewsTickerEnabledResponse{Enabled: req.Msg.GetEnabled()}), nil
+}
+
+func toNewsItemsProto(items []NewsItem) []*lcv1.NewsTickerItem {
+	out := make([]*lcv1.NewsTickerItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, &lcv1.NewsTickerItem{
+			Id: it.ID, Title: it.Title, Url: it.URL, Source: it.Source,
+			PublishedAt: timestamppb.New(it.PublishedAt), CountryCode: it.CountryCode,
+		})
+	}
+	return out
 }

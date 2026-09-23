@@ -894,7 +894,8 @@ func (d *Dependencies) initHandlers() error {
 		WithScoring(d.CityResolver, d.POISvc).
 		WithSignals(signals).
 		WithFX(fxAdapter, fxBase, litresPer100Km, pricePerLitre, signals.CountryResolver()).
-		WithNewsTicker(newsTicker)
+		WithNewsTicker(newsTicker).
+		WithPlaces(signals.PlaceResolver())
 
 	// Give the trip handler the same forecast source, so a packing list can be
 	// derived from the trip's actual weather rather than generic advice.

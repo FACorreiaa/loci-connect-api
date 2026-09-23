@@ -169,6 +169,16 @@ func (g *Gatherer) CountryResolver() CountryResolver {
 	return g.country
 }
 
+// PlaceResolver exposes the shared geocoder for town-level naming, when the
+// configured resolver supports it. Nil-safe like CountryResolver.
+func (g *Gatherer) PlaceResolver() PlaceResolver {
+	if g == nil {
+		return nil
+	}
+	pr, _ := g.country.(PlaceResolver)
+	return pr
+}
+
 // Enabled reports whether there is anything to gather. Callers use it to skip
 // the country lookup entirely when no sources are configured.
 func (g *Gatherer) Enabled() bool {
@@ -196,7 +206,7 @@ func (g *Gatherer) Gather(ctx context.Context, lat, lon float64, start, end time
 		code, err := g.country.CountryCode(ctx, lat, lon)
 		if err != nil {
 			g.logf(ctx, slog.LevelWarn, "signals: country lookup failed; country-scoped sources will be skipped",
-				slog.Any("error", err))
+				slog.String("error", redactErr(err)))
 		} else {
 			req.CountryCode = code
 		}
@@ -225,7 +235,7 @@ func (g *Gatherer) Gather(ctx context.Context, lat, lon float64, start, end time
 			g.recordResult(ctx, src.Name(), err)
 			if err != nil {
 				g.logf(ctx, slog.LevelWarn, "signals: source failed; continuing without it",
-					slog.String("source", src.Name()), slog.Any("error", err))
+					slog.String("source", src.Name()), slog.String("error", redactErr(err)))
 				return
 			}
 			if len(alerts) == 0 {

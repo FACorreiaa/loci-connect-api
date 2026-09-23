@@ -51,6 +51,9 @@ const (
 	// LocalContextServiceSetNewsTickerEnabledProcedure is the fully-qualified name of the
 	// LocalContextService's SetNewsTickerEnabled RPC.
 	LocalContextServiceSetNewsTickerEnabledProcedure = "/loci.localcontext.LocalContextService/SetNewsTickerEnabled"
+	// LocalContextServiceGetHereBriefProcedure is the fully-qualified name of the LocalContextService's
+	// GetHereBrief RPC.
+	LocalContextServiceGetHereBriefProcedure = "/loci.localcontext.LocalContextService/GetHereBrief"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -62,6 +65,7 @@ var (
 	localContextServiceEstimateDriveCostMethodDescriptor    = localContextServiceServiceDescriptor.Methods().ByName("EstimateDriveCost")
 	localContextServiceGetNewsTickerMethodDescriptor        = localContextServiceServiceDescriptor.Methods().ByName("GetNewsTicker")
 	localContextServiceSetNewsTickerEnabledMethodDescriptor = localContextServiceServiceDescriptor.Methods().ByName("SetNewsTickerEnabled")
+	localContextServiceGetHereBriefMethodDescriptor         = localContextServiceServiceDescriptor.Methods().ByName("GetHereBrief")
 )
 
 // LocalContextServiceClient is a client for the loci.localcontext.LocalContextService service.
@@ -78,6 +82,10 @@ type LocalContextServiceClient interface {
 	GetNewsTicker(context.Context, *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error)
 	// SetNewsTickerEnabled is the per-user switch for that strip.
 	SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error)
+	// GetHereBrief describes the place the caller is standing in: its name,
+	// weather, alerts and three short headline lists. The RPC does not fail
+	// because one source did.
+	GetHereBrief(context.Context, *connect.Request[localcontext.GetHereBriefRequest]) (*connect.Response[localcontext.HereBrief], error)
 }
 
 // NewLocalContextServiceClient constructs a client for the loci.localcontext.LocalContextService
@@ -126,6 +134,12 @@ func NewLocalContextServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(localContextServiceSetNewsTickerEnabledMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getHereBrief: connect.NewClient[localcontext.GetHereBriefRequest, localcontext.HereBrief](
+			httpClient,
+			baseURL+LocalContextServiceGetHereBriefProcedure,
+			connect.WithSchema(localContextServiceGetHereBriefMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -137,6 +151,7 @@ type localContextServiceClient struct {
 	estimateDriveCost    *connect.Client[localcontext.EstimateDriveCostRequest, localcontext.EstimateDriveCostResponse]
 	getNewsTicker        *connect.Client[localcontext.GetNewsTickerRequest, localcontext.GetNewsTickerResponse]
 	setNewsTickerEnabled *connect.Client[localcontext.SetNewsTickerEnabledRequest, localcontext.SetNewsTickerEnabledResponse]
+	getHereBrief         *connect.Client[localcontext.GetHereBriefRequest, localcontext.HereBrief]
 }
 
 // GetLocalContext calls loci.localcontext.LocalContextService.GetLocalContext.
@@ -169,6 +184,11 @@ func (c *localContextServiceClient) SetNewsTickerEnabled(ctx context.Context, re
 	return c.setNewsTickerEnabled.CallUnary(ctx, req)
 }
 
+// GetHereBrief calls loci.localcontext.LocalContextService.GetHereBrief.
+func (c *localContextServiceClient) GetHereBrief(ctx context.Context, req *connect.Request[localcontext.GetHereBriefRequest]) (*connect.Response[localcontext.HereBrief], error) {
+	return c.getHereBrief.CallUnary(ctx, req)
+}
+
 // LocalContextServiceHandler is an implementation of the loci.localcontext.LocalContextService
 // service.
 type LocalContextServiceHandler interface {
@@ -184,6 +204,10 @@ type LocalContextServiceHandler interface {
 	GetNewsTicker(context.Context, *connect.Request[localcontext.GetNewsTickerRequest]) (*connect.Response[localcontext.GetNewsTickerResponse], error)
 	// SetNewsTickerEnabled is the per-user switch for that strip.
 	SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error)
+	// GetHereBrief describes the place the caller is standing in: its name,
+	// weather, alerts and three short headline lists. The RPC does not fail
+	// because one source did.
+	GetHereBrief(context.Context, *connect.Request[localcontext.GetHereBriefRequest]) (*connect.Response[localcontext.HereBrief], error)
 }
 
 // NewLocalContextServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -228,6 +252,12 @@ func NewLocalContextServiceHandler(svc LocalContextServiceHandler, opts ...conne
 		connect.WithSchema(localContextServiceSetNewsTickerEnabledMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	localContextServiceGetHereBriefHandler := connect.NewUnaryHandler(
+		LocalContextServiceGetHereBriefProcedure,
+		svc.GetHereBrief,
+		connect.WithSchema(localContextServiceGetHereBriefMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.localcontext.LocalContextService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case LocalContextServiceGetLocalContextProcedure:
@@ -242,6 +272,8 @@ func NewLocalContextServiceHandler(svc LocalContextServiceHandler, opts ...conne
 			localContextServiceGetNewsTickerHandler.ServeHTTP(w, r)
 		case LocalContextServiceSetNewsTickerEnabledProcedure:
 			localContextServiceSetNewsTickerEnabledHandler.ServeHTTP(w, r)
+		case LocalContextServiceGetHereBriefProcedure:
+			localContextServiceGetHereBriefHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -273,4 +305,8 @@ func (UnimplementedLocalContextServiceHandler) GetNewsTicker(context.Context, *c
 
 func (UnimplementedLocalContextServiceHandler) SetNewsTickerEnabled(context.Context, *connect.Request[localcontext.SetNewsTickerEnabledRequest]) (*connect.Response[localcontext.SetNewsTickerEnabledResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.SetNewsTickerEnabled is not implemented"))
+}
+
+func (UnimplementedLocalContextServiceHandler) GetHereBrief(context.Context, *connect.Request[localcontext.GetHereBriefRequest]) (*connect.Response[localcontext.HereBrief], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.localcontext.LocalContextService.GetHereBrief is not implemented"))
 }
