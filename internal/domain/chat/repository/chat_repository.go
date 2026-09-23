@@ -395,9 +395,7 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 		if itineraryID != uuid.Nil {
 			var pois []locitypes.POIDetailedInfo
 			// Only parse POIs for itinerary/general responses, skip for domain-specific responses
-			if strings.Contains(interaction.Prompt, "Unified Chat - Domain: dining") ||
-				strings.Contains(interaction.Prompt, "Unified Chat - Domain: accommodation") ||
-				strings.Contains(interaction.Prompt, "Unified Chat - Domain: activities") {
+			if domainListPromptRE.MatchString(interaction.Prompt) {
 				// Skip POI parsing for domain-specific responses that don't contain POIs
 				r.logger.DebugContext(ctx, "Skipping POI parsing for domain-specific response", "interaction_id", interactionID.String())
 				span.AddEvent("Skipped POI parsing for domain-specific response")
@@ -1797,7 +1795,72 @@ func (r *RepositoryImpl) GetPOIsBySessionSortedByDistance(
 // 	// SessionIDInsideData string `json:"session_id,omitempty"`
 // }
 
+// domainListPromptRE marks the interactions whose answer is a hotel,
+// restaurant or activity list rather than places for an itinerary. The prompt
+// wrapper has read "Unified Chat Stream - Domain: …" since the parallel
+// generator landed; the old "Unified Chat - Domain: …" substring never matched
+// it, so every hotel list was being parsed into itinerary_pois.
+var domainListPromptRE = regexp.MustCompile(`(?i)Domain:\s*(dining|accommodation|activities)\b`)
+
+// parsePOIsFromResponse collects the places a stored response text holds. A
+// multi-part response is parsed one part at a time; each part may be the
+// unified {"data": …} shape, an AiCityResponse, a loose collection, a single
+// place, or places joined by commas without the enclosing brackets.
+//
+// CleanJSON strips a "[part]" header only at the very start of a text, so a
+// multi-part blob fed to it whole came back as "{…}\n[general_pois]\n{…}" and
+// failed at the '['; hence one section at a time (splitResponseSections, the
+// same splitter the chat history uses).
 func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
+	sections := splitResponseSections(responseText)
+	if sections == nil {
+		return parsePOISection(responseText, logger)
+	}
+	var all []locitypes.POIDetailedInfo
+	for _, tag := range responseSectionOrder {
+		section, ok := sections[tag]
+		if !ok || section == "" {
+			continue
+		}
+		pois, err := parsePOISection(section, logger)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, pois...)
+	}
+	if all == nil {
+		all = []locitypes.POIDetailedInfo{}
+	}
+	return all, nil
+}
+
+// looksLikeJSON says whether a cleaned response could be JSON at all. Plain
+// text ("Processed itinerary request for Rome", a status line persistResults
+// stores when no part produced anything) is not a parse failure.
+func looksLikeJSON(cleaned string) bool {
+	return strings.HasPrefix(cleaned, "{") || strings.HasPrefix(cleaned, "[")
+}
+
+// parseCommaJoinedPOIs handles "{…},{…},{…}": places serialised one after
+// another without the array brackets. Wrapping them restores the array.
+func parseCommaJoinedPOIs(cleaned string) ([]locitypes.POIDetailedInfo, bool) {
+	if !strings.HasPrefix(cleaned, "{") || !strings.HasSuffix(cleaned, "}") {
+		return nil, false
+	}
+	var pois []locitypes.POIDetailedInfo
+	if err := json.Unmarshal([]byte("["+cleaned+"]"), &pois); err != nil {
+		return nil, false
+	}
+	var named []locitypes.POIDetailedInfo
+	for _, p := range pois {
+		if p.Name != "" {
+			named = append(named, p)
+		}
+	}
+	return named, len(named) > 0
+}
+
+func parsePOISection(responseText string, logger *slog.Logger) ([]locitypes.POIDetailedInfo, error) {
 	cleanedResponse := generativeAI.CleanJSON(responseText)
 
 	// An empty result (e.g. a bare "null" or a "[section]\nnull" blob) carries
@@ -1881,6 +1944,19 @@ func parsePOIsFromResponse(responseText string, logger *slog.Logger) ([]locitype
 	if err == nil && singlePOI.Name != "" {
 		logger.Debug("parsePOIsFromResponse: Parsed as single POI", "poiName", singlePOI.Name)
 		return []locitypes.POIDetailedInfo{singlePOI}, nil
+	}
+
+	// Fourth, places joined by commas with no enclosing array.
+	if pois, ok := parseCommaJoinedPOIs(cleanedResponse); ok {
+		logger.Debug("parsePOIsFromResponse: Parsed as comma-joined places", "poiCount", len(pois))
+		return pois, nil
+	}
+
+	// Plain text was never going to parse; say so at debug level only.
+	if !looksLikeJSON(cleanedResponse) {
+		logger.Debug("parsePOIsFromResponse: response is not JSON, no POIs to parse",
+			"responsePreview", cleanedResponse[:min(80, len(cleanedResponse))])
+		return []locitypes.POIDetailedInfo{}, nil
 	}
 
 	// If all fail, log the error and return empty
