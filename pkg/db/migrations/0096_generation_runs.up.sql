@@ -22,6 +22,9 @@ CREATE INDEX IF NOT EXISTS generation_runs_user_running_idx
     ON generation_runs (user_id, started_at) WHERE status = 'running';
 CREATE INDEX IF NOT EXISTS generation_runs_session_idx
     ON generation_runs (session_id, started_at DESC);
+-- The partial index above only covers running rows; ON DELETE CASCADE from
+-- users needs every row of a user, or deleting an account scans the table.
+CREATE INDEX IF NOT EXISTS generation_runs_user_idx ON generation_runs (user_id);
 -- +goose StatementEnd
 
 -- +goose Down
