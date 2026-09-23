@@ -28,9 +28,15 @@ var nouns = map[string]string{
 }
 
 func BuildPayload(run runs.Run) Payload {
-	noun, ok := nouns[run.Domain]
-	if !ok {
+	// Every mapped noun is plural ("hotels are ready"); the itinerary
+	// fallback is the one singular.
+	noun, plural := nouns[run.Domain]
+	if !plural {
 		noun = "itinerary"
+	}
+	verb := "is"
+	if plural {
+		verb = "are"
 	}
 	subject := strings.TrimSpace(run.CityName + " " + noun)
 	path, routeType, _ := runs.ResultPath(run.Domain, run.SessionID, run.CityName, uuid.Nil)
@@ -41,7 +47,7 @@ func BuildPayload(run runs.Run) Payload {
 		URL:       path,
 	}
 	if run.Status == runs.StatusDone {
-		p.Status, p.Title, p.Body = "done", "Your "+subject+" is ready", "Tap to open it."
+		p.Status, p.Title, p.Body = "done", "Your "+subject+" "+verb+" ready", "Tap to open it."
 	} else {
 		p.Status, p.Title, p.Body = "failed", "Your "+subject+" didn't finish", "Tap to try again."
 	}

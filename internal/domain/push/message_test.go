@@ -22,7 +22,13 @@ func TestBuildPayload(t *testing.T) {
 	require.Equal(t, "Tap to try again.", p.Body)
 	require.Equal(t, "failed", p.Status)
 
-	for domain, noun := range map[string]string{"general": "itinerary", "activities": "activities", "dining": "restaurants", "nearby": "nearby places"} {
-		require.Equal(t, "Your Lisbon "+noun+" is ready", BuildPayload(runs.Run{SessionID: sid, Domain: domain, CityName: "Lisbon", Status: runs.StatusDone}).Title)
+	for domain, want := range map[string]string{
+		"general":       "Your Lisbon itinerary is ready",
+		"accommodation": "Your Lisbon hotels are ready",
+		"activities":    "Your Lisbon activities are ready",
+		"dining":        "Your Lisbon restaurants are ready",
+		"nearby":        "Your Lisbon nearby places are ready",
+	} {
+		require.Equal(t, want, BuildPayload(runs.Run{SessionID: sid, Domain: domain, CityName: "Lisbon", Status: runs.StatusDone}).Title, domain)
 	}
 }
