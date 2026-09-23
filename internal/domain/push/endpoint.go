@@ -9,7 +9,7 @@ import (
 // PushSubscription.endpoint can legitimately point at. Anything else,
 // including a lookalike suffix or an in-cluster hostname, is refused: a
 // signed-in user could otherwise register an internal address here and have
-// Task 10's sender POST to it on their behalf, which is an SSRF from inside
+// the push sender POST to it on their behalf, which is an SSRF from inside
 // the auth boundary rather than outside it.
 var webPushAllowedHosts = map[string]bool{
 	"fcm.googleapis.com":                true,
@@ -28,9 +28,9 @@ var webPushAllowedSuffixes = []string{
 
 // ValidWebPushEndpoint reports whether raw is an https URL, with no
 // credentials embedded, whose host (port stripped, case-insensitively) is
-// one of the known push-service origins. It is deliberately exported so
-// Task 10's sender can call it again as defence in depth before it ever
-// dials an endpoint pulled back out of the database.
+// one of the known push-service origins. The notifier calls it again as
+// defence in depth before it ever dials an endpoint pulled back out of the
+// database.
 func ValidWebPushEndpoint(raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
