@@ -25,11 +25,11 @@
 
 ## Review Focus
 
-1. **Aggregator echoes a different `feed_url` than we sent** (re-encoded query) → every item is dropped and all three lists come back empty. Pin: the service test asserts that items come back split, using the exact URLs `hereFeeds` produced (Task A3).
-2. **Place with a region but no locality** (rural coordinates) → the lists must still be populated from the region. Pin: `TestHereFeedsRegionOnly` (Task A2).
-3. **News switched off in Settings** → weather and place still show and the lists are empty; the band must not disappear entirely. Pin: `TestHereNewsRespectsSwitch` (Task A3) plus the web mapping test (Task A6).
-4. **Location permission denied on iOS** → the section is hidden and there is no prompt from Discover. Pin: `HereBriefSection` only calls `CurrentLocation.fetch` when `authorizationStatus` is already authorized (Task A8).
-5. **Geocoder down** → weather still returns and no RPC error. Pin: `TestGetHereBriefDegradesPerPart` (Task A4).
+1. **Aggregator echoes a different `feed_url` than we sent** (re-encoded query) → every item is dropped and all three lists come back empty. Pin: the service test asserts that items come back split, using the exact URLs `hereFeeds` produced (Task 3).
+2. **Place with a region but no locality** (rural coordinates) → the lists must still be populated from the region. Pin: `TestHereFeedsRegionOnly` (Task 2).
+3. **News switched off in Settings** → weather and place still show and the lists are empty; the band must not disappear entirely. Pin: `TestHereNewsRespectsSwitch` (Task 3) plus the web mapping test (Task 6).
+4. **Location permission denied on iOS** → the section is hidden and there is no prompt from Discover. Pin: `HereBriefSection` only calls `CurrentLocation.fetch` when `authorizationStatus` is already authorized (Task 8).
+5. **Geocoder down** → weather still returns and no RPC error. Pin: `TestGetHereBriefDegradesPerPart` (Task 4).
 
 ---
 
@@ -63,7 +63,7 @@ Working directories:
 
 ---
 
-### Task A1: Proto contract + release
+### Task 1: Proto contract + release
 
 **Files:**
 - Modify: `loci-connect-proto/proto/loci/localcontext/localcontext.proto` (messages after `GetNewsTickerResponse`, rpc in `service LocalContextService`)
@@ -157,7 +157,7 @@ git show v5.23.0:proto/loci/localcontext/localcontext.proto | grep -c GetHereBri
 
 ---
 
-### Task A2: Server — place resolver and feed builder (pure parts)
+### Task 2: Server — place resolver and feed builder (pure parts)
 
 **Files:**
 - Modify: `internal/domain/localcontext/geocode.go`
@@ -478,7 +478,7 @@ git commit -m "Name the town a coordinate sits in and build here-brief feeds"
 
 ---
 
-### Task A3: Server — here news service (fetch, split, dedupe, switch, cache)
+### Task 3: Server — here news service (fetch, split, dedupe, switch, cache)
 
 **Files:**
 - Modify: `internal/domain/localcontext/here_news.go`
@@ -684,7 +684,7 @@ git commit -m "Fetch here-brief headlines in one aggregator call"
 
 ---
 
-### Task A4: Server — `GetHereBrief` handler + wiring
+### Task 4: Server — `GetHereBrief` handler + wiring
 
 **Files:**
 - Create: `internal/domain/localcontext/here_brief_handler.go`
@@ -983,7 +983,7 @@ gh pr create --fill --base main
 
 ---
 
-### Task A5: Server deploy + prod proof
+### Task 5: Server deploy + prod proof
 
 - [ ] **Step 1:** The user merges the server PR. Wait for CD to build the image.
 - [ ] **Step 2: Promote.** The CD promote step is a no-op that reports success, so open the promote PR by hand in `~/Work/production/platform/infra`: bump the `loci-api` image tag in `apps/loci/api` to the new commit's tag. First verify that the tag's image contains the commit. The user merges it.
@@ -996,11 +996,11 @@ curl -s -X POST https://api.lociai.fyi/loci.localcontext.LocalContextService/Get
 
 Expected: `"code":"unauthenticated"`. `unimplemented` means the old image is still serving.
 
-- [ ] **Step 4: Signed-in call.** The user runs the same call with their bearer token, or checks it through the web band after Task A7. Expected: `place.locality` is non-empty and at least one of `local`/`disruption`/`whatsOn` is non-empty.
+- [ ] **Step 4: Signed-in call.** The user runs the same call with their bearer token, or checks it through the web band after Task 7. Expected: `place.locality` is non-empty and at least one of `local`/`disruption`/`whatsOn` is non-empty.
 
 ---
 
-### Task A6: Web — data hook
+### Task 6: Web — data hook
 
 **Files:**
 - Create: `loci-client/src/lib/api/hereBrief.ts`
@@ -1020,7 +1020,7 @@ pnpm buf-update   # moves @buf/loci_loci-proto.bufbuild_es to the latest BSR com
 grep -rn "GetHereBriefRequestSchema" node_modules/@buf/loci_loci-proto.bufbuild_es/loci/localcontext/localcontext_pb.d.ts | head -1
 ```
 
-Expected: one match. If not, the BSR push in Task A1 did not happen.
+Expected: one match. If not, the BSR push in Task 1 did not happen.
 
 - [ ] **Step 2: Failing test** — `hereBrief.test.ts`
 
@@ -1209,7 +1209,7 @@ git commit -m "Add useHereBrief for the place the traveller is standing in"
 
 ---
 
-### Task A7: Web — Here now band + hero kicker
+### Task 7: Web — Here now band + hero kicker
 
 **Files:**
 - Create: `loci-client/src/components/features/Dashboard/HereNowBand.tsx`
@@ -1379,7 +1379,7 @@ pnpm exec oxfmt src/lib/api/hereBrief.ts src/lib/api/hereBrief.test.ts src/compo
 
 Expected: all green. Formatting touches only these files.
 
-- [ ] **Step 6: Visual check.** Run `pnpm dev` against the prod API (after Task A5) and sign in. Check at 390px and at desktop width, in light and dark:
+- [ ] **Step 6: Visual check.** Run `pnpm dev` against the prod API (after Task 5) and sign in. Check at 390px and at desktop width, in light and dark:
   - the band shows under the hero
   - the kicker reads `<town> · 41.69° N 8.83° W`
   - with browser location blocked, the band is absent and the kicker falls back to "Plan"
@@ -1398,7 +1398,7 @@ After the user merges: grep the live bundle for `api.lociai.fyi` (not `localhost
 
 ---
 
-### Task A8: iOS — Here brief section
+### Task 8: iOS — Here brief section
 
 **Files:**
 - Create: `loci-ios/loci/loci/Features/Discover/UI/HereBriefSection.swift`
@@ -1408,7 +1408,7 @@ After the user merges: grep the live bundle for `api.lociai.fyi` (not `localhost
 - Consumes: `SettingsClients.localContext` (`Loci_Localcontext_LocalContextServiceClient`), `CurrentLocation.fetch()`, `Loci_Localcontext_HereBrief`, theme tokens `Color.lociInk`, `.lociForest`, `.lociCard`, `.lociBorder`, fonts `.lociHeadline()`, `.lociCaption(_:)`, `.lociBody()`, `LociTheme.cornerRadius`.
 - Produces: `@Observable final class HereBriefModel { var brief: Loci_Localcontext_HereBrief?; var placeName: String; func load() async }`; `struct HereBriefSection: View { let model: HereBriefModel }`.
 
-iOS takes the proto from the sibling checkout (`relativePath = "../../loci-connect-proto"`). After Task A1, make sure that checkout is on `main` at the tagged commit so `gen/swift` has `GetHereBrief`.
+iOS takes the proto from the sibling checkout (`relativePath = "../../loci-connect-proto"`). After Task 1, make sure that checkout is on `main` at the tagged commit so `gen/swift` has `GetHereBrief`.
 
 - [ ] **Step 1: Branch** (base on `origin/main`; do not stack on `feat/ios-nearby-walk` or the peer's `feat/ios-results-parity`)
 
@@ -1671,4 +1671,4 @@ Use the account you added as a Google test user.
 
 Part B's console steps (B1, B2) are yours and don't depend on anything, so start them in parallel with Part A. B3 needs B2. B4 needs B1 and B3.
 
-Part A: A1 → (user merge + tag) → A2 → A3 → A4 → (user merge) → A5 → A6 → A7 → A8. A6–A8 need A5 deployed before their visual checks, but A6/A7 code can be written against the BSR package as soon as A1 is pushed.
+Part A: 1 → (user merge + tag) → 2 → 3 → 4 → (user merge) → 5 → 6 → 7 → 8. 6–8 need A5 deployed before their visual checks, but 6/7 code can be written against the BSR package as soon as A1 is pushed.

@@ -169,6 +169,16 @@ func (g *Gatherer) CountryResolver() CountryResolver {
 	return g.country
 }
 
+// PlaceResolver exposes the shared geocoder for town-level naming, when the
+// configured resolver supports it. Nil-safe like CountryResolver.
+func (g *Gatherer) PlaceResolver() PlaceResolver {
+	if g == nil {
+		return nil
+	}
+	pr, _ := g.country.(PlaceResolver)
+	return pr
+}
+
 // Enabled reports whether there is anything to gather. Callers use it to skip
 // the country lookup entirely when no sources are configured.
 func (g *Gatherer) Enabled() bool {

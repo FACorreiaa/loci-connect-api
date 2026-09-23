@@ -108,3 +108,30 @@ func TestGeocoder_UpstreamFailureIsAnError(t *testing.T) {
 func TestGeocoder_ImplementsCountryResolver(t *testing.T) {
 	var _ CountryResolver = NewBigDataCloudGeocoder("", httpx.New(httpx.Config{}), nil)
 }
+
+func TestGeocoder_Place(t *testing.T) {
+	g, hits := geocoder(t, `{"countryCode":"PT","countryName":"Portugal","city":"Viana do Castelo","locality":"Santa Maria Maior","principalSubdivision":"Viana do Castelo District"}`, http.StatusOK)
+
+	p, err := g.Place(context.Background(), 41.69, -8.83)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Place{Locality: "Viana do Castelo", Region: "Viana do Castelo District", CountryCode: "PT", CountryName: "Portugal"}
+	if p != want {
+		t.Errorf("place = %+v, want %+v", p, want)
+	}
+	if _, err := g.Place(context.Background(), 41.69, -8.83); err != nil || atomic.LoadInt64(hits) != 1 {
+		t.Errorf("second lookup should be cached: hits=%d err=%v", atomic.LoadInt64(hits), err)
+	}
+	if _, err := g.Place(context.Background(), 41.79, -8.83); err != nil || atomic.LoadInt64(hits) != 2 {
+		t.Errorf("0.1° away is another town key: hits=%d", atomic.LoadInt64(hits))
+	}
+}
+
+func TestGeocoder_PlaceFallsBackToLocality(t *testing.T) {
+	g, _ := geocoder(t, `{"countryCode":"pt","countryName":"Portugal","city":"","locality":"Afife","principalSubdivision":""}`, http.StatusOK)
+	p, err := g.Place(context.Background(), 41.77, -8.86)
+	if err != nil || p.Locality != "Afife" || p.CountryCode != "PT" {
+		t.Errorf("place = %+v err=%v", p, err)
+	}
+}
