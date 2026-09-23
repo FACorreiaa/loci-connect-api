@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/google/uuid"
@@ -54,6 +55,7 @@ type PlanStop struct {
 // every stop, and coordinates on all of them, because a stop without
 // coordinates draws nothing on the map and publish refuses the pack.
 func Prompt(s Seed) string {
+	start, end := DayWindow(s.Theme)
 	return fmt.Sprintf(`You are writing a curated %d-day travel guide for %s, themed around %s.
 
 Return ONLY JSON matching this shape, with no prose around it:
@@ -74,7 +76,7 @@ Return ONLY JSON matching this shape, with no prose around it:
           "address": "street address",
           "website": "https://... or empty string",
           "notes": "why this stop is in this guide, and what to do there",
-          "start_minute": 540,
+          "start_minute": %d,
           "duration_minutes": 90
         }
       ]
@@ -86,10 +88,10 @@ Rules:
 - Exactly %d days, numbered 1 to %d.
 - Four to six stops a day, in the order they should be visited.
 - Every stop must be a real, currently-open place in %s with accurate coordinates.
-- start_minute is minutes from midnight; keep a day between 09:00 and 22:00 and leave travel time between stops.
+- start_minute is minutes from midnight; every stop starts between %s and %s, and leaves travel time after the stop before it.
 - notes is the reason this place earns its spot. It is what somebody is paying for, so make it specific rather than generic praise.
 - Prefer places that suit %s and the season implied by "%s".`,
-		s.Days, s.City, s.Theme, s.Days, s.Days, s.City, s.Theme, s.Hook)
+		s.Days, s.City, s.Theme, start, s.Days, s.Days, s.City, clock(start), clock(end), s.Theme, s.Hook)
 }
 
 // ParsePlan reads the model's answer, tolerating the fenced code block models
@@ -117,7 +119,26 @@ func ParsePlan(raw string) (Plan, error) {
 	if len(p.Days) == 0 {
 		return Plan{}, fmt.Errorf("plan has no days")
 	}
+	unescape(&p)
 	return p, nil
+}
+
+// unescape undoes HTML entities some models put in plain JSON strings. The
+// text is stored and rendered as text, so "&amp;" reached the page literally.
+func unescape(p *Plan) {
+	p.Summary = html.UnescapeString(p.Summary)
+	for i := range p.Days {
+		d := &p.Days[i]
+		d.Title = html.UnescapeString(d.Title)
+		d.Summary = html.UnescapeString(d.Summary)
+		for j := range d.Stops {
+			st := &d.Stops[j]
+			st.Name = html.UnescapeString(st.Name)
+			st.Description = html.UnescapeString(st.Description)
+			st.Address = html.UnescapeString(st.Address)
+			st.Notes = html.UnescapeString(st.Notes)
+		}
+	}
 }
 
 // ToDraft converts a generated plan into the rows a draft is made of.

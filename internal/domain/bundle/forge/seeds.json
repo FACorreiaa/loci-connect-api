@@ -95,7 +95,6 @@
     "city": "Valencia",
     "country_code": "ES",
     "months": [
-      2,
       3
     ],
     "hook": "Las Fallas",
@@ -231,9 +230,7 @@
     "city": "Istanbul",
     "country_code": "TR",
     "months": [
-      4,
-      5,
-      10
+      4
     ],
     "hook": "the tulip festival",
     "days": 3,
@@ -265,7 +262,6 @@
     "city": "Porto",
     "country_code": "PT",
     "months": [
-      5,
       6
     ],
     "hook": "São João",
@@ -412,6 +408,7 @@
     "city": "Salzburg",
     "country_code": "AT",
     "months": [
+      7,
       8
     ],
     "hook": "the summer festival",
@@ -422,8 +419,7 @@
     "city": "San Sebastián",
     "country_code": "ES",
     "months": [
-      8,
-      9
+      8
     ],
     "hook": "Semana Grande and pintxos",
     "days": 3,
@@ -498,6 +494,7 @@
     "city": "Douro Valley",
     "country_code": "PT",
     "months": [
+      9,
       10
     ],
     "hook": "the grape harvest",
@@ -571,6 +568,7 @@
     "city": "Vienna",
     "country_code": "AT",
     "months": [
+      11,
       12
     ],
     "hook": "the Christmas markets",
@@ -581,6 +579,7 @@
     "city": "Strasbourg",
     "country_code": "FR",
     "months": [
+      11,
       12
     ],
     "hook": "the Christmas market",
