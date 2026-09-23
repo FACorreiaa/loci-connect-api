@@ -15,8 +15,15 @@ RUN curl -s https://packagecloud.io/install/repositories/timescale/timescaledb/s
 # Download and extract latest pgvector (0.8.2)
 RUN curl -L https://github.com/pgvector/pgvector/archive/refs/tags/v0.8.2.tar.gz | tar xz -C /tmp
 
-# Build and install pgvector
-RUN cd /tmp/pgvector-0.8.2 && make && make install
+# Build and install pgvector.
+#
+# pgvector's Makefile defaults to OPTFLAGS=-march=native, which bakes the
+# GitHub runner's CPU into vector.so. A build that landed on a Sapphire
+# Rapids runner shipped AVX-512 code, and on the cluster's AMD EPYC Rome
+# (AVX2, no AVX-512) every `<=>` query killed its backend with SIGILL and
+# took Postgres into recovery. x86-64-v3 is AVX2+FMA: what the node has, and
+# what pgvector's own release packages target.
+RUN cd /tmp/pgvector-0.8.2 && make OPTFLAGS="-march=x86-64-v3" && make install
 
 # Clean up
 RUN rm -rf /tmp/pgvector-0.8.2 && rm -rf /var/lib/apt/lists/*
