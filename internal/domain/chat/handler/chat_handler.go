@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -651,7 +653,18 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 	case locitypes.EventTypeChunk, "poi_detail_chunk":
 		var cd locitypes.StreamChunkData
 		decodeData(event.Data, &cd)
-		resp.Payload = &chatv1.StreamEvent_Token{Token: &chatv1.TokenPayload{Text: cd.Text}}
+		token := &chatv1.TokenPayload{Text: cd.Text}
+		// Three workers stream into one channel; without the part a client
+		// cannot tell whose text a chunk is, which is why no client renders
+		// tokens today.
+		if data, ok := event.Data.(map[string]any); ok {
+			if part, ok := data["part"].(string); ok {
+				if index, known := tokenPartIndex[part]; known {
+					token.Part = proto.Int32(index)
+				}
+			}
+		}
+		resp.Payload = &chatv1.StreamEvent_Token{Token: token}
 
 	default:
 		// progress + developer/status events (session_validated, intent_classified,
@@ -1096,4 +1109,15 @@ func (h *ChatHandler) GetRunStatus(
 	}
 
 	return connect.NewResponse(&chatv1.GetRunStatusResponse{Runs: runs.StatusesToProto(found)}), nil
+}
+
+// tokenPartIndex maps a generation part to TokenPayload.part, "the producing
+// worker". Fixed so clients can rely on the numbers.
+var tokenPartIndex = map[string]int32{
+	"city_data":    0,
+	"general_pois": 1,
+	"itinerary":    2,
+	"hotels":       3,
+	"restaurants":  4,
+	"activities":   5,
 }
