@@ -82,3 +82,31 @@ func TestUpsertRemoveAndRemoveEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, devicesA)
 }
+
+// An endpoint registered on one platform cannot be taken over by a
+// registration for another: the conflicting upsert changes nothing.
+func TestUpsertDoesNotCrossPlatforms(t *testing.T) {
+	pool := testPool(t)
+	s := NewPostgresDeviceStore(pool)
+	ctx := context.Background()
+
+	userA := seedUser(t, pool)
+	userB := seedUser(t, pool)
+	endpoint := "https://push.example.test/" + uuid.New().String()
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM push_devices WHERE endpoint = $1`, endpoint)
+	})
+
+	require.NoError(t, s.Upsert(ctx, userA, "web_push", endpoint, "p256dh-a", "auth-a", "agent-a"))
+	require.NoError(t, s.Upsert(ctx, userB, "apns", endpoint, "", "", "agent-b"))
+
+	devicesA, err := s.ForUser(ctx, userA, "web_push")
+	require.NoError(t, err)
+	require.Len(t, devicesA, 1, "the web_push row still belongs to A")
+	require.Equal(t, "p256dh-a", devicesA[0].P256dh)
+	require.Equal(t, "auth-a", devicesA[0].Auth)
+
+	devicesB, err := s.ForUser(ctx, userB, "apns")
+	require.NoError(t, err)
+	require.Empty(t, devicesB)
+}

@@ -40,7 +40,8 @@ func (s *PostgresDeviceStore) Upsert(ctx context.Context, userID uuid.UUID, plat
 		ON CONFLICT (endpoint) DO UPDATE SET
 			user_id = EXCLUDED.user_id, platform = EXCLUDED.platform,
 			p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
-			user_agent = EXCLUDED.user_agent, last_seen_at = NOW()`,
+			user_agent = EXCLUDED.user_agent, last_seen_at = NOW()
+		WHERE push_devices.platform = EXCLUDED.platform`,
 		userID, platform, endpoint, p256dh, auth, userAgent)
 	if err != nil {
 		return fmt.Errorf("upsert push device: %w", err)
