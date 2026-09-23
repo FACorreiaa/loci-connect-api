@@ -1242,7 +1242,7 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 			EngagementLevel:       engagementLevel,
 		}
 
-		sessionID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(row.SessionKey))
+		sessionID := sessionIDForKey(row.SessionKey)
 		session := locitypes.ChatSession{
 			ID:                  sessionID,
 			UserID:              row.UserID,
@@ -2143,4 +2143,17 @@ func (r *RepositoryImpl) GetFeaturedCollections(_ context.Context, limit int) ([
 
 	r.logger.Info("Retrieved featured collections", slog.Int("count", len(collections)))
 	return collections, nil
+}
+
+// sessionIDForKey turns a grouped session key back into the id a client can
+// open. A real session id comes back as itself; before this, every key was
+// hashed into a v5 UUID, so nothing GetChatSessions listed could be found by
+// GetChatSession (the web /itinerary page and the iOS Ask Loci list both
+// got "session not found" for every past session). Only the synthesized
+// "city_date" keys for interactions with no session are hashed.
+func sessionIDForKey(key string) uuid.UUID {
+	if id, err := uuid.Parse(key); err == nil {
+		return id
+	}
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(key))
 }
