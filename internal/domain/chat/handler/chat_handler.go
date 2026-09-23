@@ -174,49 +174,61 @@ func (h *ChatHandler) StreamChat(
 		TripID:             tripID,
 	}
 
-	// bufSessionID keys the resume buffer. Known up front for a resume/continue
-	// (client sent session_id); for a fresh stream it's captured from the start
-	// event below once the server mints the session.
+	// bufSessionID keys the resume buffer. The start event names the session
+	// the pipeline actually chose, and record always takes it from there. A
+	// requested session_id is only adopted up front when there is no run store
+	// to check ownership against (the old behaviour); with one, an owned
+	// resume never reaches the generation below, so a fresh stream must not
+	// write into a buffer keyed by someone else's id before the pipeline has
+	// refused it.
 	bufSessionID := ""
-	if requestedSessionID != uuid.Nil {
+	if requestedSessionID != uuid.Nil && h.runs == nil {
 		bufSessionID = requestedSessionID.String()
 	}
 
 	// Resume path: replay what the client missed, then follow the run live until
 	// its terminal event instead of re-running the LLM. The original generation
 	// goroutine keeps buffering after a disconnect, so the buffer holds events
-	// produced while the client was gone and keeps receiving new ones. With no
-	// buffer (evicted, or another pod) a finished run points the client at its
-	// stored result; otherwise we fall through to a fresh generation
-	// (session_id honored).
-	if cc.ResumeToken != "" && bufSessionID != "" {
-		if h.resumeBuf != nil {
-			if handled, rErr := h.followResume(ctx, stream, userID, requestedSessionID, bufSessionID, cc.ResumeToken); handled {
-				llmCancel()
-				return rErr
-			}
-		}
-		if run, found := h.finishedRun(ctx, userID, requestedSessionID); found {
+	// produced while the client was gone and keeps receiving new ones.
+	if cc.ResumeToken != "" && requestedSessionID != uuid.Nil {
+		if handled, rErr := h.resume(ctx, stream, userID, requestedSessionID, cc.ResumeToken); handled {
 			llmCancel()
-			return h.sendLoadFromSession(stream, run)
+			return rErr
 		}
 	}
 
 	var tracker *runs.Tracker
-	if res, ok := runs.ReservationFrom(ctx); ok && h.runs != nil {
-		res.Claim()
-		tracker = runs.NewTracker(h.runs, res.RunID, h.onRunFinish, h.logger)
+	if h.runs != nil {
+		if res, ok := runs.ReservationFrom(ctx); ok {
+			res.Claim()
+			tracker = runs.NewTracker(h.runs, res.RunID, h.onRunFinish, h.logger)
+		} else if cc.ResumeToken != "" {
+			// The cap interceptor lets every resume through, but this one is
+			// about to generate: hold it to the same cap, and track it like
+			// any other run so its row finishes and its owner hears about it.
+			runID, rErr := h.runs.Reserve(ctx, userID)
+			switch {
+			case errors.Is(rErr, runs.ErrAtCapacity):
+				llmCancel()
+				return connect.NewError(connect.CodeResourceExhausted, errors.New(runs.CapMessage)) //nolint:staticcheck // ST1005: user-facing copy
+			case rErr != nil:
+				// Same fail-open rule as the interceptor: a DB hiccup must
+				// not cost someone their search.
+				h.logger.Error("run reservation failed; serving uncapped", "error", rErr)
+			default:
+				tracker = runs.NewTracker(h.runs, runID, h.onRunFinish, h.logger)
+			}
+		}
 	}
 
 	// record observes each live event for the run tracker, then buffers it for
-	// future resume, capturing the minted session id from the start event when
-	// we didn't already know it.
+	// future resume under the session the start event names.
 	record := func(ev locitypes.StreamEvent) {
 		tracker.Observe(ev)
 		if h.resumeBuf == nil {
 			return
 		}
-		if bufSessionID == "" && ev.Type == locitypes.EventTypeStart {
+		if ev.Type == locitypes.EventTypeStart {
 			var sd locitypes.StreamStartData
 			if decodeData(ev.Data, &sd) && sd.SessionID != "" {
 				bufSessionID = sd.SessionID
@@ -335,6 +347,61 @@ func (h *ChatHandler) toConnectError(err error) error {
 	}
 }
 
+// resume answers a resume_token request without generating. handled is false
+// when the caller should fall through to a fresh generation instead.
+//
+// With a run store, the session must have a run owned by the caller before the
+// buffer is touched; otherwise anyone holding a session id could follow
+// another person's stream. An owned session is always answered here: from the
+// buffer, from the stored result once the run has ended, or with a retryable
+// resume_lost while it is still running elsewhere (another pod, or before a
+// restart) — regenerating would start a second, untracked run of the same turn.
+func (h *ChatHandler) resume(
+	ctx context.Context,
+	stream *connect.ServerStream[chatv1.StreamEvent],
+	userID, sessionID uuid.UUID,
+	token string,
+) (handled bool, err error) {
+	key := sessionID.String()
+	if h.runs == nil {
+		if h.resumeBuf != nil {
+			return h.followResume(ctx, stream, userID, sessionID, key, token)
+		}
+		return false, nil
+	}
+	if _, owned, fErr := h.runs.FindBySession(ctx, userID, sessionID); fErr != nil || !owned {
+		if fErr != nil {
+			h.logger.Warn("resume: ownership lookup failed; generating instead", "session_id", sessionID, "error", fErr)
+		}
+		return false, nil
+	}
+	if h.resumeBuf != nil {
+		if handled, rErr := h.followResume(ctx, stream, userID, sessionID, key, token); handled {
+			return true, rErr
+		}
+	}
+	if run, found := h.finishedRun(ctx, userID, sessionID); found {
+		return true, h.sendLoadFromSession(stream, run)
+	}
+	return true, sendResumeLost(stream)
+}
+
+// sendResumeLost tells a resuming client its run is still going but cannot be
+// followed from here, so it should retry or load the stored result later.
+func sendResumeLost(stream *connect.ServerStream[chatv1.StreamEvent]) error {
+	return stream.Send(&chatv1.StreamEvent{
+		Timestamp: timestamppb.Now(),
+		EventId:   uuid.NewString(),
+		IsFinal:   true,
+		EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
+		Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
+			UserMessage:  "This search is still running. Try again in a moment.",
+			InternalCode: "resume_lost",
+			Retryable:    true,
+		}},
+	})
+}
+
 // maxResubscribes bounds how often one resume re-attaches to the buffer after
 // its follower was closed without a terminal event (it fell behind, or the
 // session was dropped), so a pathological run cannot spin the handler.
@@ -421,17 +488,7 @@ func (h *ChatHandler) followResume(
 	if run, ok := h.finishedRun(ctx, userID, sessionID); ok {
 		return true, h.sendLoadFromSession(stream, run)
 	}
-	return true, stream.Send(&chatv1.StreamEvent{
-		Timestamp: timestamppb.Now(),
-		EventId:   uuid.NewString(),
-		IsFinal:   true,
-		EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
-		Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
-			UserMessage:  "This search is still running. Try again in a moment.",
-			InternalCode: "resume_lost",
-			Retryable:    true,
-		}},
-	})
+	return true, sendResumeLost(stream)
 }
 
 // finishedRun looks up the session's latest run and returns it when it has

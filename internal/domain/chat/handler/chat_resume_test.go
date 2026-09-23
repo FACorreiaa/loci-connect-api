@@ -301,3 +301,231 @@ func TestResumeFollowerDroppedNoRunStoreSaysRetry(t *testing.T) {
 	require.Len(t, got, 1)
 	require.Equal(t, "resume_lost", got[0].GetError().GetInternalCode())
 }
+
+// ownedRunStore is a run store with one run owned by owner. FindBySession
+// honours ownership the way the SQL does (WHERE user_id = $1).
+type ownedRunStore struct {
+	runs.Store
+	mu       sync.Mutex
+	owner    uuid.UUID
+	run      runs.Run
+	full     bool
+	reserved int
+	finished []runs.Status
+}
+
+func (s *ownedRunStore) FindBySession(_ context.Context, userID, sessionID uuid.UUID) (runs.Run, bool, error) {
+	if userID != s.owner || sessionID != s.run.SessionID {
+		return runs.Run{}, false, nil
+	}
+	return s.run, true, nil
+}
+
+func (s *ownedRunStore) Reserve(context.Context, uuid.UUID) (uuid.UUID, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.full {
+		return uuid.Nil, runs.ErrAtCapacity
+	}
+	s.reserved++
+	return uuid.New(), nil
+}
+
+func (s *ownedRunStore) Attach(context.Context, uuid.UUID, uuid.UUID, string, string) error {
+	return nil
+}
+
+func (s *ownedRunStore) Finish(_ context.Context, id uuid.UUID, st runs.Status, _ string) (runs.Run, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.finished = append(s.finished, st)
+	return runs.Run{ID: id, Status: st}, true, nil
+}
+
+func (s *ownedRunStore) snapshot() (int, []runs.Status) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reserved, append([]runs.Status(nil), s.finished...)
+}
+
+// scriptedService emits a fixed run of events, like a real pipeline would.
+type scriptedService struct {
+	service.LlmInteractiontService
+	events []locitypes.StreamEvent
+	mu     sync.Mutex
+	calls  int
+}
+
+func (s *scriptedService) ProcessUnifiedChatMessageStream(cc common.ChatContext) error {
+	s.mu.Lock()
+	s.calls++
+	s.mu.Unlock()
+	for _, ev := range s.events {
+		cc.EventCh <- ev
+	}
+	return nil
+}
+
+func (s *scriptedService) callCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls
+}
+
+func startEvent(id string, sid uuid.UUID) locitypes.StreamEvent {
+	return locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: id, Data: map[string]any{
+		"domain": "itinerary", "city": "Crete", "session_id": sid.String(),
+	}}
+}
+
+// clientAs serves h over httptest as the given user.
+func clientAs(t *testing.T, h *ChatHandler, userID uuid.UUID) chatconnect.ChatServiceClient {
+	t.Helper()
+	mux := http.NewServeMux()
+	path, handler := chatconnect.NewChatServiceHandler(h,
+		connect.WithInterceptors(claimsInjector{userID: userID.String()}))
+	mux.Handle(path, handler)
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return chatconnect.NewChatServiceClient(srv.Client(), srv.URL)
+}
+
+func receiveAll(t *testing.T, c chatconnect.ChatServiceClient, req *connect.Request[chatv1.ChatRequest]) ([]*chatv1.StreamEvent, error) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	stream, err := c.StreamChat(ctx, req)
+	require.NoError(t, err)
+	var got []*chatv1.StreamEvent
+	for stream.Receive() {
+		got = append(got, proto.Clone(stream.Msg()).(*chatv1.StreamEvent))
+	}
+	return got, stream.Err()
+}
+
+// A resume token skips the cap interceptor. When it cannot be answered from
+// the buffer (here: no session_id at all) it generates, so the handler must
+// hold it to the cap itself.
+func TestResumeFallingThroughIsCapped(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	store := &ownedRunStore{full: true}
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil).WithRuns(store, nil)
+
+	_, err := receiveAll(t, clientAs(t, h, uuid.New()), connect.NewRequest(&chatv1.ChatRequest{
+		Message:     "resume",
+		CityName:    proto.String("Crete"),
+		ResumeToken: proto.String("e1"),
+	}))
+	require.Error(t, err)
+	require.Equal(t, connect.CodeResourceExhausted, connect.CodeOf(err))
+	require.Contains(t, err.Error(), runs.CapMessage)
+}
+
+// A resume that falls through below the cap is reserved and tracked like any
+// other run, so its row finishes instead of being left for the stale sweep.
+func TestResumeFallingThroughIsTracked(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	store := &ownedRunStore{}
+	sid := uuid.New()
+	svc := &scriptedService{events: []locitypes.StreamEvent{
+		startEvent("s1", sid),
+		{Type: locitypes.EventTypeComplete, EventID: "s2", IsFinal: true},
+	}}
+	h := NewChatHandler(svc, logger, nil).WithRuns(store, nil)
+
+	got, err := receiveAll(t, clientAs(t, h, uuid.New()), connect.NewRequest(&chatv1.ChatRequest{
+		Message:     "resume",
+		CityName:    proto.String("Crete"),
+		ResumeToken: proto.String("e1"),
+	}))
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	require.Eventually(t, func() bool {
+		reserved, finished := store.snapshot()
+		return reserved == 1 && len(finished) == 1 && finished[0] == runs.StatusDone
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+// The buffer is gone (another pod, or a restart) but the caller's run is still
+// running: say so, rather than start a second, untracked run of the same turn.
+func TestResumeNoBufferRunStillRunningSaysResumeLost(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	owner, sid := uuid.New(), uuid.New()
+	store := &ownedRunStore{owner: owner, run: runs.Run{
+		UserID: owner, SessionID: sid, Status: runs.StatusRunning, Domain: "itinerary", CityName: "Crete",
+	}}
+	h := NewChatHandler(noGenerateService{t: t}, logger, nil).WithRuns(store, nil)
+	h.resumeBuf = resumebuf.New()
+
+	got, err := receiveAll(t, clientAs(t, h, owner), resumeRequest(sid, "e7"))
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR, got[0].GetEventType())
+	require.True(t, got[0].GetIsFinal())
+	require.True(t, got[0].GetError().GetRetryable())
+	require.Equal(t, "resume_lost", got[0].GetError().GetInternalCode())
+	reserved, _ := store.snapshot()
+	require.Zero(t, reserved, "an answered resume reserves nothing")
+}
+
+// Knowing someone's session id is not enough to follow their stream: the
+// resume falls through to the caller's own generation, and that generation
+// writes nothing into the other person's buffer.
+func TestResumeOfAnotherUsersSessionSeesNoneOfTheirEvents(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	victim, attacker := uuid.New(), uuid.New()
+	victimSID, ownSID := uuid.New(), uuid.New()
+	store := &ownedRunStore{owner: victim, run: runs.Run{
+		UserID: victim, SessionID: victimSID, Status: runs.StatusRunning,
+	}}
+	svc := &scriptedService{events: []locitypes.StreamEvent{
+		startEvent("own-start", ownSID),
+		{Type: locitypes.EventTypeComplete, EventID: "own-done", IsFinal: true},
+	}}
+	h := NewChatHandler(svc, logger, nil).WithRuns(store, nil)
+	h.resumeBuf = resumebuf.New()
+	h.resumeBuf.Append(victimSID.String(), locitypes.StreamEvent{Type: locitypes.EventTypeStart, EventID: "secret-1"})
+	h.resumeBuf.Append(victimSID.String(), locitypes.StreamEvent{Type: "token", EventID: "secret-2", Message: "private"})
+
+	got, err := receiveAll(t, clientAs(t, h, attacker), resumeRequest(victimSID, "secret-1"))
+	require.NoError(t, err)
+	var ids []string
+	for _, ev := range got {
+		ids = append(ids, ev.GetEventId())
+	}
+	require.Equal(t, []string{"own-start", "own-done"}, ids)
+	require.Equal(t, 1, svc.callCount())
+
+	victimEvents, ok := h.resumeBuf.Replay(victimSID.String(), "")
+	require.True(t, ok)
+	require.Len(t, victimEvents, 2, "the attacker's run must not append into the victim's buffer")
+	ownEvents, ok := h.resumeBuf.Replay(ownSID.String(), "")
+	require.True(t, ok)
+	require.Len(t, ownEvents, 2)
+}
+
+// The start event names the session the pipeline chose. When it differs from
+// the one requested (refused, so a new one was minted), the buffer follows it.
+func TestStartEventRekeysResumeBuffer(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	requested, minted := uuid.New(), uuid.New()
+	svc := &scriptedService{events: []locitypes.StreamEvent{
+		startEvent("m1", minted),
+		{Type: locitypes.EventTypeComplete, EventID: "m2", IsFinal: true},
+	}}
+	h := NewChatHandler(svc, logger, nil) // no run store: the requested id is pre-set
+	h.resumeBuf = resumebuf.New()
+
+	_, err := receiveAll(t, clientAs(t, h, uuid.New()), connect.NewRequest(&chatv1.ChatRequest{
+		Message:   "continue",
+		CityName:  proto.String("Crete"),
+		SessionId: proto.String(requested.String()),
+	}))
+	require.NoError(t, err)
+
+	_, ok := h.resumeBuf.Replay(requested.String(), "")
+	require.False(t, ok, "nothing is buffered under the refused session id")
+	events, ok := h.resumeBuf.Replay(minted.String(), "")
+	require.True(t, ok)
+	require.Len(t, events, 2)
+}
