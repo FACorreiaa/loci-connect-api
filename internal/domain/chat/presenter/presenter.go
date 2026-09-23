@@ -35,6 +35,12 @@ func ToAiCityResponse(resp *locitypes.AiCityResponse) *chatv1.AiCityResponse {
 		PointsOfInterest:  ToPOIDetailedInfoSlice(resp.PointsOfInterest),
 		ItineraryResponse: ToAIItineraryResponse(resp.AIItineraryResponse),
 		SessionId:         resp.SessionID.String(),
+		// The domain lists a hotels, restaurants or activities search made.
+		// They were stored with the session all along; without them on the
+		// wire, GetChatSession restored an itinerary but never a list.
+		Hotels:      ToPOIDetailedInfoSlice(locitypes.HotelsToPOIs(resp.Hotels)),
+		Restaurants: ToPOIDetailedInfoSlice(locitypes.RestaurantsToPOIs(resp.Restaurants)),
+		Activities:  ToPOIDetailedInfoSlice(resp.Activities),
 	}
 }
 
