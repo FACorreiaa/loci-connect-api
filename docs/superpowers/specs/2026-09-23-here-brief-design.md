@@ -108,6 +108,10 @@ across lists (local keeps a shared item, then disruption, then what's on),
 sorted newest first and capped at 5 per list. The builder lives in a pure
 function `hereFeeds(place) []newsFeed` next to `feedsForCountries`.
 
+The three lists respect the person's existing news switch
+(`NewsTickerPrefs`): with news off they are empty, while weather, alerts and
+place are still returned. Cached for 10 minutes per place.
+
 Known risk: English results for small Portuguese towns may be thin. The region
 in the OR, together with hiding empty lists in the UI, covers it. Language by
 country is a follow-up only if measurement shows empty lists.
