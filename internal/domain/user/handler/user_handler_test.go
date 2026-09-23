@@ -270,3 +270,15 @@ func TestTruncateUTF8LeavesShortStringsAlone(t *testing.T) {
 		t.Errorf("got = %q, want unchanged", got)
 	}
 }
+
+// A short header can still carry invalid bytes; they are dropped rather than
+// handed to Postgres, which would reject the insert.
+func TestTruncateUTF8CleansShortInvalidStrings(t *testing.T) {
+	got := truncateUTF8("Mozilla\xff/5.0", 512)
+	if !utf8.ValidString(got) {
+		t.Fatalf("got = %q, not valid UTF-8", got)
+	}
+	if got != "Mozilla/5.0" {
+		t.Errorf("got = %q, want the invalid byte dropped", got)
+	}
+}
