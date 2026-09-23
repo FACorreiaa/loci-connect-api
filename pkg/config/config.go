@@ -27,6 +27,7 @@ type Config struct {
 	Secrets       SecretsConfig
 	Messaging     MessagingConfig
 	Voice         VoiceConfig
+	Push          PushConfig
 }
 
 type CacheConfig struct {
@@ -312,6 +313,18 @@ type StripeConfig struct {
 	CityPackCurrency   string
 }
 
+// PushConfig holds the VAPID key pair web push is signed with. All three
+// empty means push is off: runs, the cap and in-app toasts still work.
+type PushConfig struct {
+	VAPIDPublicKey  string
+	VAPIDPrivateKey string
+	VAPIDSubject    string // mailto: address push services can reach
+}
+
+func (c PushConfig) Enabled() bool {
+	return c.VAPIDPublicKey != "" && c.VAPIDPrivateKey != "" && c.VAPIDSubject != ""
+}
+
 type ObservabilityConfig struct {
 	MetricsEnabled bool
 	MetricsPort    int
@@ -399,6 +412,11 @@ func Load() (*Config, error) {
 			PriceIDCityPack:    getEnv("STRIPE_PRICE_ID_CITY_PACK", ""),
 			CityPackPriceCents: getEnvAsInt("CITY_PACK_PRICE_CENTS", 499),
 			CityPackCurrency:   getEnv("CITY_PACK_CURRENCY", "usd"),
+		},
+		Push: PushConfig{
+			VAPIDPublicKey:  strings.TrimSpace(getEnv("VAPID_PUBLIC_KEY", "")),
+			VAPIDPrivateKey: strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
+			VAPIDSubject:    strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
 		},
 		Cache: CacheConfig{
 			RedisURL:   getEnv("REDIS_URL", ""),

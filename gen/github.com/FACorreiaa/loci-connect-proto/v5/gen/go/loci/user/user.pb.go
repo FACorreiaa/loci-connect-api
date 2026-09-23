@@ -24,6 +24,56 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type PushPlatform int32
+
+const (
+	PushPlatform_PUSH_PLATFORM_UNSPECIFIED PushPlatform = 0
+	PushPlatform_PUSH_PLATFORM_WEB_PUSH    PushPlatform = 1
+	// Reserved for the iOS app; the server does not send to it yet.
+	PushPlatform_PUSH_PLATFORM_APNS PushPlatform = 2
+)
+
+// Enum value maps for PushPlatform.
+var (
+	PushPlatform_name = map[int32]string{
+		0: "PUSH_PLATFORM_UNSPECIFIED",
+		1: "PUSH_PLATFORM_WEB_PUSH",
+		2: "PUSH_PLATFORM_APNS",
+	}
+	PushPlatform_value = map[string]int32{
+		"PUSH_PLATFORM_UNSPECIFIED": 0,
+		"PUSH_PLATFORM_WEB_PUSH":    1,
+		"PUSH_PLATFORM_APNS":        2,
+	}
+)
+
+func (x PushPlatform) Enum() *PushPlatform {
+	p := new(PushPlatform)
+	*p = x
+	return p
+}
+
+func (x PushPlatform) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PushPlatform) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_user_user_proto_enumTypes[0].Descriptor()
+}
+
+func (PushPlatform) Type() protoreflect.EnumType {
+	return &file_loci_user_user_proto_enumTypes[0]
+}
+
+func (x PushPlatform) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PushPlatform.Descriptor instead.
+func (PushPlatform) EnumDescriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{0}
+}
+
 // UserStats contains user statistics
 type UserStats struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -870,6 +920,7 @@ type NotificationSettings struct {
 	Recommendations bool                   `protobuf:"varint,1,opt,name=recommendations,proto3" json:"recommendations,omitempty"`
 	TripReminders   bool                   `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3" json:"trip_reminders,omitempty"`
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	SearchFinished  bool                   `protobuf:"varint,4,opt,name=search_finished,json=searchFinished,proto3" json:"search_finished,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -925,6 +976,13 @@ func (x *NotificationSettings) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *NotificationSettings) GetSearchFinished() bool {
+	if x != nil {
+		return x.SearchFinished
+	}
+	return false
+}
+
 type GetNotificationSettingsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -966,6 +1024,7 @@ type UpdateNotificationSettingsRequest struct {
 	// Absent means "leave this switch as it is".
 	Recommendations *bool `protobuf:"varint,1,opt,name=recommendations,proto3,oneof" json:"recommendations,omitempty"`
 	TripReminders   *bool `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3,oneof" json:"trip_reminders,omitempty"`
+	SearchFinished  *bool `protobuf:"varint,3,opt,name=search_finished,json=searchFinished,proto3,oneof" json:"search_finished,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1012,6 +1071,208 @@ func (x *UpdateNotificationSettingsRequest) GetTripReminders() bool {
 		return *x.TripReminders
 	}
 	return false
+}
+
+func (x *UpdateNotificationSettingsRequest) GetSearchFinished() bool {
+	if x != nil && x.SearchFinished != nil {
+		return *x.SearchFinished
+	}
+	return false
+}
+
+type RegisterPushDeviceRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Platform PushPlatform           `protobuf:"varint,1,opt,name=platform,proto3,enum=loci.user.PushPlatform" json:"platform,omitempty"`
+	// Web push endpoint URL, or the APNs device token.
+	Endpoint string `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	// Web push only.
+	P256Dh        string `protobuf:"bytes,3,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
+	Auth          string `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterPushDeviceRequest) Reset() {
+	*x = RegisterPushDeviceRequest{}
+	mi := &file_loci_user_user_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterPushDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterPushDeviceRequest) ProtoMessage() {}
+
+func (x *RegisterPushDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterPushDeviceRequest.ProtoReflect.Descriptor instead.
+func (*RegisterPushDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RegisterPushDeviceRequest) GetPlatform() PushPlatform {
+	if x != nil {
+		return x.Platform
+	}
+	return PushPlatform_PUSH_PLATFORM_UNSPECIFIED
+}
+
+func (x *RegisterPushDeviceRequest) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *RegisterPushDeviceRequest) GetP256Dh() string {
+	if x != nil {
+		return x.P256Dh
+	}
+	return ""
+}
+
+func (x *RegisterPushDeviceRequest) GetAuth() string {
+	if x != nil {
+		return x.Auth
+	}
+	return ""
+}
+
+type UnregisterPushDeviceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Endpoint      string                 `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnregisterPushDeviceRequest) Reset() {
+	*x = UnregisterPushDeviceRequest{}
+	mi := &file_loci_user_user_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnregisterPushDeviceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnregisterPushDeviceRequest) ProtoMessage() {}
+
+func (x *UnregisterPushDeviceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnregisterPushDeviceRequest.ProtoReflect.Descriptor instead.
+func (*UnregisterPushDeviceRequest) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *UnregisterPushDeviceRequest) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+type GetPushConfigRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPushConfigRequest) Reset() {
+	*x = GetPushConfigRequest{}
+	mi := &file_loci_user_user_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPushConfigRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPushConfigRequest) ProtoMessage() {}
+
+func (x *GetPushConfigRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPushConfigRequest.ProtoReflect.Descriptor instead.
+func (*GetPushConfigRequest) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{14}
+}
+
+type PushConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty when the server has no VAPID keys: clients must not offer push.
+	VapidPublicKey string `protobuf:"bytes,1,opt,name=vapid_public_key,json=vapidPublicKey,proto3" json:"vapid_public_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PushConfig) Reset() {
+	*x = PushConfig{}
+	mi := &file_loci_user_user_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushConfig) ProtoMessage() {}
+
+func (x *PushConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_user_user_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushConfig.ProtoReflect.Descriptor instead.
+func (*PushConfig) Descriptor() ([]byte, []int) {
+	return file_loci_user_user_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PushConfig) GetVapidPublicKey() string {
+	if x != nil {
+		return x.VapidPublicKey
+	}
+	return ""
 }
 
 var File_loci_user_user_proto protoreflect.FileDescriptor
@@ -1163,25 +1424,49 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\bfilename\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\bfilename\"E\n" +
 	"\x14DeleteAccountRequest\x12-\n" +
-	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xa2\x01\n" +
+	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xcb\x01\n" +
 	"\x14NotificationSettings\x12(\n" +
 	"\x0frecommendations\x18\x01 \x01(\bR\x0frecommendations\x12%\n" +
 	"\x0etrip_reminders\x18\x02 \x01(\bR\rtripReminders\x129\n" +
 	"\n" +
-	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\" \n" +
-	"\x1eGetNotificationSettingsRequest\"\xa5\x01\n" +
+	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
+	"\x0fsearch_finished\x18\x04 \x01(\bR\x0esearchFinished\" \n" +
+	"\x1eGetNotificationSettingsRequest\"\xe7\x01\n" +
 	"!UpdateNotificationSettingsRequest\x12-\n" +
 	"\x0frecommendations\x18\x01 \x01(\bH\x00R\x0frecommendations\x88\x01\x01\x12*\n" +
-	"\x0etrip_reminders\x18\x02 \x01(\bH\x01R\rtripReminders\x88\x01\x01B\x12\n" +
+	"\x0etrip_reminders\x18\x02 \x01(\bH\x01R\rtripReminders\x88\x01\x01\x12,\n" +
+	"\x0fsearch_finished\x18\x03 \x01(\bH\x02R\x0esearchFinished\x88\x01\x01B\x12\n" +
 	"\x10_recommendationsB\x11\n" +
-	"\x0f_trip_reminders2\xa9\x04\n" +
+	"\x0f_trip_remindersB\x12\n" +
+	"\x10_search_finished\"\xc3\x01\n" +
+	"\x19RegisterPushDeviceRequest\x12?\n" +
+	"\bplatform\x18\x01 \x01(\x0e2\x17.loci.user.PushPlatformB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bplatform\x12&\n" +
+	"\bendpoint\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\bendpoint\x12 \n" +
+	"\x06p256dh\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x06p256dh\x12\x1b\n" +
+	"\x04auth\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18dR\x04auth\"E\n" +
+	"\x1bUnregisterPushDeviceRequest\x12&\n" +
+	"\bendpoint\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\bendpoint\"\x16\n" +
+	"\x14GetPushConfigRequest\"6\n" +
+	"\n" +
+	"PushConfig\x12(\n" +
+	"\x10vapid_public_key\x18\x01 \x01(\tR\x0evapidPublicKey*a\n" +
+	"\fPushPlatform\x12\x1d\n" +
+	"\x19PUSH_PLATFORM_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16PUSH_PLATFORM_WEB_PUSH\x10\x01\x12\x16\n" +
+	"\x12PUSH_PLATFORM_APNS\x10\x022\x9c\x06\n" +
 	"\vUserService\x12U\n" +
 	"\x0eGetUserProfile\x12 .loci.user.GetUserProfileRequest\x1a!.loci.user.GetUserProfileResponse\x12O\n" +
 	"\x11UpdateUserProfile\x12#.loci.user.UpdateUserProfileRequest\x1a\x15.loci.common.Response\x12U\n" +
 	"\x0eExportUserData\x12 .loci.user.ExportUserDataRequest\x1a!.loci.user.ExportUserDataResponse\x12G\n" +
 	"\rDeleteAccount\x12\x1f.loci.user.DeleteAccountRequest\x1a\x15.loci.common.Response\x12e\n" +
 	"\x17GetNotificationSettings\x12).loci.user.GetNotificationSettingsRequest\x1a\x1f.loci.user.NotificationSettings\x12k\n" +
-	"\x1aUpdateNotificationSettings\x12,.loci.user.UpdateNotificationSettingsRequest\x1a\x1f.loci.user.NotificationSettingsBCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user;userb\x06proto3"
+	"\x1aUpdateNotificationSettings\x12,.loci.user.UpdateNotificationSettingsRequest\x1a\x1f.loci.user.NotificationSettings\x12Q\n" +
+	"\x12RegisterPushDevice\x12$.loci.user.RegisterPushDeviceRequest\x1a\x15.loci.common.Response\x12U\n" +
+	"\x14UnregisterPushDevice\x12&.loci.user.UnregisterPushDeviceRequest\x1a\x15.loci.common.Response\x12G\n" +
+	"\rGetPushConfig\x12\x1f.loci.user.GetPushConfigRequest\x1a\x15.loci.user.PushConfigBCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user;userb\x06proto3"
 
 var (
 	file_loci_user_user_proto_rawDescOnce sync.Once
@@ -1195,50 +1480,63 @@ func file_loci_user_user_proto_rawDescGZIP() []byte {
 	return file_loci_user_user_proto_rawDescData
 }
 
-var file_loci_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_loci_user_user_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_loci_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_loci_user_user_proto_goTypes = []any{
-	(*UserStats)(nil),                         // 0: loci.user.UserStats
-	(*UserProfile)(nil),                       // 1: loci.user.UserProfile
-	(*UpdateProfileParams)(nil),               // 2: loci.user.UpdateProfileParams
-	(*GetUserProfileRequest)(nil),             // 3: loci.user.GetUserProfileRequest
-	(*GetUserProfileResponse)(nil),            // 4: loci.user.GetUserProfileResponse
-	(*UpdateUserProfileRequest)(nil),          // 5: loci.user.UpdateUserProfileRequest
-	(*ExportUserDataRequest)(nil),             // 6: loci.user.ExportUserDataRequest
-	(*ExportUserDataResponse)(nil),            // 7: loci.user.ExportUserDataResponse
-	(*DeleteAccountRequest)(nil),              // 8: loci.user.DeleteAccountRequest
-	(*NotificationSettings)(nil),              // 9: loci.user.NotificationSettings
-	(*GetNotificationSettingsRequest)(nil),    // 10: loci.user.GetNotificationSettingsRequest
-	(*UpdateNotificationSettingsRequest)(nil), // 11: loci.user.UpdateNotificationSettingsRequest
-	(*timestamppb.Timestamp)(nil),             // 12: google.protobuf.Timestamp
-	(*common.Response)(nil),                   // 13: loci.common.Response
+	(PushPlatform)(0),                         // 0: loci.user.PushPlatform
+	(*UserStats)(nil),                         // 1: loci.user.UserStats
+	(*UserProfile)(nil),                       // 2: loci.user.UserProfile
+	(*UpdateProfileParams)(nil),               // 3: loci.user.UpdateProfileParams
+	(*GetUserProfileRequest)(nil),             // 4: loci.user.GetUserProfileRequest
+	(*GetUserProfileResponse)(nil),            // 5: loci.user.GetUserProfileResponse
+	(*UpdateUserProfileRequest)(nil),          // 6: loci.user.UpdateUserProfileRequest
+	(*ExportUserDataRequest)(nil),             // 7: loci.user.ExportUserDataRequest
+	(*ExportUserDataResponse)(nil),            // 8: loci.user.ExportUserDataResponse
+	(*DeleteAccountRequest)(nil),              // 9: loci.user.DeleteAccountRequest
+	(*NotificationSettings)(nil),              // 10: loci.user.NotificationSettings
+	(*GetNotificationSettingsRequest)(nil),    // 11: loci.user.GetNotificationSettingsRequest
+	(*UpdateNotificationSettingsRequest)(nil), // 12: loci.user.UpdateNotificationSettingsRequest
+	(*RegisterPushDeviceRequest)(nil),         // 13: loci.user.RegisterPushDeviceRequest
+	(*UnregisterPushDeviceRequest)(nil),       // 14: loci.user.UnregisterPushDeviceRequest
+	(*GetPushConfigRequest)(nil),              // 15: loci.user.GetPushConfigRequest
+	(*PushConfig)(nil),                        // 16: loci.user.PushConfig
+	(*timestamppb.Timestamp)(nil),             // 17: google.protobuf.Timestamp
+	(*common.Response)(nil),                   // 18: loci.common.Response
 }
 var file_loci_user_user_proto_depIdxs = []int32{
-	12, // 0: loci.user.UserProfile.joined_date:type_name -> google.protobuf.Timestamp
-	0,  // 1: loci.user.UserProfile.stats:type_name -> loci.user.UserStats
-	12, // 2: loci.user.UserProfile.email_verified_at:type_name -> google.protobuf.Timestamp
-	12, // 3: loci.user.UserProfile.last_login_at:type_name -> google.protobuf.Timestamp
-	12, // 4: loci.user.UserProfile.created_at:type_name -> google.protobuf.Timestamp
-	12, // 5: loci.user.UserProfile.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: loci.user.GetUserProfileResponse.profile:type_name -> loci.user.UserProfile
-	2,  // 7: loci.user.UpdateUserProfileRequest.params:type_name -> loci.user.UpdateProfileParams
-	12, // 8: loci.user.NotificationSettings.updated_at:type_name -> google.protobuf.Timestamp
-	3,  // 9: loci.user.UserService.GetUserProfile:input_type -> loci.user.GetUserProfileRequest
-	5,  // 10: loci.user.UserService.UpdateUserProfile:input_type -> loci.user.UpdateUserProfileRequest
-	6,  // 11: loci.user.UserService.ExportUserData:input_type -> loci.user.ExportUserDataRequest
-	8,  // 12: loci.user.UserService.DeleteAccount:input_type -> loci.user.DeleteAccountRequest
-	10, // 13: loci.user.UserService.GetNotificationSettings:input_type -> loci.user.GetNotificationSettingsRequest
-	11, // 14: loci.user.UserService.UpdateNotificationSettings:input_type -> loci.user.UpdateNotificationSettingsRequest
-	4,  // 15: loci.user.UserService.GetUserProfile:output_type -> loci.user.GetUserProfileResponse
-	13, // 16: loci.user.UserService.UpdateUserProfile:output_type -> loci.common.Response
-	7,  // 17: loci.user.UserService.ExportUserData:output_type -> loci.user.ExportUserDataResponse
-	13, // 18: loci.user.UserService.DeleteAccount:output_type -> loci.common.Response
-	9,  // 19: loci.user.UserService.GetNotificationSettings:output_type -> loci.user.NotificationSettings
-	9,  // 20: loci.user.UserService.UpdateNotificationSettings:output_type -> loci.user.NotificationSettings
-	15, // [15:21] is the sub-list for method output_type
-	9,  // [9:15] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	17, // 0: loci.user.UserProfile.joined_date:type_name -> google.protobuf.Timestamp
+	1,  // 1: loci.user.UserProfile.stats:type_name -> loci.user.UserStats
+	17, // 2: loci.user.UserProfile.email_verified_at:type_name -> google.protobuf.Timestamp
+	17, // 3: loci.user.UserProfile.last_login_at:type_name -> google.protobuf.Timestamp
+	17, // 4: loci.user.UserProfile.created_at:type_name -> google.protobuf.Timestamp
+	17, // 5: loci.user.UserProfile.updated_at:type_name -> google.protobuf.Timestamp
+	2,  // 6: loci.user.GetUserProfileResponse.profile:type_name -> loci.user.UserProfile
+	3,  // 7: loci.user.UpdateUserProfileRequest.params:type_name -> loci.user.UpdateProfileParams
+	17, // 8: loci.user.NotificationSettings.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 9: loci.user.RegisterPushDeviceRequest.platform:type_name -> loci.user.PushPlatform
+	4,  // 10: loci.user.UserService.GetUserProfile:input_type -> loci.user.GetUserProfileRequest
+	6,  // 11: loci.user.UserService.UpdateUserProfile:input_type -> loci.user.UpdateUserProfileRequest
+	7,  // 12: loci.user.UserService.ExportUserData:input_type -> loci.user.ExportUserDataRequest
+	9,  // 13: loci.user.UserService.DeleteAccount:input_type -> loci.user.DeleteAccountRequest
+	11, // 14: loci.user.UserService.GetNotificationSettings:input_type -> loci.user.GetNotificationSettingsRequest
+	12, // 15: loci.user.UserService.UpdateNotificationSettings:input_type -> loci.user.UpdateNotificationSettingsRequest
+	13, // 16: loci.user.UserService.RegisterPushDevice:input_type -> loci.user.RegisterPushDeviceRequest
+	14, // 17: loci.user.UserService.UnregisterPushDevice:input_type -> loci.user.UnregisterPushDeviceRequest
+	15, // 18: loci.user.UserService.GetPushConfig:input_type -> loci.user.GetPushConfigRequest
+	5,  // 19: loci.user.UserService.GetUserProfile:output_type -> loci.user.GetUserProfileResponse
+	18, // 20: loci.user.UserService.UpdateUserProfile:output_type -> loci.common.Response
+	8,  // 21: loci.user.UserService.ExportUserData:output_type -> loci.user.ExportUserDataResponse
+	18, // 22: loci.user.UserService.DeleteAccount:output_type -> loci.common.Response
+	10, // 23: loci.user.UserService.GetNotificationSettings:output_type -> loci.user.NotificationSettings
+	10, // 24: loci.user.UserService.UpdateNotificationSettings:output_type -> loci.user.NotificationSettings
+	18, // 25: loci.user.UserService.RegisterPushDevice:output_type -> loci.common.Response
+	18, // 26: loci.user.UserService.UnregisterPushDevice:output_type -> loci.common.Response
+	16, // 27: loci.user.UserService.GetPushConfig:output_type -> loci.user.PushConfig
+	19, // [19:28] is the sub-list for method output_type
+	10, // [10:19] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_loci_user_user_proto_init() }
@@ -1256,13 +1554,14 @@ func file_loci_user_user_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_user_user_proto_rawDesc), len(file_loci_user_user_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   12,
+			NumEnums:      1,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_loci_user_user_proto_goTypes,
 		DependencyIndexes: file_loci_user_user_proto_depIdxs,
+		EnumInfos:         file_loci_user_user_proto_enumTypes,
 		MessageInfos:      file_loci_user_user_proto_msgTypes,
 	}.Build()
 	File_loci_user_user_proto = out.File

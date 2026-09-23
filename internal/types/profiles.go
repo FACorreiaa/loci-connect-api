@@ -363,10 +363,12 @@ type CombinedFilters struct {
 //
 // These lived in browser localStorage keyed by user id, so they did not follow
 // the account to a second browser or a phone and nothing server-side could read
-// them. This records the preference; sending anything is separate work.
+// them. SearchFinished gates the web push sent when a search finishes or fails;
+// the other switches are recorded but nothing sends on them yet.
 type NotificationSettings struct {
 	Recommendations bool      `json:"recommendations"`
 	TripReminders   bool      `json:"trip_reminders"`
+	SearchFinished  bool      `json:"search_finished"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
@@ -375,4 +377,5 @@ type NotificationSettings struct {
 type UpdateNotificationSettingsParams struct {
 	Recommendations *bool `json:"recommendations,omitempty"`
 	TripReminders   *bool `json:"trip_reminders,omitempty"`
+	SearchFinished  *bool `json:"search_finished,omitempty"`
 }

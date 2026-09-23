@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -15,9 +16,11 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -28,6 +31,10 @@ type UserHandler struct {
 	// exporter assembles the full self-service data export. Optional: without
 	// it the export falls back to the profile-only payload it used to return.
 	exporter *userdata.Exporter
+	// devices is nil until WithPush is called, which is how the handler knows
+	// push was never configured rather than merely misconfigured.
+	devices push.DeviceStore
+	pushCfg config.PushConfig
 }
 
 // NewUserHandler constructs a new handler.
@@ -43,6 +50,16 @@ func (h *UserHandler) SetExporter(e *userdata.Exporter) {
 	if h != nil {
 		h.exporter = e
 	}
+}
+
+// WithPush enables device registration and hands the handler the VAPID
+// config GetPushConfig serves at runtime. Without it, RegisterPushDevice and
+// UnregisterPushDevice report the service unavailable and GetPushConfig
+// always returns an empty key.
+func (h *UserHandler) WithPush(devices push.DeviceStore, cfg config.PushConfig) *UserHandler {
+	h.devices = devices
+	h.pushCfg = cfg
+	return h
 }
 
 // GetUserProfile retrieves the user's profile.
@@ -369,6 +386,8 @@ func (h *UserHandler) DeleteAccount(
 //
 // These lived in browser localStorage keyed by user id, so they did not follow
 // the account between devices and nothing server-side could read them.
+// search_finished is delivered as a push to the account's registered devices;
+// the others still just record a preference.
 func (h *UserHandler) GetNotificationSettings(
 	ctx context.Context,
 	_ *connect.Request[userpb.GetNotificationSettingsRequest],
@@ -400,6 +419,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 	settings, err := h.service.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
 		Recommendations: req.Msg.Recommendations,
 		TripReminders:   req.Msg.TripReminders,
+		SearchFinished:  req.Msg.SearchFinished,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -414,8 +434,89 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 	return &userpb.NotificationSettings{
 		Recommendations: s.Recommendations,
 		TripReminders:   s.TripReminders,
+		SearchFinished:  s.SearchFinished,
 		UpdatedAt:       timestamppb.New(s.UpdatedAt),
 	}
+}
+
+var platformNames = map[userpb.PushPlatform]string{
+	userpb.PushPlatform_PUSH_PLATFORM_WEB_PUSH: "web_push",
+	userpb.PushPlatform_PUSH_PLATFORM_APNS:     "apns",
+}
+
+// maxUserAgentLen bounds what a client-supplied User-Agent header can cost us
+// to store; nothing legitimate needs more than this.
+const maxUserAgentLen = 512
+
+// truncateUTF8 caps s at maxBytes and always returns valid UTF-8, dropping
+// any invalid bytes. Slicing a string by byte count alone can split a
+// multi-byte rune in half, and a header can arrive with invalid bytes in the
+// first place; Postgres's UTF8 encoding rejects either outright, which is how
+// a User-Agent header that happened to end mid-emoji turned "truncate for
+// safety" into a 500 on RegisterPushDevice.
+func truncateUTF8(s string, maxBytes int) string {
+	return strings.ToValidUTF8(s[:min(len(s), maxBytes)], "")
+}
+
+// RegisterPushDevice records where the caller's finished searches should be
+// announced. Re-registering refreshes it.
+func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Request[userpb.RegisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.devices == nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("push is not configured"))
+	}
+	platform, ok := platformNames[req.Msg.GetPlatform()]
+	if !ok {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unknown platform"))
+	}
+	if platform == "web_push" {
+		// The endpoint is client-supplied. Without this allow-list a signed-in
+		// user could register an internal cluster address here and have the
+		// sender POST to it on their behalf — an SSRF from inside the auth
+		// boundary rather than outside it.
+		if !push.ValidWebPushEndpoint(req.Msg.GetEndpoint()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unsupported push endpoint"))
+		}
+		if req.Msg.GetP256Dh() == "" || req.Msg.GetAuth() == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
+		}
+	}
+	userAgent := truncateUTF8(req.Header().Get("User-Agent"), maxUserAgentLen)
+	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), userAgent); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&commonpb.Response{Success: true}), nil
+}
+
+// UnregisterPushDevice stops announcing finished searches to one endpoint.
+func (h *UserHandler) UnregisterPushDevice(ctx context.Context, req *connect.Request[userpb.UnregisterPushDeviceRequest]) (*connect.Response[commonpb.Response], error) {
+	userID, err := callerUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.devices != nil {
+		if err := h.devices.Remove(ctx, userID, req.Msg.GetEndpoint()); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+	return connect.NewResponse(&commonpb.Response{Success: true}), nil
+}
+
+// GetPushConfig hands out the VAPID public key at runtime rather than as a
+// build variable: the Workers Builds deploy has no env and races the
+// Actions one, so a baked-in key would vanish whenever it won.
+func (h *UserHandler) GetPushConfig(ctx context.Context, _ *connect.Request[userpb.GetPushConfigRequest]) (*connect.Response[userpb.PushConfig], error) {
+	if _, err := callerUserID(ctx); err != nil {
+		return nil, err
+	}
+	key := ""
+	if h.pushCfg.Enabled() {
+		key = h.pushCfg.VAPIDPublicKey
+	}
+	return connect.NewResponse(&userpb.PushConfig{VapidPublicKey: key}), nil
 }
 
 // callerUserID resolves the authenticated subject from the token claims. The

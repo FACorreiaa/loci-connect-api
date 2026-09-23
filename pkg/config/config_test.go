@@ -63,6 +63,51 @@ func TestLoad_QuotaAndStripeOverrides(t *testing.T) {
 	}
 }
 
+func TestLoad_PushDefaultsDisabled(t *testing.T) {
+	t.Setenv("AI_PROVIDER", AIProviderGemini)
+	t.Setenv("GEMINI_API_KEY", "test-key")
+	t.Setenv("GEMINI_MODEL", "gemini-test")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+	t.Setenv("VAPID_PUBLIC_KEY", "")
+	t.Setenv("VAPID_PRIVATE_KEY", "")
+	t.Setenv("VAPID_SUBJECT", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Push.Enabled() {
+		t.Error("Push.Enabled() = true with no VAPID keys, want false")
+	}
+}
+
+func TestLoad_PushOverrides(t *testing.T) {
+	t.Setenv("AI_PROVIDER", AIProviderGemini)
+	t.Setenv("GEMINI_API_KEY", "test-key")
+	t.Setenv("GEMINI_MODEL", "gemini-test")
+	t.Setenv("JWT_SECRET", "test-secret-test-secret-test-secret")
+	t.Setenv("VAPID_PUBLIC_KEY", " pub-key ")
+	t.Setenv("VAPID_PRIVATE_KEY", " priv-key ")
+	t.Setenv("VAPID_SUBJECT", " mailto:push@example.test ")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Push.VAPIDPublicKey != "pub-key" {
+		t.Errorf("Push.VAPIDPublicKey = %q, want trimmed", cfg.Push.VAPIDPublicKey)
+	}
+	if cfg.Push.VAPIDPrivateKey != "priv-key" {
+		t.Errorf("Push.VAPIDPrivateKey = %q, want trimmed", cfg.Push.VAPIDPrivateKey)
+	}
+	if cfg.Push.VAPIDSubject != "mailto:push@example.test" {
+		t.Errorf("Push.VAPIDSubject = %q, want trimmed", cfg.Push.VAPIDSubject)
+	}
+	if !cfg.Push.Enabled() {
+		t.Error("Push.Enabled() = false with all three set, want true")
+	}
+}
+
 func TestLoad_OpenRouter(t *testing.T) {
 	t.Setenv("AI_PROVIDER", AIProviderOpenRouter)
 	t.Setenv("OPENROUTER_API_KEY", "test-openrouter-key")

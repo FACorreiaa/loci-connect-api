@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	chatpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
@@ -15,6 +16,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
+
+// fullRunStore always reports the caller at capacity, so the chain-order
+// test below can prove a capped request never reaches ConsumeQuota.
+type fullRunStore struct{ runs.Store }
+
+func (fullRunStore) Reserve(context.Context, uuid.UUID) (uuid.UUID, error) {
+	return uuid.Nil, runs.ErrAtCapacity
+}
 
 type recordingSubscriptionService struct {
 	consumeCalled bool
@@ -191,5 +200,46 @@ func TestInterceptorChain_StreamChatQuotaDenialReachesClient(t *testing.T) {
 	}
 	if connect.CodeOf(err) != connect.CodeResourceExhausted {
 		t.Fatalf("expected ResourceExhausted for exhausted stream quota, got %v (%v)", connect.CodeOf(err), err)
+	}
+}
+
+// TestInterceptorChain_RunCapBeforeSubscriptionQuota guards the order this
+// task adds to the chain: auth, then the run cap, then subscription quota.
+// A capped request must never reach ConsumeQuota — the point of running the
+// cap check before quota is that a refused search costs nothing.
+func TestInterceptorChain_RunCapBeforeSubscriptionQuota(t *testing.T) {
+	secret := []byte("test-secret")
+	subSvc := &recordingSubscriptionService{}
+
+	handler := connect.NewServerStreamHandler(
+		chatconnect.ChatServiceStreamChatProcedure,
+		func(ctx context.Context, _ *connect.Request[chatpb.ChatRequest], stream *connect.ServerStream[chatpb.StreamEvent]) error {
+			return stream.Send(&chatpb.StreamEvent{})
+		},
+		connect.WithInterceptors(
+			interceptors.NewAuthInterceptor(secret),
+			runs.NewCapInterceptor(fullRunStore{}, nil),
+			subscription.NewRateLimitInterceptor(subSvc),
+		),
+	)
+
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	client := chatconnect.NewChatServiceClient(http.DefaultClient, srv.URL)
+	req := connect.NewRequest(&chatpb.ChatRequest{})
+	req.Header().Set("Authorization", "Bearer "+signTestJWT(t, secret, uuid.New(), "traveler@example.com"))
+
+	stream, err := client.StreamChat(context.Background(), req)
+	if err == nil {
+		for stream.Receive() {
+		}
+		err = stream.Err()
+	}
+	if connect.CodeOf(err) != connect.CodeResourceExhausted {
+		t.Fatalf("expected ResourceExhausted from the run cap, got %v (%v)", connect.CodeOf(err), err)
+	}
+	if subSvc.consumeCalled {
+		t.Fatal("ConsumeQuota should not run when the run cap already refused the request")
 	}
 }

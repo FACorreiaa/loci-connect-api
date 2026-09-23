@@ -52,6 +52,15 @@ const (
 	// UserServiceUpdateNotificationSettingsProcedure is the fully-qualified name of the UserService's
 	// UpdateNotificationSettings RPC.
 	UserServiceUpdateNotificationSettingsProcedure = "/loci.user.UserService/UpdateNotificationSettings"
+	// UserServiceRegisterPushDeviceProcedure is the fully-qualified name of the UserService's
+	// RegisterPushDevice RPC.
+	UserServiceRegisterPushDeviceProcedure = "/loci.user.UserService/RegisterPushDevice"
+	// UserServiceUnregisterPushDeviceProcedure is the fully-qualified name of the UserService's
+	// UnregisterPushDevice RPC.
+	UserServiceUnregisterPushDeviceProcedure = "/loci.user.UserService/UnregisterPushDevice"
+	// UserServiceGetPushConfigProcedure is the fully-qualified name of the UserService's GetPushConfig
+	// RPC.
+	UserServiceGetPushConfigProcedure = "/loci.user.UserService/GetPushConfig"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -63,6 +72,9 @@ var (
 	userServiceDeleteAccountMethodDescriptor              = userServiceServiceDescriptor.Methods().ByName("DeleteAccount")
 	userServiceGetNotificationSettingsMethodDescriptor    = userServiceServiceDescriptor.Methods().ByName("GetNotificationSettings")
 	userServiceUpdateNotificationSettingsMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("UpdateNotificationSettings")
+	userServiceRegisterPushDeviceMethodDescriptor         = userServiceServiceDescriptor.Methods().ByName("RegisterPushDevice")
+	userServiceUnregisterPushDeviceMethodDescriptor       = userServiceServiceDescriptor.Methods().ByName("UnregisterPushDevice")
+	userServiceGetPushConfigMethodDescriptor              = userServiceServiceDescriptor.Methods().ByName("GetPushConfig")
 )
 
 // UserServiceClient is a client for the loci.user.UserService service.
@@ -75,6 +87,11 @@ type UserServiceClient interface {
 	// Notification switches, stored against the account rather than the browser.
 	GetNotificationSettings(context.Context, *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
 	UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
+	// Push delivery: a browser (or, later, a phone) that should hear about the
+	// caller's finished searches.
+	RegisterPushDevice(context.Context, *connect.Request[user.RegisterPushDeviceRequest]) (*connect.Response[common.Response], error)
+	UnregisterPushDevice(context.Context, *connect.Request[user.UnregisterPushDeviceRequest]) (*connect.Response[common.Response], error)
+	GetPushConfig(context.Context, *connect.Request[user.GetPushConfigRequest]) (*connect.Response[user.PushConfig], error)
 }
 
 // NewUserServiceClient constructs a client for the loci.user.UserService service. By default, it
@@ -123,6 +140,24 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceUpdateNotificationSettingsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		registerPushDevice: connect.NewClient[user.RegisterPushDeviceRequest, common.Response](
+			httpClient,
+			baseURL+UserServiceRegisterPushDeviceProcedure,
+			connect.WithSchema(userServiceRegisterPushDeviceMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		unregisterPushDevice: connect.NewClient[user.UnregisterPushDeviceRequest, common.Response](
+			httpClient,
+			baseURL+UserServiceUnregisterPushDeviceProcedure,
+			connect.WithSchema(userServiceUnregisterPushDeviceMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getPushConfig: connect.NewClient[user.GetPushConfigRequest, user.PushConfig](
+			httpClient,
+			baseURL+UserServiceGetPushConfigProcedure,
+			connect.WithSchema(userServiceGetPushConfigMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -134,6 +169,9 @@ type userServiceClient struct {
 	deleteAccount              *connect.Client[user.DeleteAccountRequest, common.Response]
 	getNotificationSettings    *connect.Client[user.GetNotificationSettingsRequest, user.NotificationSettings]
 	updateNotificationSettings *connect.Client[user.UpdateNotificationSettingsRequest, user.NotificationSettings]
+	registerPushDevice         *connect.Client[user.RegisterPushDeviceRequest, common.Response]
+	unregisterPushDevice       *connect.Client[user.UnregisterPushDeviceRequest, common.Response]
+	getPushConfig              *connect.Client[user.GetPushConfigRequest, user.PushConfig]
 }
 
 // GetUserProfile calls loci.user.UserService.GetUserProfile.
@@ -166,6 +204,21 @@ func (c *userServiceClient) UpdateNotificationSettings(ctx context.Context, req 
 	return c.updateNotificationSettings.CallUnary(ctx, req)
 }
 
+// RegisterPushDevice calls loci.user.UserService.RegisterPushDevice.
+func (c *userServiceClient) RegisterPushDevice(ctx context.Context, req *connect.Request[user.RegisterPushDeviceRequest]) (*connect.Response[common.Response], error) {
+	return c.registerPushDevice.CallUnary(ctx, req)
+}
+
+// UnregisterPushDevice calls loci.user.UserService.UnregisterPushDevice.
+func (c *userServiceClient) UnregisterPushDevice(ctx context.Context, req *connect.Request[user.UnregisterPushDeviceRequest]) (*connect.Response[common.Response], error) {
+	return c.unregisterPushDevice.CallUnary(ctx, req)
+}
+
+// GetPushConfig calls loci.user.UserService.GetPushConfig.
+func (c *userServiceClient) GetPushConfig(ctx context.Context, req *connect.Request[user.GetPushConfigRequest]) (*connect.Response[user.PushConfig], error) {
+	return c.getPushConfig.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the loci.user.UserService service.
 type UserServiceHandler interface {
 	GetUserProfile(context.Context, *connect.Request[user.GetUserProfileRequest]) (*connect.Response[user.GetUserProfileResponse], error)
@@ -176,6 +229,11 @@ type UserServiceHandler interface {
 	// Notification switches, stored against the account rather than the browser.
 	GetNotificationSettings(context.Context, *connect.Request[user.GetNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
 	UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error)
+	// Push delivery: a browser (or, later, a phone) that should hear about the
+	// caller's finished searches.
+	RegisterPushDevice(context.Context, *connect.Request[user.RegisterPushDeviceRequest]) (*connect.Response[common.Response], error)
+	UnregisterPushDevice(context.Context, *connect.Request[user.UnregisterPushDeviceRequest]) (*connect.Response[common.Response], error)
+	GetPushConfig(context.Context, *connect.Request[user.GetPushConfigRequest]) (*connect.Response[user.PushConfig], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -220,6 +278,24 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceUpdateNotificationSettingsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceRegisterPushDeviceHandler := connect.NewUnaryHandler(
+		UserServiceRegisterPushDeviceProcedure,
+		svc.RegisterPushDevice,
+		connect.WithSchema(userServiceRegisterPushDeviceMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceUnregisterPushDeviceHandler := connect.NewUnaryHandler(
+		UserServiceUnregisterPushDeviceProcedure,
+		svc.UnregisterPushDevice,
+		connect.WithSchema(userServiceUnregisterPushDeviceMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	userServiceGetPushConfigHandler := connect.NewUnaryHandler(
+		UserServiceGetPushConfigProcedure,
+		svc.GetPushConfig,
+		connect.WithSchema(userServiceGetPushConfigMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.user.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetUserProfileProcedure:
@@ -234,6 +310,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceGetNotificationSettingsHandler.ServeHTTP(w, r)
 		case UserServiceUpdateNotificationSettingsProcedure:
 			userServiceUpdateNotificationSettingsHandler.ServeHTTP(w, r)
+		case UserServiceRegisterPushDeviceProcedure:
+			userServiceRegisterPushDeviceHandler.ServeHTTP(w, r)
+		case UserServiceUnregisterPushDeviceProcedure:
+			userServiceUnregisterPushDeviceHandler.ServeHTTP(w, r)
+		case UserServiceGetPushConfigProcedure:
+			userServiceGetPushConfigHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -265,4 +347,16 @@ func (UnimplementedUserServiceHandler) GetNotificationSettings(context.Context, 
 
 func (UnimplementedUserServiceHandler) UpdateNotificationSettings(context.Context, *connect.Request[user.UpdateNotificationSettingsRequest]) (*connect.Response[user.NotificationSettings], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.UpdateNotificationSettings is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) RegisterPushDevice(context.Context, *connect.Request[user.RegisterPushDeviceRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.RegisterPushDevice is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) UnregisterPushDevice(context.Context, *connect.Request[user.UnregisterPushDeviceRequest]) (*connect.Response[common.Response], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.UnregisterPushDevice is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) GetPushConfig(context.Context, *connect.Request[user.GetPushConfigRequest]) (*connect.Response[user.PushConfig], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.user.UserService.GetPushConfig is not implemented"))
 }

@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"io"
+	"log"
 	"log/slog"
 	"os"
 	"testing"
@@ -24,10 +25,25 @@ var (
 )
 
 func sp(s string) *string { return &s }
+func bp(b bool) *bool     { return &b }
 
+// TestMain normally starts (or reuses) the shared, fully-migrated Postgres
+// testcontainer via testsupport. Set PUSH_TEST_DSN to point at a real,
+// already-migrated Postgres instead — used to exercise the push_devices /
+// search_finished migration against a local DB without invoking goose or
+// docker. Run with: PUSH_TEST_DSN=postgres://... go test -tags=integration
+// ./internal/domain/user/
 func TestMain(m *testing.M) {
-	testUserDB = testsupport.MustPool()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	if dsn := os.Getenv("PUSH_TEST_DSN"); dsn != "" {
+		pool, err := pgxpool.New(context.Background(), dsn)
+		if err != nil {
+			log.Fatalf("user integration test: connect to PUSH_TEST_DSN: %v", err)
+		}
+		testUserDB = pool
+	} else {
+		testUserDB = testsupport.MustPool()
+	}
 	testUserRepo = NewPostgresUserRepo(testUserDB, logger)
 	testUserService = NewUserService(testUserRepo, logger)
 	os.Exit(m.Run())
@@ -141,5 +157,48 @@ func TestServiceUserImpl_UserStatus_Integration(t *testing.T) {
 		profile, err := testUserService.GetUserProfile(ctx, userID)
 		require.NoError(t, err)
 		assert.True(t, profile.IsActive)
+	})
+}
+
+// TestServiceUserImpl_NotificationSettings_Integration does not call
+// clearUsersTable: unlike the other integration tests in this file, it may
+// run against a real, already-populated local DB (via PUSH_TEST_DSN) where
+// other tables reference existing users, so it creates its own uniquely
+// named users instead of touching the whole table.
+func TestServiceUserImpl_NotificationSettings_Integration(t *testing.T) {
+	ctx := context.Background()
+	suffix := uuid.New().String()[:8]
+
+	t.Run("fresh user's search_finished defaults to on", func(t *testing.T) {
+		userID := createTestUserDirectly(t, "notif_fresh_"+suffix, "notif_fresh_"+suffix+"@example.com", "Notif", "Fresh")
+
+		settings, err := testUserService.GetNotificationSettings(ctx, userID)
+		require.NoError(t, err)
+		require.NotNil(t, settings)
+		assert.True(t, settings.SearchFinished, "search_finished must default to true for a never-configured account")
+	})
+
+	t.Run("updating search_finished alone leaves the other switches untouched", func(t *testing.T) {
+		userID := createTestUserDirectly(t, "notif_update_"+suffix, "notif_update_"+suffix+"@example.com", "Notif", "Update")
+
+		// Seed recommendations/trip_reminders away from their defaults so a
+		// later search_finished-only update can prove it did not touch them.
+		seeded, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
+			Recommendations: bp(true),
+			TripReminders:   bp(true),
+		})
+		require.NoError(t, err)
+		require.True(t, seeded.Recommendations)
+		require.True(t, seeded.TripReminders)
+		require.True(t, seeded.SearchFinished)
+
+		updated, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
+			SearchFinished: bp(false),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, updated)
+		assert.False(t, updated.SearchFinished)
+		assert.True(t, updated.Recommendations, "recommendations must be unchanged by a search_finished-only update")
+		assert.True(t, updated.TripReminders, "trip_reminders must be unchanged by a search_finished-only update")
 	})
 }

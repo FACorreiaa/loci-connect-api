@@ -48,10 +48,12 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
 	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
@@ -112,6 +114,12 @@ type Dependencies struct {
 	ShareRepo         share.Repository
 	TripRepo          trip.Repository
 	TravelHistoryRepo travelhistory.Repository
+	// RunStore backs the cap interceptor and the run-status/notification RPCs.
+	RunStore runs.Store
+	// PushDevices backs device registration. Rows can be written even with no
+	// VAPID key configured; whether anything is ever sent to them is decided
+	// by Config.Push.Enabled(), not by whether a device is registered.
+	PushDevices push.DeviceStore
 
 	// Services
 	TokenManager service.TokenManager
@@ -290,6 +298,8 @@ func (d *Dependencies) initRepositories() error {
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
+	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
+	d.PushDevices = push.NewPostgresDeviceStore(d.DB.Pool)
 
 	d.Logger.Info("repositories initialized")
 	return nil
@@ -736,7 +746,18 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler.WithMFA(d.MFAService)
 	}
 	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler)
+	// A finished run becomes a web push, unless VAPID isn't configured — in
+	// which case runs, the cap and in-app toasts still work, and the log
+	// line below is the only sign anything is missing.
+	var onRunFinish runs.FinishListener
+	if d.Config.Push.Enabled() {
+		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices,
+			push.NewWebPushSender(d.Config.Push, push.NewHTTPClient()), d.Logger)
+		onRunFinish = notifier.OnRunFinished
+	} else {
+		d.Logger.Info("web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT not all set")
+	}
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
@@ -751,7 +772,7 @@ func (d *Dependencies) initHandlers() error {
 		d.Logger,
 	)
 
-	d.UserHandler = userhandler.NewUserHandler(d.UserSvc)
+	d.UserHandler = userhandler.NewUserHandler(d.UserSvc).WithPush(d.PushDevices, d.Config.Push)
 	// The self-service export previously returned the profile alone, while the
 	// account also held trips, lists, favorites, itineraries, travel history,
 	// chat sessions and the learned taste profile.

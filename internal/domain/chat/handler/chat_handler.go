@@ -25,6 +25,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/resumebuf"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -32,10 +33,12 @@ import (
 // ChatHandler implements the ChatServiceHandler interface.
 type ChatHandler struct {
 	chatconnect.UnimplementedChatServiceHandler
-	service   service.LlmInteractiontService
-	logger    *slog.Logger
-	resumeBuf *resumebuf.Buffer
-	issuer    AttributionIssuer
+	service     service.LlmInteractiontService
+	logger      *slog.Logger
+	resumeBuf   *resumebuf.Buffer
+	issuer      AttributionIssuer
+	runs        runs.Store
+	onRunFinish runs.FinishListener
 }
 
 // AttributionIssuer persists the exact traces emitted to an authenticated user.
@@ -51,6 +54,13 @@ func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger
 		logger:    logger,
 		issuer:    issuer,
 	}
+}
+
+// WithRuns records each generation and announces its end to onFinish.
+func (h *ChatHandler) WithRuns(store runs.Store, onFinish runs.FinishListener) *ChatHandler {
+	h.runs = store
+	h.onRunFinish = onFinish
+	return h
 }
 
 func (h *ChatHandler) StartChat(
@@ -164,42 +174,61 @@ func (h *ChatHandler) StreamChat(
 		TripID:             tripID,
 	}
 
-	// bufSessionID keys the resume buffer. Known up front for a resume/continue
-	// (client sent session_id); for a fresh stream it's captured from the start
-	// event below once the server mints the session.
+	// bufSessionID keys the resume buffer. The start event names the session
+	// the pipeline actually chose, and record always takes it from there. A
+	// requested session_id is only adopted up front when there is no run store
+	// to check ownership against (the old behaviour); with one, an owned
+	// resume never reaches the generation below, so a fresh stream must not
+	// write into a buffer keyed by someone else's id before the pipeline has
+	// refused it.
 	bufSessionID := ""
-	if requestedSessionID != uuid.Nil {
+	if requestedSessionID != uuid.Nil && h.runs == nil {
 		bufSessionID = requestedSessionID.String()
 	}
 
-	// Resume path: replay what the client missed instead of re-running the LLM.
-	// The original generation goroutine keeps buffering after a disconnect, so the
-	// buffer holds events produced while the client was gone. On a buffer miss
-	// (evicted/unknown) we fall through to a fresh generation (session_id honored).
-	if h.resumeBuf != nil && cc.ResumeToken != "" && bufSessionID != "" {
-		if events, found := h.resumeBuf.Replay(bufSessionID, cc.ResumeToken); found {
+	// Resume path: replay what the client missed, then follow the run live until
+	// its terminal event instead of re-running the LLM. The original generation
+	// goroutine keeps buffering after a disconnect, so the buffer holds events
+	// produced while the client was gone and keeps receiving new ones.
+	if cc.ResumeToken != "" && requestedSessionID != uuid.Nil {
+		if handled, rErr := h.resume(ctx, stream, userID, requestedSessionID, cc.ResumeToken); handled {
 			llmCancel()
-			for _, ev := range events {
-				resp, mErr := h.mapEventToProto(ctx, ev, userID)
-				if mErr != nil {
-					continue
-				}
-				if sErr := stream.Send(resp); sErr != nil {
-					return nil
-				}
-			}
-			h.logger.Info("resumed stream from buffer", "session_id", bufSessionID, "replayed", len(events))
-			return nil
+			return rErr
 		}
 	}
 
-	// appendEvent records live events for future resume, capturing the minted
-	// session id from the start event when we didn't already know it.
-	appendEvent := func(ev locitypes.StreamEvent) {
+	var tracker *runs.Tracker
+	if h.runs != nil {
+		if res, ok := runs.ReservationFrom(ctx); ok {
+			res.Claim()
+			tracker = runs.NewTracker(h.runs, res.RunID, h.onRunFinish, h.logger)
+		} else if cc.ResumeToken != "" {
+			// The cap interceptor lets every resume through, but this one is
+			// about to generate: hold it to the same cap, and track it like
+			// any other run so its row finishes and its owner hears about it.
+			runID, rErr := h.runs.Reserve(ctx, userID)
+			switch {
+			case errors.Is(rErr, runs.ErrAtCapacity):
+				llmCancel()
+				return connect.NewError(connect.CodeResourceExhausted, errors.New(runs.CapMessage)) //nolint:staticcheck // ST1005: user-facing copy
+			case rErr != nil:
+				// Same fail-open rule as the interceptor: a DB hiccup must
+				// not cost someone their search.
+				h.logger.Error("run reservation failed; serving uncapped", "error", rErr)
+			default:
+				tracker = runs.NewTracker(h.runs, runID, h.onRunFinish, h.logger)
+			}
+		}
+	}
+
+	// record observes each live event for the run tracker, then buffers it for
+	// future resume under the session the start event names.
+	record := func(ev locitypes.StreamEvent) {
+		tracker.Observe(ev)
 		if h.resumeBuf == nil {
 			return
 		}
-		if bufSessionID == "" && ev.Type == locitypes.EventTypeStart {
+		if ev.Type == locitypes.EventTypeStart {
 			var sd locitypes.StreamStartData
 			if decodeData(ev.Data, &sd) && sd.SessionID != "" {
 				bufSessionID = sd.SessionID
@@ -241,10 +270,11 @@ func (h *ChatHandler) StreamChat(
 		case event, ok := <-eventCh:
 			if !ok {
 				h.logger.Info("Event channel closed, stream finished successfully")
+				tracker.Close()
 				return nil
 			}
 
-			appendEvent(event)
+			record(event)
 
 			resp, err := h.mapEventToProto(ctx, event, userID)
 			if err != nil {
@@ -259,14 +289,24 @@ func (h *ChatHandler) StreamChat(
 				// Keep buffering the rest so a reconnect can resume from the buffer.
 				go func() {
 					for ev := range eventCh {
-						appendEvent(ev)
+						record(ev)
 					}
+					tracker.Close()
 				}()
 				return nil
 			}
 
 			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
 				h.logger.Info("Stream completed", "event_type", event.Type)
+				// The pipeline goroutine still closes eventCh after this; keep
+				// draining so any trailing events are recorded and the tracker
+				// closes (a no-op if the terminal event already finished it).
+				go func() {
+					for ev := range eventCh {
+						record(ev)
+					}
+					tracker.Close()
+				}()
 				return nil
 			}
 
@@ -276,8 +316,9 @@ func (h *ChatHandler) StreamChat(
 			// Keep buffering so a reconnect can resume from the buffer.
 			go func() {
 				for ev := range eventCh {
-					appendEvent(ev)
+					record(ev)
 				}
+				tracker.Close()
 			}()
 			return nil
 		}
@@ -304,6 +345,202 @@ func (h *ChatHandler) toConnectError(err error) error {
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
+}
+
+// resume answers a resume_token request without generating. handled is false
+// when the caller should fall through to a fresh generation instead.
+//
+// With a run store, the session must have a run owned by the caller before the
+// buffer is touched; otherwise anyone holding a session id could follow
+// another person's stream. An owned session is always answered here: from the
+// buffer, from the stored result once the run has ended, or with a retryable
+// resume_lost while it is still running elsewhere (another pod, or before a
+// restart) — regenerating would start a second, untracked run of the same turn.
+func (h *ChatHandler) resume(
+	ctx context.Context,
+	stream *connect.ServerStream[chatv1.StreamEvent],
+	userID, sessionID uuid.UUID,
+	token string,
+) (handled bool, err error) {
+	key := sessionID.String()
+	if h.runs == nil {
+		if h.resumeBuf != nil {
+			return h.followResume(ctx, stream, userID, sessionID, key, token)
+		}
+		return false, nil
+	}
+	if _, owned, fErr := h.runs.FindBySession(ctx, userID, sessionID); fErr != nil || !owned {
+		if fErr != nil {
+			h.logger.Warn("resume: ownership lookup failed; generating instead", "session_id", sessionID, "error", fErr)
+		}
+		return false, nil
+	}
+	if h.resumeBuf != nil {
+		if handled, rErr := h.followResume(ctx, stream, userID, sessionID, key, token); handled {
+			return true, rErr
+		}
+	}
+	if run, found := h.finishedRun(ctx, userID, sessionID); found {
+		return true, h.sendLoadFromSession(stream, run)
+	}
+	return true, sendResumeLost(stream)
+}
+
+// sendResumeLost tells a resuming client its run is still going but cannot be
+// followed from here, so it should retry or load the stored result later.
+func sendResumeLost(stream *connect.ServerStream[chatv1.StreamEvent]) error {
+	return stream.Send(&chatv1.StreamEvent{
+		Timestamp: timestamppb.Now(),
+		EventId:   uuid.NewString(),
+		IsFinal:   true,
+		EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
+		Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
+			UserMessage:  "This search is still running. Try again in a moment.",
+			InternalCode: "resume_lost",
+			Retryable:    true,
+		}},
+	})
+}
+
+// maxResubscribes bounds how often one resume re-attaches to the buffer after
+// its follower was closed without a terminal event (it fell behind, or the
+// session was dropped), so a pathological run cannot spin the handler.
+const maxResubscribes = 3
+
+// followResume replays a session's buffered events after token and follows the
+// run live until a terminal event reaches the client. handled is false when the
+// buffer does not know the session, so the caller can try the run store.
+//
+// A live channel that closes before a COMPLETE or ERROR was sent means the
+// follower was cut off, not that the run ended: re-subscribe from the last event
+// actually sent. If the session has left the buffer, answer from the run store,
+// and if that cannot say the run is over, tell the client to retry.
+func (h *ChatHandler) followResume(
+	ctx context.Context,
+	stream *connect.ServerStream[chatv1.StreamEvent],
+	userID, sessionID uuid.UUID,
+	bufSessionID, token string,
+) (handled bool, err error) {
+	backlog, live, cancel, found := h.resumeBuf.Subscribe(bufSessionID, token)
+	if !found {
+		return false, nil
+	}
+	defer func() { cancel() }()
+
+	lastSentID := token
+	sentTerminal := false
+	// send reports false once the client is gone. An event that fails to map
+	// counts as not sent, so a lost terminal event still reaches the fallback.
+	send := func(ev locitypes.StreamEvent) bool {
+		resp, mErr := h.mapEventToProto(ctx, ev, userID)
+		if mErr != nil {
+			return true
+		}
+		if stream.Send(resp) != nil {
+			return false
+		}
+		if ev.EventID != "" {
+			lastSentID = ev.EventID
+		}
+		if ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError {
+			sentTerminal = true
+		}
+		return true
+	}
+
+	for attempt := 0; ; attempt++ {
+		for _, ev := range backlog {
+			if !send(ev) {
+				return true, nil
+			}
+		}
+	follow:
+		for {
+			select {
+			case ev, open := <-live:
+				if !open {
+					break follow
+				}
+				if !send(ev) {
+					return true, nil
+				}
+			case <-ctx.Done():
+				return true, nil
+			}
+		}
+		cancel()
+		if sentTerminal {
+			h.logger.Info("resumed stream to its end", "session_id", bufSessionID, "resubscribes", attempt)
+			return true, nil
+		}
+		if attempt >= maxResubscribes {
+			h.logger.Warn("resume kept losing its follower; giving up", "session_id", bufSessionID, "last_event_id", lastSentID)
+			break
+		}
+		h.logger.Info("resume follower closed before the run ended; resubscribing",
+			"session_id", bufSessionID, "last_event_id", lastSentID)
+		backlog, live, cancel, found = h.resumeBuf.Subscribe(bufSessionID, lastSentID)
+		if !found {
+			break
+		}
+	}
+
+	if run, ok := h.finishedRun(ctx, userID, sessionID); ok {
+		return true, h.sendLoadFromSession(stream, run)
+	}
+	return true, sendResumeLost(stream)
+}
+
+// finishedRun looks up the session's latest run and returns it when it has
+// ended (done or failed). A lookup error is logged and treated as "unknown".
+func (h *ChatHandler) finishedRun(ctx context.Context, userID, sessionID uuid.UUID) (runs.Run, bool) {
+	if h.runs == nil || sessionID == uuid.Nil {
+		return runs.Run{}, false
+	}
+	run, found, err := h.runs.FindBySession(ctx, userID, sessionID)
+	if err != nil {
+		h.logger.Warn("resume: run lookup failed", "session_id", sessionID, "error", err)
+		return runs.Run{}, false
+	}
+	if !found || run.Status == runs.StatusRunning {
+		return runs.Run{}, false
+	}
+	return run, true
+}
+
+// sendLoadFromSession ends a resume whose events are gone: the run finished,
+// so its result is stored and GetChatSession / GetSessionPOIs can load it.
+// Navigation carries the same relative path shape the live complete event does.
+func (h *ChatHandler) sendLoadFromSession(stream *connect.ServerStream[chatv1.StreamEvent], run runs.Run) error {
+	if run.Status == runs.StatusFailed {
+		code := run.ErrorCode
+		if code == "" {
+			code = "internal" // StreamError.internal_code has min_len 1
+		}
+		return stream.Send(&chatv1.StreamEvent{
+			Timestamp: timestamppb.Now(),
+			EventId:   uuid.NewString(),
+			IsFinal:   true,
+			EventType: chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR,
+			Payload: &chatv1.StreamEvent_Error{Error: &chatv1.StreamError{
+				UserMessage:  "This search didn't finish. Try it again.",
+				InternalCode: code,
+				Retryable:    true,
+			}},
+		})
+	}
+	path, routeType, query := runs.ResultPath(run.Domain, run.SessionID, run.CityName, uuid.Nil)
+	return stream.Send(&chatv1.StreamEvent{
+		Timestamp:  timestamppb.Now(),
+		EventId:    uuid.NewString(),
+		IsFinal:    true,
+		EventType:  chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE,
+		Navigation: &chatv1.NavigationData{Url: path, RouteType: routeType, QueryParams: query},
+		Payload: &chatv1.StreamEvent_Complete{Complete: &chatv1.CompletePayload{
+			SessionId:       run.SessionID.String(),
+			LoadFromSession: true,
+		}},
+	})
 }
 
 // mapEventToProto translates an internal StreamEvent onto the typed proto
@@ -351,7 +588,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		decodeData(event.Data, &sd)
 		resp.Payload = &chatv1.StreamEvent_Start{Start: &chatv1.StartPayload{
 			SessionId: sd.SessionID,
-			Domain:    domainToProto(sd.Domain),
+			Domain:    runs.DomainToProto(sd.Domain),
 			CityName:  optString(sd.City),
 		}}
 
@@ -579,25 +816,6 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
-	}
-}
-
-func domainToProto(d string) chatv1.DomainType {
-	switch strings.ToLower(d) {
-	case "accommodation":
-		return chatv1.DomainType_DOMAIN_TYPE_ACCOMMODATION
-	case "dining":
-		return chatv1.DomainType_DOMAIN_TYPE_DINING
-	case "activities":
-		return chatv1.DomainType_DOMAIN_TYPE_ACTIVITIES
-	case "itinerary":
-		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
-	case "transport":
-		return chatv1.DomainType_DOMAIN_TYPE_TRANSPORT
-	case "general", "nearby":
-		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
-	default:
-		return chatv1.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
 }
 
@@ -845,4 +1063,37 @@ func (h *ChatHandler) EndSession(
 
 	msg := "session ended"
 	return connect.NewResponse(&commonpb.Response{Success: true, Message: &msg}), nil
+}
+
+// GetRunStatus reports the caller's runs among session_ids.
+func (h *ChatHandler) GetRunStatus(
+	ctx context.Context,
+	req *connect.Request[chatv1.GetRunStatusRequest],
+) (*connect.Response[chatv1.GetRunStatusResponse], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || userIDStr == "" {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
+	}
+
+	if h.runs == nil {
+		return connect.NewResponse(&chatv1.GetRunStatusResponse{}), nil
+	}
+
+	ids := make([]uuid.UUID, 0, len(req.Msg.GetSessionIds()))
+	for _, s := range req.Msg.GetSessionIds() {
+		if id, pErr := uuid.Parse(s); pErr == nil {
+			ids = append(ids, id)
+		}
+	}
+
+	found, err := h.runs.Statuses(ctx, userID, ids)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+
+	return connect.NewResponse(&chatv1.GetRunStatusResponse{Runs: runs.StatusesToProto(found)}), nil
 }
