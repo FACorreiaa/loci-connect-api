@@ -77,3 +77,18 @@ func TestNilTrackerIsANoop(t *testing.T) {
 	tr.Observe(start(uuid.NewString()))
 	tr.Close()
 }
+
+// A run that fails before its start event has no session to link to, so it
+// is recorded as failed but never announced.
+func TestTrackerFailureBeforeStartRecordsButDoesNotAnnounce(t *testing.T) {
+	store := &recordingStore{}
+	var got []Run
+	tr := NewTracker(store, uuid.New(), func(_ context.Context, r Run) { got = append(got, r) }, nil)
+
+	tr.Observe(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "boom"})
+	tr.Close()
+
+	require.Empty(t, store.attached)
+	require.Equal(t, []Status{StatusFailed}, store.finished)
+	require.Empty(t, got, "no session, no notification")
+}

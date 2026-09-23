@@ -113,7 +113,13 @@ func (t *Tracker) finish(status Status, code string) {
 		t.logger.Warn("finish run", "run_id", t.runID, "status", status, "error", err)
 		return
 	}
-	if moved && t.onFinish != nil {
+	// A run that ended before its start event never learned its session, so
+	// there is nothing to link a notification to: record the failure, but
+	// announce nothing.
+	t.mu.Lock()
+	attached := t.attached
+	t.mu.Unlock()
+	if moved && attached && t.onFinish != nil {
 		t.onFinish(context.WithoutCancel(ctx), run)
 	}
 }

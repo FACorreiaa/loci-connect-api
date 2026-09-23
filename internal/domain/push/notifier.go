@@ -51,6 +51,11 @@ func (n *Notifier) OnRunFinished(_ context.Context, run runs.Run) {
 func (n *Notifier) wait() { n.wg.Wait() }
 
 func (n *Notifier) deliver(ctx context.Context, run runs.Run) {
+	// A run with no session has no result to open. The tracker never
+	// reports one; this keeps a stray call from spending the one claim.
+	if run.SessionID == uuid.Nil {
+		return
+	}
 	claimed, err := n.claims.ClaimNotification(ctx, run.ID)
 	if err != nil || !claimed {
 		if err != nil {

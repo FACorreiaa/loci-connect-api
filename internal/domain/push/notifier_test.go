@@ -263,3 +263,20 @@ func TestNotifier_InvalidEndpoint_NeverSent(t *testing.T) {
 	require.Len(t, sent, 1)
 	require.Equal(t, good.Endpoint, sent[0].Endpoint)
 }
+
+func TestNotifier_NilSession_NoClaimNoSend(t *testing.T) {
+	claims := &fakeRunStore{claimed: true}
+	settings := &fakeSettingsReader{settings: &locitypes.NotificationSettings{SearchFinished: true}}
+	devices := &fakeDeviceStore{devices: []Device{{ID: uuid.New(), Endpoint: "https://fcm.googleapis.com/x"}}}
+	sender := newFakeSender()
+
+	run := testRun()
+	run.SessionID = uuid.Nil
+	n := NewNotifier(claims, settings, devices, sender, testLogger())
+	n.OnRunFinished(context.Background(), run)
+	n.wait()
+
+	require.Empty(t, claims.claimArgs, "the one claim must not be spent")
+	require.Equal(t, 0, settings.callCount())
+	require.Empty(t, sender.sentTo())
+}
