@@ -37,6 +37,10 @@ type Handler struct {
 	// Optional, attached via WithAnalytics. Nil records no product events,
 	// which is the normal state wherever no PostHog key is configured.
 	analytics *analytics.Recorder
+
+	// Optional, attached via WithChecklist. Nil makes the checklist RPCs
+	// answer Unimplemented.
+	checklist ChecklistRepository
 }
 
 // WithAnalytics attaches the product-event recorder so a re-opened trip reaches
