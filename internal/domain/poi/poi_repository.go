@@ -1969,10 +1969,15 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
 		return uuid.Nil, fmt.Errorf("failed to check POI existence: %w", err)
 	}
 
-	// Insert new POI
+	if poi.Latitude == 0 && poi.Longitude == 0 {
+		return uuid.Nil, ErrPOIHasNoLocation
+	}
+
+	// Insert new POI. The position lives in the PostGIS column (0003); there
+	// are no latitude/longitude columns, and naming them failed every save.
 	queryInsert := `
-        INSERT INTO points_of_interest (id, city_id, name, latitude, longitude, category)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO points_of_interest (id, city_id, name, location, category)
+        VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($5, $4), 4326), $6)
         RETURNING id
     `
 	poiID := uuid.New()
@@ -2015,14 +2020,22 @@ func (r *RepositoryImpl) SaveItineraryPOIs(ctx context.Context, itineraryID uuid
 	ctx, span := otel.Tracer("LlmInteractionRepo").Start(ctx, "SaveItineraryPOIs")
 	defer span.End()
 
+	// A place with no position cannot be stored; it is left out of the saved
+	// itinerary rather than failing the whole save.
+	placed := pois[:0:0]
 	for i := range pois {
 		poiID, err := r.SavePOItoPointsOfInterest(ctx, pois[i], pois[i].CityID) // Assume CityID is added to POIDetailedInfo or passed separately
+		if errors.Is(err, ErrPOIHasNoLocation) {
+			continue
+		}
 		if err != nil {
 			span.RecordError(err)
 			return fmt.Errorf("failed to ensure POI in points_of_interest: %w", err)
 		}
 		pois[i].ID = poiID
+		placed = append(placed, pois[i])
 	}
+	pois = placed
 
 	source := &ItineraryPOISource{
 		pois:        pois,
@@ -3056,3 +3069,7 @@ func (r *RepositoryImpl) FindLLMPOIByName(ctx context.Context, name string) (uui
 	span.SetAttributes(attribute.String("poi.name", name))
 	return id, nil
 }
+
+// ErrPOIHasNoLocation means a place came without a position. points_of_interest
+// requires one, and inventing 0,0 would put it in the Gulf of Guinea.
+var ErrPOIHasNoLocation = errors.New("poi has no location")
