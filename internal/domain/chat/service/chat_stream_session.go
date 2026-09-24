@@ -76,7 +76,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	// mentions. The hand-off happens before this message is written into the
 	// old session's history, so the old trip is left exactly as it was.
 	if intent == locitypes.IntentAskQuestion || intent == locitypes.IntentModifyItinerary {
-		if city, ok := l.newTripCity(ctx, session, message); ok {
+		if city, stops, ok := l.newTripCity(ctx, session, message, intent); ok {
 			l.logger.InfoContext(ctx, "Follow-up names another city; starting a new trip instead of continuing the session",
 				slog.String("session_id", sessionID.String()),
 				slog.String("session_city", sessionCityName(session)),
@@ -94,6 +94,9 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 				// Only the unary ContinueChat reaches here, and its
 				// collector folds every city in.
 				MultiCityCapable: true,
+				// An edit naming several cities, planned as a trip through
+				// them (the session's city kept first).
+				Stops: stops,
 			})
 		}
 	}
