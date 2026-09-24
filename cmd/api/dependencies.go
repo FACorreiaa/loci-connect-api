@@ -875,7 +875,7 @@ func (d *Dependencies) initHandlers() error {
 	d.IntegrationsHandler = integrations.NewHandler(d.Integrations, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
 	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
-	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService)
+	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).WithPlaces(d.POIRepo)
 	if d.DB != nil {
 		d.TripHandler = d.TripHandler.WithChecklist(trip.NewChecklistRepository(d.DB.Pool))
 	}

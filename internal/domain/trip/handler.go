@@ -34,6 +34,10 @@ type Handler struct {
 	weatherEstimated bool
 	log              *slog.Logger
 
+	// Optional, attached via WithPlaces: fills each stop's `poi` in every
+	// TripDraft response. Nil leaves stops with their id and name only.
+	places PlaceLookup
+
 	// Optional, attached via WithAnalytics. Nil records no product events,
 	// which is the normal state wherever no PostHog key is configured.
 	analytics *analytics.Recorder
@@ -98,7 +102,7 @@ func (h *Handler) SaveTrip(ctx context.Context, req *connect.Request[tripv1.Save
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	return connect.NewResponse(tripToProto(saved)), nil
+	return connect.NewResponse(h.respond(ctx, saved)), nil
 }
 
 func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTripRequest]) (*connect.Response[tripv1.TripDraft], error) {
@@ -116,7 +120,7 @@ func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTr
 	}
 	h.recordReopen(ctx, t, uid)
 	h.recordReopenEvent(t, uid)
-	return connect.NewResponse(tripToProto(t)), nil
+	return connect.NewResponse(h.respond(ctx, t)), nil
 }
 
 func (h *Handler) ListTrips(ctx context.Context, req *connect.Request[tripv1.ListTripsRequest]) (*connect.Response[tripv1.ListTripsResponse], error) {
@@ -138,7 +142,7 @@ func (h *Handler) ListTrips(ctx context.Context, req *connect.Request[tripv1.Lis
 	}
 	out := make([]*tripv1.TripDraft, 0, len(trips))
 	for _, t := range trips {
-		out = append(out, tripToProto(t))
+		out = append(out, h.respond(ctx, t))
 	}
 	return connect.NewResponse(&tripv1.ListTripsResponse{
 		Trips:      out,
@@ -194,7 +198,7 @@ func (h *Handler) mutate(ctx context.Context, tripID string, baseVersion int64, 
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	return connect.NewResponse(tripToProto(saved)), nil
+	return connect.NewResponse(h.respond(ctx, saved)), nil
 }
 
 func (h *Handler) ReorderStops(ctx context.Context, req *connect.Request[tripv1.ReorderStopsRequest]) (*connect.Response[tripv1.TripDraft], error) {
