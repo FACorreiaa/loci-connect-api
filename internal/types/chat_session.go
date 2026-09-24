@@ -207,6 +207,22 @@ type StreamEvent struct {
 	// user-facing prose. Empty on events produced before classification
 	// existed; transports fall back to text matching in that case.
 	ErrorCode StreamErrorCode `json:"error_code,omitempty"`
+	// StopIndex is set on every per-city event of a multi-city stream: the
+	// index of the city it belongs to. An error carrying it failed that city
+	// only; the stream goes on to the next one.
+	StopIndex *int `json:"stop_index,omitempty"`
+}
+
+// IsTerminal reports whether this event ends the stream: COMPLETE, or an
+// ERROR that is not about one city of a multi-city trip.
+func (e StreamEvent) IsTerminal() bool {
+	switch e.Type {
+	case EventTypeComplete:
+		return true
+	case EventTypeError:
+		return e.StopIndex == nil
+	}
+	return false
 }
 
 // StreamErrorCode classifies a streaming failure for transports.
@@ -246,6 +262,8 @@ const (
 	EventTypeMessage         = "message"
 	EventTypeError           = "error"
 	EventTypeComplete        = "complete"
+	// EventTypeRoute opens a multi-city stream (StreamRouteData).
+	EventTypeRoute           = "route"
 	EventTypeDomainDetected  = "domain_detected"
 	EventTypePromptGenerated = "prompt_generated"
 	EventTypeParsingResponse = "parsing_response"
@@ -365,4 +383,39 @@ type SessionPOIPage struct {
 type StreamDroppedStop struct {
 	CityName string `json:"city_name"`
 	Reason   string `json:"reason"`
+}
+
+// StreamRouteData opens a multi-city stream (chat.proto RoutePayload), and is
+// sent again with TripID once the parent trip is saved.
+type StreamRouteData struct {
+	Stops           []StreamRouteStop   `json:"stops"`
+	Legs            []StreamRouteLeg    `json:"legs"`
+	Outline         string              `json:"outline"`
+	Warnings        []string            `json:"warnings,omitempty"`
+	Dropped         []StreamDroppedStop `json:"dropped,omitempty"`
+	TotalTravelMins int                 `json:"total_travel_mins"`
+	TripID          string              `json:"trip_id,omitempty"`
+}
+
+// StreamRouteStop is one city of a multi-city stream.
+type StreamRouteStop struct {
+	Index      int    `json:"index"`
+	CityName   string `json:"city_name"`
+	CityID     string `json:"city_id,omitempty"`
+	SessionID  string `json:"session_id"`
+	DayNumbers []int  `json:"day_numbers"`
+}
+
+// StreamRouteLeg is travel between two cities of a multi-city stream.
+type StreamRouteLeg struct {
+	AfterDay     int     `json:"after_day"`
+	FromName     string  `json:"from_name"`
+	ToName       string  `json:"to_name"`
+	FromLat      float64 `json:"from_lat"`
+	FromLon      float64 `json:"from_lon"`
+	ToLat        float64 `json:"to_lat"`
+	ToLon        float64 `json:"to_lon"`
+	DistanceKm   float64 `json:"distance_km"`
+	DurationMins int     `json:"duration_mins"`
+	Mode         string  `json:"mode"`
 }

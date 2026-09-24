@@ -21,6 +21,7 @@ import (
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
@@ -144,9 +145,10 @@ func (h *ChatHandler) StreamChat(
 	eventCh := make(chan locitypes.StreamEvent, 100)
 
 	// Propagate trace/request IDs from the RPC context, but detach client cancel
-	// so LLM work can finish after disconnect. Handler timeout (CHAT_RPC_TIMEOUT_SEC,
-	// default 3m) bounds preparation; workers use a separate 5m deadline.
-	llmCtx, llmCancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute)
+	// so LLM work can finish after disconnect. The stream as a whole gets one
+	// city's budget per possible city of a multi-city trip; each city's
+	// generation is bounded to perCityBudget inside the pipeline.
+	llmCtx, llmCancel := context.WithTimeout(context.WithoutCancel(ctx), streamBudget())
 
 	// Resume/trip context from the request. session_id asks the server to
 	// continue an existing session rather than mint a new one.
@@ -163,7 +165,21 @@ func (h *ChatHandler) StreamChat(
 		}
 	}
 
+	var stops []common.TripStopRequest
+	for _, st := range req.Msg.GetStops() {
+		stops = append(stops, common.TripStopRequest{CityName: st.GetCityName(), Nights: int(st.GetNights()), CityID: st.GetCityId()})
+	}
+	// One stop is just a city.
+	if len(stops) == 1 {
+		if cityName == "" {
+			cityName = stops[0].CityName
+		}
+		stops = nil
+	}
+
 	cc := common.ChatContext{
+		Stops:              stops,
+		SuggestOrder:       req.Msg.GetSuggestOrder(),
 		Ctx:                llmCtx,
 		UserID:             userID,
 		ProfileID:          profileID,
@@ -298,7 +314,7 @@ func (h *ChatHandler) StreamChat(
 				return nil
 			}
 
-			if event.Type == locitypes.EventTypeComplete || event.Type == locitypes.EventTypeError {
+			if event.IsTerminal() {
 				h.logger.Info("Stream completed", "event_type", event.Type)
 				// The pipeline goroutine still closes eventCh after this; keep
 				// draining so any trailing events are recorded and the tracker
@@ -444,7 +460,7 @@ func (h *ChatHandler) followResume(
 		if ev.EventID != "" {
 			lastSentID = ev.EventID
 		}
-		if ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError {
+		if ev.IsTerminal() {
 			sentTerminal = true
 		}
 		return true
@@ -566,7 +582,17 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		}
 	}
 
+	if event.StopIndex != nil {
+		idx := int32(*event.StopIndex)
+		resp.StopIndex = &idx
+	}
+
 	switch event.Type {
+	case locitypes.EventTypeRoute:
+		var rd locitypes.StreamRouteData
+		decodeData(event.Data, &rd)
+		resp.Payload = &chatv1.StreamEvent_Route{Route: routeToProto(rd)}
+
 	case locitypes.EventTypeError:
 		resp.Payload = &chatv1.StreamEvent_Error{Error: streamErrorFromEvent(event)}
 
@@ -827,6 +853,8 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ERROR
 	case locitypes.EventTypeComplete:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE
+	case locitypes.EventTypeRoute:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ROUTE
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
 	}
@@ -1112,4 +1140,47 @@ var tokenPartIndex = map[string]int32{
 	"hotels":       3,
 	"restaurants":  4,
 	"activities":   5,
+}
+
+// perCityBudget bounds one city's generation — what the whole stream used to
+// get. A multi-city stream runs its cities one after another, so the stream as
+// a whole gets one budget per possible city.
+const (
+	perCityBudget = 3 * time.Minute
+	maxStops      = 5
+)
+
+func streamBudget() time.Duration { return perCityBudget * maxStops }
+
+// routeToProto converts a multi-city route to the wire shape.
+func routeToProto(rd locitypes.StreamRouteData) *chatv1.RoutePayload {
+	out := &chatv1.RoutePayload{
+		Outline:         rd.Outline,
+		Warnings:        rd.Warnings,
+		TotalTravelMins: int32(rd.TotalTravelMins),
+	}
+	if rd.TripID != "" {
+		id := rd.TripID
+		out.TripId = &id
+	}
+	for _, st := range rd.Stops {
+		days := make([]int32, len(st.DayNumbers))
+		for i, d := range st.DayNumbers {
+			days[i] = int32(d)
+		}
+		out.Stops = append(out.Stops, &chatv1.StopRef{
+			Index: int32(st.Index), CityName: st.CityName, CityId: st.CityID, SessionId: st.SessionID, DayNumbers: days,
+		})
+	}
+	for _, l := range rd.Legs {
+		out.Legs = append(out.Legs, &tripv1.TripLeg{
+			AfterDay: int32(l.AfterDay), FromName: l.FromName, ToName: l.ToName,
+			FromLat: l.FromLat, FromLon: l.FromLon, ToLat: l.ToLat, ToLon: l.ToLon,
+			DistanceKm: l.DistanceKm, DurationMins: int32(l.DurationMins), Mode: l.Mode,
+		})
+	}
+	for _, d := range rd.Dropped {
+		out.Dropped = append(out.Dropped, &chatv1.DroppedStop{CityName: d.CityName, Reason: d.Reason})
+	}
+	return out
 }

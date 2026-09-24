@@ -92,3 +92,16 @@ func TestTrackerFailureBeforeStartRecordsButDoesNotAnnounce(t *testing.T) {
 	require.Equal(t, []Status{StatusFailed}, store.finished)
 	require.Empty(t, got, "no session, no notification")
 }
+
+// A multi-city stream reports one city's failure as a tagged ERROR and goes
+// on to the next city; the run must not be marked failed for it.
+func TestTrackerStopErrorIsNotTerminal(t *testing.T) {
+	store := &recordingStore{}
+	tr := NewTracker(store, uuid.New(), nil, nil)
+	tr.Observe(start(uuid.NewString()))
+	one := 1
+	tr.Observe(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "porto failed", StopIndex: &one})
+	require.Empty(t, store.finished, "a stop-tagged error must not finish the run")
+	tr.Observe(locitypes.StreamEvent{Type: locitypes.EventTypeComplete})
+	require.Equal(t, []Status{StatusDone}, store.finished)
+}
