@@ -486,9 +486,30 @@ func TestGenerationKeyIsStable(t *testing.T) {
 		SnapshotHash: "snapshot",
 		UserID:       uuid.MustParse("22222222-2222-2222-2222-222222222222"),
 		POITarget:    24,
+		TripDays:     4,
 	}
-	const want = "gen:51867f217e7ee71437afc20dc2d3507132e35f78f9cbaa6224e480524bd15049"
+	// Moved when trip length joined the key (multi-city review #8): one miss
+	// per cached answer, once, instead of a wrong-length plan served forever.
+	const want = "gen:d455d615f1dece410b365133825caf25d8a66083a34b197dd503383aabfe285c"
 	if got := buildGenerationKey(in); got != want {
 		t.Errorf("generation key = %q, want %q", got, want)
+	}
+}
+
+// Review #8: the prompt asks for a number of days, so "Lisbon for 10 days"
+// and "Lisbon for 14 days" — which can clean to the same query — must not
+// share an answer.
+func TestTripDaysSeparatesPlannedAnswers(t *testing.T) {
+	in := generationKeyInput{Part: partItinerary, Domain: locitypes.DomainItinerary, CityName: "Lisbon", ModelID: "m", Query: "trip", POITarget: 40, TripDays: 10}
+	ten := buildGenerationKey(in)
+	in.TripDays = 14
+	if buildGenerationKey(in) == ten {
+		t.Fatal("10 and 14 days must key differently")
+	}
+	city := generationKeyInput{Part: partCityData, CityName: "Lisbon", ModelID: "m", Query: "trip", TripDays: 10}
+	a := buildGenerationKey(city)
+	city.TripDays = 14
+	if buildGenerationKey(city) != a {
+		t.Fatal("city data does not depend on trip length")
 	}
 }

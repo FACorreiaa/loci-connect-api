@@ -159,6 +159,7 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 				Lon:          lon,
 				HasLocation:  hasLocation,
 				POITarget:    cc.POITarget,
+				TripDays:     cc.TripDays,
 			}),
 			TTL:       partTTL(p),
 			Cacheable: cc.Cacheable,
