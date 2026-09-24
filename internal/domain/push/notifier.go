@@ -124,6 +124,14 @@ func (n *Notifier) send(ctx context.Context, run runs.Run, platform string, send
 		observability.PushSentTotal.WithLabelValues(platform, "invalid_endpoint").Inc()
 		return
 	}
+	n.sendOne(ctx, platform, sender, d, body, "run_id", run.ID)
+}
+
+// sendOne delivers one body to one device, records the outcome, and removes
+// the device when its push service says it is gone for good (a 410 web
+// endpoint; an APNs BadDeviceToken / Unregistered token). logKey/logValue
+// name what is being announced, for the failure log line.
+func (n *Notifier) sendOne(ctx context.Context, platform string, sender Sender, d Device, body []byte, logKey string, logValue any) {
 	gone, err := sender.Send(ctx, d, body)
 	switch {
 	case gone:
@@ -133,7 +141,7 @@ func (n *Notifier) send(ctx context.Context, run runs.Run, platform string, send
 		}
 	case err != nil:
 		observability.PushSentTotal.WithLabelValues(platform, "error").Inc()
-		n.logger.Warn("push send failed", "run_id", run.ID, "platform", platform, "device_id", d.ID, "error", err)
+		n.logger.Warn("push send failed", logKey, logValue, "platform", platform, "device_id", d.ID, "error", err)
 	default:
 		observability.PushSentTotal.WithLabelValues(platform, "sent").Inc()
 	}

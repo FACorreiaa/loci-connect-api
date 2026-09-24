@@ -43,7 +43,7 @@ func NewService(repo Repository, sessions Sessions, gen TextGenerator, logger *s
 	}
 }
 
-// WithNotifier sets who hears about posted messages (Stage D: APNs).
+// WithNotifier sets who hears about posted messages (PushNotifier: APNs).
 func (s *Service) WithNotifier(n Notifier) *Service {
 	if n != nil {
 		s.notifier = n
@@ -181,7 +181,7 @@ func (s *Service) Run(ctx context.Context, w Watch) error {
 	if err := s.sessions.AddMessageToSession(ctx, w.SessionID, msg); err != nil {
 		return fmt.Errorf("append to thread: %w", err)
 	}
-	s.notifier.WatchPosted(ctx, w, msg)
+	s.notifier.WatchPosted(ctx, w, session.CityName, msg)
 	return nil
 }
 

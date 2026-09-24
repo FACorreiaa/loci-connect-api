@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -758,6 +759,34 @@ func TestLoad_CacheGenerationsEnabled(t *testing.T) {
 			}
 			if cfg.Cache.GenerationsEnabled != tc.want {
 				t.Errorf("Cache.GenerationsEnabled = %v, want %v", cfg.Cache.GenerationsEnabled, tc.want)
+			}
+		})
+	}
+}
+
+func TestAPNSKey_InlineOrPath(t *testing.T) {
+	const pemKey = "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----"
+	dir := t.TempDir()
+	path := dir + "/AuthKey_TEST.p8"
+	if err := os.WriteFile(path, []byte(pemKey+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b64 := base64.StdEncoding.EncodeToString([]byte(pemKey))
+
+	cases := []struct {
+		name, inline, path, want string
+	}{
+		{"inline pem", pemKey, "", pemKey},
+		{"inline base64", b64, "", pemKey},
+		{"path when inline empty", "", path, pemKey},
+		{"inline wins over path", b64, dir + "/missing.p8", pemKey},
+		{"unreadable path is off", "", dir + "/missing.p8", ""},
+		{"nothing set is off", "", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := string(apnsKey(tc.inline, tc.path)); got != tc.want {
+				t.Fatalf("apnsKey(%q, %q) = %q, want %q", tc.name, tc.path, got, tc.want)
 			}
 		})
 	}

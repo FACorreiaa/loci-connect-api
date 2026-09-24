@@ -102,18 +102,16 @@ type TextGenerator interface {
 	GenerateText(ctx context.Context, prompt string, config *genai.GenerateContentConfig) (string, error)
 }
 
-// Notifier is told when a watch has posted into a thread.
-//
-// TODO(muse stage D): an APNs implementation that pushes to the user's
-// registered devices (push_devices, platform "apns") and deep-links to
-// msg's session. Until then the message is only in the thread.
+// Notifier is told when a watch has posted into a thread. cityName is the
+// thread's city, for a deep link back to it. PushNotifier announces it on
+// the user's iPhones; without one the message is only in the thread.
 type Notifier interface {
-	WatchPosted(ctx context.Context, w Watch, msg locitypes.ConversationMessage)
+	WatchPosted(ctx context.Context, w Watch, cityName string, msg locitypes.ConversationMessage)
 }
 
 type noopNotifier struct{}
 
-func (noopNotifier) WatchPosted(context.Context, Watch, locitypes.ConversationMessage) {}
+func (noopNotifier) WatchPosted(context.Context, Watch, string, locitypes.ConversationMessage) {}
 
 // nextSlot is the first time strictly after now on w's schedule, counting
 // from its current next_run_at. Missed slots (the server was down) are

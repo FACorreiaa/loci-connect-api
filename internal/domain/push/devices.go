@@ -1,6 +1,6 @@
 // Package push delivers "your search is done" to the devices a person has
-// registered. Web push (VAPID) only for now; APNs rows are stored for the
-// iOS app but not sent to.
+// registered (web push and APNs), and announces a standing task's message
+// on their iPhones (APNs).
 package push
 
 import (

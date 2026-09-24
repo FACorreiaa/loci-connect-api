@@ -114,18 +114,22 @@ func NewAPNSSender(cfg config.PushConfig, client *http.Client) (*APNSSender, err
 // custom keys the web payload carries at the top level, which is where the
 // app's SessionLink(userInfo:) reads them.
 type apnsBody struct {
-	APS       apnsAPS `json:"aps"`
-	SessionID string  `json:"sessionId"`
-	CityName  string  `json:"cityName"`
-	Domain    string  `json:"domain"`
-	Status    string  `json:"status"`
-	URL       string  `json:"url"`
+	APS         apnsAPS `json:"aps"`
+	SessionID   string  `json:"sessionId"`
+	CityName    string  `json:"cityName"`
+	Domain      string  `json:"domain"`
+	Status      string  `json:"status,omitempty"`
+	URL         string  `json:"url"`
+	MessageID   string  `json:"messageId,omitempty"`
+	Origin      string  `json:"origin,omitempty"`
+	SourceLabel string  `json:"sourceLabel,omitempty"`
 }
 
 type apnsAPS struct {
 	Alert    apnsAlert `json:"alert"`
 	Sound    string    `json:"sound"`
 	ThreadID string    `json:"thread-id"`
+	Category string    `json:"category,omitempty"`
 }
 
 type apnsAlert struct {
@@ -135,17 +139,25 @@ type apnsAlert struct {
 
 // EncodeAPNS turns the shared Payload into the APNs body.
 func EncodeAPNS(p Payload) ([]byte, error) {
+	threadID := p.ThreadID
+	if threadID == "" {
+		threadID = "search"
+	}
 	return json.Marshal(apnsBody{
 		APS: apnsAPS{
 			Alert:    apnsAlert{Title: p.Title, Body: p.Body},
 			Sound:    "default",
-			ThreadID: "search",
+			ThreadID: threadID,
+			Category: p.Category,
 		},
-		SessionID: p.SessionID,
-		CityName:  p.CityName,
-		Domain:    p.Domain,
-		Status:    p.Status,
-		URL:       p.URL,
+		SessionID:   p.SessionID,
+		CityName:    p.CityName,
+		Domain:      p.Domain,
+		Status:      p.Status,
+		URL:         p.URL,
+		MessageID:   p.MessageID,
+		Origin:      p.Origin,
+		SourceLabel: p.SourceLabel,
 	})
 }
 

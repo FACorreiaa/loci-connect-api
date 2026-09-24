@@ -332,7 +332,8 @@ type PushConfig struct {
 
 	APNSKeyID  string
 	APNSTeamID string
-	// APNSKey is the .p8 contents (PEM). The env carries it base64-encoded.
+	// APNSKey is the .p8 contents (PEM). APNS_KEY_P8 carries it inline
+	// (base64 or PEM); APNS_KEY_PATH names a file holding it instead.
 	APNSKey []byte
 	// APNSTopics are the bundle ids a device may register for; anything else
 	// is refused at registration, so a client cannot aim us at another app.
@@ -378,6 +379,25 @@ func apnsKeyFromEnv(raw string) []byte {
 		return decoded
 	}
 	return []byte(raw)
+}
+
+// apnsKey reads the push key from APNS_KEY_P8 (inline, base64 or PEM) or,
+// when that is empty, from the file APNS_KEY_PATH names (a mounted secret,
+// or the .p8 on a laptop). A path that cannot be read leaves APNs off; the
+// boot log then says so rather than the first push failing.
+func apnsKey(inline, path string) []byte {
+	if key := apnsKeyFromEnv(inline); key != nil {
+		return key
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(path) //nolint:gosec // operator-supplied path to the push key
+	if err != nil {
+		return nil
+	}
+	return apnsKeyFromEnv(string(raw))
 }
 
 type ObservabilityConfig struct {
@@ -474,7 +494,7 @@ func Load() (*Config, error) {
 			VAPIDSubject:    strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
 			APNSKeyID:       strings.TrimSpace(getEnv("APNS_KEY_ID", "")),
 			APNSTeamID:      strings.TrimSpace(getEnv("APNS_TEAM_ID", "")),
-			APNSKey:         apnsKeyFromEnv(getEnv("APNS_KEY_P8", "")),
+			APNSKey:         apnsKey(getEnv("APNS_KEY_P8", ""), getEnv("APNS_KEY_PATH", "")),
 			APNSTopics: []string{
 				strings.TrimSpace(getEnv("APNS_TOPIC_PROD", "")),
 				strings.TrimSpace(getEnv("APNS_TOPIC_BETA", "")),
