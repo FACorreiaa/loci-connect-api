@@ -188,10 +188,21 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		return nil, streamErr
 	}
 
+	// The continuation may have decided this was a new trip and started a
+	// session of its own (see ContinueSessionStreamed). The answer then
+	// belongs to that session, and a caller paging through it — the Telegram
+	// "more" button — must be pointed at the right one.
+	isNew := false
+	if lastItinerary.SessionID != uuid.Nil && lastItinerary.SessionID != sessionID {
+		sessionID = lastItinerary.SessionID
+		isNew = true
+	}
+
 	return &locitypes.ChatResponse{
 		SessionID:        sessionID,
 		Message:          lastMessage,
 		UpdatedItinerary: &lastItinerary,
+		IsNewSession:     isNew,
 	}, nil
 }
 
