@@ -128,9 +128,14 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 
 		stopCh := make(chan locitypes.StreamEvent, 100)
 		done := make(chan struct{})
+		// Written by the forwarder, read only after <-done below.
+		reported := false
 		go func(index int) {
 			defer close(done)
 			for ev := range stopCh {
+				if ev.Type == locitypes.EventTypeError {
+					reported = true
+				}
 				if out, keep := forwardStopEvent(ev, index); keep {
 					l.sendEvent(ctx, cc.EventCh, out, 3)
 				}
@@ -149,6 +154,18 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 		if err != nil {
 			l.logger.WarnContext(ctx, "multi-city: a city failed; continuing with the rest",
 				slog.Int("stop", i), slog.String("city", s.CityName), slog.Any("error", err))
+			// Said for the city on the stream's context when it could not say it
+			// itself — a city that ran out of time has no context to send on —
+			// or the clients would show it as still planning after the run.
+			if reported {
+				continue
+			}
+			idx := i
+			l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
+				Type:      locitypes.EventTypeError,
+				Error:     "We couldn't plan " + s.CityName + " this time.",
+				StopIndex: &idx,
+			}, 3)
 			continue
 		}
 		succeeded++

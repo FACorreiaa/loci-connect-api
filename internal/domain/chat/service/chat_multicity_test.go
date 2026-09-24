@@ -252,3 +252,29 @@ func TestCityDeadline_FitsTheRunBudget(t *testing.T) {
 		t.Fatalf("multi-city budget %v must stay under run staleness %v", multiCityBudget, runs.StaleAfter)
 	}
 }
+
+// Review #2: a city whose own deadline expired cannot send its ERROR (its
+// context is gone), so the run sends it for the city on the stream's context.
+func TestProcessMultiCity_SilentCityFailureIsReported(t *testing.T) {
+	events := make(chan locitypes.StreamEvent, 100)
+	l := newStreamService(t, &TestLLMClient{})
+	l.runCityFn = func(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
+		if cc.CityName == "Porto" {
+			return nil, context.DeadlineExceeded // no event sent: the city's context had expired
+		}
+		return &locitypes.AiCityResponse{}, nil
+	}
+	if err := l.processMultiCity(common.ChatContext{Ctx: context.Background(), EventCh: events}, twoCityRoute()); err != nil {
+		t.Fatal(err)
+	}
+	close(events)
+	found := false
+	for ev := range events {
+		if ev.Type == locitypes.EventTypeError && ev.StopIndex != nil && *ev.StopIndex == 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("Porto's failure must reach the client as a stop-tagged ERROR")
+	}
+}
