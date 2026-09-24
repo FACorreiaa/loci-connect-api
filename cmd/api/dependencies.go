@@ -65,6 +65,7 @@ import (
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/vocabulary"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/watch"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/ai"
@@ -204,6 +205,14 @@ type Dependencies struct {
 	CompareHandler           *compare.Handler
 	CityHandler              *cityhandler.CityHandler
 	TravelHistoryHandler     *travelhistory.Handler
+	// WatchHandler serves standing tasks. Always built: proposing, storing
+	// and listing work without a model; only running them needs one.
+	WatchHandler *watch.Handler
+
+	// watchRunner runs due standing tasks; nil when no model could be built
+	// or WATCH_RUNNER_ENABLED=false. watchClient is the model it runs them on.
+	watchRunner *watch.Runner
+	watchClient interface{ Close() error }
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
@@ -607,6 +616,44 @@ func (d *Dependencies) RunAppleSecretRefresh(ctx context.Context) error {
 	return d.OAuthService.RunAppleSecretRefresh(ctx)
 }
 
+// initWatches builds standing tasks: the WatchService handler, and the
+// runner that posts due tasks into their threads.
+//
+// The runner gets its own client on the operator's provider chain rather
+// than the per-user BYOK router: a tick runs outside any request, so there
+// is no caller whose key or plan could be looked up.
+func (d *Dependencies) initWatches() {
+	var gen watch.TextGenerator
+	if envFlag("WATCH_RUNNER_ENABLED", true) {
+		client, err := ai.NewChatClient(context.Background(), d.Config.AI, d.Logger)
+		if err != nil {
+			d.Logger.Warn("standing tasks will be stored but not run: no model", slog.Any("error", err))
+		} else {
+			gen = client
+			d.watchClient = client
+		}
+	} else {
+		d.Logger.Info("standing-task runner disabled by WATCH_RUNNER_ENABLED")
+	}
+	svc := watch.NewService(watch.NewPostgresRepository(d.DB.Pool), d.ChatRepo, gen, d.Logger)
+	d.WatchHandler = watch.NewHandler(svc)
+	if svc.CanRun() {
+		d.watchRunner = watch.NewRunner(svc, watch.NewPgLocker(d.DB.Pool), d.Logger)
+	}
+}
+
+// RunWatches runs due standing tasks every minute until ctx is cancelled.
+//
+// Returns nil immediately when there is no runner, so the caller can start it
+// unconditionally. Every replica runs the loop; a Postgres advisory lock lets
+// only one of them do the work in any tick.
+func (d *Dependencies) RunWatches(ctx context.Context) error {
+	if d.watchRunner == nil {
+		return nil
+	}
+	return d.watchRunner.Run(ctx)
+}
+
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
@@ -758,6 +805,7 @@ func (d *Dependencies) initHandlers() error {
 		d.Logger.Info("web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT not all set")
 	}
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
+	d.initWatches()
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger).
@@ -936,6 +984,11 @@ func (d *Dependencies) initHandlers() error {
 
 // Cleanup closes all resources
 func (d *Dependencies) Cleanup() {
+	if d.watchClient != nil {
+		if err := d.watchClient.Close(); err != nil {
+			d.Logger.Warn("failed to close standing-task model client", slog.Any("error", err))
+		}
+	}
 	if closer, ok := d.ChatService.(interface{ Close() }); ok {
 		closer.Close()
 	}

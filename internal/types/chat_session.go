@@ -49,7 +49,21 @@ type ConversationMessage struct {
 	MessageType MessageType     `json:"message_type"` // initial_request, modification_request, response
 	Timestamp   time.Time       `json:"timestamp"`
 	Metadata    MessageMetadata `json:"metadata"`
+	// Origin is empty for every message stored before proactive messages
+	// existed; empty reads as OriginReply.
+	Origin MessageOrigin `json:"origin,omitempty"`
+	// SourceLabel captions a proactive bubble, e.g. "Standing task".
+	SourceLabel string `json:"source_label,omitempty"`
 }
+
+// MessageOrigin says why a message is in the thread: an answer to the user,
+// or something the agent posted on its own.
+type MessageOrigin string
+
+const (
+	OriginReply     MessageOrigin = "reply"
+	OriginProactive MessageOrigin = "proactive"
+)
 
 type MessageRole string
 
