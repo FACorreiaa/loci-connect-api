@@ -11,6 +11,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/multicity"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -232,5 +233,22 @@ func TestTurnCollector_KeepsEveryCity(t *testing.T) {
 	}
 	if resp.Message != "" {
 		t.Fatalf("a city's progress text leaked into the message: %q", resp.Message)
+	}
+}
+
+// Review #1: the whole run fits inside the run store's staleness window, so a
+// long trip is never recorded as failed while it is still working.
+func TestCityDeadline_FitsTheRunBudget(t *testing.T) {
+	if got := cityDeadline(multiCityBudget, 2); got != cityBudget {
+		t.Fatalf("two cities get the full per-city budget, got %v", got)
+	}
+	if got := cityDeadline(multiCityBudget, 5); got*5 > multiCityBudget {
+		t.Fatalf("five cities must fit the run budget: %v each", got)
+	}
+	if got := cityDeadline(30*time.Second, 2); got < minCityBudget {
+		t.Fatalf("a city always gets at least %v, got %v", minCityBudget, got)
+	}
+	if multiCityBudget >= runs.StaleAfter {
+		t.Fatalf("multi-city budget %v must stay under run staleness %v", multiCityBudget, runs.StaleAfter)
 	}
 }

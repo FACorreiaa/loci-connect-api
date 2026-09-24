@@ -3,11 +3,13 @@ package handler
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -77,9 +79,13 @@ func TestMapEventToProto_RouteAndStopIndex(t *testing.T) {
 	}
 }
 
-// Review Focus #3: five cities run one after another.
+// Review Focus #3 / review #1: the stream outlives the planner's own budget
+// but stays inside the run store's staleness window.
 func TestStreamBudget(t *testing.T) {
-	if streamBudget() < maxStops*perCityBudget {
-		t.Fatalf("stream budget %v must cover %d sequential cities", streamBudget(), maxStops)
+	if streamBudget() >= runs.StaleAfter {
+		t.Fatalf("stream budget %v must stay under run staleness %v", streamBudget(), runs.StaleAfter)
+	}
+	if streamBudget() < 9*time.Minute {
+		t.Fatalf("stream budget %v must cover a multi-city run", streamBudget())
 	}
 }

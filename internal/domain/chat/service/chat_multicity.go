@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"strings"
@@ -9,15 +10,41 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/tripspan"
 )
 
-// cityBudget bounds one city's generation. A multi-city stream runs several
-// one after another, so the handler gives the stream as a whole one of these
-// per possible city.
+// cityBudget bounds one city's generation — what a single-city turn has
+// always had.
 const cityBudget = 3 * time.Minute
+
+// multiCityBudget is the whole of a multi-city run. It stays under the run
+// store's staleness window, which is what marks a run failed for good: a
+// trip still working at that point would be reported as dead and its done
+// notification refused.
+const multiCityBudget = runs.StaleAfter - time.Minute
+
+// minCityBudget is the least a city gets however many are left. Below it a
+// generation cannot finish, and failing fast is better than failing slowly.
+const minCityBudget = 90 * time.Second
+
+// cityDeadline shares what is left of the run between the cities still to go,
+// never more than one city's own budget and never less than the minimum.
+func cityDeadline(remaining time.Duration, citiesLeft int) time.Duration {
+	if citiesLeft < 1 {
+		citiesLeft = 1
+	}
+	d := remaining / time.Duration(citiesLeft)
+	if d > cityBudget {
+		d = cityBudget
+	}
+	if d < minCityBudget {
+		d = minCityBudget
+	}
+	return d
+}
 
 var errNoCityPlanned = errors.New("we couldn't plan any of these cities — try again in a moment")
 
@@ -67,6 +94,7 @@ func (l *ServiceImpl) planMultiCity(cc *common.ChatContext) (*multiCityRoute, er
 // index, then one parent trip and one COMPLETE.
 func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute) error {
 	ctx := cc.Ctx
+	runStart := time.Now()
 	for i := range r.Stops {
 		if r.Stops[i].SessionID == uuid.Nil {
 			r.Stops[i].SessionID = uuid.New()
@@ -111,7 +139,10 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 		child.EventCh = stopCh
 
 		started := time.Now()
+		cityCtx, cancelCity := context.WithTimeout(ctx, cityDeadline(multiCityBudget-time.Since(runStart), len(r.Stops)-i))
+		child.Ctx = cityCtx
 		data, err := l.runCity(child)
+		cancelCity()
 		close(stopCh)
 		<-done
 

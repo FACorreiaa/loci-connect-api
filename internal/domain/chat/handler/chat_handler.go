@@ -1142,15 +1142,12 @@ var tokenPartIndex = map[string]int32{
 	"activities":   5,
 }
 
-// perCityBudget bounds one city's generation — what the whole stream used to
-// get. A multi-city stream runs its cities one after another, so the stream as
-// a whole gets one budget per possible city.
-const (
-	perCityBudget = 3 * time.Minute
-	maxStops      = 5
-)
-
-func streamBudget() time.Duration { return perCityBudget * maxStops }
+// streamBudget bounds a whole stream. A multi-city trip runs its cities one
+// after another and shares its budget between them (service.multiCityBudget),
+// so the stream gets nearly all of the run store's staleness window — past it
+// the run is recorded as failed however the stream ends. A single city is
+// still bounded to its own three minutes inside the pipeline.
+func streamBudget() time.Duration { return runs.StaleAfter - 30*time.Second }
 
 // routeToProto converts a multi-city route to the wire shape.
 func routeToProto(rd locitypes.StreamRouteData) *chatv1.RoutePayload {
