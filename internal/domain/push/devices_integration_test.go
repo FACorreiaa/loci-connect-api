@@ -98,7 +98,7 @@ func TestUpsertDoesNotCrossPlatforms(t *testing.T) {
 	})
 
 	require.NoError(t, s.Upsert(ctx, Device{UserID: userA, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-a", Auth: "auth-a"}, "agent-a"))
-	require.NoError(t, s.Upsert(ctx, userB, "apns", endpoint, "", "", "agent-b"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userB, Platform: "apns", Endpoint: endpoint, APNSTopic: "com.example.app"}, "agent-b"))
 
 	devicesA, err := s.ForUser(ctx, userA, "web_push")
 	require.NoError(t, err)
