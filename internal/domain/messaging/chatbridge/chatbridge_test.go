@@ -459,3 +459,33 @@ func TestAnUncreditedPictureIsNotSent(t *testing.T) {
 		t.Errorf("the creditable picture should still be sent:\n%s", got)
 	}
 }
+
+// A multi-city answer is the route and then every city's plan, not just the
+// last city's.
+func TestReplyRendersEveryCityOfAMultiCityTrip(t *testing.T) {
+	city := func(name, poi string) locitypes.AiCityResponse {
+		return locitypes.AiCityResponse{
+			GeneralCityData: locitypes.GeneralCityData{City: name},
+			AIItineraryResponse: locitypes.AIItineraryResponse{
+				ItineraryName:    name + " plan",
+				PointsOfInterest: []locitypes.POIDetailedInfo{{Name: poi}},
+			},
+		}
+	}
+	text, _ := reply(&locitypes.ChatResponse{
+		Message:      "city_started",
+		RouteOutline: "Lisbon (2 days) → Porto (1 day) · ≈3h travel in total",
+		Cities:       []locitypes.AiCityResponse{city("Lisbon", "Belém Tower"), city("Porto", "Ribeira")},
+	})
+	for _, want := range []string{"Lisbon (2 days) → Porto", "Belém Tower", "Ribeira"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("reply missing %q:\n%s", want, text)
+		}
+	}
+	if strings.Index(text, "Belém Tower") > strings.Index(text, "Ribeira") {
+		t.Fatal("cities must be in route order")
+	}
+	if strings.Contains(text, "city_started") {
+		t.Fatal("progress text must not leak into the reply")
+	}
+}

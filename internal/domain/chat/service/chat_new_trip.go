@@ -23,7 +23,7 @@ import (
 // Extraction is cached on the message text, so the new-trip flow this hands
 // off to pays nothing extra when it runs the same extraction again.
 func (l *ServiceImpl) newTripCity(ctx context.Context, session *locitypes.ChatSession, message string) (string, bool) {
-	extracted, _, err := l.extractCityCached(ctx, message)
+	tc, err := l.extractTripCitiesCached(ctx, message)
 	if err != nil {
 		// Not knowing is not a reason to fail the turn: the session continues
 		// as it always did.
@@ -31,6 +31,12 @@ func (l *ServiceImpl) newTripCity(ctx context.Context, session *locitypes.ChatSe
 			slog.Any("error", err))
 		return "", false
 	}
+	// Two or more cities is a multi-city trip, whatever the session is about:
+	// ProcessUnifiedChatMessageStream, which this hands off to, plans it.
+	if len(tc.Cities) >= 2 {
+		return tc.First(), true
+	}
+	extracted := tc.First()
 	if !startsNewTrip(sessionCityName(session), extracted, session.CurrentItinerary) {
 		return "", false
 	}

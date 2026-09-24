@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,31 +122,16 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		}
 	})
 
-	var lastItinerary locitypes.AiCityResponse
-	var lastMessage string
-	var sessionID uuid.UUID
-
+	var c turnCollector
 	for event := range eventCh {
-		if event.Type == locitypes.EventTypeItinerary {
-			if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
-				lastItinerary = itinerary
-				sessionID = itinerary.SessionID
-			}
-		}
-		if event.Message != "" {
-			lastMessage = event.Message
-		}
+		c.observe(event)
 	}
 
 	if streamErr != nil {
 		return nil, streamErr
 	}
 
-	return &locitypes.ChatResponse{
-		SessionID:        sessionID,
-		Message:          lastMessage,
-		UpdatedItinerary: &lastItinerary,
-	}, nil
+	return c.response(uuid.Nil), nil
 }
 
 // ContinueChat is a unary wrapper around the streaming continuation flow.
@@ -162,26 +148,9 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 		}
 	})
 
-	var lastItinerary locitypes.AiCityResponse
-	var lastMessage string
-
+	var c turnCollector
 	for event := range eventCh {
-		if event.Type == locitypes.EventTypeItinerary {
-			// Try type assertion for pointer first
-			if itinerary, ok := event.Data.(*locitypes.AiCityResponse); ok {
-				lastItinerary = *itinerary
-				l.logger.Debug("Captured itinerary from event (pointer)", "poi_count", len(itinerary.AIItineraryResponse.PointsOfInterest))
-			} else if itinerary, ok := event.Data.(locitypes.AiCityResponse); ok {
-				// Try value type
-				lastItinerary = itinerary
-				l.logger.Debug("Captured itinerary from event (value)", "poi_count", len(itinerary.AIItineraryResponse.PointsOfInterest))
-			} else {
-				l.logger.Warn("Failed to cast event data to AiCityResponse", "event_type", event.Type, "data_type", fmt.Sprintf("%T", event.Data))
-			}
-		}
-		if event.Message != "" {
-			lastMessage = event.Message
-		}
+		c.observe(event)
 	}
 
 	if streamErr != nil {
@@ -192,18 +161,9 @@ func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, 
 	// session of its own (see ContinueSessionStreamed). The answer then
 	// belongs to that session, and a caller paging through it — the Telegram
 	// "more" button — must be pointed at the right one.
-	isNew := false
-	if lastItinerary.SessionID != uuid.Nil && lastItinerary.SessionID != sessionID {
-		sessionID = lastItinerary.SessionID
-		isNew = true
-	}
-
-	return &locitypes.ChatResponse{
-		SessionID:        sessionID,
-		Message:          lastMessage,
-		UpdatedItinerary: &lastItinerary,
-		IsNewSession:     isNew,
-	}, nil
+	resp := c.response(sessionID)
+	resp.IsNewSession = resp.SessionID != sessionID
+	return resp, nil
 }
 
 // getPersonalizedPOI generates a prompt for personalized POIs
@@ -232,3 +192,77 @@ func (l *ServiceImpl) saveCityInteraction(ctx context.Context, interaction locit
 }
 
 // handleSemanticAddPOIStreamed handles adding POIs with semantic search enhancement and streaming updates
+
+// turnCollector folds one turn's stream into the unary ChatResponse the
+// Telegram bridge and other non-streaming callers use. For a multi-city turn
+// it keeps every city's plan in route order and the route's outline; a
+// city's own progress text is never the turn's message.
+type turnCollector struct {
+	last    locitypes.AiCityResponse
+	message string
+	outline string
+	cities  map[int]locitypes.AiCityResponse
+}
+
+func (c *turnCollector) observe(ev locitypes.StreamEvent) {
+	switch ev.Type {
+	case locitypes.EventTypeRoute:
+		var rd locitypes.StreamRouteData
+		switch d := ev.Data.(type) {
+		case locitypes.StreamRouteData:
+			rd = d
+		case *locitypes.StreamRouteData:
+			rd = *d
+		}
+		if rd.Outline != "" {
+			c.outline = rd.Outline
+		}
+		return
+	case locitypes.EventTypeItinerary:
+		var it locitypes.AiCityResponse
+		switch d := ev.Data.(type) {
+		case locitypes.AiCityResponse:
+			it = d
+		case *locitypes.AiCityResponse:
+			it = *d
+		default:
+			return
+		}
+		if ev.StopIndex != nil {
+			if c.cities == nil {
+				c.cities = map[int]locitypes.AiCityResponse{}
+			}
+			c.cities[*ev.StopIndex] = it
+			return
+		}
+		c.last = it
+		return
+	}
+	if ev.StopIndex == nil && ev.Message != "" {
+		c.message = ev.Message
+	}
+}
+
+// response is the turn's answer. fallbackSession is used when no itinerary
+// named a session.
+func (c *turnCollector) response(fallbackSession uuid.UUID) *locitypes.ChatResponse {
+	resp := &locitypes.ChatResponse{Message: c.message, RouteOutline: c.outline}
+	if len(c.cities) > 0 {
+		idx := make([]int, 0, len(c.cities))
+		for i := range c.cities {
+			idx = append(idx, i)
+		}
+		sort.Ints(idx)
+		for _, i := range idx {
+			resp.Cities = append(resp.Cities, c.cities[i])
+		}
+		c.last = resp.Cities[0]
+	}
+	last := c.last
+	resp.UpdatedItinerary = &last
+	resp.SessionID = last.SessionID
+	if resp.SessionID == uuid.Nil {
+		resp.SessionID = fallbackSession
+	}
+	return resp
+}

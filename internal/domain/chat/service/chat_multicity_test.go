@@ -213,3 +213,24 @@ func TestStopTrip_UsesTheStopsDays(t *testing.T) {
 		t.Fatalf("expected all 12 places kept, got %d", total)
 	}
 }
+
+func TestTurnCollector_KeepsEveryCity(t *testing.T) {
+	one, zero := 1, 0
+	s0, s1 := uuid.New(), uuid.New()
+	var c turnCollector
+	c.observe(locitypes.StreamEvent{Type: locitypes.EventTypeRoute, Data: locitypes.StreamRouteData{Outline: "Lisbon → Porto"}})
+	c.observe(locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Message: "city_started", StopIndex: &zero})
+	c.observe(locitypes.StreamEvent{Type: locitypes.EventTypeItinerary, StopIndex: &one, Data: locitypes.AiCityResponse{SessionID: s1, GeneralCityData: locitypes.GeneralCityData{City: "Porto"}}})
+	c.observe(locitypes.StreamEvent{Type: locitypes.EventTypeItinerary, StopIndex: &zero, Data: &locitypes.AiCityResponse{SessionID: s0, GeneralCityData: locitypes.GeneralCityData{City: "Lisbon"}}})
+
+	resp := c.response(uuid.Nil)
+	if resp.RouteOutline != "Lisbon → Porto" || len(resp.Cities) != 2 {
+		t.Fatalf("resp = %+v", resp)
+	}
+	if resp.Cities[0].GeneralCityData.City != "Lisbon" || resp.SessionID != s0 {
+		t.Fatalf("cities must be in stop order and the session is the first city's: %+v", resp)
+	}
+	if resp.Message != "" {
+		t.Fatalf("a city's progress text leaked into the message: %q", resp.Message)
+	}
+}

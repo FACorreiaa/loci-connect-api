@@ -1,7 +1,10 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -56,5 +59,28 @@ func TestStartsNewTripWhenTheSessionHasNoCity(t *testing.T) {
 	}
 	if startsNewTrip("", "", nil) {
 		t.Fatal("nothing named, nothing to start")
+	}
+}
+
+// Review Focus #4.
+func TestNewTripCity_TwoCitiesIsANewTrip(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Porto"}, {Name: "Seville"}}, Message: "add"})
+	l.cache.Set(tripCitiesCacheKey("now add Porto and Seville"), string(raw), time.Hour)
+	session := &locitypes.ChatSession{CityName: "Lisbon", SessionContext: locitypes.SessionContext{CityName: "Lisbon"}}
+
+	city, ok := l.newTripCity(context.Background(), session, "now add Porto and Seville")
+	if !ok || city != "Porto" {
+		t.Fatalf("got %q/%v, want Porto/true", city, ok)
+	}
+}
+
+func TestNewTripCity_SessionCityPlusAnotherIsANewTrip(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Lisbon"}, {Name: "Porto"}}, Message: "then"})
+	l.cache.Set(tripCitiesCacheKey("Lisbon then Porto"), string(raw), time.Hour)
+	session := &locitypes.ChatSession{SessionContext: locitypes.SessionContext{CityName: "Lisbon"}}
+	if _, ok := l.newTripCity(context.Background(), session, "Lisbon then Porto"); !ok {
+		t.Fatal("naming the session city and another is a multi-city trip, not an edit")
 	}
 }

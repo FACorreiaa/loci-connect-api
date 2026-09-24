@@ -129,6 +129,11 @@ type ChatResponse struct {
 	IsNewSession          bool            `json:"is_new_session"`
 	RequiresClarification bool            `json:"requires_clarification"`
 	SuggestedActions      []string        `json:"suggested_actions,omitempty"`
+	// Cities is every city's plan of a multi-city turn, in route order;
+	// UpdatedItinerary is then the first of them. Empty for one city.
+	Cities []AiCityResponse `json:"cities,omitempty"`
+	// RouteOutline is the one-line route of a multi-city turn.
+	RouteOutline string `json:"route_outline,omitempty"`
 }
 
 // Session Repository Interface
