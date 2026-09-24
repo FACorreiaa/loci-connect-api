@@ -76,6 +76,10 @@ func toConnectErr(err error) error {
 		return e
 	case errors.Is(err, ErrNotPurchasable):
 		return connect.NewError(connect.CodeFailedPrecondition, errors.New("this pack is not for sale"))
+	case errors.Is(err, ErrNotConfigured):
+		// A deployment problem, not a fact about the pack: say so, so nobody
+		// reads it as a sales decision.
+		return connect.NewError(connect.CodeUnavailable, errors.New("city packs are not available on this server right now"))
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

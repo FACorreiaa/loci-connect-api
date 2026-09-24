@@ -50,11 +50,14 @@ type List struct {
 	IsPublic     bool
 	IsItinerary  bool
 	ParentListID *uuid.UUID // Nullable, as per schema
-	CityID       uuid.UUID
-	ViewCount    int
-	SaveCount    int
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	// CityID is uuid.Nil for a list with no city; it is stored as NULL, since
+	// city_id is a foreign key to cities.
+	CityID    uuid.UUID
+	ItemCount int
+	ViewCount int
+	SaveCount int
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // ContentType defines the type of content in a list item
@@ -90,6 +93,7 @@ type UpdateListRequest struct {
 	Description *string    `json:"description,omitempty" validate:"omitempty,max=500"`
 	ImageURL    *string    `json:"image_url,omitempty" validate:"omitempty,url"`
 	IsPublic    *bool      `json:"is_public,omitempty"`
+	IsItinerary *bool      `json:"is_itinerary,omitempty"`
 	CityID      *uuid.UUID `json:"city_id,omitempty"`
 }
 

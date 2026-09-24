@@ -13,6 +13,44 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
+var listRowColumns = []string{"id", "user_id", "name", "description", "image_url", "is_public", "is_itinerary", "parent_list_id", "city_id", "item_count", "view_count", "save_count", "created_at", "updated_at"}
+
+// GetAllUserLists returns both kinds, and a list with no city (city_id NULL,
+// read back as the nil uuid) is not dropped.
+func TestGetAllUserLists(t *testing.T) {
+	mock, err := pgxmock.NewPool()
+	if err != nil {
+		t.Fatalf("pgxmock.NewPool: %v", err)
+	}
+	defer mock.Close()
+
+	userID := uuid.New()
+	now := time.Now()
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT ` + listColumns + ` FROM lists l
+        WHERE l.user_id = $1
+        ORDER BY l.created_at DESC, l.id`)).
+		WithArgs(userID).
+		WillReturnRows(
+			pgxmock.NewRows(listRowColumns).
+				AddRow(uuid.New(), userID, "Favourites", "", "", false, false, uuid.Nil, uuid.Nil, 2, 0, 0, now, now).
+				AddRow(uuid.New(), userID, "Porto", "", "", false, true, uuid.Nil, uuid.New(), 5, 0, 0, now, now),
+		)
+
+	got, err := NewRepository(mock, slog.Default()).GetAllUserLists(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetAllUserLists: %v", err)
+	}
+	if len(got) != 2 || got[0].IsItinerary || !got[1].IsItinerary {
+		t.Fatalf("expected a custom list and an itinerary, got %+v", got)
+	}
+	if got[0].CityID != uuid.Nil || got[0].ItemCount != 2 {
+		t.Fatalf("unexpected custom list: %+v", got[0])
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
 func TestGetList(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
@@ -26,17 +64,11 @@ func TestGetList(t *testing.T) {
 	cityID := uuid.New()
 	now := time.Now()
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
-               COALESCE(parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-               city_id, view_count, save_count, created_at, updated_at
-        FROM lists
-        WHERE id = $1
-    `)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT ` + listColumns + ` FROM lists l WHERE l.id = $1`)).
 		WithArgs(listID).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "user_id", "name", "description", "image_url", "is_public", "is_itinerary", "parent_list_id", "city_id", "view_count", "save_count", "created_at", "updated_at"}).
-				AddRow(listID, userID, "Trip", "Desc", "img", true, false, parentID, cityID, 10, 5, now, now),
+			pgxmock.NewRows(listRowColumns).
+				AddRow(listID, userID, "Trip", "Desc", "img", true, false, parentID, cityID, 3, 10, 5, now, now),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -46,6 +78,9 @@ func TestGetList(t *testing.T) {
 	}
 	if got.ID != listID || got.UserID != userID || got.ParentListID == nil || *got.ParentListID != parentID {
 		t.Fatalf("unexpected list: %+v", got)
+	}
+	if got.ItemCount != 3 || got.CityID != cityID {
+		t.Fatalf("item count / city not mapped: %+v", got)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
@@ -62,18 +97,12 @@ func TestGetSubLists(t *testing.T) {
 	parentID := uuid.New()
 	now := time.Now()
 
-	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
-               COALESCE(parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-               city_id, view_count, save_count, created_at, updated_at
-        FROM lists
-        WHERE parent_list_id = $1
-    `)).
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT ` + listColumns + ` FROM lists l WHERE l.parent_list_id = $1`)).
 		WithArgs(parentID).
 		WillReturnRows(
-			pgxmock.NewRows([]string{"id", "user_id", "name", "description", "image_url", "is_public", "is_itinerary", "parent_list_id", "city_id", "view_count", "save_count", "created_at", "updated_at"}).
-				AddRow(uuid.New(), uuid.New(), "Child1", "Desc1", "img1", true, false, parentID, uuid.New(), 1, 2, now, now).
-				AddRow(uuid.New(), uuid.New(), "Child2", "Desc2", "img2", true, false, parentID, uuid.New(), 3, 4, now, now),
+			pgxmock.NewRows(listRowColumns).
+				AddRow(uuid.New(), uuid.New(), "Child1", "Desc1", "img1", true, false, parentID, uuid.New(), 0, 1, 2, now, now).
+				AddRow(uuid.New(), uuid.New(), "Child2", "Desc2", "img2", true, false, parentID, uuid.New(), 0, 3, 4, now, now),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -109,13 +138,7 @@ func TestGetListItems(t *testing.T) {
 	duration := int32(45)
 
 	mock.ExpectQuery(regexp.QuoteMeta(`
-        SELECT list_id, item_id, content_type, position, notes,
-               COALESCE(day_number, -1) AS day_number,
-               COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
-               COALESCE(duration, -1) AS duration,
-               COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
-               COALESCE(item_ai_description, '') AS item_ai_description,
-               created_at, updated_at
+        SELECT ` + listItemColumns + `
         FROM list_items
         WHERE list_id = $1
         ORDER BY position

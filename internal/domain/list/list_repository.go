@@ -25,6 +25,63 @@ type PgxPool interface {
 
 var _ PgxPool = (*pgxpool.Pool)(nil)
 
+// listColumns is the projection every lists read uses, so listRow always
+// matches. description and image_url are nullable TEXT, and city_id is NULL
+// for a list with no city; all three read back as zero values.
+const listColumns = `l.id, l.user_id, l.name,
+               COALESCE(l.description, '') AS description,
+               COALESCE(l.image_url, '') AS image_url,
+               l.is_public, l.is_itinerary,
+               COALESCE(l.parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
+               COALESCE(l.city_id, '00000000-0000-0000-0000-000000000000') AS city_id,
+               l.item_count, l.view_count, l.save_count, l.created_at, l.updated_at`
+
+// listItemColumns is the projection every list_items read uses.
+const listItemColumns = `list_id, item_id, content_type, position,
+               COALESCE(notes, '') AS notes,
+               COALESCE(day_number, -1) AS day_number,
+               COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
+               COALESCE(duration, -1) AS duration,
+               COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
+               COALESCE(item_ai_description, '') AS item_ai_description,
+               created_at, updated_at`
+
+// nullableUUID maps uuid.Nil to NULL, for the foreign-key columns a zero id
+// would violate.
+func nullableUUID(id uuid.UUID) *uuid.UUID {
+	if id == uuid.Nil {
+		return nil
+	}
+	return &id
+}
+
+// errListNotFound is what every read or write of a missing list returns.
+func errListNotFound(listID uuid.UUID) error {
+	return fmt.Errorf("list %s: %w", listID, locitypes.ErrNotFound)
+}
+
+// errListItemNotFound is what a read or delete of a missing item returns.
+func errListItemNotFound(listID, itemID uuid.UUID) error {
+	return fmt.Errorf("item %s in list %s: %w", itemID, listID, locitypes.ErrNotFound)
+}
+
+// classifyListItemWriteError maps the constraint failures an insert can hit to
+// the domain errors the handler turns into Connect codes: a duplicate item is
+// AlreadyExists, and validate_list_item_content_type's RAISE (the place does
+// not exist) is InvalidArgument.
+func classifyListItemWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23505":
+			return fmt.Errorf("item is already in this list: %w", locitypes.ErrConflict)
+		case "P0001", "23503":
+			return fmt.Errorf("%s: %w", pgErr.Message, locitypes.ErrBadRequest)
+		}
+	}
+	return err
+}
+
 type listRow struct {
 	ID          uuid.UUID `db:"id"`
 	UserID      uuid.UUID `db:"user_id"`
@@ -35,6 +92,7 @@ type listRow struct {
 	IsItinerary bool      `db:"is_itinerary"`
 	ParentList  uuid.UUID `db:"parent_list_id"`
 	CityID      uuid.UUID `db:"city_id"`
+	ItemCount   int       `db:"item_count"`
 	ViewCount   int       `db:"view_count"`
 	SaveCount   int       `db:"save_count"`
 	CreatedAt   time.Time `db:"created_at"`
@@ -92,6 +150,11 @@ type Repository interface {
 	DeleteListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) error
 	DeleteList(ctx context.Context, listID uuid.UUID) error
 	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error)
+	// GetAllUserLists returns every list the user owns, both kinds, newest first.
+	GetAllUserLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error)
+	// GetPlaceSummaries reads the stored place behind each item id, keyed by id.
+	// Ids with no stored place are absent from the map.
+	GetPlaceSummaries(ctx context.Context, itemIDs []uuid.UUID) (map[uuid.UUID]locitypes.POIDetailedInfo, error)
 	CountUserLists(ctx context.Context, userID uuid.UUID) (int, error)
 	CountUserListItems(ctx context.Context, userID uuid.UUID) (int, error)
 }
@@ -115,7 +178,7 @@ func (r *RepositoryImpl) CreateList(ctx context.Context, list locitypes.List) er
     `
 	_, err := r.pgpool.Exec(ctx, query,
 		list.ID, list.UserID, list.Name, list.Description, list.ImageURL, list.IsPublic, list.IsItinerary,
-		list.ParentListID, list.CityID, list.ViewCount, list.SaveCount, list.CreatedAt, list.UpdatedAt,
+		list.ParentListID, nullableUUID(list.CityID), list.ViewCount, list.SaveCount, list.CreatedAt, list.UpdatedAt,
 	)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to create list", slog.Any("error", err))
@@ -126,13 +189,7 @@ func (r *RepositoryImpl) CreateList(ctx context.Context, list locitypes.List) er
 
 // GetList retrieves a list by its ID from the lists table
 func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locitypes.List, error) {
-	query := `
-        SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
-               COALESCE(parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-               city_id, view_count, save_count, created_at, updated_at
-        FROM lists
-        WHERE id = $1
-    `
+	query := `SELECT ` + listColumns + ` FROM lists l WHERE l.id = $1`
 	rows, err := r.pgpool.Query(ctx, query, listID)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to get list", slog.Any("error", err))
@@ -142,7 +199,7 @@ func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locityp
 	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[listRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return locitypes.List{}, fmt.Errorf("list not found: %w", err)
+			return locitypes.List{}, errListNotFound(listID)
 		}
 		r.logger.ErrorContext(ctx, "Failed to read list row", slog.Any("error", err))
 		return locitypes.List{}, fmt.Errorf("failed to get list: %w", err)
@@ -153,13 +210,7 @@ func (r *RepositoryImpl) GetList(ctx context.Context, listID uuid.UUID) (locityp
 
 // GetSubLists retrieves all sub-lists with a given parent_list_id
 func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID) ([]*locitypes.List, error) {
-	query := `
-        SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
-               COALESCE(parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-               city_id, view_count, save_count, created_at, updated_at
-        FROM lists
-        WHERE parent_list_id = $1
-    `
+	query := `SELECT ` + listColumns + ` FROM lists l WHERE l.parent_list_id = $1`
 	rows, err := r.pgpool.Query(ctx, query, parentListID)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to get sub-lists", slog.Any("error", err))
@@ -184,13 +235,7 @@ func (r *RepositoryImpl) GetSubLists(ctx context.Context, parentListID uuid.UUID
 // GetListItems retrieves all items associated with a specific list, ordered by position
 func (r *RepositoryImpl) GetListItems(ctx context.Context, listID uuid.UUID) ([]*locitypes.ListItem, error) {
 	query := `
-        SELECT list_id, item_id, content_type, position, notes,
-               COALESCE(day_number, -1) AS day_number,
-               COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
-               COALESCE(duration, -1) AS duration,
-               COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
-               COALESCE(item_ai_description, '') AS item_ai_description,
-               created_at, updated_at
+        SELECT ` + listItemColumns + `
         FROM list_items
         WHERE list_id = $1
         ORDER BY position
@@ -236,7 +281,7 @@ func (r *RepositoryImpl) AddListItem(ctx context.Context, item locitypes.ListIte
 	)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to add list item", slog.Any("error", err))
-		return fmt.Errorf("failed to add list item: %w", err)
+		return fmt.Errorf("failed to add list item: %w", classifyListItemWriteError(err))
 	}
 	return nil
 }
@@ -250,7 +295,7 @@ func (r *RepositoryImpl) DeleteListItem(ctx context.Context, listID, itemID uuid
 		return fmt.Errorf("failed to delete list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no list item found for list_id %s, item_id %s, and content_type %s", listID, itemID, contentType)
+		return errListItemNotFound(listID, itemID)
 	}
 	return nil
 }
@@ -264,7 +309,7 @@ func (r *RepositoryImpl) DeleteList(ctx context.Context, listID uuid.UUID) error
 		return fmt.Errorf("failed to delete list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no list found with ID %s", listID)
+		return errListNotFound(listID)
 	}
 	return nil
 }
@@ -274,19 +319,19 @@ func (r *RepositoryImpl) UpdateList(ctx context.Context, list locitypes.List) er
 	query := `
         UPDATE lists
         SET name = $1, description = $2, image_url = $3, is_public = $4,
-            city_id = $5, updated_at = $6
-        WHERE id = $7
+            city_id = $5, updated_at = $6, is_itinerary = $7
+        WHERE id = $8
     `
 	result, err := r.pgpool.Exec(ctx, query,
 		list.Name, list.Description, list.ImageURL, list.IsPublic,
-		list.CityID, list.UpdatedAt, list.ID,
+		nullableUUID(list.CityID), list.UpdatedAt, list.IsItinerary, list.ID,
 	)
 	if err != nil {
 		r.logger.ErrorContext(ctx, "Failed to update list", slog.Any("error", err))
 		return fmt.Errorf("failed to update list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no list found with ID %s", list.ID)
+		return errListNotFound(list.ID)
 	}
 	return nil
 }
@@ -294,12 +339,7 @@ func (r *RepositoryImpl) UpdateList(ctx context.Context, list locitypes.List) er
 // GetListItem retrieves a specific item from the list_items table using list_id, item_id, and content_type
 func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UUID, contentType string) (locitypes.ListItem, error) {
 	query := `
-        SELECT list_id, item_id, content_type, position, notes,
-               COALESCE(day_number, -1) AS day_number,
-               COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
-               COALESCE(duration, -1) AS duration,
-               COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
-               COALESCE(item_ai_description, '') AS item_ai_description, created_at, updated_at
+        SELECT ` + listItemColumns + `
         FROM list_items
         WHERE list_id = $1 AND item_id = $2 AND content_type = $3
     `
@@ -312,7 +352,7 @@ func (r *RepositoryImpl) GetListItem(ctx context.Context, listID, itemID uuid.UU
 	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[listItemRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return locitypes.ListItem{}, fmt.Errorf("list item not found: %w", err)
+			return locitypes.ListItem{}, errListItemNotFound(listID, itemID)
 		}
 		r.logger.ErrorContext(ctx, "Failed to collect list item row", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
@@ -340,31 +380,39 @@ func (r *RepositoryImpl) UpdateListItem(ctx context.Context, item locitypes.List
 		return fmt.Errorf("failed to update list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no list item found for list_id %s and item_id %s", item.ListID, item.ItemID)
+		return errListItemNotFound(item.ListID, item.ItemID)
 	}
 	return nil
 }
 
 // GetUserLists retrieves all lists for a user, optionally filtered by isItinerary
 func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error) {
-	query := `
-        SELECT id, user_id, name, description, image_url, is_public, is_itinerary,
-               COALESCE(parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-               city_id, view_count, save_count, created_at, updated_at
-        FROM lists
-        WHERE user_id = $1 AND is_itinerary = $2
-        ORDER BY created_at DESC
-    `
-	rows, err := r.pgpool.Query(ctx, query, userID, isItinerary)
+	query := `SELECT ` + listColumns + ` FROM lists l
+        WHERE l.user_id = $1 AND l.is_itinerary = $2
+        ORDER BY l.created_at DESC`
+	return r.queryLists(ctx, "get user lists", query, userID, isItinerary)
+}
+
+// GetAllUserLists retrieves every list the user owns, custom lists and
+// itineraries alike, newest first.
+func (r *RepositoryImpl) GetAllUserLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
+	query := `SELECT ` + listColumns + ` FROM lists l
+        WHERE l.user_id = $1
+        ORDER BY l.created_at DESC, l.id`
+	return r.queryLists(ctx, "get all user lists", query, userID)
+}
+
+func (r *RepositoryImpl) queryLists(ctx context.Context, op, query string, args ...any) ([]*locitypes.List, error) {
+	rows, err := r.pgpool.Query(ctx, query, args...)
 	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to get user lists", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to get user lists: %w", err)
+		r.logger.ErrorContext(ctx, "Failed to "+op, slog.Any("error", err))
+		return nil, fmt.Errorf("failed to %s: %w", op, err)
 	}
 
 	dbRows, err := pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[listRow])
 	if err != nil {
-		r.logger.ErrorContext(ctx, "Failed to collect user lists", slog.Any("error", err))
-		return nil, fmt.Errorf("failed to get user lists: %w", err)
+		r.logger.ErrorContext(ctx, "Failed to collect rows for "+op, slog.Any("error", err))
+		return nil, fmt.Errorf("failed to %s: %w", op, err)
 	}
 
 	lists := make([]*locitypes.List, 0, len(dbRows))
@@ -372,8 +420,80 @@ func (r *RepositoryImpl) GetUserLists(ctx context.Context, userID uuid.UUID, isI
 		list := mapListRow(*row)
 		lists = append(lists, &list)
 	}
-
 	return lists, nil
+}
+
+type placeSummaryRow struct {
+	ID          uuid.UUID `db:"id"`
+	Name        string    `db:"name"`
+	Latitude    float64   `db:"latitude"`
+	Longitude   float64   `db:"longitude"`
+	Category    string    `db:"category"`
+	Description string    `db:"description"`
+	Address     string    `db:"address"`
+	Website     string    `db:"website"`
+	Phone       string    `db:"phone_number"`
+	Rating      float64   `db:"rating"`
+}
+
+// GetPlaceSummaries reads the stored place behind each list item. Items point
+// at points_of_interest (what every client saves today); older restaurant and
+// hotel items point at llm_suggested_pois, so that is the fallback.
+func (r *RepositoryImpl) GetPlaceSummaries(ctx context.Context, itemIDs []uuid.UUID) (map[uuid.UUID]locitypes.POIDetailedInfo, error) {
+	out := make(map[uuid.UUID]locitypes.POIDetailedInfo, len(itemIDs))
+	if len(itemIDs) == 0 {
+		return out, nil
+	}
+	const query = `
+        SELECT p.id, p.name,
+               ST_Y(p.location) AS latitude, ST_X(p.location) AS longitude,
+               COALESCE(NULLIF(p.category, ''), p.poi_type, '') AS category,
+               COALESCE(NULLIF(p.description, ''), p.ai_summary, '') AS description,
+               COALESCE(p.address, '') AS address,
+               COALESCE(p.website, '') AS website,
+               COALESCE(p.phone_number, '') AS phone_number,
+               COALESCE(p.average_rating, 0)::float8 AS rating
+        FROM points_of_interest p
+        WHERE p.id = ANY($1)
+        UNION ALL
+        SELECT s.id, s.name,
+               COALESCE(s.latitude, ST_Y(s.location)) AS latitude,
+               COALESCE(s.longitude, ST_X(s.location)) AS longitude,
+               COALESCE(s.category, '') AS category,
+               COALESCE(s.description, '') AS description,
+               COALESCE(s.address, '') AS address,
+               COALESCE(s.website, '') AS website,
+               COALESCE(s.phone_number, '') AS phone_number,
+               COALESCE(s.rating, 0)::float8 AS rating
+        FROM llm_suggested_pois s
+        WHERE s.id = ANY($1)
+          AND NOT EXISTS (SELECT 1 FROM points_of_interest p WHERE p.id = s.id)
+    `
+	rows, err := r.pgpool.Query(ctx, query, itemIDs)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "Failed to get place summaries", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get place summaries: %w", err)
+	}
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[placeSummaryRow])
+	if err != nil {
+		r.logger.ErrorContext(ctx, "Failed to collect place summaries", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to get place summaries: %w", err)
+	}
+	for _, row := range dbRows {
+		out[row.ID] = locitypes.POIDetailedInfo{
+			ID:          row.ID,
+			Name:        row.Name,
+			Latitude:    row.Latitude,
+			Longitude:   row.Longitude,
+			Category:    row.Category,
+			Description: row.Description,
+			Address:     row.Address,
+			Website:     row.Website,
+			PhoneNumber: row.Phone,
+			Rating:      row.Rating,
+		}
+	}
+	return out, nil
 }
 
 // CountUserLists returns how many lists + itinerary-lists the user owns (matches enforceListLimit).
@@ -426,6 +546,7 @@ func mapListRow(row listRow) locitypes.List {
 		IsPublic:    row.IsPublic,
 		IsItinerary: row.IsItinerary,
 		CityID:      row.CityID,
+		ItemCount:   row.ItemCount,
 		ViewCount:   row.ViewCount,
 		SaveCount:   row.SaveCount,
 		CreatedAt:   row.CreatedAt,
@@ -448,6 +569,9 @@ func mapListItemRow(row listItemRow) locitypes.ListItem {
 		Notes:       row.Notes,
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
+	}
+	if row.ContentType == locitypes.ContentTypePOI {
+		item.PoiID = row.ItemID
 	}
 
 	if row.DayNumber >= 0 {
@@ -475,13 +599,7 @@ func mapListItemRow(row listItemRow) locitypes.ListItem {
 // GetListItemByID retrieves a specific item from a list using generic item_id
 func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uuid.UUID) (locitypes.ListItem, error) {
 	query := `
-        SELECT list_id, item_id, content_type, position, notes,
-               COALESCE(day_number, -1) AS day_number,
-               COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
-               COALESCE(duration, -1) AS duration,
-               COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
-               COALESCE(item_ai_description, '') AS item_ai_description,
-               created_at, updated_at
+        SELECT ` + listItemColumns + `
         FROM list_items
         WHERE list_id = $1 AND item_id = $2
     `
@@ -494,7 +612,7 @@ func (r *RepositoryImpl) GetListItemByID(ctx context.Context, listID, itemID uui
 	row, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[listItemRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return locitypes.ListItem{}, fmt.Errorf("no list item found for list_id %s and item_id %s", listID, itemID)
+			return locitypes.ListItem{}, errListItemNotFound(listID, itemID)
 		}
 		r.logger.ErrorContext(ctx, "Failed to collect list item row", slog.Any("error", err))
 		return locitypes.ListItem{}, fmt.Errorf("failed to get list item: %w", err)
@@ -512,7 +630,7 @@ func (r *RepositoryImpl) DeleteListItemByID(ctx context.Context, listID, itemID 
 		return fmt.Errorf("failed to delete list item: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("no list item found for list_id %s and item_id %s", listID, itemID)
+		return errListItemNotFound(listID, itemID)
 	}
 	return nil
 }
@@ -541,7 +659,7 @@ func (r *RepositoryImpl) UnsaveList(ctx context.Context, userID, listID uuid.UUI
 		return fmt.Errorf("failed to unsave list: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("list was not saved by user")
+		return fmt.Errorf("list %s was not saved by user: %w", listID, locitypes.ErrNotFound)
 	}
 	return nil
 }
@@ -549,9 +667,7 @@ func (r *RepositoryImpl) UnsaveList(ctx context.Context, userID, listID uuid.UUI
 // GetUserSavedLists retrieves all lists saved by a user
 func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
 	query := `
-		SELECT l.id, l.user_id, l.name, l.description, l.image_url, l.is_public, l.is_itinerary,
-		       COALESCE(l.parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-		       l.city_id, l.view_count, l.save_count, l.created_at, l.updated_at
+		SELECT ` + listColumns + `
 		FROM lists l
 		INNER JOIN saved_lists sl ON l.id = sl.list_id
 		WHERE sl.user_id = $1
@@ -581,13 +697,7 @@ func (r *RepositoryImpl) GetUserSavedLists(ctx context.Context, userID uuid.UUID
 // GetListItemsByContentType retrieves all items of a specific content type from a list
 func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID uuid.UUID, contentType locitypes.ContentType) ([]*locitypes.ListItem, error) {
 	query := `
-		SELECT list_id, item_id, content_type, position, notes,
-		       COALESCE(day_number, -1) AS day_number,
-		       COALESCE(time_slot, TIMESTAMPTZ '0001-01-01 00:00:00+00') AS time_slot,
-		       COALESCE(duration, -1) AS duration,
-		       COALESCE(source_llm_interaction_id, '00000000-0000-0000-0000-000000000000') AS source_llm_interaction_id,
-		       COALESCE(item_ai_description, '') AS item_ai_description,
-		       created_at, updated_at
+		SELECT ` + listItemColumns + `
 		FROM list_items
 		WHERE list_id = $1 AND content_type = $2
 		ORDER BY position
@@ -616,9 +726,7 @@ func (r *RepositoryImpl) GetListItemsByContentType(ctx context.Context, listID u
 // SearchLists searches for lists based on various criteria
 func (r *RepositoryImpl) SearchLists(ctx context.Context, searchTerm, category, contentType, theme string, cityID *uuid.UUID) ([]*locitypes.List, error) {
 	query := `
-		SELECT DISTINCT l.id, l.user_id, l.name, l.description, l.image_url, l.is_public, l.is_itinerary,
-		       COALESCE(l.parent_list_id, '00000000-0000-0000-0000-000000000000') AS parent_list_id,
-		       l.city_id, l.view_count, l.save_count, l.created_at, l.updated_at
+		SELECT DISTINCT ` + listColumns + `
 		FROM lists l
 		LEFT JOIN list_items li ON l.id = li.list_id
 		WHERE l.is_public = true

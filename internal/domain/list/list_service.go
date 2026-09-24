@@ -30,6 +30,10 @@ type Service interface {
 	AddListItem(ctx context.Context, userID, listID uuid.UUID, params locitypes.AddListItemRequest) (*locitypes.ListItem, error)
 	UpdateListItem(ctx context.Context, userID, listID, itemID uuid.UUID, params locitypes.UpdateListItemRequest) (*locitypes.ListItem, error)
 	RemoveListItem(ctx context.Context, userID, listID, itemID uuid.UUID) error
+	// RemoveListItemOfType removes the item with that id and content type only.
+	RemoveListItemOfType(ctx context.Context, userID, listID, itemID uuid.UUID, contentType locitypes.ContentType) error
+	// GetListPlaces returns the stored place behind each item, keyed by item id.
+	GetListPlaces(ctx context.Context, items []*locitypes.ListItem) (map[uuid.UUID]locitypes.POIDetailedInfo, error)
 
 	// Saved Lists functionality
 	SaveList(ctx context.Context, userID, listID uuid.UUID) error
@@ -48,6 +52,8 @@ type Service interface {
 	RemovePOIListItem(ctx context.Context, userID, listID, poiID uuid.UUID) error
 
 	GetUserLists(ctx context.Context, userID uuid.UUID, isItinerary bool) ([]*locitypes.List, error)
+	// GetAllUserLists returns every list the user owns, both kinds.
+	GetAllUserLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error)
 }
 
 type ServiceImpl struct {
@@ -223,19 +229,17 @@ func (s *ServiceImpl) GetListDetails(ctx context.Context, listID, userID uuid.UU
 		l.WarnContext(ctx, "Access denied to list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "Access denied")
-		return nil, fmt.Errorf("access denied to list")
+		return nil, errListNotFound(listID)
 	}
 
-	// Fetch list items if it's an itinerary
-	var items []*locitypes.ListItem
-	if list.IsItinerary {
-		items, err = s.listRepository.GetListItems(ctx, listID)
-		if err != nil {
-			l.ErrorContext(ctx, "Failed to fetch list items", slog.Any("error", err))
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "Failed to fetch list items")
-			return nil, fmt.Errorf("failed to fetch list items: %w", err)
-		}
+	// Every list has items, not only itineraries: a custom list is where
+	// "Add to list" puts places.
+	items, err := s.listRepository.GetListItems(ctx, listID)
+	if err != nil {
+		l.ErrorContext(ctx, "Failed to fetch list items", slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to fetch list items")
+		return nil, fmt.Errorf("failed to fetch list items: %w", err)
 	}
 
 	result := &locitypes.ListWithItems{
@@ -276,7 +280,7 @@ func (s *ServiceImpl) UpdateListDetails(ctx context.Context, listID, userID uuid
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return nil, fmt.Errorf("user does not own list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Update fields if provided
@@ -291,6 +295,9 @@ func (s *ServiceImpl) UpdateListDetails(ctx context.Context, listID, userID uuid
 	}
 	if params.IsPublic != nil {
 		list.IsPublic = *params.IsPublic
+	}
+	if params.IsItinerary != nil {
+		list.IsItinerary = *params.IsItinerary
 	}
 	if params.CityID != nil {
 		list.CityID = *params.CityID
@@ -339,7 +346,7 @@ func (s *ServiceImpl) DeleteUserList(ctx context.Context, listID, userID uuid.UU
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return fmt.Errorf("user does not own list")
+		return errListNotFound(listID)
 	}
 
 	// Delete the list
@@ -395,7 +402,7 @@ func (s *ServiceImpl) AddListItem(ctx context.Context, userID, listID uuid.UUID,
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return nil, fmt.Errorf("user does not own list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Create the list item with the new structure
@@ -464,7 +471,7 @@ func (s *ServiceImpl) UpdateListItem(ctx context.Context, userID, listID, itemID
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return nil, fmt.Errorf("user does not own list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Fetch the current item by generic item ID
@@ -549,7 +556,7 @@ func (s *ServiceImpl) RemoveListItem(ctx context.Context, userID, listID, itemID
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return fmt.Errorf("user does not own list")
+		return errListNotFound(listID)
 	}
 
 	// Delete the item by generic item ID
@@ -603,14 +610,14 @@ func (s *ServiceImpl) AddPOIListItem(ctx context.Context, userID, listID, poiID 
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return nil, fmt.Errorf("user does not own list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Check if the list is an itinerary
 	if !list.IsItinerary {
 		l.WarnContext(ctx, "List is not an itinerary")
 		span.SetStatus(codes.Error, "List is not an itinerary")
-		return nil, fmt.Errorf("list is not an itinerary")
+		return nil, fmt.Errorf("list is not an itinerary: %w", locitypes.ErrBadRequest)
 	}
 
 	// Create the list item
@@ -669,7 +676,7 @@ func (s *ServiceImpl) UpdatePOIListItem(ctx context.Context, userID, listID, poi
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return nil, fmt.Errorf("user does not own list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Fetch the current item
@@ -744,7 +751,7 @@ func (s *ServiceImpl) RemovePOIListItem(ctx context.Context, userID, listID, poi
 		l.WarnContext(ctx, "User does not own list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "User does not own list")
-		return fmt.Errorf("user does not own list")
+		return errListNotFound(listID)
 	}
 
 	// Delete the item
@@ -757,6 +764,75 @@ func (s *ServiceImpl) RemovePOIListItem(ctx context.Context, userID, listID, poi
 	}
 
 	l.InfoContext(ctx, "List item deleted successfully")
+	span.SetStatus(codes.Ok, "List item deleted")
+	return nil
+}
+
+// GetAllUserLists retrieves every list the user owns, custom lists and
+// itineraries alike.
+func (s *ServiceImpl) GetAllUserLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
+	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "GetAllUserLists", trace.WithAttributes(
+		attribute.String("user.id", userID.String()),
+	))
+	defer span.End()
+
+	lists, err := s.listRepository.GetAllUserLists(ctx, userID)
+	if err != nil {
+		s.logger.ErrorContext(ctx, "Failed to get user lists", slog.String("userID", userID.String()), slog.Any("error", err))
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to get user lists")
+		return nil, fmt.Errorf("failed to get user lists: %w", err)
+	}
+	span.SetStatus(codes.Ok, "User lists fetched")
+	return lists, nil
+}
+
+// GetListPlaces returns the stored place behind each place item (POI,
+// restaurant, hotel), keyed by item id. Itinerary items have no place and are
+// skipped; so is an item whose place has since been deleted.
+func (s *ServiceImpl) GetListPlaces(ctx context.Context, items []*locitypes.ListItem) (map[uuid.UUID]locitypes.POIDetailedInfo, error) {
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, it := range items {
+		if it == nil || it.ContentType == locitypes.ContentTypeItinerary {
+			continue
+		}
+		ids = append(ids, it.ItemID)
+	}
+	if len(ids) == 0 {
+		return map[uuid.UUID]locitypes.POIDetailedInfo{}, nil
+	}
+	places, err := s.listRepository.GetPlaceSummaries(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load list places: %w", err)
+	}
+	return places, nil
+}
+
+// RemoveListItemOfType removes one item, matched by id and content type, from
+// a list the caller owns.
+func (s *ServiceImpl) RemoveListItemOfType(ctx context.Context, userID, listID, itemID uuid.UUID, contentType locitypes.ContentType) error {
+	ctx, span := otel.Tracer("ItineraryListService").Start(ctx, "RemoveListItemOfType", trace.WithAttributes(
+		attribute.String("list.id", listID.String()),
+		attribute.String("user.id", userID.String()),
+		attribute.String("item.id", itemID.String()),
+		attribute.String("content.type", string(contentType)),
+	))
+	defer span.End()
+
+	list, err := s.listRepository.GetList(ctx, listID)
+	if err != nil {
+		span.RecordError(err)
+		return fmt.Errorf("list not found: %w", err)
+	}
+	if list.UserID != userID {
+		span.SetStatus(codes.Error, "User does not own list")
+		return errListNotFound(listID)
+	}
+	if err := s.listRepository.DeleteListItem(ctx, listID, itemID, string(contentType)); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "Failed to delete list item")
+		return fmt.Errorf("failed to delete list item: %w", err)
+	}
 	span.SetStatus(codes.Ok, "List item deleted")
 	return nil
 }
@@ -915,7 +991,7 @@ func (s *ServiceImpl) GetListItemsByContentType(ctx context.Context, userID, lis
 		l.WarnContext(ctx, "Access denied to list",
 			slog.String("listOwnerID", list.UserID.String()))
 		span.SetStatus(codes.Error, "Access denied")
-		return nil, fmt.Errorf("access denied to list")
+		return nil, errListNotFound(listID)
 	}
 
 	// Get items by content type

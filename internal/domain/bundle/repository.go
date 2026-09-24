@@ -151,6 +151,14 @@ type Repository interface {
 	RecordPurchase(ctx context.Context, p Purchase) error
 	// MarkRefunded revokes ownership for a payment intent.
 	MarkRefunded(ctx context.Context, paymentIntentID string) error
+
+	// ClaimedTrip returns the trip this user's claim of the pack produced, if
+	// there is one.
+	ClaimedTrip(ctx context.Context, userID, bundleID uuid.UUID) (tripID uuid.UUID, found bool, err error)
+	// RecordClaim records tripID as the user's claim of the pack and returns
+	// the trip that holds the claim: tripID, or the one an earlier claim
+	// recorded first.
+	RecordClaim(ctx context.Context, userID, bundleID, tripID uuid.UUID) (uuid.UUID, error)
 }
 
 var _ Repository = (*RepositoryImpl)(nil)
@@ -360,6 +368,56 @@ func (r *RepositoryImpl) LoadDays(ctx context.Context, bundleID uuid.UUID, maxDa
 		return nil, fmt.Errorf("iterate bundle stops: %w", err)
 	}
 	return days, nil
+}
+
+// ClaimedTrip reads bundle_claims. A deleted trip takes its claim row with it.
+func (r *RepositoryImpl) ClaimedTrip(ctx context.Context, userID, bundleID uuid.UUID) (uuid.UUID, bool, error) {
+	var tripID uuid.UUID
+	err := r.pgpool.QueryRow(ctx, `
+        SELECT trip_id FROM bundle_claims
+        WHERE user_id = $1 AND bundle_id = $2`, userID, bundleID).Scan(&tripID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	if err != nil {
+		return uuid.Nil, false, fmt.Errorf("read bundle claim: %w", err)
+	}
+	return tripID, true, nil
+}
+
+// RecordClaim inserts the claim, or leaves an existing one alone and returns
+// its trip.
+func (r *RepositoryImpl) RecordClaim(ctx context.Context, userID, bundleID, tripID uuid.UUID) (uuid.UUID, error) {
+	var held uuid.UUID
+	err := r.pgpool.QueryRow(ctx, `
+        WITH ins AS (
+            INSERT INTO bundle_claims (user_id, bundle_id, trip_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, bundle_id) DO NOTHING
+            RETURNING trip_id
+        )
+        SELECT trip_id FROM ins
+        UNION ALL
+        SELECT trip_id FROM bundle_claims
+        WHERE user_id = $1 AND bundle_id = $2
+          AND NOT EXISTS (SELECT 1 FROM ins)
+        LIMIT 1`, userID, bundleID, tripID).Scan(&held)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// The conflicting claim committed after this statement's snapshot, so
+		// the fallback SELECT could not see it. A fresh read can.
+		existing, found, readErr := r.ClaimedTrip(ctx, userID, bundleID)
+		if readErr != nil {
+			return uuid.Nil, readErr
+		}
+		if !found {
+			return uuid.Nil, fmt.Errorf("record bundle claim: claim for bundle %s vanished", bundleID)
+		}
+		return existing, nil
+	}
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("record bundle claim: %w", err)
+	}
+	return held, nil
 }
 
 // IsOwned reports whether the user holds a live purchase for this pack.
