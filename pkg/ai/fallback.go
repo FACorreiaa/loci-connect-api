@@ -54,15 +54,50 @@ type chainClient struct {
 	// telemetry report the model that actually produced the response
 	// rather than the one that was configured.
 	active atomic.Int32
+
+	// firstChunkTimeout bounds the wait for a stream's first content, and
+	// idleTimeout the gap between chunks after that. Both exist because a
+	// provider can accept a request and then say nothing: the free tier's
+	// nex-agi model did exactly that in production, "serving" an itinerary
+	// for 90 seconds without a byte, while the only other bound was the
+	// two-minute whole-stream cap. Zero disables the check.
+	firstChunkTimeout time.Duration
+	idleTimeout       time.Duration
 }
 
 var _ generativeAI.ChatClient = (*chainClient)(nil)
+
+// Default stream patience. First content within 25s covers a cold free
+// model with a 3k-token prompt; 30s between chunks is an order of magnitude
+// above the sub-second gaps a healthy SSE stream shows.
+const (
+	defaultFirstChunkTimeout = 25 * time.Second
+	defaultIdleTimeout       = 30 * time.Second
+)
 
 func newChainClient(entries []*entry, cooldown time.Duration, logger *slog.Logger) *chainClient {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &chainClient{entries: entries, cooldown: cooldown, logger: logger}
+	return &chainClient{
+		entries:           entries,
+		cooldown:          cooldown,
+		logger:            logger,
+		firstChunkTimeout: defaultFirstChunkTimeout,
+		idleTimeout:       defaultIdleTimeout,
+	}
+}
+
+// withStreamTimeouts overrides the stream patience. Zero for either keeps
+// the default; a negative value disables that check.
+func (c *chainClient) withStreamTimeouts(firstChunk, idle time.Duration) *chainClient {
+	if firstChunk != 0 {
+		c.firstChunkTimeout = firstChunk
+	}
+	if idle != 0 {
+		c.idleTimeout = idle
+	}
+	return c
 }
 
 // errAllProvidersFailed is returned when no entry could serve the call.
@@ -81,6 +116,10 @@ func reasonFor(err error) string {
 		return "rate_limited"
 	case errors.Is(err, llmerrors.ErrUnavailable):
 		return "unavailable"
+	case errors.Is(err, llmerrors.ErrStreamStalled):
+		return "stalled"
+	case errors.Is(err, llmerrors.ErrEmptyResponse):
+		return "empty"
 	default:
 		return "unknown"
 	}
@@ -184,12 +223,19 @@ func (c *chainClient) GenerateText(
 	return out, err
 }
 
-// GenerateStream fails over only until the first chunk reaches the
-// consumer. Once any content has been emitted a second provider cannot
+// GenerateStream fails over only until the first content reaches the
+// consumer. Once any text has been emitted a second provider cannot
 // resume a half-written answer, so mid-stream failures surface to the
 // caller instead of silently switching models. The underlying clients
 // share this limitation: their retry loops also wrap only the initial
 // request.
+//
+// "First content" rather than "first chunk": providers send content-less
+// preamble (role markers, usage, a reasoning model's silence) that commits
+// the chain to nothing, so it is skipped and the clock keeps running. A
+// provider that never gets past the preamble, ends without text, or goes
+// quiet mid-answer is reported as ErrStreamStalled / ErrEmptyResponse —
+// the first two fail over, the last surfaces.
 func (c *chainClient) GenerateStream(
 	ctx context.Context,
 	prompt string,
@@ -198,42 +244,11 @@ func (c *chainClient) GenerateStream(
 	var seq iter.Seq2[*genai.GenerateContentResponse, error]
 
 	err := c.do("generate_stream", func(e *entry) error {
-		inner, err := e.client.GenerateStream(ctx, prompt, config)
+		s, err := c.openStream(ctx, e, prompt, config)
 		if err != nil {
 			return err
 		}
-
-		// Pull one chunk to convert a lazily-reported provider rejection
-		// into a value we can still fail over on. Without this the error
-		// only appears once the caller starts ranging, by which point the
-		// chain has already committed to this provider.
-		next, stop := iter.Pull2(inner)
-		head, headErr, ok := next()
-		if !ok {
-			stop()
-			seq = emptySeq
-			return nil
-		}
-		if headErr != nil {
-			stop()
-			return headErr
-		}
-
-		seq = func(yield func(*genai.GenerateContentResponse, error) bool) {
-			defer stop()
-			if !yield(head, nil) {
-				return
-			}
-			for {
-				resp, err, ok := next()
-				if !ok {
-					return
-				}
-				if !yield(resp, err) {
-					return
-				}
-			}
-		}
+		seq = s
 		return nil
 	})
 	if err != nil {
@@ -242,7 +257,136 @@ func (c *chainClient) GenerateStream(
 	return seq, nil
 }
 
-func emptySeq(yield func(*genai.GenerateContentResponse, error) bool) {}
+// openStream starts e's stream and waits for its first content. The
+// returned sequence replays that first chunk and then relays the rest,
+// watching the gap between chunks.
+func (c *chainClient) openStream(
+	ctx context.Context,
+	e *entry,
+	prompt string,
+	config *genai.GenerateContentConfig,
+) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+	// A private context so a stalled provider can be cut loose without
+	// touching the caller's. Cancelling it is what unblocks the read the
+	// stalled goroutine is sitting in.
+	ectx, cancel := context.WithCancel(ctx)
+	inner, err := e.client.GenerateStream(ectx, prompt, config)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	p := newPuller(inner, cancel)
+
+	var head *genai.GenerateContentResponse
+	for head == nil {
+		got, stalled := p.pull(c.firstChunkTimeout)
+		switch {
+		case stalled:
+			p.close()
+			return nil, fmt.Errorf("%w: no content within %s", llmerrors.ErrStreamStalled, c.firstChunkTimeout)
+		case !got.ok:
+			p.close()
+			return nil, fmt.Errorf("%w: stream ended before any text", llmerrors.ErrEmptyResponse)
+		case got.err != nil:
+			p.close()
+			if ctx.Err() != nil {
+				// The caller left; report that, not whatever the provider
+				// said about its connection being cut.
+				return nil, ctx.Err()
+			}
+			return nil, got.err
+		case hasText(got.resp):
+			head = got.resp
+		}
+	}
+
+	return func(yield func(*genai.GenerateContentResponse, error) bool) {
+		defer p.close()
+		if !yield(head, nil) {
+			return
+		}
+		for {
+			got, stalled := p.pull(c.idleTimeout)
+			if stalled {
+				yield(nil, fmt.Errorf("%w: no chunk for %s", llmerrors.ErrStreamStalled, c.idleTimeout))
+				return
+			}
+			if !got.ok {
+				return
+			}
+			if !yield(got.resp, got.err) {
+				return
+			}
+		}
+	}, nil
+}
+
+// hasText reports whether resp carries any answer text.
+func hasText(resp *genai.GenerateContentResponse) bool {
+	if resp == nil {
+		return false
+	}
+	for _, cand := range resp.Candidates {
+		if cand == nil || cand.Content == nil {
+			continue
+		}
+		for _, part := range cand.Content.Parts {
+			if part != nil && part.Text != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// puller wraps iter.Pull2 with a deadline per pull. next and stop are
+// never called concurrently: a timed-out pull cancels the provider and
+// then waits for the in-flight next to return before anything else runs.
+type puller struct {
+	next   func() (*genai.GenerateContentResponse, error, bool)
+	stop   func()
+	cancel context.CancelFunc
+}
+
+type pulled struct {
+	resp *genai.GenerateContentResponse
+	err  error
+	ok   bool
+}
+
+func newPuller(seq iter.Seq2[*genai.GenerateContentResponse, error], cancel context.CancelFunc) *puller {
+	next, stop := iter.Pull2(seq)
+	return &puller{next: next, stop: stop, cancel: cancel}
+}
+
+// pull returns the next value, or stalled=true when none arrived within d.
+// d <= 0 waits without limit.
+func (p *puller) pull(d time.Duration) (got pulled, stalled bool) {
+	if d <= 0 {
+		got.resp, got.err, got.ok = p.next()
+		return got, false
+	}
+	ch := make(chan pulled, 1)
+	go func() {
+		r, e, ok := p.next()
+		ch <- pulled{r, e, ok}
+	}()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case got = <-ch:
+		return got, false
+	case <-timer.C:
+		p.cancel()
+		<-ch
+		return pulled{}, true
+	}
+}
+
+func (p *puller) close() {
+	p.cancel()
+	p.stop()
+}
 
 // StartChatSession is not chained. A session holds provider-side
 // conversation state that cannot be migrated mid-conversation, so it

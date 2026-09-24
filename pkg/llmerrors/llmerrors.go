@@ -33,6 +33,18 @@ var ErrOutOfCredits = errors.New("llm provider out of credits")
 // (HTTP 401/403). Also terminal for the credential.
 var ErrAuthFailed = errors.New("llm provider authentication failed")
 
+// ErrStreamStalled marks a streaming call the provider accepted and then
+// went quiet on: no chunk arrived within the caller's patience, either
+// before the first content or between chunks. It is what a free-tier model
+// that "serves" a request and never writes a word looks like from here.
+// The credential is fine, so it is not Terminal, but another provider may
+// well answer, so it fails over.
+var ErrStreamStalled = errors.New("llm provider stream stalled")
+
+// ErrEmptyResponse marks a call that completed cleanly without producing
+// any content. Nothing reached the consumer, so failing over is safe.
+var ErrEmptyResponse = errors.New("llm provider returned no content")
+
 // Terminal reports whether err means the credential that produced it is
 // unusable, so retrying it is pointless and the caller should move on to
 // another provider.
@@ -52,7 +64,9 @@ func Failover(err error) bool {
 	}
 	return Terminal(err) ||
 		errors.Is(err, ErrRateLimited) ||
-		errors.Is(err, ErrUnavailable)
+		errors.Is(err, ErrUnavailable) ||
+		errors.Is(err, ErrStreamStalled) ||
+		errors.Is(err, ErrEmptyResponse)
 }
 
 // Classify wraps err with the matching sentinel so callers can use

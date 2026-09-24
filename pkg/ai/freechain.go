@@ -77,5 +77,6 @@ func NewFreeChatClient(
 	// shortcut: the cooldown is what stops a rate-limited free model being
 	// retried on every request, and a free chain of one is the case where that
 	// matters most.
-	return newChainClient(entries, cfg.FallbackCooldown, logger), nil
+	return newChainClient(entries, cfg.FallbackCooldown, logger).
+		withStreamTimeouts(cfg.StreamFirstChunkTimeout, cfg.StreamIdleTimeout), nil
 }

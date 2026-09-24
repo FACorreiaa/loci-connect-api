@@ -76,6 +76,7 @@ func TestTerminal(t *testing.T) {
 		{"auth failed", Classify(genai.APIError{Code: 401}), true},
 		{"rate limited is not terminal", Classify(genai.APIError{Code: 429}), false},
 		{"unavailable is not terminal", Classify(genai.APIError{Code: 503}), false},
+		{"stalled is not terminal", ErrStreamStalled, false},
 		{"nil", nil, false},
 	}
 	for _, tt := range cases {
@@ -98,6 +99,8 @@ func TestFailover(t *testing.T) {
 		{"auth failed", Classify(genai.APIError{Code: 403}), true},
 		{"rate limited", Classify(genai.APIError{Code: 429}), true},
 		{"unavailable", Classify(genai.APIError{Code: 500}), true},
+		{"stream stalled", fmt.Errorf("wrapped: %w", ErrStreamStalled), true},
+		{"empty response", ErrEmptyResponse, true},
 		// The caller is already gone; failing over burns a second provider
 		// for a response nobody will read.
 		{"context canceled", context.Canceled, false},

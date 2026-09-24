@@ -394,6 +394,35 @@ func (l *ServiceImpl) replayCachedPart(
 // ran (lookupGenerations) and the write happens after the output has been
 // validated (persistGenerations). Caching an unparseable stream here was how
 // invalid JSON used to be replayed for five minutes.
+// streamErrorFor turns a provider error into the code and copy a transport
+// shows. It classifies from the typed sentinels rather than the error text,
+// so the transport does not have to re-derive the verdict by matching on
+// user-facing prose. fallback is the message for an error nothing here
+// recognises; it carries no code.
+func streamErrorFor(err error, fallback string) (locitypes.StreamErrorCode, string) {
+	switch {
+	case errors.Is(err, llmerrors.ErrRateLimited):
+		return locitypes.StreamErrorQuotaExceeded,
+			"We are experiencing high traffic (Quota Exceeded). Please try again in a minute."
+	case errors.Is(err, llmerrors.ErrOutOfCredits), errors.Is(err, llmerrors.ErrAuthFailed):
+		// Every provider in the chain was exhausted or rejected. Retryable
+		// from the client's point of view, but it needs an operator to
+		// actually clear.
+		return locitypes.StreamErrorProviderUnavailable,
+			"The AI service is temporarily unavailable. Please try again later."
+	case errors.Is(err, llmerrors.ErrUnavailable):
+		return locitypes.StreamErrorProviderUnavailable,
+			"The AI service is temporarily unavailable. Please try again in a moment."
+	case errors.Is(err, llmerrors.ErrStreamStalled), errors.Is(err, llmerrors.ErrEmptyResponse):
+		// The model took the request and then stopped talking. The chain
+		// already tried the alternatives before the first word; after it,
+		// only a retry can help.
+		return locitypes.StreamErrorProviderUnavailable,
+			"The AI model stopped responding before it finished. Please try again."
+	}
+	return "", fallback
+}
+
 func (l *ServiceImpl) streamPartFromLLM(
 	ctx context.Context,
 	p partPlan,
@@ -434,26 +463,7 @@ func (l *ServiceImpl) streamPartFromLLM(
 			slog.String("part_type", partType),
 			slog.Any("error", err))
 		if ctx.Err() == nil {
-			errorMsg := fmt.Sprintf("%s worker failed: %v", partType, err)
-			// Classify from the typed sentinels rather than the error text
-			// and pass the verdict along, so the transport does not have to
-			// re-derive it by matching on user-facing prose.
-			var errorCode locitypes.StreamErrorCode
-			switch {
-			case errors.Is(err, llmerrors.ErrRateLimited):
-				errorCode = locitypes.StreamErrorQuotaExceeded
-				errorMsg = "We are experiencing high traffic (Quota Exceeded). Please try again in a minute."
-			case errors.Is(err, llmerrors.ErrOutOfCredits), errors.Is(err, llmerrors.ErrAuthFailed):
-				// Every provider in the chain was exhausted or rejected.
-				// Retryable from the client's point of view, but it needs
-				// an operator to actually clear.
-				errorCode = locitypes.StreamErrorProviderUnavailable
-				errorMsg = "The AI service is temporarily unavailable. Please try again later."
-			case errors.Is(err, llmerrors.ErrUnavailable):
-				errorCode = locitypes.StreamErrorProviderUnavailable
-				errorMsg = "The AI service is temporarily unavailable. Please try again in a moment."
-			}
-
+			errorCode, errorMsg := streamErrorFor(err, fmt.Sprintf("%s worker failed: %v", partType, err))
 			sendEvent(locitypes.StreamEvent{
 				Type:      locitypes.EventTypeError,
 				Error:     errorMsg,
@@ -484,9 +494,11 @@ func (l *ServiceImpl) streamPartFromLLM(
 				slog.String("part_type", partType),
 				slog.Any("error", err))
 			if ctx.Err() == nil {
+				errorCode, errorMsg := streamErrorFor(err, fmt.Sprintf("%s streaming error: %v", partType, err))
 				sendEvent(locitypes.StreamEvent{
-					Type:  locitypes.EventTypeError,
-					Error: fmt.Sprintf("%s streaming error: %v", partType, err),
+					Type:      locitypes.EventTypeError,
+					Error:     errorMsg,
+					ErrorCode: errorCode,
 				})
 			}
 			return streamResult{}, fmt.Errorf("%s streaming error: %w", partType, err)

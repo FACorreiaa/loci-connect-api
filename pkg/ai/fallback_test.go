@@ -27,7 +27,13 @@ type fakeClient struct {
 	// from one that fails after content was already delivered.
 	streamChunks []string
 	streamErr    error
-	closed       bool
+	// blankFirst content-less chunks precede streamChunks, the way a
+	// provider's role/usage preamble does.
+	blankFirst int
+	// stall, when set, blocks after streamChunks until the context is
+	// cancelled instead of ending the stream: a provider that went quiet.
+	stall  bool
+	closed bool
 }
 
 var _ generativeAI.ChatClient = (*fakeClient)(nil)
@@ -48,12 +54,18 @@ func (f *fakeClient) GenerateText(context.Context, string, *genai.GenerateConten
 	return f.text, nil
 }
 
-func (f *fakeClient) GenerateStream(context.Context, string, *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
+func (f *fakeClient) GenerateStream(ctx context.Context, _ string, _ *genai.GenerateContentConfig) (iter.Seq2[*genai.GenerateContentResponse, error], error) {
 	f.calls++
 	if f.err != nil {
 		return nil, f.err
 	}
 	return func(yield func(*genai.GenerateContentResponse, error) bool) {
+		for i := 0; i < f.blankFirst; i++ {
+			blank := &genai.GenerateContentResponse{ModelVersion: f.model}
+			if !yield(blank, nil) {
+				return
+			}
+		}
 		for _, chunk := range f.streamChunks {
 			resp := &genai.GenerateContentResponse{
 				Candidates: []*genai.Candidate{{
@@ -66,6 +78,11 @@ func (f *fakeClient) GenerateStream(context.Context, string, *genai.GenerateCont
 		}
 		if f.streamErr != nil {
 			yield(nil, f.streamErr)
+			return
+		}
+		if f.stall {
+			<-ctx.Done()
+			yield(nil, llmerrors.Classify(ctx.Err()))
 		}
 	}, nil
 }
@@ -94,7 +111,8 @@ func newTestChain(cooldown time.Duration, clients ...*fakeClient) *chainClient {
 	for _, c := range clients {
 		entries = append(entries, &entry{client: c, model: c.model})
 	}
-	return newChainClient(entries, cooldown, quietLogger())
+	return newChainClient(entries, cooldown, quietLogger()).
+		withStreamTimeouts(50*time.Millisecond, 50*time.Millisecond)
 }
 
 func collect(t *testing.T, seq iter.Seq2[*genai.GenerateContentResponse, error]) (string, error) {
@@ -339,5 +357,124 @@ func TestReasonForIsBounded(t *testing.T) {
 		if got := reasonFor(err); got != want {
 			t.Fatalf("reasonFor(%v) = %q, want %q", err, got, want)
 		}
+	}
+}
+
+func TestChainStreamFailsOverWhenFirstContentStalls(t *testing.T) {
+	// The provider accepted the request and never wrote a word. Nothing
+	// reached the consumer, so the chain may still move on.
+	primary := &fakeClient{model: "free/head", stall: true}
+	backup := &fakeClient{model: "free/next", streamChunks: []string{"recovered"}}
+	chain := newTestChain(time.Minute, primary, backup)
+
+	start := time.Now()
+	seq, err := chain.GenerateStream(context.Background(), "hi", nil)
+	if err != nil {
+		t.Fatalf("GenerateStream: %v", err)
+	}
+	got, err := collect(t, seq)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if got != "recovered" {
+		t.Fatalf("stream = %q, want %q", got, "recovered")
+	}
+	if backup.calls != 1 {
+		t.Fatalf("backup calls = %d, want 1", backup.calls)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("failover took %s, the stall was not cut short", elapsed)
+	}
+}
+
+func TestChainStreamSkipsBlankPreambleBeforeCommitting(t *testing.T) {
+	// Role markers and usage frames carry no text. They must not count as
+	// "content reached the consumer", or a provider that sends them and
+	// then stalls would pin the chain to itself.
+	primary := &fakeClient{model: "free/head", blankFirst: 2, stall: true}
+	backup := &fakeClient{model: "free/next", streamChunks: []string{"recovered"}}
+	chain := newTestChain(time.Minute, primary, backup)
+
+	seq, err := chain.GenerateStream(context.Background(), "hi", nil)
+	if err != nil {
+		t.Fatalf("GenerateStream: %v", err)
+	}
+	got, err := collect(t, seq)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if got != "recovered" {
+		t.Fatalf("stream = %q, want %q", got, "recovered")
+	}
+}
+
+func TestChainStreamFailsOverWhenStreamEndsWithoutText(t *testing.T) {
+	primary := &fakeClient{model: "free/head", blankFirst: 1}
+	backup := &fakeClient{model: "free/next", streamChunks: []string{"recovered"}}
+	chain := newTestChain(time.Minute, primary, backup)
+
+	seq, err := chain.GenerateStream(context.Background(), "hi", nil)
+	if err != nil {
+		t.Fatalf("GenerateStream: %v", err)
+	}
+	got, err := collect(t, seq)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if got != "recovered" {
+		t.Fatalf("stream = %q, want %q", got, "recovered")
+	}
+}
+
+func TestChainStreamSurfacesMidStreamStall(t *testing.T) {
+	// Text already reached the consumer, so the stall is reported as a
+	// typed error rather than the chain restarting on another model.
+	primary := &fakeClient{model: "free/head", streamChunks: []string{"partial "}, stall: true}
+	backup := &fakeClient{model: "free/next", streamChunks: []string{"unreached"}}
+	chain := newTestChain(time.Minute, primary, backup)
+
+	seq, err := chain.GenerateStream(context.Background(), "hi", nil)
+	if err != nil {
+		t.Fatalf("GenerateStream: %v", err)
+	}
+	got, err := collect(t, seq)
+	if !errors.Is(err, llmerrors.ErrStreamStalled) {
+		t.Fatalf("collect error = %v, want ErrStreamStalled", err)
+	}
+	if got != "partial " {
+		t.Fatalf("stream = %q, want %q", got, "partial ")
+	}
+	if backup.calls != 0 {
+		t.Fatalf("backup was called %d times after content had been emitted", backup.calls)
+	}
+}
+
+func TestChainStreamAllStalledIsAllProvidersFailed(t *testing.T) {
+	primary := &fakeClient{model: "free/head", stall: true}
+	backup := &fakeClient{model: "free/next", stall: true}
+	chain := newTestChain(time.Minute, primary, backup)
+
+	_, err := chain.GenerateStream(context.Background(), "hi", nil)
+	if !errors.Is(err, errAllProvidersFailed) || !errors.Is(err, llmerrors.ErrStreamStalled) {
+		t.Fatalf("err = %v, want all-providers-failed wrapping ErrStreamStalled", err)
+	}
+}
+
+func TestChainStreamCallerCancelDuringHeadIsNotFailover(t *testing.T) {
+	primary := &fakeClient{model: "free/head", stall: true}
+	backup := &fakeClient{model: "free/next", streamChunks: []string{"unreached"}}
+	chain := newTestChain(time.Minute, primary, backup).withStreamTimeouts(time.Minute, time.Minute)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+	_, err := chain.GenerateStream(ctx, "hi", nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if backup.calls != 0 {
+		t.Fatalf("backup was called %d times after the caller left", backup.calls)
 	}
 }

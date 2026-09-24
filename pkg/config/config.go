@@ -98,6 +98,13 @@ type AIConfig struct {
 	GenerateTimeout time.Duration
 	// StreamTimeout caps a full streaming LLM call from start to last chunk.
 	StreamTimeout time.Duration
+	// StreamFirstChunkTimeout bounds the wait for a stream's first content
+	// and StreamIdleTimeout the gap between chunks after it. They catch a
+	// provider that accepts a request and then says nothing, which the
+	// whole-stream cap alone turns into two minutes of "is writing". Zero
+	// means the chain's default; negative disables the check.
+	StreamFirstChunkTimeout time.Duration
+	StreamIdleTimeout       time.Duration
 }
 
 type ServerConfig struct {
@@ -624,6 +631,8 @@ func loadAIConfig() AIConfig {
 
 	cfg.FallbackEnabled = getEnvAsBool("AI_FALLBACK_ENABLED", !IsProduction())
 	cfg.FallbackCooldown = getEnvAsDurationSeconds("AI_FALLBACK_COOLDOWN_SEC", 5*time.Minute)
+	cfg.StreamFirstChunkTimeout = getEnvAsDurationSeconds("AI_STREAM_FIRST_CHUNK_TIMEOUT_SEC", 25*time.Second)
+	cfg.StreamIdleTimeout = getEnvAsDurationSeconds("AI_STREAM_IDLE_TIMEOUT_SEC", 30*time.Second)
 	if cfg.FallbackEnabled {
 		cfg.Fallbacks = loadFallbacks()
 	}
