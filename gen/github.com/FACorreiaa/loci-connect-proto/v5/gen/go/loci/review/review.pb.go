@@ -252,11 +252,12 @@ func (ReviewSortBy) EnumDescriptor() ([]byte, []int) {
 
 // Core review entity
 type Review struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId    string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	PoiId     string                 `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id instead
-	Rating    float64                `protobuf:"fixed64,4,opt,name=rating,proto3" json:"rating,omitempty"`          // 1.0 - 5.0
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PoiId  string                 `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id instead
+	Rating float64                `protobuf:"fixed64,4,opt,name=rating,proto3" json:"rating,omitempty"`          // Whole stars, 1 - 5
+	// Empty when the author gave none (the title is optional on create).
 	Title     string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
 	Content   string                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
 	Photos    []string               `protobuf:"bytes,7,rep,name=photos,proto3" json:"photos,omitempty"` // Photo URLs
@@ -265,10 +266,11 @@ type Review struct {
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	// Review metadata
-	HelpfulCount int32  `protobuf:"varint,12,opt,name=helpful_count,json=helpfulCount,proto3" json:"helpful_count,omitempty"` // Number of helpful votes
-	ReportCount  int32  `protobuf:"varint,13,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`    // Number of reports
-	IsVerified   bool   `protobuf:"varint,14,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`       // Verified reviewer
-	Language     string `protobuf:"bytes,15,opt,name=language,proto3" json:"language,omitempty"`                              // ISO 639-1 language code
+	HelpfulCount int32 `protobuf:"varint,12,opt,name=helpful_count,json=helpfulCount,proto3" json:"helpful_count,omitempty"` // Number of helpful votes
+	ReportCount  int32 `protobuf:"varint,13,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`    // Number of reports
+	IsVerified   bool  `protobuf:"varint,14,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`       // Verified reviewer
+	// Empty when unknown.
+	Language string `protobuf:"bytes,15,opt,name=language,proto3" json:"language,omitempty"` // ISO 639-1 language code
 	// Review aspects (detailed ratings)
 	Aspects *ReviewAspects `protobuf:"bytes,16,opt,name=aspects,proto3" json:"aspects,omitempty"`
 	// User information (public)
@@ -581,12 +583,15 @@ func (x *ReviewAspects) GetStaffRating() float64 {
 
 // Public reviewer information
 type ReviewerInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	AvatarUrl     string                 `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	ReviewCount   int32                  `protobuf:"varint,4,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
-	IsVerified    bool                   `protobuf:"varint,5,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Empty when the reviewer has set neither a username nor a display name.
+	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// Empty when the reviewer has no avatar.
+	AvatarUrl   string `protobuf:"bytes,3,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	ReviewCount int32  `protobuf:"varint,4,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	IsVerified  bool   `protobuf:"varint,5,opt,name=is_verified,json=isVerified,proto3" json:"is_verified,omitempty"`
+	// Not computed yet; empty.
 	Level         string                 `protobuf:"bytes,6,opt,name=level,proto3" json:"level,omitempty"` // "Bronze", "Silver", "Gold", "Platinum"
 	MemberSince   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1500,8 +1505,9 @@ type CreateReviewRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Ignored by the server, which takes the author from the auth token. Kept
 	// for wire compatibility; do not require it — clients correctly omit it.
-	UserId    string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	PoiId     string                 `protobuf:"bytes,2,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PoiId  string `protobuf:"bytes,2,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // Deprecated: use content_id
+	// Whole stars only (1, 2, 3, 4 or 5); the server rejects fractions.
 	Rating    float64                `protobuf:"fixed64,3,opt,name=rating,proto3" json:"rating,omitempty"`
 	Title     string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Content   string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
@@ -2153,10 +2159,15 @@ func (x *GetReviewResponse) GetCanDelete() bool {
 }
 
 type UpdateReviewRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ReviewId      string                 `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
-	Rating        float64                `protobuf:"fixed64,3,opt,name=rating,proto3" json:"rating,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId   string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ReviewId string `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	// Whole stars only (1, 2, 3, 4 or 5); the server rejects fractions.
+	Rating float64 `protobuf:"fixed64,3,opt,name=rating,proto3" json:"rating,omitempty"`
+	// Optional, as on create. The update replaces every field below, so send
+	// the full review: an empty title, photo list or visit_date clears it.
 	Title         string                 `protobuf:"bytes,4,opt,name=title,proto3" json:"title,omitempty"`
 	Content       string                 `protobuf:"bytes,5,opt,name=content,proto3" json:"content,omitempty"`
 	PhotoUrls     []string               `protobuf:"bytes,6,rep,name=photo_urls,json=photoUrls,proto3" json:"photo_urls,omitempty"`
@@ -2305,9 +2316,11 @@ func (x *UpdateReviewResponse) GetReview() *Review {
 }
 
 type DeleteReviewRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ReviewId      string                 `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ReviewId      string `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2401,7 +2414,8 @@ func (x *DeleteReviewResponse) GetResponse() *common.Response {
 }
 
 type GetUserReviewsRequest struct {
-	state         protoimpl.MessageState    `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Whose reviews to list. Empty means the authenticated caller.
 	UserId        string                    `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Pagination    *common.PaginationRequest `protobuf:"bytes,2,opt,name=pagination,proto3" json:"pagination,omitempty"`
 	Filter        *ReviewFilter             `protobuf:"bytes,3,opt,name=filter,proto3" json:"filter,omitempty"`
@@ -2597,10 +2611,12 @@ func (x *UserReviewStatistics) GetTopCategoriesReviewed() []string {
 }
 
 type LikeReviewRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ReviewId      string                 `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
-	IsLike        bool                   `protobuf:"varint,3,opt,name=is_like,json=isLike,proto3" json:"is_like,omitempty"` // true for like, false for unlike
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ReviewId      string `protobuf:"bytes,2,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	IsLike        bool   `protobuf:"varint,3,opt,name=is_like,json=isLike,proto3" json:"is_like,omitempty"` // true for like, false for unlike
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2928,14 +2944,13 @@ var File_loci_review_review_proto protoreflect.FileDescriptor
 
 const file_loci_review_review_proto_rawDesc = "" +
 	"\n" +
-	"\x18loci/review/review.proto\x12\vloci.review\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\x9b\b\n" +
+	"\x18loci/review/review.proto\x12\vloci.review\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\"\x9f\b\n" +
 	"\x06Review\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12 \n" +
 	"\x06poi_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x05poiId\x12/\n" +
-	"\x06rating\x18\x04 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\x06rating\x12 \n" +
-	"\x05title\x18\x05 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x05title\x12$\n" +
+	"\x06rating\x18\x04 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\x06rating\x12!\n" +
+	"\x05title\x18\x05 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xc8\x01R\x05title\x12$\n" +
 	"\acontent\x18\x06 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\acontent\x12,\n" +
 	"\x06photos\x18\a \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\n" +
@@ -2952,8 +2967,8 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\rhelpful_count\x18\f \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fhelpfulCount\x12*\n" +
 	"\freport_count\x18\r \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vreportCount\x12\x1f\n" +
 	"\vis_verified\x18\x0e \x01(\bR\n" +
-	"isVerified\x12=\n" +
-	"\blanguage\x18\x0f \x01(\tB!\xbaH\x1er\x1c\x10\x02\x18\n" +
+	"isVerified\x12@\n" +
+	"\blanguage\x18\x0f \x01(\tB$\xbaH!\xd8\x01\x01r\x1c\x10\x02\x18\n" +
 	"2\x16^[a-z]{2}(-[A-Z]{2})?$R\blanguage\x124\n" +
 	"\aaspects\x18\x10 \x01(\v2\x1a.loci.review.ReviewAspectsR\aaspects\x125\n" +
 	"\breviewer\x18\x11 \x01(\v2\x19.loci.review.ReviewerInfoR\breviewer\x12J\n" +
@@ -2975,17 +2990,17 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"roomRating\x12B\n" +
 	"\x10amenities_rating\x18\t \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\x0famenitiesRating\x12:\n" +
 	"\fstaff_rating\x18\n" +
-	" \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\vstaffRating\"\xc2\x02\n" +
+	" \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\vstaffRating\"\xc7\x02\n" +
 	"\fReviewerInfo\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12-\n" +
-	"\fdisplay_name\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\vdisplayName\x12*\n" +
+	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12.\n" +
+	"\fdisplay_name\x18\x02 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xc8\x01R\vdisplayName\x12-\n" +
 	"\n" +
-	"avatar_url\x18\x03 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\tavatarUrl\x12*\n" +
+	"avatar_url\x18\x03 \x01(\tB\x0e\xbaH\v\xd8\x01\x01r\x06\x18\x80\x10\x88\x01\x01R\tavatarUrl\x12*\n" +
 	"\freview_count\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vreviewCount\x12\x1f\n" +
 	"\vis_verified\x18\x05 \x01(\bR\n" +
-	"isVerified\x12\x1f\n" +
-	"\x05level\x18\x06 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\x05level\x12E\n" +
+	"isVerified\x12 \n" +
+	"\x05level\x18\x06 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x182R\x05level\x12E\n" +
 	"\fmember_since\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vmemberSince\"\xb3\x02\n" +
 	"\x10BusinessResponse\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x123\n" +
@@ -3139,13 +3154,13 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\x06review\x18\x01 \x01(\v2\x13.loci.review.ReviewR\x06review\x12\x19\n" +
 	"\bcan_edit\x18\x02 \x01(\bR\acanEdit\x12\x1d\n" +
 	"\n" +
-	"can_delete\x18\x03 \x01(\bR\tcanDelete\"\x80\x03\n" +
-	"\x13UpdateReviewRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12&\n" +
+	"can_delete\x18\x03 \x01(\bR\tcanDelete\"\xff\x02\n" +
+	"\x13UpdateReviewRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12&\n" +
 	"\treview_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\breviewId\x12/\n" +
-	"\x06rating\x18\x03 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\x06rating\x12 \n" +
-	"\x05title\x18\x04 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x05title\x12$\n" +
+	"\x06rating\x18\x03 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\xf0?R\x06rating\x12\x1e\n" +
+	"\x05title\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x05title\x12$\n" +
 	"\acontent\x18\x05 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\acontent\x123\n" +
 	"\n" +
@@ -3157,14 +3172,16 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\aaspects\x18\b \x01(\v2\x1a.loci.review.ReviewAspectsR\aaspects\"v\n" +
 	"\x14UpdateReviewResponse\x121\n" +
 	"\bresponse\x18\x01 \x01(\v2\x15.loci.common.ResponseR\bresponse\x12+\n" +
-	"\x06review\x18\x02 \x01(\v2\x13.loci.review.ReviewR\x06review\"a\n" +
-	"\x13DeleteReviewRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12&\n" +
+	"\x06review\x18\x02 \x01(\v2\x13.loci.review.ReviewR\x06review\"b\n" +
+	"\x13DeleteReviewRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12&\n" +
 	"\treview_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\breviewId\"I\n" +
 	"\x14DeleteReviewResponse\x121\n" +
-	"\bresponse\x18\x01 \x01(\v2\x15.loci.common.ResponseR\bresponse\"\xae\x01\n" +
-	"\x15GetUserReviewsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12>\n" +
+	"\bresponse\x18\x01 \x01(\v2\x15.loci.common.ResponseR\bresponse\"\xaf\x01\n" +
+	"\x15GetUserReviewsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12>\n" +
 	"\n" +
 	"pagination\x18\x02 \x01(\v2\x1e.loci.common.PaginationRequestR\n" +
 	"pagination\x121\n" +
@@ -3182,9 +3199,10 @@ const file_loci_review_review_proto_rawDesc = "" +
 	"\x14average_rating_given\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\x00\x00R\x12averageRatingGiven\x12=\n" +
 	"\x16helpful_votes_received\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x14helpfulVotesReceived\x120\n" +
 	"\x0ereviewer_level\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\rreviewerLevel\x126\n" +
-	"\x17top_categories_reviewed\x18\x05 \x03(\tR\x15topCategoriesReviewed\"x\n" +
-	"\x11LikeReviewRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12&\n" +
+	"\x17top_categories_reviewed\x18\x05 \x03(\tR\x15topCategoriesReviewed\"y\n" +
+	"\x11LikeReviewRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12&\n" +
 	"\treview_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\breviewId\x12\x17\n" +
 	"\ais_like\x18\x03 \x01(\bR\x06isLike\"s\n" +
 	"\x12LikeReviewResponse\x121\n" +
