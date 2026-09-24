@@ -50,9 +50,9 @@ func TestUpsertRemoveAndRemoveEndpoint(t *testing.T) {
 	})
 
 	// Upsert twice with the same endpoint for user A, then once for user B.
-	require.NoError(t, s.Upsert(ctx, userA, "web_push", endpoint, "p256dh-a", "auth-a", "agent-a"))
-	require.NoError(t, s.Upsert(ctx, userA, "web_push", endpoint, "p256dh-a2", "auth-a2", "agent-a2"))
-	require.NoError(t, s.Upsert(ctx, userB, "web_push", endpoint, "p256dh-b", "auth-b", "agent-b"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userA, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-a", Auth: "auth-a"}, "agent-a"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userA, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-a2", Auth: "auth-a2"}, "agent-a2"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userB, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-b", Auth: "auth-b"}, "agent-b"))
 
 	devicesA, err := s.ForUser(ctx, userA, "web_push")
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestUpsertRemoveAndRemoveEndpoint(t *testing.T) {
 	require.Empty(t, devicesB)
 
 	// RemoveEndpoint removes regardless of user.
-	require.NoError(t, s.Upsert(ctx, userA, "web_push", endpoint, "p256dh-a3", "auth-a3", "agent-a3"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userA, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-a3", Auth: "auth-a3"}, "agent-a3"))
 	devicesA, err = s.ForUser(ctx, userA, "web_push")
 	require.NoError(t, err)
 	require.Len(t, devicesA, 1)
@@ -97,8 +97,8 @@ func TestUpsertDoesNotCrossPlatforms(t *testing.T) {
 		_, _ = pool.Exec(context.Background(), `DELETE FROM push_devices WHERE endpoint = $1`, endpoint)
 	})
 
-	require.NoError(t, s.Upsert(ctx, userA, "web_push", endpoint, "p256dh-a", "auth-a", "agent-a"))
-	require.NoError(t, s.Upsert(ctx, userB, "apns", endpoint, "", "", "agent-b"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userA, Platform: "web_push", Endpoint: endpoint, P256dh: "p256dh-a", Auth: "auth-a"}, "agent-a"))
+	require.NoError(t, s.Upsert(ctx, Device{UserID: userB, Platform: "apns", Endpoint: endpoint, APNSTopic: "com.example.app"}, "agent-b"))
 
 	devicesA, err := s.ForUser(ctx, userA, "web_push")
 	require.NoError(t, err)

@@ -793,22 +793,38 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler.WithMFA(d.MFAService)
 	}
 	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
-	// A finished run becomes a web push, unless VAPID isn't configured — in
-	// which case runs, the cap and in-app toasts still work, and the log
-	// line below is the only sign anything is missing.
+	// A finished run becomes a web push and an APNs push, each only when its
+	// keys are configured. With neither, runs, the cap and in-app toasts
+	// still work, and the log lines below are the only sign anything is
+	// missing.
 	var onRunFinish runs.FinishListener
-	if d.Config.Push.Enabled() {
-		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices,
-			push.NewWebPushSender(d.Config.Push, push.NewHTTPClient()), d.Logger)
-		onRunFinish = notifier.OnRunFinished
+	var webSender push.Sender
+	if d.Config.Push.WebPushEnabled() {
+		webSender = push.NewWebPushSender(d.Config.Push, push.NewHTTPClient())
 	} else {
 		d.Logger.Info("web push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT not all set")
+	}
+	var apnsSender push.Sender
+	if d.Config.Push.APNSEnabled() {
+		sender, err := push.NewAPNSSender(d.Config.Push, push.NewHTTPClient())
+		if err != nil {
+			return fmt.Errorf("apns sender: %w", err)
+		}
+		apnsSender = sender
+		d.Logger.Info("apns enabled", slog.String("key_id", d.Config.Push.APNSKeyID), slog.Any("topics", d.Config.Push.APNSTopics))
+	} else {
+		d.Logger.Info("apns disabled: APNS_KEY_ID / APNS_TEAM_ID / APNS_KEY_P8 not all set")
+	}
+	if webSender != nil || apnsSender != nil {
+		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
+		onRunFinish = notifier.OnRunFinished
 	}
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
 	d.initWatches()
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
-	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
+	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger).
+		WithItineraries(d.POIRepo)
 	d.ListHandler = itineraryhandler.NewListHandler(d.ListSvc, d.Logger)
 	d.StatisticsHandler = statistics.NewHandler(d.StatisticsSvc, d.Logger)
 	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
@@ -827,7 +843,8 @@ func (d *Dependencies) initHandlers() error {
 	d.UserHandler.SetExporter(userdata.NewExporter(d.DB.Pool, d.Logger))
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
-	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
+	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo).
+		WithPlaces(d.POIRepo)
 	// The setup writer is handed the endpoint and tool names as data because
 	// internal/mcp imports apikey; this is the one place that can see both.
 	// The tool lists come from the table that decides scopes, so the prompt's

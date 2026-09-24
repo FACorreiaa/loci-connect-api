@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -27,7 +28,20 @@ type ItineraryHandler struct {
 	itineraryconnect.UnimplementedItineraryServiceHandler
 	listService listservice.Service
 	chatService chatservice.LlmInteractiontService
+	itineraries ItineraryReader
 	logger      *slog.Logger
+}
+
+// ItineraryReader reads one of a user's saved itineraries. It reports a
+// missing or foreign itinerary as an error wrapping pgx.ErrNoRows.
+type ItineraryReader interface {
+	GetItinerary(ctx context.Context, userID, itineraryID uuid.UUID) (*locitypes.UserSavedItinerary, error)
+}
+
+// WithItineraries enables GetItinerary.
+func (h *ItineraryHandler) WithItineraries(r ItineraryReader) *ItineraryHandler {
+	h.itineraries = r
+	return h
 }
 
 func NewItineraryHandler(
@@ -128,6 +142,32 @@ func (h *ItineraryHandler) GetUserItineraries(ctx context.Context, req *connect.
 		Itineraries: out,
 		Pagination:  paginationMeta(saved.Page, saved.PageSize, saved.TotalRecords),
 	}), nil
+}
+
+// GetItinerary returns one of this user's saved itineraries. Another user's
+// id answers NotFound, not PermissionDenied, so ids cannot be probed.
+func (h *ItineraryHandler) GetItinerary(ctx context.Context, req *connect.Request[itineraryv1.GetItineraryRequest]) (*connect.Response[itineraryv1.GetItineraryResponse], error) {
+	userID, err := h.callerID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	itineraryID, err := uuid.Parse(req.Msg.ItineraryId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid itinerary ID"))
+	}
+	if h.itineraries == nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("itineraries are not available"))
+	}
+
+	it, err := h.itineraries.GetItinerary(ctx, userID, itineraryID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && it == nil) {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("itinerary not found"))
+	}
+	if err != nil {
+		h.logger.ErrorContext(ctx, "could not read itinerary", slog.Any("error", err))
+		return nil, connect.NewError(connect.CodeInternal, errors.New("could not read itinerary"))
+	}
+	return connect.NewResponse(&itineraryv1.GetItineraryResponse{Itinerary: itineraryToProto(it)}), nil
 }
 
 // DeleteBookmark removes one of this user's bookmarked itineraries.
