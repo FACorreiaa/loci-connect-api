@@ -106,12 +106,14 @@ type ServiceImpl struct {
 	// cityResolver geocodes the cities of a multi-city trip. Nil: every
 	// multi-city request is planned as its first city.
 	cityResolver CityResolver
-	poiRepo      poi.Repository
-	poiSvc       poi.Service // POI service for nearby queries with cache + DB + LLM fallback
-	listSvc      itinerarylist.Service
-	tripRepo     trip.Repository // auto-persist generated itineraries as editable trips
-	cache        cachestore.Store
-	model        string
+	// runCityFn replaces runSingleCity in tests of the multi-city orchestrator.
+	runCityFn func(common.ChatContext) (*locitypes.AiCityResponse, error)
+	poiRepo   poi.Repository
+	poiSvc    poi.Service // POI service for nearby queries with cache + DB + LLM fallback
+	listSvc   itinerarylist.Service
+	tripRepo  trip.Repository // auto-persist generated itineraries as editable trips
+	cache     cachestore.Store
+	model     string
 	// provider is the configured upstream, used to attribute an interaction
 	// whose model id does not name its vendor.
 	provider    string
