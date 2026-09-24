@@ -58,6 +58,43 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	ctx = observability.WithAISession(ctx, sessionID.String())
 	ctx = observability.WithAIDistinctID(ctx, session.UserID.String())
 
+	// --- 1b. Classify Intent ---
+	// A pure keyword pass, so it can run before anything is written to this
+	// session; the new-trip check below needs it first.
+	intent, err := l.intentClassifier.Classify(ctx, message)
+	if err != nil {
+		err = fmt.Errorf("failed to classify intent for message '%s': %w", message, err)
+		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
+		return err
+	}
+	l.logger.InfoContext(ctx, "Intent classified", slog.String("intent", string(intent)))
+	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: "intent_classified", Data: map[string]string{"intent": string(intent)}}, 3)
+
+	// --- 1c. A message about another city is a new trip, not an edit ---
+	// Only a general request or a question can be about somewhere else; an
+	// explicit add or remove is an edit to this plan whatever place names it
+	// mentions. The hand-off happens before this message is written into the
+	// old session's history, so the old trip is left exactly as it was.
+	if intent == locitypes.IntentAskQuestion || intent == locitypes.IntentModifyItinerary {
+		if city, ok := l.newTripCity(ctx, session, message); ok {
+			l.logger.InfoContext(ctx, "Follow-up names another city; starting a new trip instead of continuing the session",
+				slog.String("session_id", sessionID.String()),
+				slog.String("session_city", sessionCityName(session)),
+				slog.String("city", city))
+			span.SetAttributes(attribute.String("new_trip.city", city))
+			l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeProgress, Data: map[string]any{"status": "new_trip", "city": city}}, 3)
+			return l.ProcessUnifiedChatMessageStream(common.ChatContext{
+				Ctx:          ctx,
+				UserID:       session.UserID,
+				ProfileID:    session.ProfileID,
+				CityName:     city,
+				Message:      message,
+				UserLocation: userLocation,
+				EventCh:      eventCh,
+			})
+		}
+	}
+
 	// --- 2. Fetch City ID ---
 	cityData, err := l.cityRepo.FindCityByNameAndCountry(ctx, session.SessionContext.CityName, "")
 	if err != nil || cityData == nil {
@@ -85,16 +122,6 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 		span.RecordError(err, trace.WithAttributes(attribute.String("warning", "User message DB save failed")))
 	}
 	session.ConversationHistory = append(session.ConversationHistory, userMessage)
-
-	// --- 4. Classify Intent ---
-	intent, err := l.intentClassifier.Classify(ctx, message)
-	if err != nil {
-		err = fmt.Errorf("failed to classify intent for message '%s': %w", message, err)
-		l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error(), IsFinal: true}, 3)
-		return err
-	}
-	l.logger.InfoContext(ctx, "Intent classified", slog.String("intent", string(intent)))
-	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{Type: "intent_classified", Data: map[string]string{"intent": string(intent)}}, 3)
 
 	// --- 5. Enhance with Semantic POI Recommendations ---
 	l.sendEvent(ctx, eventCh, locitypes.StreamEvent{
@@ -212,7 +239,19 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 				finalResponseMessage = fmt.Sprintf("Could not find %s in your itinerary.", oldPOI)
 			}
 		} else {
-			finalResponseMessage = "I’ve noted your request to modify the itinerary. Please specify the changes (e.g., 'replace X with Y')."
+			// No recognisable edit command. This branch used to return a fixed
+			// string asking for "replace X with Y" without calling a model, so
+			// any general request — "make day two quieter" — read as the bot
+			// being stuck. Answer it from the plan and the evidence instead.
+			answer, answerErr := l.answerQuestionStreamed(ctx, session, message,
+				l.packetForSession(ctx, session, message, cityID, semanticPOIs), eventCh)
+			if answerErr != nil {
+				l.logger.WarnContext(ctx, "failed to answer modification request", slog.Any("error", answerErr))
+				finalResponseMessage = "I could not work that one out just now. Could you rephrase it?"
+				assistantMessageType = locitypes.TypeError
+			} else {
+				finalResponseMessage = answer
+			}
 		}
 	}
 

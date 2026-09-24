@@ -103,7 +103,7 @@ func buildQuestionPrompt(
 ) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, `You are Loci, a travel assistant. Answer the user's question about their trip to %s.
+	fmt.Fprintf(&b, `You are Loci, a travel assistant. Answer the user's question or request about their trip to %s.
 
 `, session.SessionContext.CityName)
 
@@ -120,7 +120,7 @@ func buildQuestionPrompt(
 		b.WriteString("\n")
 	}
 
-	fmt.Fprintf(&b, `**THE USER'S QUESTION:** %s
+	fmt.Fprintf(&b, `**THE USER'S MESSAGE:** %s
 
 **HOW TO ANSWER:**
 - Answer in plain prose. No JSON, no markdown code fences.
@@ -129,6 +129,8 @@ func buildQuestionPrompt(
   hours, prices, or availability.
 - When you name a place that appears in the verified list, follow it with its
   exact [poi:<id>] marker.
+- If the user asks for a change to the plan, describe the change you would
+  make in prose using the places above; do not claim the plan was edited.
 - Be brief. Two or three sentences unless the question genuinely needs more.
 `, question)
 
