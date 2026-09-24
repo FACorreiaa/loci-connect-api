@@ -222,27 +222,13 @@ func (l *ServiceImpl) assemblePacket(cc *common.ChatContext) {
 // same message from occasionally producing a different cleaned message and so
 // a different generation key.
 func (l *ServiceImpl) extractCityCached(ctx context.Context, message string) (cityName, cleanedMessage string, err error) {
-	type extraction struct {
-		City    string `json:"city"`
-		Message string `json:"message"`
-	}
-
-	key := extractionCacheKey(message)
-	if raw, ok := l.cachedText(key); ok {
-		var e extraction
-		if json.Unmarshal([]byte(raw), &e) == nil {
-			return e.City, e.Message, nil
-		}
-	}
-
-	cityName, cleanedMessage, err = l.extractCityFromMessage(ctx, message)
+	// The single-city view of extractTripCitiesCached, so both share one
+	// provider call and one cache entry.
+	tc, err := l.extractTripCitiesCached(ctx, message)
 	if err != nil {
 		return "", "", err
 	}
-	if raw, mErr := json.Marshal(extraction{City: cityName, Message: cleanedMessage}); mErr == nil && l.cache != nil {
-		l.cache.Set(key, string(raw), extractionCacheTTL)
-	}
-	return cityName, cleanedMessage, nil
+	return tc.First(), tc.Message, nil
 }
 
 // extractionCacheTTL is how long a parsed message stays parsed. Long, because
