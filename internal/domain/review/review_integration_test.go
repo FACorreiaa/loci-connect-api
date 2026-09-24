@@ -97,7 +97,7 @@ func TestReviewModels_Integration(t *testing.T) {
 	})
 
 	t.Run("Create and save review helpful", func(t *testing.T) {
-		reviewID := insertReview(t, userID, poiID, 4, "Good place", "Nice location")
+		reviewID := insertReview(t, userID, createTestPOIForReview(t), 4, "Good place", "Nice location")
 		otherUserID := createTestUserForReview(t)
 
 		_, err := testReviewDB.Exec(ctx, `
@@ -115,7 +115,7 @@ func TestReviewModels_Integration(t *testing.T) {
 	})
 
 	t.Run("Create and save review reply", func(t *testing.T) {
-		reviewID := insertReview(t, userID, poiID, 3, "Average place", "It was okay")
+		reviewID := insertReview(t, userID, createTestPOIForReview(t), 3, "Average place", "It was okay")
 		replyUserID := createTestUserForReview(t)
 		replyID := uuid.New()
 		now := time.Now()
@@ -143,9 +143,13 @@ func TestReviewQueries_Integration(t *testing.T) {
 	userID := createTestUserForReview(t)
 	poiID := createTestPOIForReview(t)
 
+	// One review per user per POI (reviews_user_poi_unique), so the user's
+	// three reviews are of three places.
 	insertReview(t, userID, poiID, 5, "Excellent!", "Perfect place")
-	insertReview(t, userID, poiID, 4, "Very good", "Really enjoyed it")
-	insertReview(t, userID, poiID, 3, "Average", "It was okay")
+	insertReview(t, userID, createTestPOIForReview(t), 4, "Very good", "Really enjoyed it")
+	insertReview(t, userID, createTestPOIForReview(t), 3, "Average", "It was okay")
+	insertReview(t, createTestUserForReview(t), poiID, 4, "Very good", "Really enjoyed it")
+	insertReview(t, createTestUserForReview(t), poiID, 3, "Average", "It was okay")
 
 	t.Run("Get reviews by POI ordered by rating", func(t *testing.T) {
 		rows, err := testReviewDB.Query(ctx, "SELECT rating FROM reviews WHERE poi_id = $1 ORDER BY rating DESC", poiID)
@@ -192,7 +196,7 @@ func TestReviewConstraints_Integration(t *testing.T) {
 		_, err := testReviewDB.Exec(ctx, `
 			INSERT INTO reviews (id, user_id, poi_id, rating, title, content, helpful, unhelpful, is_verified, is_published, created_at, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, 0, 0, false, true, $7, $7)`,
-			uuid.New(), userID, poiID, 10, "Invalid rating", "Content", time.Now())
+			uuid.New(), userID, createTestPOIForReview(t), 10, "Invalid rating", "Content", time.Now())
 		require.Error(t, err, "rating=10 should violate the CHECK constraint")
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 
 	"connectrpc.com/connect"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
@@ -15,9 +16,9 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
-// Handler implements the ReviewService Connect handlers. Unimplemented RPCs
-// (UpdateReview, ReportReview, GetReviewStatistics, GetContentReviews) fall
-// through to the embedded default.
+// Handler implements the ReviewService Connect handlers. ReportReview falls
+// through to the embedded default (Unimplemented): there is nowhere to store
+// a report yet.
 type Handler struct {
 	reviewv1connect.UnimplementedReviewServiceHandler
 	service Service
@@ -44,8 +45,10 @@ func (h *Handler) toConnectError(err error) error {
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
-	case errors.Is(err, ErrInvalidReview):
+	case errors.Is(err, ErrInvalidReview), errors.Is(err, ErrPOINotFound):
 		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, ErrAlreadyExists):
+		return connect.NewError(connect.CodeAlreadyExists, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
@@ -60,10 +63,14 @@ func (h *Handler) CreateReview(ctx context.Context, req *connect.Request[reviewv
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid poi_id"))
 	}
+	rating, err := ratingFromProto(req.Msg.Rating)
+	if err != nil {
+		return nil, err
+	}
 	in := CreateReviewInput{
 		UserID:  userID,
 		POIID:   poiID,
-		Rating:  int(req.Msg.Rating),
+		Rating:  rating,
 		Title:   req.Msg.Title,
 		Content: req.Msg.Content,
 		Photos:  req.Msg.PhotoUrls,
@@ -112,13 +119,16 @@ func (h *Handler) GetPOIReviews(ctx context.Context, req *connect.Request[review
 }
 
 func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[reviewv1.GetUserReviewsRequest]) (*connect.Response[reviewv1.GetUserReviewsResponse], error) {
-	userID, err := uuid.Parse(req.Msg.UserId)
-	if err != nil {
-		// Fall back to the authenticated user when no explicit id is given.
+	var userID uuid.UUID
+	var err error
+	if req.Msg.UserId == "" {
+		// No explicit id: the caller's own reviews.
 		userID, err = ctxUser(ctx)
 		if err != nil {
 			return nil, err
 		}
+	} else if userID, err = uuid.Parse(req.Msg.UserId); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user_id"))
 	}
 	limit, offset := pageBounds(req.Msg.Pagination)
 	list, total, err := h.service.ListUserReviews(ctx, userID, limit, offset)
@@ -174,7 +184,116 @@ func (h *Handler) LikeReview(ctx context.Context, req *connect.Request[reviewv1.
 	return connect.NewResponse(&reviewv1.LikeReviewResponse{Response: okResponse(), NewHelpfulCount: int32(count)}), nil
 }
 
+// UpdateReview replaces the caller's own review. The request's user_id is
+// ignored; someone else's review is NotFound.
+func (h *Handler) UpdateReview(ctx context.Context, req *connect.Request[reviewv1.UpdateReviewRequest]) (*connect.Response[reviewv1.UpdateReviewResponse], error) {
+	userID, err := ctxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(req.Msg.ReviewId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid review_id"))
+	}
+	rating, err := ratingFromProto(req.Msg.Rating)
+	if err != nil {
+		return nil, err
+	}
+	in := UpdateReviewInput{
+		ReviewID: id,
+		UserID:   userID,
+		Rating:   rating,
+		Title:    req.Msg.Title,
+		Content:  req.Msg.Content,
+		Photos:   req.Msg.PhotoUrls,
+	}
+	if req.Msg.VisitDate != nil {
+		t := req.Msg.VisitDate.AsTime()
+		in.VisitDate = &t
+	}
+	r, err := h.service.UpdateReview(ctx, in)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.UpdateReviewResponse{Response: okResponse(), Review: toProtoReview(r)}), nil
+}
+
+// GetReviewStatistics returns the count, average and star breakdown of a
+// POI's published reviews. Trends, tags, aspects and languages are not
+// computed; include_trends and include_tags are ignored.
+func (h *Handler) GetReviewStatistics(ctx context.Context, req *connect.Request[reviewv1.GetReviewStatisticsRequest]) (*connect.Response[reviewv1.GetReviewStatisticsResponse], error) {
+	poiID, err := uuid.Parse(req.Msg.PoiId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid poi_id"))
+	}
+	st, err := h.service.GetStatistics(ctx, poiID)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.GetReviewStatisticsResponse{Statistics: toProtoStatistics(st)}), nil
+}
+
+// GetContentReviews serves POI reviews (content_type POI or unspecified),
+// with statistics. Reviews only exist for POIs, so any other content type is
+// InvalidArgument.
+func (h *Handler) GetContentReviews(ctx context.Context, req *connect.Request[reviewv1.GetContentReviewsRequest]) (*connect.Response[reviewv1.GetContentReviewsResponse], error) {
+	switch req.Msg.ContentType {
+	case reviewv1.ReviewContentType_REVIEW_CONTENT_TYPE_UNSPECIFIED, reviewv1.ReviewContentType_REVIEW_CONTENT_TYPE_POI:
+	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only POI reviews are supported"))
+	}
+	poiID, err := uuid.Parse(req.Msg.ContentId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid content_id"))
+	}
+	limit, offset := pageBounds(req.Msg.Pagination)
+	list, total, err := h.service.ListPOIReviews(ctx, poiID, limit, offset)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	st, err := h.service.GetStatistics(ctx, poiID)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.GetContentReviewsResponse{
+		Reviews:    toProtoReviews(list),
+		Pagination: pageMeta(total, limit, offset),
+		Statistics: toProtoStatistics(st),
+	}), nil
+}
+
 // --- mapping helpers ---
+
+// ratingFromProto accepts whole stars only. The column is an INTEGER 1–5, so
+// a fractional rating used to be silently truncated (4.5 stored as 4).
+func ratingFromProto(v float64) (int, error) {
+	if v < 1 || v > 5 || v != math.Trunc(v) {
+		return 0, connect.NewError(connect.CodeInvalidArgument, errors.New("rating must be a whole number from 1 to 5"))
+	}
+	return int(v), nil
+}
+
+func toProtoStatistics(st *Statistics) *reviewv1.ReviewStatistics {
+	if st == nil {
+		return nil
+	}
+	p := &reviewv1.ReviewStatistics{
+		PoiId:         st.POIID.String(),
+		OverallRating: st.AverageRating,
+		TotalReviews:  int32(st.TotalReviews),
+		RatingBreakdown: &reviewv1.RatingBreakdown{
+			OneStar:   int32(st.Distribution[0]),
+			TwoStar:   int32(st.Distribution[1]),
+			ThreeStar: int32(st.Distribution[2]),
+			FourStar:  int32(st.Distribution[3]),
+			FiveStar:  int32(st.Distribution[4]),
+		},
+	}
+	if st.LastReviewAt != nil {
+		p.LastUpdated = timestamppb.New(*st.LastReviewAt)
+	}
+	return p
+}
 
 func okResponse() *commonpb.Response {
 	return &commonpb.Response{Success: true}
@@ -231,6 +350,9 @@ func toProtoReview(r *Review) *reviewv1.Review {
 		UpdatedAt:    timestamppb.New(r.UpdatedAt),
 		HelpfulCount: int32(r.Helpful),
 		IsVerified:   r.IsVerified,
+		// Reviews are POI-only, so the generic content fields mirror poi_id.
+		ContentType: reviewv1.ReviewContentType_REVIEW_CONTENT_TYPE_POI,
+		ContentId:   r.POIID.String(),
 		// Enrichment: POI name (content_name) + reviewer display info.
 		ContentName: r.POIName,
 		Reviewer: &reviewv1.ReviewerInfo{
@@ -238,6 +360,7 @@ func toProtoReview(r *Review) *reviewv1.Review {
 			DisplayName: r.ReviewerName,
 			AvatarUrl:   r.ReviewerAvatar,
 			IsVerified:  r.IsVerified,
+			MemberSince: timestamppb.New(r.ReviewerSince),
 		},
 	}
 	if r.VisitDate != nil {
