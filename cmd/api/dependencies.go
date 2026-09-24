@@ -760,7 +760,8 @@ func (d *Dependencies) initHandlers() error {
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
-	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger)
+	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger).
+		WithItineraries(d.POIRepo)
 	d.ListHandler = itineraryhandler.NewListHandler(d.ListSvc, d.Logger)
 	d.StatisticsHandler = statistics.NewHandler(d.StatisticsSvc, d.Logger)
 	d.RecentsHandler = recents.NewHandler(d.RecentsSvc, d.Logger)
@@ -779,7 +780,8 @@ func (d *Dependencies) initHandlers() error {
 	d.UserHandler.SetExporter(userdata.NewExporter(d.DB.Pool, d.Logger))
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
-	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo)
+	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo).
+		WithPlaces(d.POIRepo)
 	// The setup writer is handed the endpoint and tool names as data because
 	// internal/mcp imports apikey; this is the one place that can see both.
 	// The tool lists come from the table that decides scopes, so the prompt's

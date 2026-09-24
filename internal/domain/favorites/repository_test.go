@@ -159,3 +159,27 @@ func TestFavoriteWithNonUUIDItemID(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, favorited, "a name-keyed favorite must actually delete")
 }
+
+func TestGetFavoriteByItem(t *testing.T) {
+	repo, pool := newFavoritesRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+	itemID := uuid.New()
+
+	_, err := repo.AddFavorite(ctx, newFavorite(userID, itemID, "hotel", "Casa do Largo"))
+	require.NoError(t, err)
+
+	got, err := repo.GetFavoriteByItem(ctx, userID, itemID.String(), "hotel")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "Casa do Largo", got.ItemName)
+	assert.Equal(t, "Lisbon", got.CityName)
+
+	missing, err := repo.GetFavoriteByItem(ctx, userID, itemID.String(), "restaurant")
+	require.NoError(t, err)
+	assert.Nil(t, missing, "same item under another kind is a different save")
+
+	other, err := repo.GetFavoriteByItem(ctx, insertUser(t, pool), itemID.String(), "hotel")
+	require.NoError(t, err)
+	assert.Nil(t, other, "another user's save is not visible")
+}

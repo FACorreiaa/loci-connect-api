@@ -25,6 +25,7 @@ type Handler struct {
 	plans     PlanChecker
 	listItems ListItemCounter
 	prefs     preference.Recorder
+	places    PlaceReader
 	logger    *slog.Logger
 }
 
@@ -53,6 +54,13 @@ func NewHandler(
 		listItems: listItems,
 		logger:    logger.With(slog.String("component", "favorites-handler")),
 	}
+}
+
+// WithPlaces lets the detail and nearby RPCs read stored hotels and
+// restaurants. Without it they answer from saved snapshots alone.
+func (h *Handler) WithPlaces(places PlaceReader) *Handler {
+	h.places = places
+	return h
 }
 
 // contentTypeToString converts proto enum to string

@@ -82,6 +82,10 @@ type Repository interface {
 	FindRestaurantDetails(ctx context.Context, cityID uuid.UUID, lat, lon, tolerance float64, preferences *locitypes.RestaurantUserPreferences) ([]locitypes.RestaurantDetailedInfo, error)
 	SaveRestaurantDetails(ctx context.Context, restaurant locitypes.RestaurantDetailedInfo, cityID uuid.UUID) (uuid.UUID, error)
 	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (*locitypes.RestaurantDetailedInfo, error)
+	// FindHotelsNear and FindRestaurantsNear read only what is already stored,
+	// nearest first; unlike the nearby service they never call the model.
+	FindHotelsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.HotelDetailedInfo, error)
+	FindRestaurantsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.RestaurantDetailedInfo, error)
 	// GetPOIsByCityIDAndCategory(ctx context.Context, cityID uuid.UUID, category string) ([]locitypes.POIDetailedInfo, error)
 	// GetPOIsByCityIDAndCategories(ctx context.Context, cityID uuid.UUID, categories []string) ([]locitypes.POIDetailedInfo, error)
 	// GetPOIsByCityIDAndName(ctx context.Context, cityID uuid.UUID, name string) ([]locitypes.POIDetailedInfo, error)
@@ -1124,8 +1128,12 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 
 	query := `
 		SELECT
-			id, name, description, latitude, longitude, address, website, phone_number,
-			opening_hours, price_range, category, tags, images, rating, llm_interaction_id
+			id, name, COALESCE(description, '') AS description, latitude, longitude,
+			COALESCE(address, '') AS address, COALESCE(website, '') AS website,
+			COALESCE(phone_number, '') AS phone_number, COALESCE(opening_hours::text, '') AS opening_hours,
+			COALESCE(price_range, '') AS price_range, COALESCE(category, '') AS category,
+			COALESCE(tags, '{}') AS tags, COALESCE(images, '{}') AS images,
+			COALESCE(rating, 0) AS rating, llm_interaction_id
 		FROM hotel_details
 		WHERE id = $1
 	`
@@ -1378,8 +1386,12 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
 
 	query := `
         SELECT
-            id, name, description, latitude, longitude, address, website, phone_number,
-            opening_hours, price_level, category, tags, images, rating, cuisine_type, llm_interaction_id
+            id, name, COALESCE(description, '') AS description, latitude, longitude,
+            COALESCE(address, '') AS address, COALESCE(website, '') AS website,
+            COALESCE(phone_number, '') AS phone_number, COALESCE(opening_hours::text, '') AS opening_hours,
+            COALESCE(price_level, '') AS price_level, COALESCE(category, '') AS category,
+            COALESCE(tags, '{}') AS tags, COALESCE(images, '{}') AS images,
+            COALESCE(rating, 0) AS rating, COALESCE(cuisine_type, '') AS cuisine_type, llm_interaction_id
         FROM restaurant_details
         WHERE id = $1
     `
@@ -1424,6 +1436,131 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
 	}
 	span.SetStatus(codes.Ok, "Restaurant found")
 	return &restaurant, nil
+}
+
+// FindHotelsNear returns stored hotels within radiusMeters of a point, nearest
+// first, with the city name joined in.
+func (r *RepositoryImpl) FindHotelsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.HotelDetailedInfo, error) {
+	ctx, span := otel.Tracer("HotelRepository").Start(ctx, "FindHotelsNear")
+	defer span.End()
+
+	query := `
+		SELECT
+			h.id, h.name, COALESCE(h.description, '') AS description, h.latitude, h.longitude,
+			COALESCE(h.address, '') AS address, COALESCE(h.website, '') AS website,
+			COALESCE(h.phone_number, '') AS phone_number, COALESCE(h.opening_hours::text, '') AS opening_hours,
+			COALESCE(h.price_range, '') AS price_range, COALESCE(h.category, '') AS category,
+			COALESCE(h.tags, '{}') AS tags, COALESCE(h.images, '{}') AS images,
+			COALESCE(h.rating, 0) AS rating, h.llm_interaction_id,
+			COALESCE(c.name, '') AS city
+		FROM hotel_details h
+		LEFT JOIN cities c ON c.id = h.city_id
+		WHERE ST_DWithin(h.location::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3)
+		ORDER BY h.location::geography <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+		LIMIT $4
+	`
+	rows, err := r.pgpool.Query(ctx, query, lon, lat, radiusMeters, limit)
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to query nearby hotels: %w", err)
+	}
+	type row struct {
+		hotelDetailsRow
+		City string `db:"city"`
+	}
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[row])
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect nearby hotels: %w", err)
+	}
+
+	hotels := make([]locitypes.HotelDetailedInfo, len(dbRows))
+	for i, dr := range dbRows {
+		hotels[i] = locitypes.HotelDetailedInfo{
+			ID:           dr.ID,
+			City:         dr.City,
+			Name:         dr.Name,
+			Description:  dr.Description,
+			Latitude:     dr.Latitude,
+			Longitude:    dr.Longitude,
+			Address:      dr.Address,
+			Website:      stringPtr(dr.Website),
+			PhoneNumber:  stringPtr(dr.PhoneNumber),
+			OpeningHours: stringPtr(dr.OpeningHours),
+			PriceRange:   stringPtr(dr.PriceRange),
+			Category:     dr.Category,
+			Tags:         dr.Tags,
+			Images:       dr.Images,
+			Rating:       dr.Rating,
+		}
+		if dr.LlmInteractionID != nil {
+			hotels[i].LlmInteractionID = *dr.LlmInteractionID
+		}
+	}
+	return hotels, nil
+}
+
+// FindRestaurantsNear returns stored restaurants within radiusMeters of a
+// point, nearest first, with the city name joined in.
+func (r *RepositoryImpl) FindRestaurantsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.RestaurantDetailedInfo, error) {
+	ctx, span := otel.Tracer("RestaurantRepository").Start(ctx, "FindRestaurantsNear")
+	defer span.End()
+
+	query := `
+		SELECT
+			r.id, r.name, COALESCE(r.description, '') AS description, r.latitude, r.longitude,
+			COALESCE(r.address, '') AS address, COALESCE(r.website, '') AS website,
+			COALESCE(r.phone_number, '') AS phone_number, COALESCE(r.opening_hours::text, '') AS opening_hours,
+			COALESCE(r.price_level, '') AS price_level, COALESCE(r.category, '') AS category,
+			COALESCE(r.tags, '{}') AS tags, COALESCE(r.images, '{}') AS images,
+			COALESCE(r.rating, 0) AS rating, COALESCE(r.cuisine_type, '') AS cuisine_type,
+			r.llm_interaction_id, COALESCE(c.name, '') AS city
+		FROM restaurant_details r
+		LEFT JOIN cities c ON c.id = r.city_id
+		WHERE ST_DWithin(r.location::geography, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography, $3)
+		ORDER BY r.location::geography <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+		LIMIT $4
+	`
+	rows, err := r.pgpool.Query(ctx, query, lon, lat, radiusMeters, limit)
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to query nearby restaurants: %w", err)
+	}
+	type row struct {
+		restaurantDetailsRow
+		City string `db:"city"`
+	}
+	dbRows, err := pgx.CollectRows(rows, pgx.RowToStructByName[row])
+	if err != nil {
+		span.RecordError(err)
+		return nil, fmt.Errorf("failed to collect nearby restaurants: %w", err)
+	}
+
+	restaurants := make([]locitypes.RestaurantDetailedInfo, len(dbRows))
+	for i, dr := range dbRows {
+		restaurants[i] = locitypes.RestaurantDetailedInfo{
+			ID:           dr.ID,
+			City:         dr.City,
+			Name:         dr.Name,
+			Description:  dr.Description,
+			Latitude:     dr.Latitude,
+			Longitude:    dr.Longitude,
+			Address:      stringPtr(dr.Address),
+			Website:      stringPtr(dr.Website),
+			PhoneNumber:  stringPtr(dr.PhoneNumber),
+			OpeningHours: stringPtr(dr.OpeningHours),
+			PriceLevel:   stringPtr(dr.PriceLevel),
+			CuisineType:  stringPtr(dr.CuisineType),
+			Category:     dr.Category,
+			Tags:         dr.Tags,
+			Images:       dr.Images,
+			Rating:       dr.Rating,
+		}
+		if dr.LlmInteractionID != nil {
+			restaurants[i].LlmInteractionID = *dr.LlmInteractionID
+		}
+	}
+	return restaurants, nil
 }
 
 // searchPOIsRow is a DB row struct for SearchPOIs query
@@ -1539,7 +1676,8 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 	query := `
 		SELECT
 			id, user_id, source_llm_interaction_id, session_id, primary_city_id, title, description,
-			markdown_content, tags, estimated_duration_days, estimated_cost_level, is_public
+			markdown_content, tags, estimated_duration_days, estimated_cost_level, is_public,
+			created_at, updated_at
 		FROM user_saved_itineraries
 		WHERE id = $1 AND user_id = $2
 	`
@@ -1562,12 +1700,15 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 		EstimatedDurationDays  *int32     `db:"estimated_duration_days"`
 		EstimatedCostLevel     *int32     `db:"estimated_cost_level"`
 		IsPublic               bool       `db:"is_public"`
+		CreatedAt              time.Time  `db:"created_at"`
+		UpdatedAt              time.Time  `db:"updated_at"`
 	}
 
 	dbRow, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[itineraryRow])
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			err = fmt.Errorf("no itinerary found with ID %s for user %s", itineraryID, userID)
+			// Wraps ErrNoRows so a handler can answer NotFound rather than Internal.
+			err = fmt.Errorf("no itinerary found with ID %s for user %s: %w", itineraryID, userID, pgx.ErrNoRows)
 			span.RecordError(err)
 			return nil, err
 		}
@@ -1588,6 +1729,8 @@ func (r *RepositoryImpl) GetItinerary(ctx context.Context, userID, itineraryID u
 		Description:            dbRow.Description,
 		EstimatedDurationDays:  dbRow.EstimatedDurationDays,
 		EstimatedCostLevel:     dbRow.EstimatedCostLevel,
+		CreatedAt:              dbRow.CreatedAt,
+		UpdatedAt:              dbRow.UpdatedAt,
 	}
 
 	return &itinerary, nil
