@@ -63,24 +63,40 @@ const (
 	// TripServiceSuggestPackingProcedure is the fully-qualified name of the TripService's
 	// SuggestPacking RPC.
 	TripServiceSuggestPackingProcedure = "/loci.trip.TripService/SuggestPacking"
+	// TripServiceGetTripChecklistProcedure is the fully-qualified name of the TripService's
+	// GetTripChecklist RPC.
+	TripServiceGetTripChecklistProcedure = "/loci.trip.TripService/GetTripChecklist"
+	// TripServiceUpsertChecklistItemProcedure is the fully-qualified name of the TripService's
+	// UpsertChecklistItem RPC.
+	TripServiceUpsertChecklistItemProcedure = "/loci.trip.TripService/UpsertChecklistItem"
+	// TripServiceDeleteChecklistItemProcedure is the fully-qualified name of the TripService's
+	// DeleteChecklistItem RPC.
+	TripServiceDeleteChecklistItemProcedure = "/loci.trip.TripService/DeleteChecklistItem"
+	// TripServiceDismissPackingSuggestionProcedure is the fully-qualified name of the TripService's
+	// DismissPackingSuggestion RPC.
+	TripServiceDismissPackingSuggestionProcedure = "/loci.trip.TripService/DismissPackingSuggestion"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	tripServiceServiceDescriptor                = trip.File_loci_trip_trip_proto.Services().ByName("TripService")
-	tripServiceSaveTripMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("SaveTrip")
-	tripServiceGetTripMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("GetTrip")
-	tripServiceListTripsMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("ListTrips")
-	tripServiceShareTripMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("ShareTrip")
-	tripServiceReorderStopsMethodDescriptor     = tripServiceServiceDescriptor.Methods().ByName("ReorderStops")
-	tripServiceRenameStopMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("RenameStop")
-	tripServiceEditStopDurationMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("EditStopDuration")
-	tripServiceSetConstraintMethodDescriptor    = tripServiceServiceDescriptor.Methods().ByName("SetConstraint")
-	tripServiceAddStopMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("AddStop")
-	tripServiceRemoveStopMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("RemoveStop")
-	tripServiceReplaceStopMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("ReplaceStop")
-	tripServiceExportTripMethodDescriptor       = tripServiceServiceDescriptor.Methods().ByName("ExportTrip")
-	tripServiceSuggestPackingMethodDescriptor   = tripServiceServiceDescriptor.Methods().ByName("SuggestPacking")
+	tripServiceServiceDescriptor                        = trip.File_loci_trip_trip_proto.Services().ByName("TripService")
+	tripServiceSaveTripMethodDescriptor                 = tripServiceServiceDescriptor.Methods().ByName("SaveTrip")
+	tripServiceGetTripMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("GetTrip")
+	tripServiceListTripsMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ListTrips")
+	tripServiceShareTripMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ShareTrip")
+	tripServiceReorderStopsMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("ReorderStops")
+	tripServiceRenameStopMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("RenameStop")
+	tripServiceEditStopDurationMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("EditStopDuration")
+	tripServiceSetConstraintMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("SetConstraint")
+	tripServiceAddStopMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("AddStop")
+	tripServiceRemoveStopMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("RemoveStop")
+	tripServiceReplaceStopMethodDescriptor              = tripServiceServiceDescriptor.Methods().ByName("ReplaceStop")
+	tripServiceExportTripMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("ExportTrip")
+	tripServiceSuggestPackingMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("SuggestPacking")
+	tripServiceGetTripChecklistMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("GetTripChecklist")
+	tripServiceUpsertChecklistItemMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("UpsertChecklistItem")
+	tripServiceDeleteChecklistItemMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("DeleteChecklistItem")
+	tripServiceDismissPackingSuggestionMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("DismissPackingSuggestion")
 )
 
 // TripServiceClient is a client for the loci.trip.TripService service.
@@ -100,6 +116,16 @@ type TripServiceClient interface {
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
 	SuggestPacking(context.Context, *connect.Request[trip.SuggestPackingRequest]) (*connect.Response[trip.SuggestPackingResponse], error)
+	// GetTripChecklist returns the trip's packing items, expenses and dismissed
+	// packing suggestions. Other users' trips are NotFound.
+	GetTripChecklist(context.Context, *connect.Request[trip.GetTripChecklistRequest]) (*connect.Response[trip.GetTripChecklistResponse], error)
+	// UpsertChecklistItem creates or replaces an item by (trip_id, item.id).
+	// Adding a 501st item is ResourceExhausted.
+	UpsertChecklistItem(context.Context, *connect.Request[trip.UpsertChecklistItemRequest]) (*connect.Response[trip.ChecklistItem], error)
+	// DeleteChecklistItem removes an item; deleting a missing item succeeds.
+	DeleteChecklistItem(context.Context, *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error)
+	// DismissPackingSuggestion hides a suggestion from this trip's checklist.
+	DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error)
 }
 
 // NewTripServiceClient constructs a client for the loci.trip.TripService service. By default, it
@@ -190,24 +216,52 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceSuggestPackingMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getTripChecklist: connect.NewClient[trip.GetTripChecklistRequest, trip.GetTripChecklistResponse](
+			httpClient,
+			baseURL+TripServiceGetTripChecklistProcedure,
+			connect.WithSchema(tripServiceGetTripChecklistMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		upsertChecklistItem: connect.NewClient[trip.UpsertChecklistItemRequest, trip.ChecklistItem](
+			httpClient,
+			baseURL+TripServiceUpsertChecklistItemProcedure,
+			connect.WithSchema(tripServiceUpsertChecklistItemMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		deleteChecklistItem: connect.NewClient[trip.DeleteChecklistItemRequest, trip.DeleteChecklistItemResponse](
+			httpClient,
+			baseURL+TripServiceDeleteChecklistItemProcedure,
+			connect.WithSchema(tripServiceDeleteChecklistItemMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		dismissPackingSuggestion: connect.NewClient[trip.DismissPackingSuggestionRequest, trip.DismissPackingSuggestionResponse](
+			httpClient,
+			baseURL+TripServiceDismissPackingSuggestionProcedure,
+			connect.WithSchema(tripServiceDismissPackingSuggestionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // tripServiceClient implements TripServiceClient.
 type tripServiceClient struct {
-	saveTrip         *connect.Client[trip.SaveTripRequest, trip.TripDraft]
-	getTrip          *connect.Client[trip.GetTripRequest, trip.TripDraft]
-	listTrips        *connect.Client[trip.ListTripsRequest, trip.ListTripsResponse]
-	shareTrip        *connect.Client[trip.ShareTripRequest, trip.ShareTripResponse]
-	reorderStops     *connect.Client[trip.ReorderStopsRequest, trip.TripDraft]
-	renameStop       *connect.Client[trip.RenameStopRequest, trip.TripDraft]
-	editStopDuration *connect.Client[trip.EditStopDurationRequest, trip.TripDraft]
-	setConstraint    *connect.Client[trip.SetConstraintRequest, trip.TripDraft]
-	addStop          *connect.Client[trip.AddStopRequest, trip.TripDraft]
-	removeStop       *connect.Client[trip.RemoveStopRequest, trip.TripDraft]
-	replaceStop      *connect.Client[trip.ReplaceStopRequest, trip.TripDraft]
-	exportTrip       *connect.Client[trip.ExportTripRequest, trip.ExportTripResponse]
-	suggestPacking   *connect.Client[trip.SuggestPackingRequest, trip.SuggestPackingResponse]
+	saveTrip                 *connect.Client[trip.SaveTripRequest, trip.TripDraft]
+	getTrip                  *connect.Client[trip.GetTripRequest, trip.TripDraft]
+	listTrips                *connect.Client[trip.ListTripsRequest, trip.ListTripsResponse]
+	shareTrip                *connect.Client[trip.ShareTripRequest, trip.ShareTripResponse]
+	reorderStops             *connect.Client[trip.ReorderStopsRequest, trip.TripDraft]
+	renameStop               *connect.Client[trip.RenameStopRequest, trip.TripDraft]
+	editStopDuration         *connect.Client[trip.EditStopDurationRequest, trip.TripDraft]
+	setConstraint            *connect.Client[trip.SetConstraintRequest, trip.TripDraft]
+	addStop                  *connect.Client[trip.AddStopRequest, trip.TripDraft]
+	removeStop               *connect.Client[trip.RemoveStopRequest, trip.TripDraft]
+	replaceStop              *connect.Client[trip.ReplaceStopRequest, trip.TripDraft]
+	exportTrip               *connect.Client[trip.ExportTripRequest, trip.ExportTripResponse]
+	suggestPacking           *connect.Client[trip.SuggestPackingRequest, trip.SuggestPackingResponse]
+	getTripChecklist         *connect.Client[trip.GetTripChecklistRequest, trip.GetTripChecklistResponse]
+	upsertChecklistItem      *connect.Client[trip.UpsertChecklistItemRequest, trip.ChecklistItem]
+	deleteChecklistItem      *connect.Client[trip.DeleteChecklistItemRequest, trip.DeleteChecklistItemResponse]
+	dismissPackingSuggestion *connect.Client[trip.DismissPackingSuggestionRequest, trip.DismissPackingSuggestionResponse]
 }
 
 // SaveTrip calls loci.trip.TripService.SaveTrip.
@@ -275,6 +329,26 @@ func (c *tripServiceClient) SuggestPacking(ctx context.Context, req *connect.Req
 	return c.suggestPacking.CallUnary(ctx, req)
 }
 
+// GetTripChecklist calls loci.trip.TripService.GetTripChecklist.
+func (c *tripServiceClient) GetTripChecklist(ctx context.Context, req *connect.Request[trip.GetTripChecklistRequest]) (*connect.Response[trip.GetTripChecklistResponse], error) {
+	return c.getTripChecklist.CallUnary(ctx, req)
+}
+
+// UpsertChecklistItem calls loci.trip.TripService.UpsertChecklistItem.
+func (c *tripServiceClient) UpsertChecklistItem(ctx context.Context, req *connect.Request[trip.UpsertChecklistItemRequest]) (*connect.Response[trip.ChecklistItem], error) {
+	return c.upsertChecklistItem.CallUnary(ctx, req)
+}
+
+// DeleteChecklistItem calls loci.trip.TripService.DeleteChecklistItem.
+func (c *tripServiceClient) DeleteChecklistItem(ctx context.Context, req *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error) {
+	return c.deleteChecklistItem.CallUnary(ctx, req)
+}
+
+// DismissPackingSuggestion calls loci.trip.TripService.DismissPackingSuggestion.
+func (c *tripServiceClient) DismissPackingSuggestion(ctx context.Context, req *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error) {
+	return c.dismissPackingSuggestion.CallUnary(ctx, req)
+}
+
 // TripServiceHandler is an implementation of the loci.trip.TripService service.
 type TripServiceHandler interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
@@ -292,6 +366,16 @@ type TripServiceHandler interface {
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
 	SuggestPacking(context.Context, *connect.Request[trip.SuggestPackingRequest]) (*connect.Response[trip.SuggestPackingResponse], error)
+	// GetTripChecklist returns the trip's packing items, expenses and dismissed
+	// packing suggestions. Other users' trips are NotFound.
+	GetTripChecklist(context.Context, *connect.Request[trip.GetTripChecklistRequest]) (*connect.Response[trip.GetTripChecklistResponse], error)
+	// UpsertChecklistItem creates or replaces an item by (trip_id, item.id).
+	// Adding a 501st item is ResourceExhausted.
+	UpsertChecklistItem(context.Context, *connect.Request[trip.UpsertChecklistItemRequest]) (*connect.Response[trip.ChecklistItem], error)
+	// DeleteChecklistItem removes an item; deleting a missing item succeeds.
+	DeleteChecklistItem(context.Context, *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error)
+	// DismissPackingSuggestion hides a suggestion from this trip's checklist.
+	DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error)
 }
 
 // NewTripServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -378,6 +462,30 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceSuggestPackingMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceGetTripChecklistHandler := connect.NewUnaryHandler(
+		TripServiceGetTripChecklistProcedure,
+		svc.GetTripChecklist,
+		connect.WithSchema(tripServiceGetTripChecklistMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceUpsertChecklistItemHandler := connect.NewUnaryHandler(
+		TripServiceUpsertChecklistItemProcedure,
+		svc.UpsertChecklistItem,
+		connect.WithSchema(tripServiceUpsertChecklistItemMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceDeleteChecklistItemHandler := connect.NewUnaryHandler(
+		TripServiceDeleteChecklistItemProcedure,
+		svc.DeleteChecklistItem,
+		connect.WithSchema(tripServiceDeleteChecklistItemMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceDismissPackingSuggestionHandler := connect.NewUnaryHandler(
+		TripServiceDismissPackingSuggestionProcedure,
+		svc.DismissPackingSuggestion,
+		connect.WithSchema(tripServiceDismissPackingSuggestionMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.trip.TripService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TripServiceSaveTripProcedure:
@@ -406,6 +514,14 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceExportTripHandler.ServeHTTP(w, r)
 		case TripServiceSuggestPackingProcedure:
 			tripServiceSuggestPackingHandler.ServeHTTP(w, r)
+		case TripServiceGetTripChecklistProcedure:
+			tripServiceGetTripChecklistHandler.ServeHTTP(w, r)
+		case TripServiceUpsertChecklistItemProcedure:
+			tripServiceUpsertChecklistItemHandler.ServeHTTP(w, r)
+		case TripServiceDeleteChecklistItemProcedure:
+			tripServiceDeleteChecklistItemHandler.ServeHTTP(w, r)
+		case TripServiceDismissPackingSuggestionProcedure:
+			tripServiceDismissPackingSuggestionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -465,4 +581,20 @@ func (UnimplementedTripServiceHandler) ExportTrip(context.Context, *connect.Requ
 
 func (UnimplementedTripServiceHandler) SuggestPacking(context.Context, *connect.Request[trip.SuggestPackingRequest]) (*connect.Response[trip.SuggestPackingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SuggestPacking is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) GetTripChecklist(context.Context, *connect.Request[trip.GetTripChecklistRequest]) (*connect.Response[trip.GetTripChecklistResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetTripChecklist is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) UpsertChecklistItem(context.Context, *connect.Request[trip.UpsertChecklistItemRequest]) (*connect.Response[trip.ChecklistItem], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.UpsertChecklistItem is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) DeleteChecklistItem(context.Context, *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.DeleteChecklistItem is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.DismissPackingSuggestion is not implemented"))
 }
