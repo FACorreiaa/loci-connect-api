@@ -97,6 +97,16 @@ func tripFromProto(p *tripv1.TripDraft, uid uuid.UUID) (*Trip, error) {
 	for _, pl := range p.GetLegs() {
 		t.Legs = append(t.Legs, legFromProto(pl))
 	}
+	for _, pc := range p.GetCities() {
+		c := TripCity{CityName: pc.GetCityName(), Nights: pc.GetNights(), OrderIndex: pc.GetOrderIndex()}
+		if id, err := uuid.Parse(pc.GetCityId()); err == nil {
+			c.CityID = &id
+		}
+		if id, err := uuid.Parse(pc.GetSessionId()); err == nil {
+			c.SessionID = &id
+		}
+		t.Cities = append(t.Cities, c)
+	}
 	return t, nil
 }
 
@@ -178,6 +188,16 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 	}
 	for _, l := range t.Legs {
 		p.Legs = append(p.Legs, legToProto(l))
+	}
+	for _, c := range t.Cities {
+		pc := &tripv1.TripCity{CityName: c.CityName, Nights: c.Nights, OrderIndex: c.OrderIndex}
+		if c.CityID != nil {
+			pc.CityId = c.CityID.String()
+		}
+		if c.SessionID != nil {
+			pc.SessionId = c.SessionID.String()
+		}
+		p.Cities = append(p.Cities, pc)
 	}
 	return p
 }
