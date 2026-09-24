@@ -183,7 +183,7 @@ func TestProcessUnified_TwoCitiesDispatch(t *testing.T) {
 	msg := "Lisbon for 2 days then Porto for 1"
 	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Lisbon", Days: 2}, {Name: "Porto", Days: 1}}, Ordered: true, Message: "trip"})
 	l.cache.Set(tripCitiesCacheKey(msg), string(raw), time.Hour)
-	if err := l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, EventCh: make(chan locitypes.StreamEvent, 100)}); err != nil {
+	if err := l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, MultiCityCapable: true, EventCh: make(chan locitypes.StreamEvent, 100)}); err != nil {
 		t.Fatal(err)
 	}
 	if len(cities) != 2 || cities[0] != "Lisbon" || cities[1] != "Porto" {
@@ -290,8 +290,27 @@ func TestProcessUnified_SurvivorIsTheCity(t *testing.T) {
 	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Atlantis"}, {Name: "Lisbon"}}, Message: "weekend"})
 	l.cache.Set(tripCitiesCacheKey(msg), string(raw), time.Hour)
 	events := make(chan locitypes.StreamEvent, 10)
-	_ = l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, EventCh: events})
+	_ = l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, MultiCityCapable: true, EventCh: events})
 	if len(got) != 1 || got[0].CityName != "Lisbon" || !got[0].CityFixed {
 		t.Fatalf("expected one run for Lisbon with the city fixed, got %+v", got)
+	}
+}
+
+// Review #6: a client that does not know multi-city streams (an old app or a
+// cached web bundle) keeps today's single-city answer for free text.
+func TestProcessUnified_OldClientStaysSingleCity(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	l.cityResolver = iberia
+	var cities []string
+	l.runCityFn = func(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
+		cities = append(cities, cc.CityName)
+		return &locitypes.AiCityResponse{}, nil
+	}
+	msg := "Lisbon for 2 days then Porto for 1"
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Lisbon", Days: 2}, {Name: "Porto", Days: 1}}, Ordered: true, Message: "trip"})
+	l.cache.Set(tripCitiesCacheKey(msg), string(raw), time.Hour)
+	_ = l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, EventCh: make(chan locitypes.StreamEvent, 100)})
+	if len(cities) != 1 {
+		t.Fatalf("an old client must get one city, ran %v", cities)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
@@ -178,6 +179,7 @@ func (h *ChatHandler) StreamChat(
 	}
 
 	cc := common.ChatContext{
+		MultiCityCapable:   len(stops) >= 2 || multiCityCapable(req.Header()),
 		Stops:              stops,
 		SuggestOrder:       req.Msg.GetSuggestOrder(),
 		Ctx:                llmCtx,
@@ -1180,4 +1182,20 @@ func routeToProto(rd locitypes.StreamRouteData) *chatv1.RoutePayload {
 		out.Dropped = append(out.Dropped, &chatv1.DroppedStop{CityName: d.CityName, Reason: d.Reason})
 	}
 	return out
+}
+
+// featuresHeader is how a client says what it can render. A client that
+// lists "multi-city" gets multi-city trips from free text; one that does not
+// — an app already in people's hands — keeps a single-city answer.
+const featuresHeader = "Loci-Features"
+
+func multiCityCapable(h http.Header) bool {
+	for _, v := range h.Values(featuresHeader) {
+		for _, f := range strings.Split(v, ",") {
+			if strings.TrimSpace(f) == "multi-city" {
+				return true
+			}
+		}
+	}
+	return false
 }

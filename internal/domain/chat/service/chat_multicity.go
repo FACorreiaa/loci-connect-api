@@ -69,6 +69,9 @@ func (l *ServiceImpl) planMultiCity(cc *common.ChatContext) (*multiCityRoute, er
 			req.Cities = append(req.Cities, ExtractedCity{Name: s.CityName, Days: s.Nights})
 		}
 	} else {
+		if !cc.MultiCityCapable {
+			return nil, nil
+		}
 		tc, err := l.extractTripCitiesCached(cc.Ctx, cc.Message)
 		if err != nil || len(tc.Cities) < 2 {
 			// Not knowing is not a reason to fail: the single-city path

@@ -101,6 +101,8 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 		Message:      message,
 		UserLocation: userLocation,
 		EventCh:      eventCh,
+		// The unary answer folds every city in (turnCollector).
+		MultiCityCapable: true,
 	}
 	// Written by the producer, read only after the range below. The channel
 	// close orders the two. A caller must be told the turn failed rather than

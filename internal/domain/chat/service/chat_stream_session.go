@@ -91,6 +91,9 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 				Message:      message,
 				UserLocation: userLocation,
 				EventCh:      eventCh,
+				// Only the unary ContinueChat reaches here, and its
+				// collector folds every city in.
+				MultiCityCapable: true,
 			})
 		}
 	}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -87,5 +88,16 @@ func TestStreamBudget(t *testing.T) {
 	}
 	if streamBudget() < 9*time.Minute {
 		t.Fatalf("stream budget %v must cover a multi-city run", streamBudget())
+	}
+}
+
+func TestMultiCityCapable(t *testing.T) {
+	h := http.Header{}
+	if multiCityCapable(h) {
+		t.Fatal("no header: not capable")
+	}
+	h.Set(featuresHeader, "resume, multi-city")
+	if !multiCityCapable(h) {
+		t.Fatal("header lists multi-city: capable")
 	}
 }

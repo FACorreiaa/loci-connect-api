@@ -255,6 +255,11 @@ type ChatContext struct {
 	Stops []TripStopRequest
 	// SuggestOrder lets the planner reorder Stops.
 	SuggestOrder bool
+	// MultiCityCapable says the caller renders multi-city streams (ROUTE and
+	// stop_index). Free text naming several cities only becomes a multi-city
+	// trip for such a caller; an older one keeps its single-city answer.
+	// Stops from the builder imply it.
+	MultiCityCapable bool
 	// CityFixed keeps CityName as set: a request that named several cities
 	// and kept one is about that one, whatever the extractor reads first.
 	CityFixed bool

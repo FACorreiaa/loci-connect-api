@@ -140,6 +140,15 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 		final, err := repo.GetTrip(ctx, third.ID, userID)
 		require.NoError(t, err)
 		assert.Len(t, final.Cities, 1, "cities are replaced, not appended")
+
+		// Review #6: a client that predates cities sends none; that is not
+		// "this trip has no cities".
+		final.Cities = nil
+		fourth, err := repo.SaveTrip(ctx, final, final.Version)
+		require.NoError(t, err)
+		kept, err := repo.GetTrip(ctx, fourth.ID, userID)
+		require.NoError(t, err)
+		assert.Len(t, kept.Cities, 1, "a save without cities keeps the ones the trip has")
 	})
 }
 

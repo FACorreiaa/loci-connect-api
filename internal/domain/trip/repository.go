@@ -268,12 +268,16 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		return nil, err
 	}
 
-	// Cities, replace-all like days and legs.
-	if _, err := tx.Exec(ctx, `DELETE FROM trip_cities WHERE trip_id = $1`, t.ID); err != nil {
-		return nil, fmt.Errorf("clear cities: %w", err)
-	}
-	if err := insertCities(ctx, tx, t); err != nil {
-		return nil, err
+	// Cities, replace-all like days and legs — but only when some are sent.
+	// A client that predates multi-city trips sends none, and saving its edit
+	// must not cut the trip off from each city's results.
+	if len(t.Cities) > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM trip_cities WHERE trip_id = $1`, t.ID); err != nil {
+			return nil, fmt.Errorf("clear cities: %w", err)
+		}
+		if err := insertCities(ctx, tx, t); err != nil {
+			return nil, err
+		}
 	}
 
 	// Append an immutable snapshot for merge-safe reconciliation.

@@ -67,3 +67,13 @@ func TestCorsOptionsDefaultsToLocalDev(t *testing.T) {
 		t.Fatalf("empty origins should default to local dev, got %v", opts.AllowedOrigins)
 	}
 }
+
+// The web client says it renders multi-city streams on every chat call; a
+// preflight that is refused this header breaks every search from the browser.
+func TestPreflightAllowsLociFeatures(t *testing.T) {
+	rec := preflight(t, "https://lociai.fyi",
+		"authorization,connect-protocol-version,content-type,loci-features")
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://lociai.fyi" {
+		t.Fatalf("Access-Control-Allow-Origin = %q; headers: %v", got, rec.Header())
+	}
+}
