@@ -36,6 +36,10 @@ type ChatSession struct {
 	ExpiresAt           time.Time             `json:"expires_at"`
 	Status              SessionStatus         `json:"status"` // "active", "expired", etc.
 	SearchType          SearchType            `json:"search_type"`
+	// ParentSessionID is set on the child sessions of a multi-city trip: the
+	// first city's session is the trip's own, the rest point at it, and the
+	// sessions list shows the trip once.
+	ParentSessionID *uuid.UUID `json:"parent_session_id,omitempty"`
 	// Enriched fields for better chat history display
 	PerformanceMetrics SessionPerformanceMetrics `json:"performance_metrics"`
 	ContentMetrics     SessionContentMetrics     `json:"content_metrics"`

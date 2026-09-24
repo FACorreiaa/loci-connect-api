@@ -181,6 +181,9 @@ func (l *ServiceImpl) runStop(cc common.ChatContext, r *multiCityRoute, runStart
 	child.Message = r.Message
 	child.StopRun = true
 	child.PresetSessionID = s.SessionID
+	if i > 0 {
+		child.ParentSessionID = r.Stops[0].SessionID
+	}
 	child.PresetTripDays = len(s.Days)
 	child.SuppressTripSave = true
 	child.RequestedSessionID = uuid.Nil

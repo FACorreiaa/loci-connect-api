@@ -939,8 +939,8 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.Ch
 	query := `
         INSERT INTO chat_sessions (
             id, user_id, profile_id, city_name, current_itinerary, conversation_history, session_context,
-            created_at, updated_at, expires_at, status
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            created_at, updated_at, expires_at, status, parent_session_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     `
 	itineraryJSON, err := json.Marshal(session.CurrentItinerary)
 	if err != nil {
@@ -960,7 +960,8 @@ func (r *RepositoryImpl) CreateSession(ctx context.Context, session locitypes.Ch
 
 	if err := db.WithTxBegin(ctx, r.pgpool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, query, session.ID, session.UserID, session.ProfileID, session.CityName,
-			itineraryJSON, historyJSON, contextJSON, session.CreatedAt, session.UpdatedAt, session.ExpiresAt, session.Status); err != nil {
+			itineraryJSON, historyJSON, contextJSON, session.CreatedAt, session.UpdatedAt, session.ExpiresAt, session.Status,
+			session.ParentSessionID); err != nil {
 			r.logger.ErrorContext(ctx, "Failed to create session", slog.Any("error", err))
 			return fmt.Errorf("failed to create session: %w", err)
 		}
@@ -1081,6 +1082,12 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
                 ) as interactions
             FROM llm_interactions
             WHERE user_id = $1 AND prompt IS NOT NULL
+              -- A multi-city trip's later cities are child sessions of its
+              -- first city's session; the trip is listed once, under that one.
+              AND NOT EXISTS (
+                  SELECT 1 FROM chat_sessions cs
+                  WHERE cs.id = llm_interactions.session_id AND cs.parent_session_id IS NOT NULL
+              )
             GROUP BY session_key, user_id, city_name
         )
         SELECT
@@ -1122,6 +1129,12 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
                 city_name
             FROM llm_interactions
             WHERE user_id = $1 AND prompt IS NOT NULL
+              -- A multi-city trip's later cities are child sessions of its
+              -- first city's session; the trip is listed once, under that one.
+              AND NOT EXISTS (
+                  SELECT 1 FROM chat_sessions cs
+                  WHERE cs.id = llm_interactions.session_id AND cs.parent_session_id IS NOT NULL
+              )
             GROUP BY session_key, user_id, city_name
         )
         SELECT COUNT(*) FROM grouped_interactions
@@ -2027,7 +2040,7 @@ func (r *RepositoryImpl) GetRecentChatSessions(ctx context.Context, userID uuid.
 	query := `
 		SELECT id, user_id, profile_id, city_name, conversation_history, created_at, updated_at, COALESCE(search_type, 'itinerary') as search_type
 		FROM chat_sessions
-		WHERE user_id = $1 AND status = 'active'
+		WHERE user_id = $1 AND status = 'active' AND parent_session_id IS NULL
 		ORDER BY created_at DESC
 		LIMIT $2
 	`
@@ -2069,7 +2082,7 @@ func (r *RepositoryImpl) GetRecentChatSessionsByType(ctx context.Context, userID
 	query := `
 		SELECT id, user_id, profile_id, city_name, conversation_history, created_at, updated_at, search_type
 		FROM chat_sessions
-		WHERE user_id = $1 AND status = 'active' AND search_type = $2
+		WHERE user_id = $1 AND status = 'active' AND search_type = $2 AND parent_session_id IS NULL
 		ORDER BY created_at DESC
 		LIMIT $3
 	`

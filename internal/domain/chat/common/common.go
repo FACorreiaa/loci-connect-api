@@ -269,6 +269,10 @@ type ChatContext struct {
 
 	// StopRun marks a child run: it never dispatches to multi-city again.
 	StopRun bool
+	// ParentSessionID is the trip's own session (the first city's) on every
+	// later city's child run, so their sessions are filed under the trip.
+	// Nil on the first city and on single-city turns.
+	ParentSessionID uuid.UUID
 	// PresetSessionID is the session id the child run creates (the route
 	// named it before the city started generating).
 	PresetSessionID uuid.UUID
