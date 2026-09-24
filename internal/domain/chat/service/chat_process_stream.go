@@ -176,6 +176,10 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 			ExpiresAt: time.Now().Add(24 * time.Hour),
 			Status:    "active",
 		}
+		if cc.ParentSessionID != uuid.Nil {
+			parent := cc.ParentSessionID
+			session.ParentSessionID = &parent
+		}
 		if err := l.llmInteractionRepo.CreateSession(ctx, session); err != nil {
 			return nil, fmt.Errorf("failed to create session: %w", err)
 		}

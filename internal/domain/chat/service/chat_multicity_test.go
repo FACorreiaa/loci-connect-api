@@ -91,21 +91,30 @@ func TestMergeStopTrips_FailedCityKeepsItsDays(t *testing.T) {
 
 func TestProcessMultiCity_EventOrderAndFailureIsolation(t *testing.T) {
 	events := make(chan locitypes.StreamEvent, 200)
+	route := twoCityRoute()
 	l := newStreamService(t, &TestLLMClient{})
 	l.runCityFn = func(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
 		if cc.CityName == "Porto" {
+			if cc.ParentSessionID != route.Stops[0].SessionID {
+				t.Errorf("second city must be a child of the first city's session: %v", cc.ParentSessionID)
+			}
 			cc.EventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "porto failed"}
 			return nil, errors.New("porto failed")
 		}
 		if !cc.StopRun || !cc.SuppressTripSave || cc.PresetTripDays != 2 || cc.PresetSessionID == uuid.Nil {
 			t.Errorf("child context not preset: %+v", cc)
 		}
+		// The first city's session is the trip's own; every later city is a
+		// child of it, so the sessions list can fold them into one entry.
+		if cc.CityName == "Lisbon" && cc.ParentSessionID != uuid.Nil {
+			t.Errorf("first city must have no parent: %+v", cc.ParentSessionID)
+		}
 		cc.EventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeStart, Data: locitypes.StreamStartData{SessionID: cc.PresetSessionID.String()}}
 		cc.EventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeItinerary, Data: locitypes.AiCityResponse{}}
 		cc.EventCh <- locitypes.StreamEvent{Type: locitypes.EventTypeComplete}
 		return &locitypes.AiCityResponse{}, nil
 	}
-	err := l.processMultiCity(common.ChatContext{Ctx: context.Background(), UserID: uuid.New(), EventCh: events}, twoCityRoute())
+	err := l.processMultiCity(common.ChatContext{Ctx: context.Background(), UserID: uuid.New(), EventCh: events}, route)
 	close(events)
 	if err != nil {
 		t.Fatalf("one city failing must not fail the run: %v", err)
