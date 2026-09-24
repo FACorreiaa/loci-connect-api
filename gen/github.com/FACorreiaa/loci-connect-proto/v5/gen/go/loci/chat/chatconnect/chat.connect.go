@@ -24,6 +24,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// ChatServiceName is the fully-qualified name of the ChatService service.
 	ChatServiceName = "loci.chat.ChatService"
+	// WatchServiceName is the fully-qualified name of the WatchService service.
+	WatchServiceName = "loci.chat.WatchService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -66,6 +68,18 @@ const (
 	// ChatServiceGetRunStatusProcedure is the fully-qualified name of the ChatService's GetRunStatus
 	// RPC.
 	ChatServiceGetRunStatusProcedure = "/loci.chat.ChatService/GetRunStatus"
+	// WatchServiceProposeWatchProcedure is the fully-qualified name of the WatchService's ProposeWatch
+	// RPC.
+	WatchServiceProposeWatchProcedure = "/loci.chat.WatchService/ProposeWatch"
+	// WatchServiceCreateWatchProcedure is the fully-qualified name of the WatchService's CreateWatch
+	// RPC.
+	WatchServiceCreateWatchProcedure = "/loci.chat.WatchService/CreateWatch"
+	// WatchServiceListWatchesProcedure is the fully-qualified name of the WatchService's ListWatches
+	// RPC.
+	WatchServiceListWatchesProcedure = "/loci.chat.WatchService/ListWatches"
+	// WatchServiceDeleteWatchProcedure is the fully-qualified name of the WatchService's DeleteWatch
+	// RPC.
+	WatchServiceDeleteWatchProcedure = "/loci.chat.WatchService/DeleteWatch"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -83,6 +97,11 @@ var (
 	chatServiceRemoveBookmarkMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("RemoveBookmark")
 	chatServiceStreamChatMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("StreamChat")
 	chatServiceGetRunStatusMethodDescriptor          = chatServiceServiceDescriptor.Methods().ByName("GetRunStatus")
+	watchServiceServiceDescriptor                    = chat.File_loci_chat_chat_proto.Services().ByName("WatchService")
+	watchServiceProposeWatchMethodDescriptor         = watchServiceServiceDescriptor.Methods().ByName("ProposeWatch")
+	watchServiceCreateWatchMethodDescriptor          = watchServiceServiceDescriptor.Methods().ByName("CreateWatch")
+	watchServiceListWatchesMethodDescriptor          = watchServiceServiceDescriptor.Methods().ByName("ListWatches")
+	watchServiceDeleteWatchMethodDescriptor          = watchServiceServiceDescriptor.Methods().ByName("DeleteWatch")
 )
 
 // ChatServiceClient is a client for the loci.chat.ChatService service.
@@ -449,4 +468,158 @@ func (UnimplementedChatServiceHandler) StreamChat(context.Context, *connect.Requ
 
 func (UnimplementedChatServiceHandler) GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.GetRunStatus is not implemented"))
+}
+
+// WatchServiceClient is a client for the loci.chat.WatchService service.
+type WatchServiceClient interface {
+	// Turns free text into a proposal. Stores nothing.
+	ProposeWatch(context.Context, *connect.Request[chat.ProposeWatchRequest]) (*connect.Response[chat.ProposeWatchResponse], error)
+	// Stores a confirmed proposal and posts the confirmation into the thread.
+	CreateWatch(context.Context, *connect.Request[chat.CreateWatchRequest]) (*connect.Response[chat.CreateWatchResponse], error)
+	// The caller's watches, soonest next run first.
+	ListWatches(context.Context, *connect.Request[chat.ListWatchesRequest]) (*connect.Response[chat.ListWatchesResponse], error)
+	// Stops and removes one of the caller's watches.
+	DeleteWatch(context.Context, *connect.Request[chat.DeleteWatchRequest]) (*connect.Response[chat.DeleteWatchResponse], error)
+}
+
+// NewWatchServiceClient constructs a client for the loci.chat.WatchService service. By default, it
+// uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and sends
+// uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC() or
+// connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewWatchServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) WatchServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	return &watchServiceClient{
+		proposeWatch: connect.NewClient[chat.ProposeWatchRequest, chat.ProposeWatchResponse](
+			httpClient,
+			baseURL+WatchServiceProposeWatchProcedure,
+			connect.WithSchema(watchServiceProposeWatchMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		createWatch: connect.NewClient[chat.CreateWatchRequest, chat.CreateWatchResponse](
+			httpClient,
+			baseURL+WatchServiceCreateWatchProcedure,
+			connect.WithSchema(watchServiceCreateWatchMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listWatches: connect.NewClient[chat.ListWatchesRequest, chat.ListWatchesResponse](
+			httpClient,
+			baseURL+WatchServiceListWatchesProcedure,
+			connect.WithSchema(watchServiceListWatchesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		deleteWatch: connect.NewClient[chat.DeleteWatchRequest, chat.DeleteWatchResponse](
+			httpClient,
+			baseURL+WatchServiceDeleteWatchProcedure,
+			connect.WithSchema(watchServiceDeleteWatchMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// watchServiceClient implements WatchServiceClient.
+type watchServiceClient struct {
+	proposeWatch *connect.Client[chat.ProposeWatchRequest, chat.ProposeWatchResponse]
+	createWatch  *connect.Client[chat.CreateWatchRequest, chat.CreateWatchResponse]
+	listWatches  *connect.Client[chat.ListWatchesRequest, chat.ListWatchesResponse]
+	deleteWatch  *connect.Client[chat.DeleteWatchRequest, chat.DeleteWatchResponse]
+}
+
+// ProposeWatch calls loci.chat.WatchService.ProposeWatch.
+func (c *watchServiceClient) ProposeWatch(ctx context.Context, req *connect.Request[chat.ProposeWatchRequest]) (*connect.Response[chat.ProposeWatchResponse], error) {
+	return c.proposeWatch.CallUnary(ctx, req)
+}
+
+// CreateWatch calls loci.chat.WatchService.CreateWatch.
+func (c *watchServiceClient) CreateWatch(ctx context.Context, req *connect.Request[chat.CreateWatchRequest]) (*connect.Response[chat.CreateWatchResponse], error) {
+	return c.createWatch.CallUnary(ctx, req)
+}
+
+// ListWatches calls loci.chat.WatchService.ListWatches.
+func (c *watchServiceClient) ListWatches(ctx context.Context, req *connect.Request[chat.ListWatchesRequest]) (*connect.Response[chat.ListWatchesResponse], error) {
+	return c.listWatches.CallUnary(ctx, req)
+}
+
+// DeleteWatch calls loci.chat.WatchService.DeleteWatch.
+func (c *watchServiceClient) DeleteWatch(ctx context.Context, req *connect.Request[chat.DeleteWatchRequest]) (*connect.Response[chat.DeleteWatchResponse], error) {
+	return c.deleteWatch.CallUnary(ctx, req)
+}
+
+// WatchServiceHandler is an implementation of the loci.chat.WatchService service.
+type WatchServiceHandler interface {
+	// Turns free text into a proposal. Stores nothing.
+	ProposeWatch(context.Context, *connect.Request[chat.ProposeWatchRequest]) (*connect.Response[chat.ProposeWatchResponse], error)
+	// Stores a confirmed proposal and posts the confirmation into the thread.
+	CreateWatch(context.Context, *connect.Request[chat.CreateWatchRequest]) (*connect.Response[chat.CreateWatchResponse], error)
+	// The caller's watches, soonest next run first.
+	ListWatches(context.Context, *connect.Request[chat.ListWatchesRequest]) (*connect.Response[chat.ListWatchesResponse], error)
+	// Stops and removes one of the caller's watches.
+	DeleteWatch(context.Context, *connect.Request[chat.DeleteWatchRequest]) (*connect.Response[chat.DeleteWatchResponse], error)
+}
+
+// NewWatchServiceHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewWatchServiceHandler(svc WatchServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	watchServiceProposeWatchHandler := connect.NewUnaryHandler(
+		WatchServiceProposeWatchProcedure,
+		svc.ProposeWatch,
+		connect.WithSchema(watchServiceProposeWatchMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	watchServiceCreateWatchHandler := connect.NewUnaryHandler(
+		WatchServiceCreateWatchProcedure,
+		svc.CreateWatch,
+		connect.WithSchema(watchServiceCreateWatchMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	watchServiceListWatchesHandler := connect.NewUnaryHandler(
+		WatchServiceListWatchesProcedure,
+		svc.ListWatches,
+		connect.WithSchema(watchServiceListWatchesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	watchServiceDeleteWatchHandler := connect.NewUnaryHandler(
+		WatchServiceDeleteWatchProcedure,
+		svc.DeleteWatch,
+		connect.WithSchema(watchServiceDeleteWatchMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/loci.chat.WatchService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case WatchServiceProposeWatchProcedure:
+			watchServiceProposeWatchHandler.ServeHTTP(w, r)
+		case WatchServiceCreateWatchProcedure:
+			watchServiceCreateWatchHandler.ServeHTTP(w, r)
+		case WatchServiceListWatchesProcedure:
+			watchServiceListWatchesHandler.ServeHTTP(w, r)
+		case WatchServiceDeleteWatchProcedure:
+			watchServiceDeleteWatchHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedWatchServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedWatchServiceHandler struct{}
+
+func (UnimplementedWatchServiceHandler) ProposeWatch(context.Context, *connect.Request[chat.ProposeWatchRequest]) (*connect.Response[chat.ProposeWatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.WatchService.ProposeWatch is not implemented"))
+}
+
+func (UnimplementedWatchServiceHandler) CreateWatch(context.Context, *connect.Request[chat.CreateWatchRequest]) (*connect.Response[chat.CreateWatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.WatchService.CreateWatch is not implemented"))
+}
+
+func (UnimplementedWatchServiceHandler) ListWatches(context.Context, *connect.Request[chat.ListWatchesRequest]) (*connect.Response[chat.ListWatchesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.WatchService.ListWatches is not implemented"))
+}
+
+func (UnimplementedWatchServiceHandler) DeleteWatch(context.Context, *connect.Request[chat.DeleteWatchRequest]) (*connect.Response[chat.DeleteWatchResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.WatchService.DeleteWatch is not implemented"))
 }
