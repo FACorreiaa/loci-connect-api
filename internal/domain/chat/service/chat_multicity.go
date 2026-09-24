@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -122,67 +123,30 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 	l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeRoute, Data: routeData(r, "")}, 3)
 
 	perStop := make([]*trip.Trip, len(r.Stops))
-	succeeded := 0
+	var (
+		mu        sync.Mutex
+		succeeded int
+		wg        sync.WaitGroup
+	)
+	// At most `concurrency` cities generate at once, started in route order,
+	// so the trip fills from its beginning. Each city waits for a slot before
+	// its deadline is set, so the time it gets is shared out by what is left.
+	slots := make(chan struct{}, l.multiCityConcurrency())
 	for i, s := range r.Stops {
-		child := cc
-		child.CityName = s.CityName
-		child.Message = r.Message
-		child.StopRun = true
-		child.PresetSessionID = s.SessionID
-		child.PresetTripDays = len(s.Days)
-		child.SuppressTripSave = true
-		child.RequestedSessionID = uuid.Nil
-		child.TripID = uuid.Nil
-		child.SessionID = uuid.Nil
-		child.Stops = nil
-
-		stopCh := make(chan locitypes.StreamEvent, 100)
-		done := make(chan struct{})
-		// Written by the forwarder, read only after <-done below.
-		reported := false
-		go func(index int) {
-			defer close(done)
-			for ev := range stopCh {
-				if ev.Type == locitypes.EventTypeError {
-					reported = true
-				}
-				if out, keep := forwardStopEvent(ev, index); keep {
-					l.sendEvent(ctx, cc.EventCh, out, 3)
-				}
+		slots <- struct{}{}
+		wg.Add(1)
+		go func(i int, s multiCityStop) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			if tr, ok := l.runStop(cc, r, runStart, i, s); ok {
+				mu.Lock()
+				perStop[i] = tr
+				succeeded++
+				mu.Unlock()
 			}
-		}(i)
-		child.EventCh = stopCh
-
-		started := time.Now()
-		cityCtx, cancelCity := context.WithTimeout(ctx, cityDeadline(multiCityBudget-time.Since(runStart), len(r.Stops)-i))
-		child.Ctx = cityCtx
-		data, err := l.runCity(child)
-		cancelCity()
-		close(stopCh)
-		<-done
-
-		if err != nil {
-			l.logger.WarnContext(ctx, "multi-city: a city failed; continuing with the rest",
-				slog.Int("stop", i), slog.String("city", s.CityName), slog.Any("error", err))
-			// Said for the city on the stream's context when it could not say it
-			// itself — a city that ran out of time has no context to send on —
-			// or the clients would show it as still planning after the run.
-			if reported {
-				continue
-			}
-			idx := i
-			l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
-				Type:      locitypes.EventTypeError,
-				Error:     "We couldn't plan " + s.CityName + " this time.",
-				StopIndex: &idx,
-			}, 3)
-			continue
-		}
-		succeeded++
-		l.logger.InfoContext(ctx, "multi-city: city generated",
-			slog.Int("stop", i), slog.String("city", s.CityName), slog.Duration("took", time.Since(started)))
-		perStop[i] = stopTrip(child, s, data)
+		}(i, s)
 	}
+	wg.Wait()
 
 	if succeeded == 0 {
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: errNoCityPlanned.Error()}, 3)
@@ -205,6 +169,92 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 	}
 	l.sendCompletionEvent(&fin)
 	return nil
+}
+
+// runStop generates one city as a child run, forwarding its events tagged
+// with its index. It reports the city's failure itself when the city could
+// not (a city that ran out of time has no context left to send on).
+func (l *ServiceImpl) runStop(cc common.ChatContext, r *multiCityRoute, runStart time.Time, i int, s multiCityStop) (*trip.Trip, bool) {
+	ctx := cc.Ctx
+	child := cc
+	child.CityName = s.CityName
+	child.Message = r.Message
+	child.StopRun = true
+	child.PresetSessionID = s.SessionID
+	child.PresetTripDays = len(s.Days)
+	child.SuppressTripSave = true
+	child.RequestedSessionID = uuid.Nil
+	child.TripID = uuid.Nil
+	child.SessionID = uuid.Nil
+	child.Stops = nil
+
+	stopCh := make(chan locitypes.StreamEvent, 100)
+	done := make(chan struct{})
+	// Written by the forwarder, read only after <-done below.
+	reported := false
+	go func() {
+		defer close(done)
+		for ev := range stopCh {
+			if ev.Type == locitypes.EventTypeError {
+				reported = true
+			}
+			if out, keep := forwardStopEvent(ev, i); keep {
+				l.sendEvent(ctx, cc.EventCh, out, 3)
+			}
+		}
+	}()
+	child.EventCh = stopCh
+
+	started := time.Now()
+	left := waves(len(r.Stops)-i, l.multiCityConcurrency())
+	cityCtx, cancelCity := context.WithTimeout(ctx, cityDeadline(multiCityBudget-time.Since(runStart), left))
+	child.Ctx = cityCtx
+	data, err := l.runCity(child)
+	cancelCity()
+	close(stopCh)
+	<-done
+
+	if err != nil {
+		l.logger.WarnContext(ctx, "multi-city: a city failed; continuing with the rest",
+			slog.Int("stop", i), slog.String("city", s.CityName), slog.Any("error", err))
+		if !reported {
+			idx := i
+			l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
+				Type:      locitypes.EventTypeError,
+				Error:     "We couldn't plan " + s.CityName + " this time.",
+				StopIndex: &idx,
+			}, 3)
+		}
+		return nil, false
+	}
+	l.logger.InfoContext(ctx, "multi-city: city generated",
+		slog.Int("stop", i), slog.String("city", s.CityName), slog.Duration("took", time.Since(started)))
+	return stopTrip(child, s, data), true
+}
+
+// multiCityConcurrency is how many cities generate at once. Unset is one at a
+// time; production wiring sets MULTICITY_CONCURRENCY (default 2).
+func (l *ServiceImpl) multiCityConcurrency() int {
+	if l.cityConcurrency < 1 {
+		return 1
+	}
+	return l.cityConcurrency
+}
+
+// SetMultiCityConcurrency sets how many cities of a multi-city trip generate
+// at once. Each city holds three of the pod's LLM slots while it runs.
+func (l *ServiceImpl) SetMultiCityConcurrency(n int) { l.cityConcurrency = n }
+
+// waves is how many rounds the remaining cities take at this concurrency —
+// what the run's time left is shared between.
+func waves(citiesLeft, concurrency int) int {
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	if citiesLeft < 1 {
+		return 1
+	}
+	return (citiesLeft + concurrency - 1) / concurrency
 }
 
 // stopTrip is one city's generated places as trip days, spread over that

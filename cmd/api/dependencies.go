@@ -419,6 +419,11 @@ func (d *Dependencies) initServices() error {
 	chatSvc.SetPreferenceVectors(d.PreferenceVectors)
 	// Multi-city trips resolve each named city with the same geocoder compare uses.
 	chatSvc.SetCityResolver(d.CityResolver)
+	// Cities of a multi-city trip generated at once. Each holds three of the
+	// pod's AI_MAX_CONCURRENT_CALLS slots while it runs; two keeps a 3-city
+	// trip near a minute and a half and leaves room for everyone else. Set 1
+	// when the provider is short of capacity (free chain, credits).
+	chatSvc.SetMultiCityConcurrency(envInt("MULTICITY_CONCURRENCY", 2))
 	// Grounded generation: retrieve real POI rows before prompting, then verify
 	// the answer against them. Without this the chat path generates from the
 	// city name and preference text alone.
@@ -1110,4 +1115,12 @@ func (a placePOIUpserterAdapter) UpsertPOIByIdentity(ctx context.Context, name s
 		Longitude: lng,
 	}, cityID)
 	return id, err
+}
+
+// envInt reads a positive integer from the environment, or def.
+func envInt(key string, def int) int {
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key))); err == nil && v > 0 {
+		return v
+	}
+	return def
 }
