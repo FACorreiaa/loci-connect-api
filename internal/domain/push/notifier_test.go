@@ -72,11 +72,14 @@ func (f *fakeSettingsReader) callCount() int {
 type fakeDeviceStore struct {
 	mu      sync.Mutex
 	devices []Device
-	err     error
-	removed []string
+	// byPlatform, when set, answers ForUser per platform; devices is the
+	// answer for every platform otherwise.
+	byPlatform map[string][]Device
+	err        error
+	removed    []string
 }
 
-func (f *fakeDeviceStore) Upsert(ctx context.Context, userID uuid.UUID, platform, endpoint, p256dh, auth, userAgent string) error {
+func (f *fakeDeviceStore) Upsert(ctx context.Context, d Device, userAgent string) error {
 	return nil
 }
 
@@ -92,6 +95,9 @@ func (f *fakeDeviceStore) RemoveEndpoint(ctx context.Context, endpoint string) e
 }
 
 func (f *fakeDeviceStore) ForUser(ctx context.Context, userID uuid.UUID, platform string) ([]Device, error) {
+	if f.byPlatform != nil {
+		return f.byPlatform[platform], f.err
+	}
 	return f.devices, f.err
 }
 
@@ -279,4 +285,46 @@ func TestNotifier_NilSession_NoClaimNoSend(t *testing.T) {
 	require.Empty(t, claims.claimArgs, "the one claim must not be spent")
 	require.Equal(t, 0, settings.callCount())
 	require.Empty(t, sender.sentTo())
+}
+
+// Each platform's devices go to that platform's sender, and a platform with
+// no sender is skipped without touching its devices.
+func TestNotifier_RoutesEachPlatformToItsSender(t *testing.T) {
+	claims := &fakeRunStore{claimed: true}
+	settings := &fakeSettingsReader{settings: &locitypes.NotificationSettings{SearchFinished: true}}
+	web := Device{ID: uuid.New(), Platform: PlatformWebPush, Endpoint: "https://fcm.googleapis.com/x"}
+	phone := Device{ID: uuid.New(), Platform: PlatformAPNS, Endpoint: apnsDevice().Endpoint, APNSTopic: "com.example.app"}
+	devices := &fakeDeviceStore{byPlatform: map[string][]Device{PlatformWebPush: {web}, PlatformAPNS: {phone}}}
+	webSender := newFakeSender()
+	apnsSender := newFakeSender()
+
+	n := NewNotifier(claims, settings, devices, webSender, testLogger()).WithSender(PlatformAPNS, apnsSender)
+	n.OnRunFinished(context.Background(), testRun())
+	n.wait()
+
+	require.Equal(t, []Device{web}, webSender.sentTo())
+	require.Equal(t, []Device{phone}, apnsSender.sentTo())
+
+	// APNs only: the web devices are never listed as sendable.
+	apnsOnly := newFakeSender()
+	n = NewNotifier(claims, settings, devices, nil, testLogger()).WithSender(PlatformAPNS, apnsOnly)
+	n.OnRunFinished(context.Background(), testRun())
+	n.wait()
+	require.Equal(t, []Device{phone}, apnsOnly.sentTo())
+}
+
+// A gone APNs token is removed the same way a gone web endpoint is.
+func TestNotifier_GoneAPNSTokenRemoved(t *testing.T) {
+	claims := &fakeRunStore{claimed: true}
+	settings := &fakeSettingsReader{settings: &locitypes.NotificationSettings{SearchFinished: true}}
+	phone := Device{ID: uuid.New(), Platform: PlatformAPNS, Endpoint: apnsDevice().Endpoint, APNSTopic: "com.example.app"}
+	devices := &fakeDeviceStore{byPlatform: map[string][]Device{PlatformAPNS: {phone}}}
+	apnsSender := newFakeSender()
+	apnsSender.results[phone.Endpoint] = sendResult{gone: true}
+
+	n := NewNotifier(claims, settings, devices, nil, testLogger()).WithSender(PlatformAPNS, apnsSender)
+	n.OnRunFinished(context.Background(), testRun())
+	n.wait()
+
+	require.Equal(t, []string{phone.Endpoint}, devices.removedEndpoints())
 }

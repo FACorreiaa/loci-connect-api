@@ -472,7 +472,15 @@ func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Reque
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unknown platform"))
 	}
-	if platform == "web_push" {
+	device := push.Device{
+		UserID:   userID,
+		Platform: platform,
+		Endpoint: req.Msg.GetEndpoint(),
+		P256dh:   req.Msg.GetP256Dh(),
+		Auth:     req.Msg.GetAuth(),
+	}
+	switch platform {
+	case push.PlatformWebPush:
 		// The endpoint is client-supplied. Without this allow-list a signed-in
 		// user could register an internal cluster address here and have the
 		// sender POST to it on their behalf — an SSRF from inside the auth
@@ -483,9 +491,27 @@ func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Reque
 		if req.Msg.GetP256Dh() == "" || req.Msg.GetAuth() == "" {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("web push needs p256dh and auth"))
 		}
+	case push.PlatformAPNS:
+		// The token, topic and environment are what the sender puts in the
+		// request to Apple, so each is checked against what we own: a real
+		// device token, one of our bundle ids, one of Apple's two hosts.
+		if !push.ValidAPNSToken(req.Msg.GetEndpoint()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("apns needs a 64-character hex device token"))
+		}
+		if !h.pushCfg.APNSTopicAllowed(req.Msg.GetApnsTopic()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unknown apns topic"))
+		}
+		if !push.ValidAPNSEnvironment(req.Msg.GetApnsEnvironment()) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("apns environment must be production or sandbox"))
+		}
+		device.APNSTopic = req.Msg.GetApnsTopic()
+		device.APNSEnvironment = req.Msg.GetApnsEnvironment()
+		if device.APNSEnvironment == "" {
+			device.APNSEnvironment = push.APNSEnvironmentProduction
+		}
 	}
 	userAgent := truncateUTF8(req.Header().Get("User-Agent"), maxUserAgentLen)
-	if err := h.devices.Upsert(ctx, userID, platform, req.Msg.GetEndpoint(), req.Msg.GetP256Dh(), req.Msg.GetAuth(), userAgent); err != nil {
+	if err := h.devices.Upsert(ctx, device, userAgent); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&commonpb.Response{Success: true}), nil
@@ -513,7 +539,7 @@ func (h *UserHandler) GetPushConfig(ctx context.Context, _ *connect.Request[user
 		return nil, err
 	}
 	key := ""
-	if h.pushCfg.Enabled() {
+	if h.pushCfg.WebPushEnabled() {
 		key = h.pushCfg.VAPIDPublicKey
 	}
 	return connect.NewResponse(&userpb.PushConfig{VapidPublicKey: key}), nil

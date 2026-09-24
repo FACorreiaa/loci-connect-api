@@ -15,7 +15,7 @@ import (
 var PushSentTotal = promauto.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "loci_push_sent_total",
-		Help: "Web push delivery attempts for finished runs, by outcome",
+		Help: "Push delivery attempts for finished runs, by platform and outcome",
 	},
-	[]string{"result"},
+	[]string{"platform", "result"},
 )

@@ -98,13 +98,15 @@ type fakeDeviceStore struct {
 	upsertedPlatform string
 	upsertedEndpoint string
 	upsertCalled     bool
+	upserted         push.Device
 }
 
-func (f *fakeDeviceStore) Upsert(_ context.Context, userID uuid.UUID, platform, endpoint, _, _, _ string) error {
+func (f *fakeDeviceStore) Upsert(_ context.Context, d push.Device, _ string) error {
 	f.upsertCalled = true
-	f.upsertedUserID = userID
-	f.upsertedPlatform = platform
-	f.upsertedEndpoint = endpoint
+	f.upsertedUserID = d.UserID
+	f.upsertedPlatform = d.Platform
+	f.upsertedEndpoint = d.Endpoint
+	f.upserted = d
 	return nil
 }
 
@@ -280,5 +282,78 @@ func TestTruncateUTF8CleansShortInvalidStrings(t *testing.T) {
 	}
 	if got != "Mozilla/5.0" {
 		t.Errorf("got = %q, want the invalid byte dropped", got)
+	}
+}
+
+func apnsConfig() config.PushConfig {
+	return config.PushConfig{APNSTopics: []string{"com.fernandocorreia.loci", "com.fernandocorreia.loci.beta"}}
+}
+
+const apnsToken = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+// An APNs registration carries the token, one of our bundle ids and the host
+// the token belongs to; the row stores all three.
+func TestRegisterPushDeviceAPNSStoresTopicAndEnvironment(t *testing.T) {
+	store := &fakeDeviceStore{}
+	h := NewUserHandler(&recordingUserService{}).WithPush(store, apnsConfig())
+	userID := uuid.New()
+	topic := "com.fernandocorreia.loci.beta"
+	env := "sandbox"
+
+	_, err := h.RegisterPushDevice(authedCtx(userID), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
+		Platform:        userpb.PushPlatform_PUSH_PLATFORM_APNS,
+		Endpoint:        apnsToken,
+		ApnsTopic:       &topic,
+		ApnsEnvironment: &env,
+	}))
+	if err != nil {
+		t.Fatalf("RegisterPushDevice: %v", err)
+	}
+	if store.upserted.APNSTopic != topic || store.upserted.APNSEnvironment != env || store.upserted.UserID != userID {
+		t.Errorf("stored %+v", store.upserted)
+	}
+}
+
+// Without an environment the token is taken as production, the App Store
+// and TestFlight case.
+func TestRegisterPushDeviceAPNSDefaultsToProduction(t *testing.T) {
+	store := &fakeDeviceStore{}
+	h := NewUserHandler(&recordingUserService{}).WithPush(store, apnsConfig())
+	topic := "com.fernandocorreia.loci"
+	_, err := h.RegisterPushDevice(authedCtx(uuid.New()), connect.NewRequest(&userpb.RegisterPushDeviceRequest{
+		Platform:  userpb.PushPlatform_PUSH_PLATFORM_APNS,
+		Endpoint:  apnsToken,
+		ApnsTopic: &topic,
+	}))
+	if err != nil {
+		t.Fatalf("RegisterPushDevice: %v", err)
+	}
+	if store.upserted.APNSEnvironment != "production" {
+		t.Errorf("environment = %q, want production", store.upserted.APNSEnvironment)
+	}
+}
+
+// A token that is not a device token, a bundle id that is not ours, or an
+// environment Apple has no host for are all refused before the store sees them.
+func TestRegisterPushDeviceAPNSRejectsBadInput(t *testing.T) {
+	ours := "com.fernandocorreia.loci"
+	other := "com.example.spoof"
+	staging := "staging"
+	cases := map[string]*userpb.RegisterPushDeviceRequest{
+		"short token":   {Platform: userpb.PushPlatform_PUSH_PLATFORM_APNS, Endpoint: "abc", ApnsTopic: &ours},
+		"foreign topic": {Platform: userpb.PushPlatform_PUSH_PLATFORM_APNS, Endpoint: apnsToken, ApnsTopic: &other},
+		"no topic":      {Platform: userpb.PushPlatform_PUSH_PLATFORM_APNS, Endpoint: apnsToken},
+		"bad env":       {Platform: userpb.PushPlatform_PUSH_PLATFORM_APNS, Endpoint: apnsToken, ApnsTopic: &ours, ApnsEnvironment: &staging},
+	}
+	for name, req := range cases {
+		store := &fakeDeviceStore{}
+		h := NewUserHandler(&recordingUserService{}).WithPush(store, apnsConfig())
+		_, err := h.RegisterPushDevice(authedCtx(uuid.New()), connect.NewRequest(req))
+		if connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Errorf("%s: code = %v, want InvalidArgument", name, connect.CodeOf(err))
+		}
+		if store.upsertCalled {
+			t.Errorf("%s: store.Upsert was called", name)
+		}
 	}
 }
