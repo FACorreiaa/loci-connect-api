@@ -1086,10 +1086,17 @@ type RegisterPushDeviceRequest struct {
 	// Web push endpoint URL, or the APNs device token.
 	Endpoint string `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	// Web push only.
-	P256Dh        string `protobuf:"bytes,3,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
-	Auth          string `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	P256Dh string `protobuf:"bytes,3,opt,name=p256dh,proto3" json:"p256dh,omitempty"`
+	Auth   string `protobuf:"bytes,4,opt,name=auth,proto3" json:"auth,omitempty"`
+	// APNs only. The app's bundle id, which is the APNs topic the server sends
+	// to, and which APNs host the token belongs to: "production" for App Store
+	// and TestFlight builds, "sandbox" for builds signed with a development
+	// profile. A token registered against the wrong host is silently dropped
+	// by Apple, so the client says which it has.
+	ApnsTopic       *string `protobuf:"bytes,5,opt,name=apns_topic,json=apnsTopic,proto3,oneof" json:"apns_topic,omitempty"`
+	ApnsEnvironment *string `protobuf:"bytes,6,opt,name=apns_environment,json=apnsEnvironment,proto3,oneof" json:"apns_environment,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RegisterPushDeviceRequest) Reset() {
@@ -1146,6 +1153,20 @@ func (x *RegisterPushDeviceRequest) GetP256Dh() string {
 func (x *RegisterPushDeviceRequest) GetAuth() string {
 	if x != nil {
 		return x.Auth
+	}
+	return ""
+}
+
+func (x *RegisterPushDeviceRequest) GetApnsTopic() string {
+	if x != nil && x.ApnsTopic != nil {
+		return *x.ApnsTopic
+	}
+	return ""
+}
+
+func (x *RegisterPushDeviceRequest) GetApnsEnvironment() string {
+	if x != nil && x.ApnsEnvironment != nil {
+		return *x.ApnsEnvironment
 	}
 	return ""
 }
@@ -1438,14 +1459,20 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x0fsearch_finished\x18\x03 \x01(\bH\x02R\x0esearchFinished\x88\x01\x01B\x12\n" +
 	"\x10_recommendationsB\x11\n" +
 	"\x0f_trip_remindersB\x12\n" +
-	"\x10_search_finished\"\xc3\x01\n" +
+	"\x10_search_finished\"\xe1\x02\n" +
 	"\x19RegisterPushDeviceRequest\x12?\n" +
 	"\bplatform\x18\x01 \x01(\x0e2\x17.loci.user.PushPlatformB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bplatform\x12&\n" +
 	"\bendpoint\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\bendpoint\x12 \n" +
 	"\x06p256dh\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x06p256dh\x12\x1b\n" +
-	"\x04auth\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18dR\x04auth\"E\n" +
+	"\x04auth\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18dR\x04auth\x12,\n" +
+	"\n" +
+	"apns_topic\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01H\x00R\tapnsTopic\x88\x01\x01\x12J\n" +
+	"\x10apns_environment\x18\x06 \x01(\tB\x1a\xbaH\x17r\x15R\n" +
+	"productionR\asandboxH\x01R\x0fapnsEnvironment\x88\x01\x01B\r\n" +
+	"\v_apns_topicB\x13\n" +
+	"\x11_apns_environment\"E\n" +
 	"\x1bUnregisterPushDeviceRequest\x12&\n" +
 	"\bendpoint\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x10R\bendpoint\"\x16\n" +
@@ -1549,6 +1576,7 @@ func file_loci_user_user_proto_init() {
 	file_loci_user_user_proto_msgTypes[3].OneofWrappers = []any{}
 	file_loci_user_user_proto_msgTypes[5].OneofWrappers = []any{}
 	file_loci_user_user_proto_msgTypes[11].OneofWrappers = []any{}
+	file_loci_user_user_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

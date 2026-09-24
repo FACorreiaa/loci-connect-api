@@ -624,3 +624,19 @@ func (m *MockTagsRepo) GetTagsForProfile(ctx context.Context, profileID uuid.UUI
 
 // --- Integration Tests for llmInteraction (Example for GetPOIDetailedInfosResponse) ---
 // These would require a running database instance and potentially a configured AI client.
+
+func (m *MockPOIRepository) FindHotelsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.HotelDetailedInfo, error) {
+	args := m.Called(ctx, lat, lon, radiusMeters, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.HotelDetailedInfo), args.Error(1)
+}
+
+func (m *MockPOIRepository) FindRestaurantsNear(ctx context.Context, lat, lon, radiusMeters float64, limit int) ([]locitypes.RestaurantDetailedInfo, error) {
+	args := m.Called(ctx, lat, lon, radiusMeters, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]locitypes.RestaurantDetailedInfo), args.Error(1)
+}

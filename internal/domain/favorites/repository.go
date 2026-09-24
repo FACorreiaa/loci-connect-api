@@ -2,11 +2,13 @@ package favorites
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -17,6 +19,9 @@ type Repository interface {
 	GetFavorites(ctx context.Context, userID uuid.UUID, contentType string, limit, offset int) ([]locitypes.FavoriteItem, int, error)
 	IsFavorited(ctx context.Context, userID uuid.UUID, itemID, contentType string) (bool, error)
 	GetFavoritesCount(ctx context.Context, userID uuid.UUID, contentType string) (int, error)
+	// GetFavoriteByItem returns the saved snapshot of one item, or nil when
+	// the user has not saved it.
+	GetFavoriteByItem(ctx context.Context, userID uuid.UUID, itemID, contentType string) (*locitypes.FavoriteItem, error)
 }
 
 // RepositoryImpl implements Repository
@@ -232,4 +237,38 @@ func (r *RepositoryImpl) GetFavoritesCount(ctx context.Context, userID uuid.UUID
 	}
 
 	return count, nil
+}
+
+// GetFavoriteByItem returns the saved snapshot of one item, or nil when the
+// user has not saved it.
+func (r *RepositoryImpl) GetFavoriteByItem(ctx context.Context, userID uuid.UUID, itemID, contentType string) (*locitypes.FavoriteItem, error) {
+	var fav locitypes.FavoriteItem
+	err := r.db.QueryRow(ctx, `
+		SELECT id, user_id, item_id, item_name, content_type, notes, description,
+		       city_name, latitude, longitude, rating, category, added_at
+		FROM user_favorites
+		WHERE user_id = $1 AND item_id = $2 AND content_type = $3
+	`, userID, itemID, contentType).Scan(
+		&fav.ID,
+		&fav.UserID,
+		&fav.ItemID,
+		&fav.ItemName,
+		&fav.ContentType,
+		&fav.Notes,
+		&fav.Description,
+		&fav.CityName,
+		&fav.Latitude,
+		&fav.Longitude,
+		&fav.Rating,
+		&fav.Category,
+		&fav.AddedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		r.logger.ErrorContext(ctx, "failed to get favorite", slog.Any("error", err))
+		return nil, err
+	}
+	return &fav, nil
 }
