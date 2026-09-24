@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -313,16 +314,63 @@ type StripeConfig struct {
 	CityPackCurrency   string
 }
 
-// PushConfig holds the VAPID key pair web push is signed with. All three
-// empty means push is off: runs, the cap and in-app toasts still work.
+// PushConfig holds what each push transport is signed with: the VAPID key
+// pair for web push and the team's APNs auth key for iPhones. A transport
+// with nothing configured is off; with both off, runs, the cap and in-app
+// toasts still work.
 type PushConfig struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string // mailto: address push services can reach
+
+	APNSKeyID  string
+	APNSTeamID string
+	// APNSKey is the .p8 contents (PEM). The env carries it base64-encoded.
+	APNSKey []byte
+	// APNSTopics are the bundle ids a device may register for; anything else
+	// is refused at registration, so a client cannot aim us at another app.
+	APNSTopics []string
 }
 
-func (c PushConfig) Enabled() bool {
+// WebPushEnabled says whether browsers can be sent to.
+func (c PushConfig) WebPushEnabled() bool {
 	return c.VAPIDPublicKey != "" && c.VAPIDPrivateKey != "" && c.VAPIDSubject != ""
+}
+
+// APNSEnabled says whether iPhones can be sent to.
+func (c PushConfig) APNSEnabled() bool {
+	return c.APNSKeyID != "" && c.APNSTeamID != "" && len(c.APNSKey) > 0
+}
+
+// Enabled says whether any transport can deliver a finished run.
+func (c PushConfig) Enabled() bool {
+	return c.WebPushEnabled() || c.APNSEnabled()
+}
+
+// APNSTopicAllowed says whether a bundle id is one of ours.
+func (c PushConfig) APNSTopicAllowed(topic string) bool {
+	for _, t := range c.APNSTopics {
+		if t != "" && t == topic {
+			return true
+		}
+	}
+	return false
+}
+
+// apnsKeyFromEnv accepts the .p8 either base64-encoded (how a sealed secret
+// carries a multi-line file) or as the raw PEM.
+func apnsKeyFromEnv(raw string) []byte {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if strings.HasPrefix(raw, "-----BEGIN") {
+		return []byte(raw)
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil {
+		return decoded
+	}
+	return []byte(raw)
 }
 
 type ObservabilityConfig struct {
@@ -417,6 +465,13 @@ func Load() (*Config, error) {
 			VAPIDPublicKey:  strings.TrimSpace(getEnv("VAPID_PUBLIC_KEY", "")),
 			VAPIDPrivateKey: strings.TrimSpace(getEnv("VAPID_PRIVATE_KEY", "")),
 			VAPIDSubject:    strings.TrimSpace(getEnv("VAPID_SUBJECT", "")),
+			APNSKeyID:       strings.TrimSpace(getEnv("APNS_KEY_ID", "")),
+			APNSTeamID:      strings.TrimSpace(getEnv("APNS_TEAM_ID", "")),
+			APNSKey:         apnsKeyFromEnv(getEnv("APNS_KEY_P8", "")),
+			APNSTopics: []string{
+				strings.TrimSpace(getEnv("APNS_TOPIC_PROD", "")),
+				strings.TrimSpace(getEnv("APNS_TOPIC_BETA", "")),
+			},
 		},
 		Cache: CacheConfig{
 			RedisURL:   getEnv("REDIS_URL", ""),
