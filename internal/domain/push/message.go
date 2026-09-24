@@ -18,6 +18,16 @@ type Payload struct {
 	Title     string `json:"title"`
 	Body      string `json:"body"`
 	URL       string `json:"url"`
+
+	// Set only on a proactive message (a standing task posting into a
+	// thread); a finished search leaves them empty and its JSON unchanged.
+	MessageID   string `json:"messageId,omitempty"`
+	Origin      string `json:"origin,omitempty"`
+	SourceLabel string `json:"sourceLabel,omitempty"`
+	// Category and ThreadID go under "aps" in the APNs body; empty means the
+	// search defaults (no category, thread "search").
+	Category string `json:"category,omitempty"`
+	ThreadID string `json:"threadId,omitempty"`
 }
 
 var nouns = map[string]string{

@@ -621,8 +621,9 @@ func (d *Dependencies) RunAppleSecretRefresh(ctx context.Context) error {
 //
 // The runner gets its own client on the operator's provider chain rather
 // than the per-user BYOK router: a tick runs outside any request, so there
-// is no caller whose key or plan could be looked up.
-func (d *Dependencies) initWatches() {
+// is no caller whose key or plan could be looked up. pusher, when APNs is
+// configured, announces each posted message on the owner's iPhones.
+func (d *Dependencies) initWatches(pusher watch.ProactivePusher) {
 	var gen watch.TextGenerator
 	if envFlag("WATCH_RUNNER_ENABLED", true) {
 		client, err := ai.NewChatClient(context.Background(), d.Config.AI, d.Logger)
@@ -635,7 +636,8 @@ func (d *Dependencies) initWatches() {
 	} else {
 		d.Logger.Info("standing-task runner disabled by WATCH_RUNNER_ENABLED")
 	}
-	svc := watch.NewService(watch.NewPostgresRepository(d.DB.Pool), d.ChatRepo, gen, d.Logger)
+	svc := watch.NewService(watch.NewPostgresRepository(d.DB.Pool), d.ChatRepo, gen, d.Logger).
+		WithNotifier(watch.NewPushNotifier(pusher))
 	d.WatchHandler = watch.NewHandler(svc)
 	if svc.CanRun() {
 		d.watchRunner = watch.NewRunner(svc, watch.NewPgLocker(d.DB.Pool), d.Logger)
@@ -815,12 +817,18 @@ func (d *Dependencies) initHandlers() error {
 	} else {
 		d.Logger.Info("apns disabled: APNS_KEY_ID / APNS_TEAM_ID / APNS_KEY_P8 not all set")
 	}
+	// The same notifier announces a standing task's message on iPhones
+	// (APNs only); with APNs off, that message is only in the thread.
+	var watchPusher watch.ProactivePusher
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
+		if apnsSender != nil {
+			watchPusher = notifier
+		}
 	}
 	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
-	d.initWatches()
+	d.initWatches(watchPusher)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger).

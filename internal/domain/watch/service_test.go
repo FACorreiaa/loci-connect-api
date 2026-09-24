@@ -152,10 +152,16 @@ func (g *fakeGen) GenerateText(_ context.Context, prompt string, _ *genai.Genera
 	return g.reply, g.err
 }
 
-type fakeNotifier struct{ posted []Watch }
+type fakeNotifier struct {
+	posted []Watch
+	cities []string
+	msgs   []locitypes.ConversationMessage
+}
 
-func (n *fakeNotifier) WatchPosted(_ context.Context, w Watch, _ locitypes.ConversationMessage) {
+func (n *fakeNotifier) WatchPosted(_ context.Context, w Watch, cityName string, msg locitypes.ConversationMessage) {
 	n.posted = append(n.posted, w)
+	n.cities = append(n.cities, cityName)
+	n.msgs = append(n.msgs, msg)
 }
 
 var fixedNow = time.Date(2026, 9, 23, 10, 30, 0, 0, time.UTC)
@@ -287,6 +293,8 @@ func TestRunAppendsProactiveMessageAndNotifies(t *testing.T) {
 	require.Equal(t, locitypes.RoleAssistant, got[0].Role)
 	require.Equal(t, fixedNow, got[0].Timestamp)
 	require.Len(t, n.posted, 1)
+	require.Equal(t, []string{"Lisbon"}, n.cities)
+	require.Equal(t, got[0].ID, n.msgs[0].ID)
 
 	require.Len(t, gen.prompts, 1)
 	require.Contains(t, gen.prompts[0], "Task: tell me if it will rain")
