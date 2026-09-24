@@ -417,6 +417,8 @@ func (d *Dependencies) initServices() error {
 		return fmt.Errorf("failed to initialize chat service: %w", err)
 	}
 	chatSvc.SetPreferenceVectors(d.PreferenceVectors)
+	// Multi-city trips resolve each named city with the same geocoder compare uses.
+	chatSvc.SetCityResolver(d.CityResolver)
 	// Grounded generation: retrieve real POI rows before prompting, then verify
 	// the answer against them. Without this the chat path generates from the
 	// city name and preference text alone.

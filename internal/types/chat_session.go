@@ -359,3 +359,10 @@ type SessionPOIPage struct {
 	HasMore     bool
 	PlannedDays int
 }
+
+// StreamDroppedStop is a city a multi-city request named that the route left
+// out, and why.
+type StreamDroppedStop struct {
+	CityName string `json:"city_name"`
+	Reason   string `json:"reason"`
+}
