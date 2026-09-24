@@ -80,7 +80,8 @@ func NewChatClient(
 			slog.Int("providers", len(entries)),
 			slog.String("primary", entries[0].model))
 	}
-	return newChainClient(entries, cfg.FallbackCooldown, logger), nil
+	return newChainClient(entries, cfg.FallbackCooldown, logger).
+		withStreamTimeouts(cfg.StreamFirstChunkTimeout, cfg.StreamIdleTimeout), nil
 }
 
 // newProviderClient constructs a single provider client. cfg supplies the
