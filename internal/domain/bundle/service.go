@@ -21,6 +21,10 @@ var (
 	// ErrNotOwned is returned when a caller asks for something only a buyer
 	// may have.
 	ErrNotOwned = errors.New("bundle not owned")
+	// ErrNotConfigured is returned when this deployment was built without a
+	// dependency the call needs, such as the trips store Claim writes to. It
+	// is the server's fault, not the pack's or the caller's.
+	ErrNotConfigured = errors.New("bundle service is not fully configured")
 )
 
 // freePreviewDays is how much of a paid pack anybody can read.
@@ -253,11 +257,15 @@ func (s *Service) ListMine(ctx context.Context, userID uuid.UUID, page, pageSize
 // Claim writes a pack into the caller's own trips.
 //
 // The result is an ordinary trip: editable, exportable, shareable, and
-// untouched by later edits to the pack it came from. A pack is a template, so
-// claiming one twice is allowed and produces two trips.
+// untouched by later edits to the pack it came from.
+//
+// Claiming is idempotent: a caller who already claimed this pack gets the
+// same trip back, so a double tap or a retried request does not leave copies.
+// Deleting that trip frees the claim, and the next claim writes a new one.
 func (s *Service) Claim(ctx context.Context, userID, bundleID uuid.UUID) (uuid.UUID, error) {
 	if s.trips == nil {
-		return uuid.Nil, ErrNotPurchasable
+		s.logger.Error("bundle claim attempted with no trips store configured", "bundle_id", bundleID)
+		return uuid.Nil, ErrNotConfigured
 	}
 
 	b, err := s.repo.GetByID(ctx, bundleID)
@@ -276,6 +284,12 @@ func (s *Service) Claim(ctx context.Context, userID, bundleID uuid.UUID) (uuid.U
 		if !owned {
 			return uuid.Nil, ErrNotOwned
 		}
+	}
+
+	if tripID, found, err := s.repo.ClaimedTrip(ctx, userID, b.ID); err != nil {
+		return uuid.Nil, err
+	} else if found {
+		return tripID, nil
 	}
 
 	days, err := s.repo.LoadDays(ctx, b.ID, 0)
@@ -327,5 +341,17 @@ func (s *Service) Claim(ctx context.Context, userID, bundleID uuid.UUID) (uuid.U
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("save claimed trip: %w", err)
 	}
-	return saved.ID, nil
+	// Two concurrent claims can both get past the lookup above. The claim row
+	// is unique per user and pack, so both callers are answered with the trip
+	// that won; the loser's copy stays in the user's trips, since there is no
+	// trip delete to undo it with.
+	winner, err := s.repo.RecordClaim(ctx, userID, b.ID, saved.ID)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("record bundle claim: %w", err)
+	}
+	if winner != saved.ID {
+		s.logger.Warn("concurrent bundle claim wrote a duplicate trip",
+			"bundle_id", b.ID, "kept_trip_id", winner, "duplicate_trip_id", saved.ID)
+	}
+	return winner, nil
 }

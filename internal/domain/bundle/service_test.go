@@ -20,6 +20,10 @@ type fakeRepo struct {
 	owned        bool
 	lastMaxDays  int
 	loadDaysCall int
+	// claims is bundle_claims keyed by user; raceTrip, when set, is a claim a
+	// concurrent request records between the lookup and RecordClaim.
+	claims   map[uuid.UUID]uuid.UUID
+	raceTrip uuid.UUID
 }
 
 func (f *fakeRepo) ListPublished(context.Context, ListFilter) ([]Bundle, int, error) {
@@ -69,6 +73,25 @@ func (f *fakeRepo) ListOwned(context.Context, uuid.UUID, int, int) ([]Bundle, in
 }
 func (f *fakeRepo) RecordPurchase(context.Context, Purchase) error { return nil }
 func (f *fakeRepo) MarkRefunded(context.Context, string) error     { return nil }
+
+func (f *fakeRepo) ClaimedTrip(_ context.Context, userID, _ uuid.UUID) (uuid.UUID, bool, error) {
+	id, ok := f.claims[userID]
+	return id, ok, nil
+}
+
+func (f *fakeRepo) RecordClaim(_ context.Context, userID, _, tripID uuid.UUID) (uuid.UUID, error) {
+	if f.claims == nil {
+		f.claims = map[uuid.UUID]uuid.UUID{}
+	}
+	if f.raceTrip != uuid.Nil {
+		f.claims[userID] = f.raceTrip
+	}
+	if held, ok := f.claims[userID]; ok {
+		return held, nil
+	}
+	f.claims[userID] = tripID
+	return tripID, nil
+}
 
 type fakeCheckout struct{ called bool }
 
