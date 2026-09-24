@@ -82,18 +82,21 @@ func (ContentType) EnumDescriptor() ([]byte, []int) {
 
 // Core list entity
 type List struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	ImageUrl      string                 `protobuf:"bytes,5,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	IsPublic      bool                   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
-	IsItinerary   bool                   `protobuf:"varint,7,opt,name=is_itinerary,json=isItinerary,proto3" json:"is_itinerary,omitempty"`
-	ParentListId  string                 `protobuf:"bytes,8,opt,name=parent_list_id,json=parentListId,proto3" json:"parent_list_id,omitempty"`
-	CityId        string                 `protobuf:"bytes,9,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
-	ViewCount     int32                  `protobuf:"varint,10,opt,name=view_count,json=viewCount,proto3" json:"view_count,omitempty"`
-	SaveCount     int32                  `protobuf:"varint,11,opt,name=save_count,json=saveCount,proto3" json:"save_count,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Name   string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// Empty when the list has no description.
+	Description  string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	ImageUrl     string `protobuf:"bytes,5,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	IsPublic     bool   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
+	IsItinerary  bool   `protobuf:"varint,7,opt,name=is_itinerary,json=isItinerary,proto3" json:"is_itinerary,omitempty"`
+	ParentListId string `protobuf:"bytes,8,opt,name=parent_list_id,json=parentListId,proto3" json:"parent_list_id,omitempty"`
+	// Empty when the list is not tied to a city.
+	CityId    string `protobuf:"bytes,9,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	ViewCount int32  `protobuf:"varint,10,opt,name=view_count,json=viewCount,proto3" json:"view_count,omitempty"`
+	SaveCount int32  `protobuf:"varint,11,opt,name=save_count,json=saveCount,proto3" json:"save_count,omitempty"`
+	// Number of items in the list.
 	ItemCount     int32                  `protobuf:"varint,12,opt,name=item_count,json=itemCount,proto3" json:"item_count,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -231,10 +234,12 @@ func (x *List) GetUpdatedAt() *timestamppb.Timestamp {
 
 // List item entity
 type ListItem struct {
-	state                  protoimpl.MessageState              `protogen:"open.v1"`
-	ListId                 string                              `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	ItemId                 string                              `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	PoiId                  string                              `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"` // For backward compatibility with POI-only items
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	ListId string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ItemId string                 `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	// For backward compatibility with POI-only items: equals item_id when
+	// content_type is POI, empty otherwise.
+	PoiId                  string                              `protobuf:"bytes,3,opt,name=poi_id,json=poiId,proto3" json:"poi_id,omitempty"`
 	ContentType            ContentType                         `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
 	Position               int32                               `protobuf:"varint,5,opt,name=position,proto3" json:"position,omitempty"`
 	Notes                  string                              `protobuf:"bytes,6,opt,name=notes,proto3" json:"notes,omitempty"`
@@ -431,7 +436,11 @@ func (x *ListWithItems) GetItems() []*ListItem {
 	return nil
 }
 
-// List item with detailed content
+// List item with detailed content. When GetListRequest.include_detailed_items
+// is set, the server fills poi (content type POI), restaurant (RESTAURANT) or
+// hotel (HOTEL) from the stored place; it is left unset when the place is gone.
+// Only the fields the server stores are filled: id, name, latitude, longitude,
+// category, description, address, website, phone and rating.
 type ListItemWithContent struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
 	ListItem      *ListItem               `protobuf:"bytes,1,opt,name=list_item,json=listItem,proto3" json:"list_item,omitempty"`
@@ -563,20 +572,23 @@ func (x *ListWithDetailedItems) GetItems() []*ListItemWithContent {
 
 // POI detailed info (simplified from poi.proto)
 type POIDetailedInfo struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Latitude      float64                `protobuf:"fixed64,3,opt,name=latitude,proto3" json:"latitude,omitempty"`
-	Longitude     float64                `protobuf:"fixed64,4,opt,name=longitude,proto3" json:"longitude,omitempty"`
-	Category      string                 `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
-	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
-	Rating        float64                `protobuf:"fixed64,7,opt,name=rating,proto3" json:"rating,omitempty"`
-	ReviewCount   int32                  `protobuf:"varint,8,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
-	PriceRange    string                 `protobuf:"bytes,9,opt,name=price_range,json=priceRange,proto3" json:"price_range,omitempty"`
-	Address       string                 `protobuf:"bytes,10,opt,name=address,proto3" json:"address,omitempty"`
-	Phone         string                 `protobuf:"bytes,11,opt,name=phone,proto3" json:"phone,omitempty"`
-	Website       string                 `protobuf:"bytes,12,opt,name=website,proto3" json:"website,omitempty"`
-	Photos        []string               `protobuf:"bytes,13,rep,name=photos,proto3" json:"photos,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name      string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Latitude  float64                `protobuf:"fixed64,3,opt,name=latitude,proto3" json:"latitude,omitempty"`
+	Longitude float64                `protobuf:"fixed64,4,opt,name=longitude,proto3" json:"longitude,omitempty"`
+	// Empty when unknown.
+	Category string `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
+	// Empty when unknown.
+	Description string  `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Rating      float64 `protobuf:"fixed64,7,opt,name=rating,proto3" json:"rating,omitempty"`
+	ReviewCount int32   `protobuf:"varint,8,opt,name=review_count,json=reviewCount,proto3" json:"review_count,omitempty"`
+	PriceRange  string  `protobuf:"bytes,9,opt,name=price_range,json=priceRange,proto3" json:"price_range,omitempty"`
+	// Empty when unknown.
+	Address       string   `protobuf:"bytes,10,opt,name=address,proto3" json:"address,omitempty"`
+	Phone         string   `protobuf:"bytes,11,opt,name=phone,proto3" json:"phone,omitempty"`
+	Website       string   `protobuf:"bytes,12,opt,name=website,proto3" json:"website,omitempty"`
+	Photos        []string `protobuf:"bytes,13,rep,name=photos,proto3" json:"photos,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -967,13 +979,17 @@ func (x *UserSavedItinerary) GetUpdatedAt() *timestamppb.Timestamp {
 
 // List management
 type CreateListRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	CityId        string                 `protobuf:"bytes,4,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
-	IsItinerary   bool                   `protobuf:"varint,5,opt,name=is_itinerary,json=isItinerary,proto3" json:"is_itinerary,omitempty"`
-	IsPublic      bool                   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Name   string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Optional.
+	Description string `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	// Optional. A city UUID; the list is stored without a city when empty.
+	CityId        string `protobuf:"bytes,4,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	IsItinerary   bool   `protobuf:"varint,5,opt,name=is_itinerary,json=isItinerary,proto3" json:"is_itinerary,omitempty"`
+	IsPublic      bool   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1110,12 +1126,17 @@ func (x *CreateListResponse) GetList() *List {
 	return nil
 }
 
+// Returns every list the caller owns, custom lists and itineraries alike,
+// newest first.
 type GetListsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
-	IncludeItems  bool                   `protobuf:"varint,4,opt,name=include_items,json=includeItems,proto3" json:"include_items,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Page size; 0 returns every list.
+	Limit         int32 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32 `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	IncludeItems  bool  `protobuf:"varint,4,opt,name=include_items,json=includeItems,proto3" json:"include_items,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1179,9 +1200,10 @@ func (x *GetListsRequest) GetIncludeItems() bool {
 }
 
 type GetListsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Lists         []*ListWithItems       `protobuf:"bytes,1,rep,name=lists,proto3" json:"lists,omitempty"`
-	TotalCount    int32                  `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Lists []*ListWithItems       `protobuf:"bytes,1,rep,name=lists,proto3" json:"lists,omitempty"`
+	// Every list the caller owns, before limit/offset.
+	TotalCount    int32 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1231,10 +1253,14 @@ func (x *GetListsResponse) GetTotalCount() int32 {
 }
 
 type GetListRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	UserId               string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId               string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	IncludeDetailedItems bool                   `protobuf:"varint,3,opt,name=include_detailed_items,json=includeDetailedItems,proto3" json:"include_detailed_items,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	// Fill each item's poi/restaurant/hotel from the stored place. Items are
+	// returned for every list either way.
+	IncludeDetailedItems bool `protobuf:"varint,3,opt,name=include_detailed_items,json=includeDetailedItems,proto3" json:"include_detailed_items,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -1335,14 +1361,18 @@ func (x *GetListResponse) GetList() *ListWithDetailedItems {
 }
 
 type UpdateListRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	ImageUrl      string                 `protobuf:"bytes,5,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
-	IsPublic      bool                   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
-	CityId        string                 `protobuf:"bytes,7,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId      string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId      string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	Name        string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	ImageUrl    string `protobuf:"bytes,5,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	IsPublic    bool   `protobuf:"varint,6,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
+	CityId      string `protobuf:"bytes,7,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	// Switch the list between custom list and itinerary. Unchanged when unset.
+	IsItinerary   *bool `protobuf:"varint,8,opt,name=is_itinerary,json=isItinerary,proto3,oneof" json:"is_itinerary,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1426,6 +1456,13 @@ func (x *UpdateListRequest) GetCityId() string {
 	return ""
 }
 
+func (x *UpdateListRequest) GetIsItinerary() bool {
+	if x != nil && x.IsItinerary != nil {
+		return *x.IsItinerary
+	}
+	return false
+}
+
 type UpdateListResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -1487,9 +1524,11 @@ func (x *UpdateListResponse) GetList() *List {
 }
 
 type DeleteListRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1592,12 +1631,14 @@ func (x *DeleteListResponse) GetMessage() string {
 
 // Itinerary creation
 type CreateItineraryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ParentListId  string                 `protobuf:"bytes,2,opt,name=parent_list_id,json=parentListId,proto3" json:"parent_list_id,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
-	IsPublic      bool                   `protobuf:"varint,5,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ParentListId  string `protobuf:"bytes,2,opt,name=parent_list_id,json=parentListId,proto3" json:"parent_list_id,omitempty"`
+	Name          string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	IsPublic      bool   `protobuf:"varint,5,opt,name=is_public,json=isPublic,proto3" json:"is_public,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1729,7 +1770,9 @@ func (x *CreateItineraryResponse) GetItinerary() *List {
 
 // List item management
 type AddListItemRequest struct {
-	state                  protoimpl.MessageState              `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
 	UserId                 string                              `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	ListId                 string                              `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	ItemId                 string                              `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
@@ -1921,7 +1964,9 @@ func (x *AddListItemResponse) GetItem() *ListItem {
 }
 
 type UpdateListItemRequest struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
 	UserId                 string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	ListId                 string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	ItemId                 string                 `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
@@ -2104,12 +2149,16 @@ func (x *UpdateListItemResponse) GetItem() *ListItem {
 	return nil
 }
 
+// Removes the item from a list the caller owns. content_type narrows the match
+// when set; UNSPECIFIED removes the item whatever its type.
 type RemoveListItemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	ItemId        string                 `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
-	ContentType   ContentType            `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string      `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string      `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ItemId        string      `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	ContentType   ContentType `protobuf:"varint,4,opt,name=content_type,json=contentType,proto3,enum=loci.list.ContentType" json:"content_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2225,10 +2274,12 @@ func (x *RemoveListItemResponse) GetMessage() string {
 }
 
 type GetListItemsRequest struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	UserId                string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId                string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
-	IncludeContentDetails bool                   `protobuf:"varint,3,opt,name=include_content_details,json=includeContentDetails,proto3" json:"include_content_details,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId                string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId                string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	IncludeContentDetails bool   `protobuf:"varint,3,opt,name=include_content_details,json=includeContentDetails,proto3" json:"include_content_details,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -2338,9 +2389,11 @@ func (x *GetListItemsResponse) GetTotalCount() int32 {
 
 // Content-specific item requests
 type GetListRestaurantsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2434,9 +2487,11 @@ func (x *GetListRestaurantsResponse) GetRestaurants() []*RestaurantDetailedInfo 
 }
 
 type GetListHotelsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2530,9 +2585,11 @@ func (x *GetListHotelsResponse) GetHotels() []*HotelDetailedInfo {
 }
 
 type GetListItinerariesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2627,9 +2684,11 @@ func (x *GetListItinerariesResponse) GetItineraries() []*UserSavedItinerary {
 
 // Public list management
 type SavePublicListRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2731,9 +2790,11 @@ func (x *SavePublicListResponse) GetMessage() string {
 }
 
 type UnsaveListRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ListId        string `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2835,10 +2896,12 @@ func (x *UnsaveListResponse) GetMessage() string {
 }
 
 type GetSavedListsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int32                  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Ignored by the server, which acts as the authenticated caller. Kept for
+	// wire compatibility; clients should omit it.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Limit         int32  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32  `protobuf:"varint,3,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3154,19 +3217,19 @@ var File_loci_list_list_proto protoreflect.FileDescriptor
 
 const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
-	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(loci/recommendation/recommendation.proto\"\xcb\x04\n" +
+	"\x14loci/list/list.proto\x12\tloci.list\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(loci/recommendation/recommendation.proto\"\xcd\x04\n" +
 	"\x04List\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +
 	"\x04name\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12,\n" +
-	"\vdescription\x18\x04 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\vdescription\x12%\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12-\n" +
+	"\vdescription\x18\x04 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xa0\x1fR\vdescription\x12%\n" +
 	"\timage_url\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\bimageUrl\x12\x1b\n" +
 	"\tis_public\x18\x06 \x01(\bR\bisPublic\x12!\n" +
 	"\fis_itinerary\x18\a \x01(\bR\visItinerary\x12-\n" +
-	"\x0eparent_list_id\x18\b \x01(\tB\a\xbaH\x04r\x02\x18dR\fparentListId\x12\"\n" +
-	"\acity_id\x18\t \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06cityId\x12&\n" +
+	"\x0eparent_list_id\x18\b \x01(\tB\a\xbaH\x04r\x02\x18dR\fparentListId\x12#\n" +
+	"\acity_id\x18\t \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06cityId\x12&\n" +
 	"\n" +
 	"view_count\x18\n" +
 	" \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tviewCount\x12&\n" +
@@ -3177,11 +3240,12 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\x83\x06\n" +
+	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\x84\x06\n" +
 	"\bListItem\x12\"\n" +
 	"\alist_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
-	"\aitem_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12 \n" +
-	"\x06poi_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x05poiId\x12C\n" +
+	"\aitem_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12!\n" +
+	"\x06poi_id\x18\x03 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x05poiId\x12C\n" +
 	"\fcontent_type\x18\x04 \x01(\x0e2\x16.loci.list.ContentTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontentType\x12#\n" +
 	"\bposition\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\bposition\x12\x1e\n" +
 	"\x05notes\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\x05notes\x12&\n" +
@@ -3211,24 +3275,21 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\titinerary\x18\x05 \x01(\v2\x1d.loci.list.UserSavedItineraryR\titinerary\"r\n" +
 	"\x15ListWithDetailedItems\x12#\n" +
 	"\x04list\x18\x01 \x01(\v2\x0f.loci.list.ListR\x04list\x124\n" +
-	"\x05items\x18\x02 \x03(\v2\x1e.loci.list.ListItemWithContentR\x05items\"\xac\x04\n" +
+	"\x05items\x18\x02 \x03(\v2\x1e.loci.list.ListItemWithContentR\x05items\"\xaf\x04\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\x04name\x123\n" +
 	"\blatitude\x18\x03 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0R\blatitude\x125\n" +
-	"\tlongitude\x18\x04 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0R\tlongitude\x12&\n" +
-	"\bcategory\x18\x05 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\bcategory\x12,\n" +
-	"\vdescription\x18\x06 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\vdescription\x12/\n" +
+	"\tlongitude\x18\x04 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0R\tlongitude\x12'\n" +
+	"\bcategory\x18\x05 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xc8\x01R\bcategory\x12-\n" +
+	"\vdescription\x18\x06 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xa0\x1fR\vdescription\x12/\n" +
 	"\x06rating\x18\a \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x00\x14@)\x00\x00\x00\x00\x00\x00\x00\x00R\x06rating\x12*\n" +
 	"\freview_count\x18\b \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vreviewCount\x12(\n" +
 	"\vprice_range\x18\t \x01(\tB\a\xbaH\x04r\x02\x182R\n" +
-	"priceRange\x12$\n" +
+	"priceRange\x12%\n" +
 	"\aaddress\x18\n" +
-	" \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\aaddress\x12\x1d\n" +
+	" \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xf4\x03R\aaddress\x12\x1d\n" +
 	"\x05phone\x18\v \x01(\tB\a\xbaH\x04r\x02\x182R\x05phone\x12\"\n" +
 	"\awebsite\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\awebsite\x12,\n" +
 	"\x06photos\x18\r \x03(\tB\x14\xbaH\x11\x92\x01\x0e\x10\x14\"\n" +
@@ -3265,56 +3326,64 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\xe9\x01\n" +
-	"\x11CreateListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\x1e\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\"\xec\x01\n" +
+	"\x11CreateListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12,\n" +
-	"\vdescription\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xa0\x1fR\vdescription\x12\"\n" +
-	"\acity_id\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06cityId\x12!\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12-\n" +
+	"\vdescription\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xa0\x1fR\vdescription\x12#\n" +
+	"\acity_id\x18\x04 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06cityId\x12!\n" +
 	"\fis_itinerary\x18\x05 \x01(\bR\visItinerary\x12\x1b\n" +
 	"\tis_public\x18\x06 \x01(\bR\bisPublic\"w\n" +
 	"\x12CreateListResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12#\n" +
-	"\x04list\x18\x03 \x01(\v2\x0f.loci.list.ListR\x04list\"\x9d\x01\n" +
-	"\x0fGetListsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12 \n" +
-	"\x05limit\x18\x02 \x01(\x05B\n" +
-	"\xbaH\a\x1a\x05\x18\xc8\x01(\x01R\x05limit\x12\x1f\n" +
+	"\x04list\x18\x03 \x01(\v2\x0f.loci.list.ListR\x04list\"\xa1\x01\n" +
+	"\x0fGetListsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12#\n" +
+	"\x05limit\x18\x02 \x01(\x05B\r\xbaH\n" +
+	"\xd8\x01\x01\x1a\x05\x18\xc8\x01(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\x12#\n" +
 	"\rinclude_items\x18\x04 \x01(\bR\fincludeItems\"c\n" +
 	"\x10GetListsResponse\x12.\n" +
 	"\x05lists\x18\x01 \x03(\v2\x18.loci.list.ListWithItemsR\x05lists\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"\x8e\x01\n" +
-	"\x0eGetListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"totalCount\"\x8f\x01\n" +
+	"\x0eGetListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x124\n" +
 	"\x16include_detailed_items\x18\x03 \x01(\bR\x14includeDetailedItems\"G\n" +
 	"\x0fGetListResponse\x124\n" +
-	"\x04list\x18\x01 \x01(\v2 .loci.list.ListWithDetailedItemsR\x04list\"\x8b\x02\n" +
-	"\x11UpdateListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\x04list\x18\x01 \x01(\v2 .loci.list.ListWithDetailedItemsR\x04list\"\xc5\x02\n" +
+	"\x11UpdateListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\x1c\n" +
 	"\x04name\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x04name\x12*\n" +
 	"\vdescription\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xa0\x1fR\vdescription\x12%\n" +
 	"\timage_url\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\bimageUrl\x12\x1b\n" +
 	"\tis_public\x18\x06 \x01(\bR\bisPublic\x12 \n" +
-	"\acity_id\x18\a \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\"w\n" +
+	"\acity_id\x18\a \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12&\n" +
+	"\fis_itinerary\x18\b \x01(\bH\x00R\visItinerary\x88\x01\x01B\x0f\n" +
+	"\r_is_itinerary\"w\n" +
 	"\x12UpdateListResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12#\n" +
-	"\x04list\x18\x03 \x01(\v2\x0f.loci.list.ListR\x04list\"[\n" +
-	"\x11DeleteListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\x04list\x18\x03 \x01(\v2\x0f.loci.list.ListR\x04list\"\\\n" +
+	"\x11DeleteListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"R\n" +
 	"\x12DeleteListResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
-	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"\xd4\x01\n" +
-	"\x16CreateItineraryRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12-\n" +
+	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"\xd5\x01\n" +
+	"\x16CreateItineraryRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12-\n" +
 	"\x0eparent_list_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\fparentListId\x12\x1e\n" +
 	"\x04name\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x04name\x12*\n" +
@@ -3323,9 +3392,10 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\x17CreateItineraryResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12-\n" +
-	"\titinerary\x18\x03 \x01(\v2\x0f.loci.list.ListR\titinerary\"\x98\x05\n" +
-	"\x12AddListItemRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\titinerary\x18\x03 \x01(\v2\x0f.loci.list.ListR\titinerary\"\x99\x05\n" +
+	"\x12AddListItemRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
 	"\aitem_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12C\n" +
 	"\fcontent_type\x18\x04 \x01(\x0e2\x16.loci.list.ContentTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontentType\x12#\n" +
@@ -3343,9 +3413,10 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\x13AddListItemResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12'\n" +
-	"\x04item\x18\x03 \x01(\v2\x13.loci.list.ListItemR\x04item\"\xa0\x04\n" +
-	"\x15UpdateListItemRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\x04item\x18\x03 \x01(\v2\x13.loci.list.ListItemR\x04item\"\xa1\x04\n" +
+	"\x15UpdateListItemRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
 	"\aitem_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12C\n" +
 	"\fcontent_type\x18\x04 \x01(\x0e2\x16.loci.list.ContentTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontentType\x12#\n" +
@@ -3361,52 +3432,60 @@ const file_loci_list_list_proto_rawDesc = "" +
 	"\x16UpdateListItemResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\x12'\n" +
-	"\x04item\x18\x03 \x01(\v2\x13.loci.list.ListItemR\x04item\"\xc8\x01\n" +
-	"\x15RemoveListItemRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\x04item\x18\x03 \x01(\v2\x13.loci.list.ListItemR\x04item\"\xc9\x01\n" +
+	"\x15RemoveListItemRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x12\"\n" +
 	"\aitem_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06itemId\x12C\n" +
 	"\fcontent_type\x18\x04 \x01(\x0e2\x16.loci.list.ContentTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\vcontentType\"V\n" +
 	"\x16RemoveListItemResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
-	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"\x95\x01\n" +
-	"\x13GetListItemsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"\x96\x01\n" +
+	"\x13GetListItemsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\x126\n" +
 	"\x17include_content_details\x18\x03 \x01(\bR\x15includeContentDetails\"m\n" +
 	"\x14GetListItemsResponse\x124\n" +
 	"\x05items\x18\x01 \x03(\v2\x1e.loci.list.ListItemWithContentR\x05items\x12\x1f\n" +
 	"\vtotal_count\x18\x02 \x01(\x05R\n" +
-	"totalCount\"c\n" +
-	"\x19GetListRestaurantsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"totalCount\"d\n" +
+	"\x19GetListRestaurantsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"a\n" +
 	"\x1aGetListRestaurantsResponse\x12C\n" +
-	"\vrestaurants\x18\x01 \x03(\v2!.loci.list.RestaurantDetailedInfoR\vrestaurants\"^\n" +
-	"\x14GetListHotelsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\vrestaurants\x18\x01 \x03(\v2!.loci.list.RestaurantDetailedInfoR\vrestaurants\"_\n" +
+	"\x14GetListHotelsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"M\n" +
 	"\x15GetListHotelsResponse\x124\n" +
-	"\x06hotels\x18\x01 \x03(\v2\x1c.loci.list.HotelDetailedInfoR\x06hotels\"c\n" +
-	"\x19GetListItinerariesRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\x06hotels\x18\x01 \x03(\v2\x1c.loci.list.HotelDetailedInfoR\x06hotels\"d\n" +
+	"\x19GetListItinerariesRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"]\n" +
 	"\x1aGetListItinerariesResponse\x12?\n" +
-	"\vitineraries\x18\x01 \x03(\v2\x1d.loci.list.UserSavedItineraryR\vitineraries\"_\n" +
-	"\x15SavePublicListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\vitineraries\x18\x01 \x03(\v2\x1d.loci.list.UserSavedItineraryR\vitineraries\"`\n" +
+	"\x15SavePublicListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"V\n" +
 	"\x16SavePublicListResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
-	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"[\n" +
-	"\x11UnsaveListRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12\"\n" +
+	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"\\\n" +
+	"\x11UnsaveListRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12\"\n" +
 	"\alist_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06listId\"R\n" +
 	"\x12UnsaveListResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
-	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"}\n" +
-	"\x14GetSavedListsRequest\x12\"\n" +
-	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12 \n" +
+	"\amessage\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\amessage\"~\n" +
+	"\x14GetSavedListsRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12 \n" +
 	"\x05limit\x18\x02 \x01(\x05B\n" +
 	"\xbaH\a\x1a\x05\x18\xc8\x01(\x01R\x05limit\x12\x1f\n" +
 	"\x06offset\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06offset\"h\n" +
@@ -3620,6 +3699,7 @@ func file_loci_list_list_proto_init() {
 		return
 	}
 	file_loci_list_list_proto_msgTypes[1].OneofWrappers = []any{}
+	file_loci_list_list_proto_msgTypes[15].OneofWrappers = []any{}
 	file_loci_list_list_proto_msgTypes[21].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
