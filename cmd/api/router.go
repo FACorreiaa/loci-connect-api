@@ -274,6 +274,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		deps.Logger.Info("registered Connect RPC service", "path", chatPath)
 	}
 
+	if deps.WatchHandler != nil {
+		watchPath, watchHandler := chatconnect.NewWatchServiceHandler(deps.WatchHandler, opts)
+		mux.Handle(watchPath, watchHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", watchPath)
+	}
+
 	if deps.DiscoverHandler != nil {
 		discoverPath, discoverHandler := discoverconnect.NewDiscoverServiceHandler(deps.DiscoverHandler, opts)
 		mux.Handle(discoverPath, discoverHandler)
