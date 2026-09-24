@@ -83,6 +83,22 @@ func (m *MockListRepository) GetUserLists(ctx context.Context, userID uuid.UUID,
 	return args.Get(0).([]*locitypes.List), args.Error(1)
 }
 
+func (m *MockListRepository) GetAllUserLists(ctx context.Context, userID uuid.UUID) ([]*locitypes.List, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*locitypes.List), args.Error(1)
+}
+
+func (m *MockListRepository) GetPlaceSummaries(ctx context.Context, itemIDs []uuid.UUID) (map[uuid.UUID]locitypes.POIDetailedInfo, error) {
+	args := m.Called(ctx, itemIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[uuid.UUID]locitypes.POIDetailedInfo), args.Error(1)
+}
+
 func (m *MockListRepository) CountUserLists(ctx context.Context, userID uuid.UUID) (int, error) {
 	args := m.Called(ctx, userID)
 	return args.Int(0), args.Error(1)
@@ -331,7 +347,7 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 		}
 
 		mockRepo.On("GetList", mock.Anything, listID).Return(publicList, nil).Once()
-		mockRepo.On("GetListItems", ctx, listID).Return(items, nil).Once()
+		mockRepo.On("GetListItems", mock.Anything, listID).Return(items, nil).Once()
 
 		result, err := service.GetListDetails(ctx, listID, userID)
 
@@ -355,7 +371,7 @@ func TestServiceImpl_GetListDetails(t *testing.T) {
 		_, err := service.GetListDetails(ctx, listID, userID)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "access denied to list")
+		assert.ErrorIs(t, err, locitypes.ErrNotFound)
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -428,7 +444,7 @@ func TestServiceImpl_UpdateListDetails(t *testing.T) {
 		_, err := service.UpdateListDetails(ctx, listID, userID, locitypes.UpdateListRequest{})
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user does not own list")
+		assert.ErrorIs(t, err, locitypes.ErrNotFound)
 		mockRepo.AssertExpectations(t)
 	})
 }
@@ -575,7 +591,7 @@ func TestServiceImpl_DeleteUserList(t *testing.T) {
 		err := service.DeleteUserList(ctx, listID, userID)
 
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "user does not own list")
+		assert.ErrorIs(t, err, locitypes.ErrNotFound)
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -588,5 +604,78 @@ func TestServiceImpl_DeleteUserList(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "list not found")
 		mockRepo.AssertExpectations(t)
+	})
+}
+
+// A custom list (not an itinerary) is where "Add to list" puts places, so its
+// items must come back too.
+func TestServiceImpl_GetListDetails_CustomListHasItems(t *testing.T) {
+	ctx := context.Background()
+	service, mockRepo := setupListServiceTest()
+	userID, listID := uuid.New(), uuid.New()
+	items := []*locitypes.ListItem{{ListID: listID, ItemID: uuid.New(), ContentType: locitypes.ContentTypePOI}}
+
+	mockRepo.On("GetList", mock.Anything, listID).Return(locitypes.List{ID: listID, UserID: userID}, nil).Once()
+	mockRepo.On("GetListItems", mock.Anything, listID).Return(items, nil).Once()
+
+	got, err := service.GetListDetails(ctx, listID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, items, got.Items)
+	mockRepo.AssertExpectations(t)
+}
+
+// Someone else's private list reads as missing, not as forbidden, so ids
+// cannot be probed.
+func TestServiceImpl_GetListDetails_OthersPrivateListIsNotFound(t *testing.T) {
+	service, mockRepo := setupListServiceTest()
+	listID := uuid.New()
+	mockRepo.On("GetList", mock.Anything, listID).Return(locitypes.List{ID: listID, UserID: uuid.New()}, nil).Once()
+
+	_, err := service.GetListDetails(context.Background(), listID, uuid.New())
+	assert.ErrorIs(t, err, locitypes.ErrNotFound)
+}
+
+func TestServiceImpl_GetListPlaces_SkipsItineraries(t *testing.T) {
+	service, mockRepo := setupListServiceTest()
+	poi, itin := uuid.New(), uuid.New()
+	items := []*locitypes.ListItem{
+		{ItemID: poi, ContentType: locitypes.ContentTypePOI},
+		{ItemID: itin, ContentType: locitypes.ContentTypeItinerary},
+		nil,
+	}
+	want := map[uuid.UUID]locitypes.POIDetailedInfo{poi: {ID: poi, Name: "Torre"}}
+	mockRepo.On("GetPlaceSummaries", mock.Anything, []uuid.UUID{poi}).Return(want, nil).Once()
+
+	got, err := service.GetListPlaces(context.Background(), items)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+	mockRepo.AssertExpectations(t)
+
+	// Only itineraries: no query at all.
+	got, err = service.GetListPlaces(context.Background(), items[1:2])
+	require.NoError(t, err)
+	assert.Empty(t, got)
+}
+
+func TestServiceImpl_RemoveListItemOfType(t *testing.T) {
+	ctx := context.Background()
+	userID, listID, itemID := uuid.New(), uuid.New(), uuid.New()
+
+	t.Run("owner removes by id and type", func(t *testing.T) {
+		service, mockRepo := setupListServiceTest()
+		mockRepo.On("GetList", mock.Anything, listID).Return(locitypes.List{ID: listID, UserID: userID}, nil).Once()
+		mockRepo.On("DeleteListItem", mock.Anything, listID, itemID, "hotel").Return(nil).Once()
+
+		require.NoError(t, service.RemoveListItemOfType(ctx, userID, listID, itemID, locitypes.ContentTypeHotel))
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("another user's list is not found", func(t *testing.T) {
+		service, mockRepo := setupListServiceTest()
+		mockRepo.On("GetList", mock.Anything, listID).Return(locitypes.List{ID: listID, UserID: uuid.New()}, nil).Once()
+
+		err := service.RemoveListItemOfType(ctx, userID, listID, itemID, locitypes.ContentTypeHotel)
+		assert.ErrorIs(t, err, locitypes.ErrNotFound)
+		mockRepo.AssertNotCalled(t, "DeleteListItem", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 }
