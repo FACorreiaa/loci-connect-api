@@ -19,6 +19,9 @@ func TestClassify(t *testing.T) {
 		{"api 429", genai.APIError{Code: 429, Message: "rate limit"}, ErrRateLimited},
 		{"api 503", genai.APIError{Code: 503, Message: "overloaded"}, ErrUnavailable},
 		{"api 400 passthrough", genai.APIError{Code: 400, Message: "bad request"}, nil},
+		// A retired :free slug answers 404; the next model in the chain may
+		// still be live.
+		{"api 404 model retired", genai.APIError{Code: 404, Message: "This model is unavailable for free. The paid version is available now"}, ErrUnavailable},
 		{"wrapped api 429", fmt.Errorf("call failed: %w", genai.APIError{Code: 429}), ErrRateLimited},
 		{"resource exhausted string", errors.New("rpc error: RESOURCE_EXHAUSTED"), ErrRateLimited},
 		{"quota string", errors.New("quota exceeded for model"), ErrRateLimited},
@@ -99,6 +102,7 @@ func TestFailover(t *testing.T) {
 		{"auth failed", Classify(genai.APIError{Code: 403}), true},
 		{"rate limited", Classify(genai.APIError{Code: 429}), true},
 		{"unavailable", Classify(genai.APIError{Code: 500}), true},
+		{"model not found", Classify(genai.APIError{Code: 404}), true},
 		{"stream stalled", fmt.Errorf("wrapped: %w", ErrStreamStalled), true},
 		{"empty response", ErrEmptyResponse, true},
 		// The caller is already gone; failing over burns a second provider

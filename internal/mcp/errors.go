@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"google.golang.org/genai"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
@@ -25,6 +27,11 @@ func toolError(err error) error {
 	case errors.Is(err, llmerrors.ErrRateLimited):
 		return errors.New("the AI provider is throttling requests; retry in a few seconds")
 	case errors.Is(err, llmerrors.ErrUnavailable):
+		return errors.New("the AI provider is temporarily unavailable; retry in a few seconds")
+	case llmerrors.Failover(err), errors.As(err, new(genai.APIError)):
+		// Credits, a rejected key, a stalled stream, or a provider error
+		// nothing classified: the wrapped text quotes the provider and can
+		// name the model, so it stays in the logs.
 		return errors.New("the AI provider is temporarily unavailable; retry in a few seconds")
 	case errors.Is(err, context.DeadlineExceeded):
 		return errors.New("the request timed out; try a smaller radius or a more specific query")

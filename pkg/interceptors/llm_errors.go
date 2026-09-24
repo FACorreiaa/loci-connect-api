@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"google.golang.org/genai"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
@@ -53,9 +54,18 @@ func mapLLMError(err error) error {
 	switch {
 	case errors.Is(err, llmerrors.ErrRateLimited):
 		return connect.NewError(connect.CodeUnavailable, errors.New("AI provider is throttling requests, please retry shortly"))
-	case errors.Is(err, llmerrors.ErrUnavailable):
+	case llmerrors.Failover(err), isProviderAPIError(err):
+		// Unavailable, out of credits, a rejected key, a stalled or empty
+		// stream, or a provider error nothing classified. The wrapped text
+		// quotes the provider and can name the model; none of it is the
+		// user's business, and a retry is all they can do about it.
 		return connect.NewError(connect.CodeUnavailable, errors.New("AI provider is temporarily unavailable, please retry shortly"))
 	default:
 		return err
 	}
+}
+
+func isProviderAPIError(err error) bool {
+	var apiErr genai.APIError
+	return errors.As(err, &apiErr)
 }

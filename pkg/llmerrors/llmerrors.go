@@ -20,7 +20,7 @@ import (
 var ErrRateLimited = errors.New("llm provider rate limited")
 
 // ErrUnavailable marks a transient provider outage (HTTP 5xx) after
-// retries were exhausted.
+// retries were exhausted, or a model the provider no longer serves (404).
 var ErrUnavailable = errors.New("llm provider unavailable")
 
 // ErrOutOfCredits marks a provider refusing the call because the account
@@ -89,7 +89,11 @@ func Classify(err error) error {
 			return fmt.Errorf("%w: %w", ErrAuthFailed, err)
 		case apiErr.Code == http.StatusTooManyRequests:
 			return fmt.Errorf("%w: %w", ErrRateLimited, err)
-		case apiErr.Code >= 500:
+		// A 404 here is the model, not the route: OpenRouter answers it when
+		// a :free slug is retired ("This model is unavailable for free") or
+		// has no live endpoint. The credential is fine and the next model in
+		// the chain may well answer, so it fails over like an outage.
+		case apiErr.Code == http.StatusNotFound || apiErr.Code >= 500:
 			return fmt.Errorf("%w: %w", ErrUnavailable, err)
 		}
 		return err

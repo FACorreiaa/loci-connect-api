@@ -30,8 +30,10 @@ func TestLiveFallbackAnswers(t *testing.T) {
 		FallbackEnabled:  true,
 		FallbackCooldown: time.Minute,
 		Fallbacks: []config.AIProviderSpec{
-			{Provider: config.AIProviderOpenRouter, APIKey: key, Model: "z-ai/glm-5.2:free"},
 			{Provider: config.AIProviderOpenRouter, APIKey: key, Model: "nvidia/nemotron-3-super-120b-a12b:free"},
+			{Provider: config.AIProviderOpenRouter, APIKey: key, Model: "nvidia/nemotron-3-ultra-550b-a55b:free"},
+			{Provider: config.AIProviderOpenRouter, APIKey: key, Model: "google/gemma-4-31b-it:free"},
+			{Provider: config.AIProviderOpenRouter, APIKey: key, Model: "qwen/qwen3.8-27b:free"},
 		},
 		MaxRetries:      2,
 		RetryBaseDelay:  500 * time.Millisecond,

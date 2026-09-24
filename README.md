@@ -142,7 +142,7 @@ Copy `.env.prod.example` to `.env` (or export the variables directly). The minim
 | `GEMINI_API_KEY` + `GEMINI_MODEL` | Gemini access when `AI_PROVIDER=gemini` |
 | `AI_FALLBACK_ENABLED` | Free-tier fallback chain. Defaults to on outside production, and the server refuses to boot with it on when `APP_ENV=production` |
 | `AI_FALLBACK_OPENROUTER_API_KEY` | Key for the fallback chain. Falls back to `OPENROUTER_API_KEY`; set separately to use a spend-capped key |
-| `AI_FALLBACK_MODELS` | Ordered fallback models (default `z-ai/glm-5.2:free,nvidia/nemotron-3-super-120b-a12b:free`) |
+| `AI_FALLBACK_MODELS` | Ordered fallback models (default `nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-31b-it:free,qwen/qwen3.8-27b:free`) |
 | `AI_FALLBACK_COOLDOWN_SEC` | How long a credential is benched after a 401/402 (default `300`) |
 | `SERVER_HOST`, `SERVER_PORT` | HTTP listen address (default `0.0.0.0:8000`) |
 | `WEATHER_PROVIDER` | Forecast source: `openmeteo` (default, no key), `openweather` (needs `OPENWEATHER_API_KEY`), `stub`. Leave unset with a key present to keep OpenWeather |
