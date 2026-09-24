@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -312,5 +313,88 @@ func TestProcessUnified_OldClientStaysSingleCity(t *testing.T) {
 	_ = l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, EventCh: make(chan locitypes.StreamEvent, 100)})
 	if len(cities) != 1 {
 		t.Fatalf("an old client must get one city, ran %v", cities)
+	}
+}
+
+func threeCityRoute() *multiCityRoute {
+	r := twoCityRoute()
+	r.Stops = append(r.Stops, multiCityStop{Index: 2, CityName: "Coimbra", Lat: 40.21, Lon: -8.43, Days: []int{4}, Nights: 1, SessionID: uuid.New()})
+	return r
+}
+
+// Two cities at a time: the trip is ready in about half the wall time, and at
+// most concurrency cities hold the pod's LLM slots at once.
+func TestProcessMultiCity_RunsCitiesTwoAtATime(t *testing.T) {
+	events := make(chan locitypes.StreamEvent, 300)
+	l := newStreamService(t, &TestLLMClient{})
+	l.SetMultiCityConcurrency(2)
+
+	var mu sync.Mutex
+	running, peak := 0, 0
+	var started []string
+	release := make(chan struct{})
+	l.runCityFn = func(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
+		mu.Lock()
+		running++
+		if running > peak {
+			peak = running
+		}
+		started = append(started, cc.CityName)
+		mu.Unlock()
+		<-release
+		mu.Lock()
+		running--
+		mu.Unlock()
+		return &locitypes.AiCityResponse{}, nil
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- l.processMultiCity(common.ChatContext{Ctx: context.Background(), EventCh: events}, threeCityRoute())
+	}()
+	// Let the first wave start, then free them one by one.
+	deadline := time.After(2 * time.Second)
+	for {
+		mu.Lock()
+		n := len(started)
+		mu.Unlock()
+		if n >= 2 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("two cities never ran at the same time")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	close(events)
+	if peak != 2 {
+		t.Fatalf("peak concurrency = %d, want 2", peak)
+	}
+	// Waves go in route order; within a wave the two start together.
+	if len(started) != 3 || started[2] != "Coimbra" {
+		t.Fatalf("the third city waits for a slot, got %v", started)
+	}
+	completes := 0
+	for ev := range events {
+		if ev.Type == locitypes.EventTypeComplete {
+			completes++
+		}
+	}
+	if completes != 1 {
+		t.Fatalf("one COMPLETE, got %d", completes)
+	}
+}
+
+func TestMultiCityWaves(t *testing.T) {
+	cases := []struct{ left, conc, want int }{{5, 2, 3}, {4, 2, 2}, {1, 2, 1}, {3, 1, 3}, {0, 2, 1}}
+	for _, c := range cases {
+		if got := waves(c.left, c.conc); got != c.want {
+			t.Errorf("waves(%d,%d) = %d, want %d", c.left, c.conc, got, c.want)
+		}
 	}
 }

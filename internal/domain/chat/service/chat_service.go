@@ -106,6 +106,8 @@ type ServiceImpl struct {
 	// cityResolver geocodes the cities of a multi-city trip. Nil: every
 	// multi-city request is planned as its first city.
 	cityResolver CityResolver
+	// cityConcurrency is how many cities of a multi-city trip generate at once.
+	cityConcurrency int
 	// runCityFn replaces runSingleCity in tests of the multi-city orchestrator.
 	runCityFn func(common.ChatContext) (*locitypes.AiCityResponse, error)
 	poiRepo   poi.Repository
