@@ -2,13 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"google.golang.org/genai"
 
-	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -25,33 +23,38 @@ func normalizeCacheComponent(s string) string {
 	return s
 }
 
-// extractCityFromMessage uses AI to extract city name and clean the message
-
-func (l *ServiceImpl) extractCityFromMessage(ctx context.Context, message string) (cityName, cleanedMessage string, err error) {
+// extractTripCitiesFromMessage uses AI to read every city out of a travel
+// request, in the order given, and clean the message of them.
+func (l *ServiceImpl) extractTripCitiesFromMessage(ctx context.Context, message string) (TripCities, error) {
 	prompt := fmt.Sprintf(`
-You are a text parser. Extract the city name from the user's travel request and return a clean version of the message.
+You are a text parser. Read every city the traveller wants to visit, in the order they gave them, and return a clean version of the message with the city names and per-city durations removed.
 
 User message: "%s"
 
 Respond with ONLY a JSON object in this exact format:
 {
-    "city": "City Name",
-    "message": "cleaned message without city"
+    "cities": [{"city": "City Name", "days": 0}],
+    "ordered": false,
+    "message": "cleaned message without cities"
 }
 
-Examples:
-- "Find restaurants in Barcelona" → {"city": "Barcelona", "message": "Find restaurants"}
-- "What to do in Paris?" → {"city": "Paris", "message": "What to do"}
-- "Barcelona restaurants" → {"city": "Barcelona", "message": "restaurants"}
-- "Show me hotels in New York" → {"city": "New York", "message": "Show me hotels"}
-- "Things to do Madrid" → {"city": "Madrid", "message": "Things to do"}
+"days" is how many days or nights the traveller gave that one city, or 0 if they did not say.
+"ordered" is true only when they sequenced the cities themselves ("then", "after", "ending in", "first ... then").
+A neighbourhood, landmark or region is not a city. Never invent a city.
 
-If no city is mentioned, use empty string for city.
+Examples:
+- "Find restaurants in Barcelona" → {"cities":[{"city":"Barcelona","days":0}],"ordered":false,"message":"Find restaurants"}
+- "Lisbon for 3 days then Porto for 2" → {"cities":[{"city":"Lisbon","days":3},{"city":"Porto","days":2}],"ordered":true,"message":"trip"}
+- "A week in Lisbon, Porto and Seville" → {"cities":[{"city":"Lisbon","days":0},{"city":"Porto","days":0},{"city":"Seville","days":0}],"ordered":false,"message":"A week trip"}
+- "What to do in Paris?" → {"cities":[{"city":"Paris","days":0}],"ordered":false,"message":"What to do"}
+- "Replace Alfama with Belém" → {"cities":[],"ordered":false,"message":"Replace Alfama with Belém"}
+
+If no city is mentioned, return an empty "cities" list.
 `, message)
 
 	release, err := l.acquireLLMSlot(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("LLM capacity exceeded: %w", err)
+		return TripCities{}, fmt.Errorf("LLM capacity exceeded: %w", err)
 	}
 	defer release()
 
@@ -59,7 +62,7 @@ If no city is mentioned, use empty string for city.
 		Temperature: genai.Ptr[float32](0.1), // Low temperature for consistent parsing
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("failed to parse message: %w", err)
+		return TripCities{}, fmt.Errorf("failed to parse message: %w", err)
 	}
 
 	var responseText strings.Builder
@@ -74,25 +77,10 @@ If no city is mentioned, use empty string for city.
 	}
 
 	if responseText.String() == "" {
-		return "", "", fmt.Errorf("empty response from AI parser")
+		return TripCities{}, fmt.Errorf("empty response from AI parser")
 	}
 
-	cleanResponse := generativeAI.CleanJSON(responseText.String())
-	var parsed struct {
-		City    string `json:"city"`
-		Message string `json:"message"`
-	}
-
-	if err := json.Unmarshal([]byte(cleanResponse), &parsed); err != nil {
-		return "", "", fmt.Errorf("failed to parse extraction response: %w", err)
-	}
-
-	// If no city extracted, return original message
-	if parsed.City == "" {
-		return "", message, nil
-	}
-
-	return parsed.City, parsed.Message, nil
+	return parseTripCities(responseText.String(), message)
 }
 
 // convertHotelsToPOIs adapts hotel details into POI entries for client responses.

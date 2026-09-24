@@ -45,6 +45,7 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 
 	start := time.Date(2026, 9, 12, 9, 0, 0, 0, time.UTC)
 	day2Date := start.AddDate(0, 0, 1)
+	evoraSession := uuid.New()
 
 	in := &Trip{
 		UserID:   userID,
@@ -84,6 +85,10 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 				DistanceKm: 62, DurationMins: 46, Mode: "drive",
 			},
 		},
+		Cities: []TripCity{
+			{CityName: "Évora", SessionID: &evoraSession, Nights: 1, OrderIndex: 0},
+			{CityName: "Beja", Nights: 1, OrderIndex: 1},
+		},
 	}
 
 	saved, err := repo.SaveTrip(ctx, in, 0)
@@ -111,6 +116,15 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 		assert.Equal(t, "drive", got.Legs[1].Mode)
 	})
 
+	t.Run("cities keep their order and sessions", func(t *testing.T) {
+		require.Len(t, got.Cities, 2)
+		assert.Equal(t, "Évora", got.Cities[0].CityName)
+		require.NotNil(t, got.Cities[0].SessionID)
+		assert.Equal(t, evoraSession, *got.Cities[0].SessionID)
+		assert.Nil(t, got.Cities[1].SessionID)
+		assert.Equal(t, int32(1), got.Cities[1].OrderIndex)
+	})
+
 	t.Run("legs are replaced rather than accumulated on re-save", func(t *testing.T) {
 		got.Legs = got.Legs[:1]
 		again, err := repo.SaveTrip(ctx, got, got.Version)
@@ -119,6 +133,22 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 		reread, err := repo.GetTrip(ctx, again.ID, userID)
 		require.NoError(t, err)
 		assert.Len(t, reread.Legs, 1, "a shortened route must not leave the old leg behind")
+
+		reread.Cities = reread.Cities[:1]
+		third, err := repo.SaveTrip(ctx, reread, reread.Version)
+		require.NoError(t, err)
+		final, err := repo.GetTrip(ctx, third.ID, userID)
+		require.NoError(t, err)
+		assert.Len(t, final.Cities, 1, "cities are replaced, not appended")
+
+		// Review #6: a client that predates cities sends none; that is not
+		// "this trip has no cities".
+		final.Cities = nil
+		fourth, err := repo.SaveTrip(ctx, final, final.Version)
+		require.NoError(t, err)
+		kept, err := repo.GetTrip(ctx, fourth.ID, userID)
+		require.NoError(t, err)
+		assert.Len(t, kept.Cities, 1, "a save without cities keeps the ones the trip has")
 	})
 }
 

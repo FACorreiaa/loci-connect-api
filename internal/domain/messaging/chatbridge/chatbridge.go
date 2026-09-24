@@ -136,6 +136,12 @@ func reply(response *locitypes.ChatResponse) (text, next string) {
 		return "Done — open Loci to see it.", ""
 	}
 
+	// A multi-city trip: the route, then every city's plan in order. Prose
+	// does not win here — a city's own text is about that city alone.
+	if len(response.Cities) >= 2 {
+		return renderMultiCity(response), ""
+	}
+
 	// A next-page token is offered whenever the stored answer has more than
 	// one page in it, including alongside prose: the prose answers the
 	// question, and the places are still there to page through.
@@ -346,4 +352,31 @@ func mapLink(poi locitypes.POIDetailedInfo) string {
 	}
 	return fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%.6f,%.6f",
 		poi.Latitude, poi.Longitude)
+}
+
+// renderMultiCity is a multi-city answer as text: the route's outline, then
+// each city's plan under its name.
+func renderMultiCity(response *locitypes.ChatResponse) string {
+	var b strings.Builder
+	if outline := strings.TrimSpace(response.RouteOutline); outline != "" {
+		b.WriteString(outline)
+		b.WriteString("\n")
+	}
+	for i := range response.Cities {
+		city := &response.Cities[i]
+		plan := renderItinerary(city)
+		if plan == "" {
+			continue
+		}
+		b.WriteString("\n")
+		if name := strings.TrimSpace(city.GeneralCityData.City); name != "" {
+			b.WriteString("— " + name + " —\n")
+		}
+		b.WriteString(plan)
+		b.WriteString("\n")
+	}
+	if b.Len() == 0 {
+		return "Done — open Loci to see it."
+	}
+	return strings.TrimSpace(b.String())
 }

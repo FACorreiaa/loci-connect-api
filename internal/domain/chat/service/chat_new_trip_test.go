@@ -1,7 +1,11 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
@@ -56,5 +60,49 @@ func TestStartsNewTripWhenTheSessionHasNoCity(t *testing.T) {
 	}
 	if startsNewTrip("", "", nil) {
 		t.Fatal("nothing named, nothing to start")
+	}
+}
+
+// Review Focus #4 / review #7: "now add Porto and Seville" in a Lisbon session
+// is a multi-city trip that keeps Lisbon.
+func TestNewTripCity_AddingCitiesKeepsTheSessionCity(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Porto"}, {Name: "Seville"}}, Message: "add"})
+	l.cache.Set(tripCitiesCacheKey("now add Porto and Seville"), string(raw), time.Hour)
+	session := &locitypes.ChatSession{CityName: "Lisbon", SessionContext: locitypes.SessionContext{CityName: "Lisbon"}}
+
+	city, stops, ok := l.newTripCity(context.Background(), session, "now add Porto and Seville", locitypes.IntentModifyItinerary)
+	if !ok || city != "Lisbon" {
+		t.Fatalf("got %q/%v, want Lisbon/true", city, ok)
+	}
+	var names []string
+	for _, s := range stops {
+		names = append(names, s.CityName)
+	}
+	if strings.Join(names, ",") != "Lisbon,Porto,Seville" {
+		t.Fatalf("stops = %v, want Lisbon,Porto,Seville", names)
+	}
+}
+
+func TestNewTripCity_SessionCityPlusAnotherIsANewTrip(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Lisbon"}, {Name: "Porto"}}, Message: "then"})
+	l.cache.Set(tripCitiesCacheKey("Lisbon then Porto"), string(raw), time.Hour)
+	session := &locitypes.ChatSession{SessionContext: locitypes.SessionContext{CityName: "Lisbon"}}
+	_, stops, ok := l.newTripCity(context.Background(), session, "Lisbon then Porto", locitypes.IntentModifyItinerary)
+	if !ok || len(stops) != 2 {
+		t.Fatalf("naming the session city and another is a multi-city trip, got %v %v", stops, ok)
+	}
+}
+
+// Review #7: a question that names two places is a question, not two trips.
+func TestNewTripCity_AQuestionNamingTwoPlacesIsNotMultiCity(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	msg := "Is Sintra closer to Lisbon or Cascais?"
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Lisbon"}, {Name: "Cascais"}}, Message: msg})
+	l.cache.Set(tripCitiesCacheKey(msg), string(raw), time.Hour)
+	session := &locitypes.ChatSession{SessionContext: locitypes.SessionContext{CityName: "Lisbon"}}
+	if _, stops, _ := l.newTripCity(context.Background(), session, msg, locitypes.IntentAskQuestion); len(stops) != 0 {
+		t.Fatalf("a question must not start a multi-city trip, got %v", stops)
 	}
 }

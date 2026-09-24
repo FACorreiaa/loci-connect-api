@@ -365,6 +365,10 @@ type generationKeyInput struct {
 	// POITarget is how many places the answer was asked for. Only parts whose
 	// prompt renders it include it; see partUsesPOITarget.
 	POITarget int
+	// TripDays is how many days the answer plans. The same parts render it,
+	// and the cleaned query no longer carries it once the extractor strips
+	// durations, so without it "10 days" and "14 days" shared an answer.
+	TripDays int
 }
 
 // buildGenerationKey derives the cache key for one part of one answer:
@@ -402,7 +406,7 @@ func buildGenerationKey(in generationKeyInput) string {
 		components = append(components, in.UserID.String())
 	}
 	if partUsesPOITarget(in.Part) {
-		components = append(components, strconv.Itoa(in.POITarget))
+		components = append(components, strconv.Itoa(in.POITarget), "d"+strconv.Itoa(in.TripDays))
 	}
 	if partUsesLocation(in.Part) && in.HasLocation {
 		components = append(components,

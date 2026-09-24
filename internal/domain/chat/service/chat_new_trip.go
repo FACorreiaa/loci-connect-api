@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -22,19 +23,53 @@ import (
 //
 // Extraction is cached on the message text, so the new-trip flow this hands
 // off to pays nothing extra when it runs the same extraction again.
-func (l *ServiceImpl) newTripCity(ctx context.Context, session *locitypes.ChatSession, message string) (string, bool) {
-	extracted, _, err := l.extractCityCached(ctx, message)
+//
+// An edit that names two or more cities ("now add Porto and Seville") is a
+// multi-city trip, returned as stops that keep the session's own city first.
+// A question that names several places is still a question: it goes through
+// the single-city check on the first one, as it always did.
+func (l *ServiceImpl) newTripCity(
+	ctx context.Context,
+	session *locitypes.ChatSession,
+	message string,
+	intent locitypes.IntentType,
+) (string, []common.TripStopRequest, bool) {
+	tc, err := l.extractTripCitiesCached(ctx, message)
 	if err != nil {
 		// Not knowing is not a reason to fail the turn: the session continues
 		// as it always did.
 		l.logger.WarnContext(ctx, "could not read a city out of the follow-up; continuing the session",
 			slog.Any("error", err))
-		return "", false
+		return "", nil, false
 	}
+	if len(tc.Cities) >= 2 && intent != locitypes.IntentAskQuestion {
+		stops := tripStopsKeeping(sessionCityName(session), tc.Cities)
+		return stops[0].CityName, stops, true
+	}
+	extracted := tc.First()
 	if !startsNewTrip(sessionCityName(session), extracted, session.CurrentItinerary) {
-		return "", false
+		return "", nil, false
 	}
-	return strings.TrimSpace(extracted), true
+	return strings.TrimSpace(extracted), nil, true
+}
+
+// tripStopsKeeping is the cities an edit named, with the session's city first
+// when the edit did not name it: "add Porto and Seville" adds to Lisbon.
+func tripStopsKeeping(sessionCity string, cities []ExtractedCity) []common.TripStopRequest {
+	var stops []common.TripStopRequest
+	named := false
+	for _, c := range cities {
+		if strings.EqualFold(strings.TrimSpace(c.Name), strings.TrimSpace(sessionCity)) {
+			named = true
+		}
+	}
+	if !named && strings.TrimSpace(sessionCity) != "" {
+		stops = append(stops, common.TripStopRequest{CityName: strings.TrimSpace(sessionCity)})
+	}
+	for _, c := range cities {
+		stops = append(stops, common.TripStopRequest{CityName: c.Name, Nights: c.Days})
+	}
+	return stops
 }
 
 // sessionCityName is the city a session is about. SessionContext carries it

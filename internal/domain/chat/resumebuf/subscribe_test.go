@@ -186,3 +186,19 @@ func TestSlowFollowerIsClosedAndResumesWithoutGap(t *testing.T) {
 	require.False(t, open, "the run has ended, so the re-subscription is already closed")
 	require.Equal(t, want, got, "no gap, no duplicate, terminal last")
 }
+
+// A multi-city run's city error is not the end of the run: a reconnect must
+// keep following it.
+func TestSubscribeStopErrorKeepsRunLive(t *testing.T) {
+	b := New()
+	one := 1
+	b.Append("s1", locitypes.StreamEvent{Type: locitypes.EventTypeError, EventID: "e1", StopIndex: &one})
+	_, live, cancel, ok := b.Subscribe("s1", "")
+	defer cancel()
+	require.True(t, ok)
+	select {
+	case _, open := <-live:
+		require.True(t, open, "live channel must stay open after a stop-tagged error")
+	case <-time.After(100 * time.Millisecond):
+	}
+}

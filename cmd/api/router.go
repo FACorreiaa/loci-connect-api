@@ -241,6 +241,8 @@ var browserRequestHeaders = []string{
 	"X-Posthog-Distinct-Id",
 	"X-Posthog-Session-Id",
 	"X-Posthog-Window-Id",
+	// Loci-Features: what the client can render (chat_handler.go featuresHeader).
+	"Loci-Features",
 }
 
 // corsOptions builds the CORS policy for browser clients. Origins come from

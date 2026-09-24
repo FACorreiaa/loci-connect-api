@@ -91,6 +91,16 @@ type TripLeg struct {
 	BookingURL   *string
 }
 
+// TripCity is one city of a multi-city trip, in visiting order, linked to the
+// chat session its places were generated in. Empty for a single-city trip.
+type TripCity struct {
+	CityName   string
+	CityID     *uuid.UUID
+	SessionID  *uuid.UUID
+	Nights     int32
+	OrderIndex int32
+}
+
 // Trip is the full editable trip aggregate.
 type Trip struct {
 	ID          uuid.UUID
@@ -101,7 +111,9 @@ type Trip struct {
 	Constraints TripConstraint
 	Days        []TripDay
 	// Legs is travel between the trip's cities. Empty for a single-city trip.
-	Legs            []TripLeg
+	Legs []TripLeg
+	// Cities of a multi-city trip, in visiting order. Empty for one city.
+	Cities          []TripCity
 	Version         int64
 	SourceSessionID *string
 	IsPublic        bool
@@ -256,6 +268,18 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		return nil, err
 	}
 
+	// Cities, replace-all like days and legs — but only when some are sent.
+	// A client that predates multi-city trips sends none, and saving its edit
+	// must not cut the trip off from each city's results.
+	if len(t.Cities) > 0 {
+		if _, err := tx.Exec(ctx, `DELETE FROM trip_cities WHERE trip_id = $1`, t.ID); err != nil {
+			return nil, fmt.Errorf("clear cities: %w", err)
+		}
+		if err := insertCities(ctx, tx, t); err != nil {
+			return nil, err
+		}
+	}
+
 	// Append an immutable snapshot for merge-safe reconciliation.
 	snapshotJSON, err := json.Marshal(t)
 	if err != nil {
@@ -405,6 +429,9 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 	if err := r.loadLegs(ctx, t); err != nil {
 		return err
 	}
+	if err := r.loadCities(ctx, t); err != nil {
+		return err
+	}
 	dayRows, err := r.db.Query(ctx, `
 		SELECT id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day
 		FROM trip_days WHERE trip_id = $1 ORDER BY day_number`, t.ID)
@@ -488,4 +515,50 @@ func scanTrip(row rowScanner) (*Trip, error) {
 		}
 	}
 	return &t, nil
+}
+
+// insertCities writes a trip's cities in one batched round trip.
+func insertCities(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if len(t.Cities) == 0 {
+		return nil
+	}
+	b := &pgx.Batch{}
+	for i := range t.Cities {
+		c := &t.Cities[i]
+		b.Queue(`
+			INSERT INTO trip_cities (trip_id, order_index, city_name, city_id, session_id, nights)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			t.ID, c.OrderIndex, c.CityName, c.CityID, c.SessionID, c.Nights)
+	}
+	br := tx.SendBatch(ctx, b)
+	for range t.Cities {
+		if _, err := br.Exec(); err != nil {
+			_ = br.Close()
+			return fmt.Errorf("insert city: %w", err)
+		}
+	}
+	if err := br.Close(); err != nil {
+		return fmt.Errorf("insert city: %w", err)
+	}
+	return nil
+}
+
+// loadCities populates t.Cities in visiting order.
+func (r *repository) loadCities(ctx context.Context, t *Trip) error {
+	rows, err := r.db.Query(ctx, `
+		SELECT order_index, city_name, city_id, session_id, nights
+		FROM trip_cities WHERE trip_id = $1 ORDER BY order_index`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load cities: %w", err)
+	}
+	defer rows.Close()
+	t.Cities = nil
+	for rows.Next() {
+		var c TripCity
+		if err := rows.Scan(&c.OrderIndex, &c.CityName, &c.CityID, &c.SessionID, &c.Nights); err != nil {
+			return fmt.Errorf("scan city: %w", err)
+		}
+		t.Cities = append(t.Cities, c)
+	}
+	return rows.Err()
 }

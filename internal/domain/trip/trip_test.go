@@ -144,3 +144,22 @@ func TestSortStopsByOrder(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestTripCitiesRoundTripThroughProto(t *testing.T) {
+	sid := uuid.New()
+	in := &Trip{
+		ID: uuid.New(), UserID: uuid.New(), CityName: "Lisbon", Title: "Lisbon + Porto",
+		Cities: []TripCity{{CityName: "Lisbon", SessionID: &sid, Nights: 3, OrderIndex: 0}, {CityName: "Porto", Nights: 2, OrderIndex: 1}},
+	}
+	p := tripToProto(in)
+	if len(p.GetCities()) != 2 || p.GetCities()[0].GetSessionId() != sid.String() || p.GetCities()[1].GetNights() != 2 {
+		t.Fatalf("proto cities = %+v", p.GetCities())
+	}
+	back, err := tripFromProto(p, in.UserID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(back.Cities) != 2 || back.Cities[0].SessionID == nil || *back.Cities[0].SessionID != sid || back.Cities[1].SessionID != nil {
+		t.Fatalf("round trip lost cities: %+v", back.Cities)
+	}
+}

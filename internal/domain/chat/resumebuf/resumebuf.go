@@ -111,7 +111,7 @@ func (b *Buffer) Append(sessionID string, ev locitypes.StreamEvent) {
 }
 
 func isTerminal(ev locitypes.StreamEvent) bool {
-	return ev.Type == locitypes.EventTypeComplete || ev.Type == locitypes.EventTypeError
+	return ev.IsTerminal()
 }
 
 // Subscribe is Replay that keeps going: the backlog after afterEventID, then

@@ -76,7 +76,7 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 	// mentions. The hand-off happens before this message is written into the
 	// old session's history, so the old trip is left exactly as it was.
 	if intent == locitypes.IntentAskQuestion || intent == locitypes.IntentModifyItinerary {
-		if city, ok := l.newTripCity(ctx, session, message); ok {
+		if city, stops, ok := l.newTripCity(ctx, session, message, intent); ok {
 			l.logger.InfoContext(ctx, "Follow-up names another city; starting a new trip instead of continuing the session",
 				slog.String("session_id", sessionID.String()),
 				slog.String("session_city", sessionCityName(session)),
@@ -91,6 +91,12 @@ func (l *ServiceImpl) ContinueSessionStreamed(
 				Message:      message,
 				UserLocation: userLocation,
 				EventCh:      eventCh,
+				// Only the unary ContinueChat reaches here, and its
+				// collector folds every city in.
+				MultiCityCapable: true,
+				// An edit naming several cities, planned as a trip through
+				// them (the session's city kept first).
+				Stops: stops,
 			})
 		}
 	}
@@ -654,21 +660,53 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 	return fmt.Sprintf("I've added %s to your itinerary.", poiName), nil
 }
 
-// ProcessUnifiedChatMessageStream handles unified chat with optimized streaming based on Google GenAI patterns
-
+// ProcessUnifiedChatMessageStream answers one chat turn. A turn naming two or
+// more cities (or carrying stops from the builder) is a multi-city trip,
+// answered by running the single-city pipeline once per city; anything else
+// is exactly the single-city turn it always was.
 func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) error {
+	if !cc.StopRun {
+		route, err := l.planMultiCity(&cc)
+		if err != nil {
+			l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
+			return err
+		}
+		if route != nil {
+			return l.processMultiCity(cc, route)
+		}
+	}
+	_, err := l.runCity(cc)
+	return err
+}
+
+// runCity runs one city, through the test seam when one is set.
+func (l *ServiceImpl) runCity(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
+	if l.runCityFn != nil {
+		return l.runCityFn(cc)
+	}
+	return l.runSingleCity(cc)
+}
+
+// runSingleCity answers one chat turn about one city: the whole unified
+// pipeline, bounded to one city's budget. It returns the parsed answer so a
+// multi-city run can fold it into its parent trip.
+func (l *ServiceImpl) runSingleCity(cc common.ChatContext) (*locitypes.AiCityResponse, error) {
 	startTime := time.Now() // Track when processing starts
 	ctx, span := otel.Tracer("LlmInteractionService").Start(cc.Ctx, "ProcessUnifiedChatMessageStream", trace.WithAttributes(
 		attribute.String("message", cc.Message),
 	))
 	defer span.End()
+	// One city's budget, whatever the stream's: a multi-city stream runs
+	// several of these one after another.
+	ctx, cancel := context.WithTimeout(ctx, cityBudget)
+	defer cancel()
 	cc.Ctx = ctx // Update context with tracing
 
 	plan, err := l.prepareChatContext(&cc)
 	if err != nil {
 		span.RecordError(err)
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-		return err
+		return nil, err
 	}
 
 	// Give every LLM call this turn makes a shared PostHog AI Observability
@@ -692,7 +730,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 		if !hasContent {
 			span.RecordError(err)
 			l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-			return err
+			return nil, err
 		}
 		l.logger.WarnContext(ctx, "Some streaming workers failed; continuing with partial or cache-hydrated responses",
 			slog.Any("error", err))
@@ -703,13 +741,13 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	if err != nil {
 		span.RecordError(err)
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-		return err
+		return nil, err
 	}
 
 	if err := l.persistResults(&cc, plan, data, rawResponses, startTime); err != nil {
 		span.RecordError(err)
 		l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)
-		return err
+		return nil, err
 	}
 
 	l.sendCompletionEvent(&cc)
@@ -718,7 +756,7 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	l.logger.InfoContext(ctx, "Completion processing finished, event channel will be closed by handler")
 
 	span.SetStatus(codes.Ok, "Unified chat stream processed successfully")
-	return nil
+	return data, nil
 }
 
 // streamResult is what one streamed part produced: the full text, and what

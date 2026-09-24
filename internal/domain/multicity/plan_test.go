@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/geo"
 )
 
 // Real coordinates, so the distances and drive times in these tests are the ones
@@ -271,5 +273,66 @@ func TestPlan_WarnsWhenTravelDominates(t *testing.T) {
 	}
 	if got.TravelShare > 0.25 && !warned {
 		t.Errorf("travel share %.2f should have produced a warning, got %v", got.TravelShare, got.Warnings)
+	}
+}
+
+var rome = City{ID: "rome", Name: "Rome", Lat: 41.90, Lon: 12.50, Score: 88, POICount: 40}
+
+func TestModeFor(t *testing.T) {
+	cases := []struct {
+		km   float64
+		mode string
+	}{{40, "drive"}, {99, "drive"}, {100, "train"}, {313, "train"}, {700, "train"}, {701, "flight"}, {1860, "flight"}}
+	for _, c := range cases {
+		mode, mins := ModeFor(c.km)
+		if mode != c.mode {
+			t.Errorf("ModeFor(%v) mode = %q, want %q", c.km, mode, c.mode)
+		}
+		if mins <= 0 {
+			t.Errorf("ModeFor(%v) mins = %d, want > 0", c.km, mins)
+		}
+	}
+	// A flight to Rome must be faster door-to-door than driving it.
+	_, fly := ModeFor(1860)
+	if drive := geo.DriveMins(1860); fly >= drive {
+		t.Errorf("flight %d min should beat drive %d min", fly, drive)
+	}
+}
+
+// Without MultiModal, Lisbon→Rome is a 23-hour drive and blows a weekend's
+// travel budget; with it,
+// it is a flight and the city stays.
+func TestPlan_MultiModalKeepsFarCity(t *testing.T) {
+	start, end := window(2 * 24)
+	in := Input{Candidates: []City{lisbon, rome}, Start: start, End: end}
+
+	if got := Plan(in); len(got.Cities) != 1 {
+		t.Fatalf("drive-only: expected Rome dropped, got %v", cityNames(got.Cities))
+	}
+	in.MultiModal = true
+	got := Plan(in)
+	if len(got.Cities) != 2 {
+		t.Fatalf("multi-modal: expected both cities, got %v (dropped %v)", cityNames(got.Cities), got.Dropped)
+	}
+	if len(got.Legs) != 1 || got.Legs[0].Mode != "flight" {
+		t.Fatalf("expected one flight leg and no outbound leg, got %+v", got.Legs)
+	}
+	if !strings.Contains(got.Outline, "travel") || strings.Contains(got.Outline, "driving") {
+		t.Errorf("outline should talk about travel, not driving: %q", got.Outline)
+	}
+}
+
+// No origin: ordering starts at the first city named, and there is no leg
+// from nowhere.
+func TestPlan_NoOriginStartsAtFirstCandidate(t *testing.T) {
+	start, end := window(6 * 24)
+	got := Plan(Input{Candidates: []City{porto, lisbon, coimbra}, Start: start, End: end, MultiModal: true})
+	if names := cityNames(got.Cities); len(names) != 3 || names[0] != "Porto" {
+		t.Fatalf("expected route to start at Porto, got %v", names)
+	}
+	for _, l := range got.Legs {
+		if l.FromName == "" {
+			t.Fatalf("unexpected outbound leg from no origin: %+v", l)
+		}
 	}
 }

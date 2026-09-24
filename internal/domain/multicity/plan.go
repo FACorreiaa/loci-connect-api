@@ -28,6 +28,33 @@ const travelShareCeiling = 0.35
 // the route. Below this you arrive, look around, and leave.
 const minHoursPerCity = 10
 
+// ModeFor picks how a traveller would plausibly cover a straight-line
+// distance, and roughly how long it takes door to door. It is an estimate for
+// planning, not a schedule: the UI says "≈".
+func ModeFor(distanceKm float64) (mode string, mins int) {
+	switch {
+	case distanceKm < 100:
+		return "drive", geo.DriveMins(distanceKm)
+	case distanceKm <= 700:
+		// ~100 km/h average including stops, plus getting to and from stations.
+		return "train", int(distanceKm/100*60) + 30
+	default:
+		// ~700 km/h in the air, plus three hours of airports.
+		return "flight", int(distanceKm/700*60) + 180
+	}
+}
+
+// legTravel is the mode and minutes for one leg under this input's rules.
+func (in Input) legTravel(km float64) (string, int) {
+	if in.MultiModal {
+		return ModeFor(km)
+	}
+	return "drive", geo.DriveMins(km)
+}
+
+// hasOrigin reports whether the trip starts somewhere other than its first city.
+func (in Input) hasOrigin() bool { return in.OriginName != "" }
+
 // City is a candidate destination.
 type City struct {
 	ID   string
@@ -90,6 +117,10 @@ type Input struct {
 	ReturnToOrigin bool
 	// MaxCities caps the route length. Zero means "as many as fit".
 	MaxCities int
+	// MultiModal lets legs be trains and flights, picked by distance. Off,
+	// every leg is a drive — the weekend comparison's original assumption,
+	// kept so its answers do not change.
+	MultiModal bool
 }
 
 // Route is the resulting plan: which cities, in what order, on which days.
@@ -143,6 +174,13 @@ func Plan(in Input) Route {
 		return out
 	}
 
+	// No origin: the trip starts in the first city the traveller named, so
+	// order from there and charge no outbound leg.
+	if !in.hasOrigin() {
+		in.OriginLat, in.OriginLon = in.Candidates[0].Lat, in.Candidates[0].Lon
+		in.ReturnToOrigin = false
+	}
+
 	ordered := routeOrder(in.OriginLat, in.OriginLon, in.Candidates)
 
 	budgetMins := int(windowHours * travelShareCeiling * 60)
@@ -161,10 +199,11 @@ func Plan(in Input) Route {
 			continue
 		}
 
-		legMins := geo.DriveMins(geo.HaversineKm(curLat, curLon, c.Lat, c.Lon))
+		_, legMins := in.legTravel(geo.HaversineKm(curLat, curLon, c.Lat, c.Lon))
 		prospective := travelMins + legMins
 		if in.ReturnToOrigin {
-			prospective += geo.DriveMins(geo.HaversineKm(c.Lat, c.Lon, in.OriginLat, in.OriginLon))
+			_, back := in.legTravel(geo.HaversineKm(c.Lat, c.Lon, in.OriginLat, in.OriginLon))
+			prospective += back
 		}
 
 		// Would adding this city blow the travel budget?
@@ -196,7 +235,8 @@ func Plan(in Input) Route {
 	}
 
 	if in.ReturnToOrigin {
-		travelMins += geo.DriveMins(geo.HaversineKm(curLat, curLon, in.OriginLat, in.OriginLon))
+		_, back := in.legTravel(geo.HaversineKm(curLat, curLon, in.OriginLat, in.OriginLon))
+		travelMins += back
 	}
 
 	out.Feasible = true
@@ -206,7 +246,7 @@ func Plan(in Input) Route {
 	out.Days = allocateDays(chosen, totalDays, in.Start)
 	out.Legs = buildLegs(in, chosen, out.Days)
 	out.Warnings = warnings(chosen, out.Days, out.TravelShare)
-	out.Outline = outline(chosen, out.Days, travelMins)
+	out.Outline = outline(chosen, out.Days, travelMins, in.MultiModal)
 
 	return out
 }
@@ -289,17 +329,21 @@ func buildLegs(in Input, cities []City, days []DayPlan) []Leg {
 
 	leg := func(fromName string, fromLat, fromLon float64, toName string, toLat, toLon float64, afterDay int) Leg {
 		km := geo.HaversineKm(fromLat, fromLon, toLat, toLon)
+		mode, mins := in.legTravel(km)
 		return Leg{
 			FromName: fromName, FromLat: fromLat, FromLon: fromLon,
 			ToName: toName, ToLat: toLat, ToLon: toLon,
-			DistanceKm: km, DurationMins: geo.DriveMins(km),
-			AfterDay: afterDay, Mode: "drive",
+			DistanceKm: km, DurationMins: mins,
+			AfterDay: afterDay, Mode: mode,
 		}
 	}
 
-	// Outbound: origin to the first city, before day 1.
-	legs = append(legs, leg(in.OriginName, in.OriginLat, in.OriginLon,
-		cities[0].Name, cities[0].Lat, cities[0].Lon, 0))
+	// Outbound: origin to the first city, before day 1. A trip that starts in
+	// its first city has none.
+	if in.hasOrigin() {
+		legs = append(legs, leg(in.OriginName, in.OriginLat, in.OriginLon,
+			cities[0].Name, cities[0].Lat, cities[0].Lon, 0))
+	}
 
 	// Between cities: the move happens at the end of the last day spent in the
 	// previous city.
@@ -353,7 +397,7 @@ func warnings(cities []City, days []DayPlan, travelShare float64) []string {
 	return w
 }
 
-func outline(cities []City, days []DayPlan, travelMins int) string {
+func outline(cities []City, days []DayPlan, travelMins int, multiModal bool) string {
 	counts := map[string]int{}
 	for _, d := range days {
 		counts[d.CityName]++
@@ -368,6 +412,9 @@ func outline(cities []City, days []DayPlan, travelMins int) string {
 	joined := parts[0]
 	for i := 1; i < len(parts); i++ {
 		joined += " → " + parts[i]
+	}
+	if multiModal {
+		return fmt.Sprintf("%s · ≈%s travel in total", joined, humanMins(travelMins))
 	}
 	return fmt.Sprintf("%s · %s driving in total", joined, humanMins(travelMins))
 }

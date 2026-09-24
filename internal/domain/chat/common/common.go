@@ -221,6 +221,14 @@ func UniqueStringSlice(slice []string) []string {
 	return result
 }
 
+// TripStopRequest is one city of a multi-city request.
+type TripStopRequest struct {
+	CityName string
+	Nights   int
+	CityID   string
+}
+
+// ChatContext carries one chat turn through the pipeline.
 type ChatContext struct {
 	// Context for cancellation and timeouts
 	Ctx context.Context
@@ -241,6 +249,34 @@ type ChatContext struct {
 	ResumeToken string
 	// TripID binds this stream to a persisted TripDraft (Slice 2). Optional.
 	TripID uuid.UUID
+
+	// Stops is a multi-city trip from the stop builder (ChatRequest.stops).
+	// Two or more skip city extraction.
+	Stops []TripStopRequest
+	// SuggestOrder lets the planner reorder Stops.
+	SuggestOrder bool
+	// MultiCityCapable says the caller renders multi-city streams (ROUTE and
+	// stop_index). Free text naming several cities only becomes a multi-city
+	// trip for such a caller; an older one keeps its single-city answer.
+	// Stops from the builder imply it.
+	MultiCityCapable bool
+	// CityFixed keeps CityName as set: a request that named several cities
+	// and kept one is about that one, whatever the extractor reads first.
+	CityFixed bool
+
+	// The fields below are set by the multi-city orchestrator on the child run
+	// it makes for each city; a request never sets them.
+
+	// StopRun marks a child run: it never dispatches to multi-city again.
+	StopRun bool
+	// PresetSessionID is the session id the child run creates (the route
+	// named it before the city started generating).
+	PresetSessionID uuid.UUID
+	// PresetTripDays replaces the day count read from the message.
+	PresetTripDays int
+	// SuppressTripSave stops the child saving its own Trip: the parent trip
+	// holds every city.
+	SuppressTripSave bool
 
 	// Derived/Generated fields populated during preparation
 	SessionID       uuid.UUID

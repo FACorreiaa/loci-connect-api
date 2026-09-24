@@ -52,6 +52,10 @@ func (t *Tracker) Observe(ev locitypes.StreamEvent) {
 	case locitypes.EventTypeComplete:
 		t.finish(StatusDone, "")
 	case locitypes.EventTypeError:
+		if ev.StopIndex != nil {
+			// One city of a multi-city trip failed; the run goes on.
+			return
+		}
 		code := string(ev.ErrorCode)
 		if code == "" {
 			code = "internal"

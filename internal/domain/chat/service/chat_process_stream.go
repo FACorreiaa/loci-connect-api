@@ -40,30 +40,39 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 	// Assuming "4 days" survives that is a guess, and it is the kind of guess
 	// that fails quietly: the request still works, it is just sized for two
 	// days.
-	span := tripspan.Parse(cc.Message)
-	cc.TripDays, cc.TripDaysSource = span.Days, string(span.Source)
-	observability.RecordTripDurationParse(cc.TripDaysSource, cc.TripDays)
-	if !span.Parsed() {
-		// The raw text behind these is the copy for a future "did you mean 4
-		// days?" prompt, so it is logged rather than merely counted.
-		l.logger.InfoContext(ctx, "no trip duration in the request; assuming a short sample",
-			slog.String("message", cc.Message),
-			slog.Int("assumed_days", cc.TripDays))
+	// One city of a multi-city trip is sized by the route, which already read
+	// the request.
+	if cc.PresetTripDays > 0 {
+		cc.TripDays, cc.TripDaysSource = cc.PresetTripDays, "multicity"
+	} else {
+		span := tripspan.Parse(cc.Message)
+		cc.TripDays, cc.TripDaysSource = span.Days, string(span.Source)
+		observability.RecordTripDurationParse(cc.TripDaysSource, cc.TripDays)
+		if !span.Parsed() {
+			// The raw text behind these is the copy for a future "did you mean 4
+			// days?" prompt, so it is logged rather than merely counted.
+			l.logger.InfoContext(ctx, "no trip duration in the request; assuming a short sample",
+				slog.String("message", cc.Message),
+				slog.Int("assumed_days", cc.TripDays))
+		}
 	}
 
-	// 1. Extract City
-	extractedCity, cleanedMessage, err := l.extractCityCached(ctx, cc.Message)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse message: %w", err)
+	// 1. Extract City. A multi-city child run already has its city and its
+	// cleaned message from the route.
+	if !cc.StopRun {
+		extractedCity, cleanedMessage, err := l.extractCityCached(ctx, cc.Message)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse message: %w", err)
+		}
+		if extractedCity != "" && !cc.CityFixed {
+			cc.CityName = extractedCity
+		}
+		cc.Message = cleanedMessage // Update normalized message
 	}
-	if extractedCity != "" {
-		cc.CityName = extractedCity
-	}
-	cc.Message = cleanedMessage // Update normalized message
 
 	// 2. Detect Domain
 	domainDetector := &locitypes.DomainDetector{}
-	cc.Domain = domainDetector.DetectDomain(ctx, cleanedMessage)
+	cc.Domain = domainDetector.DetectDomain(ctx, cc.Message)
 
 	// 3. Fetch User Data & Preferences
 	interests, searchProfile, tags, err := l.FetchUserData(ctx, cc.UserID, cc.ProfileID)
@@ -146,7 +155,10 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 	}
 
 	if cc.SessionID == uuid.Nil {
-		cc.SessionID = uuid.New()
+		cc.SessionID = cc.PresetSessionID
+		if cc.SessionID == uuid.Nil {
+			cc.SessionID = uuid.New()
+		}
 		session := locitypes.ChatSession{
 			ID:        cc.SessionID,
 			UserID:    cc.UserID,
@@ -222,27 +234,13 @@ func (l *ServiceImpl) assemblePacket(cc *common.ChatContext) {
 // same message from occasionally producing a different cleaned message and so
 // a different generation key.
 func (l *ServiceImpl) extractCityCached(ctx context.Context, message string) (cityName, cleanedMessage string, err error) {
-	type extraction struct {
-		City    string `json:"city"`
-		Message string `json:"message"`
-	}
-
-	key := extractionCacheKey(message)
-	if raw, ok := l.cachedText(key); ok {
-		var e extraction
-		if json.Unmarshal([]byte(raw), &e) == nil {
-			return e.City, e.Message, nil
-		}
-	}
-
-	cityName, cleanedMessage, err = l.extractCityFromMessage(ctx, message)
+	// The single-city view of extractTripCitiesCached, so both share one
+	// provider call and one cache entry.
+	tc, err := l.extractTripCitiesCached(ctx, message)
 	if err != nil {
 		return "", "", err
 	}
-	if raw, mErr := json.Marshal(extraction{City: cityName, Message: cleanedMessage}); mErr == nil && l.cache != nil {
-		l.cache.Set(key, string(raw), extractionCacheTTL)
-	}
-	return cityName, cleanedMessage, nil
+	return tc.First(), tc.Message, nil
 }
 
 // extractionCacheTTL is how long a parsed message stays parsed. Long, because
@@ -704,7 +702,7 @@ func (l *ServiceImpl) persistResults(
 	// in /trips. Best-effort for itinerary/general domains — never fail the stream
 	// on a trip-save error. Persisted ID is stashed on cc.TripID so the completion
 	// event can deep-link the client to /trips/:id.
-	if l.tripRepo != nil && (cc.Domain == locitypes.DomainItinerary || cc.Domain == locitypes.DomainGeneral) {
+	if l.tripRepo != nil && !cc.SuppressTripSave && (cc.Domain == locitypes.DomainItinerary || cc.Domain == locitypes.DomainGeneral) {
 		if tr := buildTripFromCityResponse(cc, data, recommendationRunID); tr != nil {
 			saved, terr := l.tripRepo.SaveTrip(storageCtx, tr, 0)
 			if terr != nil {
