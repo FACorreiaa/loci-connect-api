@@ -64,7 +64,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse message: %w", err)
 		}
-		if extractedCity != "" {
+		if extractedCity != "" && !cc.CityFixed {
 			cc.CityName = extractedCity
 		}
 		cc.Message = cleanedMessage // Update normalized message

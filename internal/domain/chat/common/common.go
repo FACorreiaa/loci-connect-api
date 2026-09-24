@@ -255,6 +255,9 @@ type ChatContext struct {
 	Stops []TripStopRequest
 	// SuggestOrder lets the planner reorder Stops.
 	SuggestOrder bool
+	// CityFixed keeps CityName as set: a request that named several cities
+	// and kept one is about that one, whatever the extractor reads first.
+	CityFixed bool
 
 	// The fields below are set by the multi-city orchestrator on the child run
 	// it makes for each city; a request never sets them.

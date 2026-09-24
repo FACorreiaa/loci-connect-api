@@ -278,3 +278,20 @@ func TestProcessMultiCity_SilentCityFailureIsReported(t *testing.T) {
 		t.Fatal("Porto's failure must reach the client as a stop-tagged ERROR")
 	}
 }
+
+// Review #3: "Atlantis and Lisbon" is a single-city trip to Lisbon — not to
+// Atlantis because it was named first — and the city is not re-extracted.
+func TestProcessUnified_SurvivorIsTheCity(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	l.cityResolver = iberia
+	var got []common.ChatContext
+	l.runCityFn = func(cc common.ChatContext) (*locitypes.AiCityResponse, error) { got = append(got, cc); return nil, nil }
+	msg := "Atlantis and Lisbon for a weekend"
+	raw, _ := json.Marshal(TripCities{Cities: []ExtractedCity{{Name: "Atlantis"}, {Name: "Lisbon"}}, Message: "weekend"})
+	l.cache.Set(tripCitiesCacheKey(msg), string(raw), time.Hour)
+	events := make(chan locitypes.StreamEvent, 10)
+	_ = l.ProcessUnifiedChatMessageStream(common.ChatContext{Ctx: context.Background(), Message: msg, EventCh: events})
+	if len(got) != 1 || got[0].CityName != "Lisbon" || !got[0].CityFixed {
+		t.Fatalf("expected one run for Lisbon with the city fixed, got %+v", got)
+	}
+}

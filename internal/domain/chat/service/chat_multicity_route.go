@@ -54,6 +54,11 @@ type multiCityRoute struct {
 	Message string
 }
 
+// IsMulti reports whether the route really spans several cities. A route of
+// one is a request that named several but kept one: it is planned as that
+// single city, and Dropped says why the others went.
+func (r *multiCityRoute) IsMulti() bool { return r != nil && len(r.Stops) >= 2 }
+
 // routeRequest is what the traveller asked for, however they asked it.
 type routeRequest struct {
 	Cities       []ExtractedCity
@@ -65,14 +70,16 @@ type routeRequest struct {
 	Message      string
 }
 
-// buildMultiCityRoute resolves the cities and lays out the trip. It returns a
-// nil route and no error when fewer than two real cities remain: that request
-// is an ordinary single-city one and takes today's path.
+// buildMultiCityRoute resolves the cities and lays out the trip. With fewer
+// than two real cities it returns a route of one — the survivor, planned as a
+// single-city trip — and a nil route when the geocoder itself failed, so the
+// request takes today's single-city path unchanged.
 func buildMultiCityRoute(ctx context.Context, r CityResolver, req routeRequest) (*multiCityRoute, error) {
 	out := &multiCityRoute{Message: req.Message}
 
 	var resolved []multicity.City
 	nights := map[string]int{}
+	lookupFailed := false
 	for _, c := range req.Cities {
 		if len(resolved) == maxTripCities {
 			out.Dropped = append(out.Dropped, locitypes.StreamDroppedStop{
@@ -85,6 +92,12 @@ func buildMultiCityRoute(ctx context.Context, r CityResolver, req routeRequest) 
 			q.NearLat, q.NearLon = req.Origin.UserLat, req.Origin.UserLon
 		}
 		got, err := r.Resolve(ctx, q)
+		if err != nil && !errors.Is(err, city.ErrCityUnresolvable) {
+			// Our geocoder failing says nothing about the city.
+			lookupFailed = true
+			out.Dropped = append(out.Dropped, locitypes.StreamDroppedStop{CityName: c.Name, Reason: "we couldn't look this city up just now"})
+			continue
+		}
 		if err != nil || got == nil {
 			out.Dropped = append(out.Dropped, locitypes.StreamDroppedStop{CityName: c.Name, Reason: "we couldn't find this city"})
 			continue
@@ -108,9 +121,12 @@ func buildMultiCityRoute(ctx context.Context, r CityResolver, req routeRequest) 
 
 	switch len(resolved) {
 	case 0:
+		if lookupFailed {
+			return nil, nil
+		}
 		return nil, ErrNoCitiesResolved
 	case 1:
-		return nil, nil
+		return out.single(resolved[0]), nil
 	}
 
 	allNights := true
@@ -148,9 +164,12 @@ func buildMultiCityRoute(ctx context.Context, r CityResolver, req routeRequest) 
 		}
 	}
 
-	if len(route.Cities) < 2 {
-		// The planner kept one city: still a single-city trip.
-		return nil, nil
+	if len(route.Cities) == 1 {
+		// The planner kept one city: a single-city trip to it.
+		return out.single(route.Cities[0]), nil
+	}
+	if len(route.Cities) == 0 {
+		return out.single(resolved[0]), nil
 	}
 
 	out.Route = route
@@ -168,4 +187,14 @@ func buildMultiCityRoute(ctx context.Context, r CityResolver, req routeRequest) 
 		out.Stops = append(out.Stops, s)
 	}
 	return out, nil
+}
+
+// single makes this a route of one city: the request is planned as that city.
+func (r *multiCityRoute) single(c multicity.City) *multiCityRoute {
+	s := multiCityStop{CityName: c.Name, Lat: c.Lat, Lon: c.Lon}
+	if id, err := uuid.Parse(c.ID); err == nil {
+		s.CityID = id
+	}
+	r.Stops = []multiCityStop{s}
+	return r
 }

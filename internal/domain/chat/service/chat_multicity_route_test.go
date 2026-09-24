@@ -93,12 +93,37 @@ func TestBuildRoute_UnresolvableIsDroppedNotFatal(t *testing.T) {
 	}
 }
 
-func TestBuildRoute_OneRealCityFallsBack(t *testing.T) {
+// Review #3: one real city left is a single-city trip *to that city*, even
+// when the unfindable one was named first, and the traveller hears why.
+func TestBuildRoute_OneRealCityIsTheSurvivor(t *testing.T) {
 	r, err := buildMultiCityRoute(context.Background(), iberia, routeRequest{
-		Cities: []ExtractedCity{{Name: "Lisbon"}, {Name: "Atlantis"}}, Message: "trip", TotalDays: 3,
+		Cities: []ExtractedCity{{Name: "Atlantis"}, {Name: "Lisbon"}}, Message: "trip", TotalDays: 3,
+	})
+	if err != nil || r == nil {
+		t.Fatalf("route = %v, err = %v", r, err)
+	}
+	if r.IsMulti() || len(r.Stops) != 1 || r.Stops[0].CityName != "Lisbon" {
+		t.Fatalf("expected the single survivor Lisbon, got %+v", r.Stops)
+	}
+	if len(r.Dropped) != 1 || r.Dropped[0].CityName != "Atlantis" {
+		t.Fatalf("dropped = %+v", r.Dropped)
+	}
+}
+
+type downResolver struct{}
+
+func (downResolver) Resolve(context.Context, city.ResolveQuery) (*city.Resolved, error) {
+	return nil, errors.New("geocoder: connection refused")
+}
+
+// Review #4: the geocoder being down is not the traveller's cities being
+// wrong — the request falls back to today's single-city path.
+func TestBuildRoute_GeocoderDownFallsBack(t *testing.T) {
+	r, err := buildMultiCityRoute(context.Background(), downResolver{}, routeRequest{
+		Cities: []ExtractedCity{{Name: "Lisbon"}, {Name: "Porto"}}, Message: "trip", TotalDays: 3,
 	})
 	if err != nil || r != nil {
-		t.Fatalf("expected nil route (single-city fallback), got %v err %v", r, err)
+		t.Fatalf("expected a quiet fallback, got %v err %v", r, err)
 	}
 }
 

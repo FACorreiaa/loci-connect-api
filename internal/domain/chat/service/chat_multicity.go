@@ -81,10 +81,17 @@ func (l *ServiceImpl) planMultiCity(cc *common.ChatContext) (*multiCityRoute, er
 	if err != nil {
 		return nil, err
 	}
-	if route == nil && len(cc.Stops) >= 2 && cc.CityName == "" {
-		// The builder asked for several cities and only one survived: plan it
-		// as that city rather than re-extracting from free text.
-		cc.CityName = cc.Stops[0].CityName
+	if route != nil && !route.IsMulti() && len(route.Stops) == 1 {
+		// Several cities named, one kept: plan that one, and say why the
+		// others went.
+		cc.CityName, cc.CityFixed = route.Stops[0].CityName, true
+		for _, d := range route.Dropped {
+			l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
+				Type:    locitypes.EventTypeProgress,
+				Message: d.CityName + ": " + d.Reason,
+			}, 3)
+		}
+		return nil, nil
 	}
 	return route, nil
 }
