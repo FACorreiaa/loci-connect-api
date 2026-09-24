@@ -118,7 +118,7 @@ func (l *ServiceImpl) HandlePersonalisedPOIs(ctx context.Context, pois []locityp
 		return pois, nil
 	}
 
-	if err := l.poiRepo.SaveItineraryPOIs(ctx, itineraryID, pois); err != nil {
+	if err := l.poiRepo.SaveItineraryPOIs(ctx, itineraryID, withCity(pois, cityID)); err != nil {
 		return nil, fmt.Errorf("failed to save itinerary POIs: %w", err)
 	}
 
@@ -252,3 +252,17 @@ func (l *ServiceImpl) parseCityDataFromResponse(_ context.Context, responseConte
 }
 
 // streamWorkerWithResponseAndCache handles streaming for a single worker with response capture and cache support.
+
+// withCity is pois with the turn's city on every place that names none. The
+// model's itinerary JSON carries no city id, and points_of_interest requires
+// a real one (city_id_fkey). A copy, so the caller's slice is untouched.
+func withCity(pois []locitypes.POIDetailedInfo, cityID uuid.UUID) []locitypes.POIDetailedInfo {
+	out := make([]locitypes.POIDetailedInfo, len(pois))
+	for i, p := range pois {
+		if p.CityID == uuid.Nil {
+			p.CityID = cityID
+		}
+		out[i] = p
+	}
+	return out
+}
