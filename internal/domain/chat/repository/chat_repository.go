@@ -1979,8 +1979,8 @@ func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetai
 		err = tx.QueryRow(ctx, createPoiQuery,
 			POIDetailedInfo.Name,
 			cityID,
+			POIDetailedInfo.Longitude, // lon, lat for ST_MakePoint
 			POIDetailedInfo.Latitude,
-			POIDetailedInfo.Longitude,
 			POIDetailedInfo.Category,
 			POIDetailedInfo.DescriptionPOI, // Assumes locitypes.POIDetailedInfo has DescriptionPOI from JSON
 		).Scan(&poiDBID)
