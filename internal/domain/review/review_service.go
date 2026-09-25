@@ -12,6 +12,9 @@ import (
 // ErrInvalidReview signals a validation failure on review input.
 var ErrInvalidReview = errors.New("invalid review")
 
+// ErrOwnReview is returned when a user votes on their own review.
+var ErrOwnReview = errors.New("cannot vote on your own review")
+
 // CreateReviewInput is the validated input for creating a review.
 type CreateReviewInput struct {
 	UserID    uuid.UUID
@@ -44,6 +47,7 @@ type Service interface {
 	DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error
 	LikeReview(ctx context.Context, userID, reviewID uuid.UUID, isLike bool) (int, error)
 	GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error)
+	GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error)
 }
 
 type service struct {
@@ -105,7 +109,16 @@ func (s *service) DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) 
 	return s.repo.Delete(ctx, reviewID, userID)
 }
 
+// LikeReview records a helpful vote. Authors cannot vote on their own
+// review: the count would be self-inflated and both clients hide the button.
 func (s *service) LikeReview(ctx context.Context, userID, reviewID uuid.UUID, isLike bool) (int, error) {
+	r, err := s.repo.GetByID(ctx, reviewID)
+	if err != nil {
+		return 0, err
+	}
+	if r.UserID == userID {
+		return 0, ErrOwnReview
+	}
 	return s.repo.SetHelpful(ctx, userID, reviewID, isLike)
 }
 
@@ -128,4 +141,8 @@ func (s *service) UpdateReview(ctx context.Context, in UpdateReviewInput) (*Revi
 
 func (s *service) GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error) {
 	return s.repo.Statistics(ctx, poiID)
+}
+
+func (s *service) GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error) {
+	return s.repo.UserStatistics(ctx, userID)
 }

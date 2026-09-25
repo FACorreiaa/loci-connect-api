@@ -30,6 +30,18 @@ type fakeService struct {
 	likedWith *bool
 	err       error
 	stats     *Statistics
+	userStats *UserStatistics
+}
+
+func (f *fakeService) GetUserStatistics(_ context.Context, userID uuid.UUID) (*UserStatistics, error) {
+	f.statsFor = userID
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.userStats == nil {
+		return &UserStatistics{}, nil // the repository never returns nil without an error
+	}
+	return f.userStats, nil
 }
 
 func (f *fakeService) CreateReview(_ context.Context, in CreateReviewInput) (*Review, error) {
@@ -268,4 +280,38 @@ func TestToProtoReview_FillsContentAndMemberSince(t *testing.T) {
 	require.NotNil(t, p.Reviewer.MemberSince)
 	assert.True(t, since.Equal(p.Reviewer.MemberSince.AsTime()))
 	assert.InDelta(t, 4.0, p.Rating, 0)
+}
+
+// Marking your own review helpful is refused, and the refusal is a
+// permission problem the client can word, not an internal error.
+func TestLikeReview_OwnReviewIsPermissionDenied(t *testing.T) {
+	h := newTestHandler(&fakeService{err: ErrOwnReview})
+	_, err := h.LikeReview(authed(uuid.New()), connect.NewRequest(&reviewv1.LikeReviewRequest{
+		ReviewId: uuid.NewString(), IsLike: true,
+	}))
+	assert.Equal(t, connect.CodePermissionDenied, codeOf(t, err))
+}
+
+// My reviews carries the summary the clients used to compute from the rows.
+func TestGetUserReviews_FillsStatistics(t *testing.T) {
+	caller := uuid.New()
+	svc := &fakeService{userStats: &UserStatistics{TotalReviews: 7, AverageRatingGiven: 4.3, HelpfulVotesReceived: 12}}
+	h := newTestHandler(svc)
+	res, err := h.GetUserReviews(authed(caller), connect.NewRequest(&reviewv1.GetUserReviewsRequest{}))
+	require.NoError(t, err)
+	require.NotNil(t, res.Msg.Statistics)
+	assert.EqualValues(t, 7, res.Msg.Statistics.TotalReviews)
+	assert.InDelta(t, 4.3, res.Msg.Statistics.AverageRatingGiven, 0.001)
+	assert.EqualValues(t, 12, res.Msg.Statistics.HelpfulVotesReceived)
+	assert.Equal(t, "guide", res.Msg.Statistics.ReviewerLevel)
+	assert.Equal(t, caller, svc.statsFor)
+}
+
+func TestReviewerLevel(t *testing.T) {
+	assert.Equal(t, "new", reviewerLevel(0))
+	assert.Equal(t, "explorer", reviewerLevel(1))
+	assert.Equal(t, "explorer", reviewerLevel(4))
+	assert.Equal(t, "guide", reviewerLevel(5))
+	assert.Equal(t, "guide", reviewerLevel(19))
+	assert.Equal(t, "expert", reviewerLevel(20))
 }

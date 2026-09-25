@@ -49,6 +49,8 @@ func (h *Handler) toConnectError(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, ErrAlreadyExists):
 		return connect.NewError(connect.CodeAlreadyExists, err)
+	case errors.Is(err, ErrOwnReview):
+		return connect.NewError(connect.CodePermissionDenied, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
@@ -135,10 +137,35 @@ func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[revie
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	st, err := h.service.GetUserStatistics(ctx, userID)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
 	return connect.NewResponse(&reviewv1.GetUserReviewsResponse{
 		Reviews:    toProtoReviews(list),
 		Pagination: pageMeta(total, limit, offset),
+		Statistics: &reviewv1.UserReviewStatistics{
+			TotalReviews:         int32(st.TotalReviews), //nolint:gosec // bounded by the row count
+			AverageRatingGiven:   st.AverageRatingGiven,
+			HelpfulVotesReceived: int32(st.HelpfulVotesReceived), //nolint:gosec // bounded by the vote count
+			ReviewerLevel:        reviewerLevel(st.TotalReviews),
+		},
 	}), nil
+}
+
+// reviewerLevel names the tier My reviews shows for a review count. The
+// thresholds are the ones the web client used before the server filled this.
+func reviewerLevel(total int) string {
+	switch {
+	case total >= 20:
+		return "expert"
+	case total >= 5:
+		return "guide"
+	case total >= 1:
+		return "explorer"
+	default:
+		return "new"
+	}
 }
 
 func (h *Handler) GetRecentReviews(ctx context.Context, req *connect.Request[reviewv1.GetRecentReviewsRequest]) (*connect.Response[reviewv1.GetRecentReviewsResponse], error) {
