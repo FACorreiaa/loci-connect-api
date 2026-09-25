@@ -73,6 +73,13 @@ type Statistics struct {
 	LastReviewAt *time.Time
 }
 
+// UserStatistics summarises one user's published reviews for My reviews.
+type UserStatistics struct {
+	TotalReviews         int
+	AverageRatingGiven   float64
+	HelpfulVotesReceived int
+}
+
 type Repository interface {
 	Create(ctx context.Context, r *Review) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Review, error)
@@ -83,6 +90,7 @@ type Repository interface {
 	Delete(ctx context.Context, reviewID, userID uuid.UUID) error
 	SetHelpful(ctx context.Context, userID, reviewID uuid.UUID, isHelpful bool) (int, error)
 	Statistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error)
+	UserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error)
 }
 
 type repository struct {
@@ -177,6 +185,23 @@ func (repo *repository) Statistics(ctx context.Context, poiID uuid.UUID) (*Stati
 		Scan(&st.TotalReviews, &st.AverageRating,
 			&st.Distribution[0], &st.Distribution[1], &st.Distribution[2], &st.Distribution[3], &st.Distribution[4],
 			&st.LastReviewAt)
+	if err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
+// UserStatistics totals a user's published reviews. A user with none yields
+// zeros, never an error.
+func (repo *repository) UserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error) {
+	st := &UserStatistics{}
+	err := repo.db.QueryRow(ctx, `
+		SELECT COUNT(*),
+		       COALESCE(AVG(rating), 0)::float8,
+		       COALESCE(SUM(helpful), 0)
+		FROM reviews
+		WHERE user_id = $1 AND is_published = true`, userID).
+		Scan(&st.TotalReviews, &st.AverageRatingGiven, &st.HelpfulVotesReceived)
 	if err != nil {
 		return nil, err
 	}

@@ -285,3 +285,28 @@ func TestReviewMigration_DedupesKeepingNewest_Integration(t *testing.T) {
 	require.NoError(t, rows.Err())
 	assert.Equal(t, []uuid.UUID{newer}, ids)
 }
+
+// The summary My reviews shows, from the rows: the server used to leave
+// UserReviewStatistics empty and both clients recomputed it.
+func TestReviewRepo_UserStatistics_Integration(t *testing.T) {
+	repo, pool := newRepo(t)
+	ctx := context.Background()
+	author, voter := seedUser(t, pool), seedUser(t, pool)
+	p1, p2 := seedPOI(t, pool), seedPOI(t, pool)
+
+	empty, err := repo.UserStatistics(ctx, author)
+	require.NoError(t, err)
+	assert.Equal(t, &UserStatistics{}, empty)
+
+	first := &Review{UserID: author, POIID: p1, Rating: 4, Content: "good enough"}
+	require.NoError(t, repo.Create(ctx, first))
+	require.NoError(t, repo.Create(ctx, &Review{UserID: author, POIID: p2, Rating: 5, Content: "loved it"}))
+	_, err = repo.SetHelpful(ctx, voter, first.ID, true)
+	require.NoError(t, err)
+
+	got, err := repo.UserStatistics(ctx, author)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got.TotalReviews)
+	assert.InDelta(t, 4.5, got.AverageRatingGiven, 0.001)
+	assert.Equal(t, 1, got.HelpfulVotesReceived)
+}
