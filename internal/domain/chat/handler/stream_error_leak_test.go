@@ -69,3 +69,28 @@ func TestExplicitCodeStillWinsOverTheScrub(t *testing.T) {
 		t.Fatalf("explicit code must not carry the raw address either: %q", se.UserMessage)
 	}
 }
+
+// Free-tier users must never learn which model or provider served them, and
+// the chain's failures used to reach them verbatim: an unclassified provider
+// error falls through streamErrorFor as "<part> worker failed: %v".
+func TestProviderErrorsNeverNameTheModel(t *testing.T) {
+	leaks := []string{
+		"itinerary worker failed: Error 404, Message: This model is unavailable for free. The paid version is available now, Status: , Details: []",
+		"general_pois streaming error: Error 400, Message: nvidia/nemotron-3-ultra-550b-a55b:free is not a valid model ID",
+		"Upstream error from Nvidia: Service temporarily overloaded",
+		"decode openrouter stream event: invalid character 'x' looking for beginning of value",
+		"Streaming failed for POI 'Belem Tower': openrouter stateful chat sessions are not supported",
+	}
+	for _, msg := range leaks {
+		se := streamErrorFromEvent(locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: msg})
+		lower := strings.ToLower(se.UserMessage)
+		for _, secret := range []string{"openrouter", "nvidia", "nemotron", ":free", "error 4", "message:", "upstream"} {
+			if strings.Contains(lower, secret) {
+				t.Fatalf("user message leaked %q: %q", secret, se.UserMessage)
+			}
+		}
+		if se.InternalCode != "provider_unavailable" || !se.Retryable {
+			t.Fatalf("want retryable provider_unavailable for %q, got %+v", msg, se)
+		}
+	}
+}

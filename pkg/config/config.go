@@ -49,22 +49,31 @@ const (
 	AIProviderOpenRouter = "openrouter"
 )
 
-// defaultFallbackModels are OpenRouter's zero-cost models, ordered by
-// suitability. All advertise structured_outputs and response_format, which
-// Loci's JSON-contract prompts require; the larger free models
-// (nemotron-3-ultra, nemotron-3.5-lightning, both a million tokens of context)
-// do not, so they are deliberately excluded despite the bigger window.
+// defaultFallbackModels are OpenRouter's zero-cost models, ordered by what
+// they did on Loci's own prompts (city_data, general_pois, itinerary),
+// streamed one at a time on 2026-09-24:
+//
+//   - nemotron-3-super answered 7 of 9, twelve places in 16-22s.
+//   - nemotron-3-ultra answered 3 of 9; the rest were "Service temporarily
+//     overloaded", and one list of twelve places took 123s. Kept as the
+//     second model for its capacity, not its speed.
+//   - gemma-4-31b and qwen3.8-27b answered 429 to every call that day. Both
+//     are cheap to keep: a refusal costs well under a second, and they are
+//     live on other days.
+//
+// No caller asks for response_format, so a model's JSON-mode support does not
+// matter here; the JSON contract lives in the prompts, and every one of these
+// followed it when it answered at all.
 //
 // z-ai/glm-5.2:free was the head here until OpenRouter retired it. Asking for
 // it returns 404 "This model is unavailable for free. The paid version is
-// available now", and the chain does not advance past that — so every non-Pro
-// user's chat failed outright, in production, while the paid primary kept
-// working for anyone on a key. A dead head takes the whole chain down with it,
-// which is the argument for listing more than one live model rather than
-// trusting any single free slug to stay free.
+// available now". llmerrors now fails a 404 over, but a single free slug is
+// still one retirement away from nothing, so the list stays long.
 var defaultFallbackModels = []string{
 	"nvidia/nemotron-3-super-120b-a12b:free",
-	"nex-agi/nex-n2.5-pro:free",
+	"nvidia/nemotron-3-ultra-550b-a55b:free",
+	"google/gemma-4-31b-it:free",
+	"qwen/qwen3.8-27b:free",
 }
 
 // AIProviderSpec identifies one link in the chat fallback chain.

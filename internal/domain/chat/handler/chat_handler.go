@@ -888,6 +888,32 @@ var infrastructureErrorMarkers = []string{
 
 const infrastructureUserMessage = "Loci is restarting a service. Try again in a minute."
 
+// providerErrorMarkers fingerprint an error from the model chain rather than
+// from us: a provider's own prose, a model slug, or genai.APIError's
+// "Error 404, Message: …" rendering. Which model or provider served a turn is
+// never the user's business, least of all on the free tier, and the chat
+// service still forwards unclassified chain errors as "<part> worker failed:
+// %v", so they are scrubbed here with the infrastructure ones.
+var providerErrorMarkers = []string{
+	"openrouter", "nvidia", "nemotron", "gemma", "qwen", "gemini", "genai",
+	":free", "upstream error", "stream event", "model id", "api key",
+	"message:", "error 4", "error 5",
+}
+
+const providerUserMessage = "The AI service is temporarily unavailable. Please try again in a moment."
+
+// looksLikeProviderError reports whether a message names or quotes the model
+// chain.
+func looksLikeProviderError(msg string) bool {
+	lower := strings.ToLower(msg)
+	for _, m := range providerErrorMarkers {
+		if strings.Contains(lower, m) {
+			return true
+		}
+	}
+	return false
+}
+
 // looksLikeInfrastructureError reports whether a message carries the kind of
 // detail a person cannot act on and an attacker can.
 func looksLikeInfrastructureError(msg string) bool {
@@ -917,10 +943,17 @@ func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 		InternalCode: "stream_error",
 		Retryable:    false,
 	}
-	if looksLikeInfrastructureError(msg) {
+	switch {
+	case looksLikeInfrastructureError(msg):
 		se.UserMessage = infrastructureUserMessage
 		se.InternalCode = "internal"
 		se.Retryable = true
+	case looksLikeProviderError(msg):
+		se.UserMessage = providerUserMessage
+		se.InternalCode = "provider_unavailable"
+		se.Retryable = true
+		ra := int32(30000)
+		se.RetryAfterMs = &ra
 	}
 	// Prefer the producer's classification. Text matching stays as a
 	// fallback for events emitted without one, but it must not override
