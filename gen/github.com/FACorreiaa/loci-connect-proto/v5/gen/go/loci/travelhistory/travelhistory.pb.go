@@ -349,14 +349,26 @@ type TravelSummary struct {
 	TripsCompleted int32                  `protobuf:"varint,5,opt,name=trips_completed,json=tripsCompleted,proto3" json:"trips_completed,omitempty"`
 	FirstVisitAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=first_visit_at,json=firstVisitAt,proto3" json:"first_visit_at,omitempty"`
 	LastVisitAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=last_visit_at,json=lastVisitAt,proto3" json:"last_visit_at,omitempty"`
-	// The same window one period earlier.
+	// Counts for the previous window, from 2 * period_days to period_days ago.
+	// Compare each against the matching *_this_period field, not the all-time
+	// totals above. A city (or country) counts in the window its first visit
+	// falls in; POIs count every visit in the window. Zero when nothing fell in
+	// the window.
+	//
+	// Servers before the *_this_period fields existed sent the all-time totals as
+	// they stood when the current window opened, which only ever trended upward.
 	CitiesVisitedPrevPeriod    int32 `protobuf:"varint,8,opt,name=cities_visited_prev_period,json=citiesVisitedPrevPeriod,proto3" json:"cities_visited_prev_period,omitempty"`
 	CountriesVisitedPrevPeriod int32 `protobuf:"varint,9,opt,name=countries_visited_prev_period,json=countriesVisitedPrevPeriod,proto3" json:"countries_visited_prev_period,omitempty"`
 	PoisVisitedPrevPeriod      int32 `protobuf:"varint,10,opt,name=pois_visited_prev_period,json=poisVisitedPrevPeriod,proto3" json:"pois_visited_prev_period,omitempty"`
 	// Width of the comparison window actually used, in days.
-	PeriodDays    int32 `protobuf:"varint,11,opt,name=period_days,json=periodDays,proto3" json:"period_days,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	PeriodDays int32 `protobuf:"varint,11,opt,name=period_days,json=periodDays,proto3" json:"period_days,omitempty"`
+	// Counts for the current window, the last period_days, counted the same way
+	// as *_prev_period. A trend is *_this_period against *_prev_period.
+	CitiesVisitedThisPeriod    int32 `protobuf:"varint,12,opt,name=cities_visited_this_period,json=citiesVisitedThisPeriod,proto3" json:"cities_visited_this_period,omitempty"`
+	CountriesVisitedThisPeriod int32 `protobuf:"varint,13,opt,name=countries_visited_this_period,json=countriesVisitedThisPeriod,proto3" json:"countries_visited_this_period,omitempty"`
+	PoisVisitedThisPeriod      int32 `protobuf:"varint,14,opt,name=pois_visited_this_period,json=poisVisitedThisPeriod,proto3" json:"pois_visited_this_period,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *TravelSummary) Reset() {
@@ -466,6 +478,27 @@ func (x *TravelSummary) GetPeriodDays() int32 {
 	return 0
 }
 
+func (x *TravelSummary) GetCitiesVisitedThisPeriod() int32 {
+	if x != nil {
+		return x.CitiesVisitedThisPeriod
+	}
+	return 0
+}
+
+func (x *TravelSummary) GetCountriesVisitedThisPeriod() int32 {
+	if x != nil {
+		return x.CountriesVisitedThisPeriod
+	}
+	return 0
+}
+
+func (x *TravelSummary) GetPoisVisitedThisPeriod() int32 {
+	if x != nil {
+		return x.PoisVisitedThisPeriod
+	}
+	return 0
+}
+
 // GlobeArc is one leg between two placed points, ready to draw as a great
 // circle. Sourced from real TripLeg rows — never synthesised between cities
 // that merely appear in the same trip.
@@ -481,8 +514,13 @@ type GlobeArc struct {
 	TripId     string                 `protobuf:"bytes,8,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
 	// Transport mode as stored on the leg ("fly", "drive", "rail", ...). Empty
 	// when the trip did not record one.
-	Mode          string                 `protobuf:"bytes,9,opt,name=mode,proto3" json:"mode,omitempty"`
-	OccurredAt    *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	Mode       string                 `protobuf:"bytes,9,opt,name=mode,proto3" json:"mode,omitempty"`
+	OccurredAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	// The trip_legs row id. Stable across reads; it changes only when the trip
+	// is saved again, because SaveTrip rewrites a trip's legs.
+	Id string `protobuf:"bytes,11,opt,name=id,proto3" json:"id,omitempty"`
+	// Travel time recorded on the leg, in minutes. Zero when unknown.
+	DurationMins  int32 `protobuf:"varint,12,opt,name=duration_mins,json=durationMins,proto3" json:"duration_mins,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -585,6 +623,20 @@ func (x *GlobeArc) GetOccurredAt() *timestamppb.Timestamp {
 		return x.OccurredAt
 	}
 	return nil
+}
+
+func (x *GlobeArc) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GlobeArc) GetDurationMins() int32 {
+	if x != nil {
+		return x.DurationMins
+	}
+	return 0
 }
 
 type ListVisitedCitiesRequest struct {
@@ -1289,7 +1341,7 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"visited_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tvisitedAtB\v\n" +
 	"\t_latitudeB\f\n" +
 	"\n" +
-	"_longitude\"\xac\x04\n" +
+	"_longitude\"\xe5\x05\n" +
 	"\rTravelSummary\x12%\n" +
 	"\x0ecities_visited\x18\x01 \x01(\x05R\rcitiesVisited\x12+\n" +
 	"\x11countries_visited\x18\x02 \x01(\x05R\x10countriesVisited\x12!\n" +
@@ -1304,7 +1356,10 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\x18pois_visited_prev_period\x18\n" +
 	" \x01(\x05R\x15poisVisitedPrevPeriod\x12\x1f\n" +
 	"\vperiod_days\x18\v \x01(\x05R\n" +
-	"periodDays\"\xc0\x03\n" +
+	"periodDays\x12;\n" +
+	"\x1acities_visited_this_period\x18\f \x01(\x05R\x17citiesVisitedThisPeriod\x12A\n" +
+	"\x1dcountries_visited_this_period\x18\r \x01(\x05R\x1acountriesVisitedThisPeriod\x127\n" +
+	"\x18pois_visited_this_period\x18\x0e \x01(\x05R\x15poisVisitedThisPeriod\"\xfe\x03\n" +
 	"\bGlobeArc\x12%\n" +
 	"\tfrom_name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bfromName\x12!\n" +
 	"\ato_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x06toName\x122\n" +
@@ -1318,7 +1373,9 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\x04mode\x18\t \x01(\tB\a\xbaH\x04r\x02\x182R\x04mode\x12;\n" +
 	"\voccurred_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"`\n" +
+	"occurredAt\x12\x0e\n" +
+	"\x02id\x18\v \x01(\tR\x02id\x12,\n" +
+	"\rduration_mins\x18\f \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fdurationMins\"`\n" +
 	"\x18ListVisitedCitiesRequest\x12\x1b\n" +
 	"\x04page\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x04page\x12'\n" +
 	"\tpage_size\x18\x02 \x01(\x05B\n" +
