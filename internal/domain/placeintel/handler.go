@@ -750,11 +750,13 @@ func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Reques
 		FROM contributor_profiles WHERE user_id = $1`, uid).
 		Scan(&profile.Reputation, &profile.SubmittedClaims, &profile.AcceptedClaims, &profile.Badges)
 	if errors.Is(err, pgx.ErrNoRows) {
+		profile.BadgeDetails = []*placev1.Badge{}
 		return connect.NewResponse(profile), nil
 	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get contributor profile: %w", err))
 	}
+	profile.BadgeDetails = badgesFor(profile.Badges)
 	return connect.NewResponse(profile), nil
 }
 

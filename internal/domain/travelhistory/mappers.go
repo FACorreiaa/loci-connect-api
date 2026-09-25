@@ -115,16 +115,18 @@ func arcToProto(a *GlobeArc) *travelhistoryv1.GlobeArc {
 		return nil
 	}
 	return &travelhistoryv1.GlobeArc{
-		FromName:   a.FromName,
-		ToName:     a.ToName,
-		FromLat:    a.FromLat,
-		FromLon:    a.FromLon,
-		ToLat:      a.ToLat,
-		ToLon:      a.ToLon,
-		DistanceKm: a.DistanceKm,
-		TripId:     uuidPtrToString(a.TripID),
-		Mode:       a.Mode,
-		OccurredAt: timestampPtrOrNil(a.OccurredAt),
+		FromName:     a.FromName,
+		ToName:       a.ToName,
+		FromLat:      a.FromLat,
+		FromLon:      a.FromLon,
+		ToLat:        a.ToLat,
+		ToLon:        a.ToLon,
+		DistanceKm:   a.DistanceKm,
+		TripId:       uuidPtrToString(a.TripID),
+		Mode:         a.Mode,
+		OccurredAt:   timestampPtrOrNil(a.OccurredAt),
+		Id:           a.ID.String(),
+		DurationMins: a.DurationMins,
 	}
 }
 
@@ -154,6 +156,9 @@ func summaryToProto(s *Summary) *travelhistoryv1.TravelSummary {
 		CountriesVisitedPrevPeriod: s.CountriesVisitedPrev,
 		PoisVisitedPrevPeriod:      s.POIsVisitedPrev,
 		PeriodDays:                 s.PeriodDays,
+		CitiesVisitedThisPeriod:    s.CitiesVisitedThisPeriod,
+		CountriesVisitedThisPeriod: s.CountriesVisitedThisPeriod,
+		PoisVisitedThisPeriod:      s.POIsVisitedThisPeriod,
 	}
 }
 

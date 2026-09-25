@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +50,11 @@ type Service interface {
 	LikeReview(ctx context.Context, userID, reviewID uuid.UUID, isLike bool) (int, error)
 	GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error)
 	GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error)
+	GetMyPOIReview(ctx context.Context, userID, poiID uuid.UUID) (*Review, error)
+	// MarkVotedBy sets VotedByMe on each review viewer has marked helpful. A
+	// nil viewer (anonymous read) leaves every flag false.
+	MarkVotedBy(ctx context.Context, viewer uuid.UUID, reviews ...*Review) error
+	ReportReview(ctx context.Context, reporterID, reviewID uuid.UUID, reason, details string) error
 }
 
 type service struct {
@@ -145,4 +152,49 @@ func (s *service) GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statisti
 
 func (s *service) GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error) {
 	return s.repo.UserStatistics(ctx, userID)
+}
+
+func (s *service) GetMyPOIReview(ctx context.Context, userID, poiID uuid.UUID) (*Review, error) {
+	return s.repo.GetByUserAndPOI(ctx, userID, poiID)
+}
+
+func (s *service) MarkVotedBy(ctx context.Context, viewer uuid.UUID, reviews ...*Review) error {
+	if viewer == uuid.Nil || len(reviews) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(reviews))
+	for _, r := range reviews {
+		if r != nil {
+			ids = append(ids, r.ID)
+		}
+	}
+	voted, err := s.repo.VotedBy(ctx, viewer, ids)
+	if err != nil {
+		return err
+	}
+	for _, r := range reviews {
+		if r != nil {
+			r.VotedByMe = voted[r.ID]
+		}
+	}
+	return nil
+}
+
+// normalizeReportReason lower-cases and trims a report reason and checks it
+// against ReportReasons.
+func normalizeReportReason(reason string) (string, error) {
+	r := strings.ToLower(strings.TrimSpace(reason))
+	if !slices.Contains(ReportReasons, r) {
+		return "", errors.Join(ErrInvalidReview,
+			errors.New("reason must be one of: "+strings.Join(ReportReasons, ", ")))
+	}
+	return r, nil
+}
+
+func (s *service) ReportReview(ctx context.Context, reporterID, reviewID uuid.UUID, reason, details string) error {
+	r, err := normalizeReportReason(reason)
+	if err != nil {
+		return err
+	}
+	return s.repo.Report(ctx, reporterID, reviewID, r, strings.TrimSpace(details))
 }

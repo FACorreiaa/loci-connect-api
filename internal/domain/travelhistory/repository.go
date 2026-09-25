@@ -170,14 +170,15 @@ func (r *repository) Summary(ctx context.Context, userID uuid.UUID, periodDays i
 	if periodDays <= 0 {
 		periodDays = DefaultPeriodDays
 	}
-	windowStart := r.now().AddDate(0, 0, -int(periodDays))
+	now := r.now()
+	windowStart := now.AddDate(0, 0, -int(periodDays))
+	prevStart := windowStart.AddDate(0, 0, -int(periodDays))
 
 	s := &Summary{PeriodDays: periodDays}
 
-	// Current totals, plus the same totals as they stood at windowStart. The
-	// "prev" figures count only what was already known before the window opened,
-	// so `current - prev` is genuinely "added during this period" rather than a
-	// decorative arrow.
+	// All-time totals, plus counts for two equal windows: [windowStart, now]
+	// and [prevStart, windowStart). A city counts in the window its first
+	// visit falls in; a country in the window its earliest city falls in.
 	err := r.db.QueryRow(ctx, `
 		SELECT
 			COUNT(*),
@@ -185,23 +186,39 @@ func (r *repository) Summary(ctx context.Context, userID uuid.UUID, periodDays i
 			COUNT(DISTINCT trip_id) FILTER (WHERE trip_id IS NOT NULL),
 			MIN(first_visit_at),
 			MAX(last_visit_at),
-			COUNT(*) FILTER (WHERE first_visit_at < $2),
-			COUNT(DISTINCT NULLIF(BTRIM(country), '')) FILTER (WHERE first_visit_at < $2)
+			COUNT(*) FILTER (WHERE first_visit_at >= $2),
+			COUNT(*) FILTER (WHERE first_visit_at >= $3 AND first_visit_at < $2)
 		FROM user_visited_cities
-		WHERE user_id = $1`, userID, windowStart,
+		WHERE user_id = $1`, userID, windowStart, prevStart,
 	).Scan(
 		&s.CitiesVisited, &s.CountriesVisited, &s.TripsCompleted,
 		&s.FirstVisitAt, &s.LastVisitAt,
-		&s.CitiesVisitedPrev, &s.CountriesVisitedPrev,
+		&s.CitiesVisitedThisPeriod, &s.CitiesVisitedPrev,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("summarise visited cities: %w", err)
 	}
 
 	if err := r.db.QueryRow(ctx, `
-		SELECT COUNT(*), COUNT(*) FILTER (WHERE visited_at < $2)
-		FROM user_visited_pois WHERE user_id = $1`, userID, windowStart,
-	).Scan(&s.POIsVisited, &s.POIsVisitedPrev); err != nil {
+		SELECT
+			COUNT(*) FILTER (WHERE first_at >= $2),
+			COUNT(*) FILTER (WHERE first_at >= $3 AND first_at < $2)
+		FROM (
+			SELECT MIN(first_visit_at) AS first_at
+			FROM user_visited_cities
+			WHERE user_id = $1 AND BTRIM(country) <> ''
+			GROUP BY BTRIM(country)
+		) countries`, userID, windowStart, prevStart,
+	).Scan(&s.CountriesVisitedThisPeriod, &s.CountriesVisitedPrev); err != nil {
+		return nil, fmt.Errorf("summarise visited countries: %w", err)
+	}
+
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*),
+		       COUNT(*) FILTER (WHERE visited_at >= $2),
+		       COUNT(*) FILTER (WHERE visited_at >= $3 AND visited_at < $2)
+		FROM user_visited_pois WHERE user_id = $1`, userID, windowStart, prevStart,
+	).Scan(&s.POIsVisited, &s.POIsVisitedThisPeriod, &s.POIsVisitedPrev); err != nil {
 		return nil, fmt.Errorf("summarise visited pois: %w", err)
 	}
 
@@ -234,7 +251,7 @@ func (r *repository) GlobeData(ctx context.Context, userID uuid.UUID, limit int)
 	// is skipped rather than straightened onto a city centroid: half a real arc
 	// is a fabricated one.
 	rows, err := r.db.Query(ctx, `
-		SELECT l.from_name, l.to_name, l.from_lat, l.from_lon, l.to_lat, l.to_lon,
+		SELECT l.id, l.duration_mins, l.from_name, l.to_name, l.from_lat, l.from_lon, l.to_lat, l.to_lon,
 		       l.distance_km, l.trip_id, l.mode, d.date
 		FROM trip_legs l
 		JOIN trips t ON t.id = l.trip_id
@@ -254,7 +271,7 @@ func (r *repository) GlobeData(ctx context.Context, userID uuid.UUID, limit int)
 		var a GlobeArc
 		var tripID uuid.UUID
 		if scanErr := rows.Scan(
-			&a.FromName, &a.ToName, &a.FromLat, &a.FromLon, &a.ToLat, &a.ToLon,
+			&a.ID, &a.DurationMins, &a.FromName, &a.ToName, &a.FromLat, &a.FromLon, &a.ToLat, &a.ToLon,
 			&a.DistanceKm, &tripID, &a.Mode, &a.OccurredAt,
 		); scanErr != nil {
 			return nil, nil, fmt.Errorf("scan globe arc: %w", scanErr)

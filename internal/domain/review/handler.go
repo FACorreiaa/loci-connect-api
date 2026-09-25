@@ -16,9 +16,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
-// Handler implements the ReviewService Connect handlers. ReportReview falls
-// through to the embedded default (Unimplemented): there is nowhere to store
-// a report yet.
+// Handler implements the ReviewService Connect handlers.
 type Handler struct {
 	reviewv1connect.UnimplementedReviewServiceHandler
 	service Service
@@ -53,6 +51,23 @@ func (h *Handler) toConnectError(err error) error {
 		return connect.NewError(connect.CodePermissionDenied, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
+	}
+}
+
+// viewer is the authenticated caller, or uuid.Nil for an anonymous read.
+func viewer(ctx context.Context) uuid.UUID {
+	id, err := ctxUser(ctx)
+	if err != nil {
+		return uuid.Nil
+	}
+	return id
+}
+
+// markVoted fills voted_by_me for the caller. It is enrichment: a failure is
+// logged and the reviews go out with the flag false rather than failing the read.
+func (h *Handler) markVoted(ctx context.Context, reviews ...*Review) {
+	if err := h.service.MarkVotedBy(ctx, viewer(ctx), reviews...); err != nil {
+		h.logger.WarnContext(ctx, "could not load the caller's helpful votes", slog.Any("error", err))
 	}
 }
 
@@ -101,6 +116,7 @@ func (h *Handler) GetReview(ctx context.Context, req *connect.Request[reviewv1.G
 	if uid, e := ctxUser(ctx); e == nil {
 		owner = uid == r.UserID
 	}
+	h.markVoted(ctx, r)
 	return connect.NewResponse(&reviewv1.GetReviewResponse{Review: toProtoReview(r), CanEdit: owner, CanDelete: owner}), nil
 }
 
@@ -114,6 +130,7 @@ func (h *Handler) GetPOIReviews(ctx context.Context, req *connect.Request[review
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	h.markVoted(ctx, list...)
 	return connect.NewResponse(&reviewv1.GetPOIReviewsResponse{
 		Reviews:    toProtoReviews(list),
 		Pagination: pageMeta(total, limit, offset),
@@ -141,6 +158,7 @@ func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[revie
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	h.markVoted(ctx, list...)
 	return connect.NewResponse(&reviewv1.GetUserReviewsResponse{
 		Reviews:    toProtoReviews(list),
 		Pagination: pageMeta(total, limit, offset),
@@ -149,6 +167,13 @@ func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[revie
 			AverageRatingGiven:   st.AverageRatingGiven,
 			HelpfulVotesReceived: int32(st.HelpfulVotesReceived), //nolint:gosec // bounded by the vote count
 			ReviewerLevel:        reviewerLevel(st.TotalReviews),
+			RatingDistribution: &reviewv1.RatingBreakdown{
+				OneStar:   int32(st.Distribution[0]), //nolint:gosec // bounded by the row count
+				TwoStar:   int32(st.Distribution[1]), //nolint:gosec // bounded by the row count
+				ThreeStar: int32(st.Distribution[2]), //nolint:gosec // bounded by the row count
+				FourStar:  int32(st.Distribution[3]), //nolint:gosec // bounded by the row count
+				FiveStar:  int32(st.Distribution[4]), //nolint:gosec // bounded by the row count
+			},
 		},
 	}), nil
 }
@@ -174,6 +199,7 @@ func (h *Handler) GetRecentReviews(ctx context.Context, req *connect.Request[rev
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	h.markVoted(ctx, list...)
 	return connect.NewResponse(&reviewv1.GetRecentReviewsResponse{
 		Reviews:    toProtoReviews(list),
 		Pagination: pageMeta(total, limit, offset),
@@ -242,7 +268,45 @@ func (h *Handler) UpdateReview(ctx context.Context, req *connect.Request[reviewv
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	h.markVoted(ctx, r)
 	return connect.NewResponse(&reviewv1.UpdateReviewResponse{Response: okResponse(), Review: toProtoReview(r)}), nil
+}
+
+// GetMyPOIReview returns the caller's own review of a POI, published or not.
+// NotFound when they have not reviewed it.
+func (h *Handler) GetMyPOIReview(ctx context.Context, req *connect.Request[reviewv1.GetMyPOIReviewRequest]) (*connect.Response[reviewv1.GetMyPOIReviewResponse], error) {
+	userID, err := ctxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	poiID, err := uuid.Parse(req.Msg.PoiId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid poi_id"))
+	}
+	r, err := h.service.GetMyPOIReview(ctx, userID, poiID)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	h.markVoted(ctx, r)
+	return connect.NewResponse(&reviewv1.GetMyPOIReviewResponse{Review: toProtoReview(r)}), nil
+}
+
+// ReportReview records the caller's report of someone else's review. The
+// request's user_id is ignored. Reporting again replaces the earlier reason;
+// reporting your own review is PermissionDenied.
+func (h *Handler) ReportReview(ctx context.Context, req *connect.Request[reviewv1.ReportReviewRequest]) (*connect.Response[reviewv1.ReportReviewResponse], error) {
+	userID, err := ctxUser(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(req.Msg.ReviewId)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid review_id"))
+	}
+	if err := h.service.ReportReview(ctx, userID, id, req.Msg.Reason, req.Msg.Details); err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.ReportReviewResponse{Response: okResponse()}), nil
 }
 
 // GetReviewStatistics returns the count, average and star breakdown of a
@@ -278,6 +342,7 @@ func (h *Handler) GetContentReviews(ctx context.Context, req *connect.Request[re
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	h.markVoted(ctx, list...)
 	st, err := h.service.GetStatistics(ctx, poiID)
 	if err != nil {
 		return nil, h.toConnectError(err)
@@ -376,7 +441,9 @@ func toProtoReview(r *Review) *reviewv1.Review {
 		CreatedAt:    timestamppb.New(r.CreatedAt),
 		UpdatedAt:    timestamppb.New(r.UpdatedAt),
 		HelpfulCount: int32(r.Helpful),
+		ReportCount:  int32(r.ReportCount),
 		IsVerified:   r.IsVerified,
+		VotedByMe:    r.VotedByMe,
 		// Reviews are POI-only, so the generic content fields mirror poi_id.
 		ContentType: reviewv1.ReviewContentType_REVIEW_CONTENT_TYPE_POI,
 		ContentId:   r.POIID.String(),

@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -21,6 +22,14 @@ var ErrAlreadyExists = errors.New("you have already reviewed this place")
 
 // ErrPOINotFound is returned when a review names a POI that does not exist.
 var ErrPOINotFound = errors.New("poi not found")
+
+// ErrReportOwnReview is returned when a user reports their own review. It
+// wraps ErrOwnReview, so it maps to the same PermissionDenied.
+var ErrReportOwnReview = fmt.Errorf("cannot report your own review: %w", ErrOwnReview)
+
+// ReportReasons are the reasons ReportReview accepts; the review_reports
+// CHECK constraint holds the same list.
+var ReportReasons = []string{"spam", "inappropriate", "fake", "offensive", "other"}
 
 // Postgres SQLSTATEs the repository maps to domain errors.
 const (
@@ -44,6 +53,11 @@ type Review struct {
 	IsPublished bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	// ReportCount is the number of distinct people who reported the review.
+	ReportCount int
+	// VotedByMe is per viewer, not stored on the row: the service fills it
+	// for the authenticated caller (see VotedBy).
+	VotedByMe bool
 
 	// Enrichment (joined): reviewer + reviewed POI display info.
 	ReviewerName   string
@@ -78,6 +92,8 @@ type UserStatistics struct {
 	TotalReviews         int
 	AverageRatingGiven   float64
 	HelpfulVotesReceived int
+	// Distribution[i] is the number of (i+1)-star reviews the user gave.
+	Distribution [5]int
 }
 
 type Repository interface {
@@ -91,6 +107,12 @@ type Repository interface {
 	SetHelpful(ctx context.Context, userID, reviewID uuid.UUID, isHelpful bool) (int, error)
 	Statistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error)
 	UserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error)
+	// GetByUserAndPOI returns userID's review of poiID, published or not.
+	GetByUserAndPOI(ctx context.Context, userID, poiID uuid.UUID) (*Review, error)
+	// VotedBy reports which of reviewIDs userID has marked helpful.
+	VotedBy(ctx context.Context, userID uuid.UUID, reviewIDs []uuid.UUID) (map[uuid.UUID]bool, error)
+	// Report records (or re-records) reporterID's report of reviewID.
+	Report(ctx context.Context, reporterID, reviewID uuid.UUID, reason, details string) error
 }
 
 type repository struct {
@@ -110,7 +132,8 @@ const selectReview = `
 	       COALESCE(NULLIF(u.username, ''), u.display_name, '') AS reviewer_name,
 	       COALESCE(u.profile_image_url, '') AS reviewer_avatar,
 	       u.created_at AS reviewer_since,
-	       COALESCE(p.name, '') AS poi_name
+	       COALESCE(p.name, '') AS poi_name,
+	       (SELECT COUNT(*) FROM review_reports rr WHERE rr.review_id = r.id)::int AS report_count
 	FROM reviews r
 	JOIN users u ON u.id = r.user_id
 	LEFT JOIN points_of_interest p ON p.id = r.poi_id`
@@ -119,7 +142,7 @@ func scanReview(row pgx.Row) (*Review, error) {
 	var r Review
 	err := row.Scan(&r.ID, &r.UserID, &r.POIID, &r.Rating, &r.Title, &r.Content, &r.Photos,
 		&r.VisitDate, &r.Helpful, &r.Unhelpful, &r.IsVerified, &r.IsPublished, &r.CreatedAt, &r.UpdatedAt,
-		&r.ReviewerName, &r.ReviewerAvatar, &r.ReviewerSince, &r.POIName)
+		&r.ReviewerName, &r.ReviewerAvatar, &r.ReviewerSince, &r.POIName, &r.ReportCount)
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +221,16 @@ func (repo *repository) UserStatistics(ctx context.Context, userID uuid.UUID) (*
 	err := repo.db.QueryRow(ctx, `
 		SELECT COUNT(*),
 		       COALESCE(AVG(rating), 0)::float8,
-		       COALESCE(SUM(helpful), 0)
+		       COALESCE(SUM(helpful), 0),
+		       COUNT(*) FILTER (WHERE rating = 1),
+		       COUNT(*) FILTER (WHERE rating = 2),
+		       COUNT(*) FILTER (WHERE rating = 3),
+		       COUNT(*) FILTER (WHERE rating = 4),
+		       COUNT(*) FILTER (WHERE rating = 5)
 		FROM reviews
 		WHERE user_id = $1 AND is_published = true`, userID).
-		Scan(&st.TotalReviews, &st.AverageRatingGiven, &st.HelpfulVotesReceived)
+		Scan(&st.TotalReviews, &st.AverageRatingGiven, &st.HelpfulVotesReceived,
+			&st.Distribution[0], &st.Distribution[1], &st.Distribution[2], &st.Distribution[3], &st.Distribution[4])
 	if err != nil {
 		return nil, err
 	}
@@ -330,4 +359,64 @@ func (repo *repository) SetHelpful(ctx context.Context, userID, reviewID uuid.UU
 		return 0, ErrNotFound
 	}
 	return helpful, err
+}
+
+func (repo *repository) GetByUserAndPOI(ctx context.Context, userID, poiID uuid.UUID) (*Review, error) {
+	r, err := scanReview(repo.db.QueryRow(ctx, selectReview+` WHERE r.user_id = $1 AND r.poi_id = $2`, userID, poiID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return r, err
+}
+
+func (repo *repository) VotedBy(ctx context.Context, userID uuid.UUID, reviewIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	out := make(map[uuid.UUID]bool)
+	if userID == uuid.Nil || len(reviewIDs) == 0 {
+		return out, nil
+	}
+	rows, err := repo.db.Query(ctx, `
+		SELECT review_id FROM review_helpfuls
+		WHERE user_id = $1 AND review_id = ANY($2) AND is_helpful = true`, userID, reviewIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// Report upserts the reporter's report: a second report of the same review
+// replaces the reason and details instead of adding a row. Reporting your own
+// review is ErrReportOwnReview; a missing review is ErrNotFound.
+func (repo *repository) Report(ctx context.Context, reporterID, reviewID uuid.UUID, reason, details string) error {
+	var author uuid.UUID
+	err := repo.db.QueryRow(ctx, `SELECT user_id FROM reviews WHERE id = $1`, reviewID).Scan(&author)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if author == reporterID {
+		return ErrReportOwnReview
+	}
+	_, err = repo.db.Exec(ctx, `
+		INSERT INTO review_reports (review_id, reporter_id, reason, details)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (reporter_id, review_id)
+		DO UPDATE SET reason = EXCLUDED.reason, details = EXCLUDED.details, created_at = NOW()`,
+		reviewID, reporterID, reason, details)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgForeignKeyViolation &&
+		pgErr.ConstraintName == "review_reports_review_id_fkey" {
+		// Deleted between the lookup and the insert.
+		return ErrNotFound
+	}
+	return err
 }

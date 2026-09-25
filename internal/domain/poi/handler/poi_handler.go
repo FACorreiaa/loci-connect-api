@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"connectrpc.com/connect"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
@@ -24,49 +25,74 @@ func NewPOIHandler(svc poi.Service) *POIHandler {
 	return &POIHandler{service: svc}
 }
 
-func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.SearchPOIRequest]) (*connect.Response[poiv1.SearchPOIResponse], error) {
-	// Map request to filter
-	filter := locitypes.POIFilter{
-		// Mapping depends on SearchPOIRequest fields availability
-		// Assuming minimal mapping for now based on what I saw in cat output (query, city_name, lat, lon)
-		// and using SearchPOIsSemantic or SearchPOIsByQueryAndCity logic from service
-	}
-	// Actually, the service has SearchPOIs(filter) OR SearchPOIsSemantic
-	// The proto request has `query`, `city_name`, `latitude`, `longitude`, `search_type`
+// searchMode is how SearchPOI answers a request.
+type searchMode int
 
+const (
+	// searchSemanticCity is a semantic search inside one named city (with the
+	// LLM fallback when the city has nothing).
+	searchSemanticCity searchMode = iota
+	// searchHybrid ranks by distance from the given point and by meaning.
+	searchHybrid
+	// searchSemanticAll is a semantic search across every city.
+	searchSemanticAll
+)
+
+// defaultHybridRadiusKm applies when a location-based search sends no radius.
+// Zero would match nothing (ST_DWithin with a 0 m radius).
+const defaultHybridRadiusKm = 25.0
+
+// nearbyCityPlaceholder is what clients send as city_name for "around me";
+// it is not a city and must never be looked up (or handed to the LLM) as one.
+const nearbyCityPlaceholder = "nearby"
+
+// resolveSearch picks the search to run. city_name is optional: empty (or the
+// "nearby" placeholder) searches around latitude/longitude when a location is
+// set, otherwise across every city. It returns the cleaned city name.
+func resolveSearch(searchType, cityName string, lat, lon float64) (searchMode, string) {
+	city := strings.TrimSpace(cityName)
+	if strings.EqualFold(city, nearbyCityPlaceholder) {
+		city = ""
+	}
+	hasLocation := lat != 0 || lon != 0
+
+	if searchType == "hybrid" && hasLocation {
+		return searchHybrid, city
+	}
+	switch {
+	case city != "":
+		return searchSemanticCity, city
+	case hasLocation:
+		return searchHybrid, ""
+	default:
+		return searchSemanticAll, ""
+	}
+}
+
+func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.SearchPOIRequest]) (*connect.Response[poiv1.SearchPOIResponse], error) {
 	searchType := ""
 	if req.Msg.SearchType != nil {
 		searchType = *req.Msg.SearchType
 	}
 	query := req.Msg.Query
-	cityName := req.Msg.CityName
+	mode, cityName := resolveSearch(searchType, req.Msg.CityName, req.Msg.Latitude, req.Msg.Longitude)
 
 	var pois []locitypes.POIDetailedInfo
 	var err error
 
-	switch searchType {
-	case "semantic":
-		if cityName != "" {
-			// Need city UUID if using SearchPOIsSemanticByCity...
-			// Service method SearchPOIsSemanticByCity requires UUID.
-			// Helper SearchPOIsByQueryAndCity takes string name.
-			pois, err = h.service.SearchPOIsByQueryAndCity(ctx, query, cityName)
-		} else {
-			limit := 20 // Default
-			pois, err = h.service.SearchPOIsSemantic(ctx, query, limit)
-		}
-	case "hybrid":
-		// Needs filter + query
+	switch mode {
+	case searchHybrid:
+		filter := locitypes.POIFilter{Radius: defaultHybridRadiusKm}
 		filter.Location.Latitude = req.Msg.Latitude
 		filter.Location.Longitude = req.Msg.Longitude
 		if req.Msg.RadiusKm != nil {
 			filter.Radius = *req.Msg.RadiusKm
 		}
 		pois, err = h.service.SearchPOIsHybrid(ctx, filter, query, 0.5) // Default weight
-	default:
-		// Default to text search or semantic?
-		// Using SearchPOIsByQueryAndCity as generic entry point if query/city provided
+	case searchSemanticCity:
 		pois, err = h.service.SearchPOIsByQueryAndCity(ctx, query, cityName)
+	default:
+		pois, err = h.service.SearchPOIsSemantic(ctx, query, 20)
 	}
 
 	if err != nil {
@@ -75,7 +101,6 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 
 	return connect.NewResponse(&poiv1.SearchPOIResponse{
 		Pois: presenter.ToPOIProtos(pois),
-		// Pagination metadata if needed
 	}), nil
 }
 

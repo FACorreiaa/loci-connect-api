@@ -86,11 +86,13 @@ type VisitedPOI struct {
 
 // Summary backs the dashboard statistics rail.
 //
-// The Prev* fields are the running totals as they stood PeriodDays ago (not
-// the previous window's own counts), so `current - prev` is what this period
-// added and the rail can render a real delta rather than an invented arrow.
-// Because the totals only grow (a visit is never un-visited except by an
-// explicit delete), the arrow points up or is flat; that is the honest shape.
+// The *Visited fields are all-time totals. The windowed counts compare like
+// with like: *ThisPeriod covers the last PeriodDays, *Prev the PeriodDays
+// before that. A city or country counts in the window its FIRST visit falls
+// in (user_visited_cities keeps no per-visit rows); a POI counts per visit.
+// The Prev* fields used to be the totals as they stood when the window
+// opened, so a client comparing them with the totals could only ever show
+// growth.
 type Summary struct {
 	CitiesVisited    int32
 	CountriesVisited int32
@@ -99,6 +101,10 @@ type Summary struct {
 	TripsCompleted   int32
 	FirstVisitAt     *time.Time
 	LastVisitAt      *time.Time
+
+	CitiesVisitedThisPeriod    int32
+	CountriesVisitedThisPeriod int32
+	POIsVisitedThisPeriod      int32
 
 	CitiesVisitedPrev    int32
 	CountriesVisitedPrev int32
@@ -110,16 +116,19 @@ type Summary struct {
 // circle. Sourced from real trip legs only — never synthesised between cities
 // that merely happen to appear in the same trip.
 type GlobeArc struct {
-	FromName   string
-	ToName     string
-	FromLat    float64
-	FromLon    float64
-	ToLat      float64
-	ToLon      float64
-	DistanceKm float64
-	TripID     *uuid.UUID
-	Mode       string
-	OccurredAt *time.Time
+	// ID is the trip_legs row id.
+	ID           uuid.UUID
+	DurationMins int32
+	FromName     string
+	ToName       string
+	FromLat      float64
+	FromLon      float64
+	ToLat        float64
+	ToLon        float64
+	DistanceKm   float64
+	TripID       *uuid.UUID
+	Mode         string
+	OccurredAt   *time.Time
 }
 
 // VisitInput is a request to record one visit. POIID/POIName are optional: a
