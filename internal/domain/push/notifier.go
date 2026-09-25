@@ -84,6 +84,8 @@ func (n *Notifier) deliver(ctx context.Context, run runs.Run) {
 	if err != nil || !claimed {
 		if err != nil {
 			n.logger.Warn("claim run notification", "run_id", run.ID, "error", err)
+		} else {
+			n.logger.Info("push skipped: run already announced", "run_id", run.ID)
 		}
 		return
 	}
@@ -93,6 +95,7 @@ func (n *Notifier) deliver(ctx context.Context, run runs.Run) {
 		return
 	}
 	if !settings.SearchFinished {
+		n.logger.Info("push skipped: search_finished is off", "run_id", run.ID, "user_id", run.UserID)
 		return
 	}
 	body, err := json.Marshal(BuildPayload(run))
@@ -109,6 +112,9 @@ func (n *Notifier) deliver(ctx context.Context, run runs.Run) {
 			n.logger.Warn("list push devices", "run_id", run.ID, "platform", platform, "error", err)
 			continue
 		}
+		// Every silent outcome used to look the same from the outside; the
+		// device count is what tells "never registered" from "sent and dropped".
+		n.logger.Info("push: delivering", "run_id", run.ID, "platform", platform, "devices", len(devices), "status", run.Status)
 		for _, d := range devices {
 			n.send(ctx, run, platform, sender, d, body)
 		}
@@ -136,6 +142,9 @@ func (n *Notifier) sendOne(ctx context.Context, platform string, sender Sender, 
 	switch {
 	case gone:
 		observability.PushSentTotal.WithLabelValues(platform, "gone").Inc()
+		// The push service disowned this device: the row goes, and nothing on
+		// the phone knows. Say so, with Apple's reason when there is one.
+		n.logger.Warn("push endpoint gone; removing device", logKey, logValue, "platform", platform, "device_id", d.ID, "reason", err)
 		if rErr := n.devices.RemoveEndpoint(ctx, d.Endpoint); rErr != nil {
 			n.logger.Warn("remove gone push endpoint", "error", rErr)
 		}

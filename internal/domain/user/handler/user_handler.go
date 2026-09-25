@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -448,6 +449,16 @@ var platformNames = map[userpb.PushPlatform]string{
 // to store; nothing legitimate needs more than this.
 const maxUserAgentLen = 512
 
+// endpointPrefix is enough of a token or subscription URL to match a log line
+// to a device without writing the whole credential into the logs.
+func endpointPrefix(endpoint string) string {
+	const n = 8
+	if len(endpoint) <= n {
+		return endpoint
+	}
+	return endpoint[:n] + "…"
+}
+
 // truncateUTF8 caps s at maxBytes and always returns valid UTF-8, dropping
 // any invalid bytes. Slicing a string by byte count alone can split a
 // multi-byte rune in half, and a header can arrive with invalid bytes in the
@@ -514,6 +525,8 @@ func (h *UserHandler) RegisterPushDevice(ctx context.Context, req *connect.Reque
 	if err := h.devices.Upsert(ctx, device, userAgent); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
+	slog.Default().Info("push device registered", "user_id", userID, "platform", device.Platform,
+		"apns_topic", device.APNSTopic, "apns_environment", device.APNSEnvironment, "endpoint_prefix", endpointPrefix(device.Endpoint))
 	return connect.NewResponse(&commonpb.Response{Success: true}), nil
 }
 
