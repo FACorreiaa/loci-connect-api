@@ -86,8 +86,11 @@ type VisitedPOI struct {
 
 // Summary backs the dashboard statistics rail.
 //
-// The Prev* fields are the same counts one period earlier. They exist so the
-// rail can render a real delta; without them a trend arrow can only be invented.
+// The Prev* fields are the running totals as they stood PeriodDays ago (not
+// the previous window's own counts), so `current - prev` is what this period
+// added and the rail can render a real delta rather than an invented arrow.
+// Because the totals only grow (a visit is never un-visited except by an
+// explicit delete), the arrow points up or is flat; that is the honest shape.
 type Summary struct {
 	CitiesVisited    int32
 	CountriesVisited int32
