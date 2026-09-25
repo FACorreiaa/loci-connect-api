@@ -75,3 +75,37 @@ func TestResolveCityErrorKeepsOutagesApartFromBadInput(t *testing.T) {
 		})
 	}
 }
+
+func TestBadgeFor(t *testing.T) {
+	t.Parallel()
+	b := badgeFor("local-scout")
+	assert.Equal(t, "local-scout", b.Slug)
+	assert.Equal(t, "Local scout", b.DisplayName)
+	assert.NotEmpty(t, b.Description)
+
+	// A slug awarded before its copy was written still reads as words.
+	b = badgeFor("night-owl")
+	assert.Equal(t, "night-owl", b.Slug)
+	assert.Equal(t, "Night owl", b.DisplayName)
+	assert.Empty(t, b.Description)
+
+	got := badgesFor([]string{"local-scout", "night-owl"})
+	assert.Equal(t, []string{"local-scout", "night-owl"}, []string{got[0].Slug, got[1].Slug}, "order follows the slug list")
+}
+
+func TestMyClaimsPage(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		limit, page       int32
+		wantLim, wantOffs int
+	}{
+		{0, 0, 20, 0},
+		{10, 1, 10, 0},
+		{10, 3, 10, 20},
+		{5, 0, 5, 0},
+	} {
+		l, o := myClaimsPage(tc.limit, tc.page)
+		assert.Equal(t, tc.wantLim, l)
+		assert.Equal(t, tc.wantOffs, o)
+	}
+}

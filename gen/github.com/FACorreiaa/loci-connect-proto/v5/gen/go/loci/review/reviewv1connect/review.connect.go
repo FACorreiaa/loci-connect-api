@@ -59,6 +59,9 @@ const (
 	// ReviewServiceReportReviewProcedure is the fully-qualified name of the ReviewService's
 	// ReportReview RPC.
 	ReviewServiceReportReviewProcedure = "/loci.review.ReviewService/ReportReview"
+	// ReviewServiceGetMyPOIReviewProcedure is the fully-qualified name of the ReviewService's
+	// GetMyPOIReview RPC.
+	ReviewServiceGetMyPOIReviewProcedure = "/loci.review.ReviewService/GetMyPOIReview"
 	// ReviewServiceGetReviewStatisticsProcedure is the fully-qualified name of the ReviewService's
 	// GetReviewStatistics RPC.
 	ReviewServiceGetReviewStatisticsProcedure = "/loci.review.ReviewService/GetReviewStatistics"
@@ -79,6 +82,7 @@ var (
 	reviewServiceGetUserReviewsMethodDescriptor      = reviewServiceServiceDescriptor.Methods().ByName("GetUserReviews")
 	reviewServiceLikeReviewMethodDescriptor          = reviewServiceServiceDescriptor.Methods().ByName("LikeReview")
 	reviewServiceReportReviewMethodDescriptor        = reviewServiceServiceDescriptor.Methods().ByName("ReportReview")
+	reviewServiceGetMyPOIReviewMethodDescriptor      = reviewServiceServiceDescriptor.Methods().ByName("GetMyPOIReview")
 	reviewServiceGetReviewStatisticsMethodDescriptor = reviewServiceServiceDescriptor.Methods().ByName("GetReviewStatistics")
 	reviewServiceGetRecentReviewsMethodDescriptor    = reviewServiceServiceDescriptor.Methods().ByName("GetRecentReviews")
 )
@@ -101,8 +105,12 @@ type ReviewServiceClient interface {
 	GetUserReviews(context.Context, *connect.Request[review.GetUserReviewsRequest]) (*connect.Response[review.GetUserReviewsResponse], error)
 	// Like/unlike a review
 	LikeReview(context.Context, *connect.Request[review.LikeReviewRequest]) (*connect.Response[review.LikeReviewResponse], error)
-	// Report a review
+	// Report a review. One report per reporter per review; reporting again
+	// updates the reason. Reporting your own review is rejected.
 	ReportReview(context.Context, *connect.Request[review.ReportReviewRequest]) (*connect.Response[review.ReportReviewResponse], error)
+	// The caller's own review of a POI. NotFound when they have not reviewed it,
+	// so a client can choose between "Write a review" and "Edit your review".
+	GetMyPOIReview(context.Context, *connect.Request[review.GetMyPOIReviewRequest]) (*connect.Response[review.GetMyPOIReviewResponse], error)
 	// Get review statistics for any content type
 	GetReviewStatistics(context.Context, *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error)
 	// Get the most recent reviews across all content (global feed)
@@ -173,6 +181,12 @@ func NewReviewServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(reviewServiceReportReviewMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getMyPOIReview: connect.NewClient[review.GetMyPOIReviewRequest, review.GetMyPOIReviewResponse](
+			httpClient,
+			baseURL+ReviewServiceGetMyPOIReviewProcedure,
+			connect.WithSchema(reviewServiceGetMyPOIReviewMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		getReviewStatistics: connect.NewClient[review.GetReviewStatisticsRequest, review.GetReviewStatisticsResponse](
 			httpClient,
 			baseURL+ReviewServiceGetReviewStatisticsProcedure,
@@ -199,6 +213,7 @@ type reviewServiceClient struct {
 	getUserReviews      *connect.Client[review.GetUserReviewsRequest, review.GetUserReviewsResponse]
 	likeReview          *connect.Client[review.LikeReviewRequest, review.LikeReviewResponse]
 	reportReview        *connect.Client[review.ReportReviewRequest, review.ReportReviewResponse]
+	getMyPOIReview      *connect.Client[review.GetMyPOIReviewRequest, review.GetMyPOIReviewResponse]
 	getReviewStatistics *connect.Client[review.GetReviewStatisticsRequest, review.GetReviewStatisticsResponse]
 	getRecentReviews    *connect.Client[review.GetRecentReviewsRequest, review.GetRecentReviewsResponse]
 }
@@ -248,6 +263,11 @@ func (c *reviewServiceClient) ReportReview(ctx context.Context, req *connect.Req
 	return c.reportReview.CallUnary(ctx, req)
 }
 
+// GetMyPOIReview calls loci.review.ReviewService.GetMyPOIReview.
+func (c *reviewServiceClient) GetMyPOIReview(ctx context.Context, req *connect.Request[review.GetMyPOIReviewRequest]) (*connect.Response[review.GetMyPOIReviewResponse], error) {
+	return c.getMyPOIReview.CallUnary(ctx, req)
+}
+
 // GetReviewStatistics calls loci.review.ReviewService.GetReviewStatistics.
 func (c *reviewServiceClient) GetReviewStatistics(ctx context.Context, req *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error) {
 	return c.getReviewStatistics.CallUnary(ctx, req)
@@ -276,8 +296,12 @@ type ReviewServiceHandler interface {
 	GetUserReviews(context.Context, *connect.Request[review.GetUserReviewsRequest]) (*connect.Response[review.GetUserReviewsResponse], error)
 	// Like/unlike a review
 	LikeReview(context.Context, *connect.Request[review.LikeReviewRequest]) (*connect.Response[review.LikeReviewResponse], error)
-	// Report a review
+	// Report a review. One report per reporter per review; reporting again
+	// updates the reason. Reporting your own review is rejected.
 	ReportReview(context.Context, *connect.Request[review.ReportReviewRequest]) (*connect.Response[review.ReportReviewResponse], error)
+	// The caller's own review of a POI. NotFound when they have not reviewed it,
+	// so a client can choose between "Write a review" and "Edit your review".
+	GetMyPOIReview(context.Context, *connect.Request[review.GetMyPOIReviewRequest]) (*connect.Response[review.GetMyPOIReviewResponse], error)
 	// Get review statistics for any content type
 	GetReviewStatistics(context.Context, *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error)
 	// Get the most recent reviews across all content (global feed)
@@ -344,6 +368,12 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(reviewServiceReportReviewMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	reviewServiceGetMyPOIReviewHandler := connect.NewUnaryHandler(
+		ReviewServiceGetMyPOIReviewProcedure,
+		svc.GetMyPOIReview,
+		connect.WithSchema(reviewServiceGetMyPOIReviewMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	reviewServiceGetReviewStatisticsHandler := connect.NewUnaryHandler(
 		ReviewServiceGetReviewStatisticsProcedure,
 		svc.GetReviewStatistics,
@@ -376,6 +406,8 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 			reviewServiceLikeReviewHandler.ServeHTTP(w, r)
 		case ReviewServiceReportReviewProcedure:
 			reviewServiceReportReviewHandler.ServeHTTP(w, r)
+		case ReviewServiceGetMyPOIReviewProcedure:
+			reviewServiceGetMyPOIReviewHandler.ServeHTTP(w, r)
 		case ReviewServiceGetReviewStatisticsProcedure:
 			reviewServiceGetReviewStatisticsHandler.ServeHTTP(w, r)
 		case ReviewServiceGetRecentReviewsProcedure:
@@ -423,6 +455,10 @@ func (UnimplementedReviewServiceHandler) LikeReview(context.Context, *connect.Re
 
 func (UnimplementedReviewServiceHandler) ReportReview(context.Context, *connect.Request[review.ReportReviewRequest]) (*connect.Response[review.ReportReviewResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.review.ReviewService.ReportReview is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) GetMyPOIReview(context.Context, *connect.Request[review.GetMyPOIReviewRequest]) (*connect.Response[review.GetMyPOIReviewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.review.ReviewService.GetMyPOIReview is not implemented"))
 }
 
 func (UnimplementedReviewServiceHandler) GetReviewStatistics(context.Context, *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error) {

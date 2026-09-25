@@ -797,7 +797,9 @@ type TripDraft struct {
 	// Empty on create — the server assigns identity (repository.SaveTrip treats a
 	// nil id as "new trip"). Requiring it made creating a trip impossible, which
 	// is the one thing every trip has to do first.
-	Id          string          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Owner. Set on every trip the server returns. Ignored on SaveTrip, which
+	// takes the owner from the auth token, so a client may leave it empty.
 	UserId      string          `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	CityId      *string         `protobuf:"bytes,3,opt,name=city_id,json=cityId,proto3,oneof" json:"city_id,omitempty"`
 	CityName    string          `protobuf:"bytes,4,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
@@ -813,11 +815,14 @@ type TripDraft struct {
 	// single-city trip, whose city is city_name above.
 	Cities []*TripCity `protobuf:"bytes,13,rep,name=cities,proto3" json:"cities,omitempty"`
 	// Session that generated the initial draft, if any.
-	SourceSessionId *string                `protobuf:"bytes,9,opt,name=source_session_id,json=sourceSessionId,proto3,oneof" json:"source_session_id,omitempty"`
-	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	SourceSessionId *string `protobuf:"bytes,9,opt,name=source_session_id,json=sourceSessionId,proto3,oneof" json:"source_session_id,omitempty"`
+	// Set on every trip the server returns. Ignored on SaveTrip, which stamps
+	// both itself, so a client creating a trip may leave them unset. (Requiring
+	// them rejected every create that did not invent a timestamp.)
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TripDraft) Reset() {
@@ -2602,10 +2607,11 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"session_id\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18dR\tsessionId\x12!\n" +
 	"\x06nights\x18\x04 \x01(\x05B\t\xbaH\x06\x1a\x04\x18\x1e(\x00R\x06nights\x12(\n" +
 	"\vorder_index\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\n" +
-	"orderIndex\"\xfc\x04\n" +
+	"orderIndex\"\xed\x04\n" +
 	"\tTripDraft\x12\x17\n" +
-	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12\"\n" +
-	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12'\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12#\n" +
+	"\auser_id\x18\x02 \x01(\tB\n" +
+	"\xbaH\a\xd8\x01\x01r\x02\x18dR\x06userId\x12'\n" +
 	"\acity_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x06cityId\x88\x01\x01\x12%\n" +
 	"\tcity_name\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x12 \n" +
 	"\x05title\x18\x05 \x01(\tB\n" +
@@ -2616,12 +2622,12 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\x04legs\x18\f \x03(\v2\x12.loci.trip.TripLegR\x04legs\x12+\n" +
 	"\x06cities\x18\r \x03(\v2\x13.loci.trip.TripCityR\x06cities\x12;\n" +
 	"\x11source_session_id\x18\t \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\x0fsourceSessionId\x88\x01\x01\x12A\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01H\x01R\x0fsourceSessionId\x88\x01\x01\x129\n" +
 	"\n" +
 	"created_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\n" +
+	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAtB\n" +
 	"\n" +
 	"\b_city_idB\x14\n" +
 	"\x12_source_session_id\"\xe5\x01\n" +

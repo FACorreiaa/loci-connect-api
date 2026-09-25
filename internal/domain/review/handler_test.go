@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	reviewv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/review"
 	"github.com/google/uuid"
@@ -31,6 +32,12 @@ type fakeService struct {
 	err       error
 	stats     *Statistics
 	userStats *UserStatistics
+
+	list       []*Review
+	votedBy    map[uuid.UUID]bool // review ids the viewer has voted
+	viewerSeen uuid.UUID
+	myReview   *Review
+	reported   *reportCall
 }
 
 func (f *fakeService) GetUserStatistics(_ context.Context, userID uuid.UUID) (*UserStatistics, error) {
@@ -42,6 +49,39 @@ func (f *fakeService) GetUserStatistics(_ context.Context, userID uuid.UUID) (*U
 		return &UserStatistics{}, nil // the repository never returns nil without an error
 	}
 	return f.userStats, nil
+}
+
+type reportCall struct {
+	reporter, review uuid.UUID
+	reason, details  string
+}
+
+func (f *fakeService) GetMyPOIReview(_ context.Context, userID, poiID uuid.UUID) (*Review, error) {
+	f.listedFor = poiID
+	f.viewerSeen = userID
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.myReview == nil {
+		return nil, ErrNotFound
+	}
+	return f.myReview, nil
+}
+
+func (f *fakeService) MarkVotedBy(_ context.Context, viewer uuid.UUID, reviews ...*Review) error {
+	f.viewerSeen = viewer
+	if viewer == uuid.Nil {
+		return nil
+	}
+	for _, r := range reviews {
+		r.VotedByMe = f.votedBy[r.ID]
+	}
+	return nil
+}
+
+func (f *fakeService) ReportReview(_ context.Context, reporterID, reviewID uuid.UUID, reason, details string) error {
+	f.reported = &reportCall{reporterID, reviewID, reason, details}
+	return f.err
 }
 
 func (f *fakeService) CreateReview(_ context.Context, in CreateReviewInput) (*Review, error) {
@@ -62,12 +102,12 @@ func (f *fakeService) UpdateReview(_ context.Context, in UpdateReviewInput) (*Re
 
 func (f *fakeService) ListUserReviews(_ context.Context, userID uuid.UUID, _, _ int) ([]*Review, int, error) {
 	f.listedFor = userID
-	return nil, 0, f.err
+	return f.list, len(f.list), f.err
 }
 
 func (f *fakeService) ListPOIReviews(_ context.Context, poiID uuid.UUID, _, _ int) ([]*Review, int, error) {
 	f.listedFor = poiID
-	return nil, 0, f.err
+	return f.list, len(f.list), f.err
 }
 
 func (f *fakeService) GetStatistics(_ context.Context, poiID uuid.UUID) (*Statistics, error) {
@@ -265,10 +305,134 @@ func TestGetContentReviews_POIOnly(t *testing.T) {
 	assert.Equal(t, connect.CodeInvalidArgument, codeOf(t, err))
 }
 
-func TestReportReview_StillUnimplemented(t *testing.T) {
-	h := newTestHandler(&fakeService{})
-	_, err := h.ReportReview(authed(uuid.New()), connect.NewRequest(&reviewv1.ReportReviewRequest{}))
-	assert.Equal(t, connect.CodeUnimplemented, codeOf(t, err))
+func TestReportReview(t *testing.T) {
+	caller, reviewID := uuid.New(), uuid.New()
+	svc := &fakeService{}
+	h := newTestHandler(svc)
+	_, err := h.ReportReview(authed(caller), connect.NewRequest(&reviewv1.ReportReviewRequest{
+		UserId: uuid.NewString(), ReviewId: reviewID.String(), Reason: "spam", Details: "link farm",
+	}))
+	require.NoError(t, err)
+	require.NotNil(t, svc.reported)
+	assert.Equal(t, reportCall{caller, reviewID, "spam", "link farm"}, *svc.reported,
+		"the reporter is the caller, never the request's user_id")
+
+	_, err = h.ReportReview(context.Background(), connect.NewRequest(&reviewv1.ReportReviewRequest{ReviewId: reviewID.String(), Reason: "spam"}))
+	assert.Equal(t, connect.CodeUnauthenticated, codeOf(t, err))
+	_, err = h.ReportReview(authed(caller), connect.NewRequest(&reviewv1.ReportReviewRequest{ReviewId: "nope", Reason: "spam"}))
+	assert.Equal(t, connect.CodeInvalidArgument, codeOf(t, err))
+
+	for svcErr, want := range map[error]connect.Code{
+		ErrReportOwnReview: connect.CodePermissionDenied,
+		ErrNotFound:        connect.CodeNotFound,
+		ErrInvalidReview:   connect.CodeInvalidArgument,
+	} {
+		h := newTestHandler(&fakeService{err: svcErr})
+		_, err := h.ReportReview(authed(caller), connect.NewRequest(&reviewv1.ReportReviewRequest{ReviewId: reviewID.String(), Reason: "spam"}))
+		assert.Equal(t, want, codeOf(t, err), "service error %v", svcErr)
+	}
+}
+
+func TestGetPOIReviews_FillsVotedByMeForCaller(t *testing.T) {
+	voted, notVoted := &Review{ID: uuid.New()}, &Review{ID: uuid.New()}
+	caller := uuid.New()
+	svc := &fakeService{list: []*Review{voted, notVoted}, votedBy: map[uuid.UUID]bool{voted.ID: true}}
+	h := newTestHandler(svc)
+
+	res, err := h.GetPOIReviews(authed(caller), connect.NewRequest(&reviewv1.GetPOIReviewsRequest{PoiId: uuid.NewString()}))
+	require.NoError(t, err)
+	assert.Equal(t, caller, svc.viewerSeen)
+	require.Len(t, res.Msg.Reviews, 2)
+	assert.True(t, res.Msg.Reviews[0].VotedByMe)
+	assert.False(t, res.Msg.Reviews[1].VotedByMe)
+
+	// Anonymous reads carry no vote state.
+	voted.VotedByMe = false
+	res, err = h.GetPOIReviews(context.Background(), connect.NewRequest(&reviewv1.GetPOIReviewsRequest{PoiId: uuid.NewString()}))
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Nil, svc.viewerSeen)
+	assert.False(t, res.Msg.Reviews[0].VotedByMe)
+}
+
+func TestGetMyPOIReview(t *testing.T) {
+	caller, poiID := uuid.New(), uuid.New()
+	mine := &Review{ID: uuid.New(), UserID: caller, POIID: poiID, Rating: 4, Content: "ok"}
+	svc := &fakeService{myReview: mine}
+	h := newTestHandler(svc)
+
+	res, err := h.GetMyPOIReview(authed(caller), connect.NewRequest(&reviewv1.GetMyPOIReviewRequest{PoiId: poiID.String()}))
+	require.NoError(t, err)
+	assert.Equal(t, mine.ID.String(), res.Msg.Review.Id)
+	assert.Equal(t, caller, svc.viewerSeen)
+	assert.Equal(t, poiID, svc.listedFor)
+
+	h = newTestHandler(&fakeService{})
+	_, err = h.GetMyPOIReview(authed(caller), connect.NewRequest(&reviewv1.GetMyPOIReviewRequest{PoiId: poiID.String()}))
+	assert.Equal(t, connect.CodeNotFound, codeOf(t, err), "no review yet is NotFound")
+
+	_, err = h.GetMyPOIReview(context.Background(), connect.NewRequest(&reviewv1.GetMyPOIReviewRequest{PoiId: poiID.String()}))
+	assert.Equal(t, connect.CodeUnauthenticated, codeOf(t, err))
+	_, err = h.GetMyPOIReview(authed(caller), connect.NewRequest(&reviewv1.GetMyPOIReviewRequest{PoiId: "x"}))
+	assert.Equal(t, connect.CodeInvalidArgument, codeOf(t, err))
+}
+
+func TestNormalizeReportReason(t *testing.T) {
+	for in, want := range map[string]string{"spam": "spam", " Fake ": "fake", "OTHER": "other", "offensive": "offensive", "inappropriate": "inappropriate"} {
+		got, err := normalizeReportReason(in)
+		require.NoError(t, err, in)
+		assert.Equal(t, want, got)
+	}
+	for _, in := range []string{"", "rude", "spam!"} {
+		_, err := normalizeReportReason(in)
+		require.ErrorIs(t, err, ErrInvalidReview, in)
+	}
+}
+
+type fakeVoteRepo struct {
+	Repository
+	voted map[uuid.UUID]bool
+	calls int
+}
+
+func (f *fakeVoteRepo) VotedBy(_ context.Context, _ uuid.UUID, _ []uuid.UUID) (map[uuid.UUID]bool, error) {
+	f.calls++
+	return f.voted, nil
+}
+
+func TestService_MarkVotedBy(t *testing.T) {
+	a, b := &Review{ID: uuid.New()}, &Review{ID: uuid.New()}
+	repo := &fakeVoteRepo{voted: map[uuid.UUID]bool{b.ID: true}}
+	svc := NewService(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	require.NoError(t, svc.MarkVotedBy(context.Background(), uuid.Nil, a, b))
+	assert.Zero(t, repo.calls, "an anonymous viewer never queries votes")
+
+	require.NoError(t, svc.MarkVotedBy(context.Background(), uuid.New(), a, nil, b))
+	assert.False(t, a.VotedByMe)
+	assert.True(t, b.VotedByMe)
+}
+
+func TestGetUserReviews_FillsRatingDistribution(t *testing.T) {
+	svc := &fakeService{userStats: &UserStatistics{TotalReviews: 3, AverageRatingGiven: 4, Distribution: [5]int{0, 0, 1, 1, 1}}}
+	h := newTestHandler(svc)
+	res, err := h.GetUserReviews(authed(uuid.New()), connect.NewRequest(&reviewv1.GetUserReviewsRequest{}))
+	require.NoError(t, err)
+	d := res.Msg.Statistics.GetRatingDistribution()
+	require.NotNil(t, d)
+	assert.EqualValues(t, 0, d.OneStar)
+	assert.EqualValues(t, 1, d.ThreeStar)
+	assert.EqualValues(t, 1, d.FourStar)
+	assert.EqualValues(t, 1, d.FiveStar)
+	require.NoError(t, protovalidate.Validate(res.Msg.Statistics))
+}
+
+// ReportReview's user_id was min_len 1 although the server acts as the caller;
+// GetMyPOIReview needs a poi_id.
+func TestReviewContracts(t *testing.T) {
+	require.NoError(t, protovalidate.Validate(&reviewv1.ReportReviewRequest{ReviewId: uuid.NewString(), Reason: "spam"}))
+	require.Error(t, protovalidate.Validate(&reviewv1.ReportReviewRequest{ReviewId: uuid.NewString()}), "a reason is still required")
+	require.NoError(t, protovalidate.Validate(&reviewv1.GetMyPOIReviewRequest{PoiId: uuid.NewString()}))
+	require.Error(t, protovalidate.Validate(&reviewv1.GetMyPOIReviewRequest{}))
 }
 
 func TestToProtoReview_FillsContentAndMemberSince(t *testing.T) {
@@ -280,6 +444,10 @@ func TestToProtoReview_FillsContentAndMemberSince(t *testing.T) {
 	require.NotNil(t, p.Reviewer.MemberSince)
 	assert.True(t, since.Equal(p.Reviewer.MemberSince.AsTime()))
 	assert.InDelta(t, 4.0, p.Rating, 0)
+
+	p = toProtoReview(&Review{ID: uuid.New(), VotedByMe: true, ReportCount: 2})
+	assert.True(t, p.VotedByMe)
+	assert.EqualValues(t, 2, p.ReportCount)
 }
 
 // Marking your own review helpful is refused, and the refusal is a

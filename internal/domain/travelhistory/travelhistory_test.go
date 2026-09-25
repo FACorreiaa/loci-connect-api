@@ -313,6 +313,13 @@ func TestSummaryToProtoCarriesPrevPeriod(t *testing.T) {
 	if summaryToProto(nil) != nil {
 		t.Error("summaryToProto(nil) should be nil")
 	}
+
+	s.CitiesVisitedThisPeriod, s.CountriesVisitedThisPeriod, s.POIsVisitedThisPeriod = 2, 1, 7
+	got = summaryToProto(s)
+	if got.GetCitiesVisitedThisPeriod() != 2 || got.GetCountriesVisitedThisPeriod() != 1 || got.GetPoisVisitedThisPeriod() != 7 {
+		t.Errorf("this-period counts not mapped: %d %d %d",
+			got.GetCitiesVisitedThisPeriod(), got.GetCountriesVisitedThisPeriod(), got.GetPoisVisitedThisPeriod())
+	}
 }
 
 func TestVisitInputFromProto(t *testing.T) {
