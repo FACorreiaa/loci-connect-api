@@ -2,9 +2,11 @@ package travelhistory
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -316,6 +318,14 @@ func (r *repository) RecordVisit(ctx context.Context, userID uuid.UUID, in Visit
 // the first/last window and incrementing the count. Split out because the
 // backfill needs the same merge semantics inside its own transaction.
 func upsertVisitedCity(ctx context.Context, tx pgx.Tx, userID uuid.UUID, in VisitInput) (*VisitedCity, error) {
+	if in.Country == "" {
+		country, err := countryFromCities(ctx, tx, in)
+		if err != nil {
+			return nil, err
+		}
+		in.Country = country
+	}
+
 	// Two partial unique indexes cover this table (resolved vs unresolved city),
 	// and ON CONFLICT can only name one. Resolve which one applies first.
 	conflict := `(user_id, LOWER(BTRIM(city_name)), LOWER(BTRIM(country))) WHERE city_id IS NULL`
@@ -349,6 +359,38 @@ func upsertVisitedCity(ctx context.Context, tx pgx.Tx, userID uuid.UUID, in Visi
 		return nil, fmt.Errorf("upsert visited city: %w", err)
 	}
 	return city, nil
+}
+
+// countryFromCities looks the country up when the caller could not attribute
+// one (the POI had no city_id, so nothing joined). It trusts the cities table
+// only where the place is plausibly the same: a row with the same name whose
+// centre is within 200 km, or failing that the nearest centre within 50 km.
+// Anything further is a namesake elsewhere, and an empty country is preferred
+// to a wrong flag.
+func countryFromCities(ctx context.Context, tx pgx.Tx, in VisitInput) (string, error) {
+	var country string
+	err := tx.QueryRow(ctx, `
+		WITH here AS (
+			SELECT ST_SetSRID(ST_MakePoint($2::float8, $3::float8), 4326)::geography AS pt
+		)
+		SELECT c.country
+		FROM cities c, here
+		WHERE BTRIM(c.country) <> ''
+		  AND (
+		    (LOWER(BTRIM(c.name)) = LOWER($1)
+		      AND (c.center_location IS NULL OR ST_DWithin(c.center_location::geography, here.pt, 200000)))
+		    OR (c.center_location IS NOT NULL AND ST_DWithin(c.center_location::geography, here.pt, 50000))
+		  )
+		ORDER BY (LOWER(BTRIM(c.name)) = LOWER($1)) DESC,
+		         c.center_location::geography <-> here.pt NULLS LAST
+		LIMIT 1`, in.CityName, in.Longitude, in.Latitude).Scan(&country)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolve visit country: %w", err)
+	}
+	return strings.TrimSpace(country), nil
 }
 
 func (r *repository) DeleteVisit(ctx context.Context, userID, id uuid.UUID) error {
