@@ -163,3 +163,29 @@ func TestTripCitiesRoundTripThroughProto(t *testing.T) {
 		t.Fatalf("round trip lost cities: %+v", back.Cities)
 	}
 }
+
+// A client that edits a trip sends the day ids it was given back; SaveTrip
+// keeps them (see dayids_integration_test.go), which only works if the mapper
+// carries them in. It used to drop them, so every save renumbered every day
+// and AddToTrip's "which day" answer pointed at a row that no longer existed.
+func TestTripFromProtoKeepsDayIDs(t *testing.T) {
+	dayID := uuid.New()
+	p := &tripv1.TripDraft{
+		Title: "Lisbon",
+		Days: []*tripv1.TripDay{
+			{Id: dayID.String(), DayNumber: 1},
+			{Id: "not-a-uuid", DayNumber: 2},
+			{DayNumber: 3},
+		},
+	}
+	got, err := tripFromProto(p, uuid.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Days[0].ID != dayID {
+		t.Fatalf("day 1 id dropped: %s", got.Days[0].ID)
+	}
+	if got.Days[1].ID != uuid.Nil || got.Days[2].ID != uuid.Nil {
+		t.Fatalf("a malformed or missing id must read as none: %v %v", got.Days[1].ID, got.Days[2].ID)
+	}
+}

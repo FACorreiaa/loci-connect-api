@@ -70,6 +70,11 @@ func tripFromProto(p *tripv1.TripDraft, uid uuid.UUID) (*Trip, error) {
 			CityName:  pd.GetCityName(),
 			TravelDay: pd.GetTravelDay(),
 		}
+		// The id the client was given comes back so SaveTrip can keep it (a
+		// malformed one reads as none and the day gets a fresh id).
+		if pd.GetId() != "" {
+			d.ID, _ = uuid.Parse(pd.GetId())
+		}
 		if pd.Date != nil {
 			dt := pd.GetDate().AsTime()
 			d.Date = &dt

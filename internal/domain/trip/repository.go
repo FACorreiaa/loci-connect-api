@@ -251,11 +251,19 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	}
 	t.Version = newVersion
 
-	// Replace-all days + stops (simplest correct model for trip-sized data).
+	// Replace-all days + stops (simplest correct model for trip-sized data),
+	// but ids survive: a day or stop the client sends back with the id it was
+	// given is re-inserted under that id, so an edit never invalidates what
+	// the clients hold (web's AddToTrip day choice, iOS's reminders keyed by
+	// stop). Only ids this trip owned before the save are honoured.
+	owned, err := ownedIDs(ctx, tx, t.ID)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1`, t.ID); err != nil {
 		return nil, fmt.Errorf("clear days: %w", err)
 	}
-	if err := insertDays(ctx, tx, t); err != nil {
+	if err := insertDays(ctx, tx, t, owned); err != nil {
 		return nil, err
 	}
 
@@ -337,7 +345,42 @@ func (r *repository) loadLegs(ctx context.Context, t *Trip) error {
 // insertDays writes a trip's days and then its stops as two batched round
 // trips instead of one per row. Day ids come back from the first batch so the
 // stops can reference them; ids are assigned back onto t in place.
-func insertDays(ctx context.Context, tx pgx.Tx, t *Trip) error {
+// ownedIDs is every day and stop id a trip has right now, so a save can tell
+// an id the client is handing back from one it made up or took from another
+// trip. Empty for a new trip.
+func ownedIDs(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) (map[uuid.UUID]bool, error) {
+	owned := map[uuid.UUID]bool{}
+	if tripID == uuid.Nil {
+		return owned, nil
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT d.id FROM trip_days d WHERE d.trip_id = $1
+		UNION ALL
+		SELECT s.id FROM trip_stops s JOIN trip_days d ON d.id = s.day_id WHERE d.trip_id = $1`, tripID)
+	if err != nil {
+		return nil, fmt.Errorf("owned ids: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("owned ids: %w", err)
+		}
+		owned[id] = true
+	}
+	return owned, rows.Err()
+}
+
+// keepID is the id to insert a day or stop under: the one the client sent
+// back when this trip owned it, otherwise nil for the database to choose.
+func keepID(id uuid.UUID, owned map[uuid.UUID]bool) *uuid.UUID {
+	if id == uuid.Nil || !owned[id] {
+		return nil
+	}
+	return &id
+}
+
+func insertDays(ctx context.Context, tx pgx.Tx, t *Trip, owned map[uuid.UUID]bool) error {
 	if len(t.Days) == 0 {
 		return nil
 	}
@@ -345,9 +388,9 @@ func insertDays(ctx context.Context, tx pgx.Tx, t *Trip) error {
 	for di := range t.Days {
 		day := &t.Days[di]
 		days.Queue(`
-			INSERT INTO trip_days (trip_id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-			t.ID, day.DayNumber, day.Date,
+			INSERT INTO trip_days (id, trip_id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day)
+			VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+			keepID(day.ID, owned), t.ID, day.DayNumber, day.Date,
 			day.CityID, day.CityName, day.CityLat, day.CityLon, day.TravelDay)
 	}
 	br := tx.SendBatch(ctx, days)
@@ -371,9 +414,9 @@ func insertDays(ctx context.Context, tx pgx.Tx, t *Trip) error {
 				return fmt.Errorf("marshal recommendation trace: %w", err)
 			}
 			stops.Queue(`
-				INSERT INTO trip_stops (day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-				day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON)
+				INSERT INTO trip_stops (id, day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
+				VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+				keepID(s.ID, owned), day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON)
 		}
 	}
 	if stops.Len() == 0 {
