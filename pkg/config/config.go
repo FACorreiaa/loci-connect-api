@@ -310,6 +310,10 @@ type SubscriptionConfig struct {
 	// case-insensitively against users.email. Applied where the plan is
 	// resolved, so quota, entitlements, model routing and the client all agree.
 	ProEmails []string
+	// PlanGating holds free accounts to the free feature set. Off until the
+	// product has users to gate (subscription.Entitled); the daily LLM quota
+	// and model routing are cost controls and ignore it.
+	PlanGating bool
 }
 
 // StripeConfig holds Stripe API credentials, the two Pro price IDs, and the
@@ -467,6 +471,7 @@ func Load() (*Config, error) {
 			FreeDailyLLMLimit: getEnvAsInt("FREE_DAILY_LLM_LIMIT", 10),
 			ProDailyLLMLimit:  getEnvAsInt("PRO_DAILY_LLM_LIMIT", 100),
 			ProEmails:         getEnvAsSlice("PRO_EMAILS", nil),
+			PlanGating:        getEnvAsBool("PLAN_GATING", false),
 		},
 		Secrets: SecretsConfig{
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),

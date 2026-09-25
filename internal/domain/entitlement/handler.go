@@ -91,7 +91,7 @@ func (h *Handler) GetEntitlements(
 		placesSaved += n
 	}
 
-	isPro := subscription.IsProPlan(plan)
+	isPro := subscription.Entitled(plan)
 	out := &entitlementv1.Entitlements{
 		Plan:            plan,
 		ListsUsed:       int32(listsUsed),

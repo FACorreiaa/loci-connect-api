@@ -344,7 +344,7 @@ func (h *Handler) PushTripToCalendar(
 	exportTrip := t
 	if h.plans != nil {
 		plan, perr := h.plans.EffectivePlan(ctx, uid)
-		if perr == nil && !subscription.IsProPlan(plan) && len(t.Days) > 1 {
+		if perr == nil && !subscription.Entitled(plan) && len(t.Days) > 1 {
 			clone := *t
 			clone.Days = append([]trip.TripDay(nil), t.Days[0])
 			exportTrip = &clone

@@ -149,7 +149,7 @@ func (l *ServiceImpl) GenerateEnhancedPersonalisedPOIWorker(ctx context.Context,
 	// This path carries no parsed duration, so it asks for what an unstated
 	// trip length is worth. The plan still applies: a Pro caller is not sized
 	// for free here either.
-	target := resolvePOITarget(tripspan.DefaultDays, subscription.IsProPlan(l.planFor(ctx)))
+	target := resolvePOITarget(tripspan.DefaultDays, subscription.Entitled(l.planFor(ctx)))
 	prompt := l.getEnhancedPersonalizedPOIPrompt(cityName, enhancedPromptData, domain, target)
 	span.SetAttributes(attribute.Int("prompt.length", len(prompt)))
 

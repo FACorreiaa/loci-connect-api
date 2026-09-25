@@ -34,7 +34,7 @@ func (e *EntitlementExceededError) Is(target error) bool {
 
 // ListLimitForPlan returns the max top-level lists for a plan (-1 = unlimited).
 func ListLimitForPlan(plan string) int {
-	if IsProPlan(plan) {
+	if Entitled(plan) {
 		return -1
 	}
 	return FreeMaxLists
@@ -42,7 +42,7 @@ func ListLimitForPlan(plan string) int {
 
 // PlaceLimitForPlan returns the max saved places (list items + favorites) for a plan.
 func PlaceLimitForPlan(plan string) int {
-	if IsProPlan(plan) {
+	if Entitled(plan) {
 		return -1
 	}
 	return FreeMaxPlaces

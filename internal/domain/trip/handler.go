@@ -409,8 +409,8 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 		exportTrip := t
 		if h.plans != nil {
 			plan, perr := h.plans.EffectivePlan(ctx, uid)
-			if perr == nil && !subscription.IsProPlan(plan) && len(t.Days) > 1 {
-				// Free: Day 1 only (matches TripKit client soft-gate).
+			if perr == nil && !subscription.Entitled(plan) && len(t.Days) > 1 {
+				// Gated free: Day 1 only (matches TripKit client soft-gate).
 				clone := *t
 				clone.Days = append([]TripDay(nil), t.Days[0])
 				exportTrip = &clone
@@ -434,7 +434,7 @@ func (h *Handler) ExportTrip(ctx context.Context, req *connect.Request[tripv1.Ex
 	case tripv1.ExportFormat_EXPORT_FORMAT_MARKDOWN:
 		if h.plans != nil {
 			plan, perr := h.plans.EffectivePlan(ctx, uid)
-			if perr == nil && !subscription.IsProPlan(plan) {
+			if perr == nil && !subscription.Entitled(plan) {
 				return nil, apierr.ToConnect(&subscription.EntitlementExceededError{
 					Feature: "export",
 					Limit:   0,

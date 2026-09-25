@@ -124,7 +124,7 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 	// 3b-ii. Size the answer. This has to happen before the plan is built: the
 	// target reaches both the prompts and the cache key, and the key is minted
 	// inside resolveGenerationPlan.
-	cc.POITarget = resolvePOITarget(cc.TripDays, subscription.IsProPlan(l.planFor(ctx)))
+	cc.POITarget = resolvePOITarget(cc.TripDays, subscription.Entitled(l.planFor(ctx)))
 	observability.RecordPOITarget(cc.POITarget)
 
 	// 3c. Plan this turn's parts, look them up, and retrieve evidence only if
