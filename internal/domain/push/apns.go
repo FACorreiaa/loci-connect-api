@@ -214,7 +214,10 @@ func (s *APNSSender) post(ctx context.Context, d Device, encoded []byte, retryOn
 	_ = json.Unmarshal(raw, &apnsErr)
 	switch apnsErr.Reason {
 	case "BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic", "ExpiredToken":
-		return true, nil
+		// Gone, and the reason travels with it: a BadDeviceToken from the
+		// production host is usually a sandbox token, which is a build
+		// configuration problem, not a lost device.
+		return true, fmt.Errorf("apns: status %d (%s)", resp.StatusCode, apnsErr.Reason)
 	case "ExpiredProviderToken", "InvalidProviderToken":
 		if retryOnExpiredToken {
 			s.mu.Lock()

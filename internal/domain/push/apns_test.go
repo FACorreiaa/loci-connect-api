@@ -166,14 +166,15 @@ func TestAPNSSender_GoneReasonsRemoveTheDevice(t *testing.T) {
 		srv := newAPNSServer(t, http.StatusBadRequest, `{"reason":"`+reason+`"}`)
 		sender := testSender(t, srv)
 		gone, err := sender.Send(context.Background(), apnsDevice(), payloadBody(t))
-		require.NoError(t, err, reason)
 		require.True(t, gone, reason)
+		// The reason rides along so the notifier can log why the device left.
+		require.ErrorContains(t, err, reason)
 	}
 	srv := newAPNSServer(t, http.StatusGone, `{"reason":"Unregistered","timestamp":1}`)
 	sender := testSender(t, srv)
 	gone, err := sender.Send(context.Background(), apnsDevice(), payloadBody(t))
-	require.NoError(t, err)
 	require.True(t, gone)
+	require.ErrorContains(t, err, "Unregistered")
 }
 
 func TestAPNSSender_OtherErrorsAreReportedNotGone(t *testing.T) {
