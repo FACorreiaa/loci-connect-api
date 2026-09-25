@@ -38,7 +38,7 @@ func (s stubFavs) GetFavoritesCount(context.Context, uuid.UUID, string) (int, er
 }
 
 func TestGetEntitlements_FreeUnifiedSaves(t *testing.T) {
-	t.Parallel()
+	withGating(t, true)
 	uid := uuid.New()
 	h := NewHandler(stubPlans{plan: subscription.PlanFree}, stubLists{lists: 2, places: 10}, stubFavs{n: 5})
 	ctx := context.WithValue(context.Background(), interceptors.UserIDKey, uid.String())
@@ -60,7 +60,7 @@ func TestGetEntitlements_FreeUnifiedSaves(t *testing.T) {
 }
 
 func TestGetEntitlements_ProUnlimited(t *testing.T) {
-	t.Parallel()
+	withGating(t, true)
 	uid := uuid.New()
 	h := NewHandler(stubPlans{plan: subscription.PlanPremiumMonthly}, stubLists{lists: 99, places: 500}, stubFavs{n: 100})
 	ctx := context.WithValue(context.Background(), interceptors.UserIDKey, uid.String())
@@ -79,4 +79,32 @@ func TestGetEntitlements_ProUnlimited(t *testing.T) {
 	if !e.AdvancedFilters || !e.ExportFull {
 		t.Fatal("pro flags should be true")
 	}
+}
+
+// With gating off (the default) a free account reads exactly like Pro, so the
+// clients open every export and stop counting lists and places.
+func TestGetEntitlements_UngatedFreeIsUnlimited(t *testing.T) {
+	withGating(t, false)
+	uid := uuid.New()
+	h := NewHandler(stubPlans{plan: subscription.PlanFree}, stubLists{lists: 2, places: 10}, stubFavs{n: 5})
+	ctx := context.WithValue(context.Background(), interceptors.UserIDKey, uid.String())
+
+	res, err := h.GetEntitlements(ctx, connect.NewRequest(&entitlementv1.GetEntitlementsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := res.Msg
+	if e.Plan != subscription.PlanFree {
+		t.Fatalf("the plan itself stays truthful: %+v", e)
+	}
+	if e.ListsLimit != -1 || e.PlacesLimit != -1 || !e.AdvancedFilters || !e.ExportFull {
+		t.Fatalf("ungated free should be unlimited with every flag on: %+v", e)
+	}
+}
+
+func withGating(t *testing.T, on bool) {
+	t.Helper()
+	previous := subscription.Gating()
+	subscription.SetGating(on)
+	t.Cleanup(func() { subscription.SetGating(previous) })
 }

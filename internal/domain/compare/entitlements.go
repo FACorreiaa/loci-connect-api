@@ -35,7 +35,7 @@ func EntitlementsForUser(ctx context.Context, plans PlanChecker, userID uuid.UUI
 	if err != nil {
 		return free
 	}
-	if subscription.IsProPlan(plan) {
+	if subscription.Entitled(plan) {
 		return Entitlements{MaxCandidates: ProMaxCandidates, AllowMultiCity: true}
 	}
 	return free

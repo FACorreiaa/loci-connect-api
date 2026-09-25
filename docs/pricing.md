@@ -28,6 +28,24 @@ labelled by the model that answered) carry the real usage; divide either by
 Historic tier table (superseded): free 5/day, paid 10/day, premium unlimited.
 The `paid`/`explorer` plan strings never existed in the DB enum and were removed.
 
+## Plan gating (switched off 2026-09-25)
+
+**Nothing is gated by plan today.** `PLAN_GATING` (env, default `false`) sets
+`subscription.SetGating`; every feature gate asks `subscription.Entitled(plan)`,
+which is true for every plan while gating is off and only for Pro plans while
+it is on. Sites that go through it: trip exports (PDF Day-1 trim, Markdown
+lock), the calendar push's Day-1 trim, list and place caps
+(`ListLimitForPlan`, `PlaceLimitForPlan`), compare candidates and multi-city,
+the POI target per day, and `GetEntitlements` (limits `-1`, `export_full` and
+`advanced_filters` on). What a plan *is* never changes: `IsProPlan` stays
+truthful for billing, and the daily LLM quota and model routing are cost
+controls, not features, so they keep reading the real plan.
+
+The decision and the order to gate features in when there are users to gate
+live in the iOS roadmap (`loci-ios/docs/ios/ROADMAP.md`, "Deferred — Pro
+gating"). To re-enable: set `PLAN_GATING=true` on the API, flip
+`PLAN_GATING_ENABLED` in the web client and `PlanGating.enabled` on iOS.
+
 ## Implementation Strategy
 
 ### 1. Database Schema

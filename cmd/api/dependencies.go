@@ -454,6 +454,10 @@ func (d *Dependencies) initServices() error {
 	d.UserSvc = user.NewUserService(d.UserRepo, d.Logger)
 	d.InterestSvc = interestrepo.NewService(d.InterestRepo, d.Logger)
 	d.TagsSvc = tagrepo.NewtagsService(d.TagRepo, d.Logger)
+	// Feature gates read this once at boot; off means every plan gets the Pro
+	// feature set (docs/pricing.md, "Plan gating").
+	subscription.SetGating(d.Config.Subscription.PlanGating)
+	d.Logger.Info("plan gating", slog.Bool("enabled", d.Config.Subscription.PlanGating))
 	d.SubscriptionService = subscription.NewService(d.UsageRepo, d.Logger, d.Config.Auth.AdminEmail, subscription.Limits{
 		FreeDaily: d.Config.Subscription.FreeDailyLLMLimit,
 		ProDaily:  d.Config.Subscription.ProDailyLLMLimit,
