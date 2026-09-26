@@ -118,9 +118,9 @@ func NewSharingRepository(db *pgxpool.Pool, logger *slog.Logger) SharingReposito
 func (r *sharingRepository) SetVisibility(ctx context.Context, id, owner uuid.UUID, vis Visibility, shareDetails bool, code string) (*Trip, error) {
 	ct, err := r.db.Exec(ctx, `
 		UPDATE trips
-		SET visibility = $1, share_details = $2,
-		    is_public = ($1 <> 1),
-		    share_code = CASE WHEN $1 = 1 THEN share_code ELSE COALESCE(share_code, $3) END,
+		SET visibility = $1::smallint, share_details = $2,
+		    is_public = ($1::smallint <> 1),
+		    share_code = CASE WHEN $1::smallint = 1 THEN share_code ELSE COALESCE(share_code, $3) END,
 		    updated_at = NOW()
 		WHERE id = $4 AND user_id = $5`, vis, shareDetails, code, id, owner)
 	if err != nil {
