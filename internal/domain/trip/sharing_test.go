@@ -82,6 +82,12 @@ func TestRedactForViewerHidesPrivateDetails(t *testing.T) {
 	if shared.GetShareCode() != "" {
 		t.Error("share code leaked with details on")
 	}
+
+	public := sharedDraft()
+	public.Visibility = tripv1.TripVisibility_TRIP_VISIBILITY_PUBLIC
+	if redactForViewer(public, false, owner).GetShareCode() != "abc123" {
+		t.Error("a public trip lost the link signed-out visitors open it by")
+	}
 }
 
 func TestCopyOfIsANewPrivateTrip(t *testing.T) {

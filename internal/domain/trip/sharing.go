@@ -271,7 +271,13 @@ func (h *Handler) respondShared(ctx context.Context, viewer uuid.UUID, t *Trip) 
 }
 
 func redactForViewer(p *tripv1.TripDraft, shareDetails bool, owner *socialv1.PublicUser) *tripv1.TripDraft {
-	p.ShareCode = ""
+	// A public trip's link is no secret (the trip is listed on the owner's
+	// profile) and it is how a signed-out visitor opens it. Every other
+	// level keeps its link to the owner: a friend re-sharing it would widen
+	// who can see the trip.
+	if p.GetVisibility() != tripv1.TripVisibility_TRIP_VISIBILITY_PUBLIC {
+		p.ShareCode = ""
+	}
 	p.SourceSessionId = nil
 	p.Owner = owner
 	if !shareDetails {
