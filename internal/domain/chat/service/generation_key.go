@@ -44,7 +44,16 @@ const (
 	partHotels      generationPart = "hotels"
 	partRestaurants generationPart = "restaurants"
 	partActivities  generationPart = "activities"
+	partGastronomy  generationPart = "gastronomy"
 )
+
+// isCityScopedPart reports whether the part's prompt names nothing but the
+// city. Such a part is keyed on the city alone — no domain, no query — so one
+// answer serves every request about that city, including the standalone
+// GetCityGastronomy lookup.
+func isCityScopedPart(p generationPart) bool {
+	return p == partGastronomy
+}
 
 // isPersonalPart reports whether the part's prompt carries anything about the
 // traveller: the preference profile and, through the evidence packet, the
@@ -96,7 +105,7 @@ func partUsesPOITarget(p generationPart) bool {
 // the place lists it was built from.
 func partTTL(p generationPart) time.Duration {
 	switch p {
-	case partCityData:
+	case partCityData, partGastronomy:
 		return 30 * 24 * time.Hour
 	case partItinerary:
 		return 14 * 24 * time.Hour
@@ -392,14 +401,19 @@ func buildGenerationKey(in generationKeyInput) string {
 		snapshot = ""
 	}
 
+	domain, query := string(in.Domain), normalizeRequestText(in.Query)
+	if isCityScopedPart(in.Part) {
+		domain, query = "", ""
+	}
+
 	components := []string{
 		generationTemplateVersion,
 		string(in.Part),
-		string(in.Domain),
+		domain,
 		city,
 		in.ModelID,
 		generationLanguage,
-		normalizeRequestText(in.Query),
+		query,
 		snapshot,
 	}
 	if isPersonalPart(in.Part) {
@@ -416,6 +430,18 @@ func buildGenerationKey(in generationKeyInput) string {
 
 	sum := sha256.Sum256([]byte(strings.Join(components, "\x00")))
 	return "gen:" + hex.EncodeToString(sum[:])
+}
+
+// gastronomyCacheKey is the key a city's gastronomy is stored under. The chat
+// pipeline and GetCityGastronomy both use it, so either one fills the cache
+// for the other.
+func gastronomyCacheKey(cityID uuid.UUID, cityName, modelID string) string {
+	return buildGenerationKey(generationKeyInput{
+		Part:     partGastronomy,
+		CityID:   cityID,
+		CityName: cityName,
+		ModelID:  modelID,
+	})
 }
 
 // extractionCacheKey keys the city-extraction step by the raw message alone.

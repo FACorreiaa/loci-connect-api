@@ -125,8 +125,9 @@ func TestLookupPrefersMemoryOverTheDurableLayer(t *testing.T) {
 	cc := testChatContext(t, "three days in funchal")
 	cc.Cacheable = true
 	plan := l.planGeneration(cc)
-	if len(plan) != 3 {
-		t.Fatalf("planned %d parts, want 3", len(plan))
+	// city_data, general_pois, itinerary and gastronomy.
+	if len(plan) != 4 {
+		t.Fatalf("planned %d parts, want 4", len(plan))
 	}
 	l.cache.Set(plan[0].CacheKey, validCityData, time.Minute)
 
@@ -487,8 +488,8 @@ func TestInteractionRowRecordsWhatTheTurnCost(t *testing.T) {
 	if err := json.Unmarshal(row.ResponsePayload, &payload); err != nil {
 		t.Fatalf("ResponsePayload: %v", err)
 	}
-	if len(payload.Parts) != 3 {
-		t.Fatalf("payload holds %d parts, want 3", len(payload.Parts))
+	if len(payload.Parts) != 4 {
+		t.Fatalf("payload holds %d parts, want 4", len(payload.Parts))
 	}
 	if got := payload.Parts[string(partCityData)].ServedFrom; got != observability.LLMCacheLayerMemory {
 		t.Errorf("city_data served_from = %q", got)

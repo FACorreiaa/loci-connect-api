@@ -276,6 +276,14 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	parsePart(partHotels, &data.Hotels)
 	parsePart(partRestaurants, &data.Restaurants)
 	parsePart(partActivities, &data.Activities)
+	if raw, ok := rawResponses[string(partGastronomy)]; ok {
+		if g, err := parseGastronomy(raw); err == nil && g.Usable() {
+			data.Gastronomy = g
+		} else {
+			l.logger.WarnContext(ctx, "gastronomy part unusable, omitting it",
+				slog.String("city_name", cc.CityName), slog.Any("error", err))
+		}
+	}
 
 	// Day numbering is decided here, not by the model and not by the clients.
 	// PlannedDays comes from the parsed request rather than from whatever the
@@ -409,7 +417,30 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 
 	runPart := func(p partPlan) {
 		partType := string(p.Part)
+		optional := isOptionalPart(p.Part)
+		send := sendEventWithResponse
+		if optional {
+			// An optional part's failure is not the turn's failure: its error
+			// events must not reach a client that would show them.
+			send = func(event locitypes.StreamEvent) {
+				if event.Type == locitypes.EventTypeError {
+					return
+				}
+				sendEventWithResponse(event)
+			}
+		}
 		g.Go(func() (err error) {
+			if optional {
+				defer func() {
+					if err != nil {
+						l.logger.WarnContext(gctx, "optional part failed, continuing without it",
+							slog.String("part_type", partType), slog.Any("error", err))
+						err = nil
+						return
+					}
+					l.emitGastronomy(workerCtx, cc, responses, &responsesMutex)
+				}()
+			}
 			defer func() {
 				if r := recover(); r != nil {
 					l.logger.ErrorContext(gctx, "stream worker panicked",
@@ -424,7 +455,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 
 			outcome := common.PartOutcome{CacheKey: p.CacheKey, ModelID: p.ModelID}
 			if p.Hit != nil {
-				err = l.replayCachedPart(gctx, p, sendEventWithResponse, cc.Domain)
+				err = l.replayCachedPart(gctx, p, send, cc.Domain)
 				outcome.ServedFrom = p.Hit.Layer
 				outcome.ModelVersion = p.Hit.ModelVersion
 				outcome.TokensOut = p.Hit.TokensOut
@@ -433,7 +464,7 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 				// packet retrieval produced for this turn.
 				prompt := p.Prompt(cc.Packet)
 				var res streamResult
-				res, err = l.streamPartFromLLM(gctx, p, prompt, sendEventWithResponse, cc.Domain)
+				res, err = l.streamPartFromLLM(gctx, p, prompt, send, cc.Domain)
 				outcome.ServedFrom = servedFromLLM
 				outcome.PromptHash = promptHash(prompt)
 				outcome.ModelVersion = res.ModelVersion
@@ -498,6 +529,37 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 	}
 	l.logger.InfoContext(ctx, "All streaming workers completed")
 	return finalResponses, nil
+}
+
+// isOptionalPart reports whether a part may fail without failing the turn.
+// Gastronomy is an extra section on itinerary and general answers; a turn that
+// produced the itinerary but not the food section is still a good answer.
+func isOptionalPart(p generationPart) bool {
+	return p == partGastronomy
+}
+
+// emitGastronomy sends the gastronomy section as soon as its part is complete,
+// so clients can render it before the itinerary event. The same value is on
+// AiCityResponse.gastronomy in the itinerary and completion events.
+func (l *ServiceImpl) emitGastronomy(ctx context.Context, cc *common.ChatContext, responses map[string]*strings.Builder, mu *sync.Mutex) {
+	mu.Lock()
+	var raw string
+	if b := responses[string(partGastronomy)]; b != nil {
+		raw = b.String()
+	}
+	mu.Unlock()
+
+	g, err := parseGastronomy(raw)
+	if err != nil || !g.Usable() {
+		return
+	}
+	l.sendEvent(ctx, cc.EventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeGastronomy,
+		Data: locitypes.StreamGastronomyData{
+			Gastronomy: *g,
+			SessionID:  cc.SessionID.String(),
+		},
+	}, 3)
 }
 
 // persistResults handles saving City, generations, Interactions, and Session updates.

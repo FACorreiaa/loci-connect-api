@@ -41,6 +41,7 @@ func ToAiCityResponse(resp *locitypes.AiCityResponse) *chatv1.AiCityResponse {
 		Hotels:      ToPOIDetailedInfoSlice(locitypes.HotelsToPOIs(resp.Hotels)),
 		Restaurants: ToPOIDetailedInfoSlice(locitypes.RestaurantsToPOIs(resp.Restaurants)),
 		Activities:  ToPOIDetailedInfoSlice(resp.Activities),
+		Gastronomy:  ToCityGastronomy(resp.Gastronomy),
 	}
 }
 

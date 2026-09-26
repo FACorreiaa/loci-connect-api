@@ -79,7 +79,9 @@ func (i *TimeoutInterceptor) resolveUnaryTimeout(procedure string, header http.H
 
 func isChatUnaryProcedure(procedure string) bool {
 	return strings.Contains(procedure, "StartChat") ||
-		strings.Contains(procedure, "ContinueChat")
+		strings.Contains(procedure, "ContinueChat") ||
+		// A gastronomy cache miss is one full generation.
+		strings.Contains(procedure, "GetCityGastronomy")
 }
 
 func parseClientTimeout(header http.Header) (time.Duration, bool) {

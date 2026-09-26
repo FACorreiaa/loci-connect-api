@@ -29,6 +29,8 @@ func nestedKeyForPart(p generationPart) string {
 		return "restaurants"
 	case partActivities:
 		return "activities"
+	case partGastronomy:
+		return "gastronomy"
 	}
 	return ""
 }
@@ -116,6 +118,10 @@ func validateGeneratedPart(part generationPart, raw string, target int) bool {
 	case partRestaurants:
 		var restaurants []locitypes.RestaurantDetailedInfo
 		return parseGeneratedPart(part, raw, &restaurants) == nil && enough(len(restaurants))
+	case partGastronomy:
+		// A fixed-size answer: the POI floor does not apply.
+		g, err := parseGastronomy(raw)
+		return err == nil && g.Usable()
 	}
 	return false
 }
@@ -352,4 +358,15 @@ func cityIDOrNil(id uuid.UUID) *uuid.UUID {
 		return nil
 	}
 	return &id
+}
+
+// parseGastronomy decodes and normalises a gastronomy part. Both the chat
+// pipeline and GetCityGastronomy read it through here.
+func parseGastronomy(raw string) (*locitypes.CityGastronomy, error) {
+	var g locitypes.CityGastronomy
+	if err := parseGeneratedPart(partGastronomy, raw, &g); err != nil {
+		return nil, err
+	}
+	g.Normalize()
+	return &g, nil
 }

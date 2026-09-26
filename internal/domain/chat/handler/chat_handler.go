@@ -652,6 +652,16 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
 
+	case locitypes.EventTypeGastronomy:
+		var gd locitypes.StreamGastronomyData
+		if !decodeData(event.Data, &gd) {
+			return nil, fmt.Errorf("gastronomy event %q: undecodable data", event.EventID)
+		}
+		resp.Payload = &chatv1.StreamEvent_Gastronomy{Gastronomy: &chatv1.GastronomyPayload{
+			Gastronomy: presenter.ToCityGastronomy(&gd.Gastronomy),
+			SessionId:  gd.SessionID,
+		}}
+
 	case "activities":
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
@@ -857,6 +867,8 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_COMPLETE
 	case locitypes.EventTypeRoute:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ROUTE
+	case locitypes.EventTypeGastronomy:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_GASTRONOMY
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
 	}
@@ -1175,6 +1187,7 @@ var tokenPartIndex = map[string]int32{
 	"hotels":       3,
 	"restaurants":  4,
 	"activities":   5,
+	"gastronomy":   6,
 }
 
 // streamBudget bounds a whole stream. A multi-city trip runs its cities one

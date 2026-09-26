@@ -58,6 +58,10 @@ const (
 	maxOutputTokensCap = 32768
 )
 
+// gastronomyPlaceBudget sizes the gastronomy part's output budget: up to ten
+// dishes with up to three places each, counted as places.
+const gastronomyPlaceBudget = 24
+
 func outputTokenBudget(target int) int32 {
 	budget := baseOutputTokens + tokensPerPlace*target
 	if budget > maxOutputTokensCap {
@@ -174,6 +178,15 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 		return getCityDataPrompt(cc.CityName)
 	})
 
+	// Gastronomy names nothing but the city: no preferences, no packet (its
+	// places are light references, not POIs to cite), and a fixed size, so its
+	// token budget is set by what it asks for rather than by the trip's POI
+	// target.
+	gastronomy := part(partGastronomy, func(_ string, _ *retrieval.ContextPacket) string {
+		return getGastronomyPrompt(cc.CityName)
+	})
+	gastronomy.POITarget = gastronomyPlaceBudget
+
 	switch cc.Domain {
 	case locitypes.DomainItinerary, locitypes.DomainGeneral:
 		return []partPlan{
@@ -186,6 +199,7 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 			part(partItinerary, func(prefs string, packet *retrieval.ContextPacket) string {
 				return groundPrompt(getPersonalizedItineraryPrompt(cc.CityName, cc.Message, prefs, cc.POITarget, cc.TripDays, assumedDays), packet)
 			}),
+			gastronomy,
 		}
 	case locitypes.DomainAccommodation:
 		return []partPlan{

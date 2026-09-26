@@ -124,7 +124,11 @@ type AiCityResponse struct {
 	Hotels              []HotelDetailedInfo      `json:"hotels,omitempty"`
 	Restaurants         []RestaurantDetailedInfo `json:"restaurants,omitempty"`
 	Activities          []POIDetailedInfo        `json:"activities,omitempty"`
-	SessionID           uuid.UUID                `json:"session_id"`
+	// Gastronomy is the city's typical gastronomy, generated alongside
+	// itinerary and general answers. Nil for other domains and when its
+	// generation failed; it never fails the answer it rides on.
+	Gastronomy *CityGastronomy `json:"gastronomy,omitempty"`
+	SessionID  uuid.UUID       `json:"session_id"`
 }
 
 type GenAIResponse struct {
