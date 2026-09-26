@@ -201,6 +201,10 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 			}),
 			gastronomy,
 		}
+	case locitypes.DomainGastronomy:
+		// A gastronomy search is the gastronomy part itself, plus the city
+		// header every result page shows.
+		return []partPlan{cityData, gastronomy}
 	case locitypes.DomainAccommodation:
 		return []partPlan{
 			cityData,

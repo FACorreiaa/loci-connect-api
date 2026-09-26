@@ -241,17 +241,70 @@ func TestHasLiveWords(t *testing.T) {
 	}
 }
 
-func TestNormalizeRequestText(t *testing.T) {
-	cases := map[string]string{
-		"  3 Days   in Funchal!! ": "3 days in funchal",
-		"Winter trip.":             "winter trip",
-		"":                         "",
-		"...":                      "",
+func TestCanonicalRequestText(t *testing.T) {
+	same := [][]string{
+		{"Food in Madeira", "Gastronomy in Madeira", "madeira cuisine?", "Madeira dishes", "what to eat in Madeira"},
+		{"3 days in Funchal", "Three days in Funchal!!", "  3 Days   in Funchal. ", "3-day trip to Funchal", "itinerary for 3 days in Funchal"},
+		{"restaurants in Madeira", "Best restaurants in Madeira", "Show me some restaurants in madeira please"},
+		{"things to do in Madeira", "activities in Madeira", "What are the best attractions in Madeira?"},
+		{"hotels in Madeira", "accommodation in Madeira", "where to stay in Madeira"},
+		{"museums in Madeira", "museum in Madeira"},
 	}
-	for in, want := range cases {
-		if got := normalizeRequestText(in); got != want {
-			t.Errorf("normalizeRequestText(%q) = %q, want %q", in, got, want)
+	for _, group := range same {
+		want := canonicalRequestText(group[0], "Madeira")
+		if group[0] == "3 days in Funchal" {
+			want = canonicalRequestText(group[0], "Funchal")
 		}
+		for _, q := range group[1:] {
+			city := "Madeira"
+			if strings.Contains(q, "Funchal") {
+				city = "Funchal"
+			}
+			if got := canonicalRequestText(q, city); got != want {
+				t.Errorf("canonical(%q) = %q, want %q (as %q)", q, got, want, group[0])
+			}
+		}
+	}
+
+	different := [][2]string{
+		{"summer activities in Madeira", "winter activities in Madeira"},
+		{"hotels in Madeira", "hostels in Madeira"},
+		{"vegan restaurants in Madeira", "restaurants in Madeira"},
+		{"3 days in Madeira", "5 days in Madeira"},
+		{"restaurants in Madeira", "food in Madeira"},
+	}
+	for _, pair := range different {
+		if canonicalRequestText(pair[0], "Madeira") == canonicalRequestText(pair[1], "Madeira") {
+			t.Errorf("%q and %q share a key, but ask for different things", pair[0], pair[1])
+		}
+	}
+
+	if got := canonicalRequestText("", "Madeira"); got != "" {
+		t.Errorf("empty request = %q", got)
+	}
+}
+
+// The canonical text is what the key hashes, so equivalent requests from the
+// same traveller with the same settings reach the same cached answer — and a
+// settings change still misses.
+func TestGenerationKeyFoldsEquivalentRequests(t *testing.T) {
+	base := generationKeyInput{
+		Part: partRestaurants, Domain: locitypes.DomainDining, CityName: "Madeira",
+		ModelID: "m", UserID: uuid.New(), SnapshotHash: "summer", POITarget: 10,
+	}
+	a, b := base, base
+	a.Query = "restaurants in Madeira"
+	b.Query = "Show me the best restaurants in madeira!"
+	if buildGenerationKey(a) != buildGenerationKey(b) {
+		t.Error("equivalent requests got different keys")
+	}
+	b.SnapshotHash = "winter"
+	if buildGenerationKey(a) == buildGenerationKey(b) {
+		t.Error("different settings share a key")
+	}
+	b.SnapshotHash, b.UserID = "summer", uuid.New()
+	if buildGenerationKey(a) == buildGenerationKey(b) {
+		t.Error("personal parts of two users share a key")
 	}
 }
 
@@ -490,7 +543,9 @@ func TestGenerationKeyIsStable(t *testing.T) {
 	}
 	// Moved when trip length joined the key (multi-city review #8): one miss
 	// per cached answer, once, instead of a wrong-length plan served forever.
-	const want = "gen:d455d615f1dece410b365133825caf25d8a66083a34b197dd503383aabfe285c"
+	// Moved again when the query became canonical (canonicalRequestText): one
+	// miss per cached answer, once, and then equivalent wordings share it.
+	const want = "gen:1596902235df0d5976723eb145e79d646a5beda232247fa125825871fa5644f9"
 	if got := buildGenerationKey(in); got != want {
 		t.Errorf("generation key = %q, want %q", got, want)
 	}

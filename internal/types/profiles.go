@@ -347,6 +347,9 @@ const (
 	DomainItinerary     DomainType = "itinerary"
 	DomainTransport     DomainType = "transport"
 	DomainNearby        DomainType = "nearby"
+	// DomainGastronomy is a city's typical food: dishes and the famous places
+	// to eat them, rather than a list of restaurants.
+	DomainGastronomy DomainType = "gastronomy"
 )
 
 // CombinedFilters represents merged filters from all domains

@@ -20,6 +20,7 @@ func TestResultPath(t *testing.T) {
 		{"dining", "/restaurants?sessionId=" + sid.String() + "&cityName=Crete&domain=restaurants", "restaurants", uuid.Nil},
 		{"activities", "/activities?sessionId=" + sid.String() + "&cityName=Crete&domain=activities", "activities", uuid.Nil},
 		{"nearby", "/nearme?sessionId=" + sid.String() + "&cityName=Crete&domain=nearme", "nearme", uuid.Nil},
+		{"gastronomy", "/gastronomy?sessionId=" + sid.String() + "&cityName=Crete&domain=gastronomy", "gastronomy", uuid.Nil},
 		{"accommodation", "/hotels?sessionId=" + sid.String() + "&cityName=Crete&domain=hotels", "hotels", trip},
 		{"dining", "/restaurants?sessionId=" + sid.String() + "&cityName=Crete&domain=restaurants", "restaurants", trip},
 		{"activities", "/activities?sessionId=" + sid.String() + "&cityName=Crete&domain=activities", "activities", trip},

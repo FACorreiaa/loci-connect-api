@@ -417,7 +417,9 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 
 	runPart := func(p partPlan) {
 		partType := string(p.Part)
-		optional := isOptionalPart(p.Part)
+		// Gastronomy is optional when it rides on another answer, and the
+		// answer itself on a gastronomy search.
+		optional := isOptionalPart(p.Part) && cc.Domain != locitypes.DomainGastronomy
 		send := sendEventWithResponse
 		if optional {
 			// An optional part's failure is not the turn's failure: its error
@@ -430,17 +432,17 @@ func (l *ServiceImpl) orchestrateLLMStreams(cc *common.ChatContext, plan []partP
 			}
 		}
 		g.Go(func() (err error) {
-			if optional {
-				defer func() {
-					if err != nil {
-						l.logger.WarnContext(gctx, "optional part failed, continuing without it",
-							slog.String("part_type", partType), slog.Any("error", err))
-						err = nil
-						return
-					}
+			defer func() {
+				if err != nil && optional {
+					l.logger.WarnContext(gctx, "optional part failed, continuing without it",
+						slog.String("part_type", partType), slog.Any("error", err))
+					err = nil
+					return
+				}
+				if err == nil && p.Part == partGastronomy {
 					l.emitGastronomy(workerCtx, cc, responses, &responsesMutex)
-				}()
-			}
+				}
+			}()
 			defer func() {
 				if r := recover(); r != nil {
 					l.logger.ErrorContext(gctx, "stream worker panicked",
@@ -737,6 +739,15 @@ func (l *ServiceImpl) persistResults(
 				SessionID:       cc.SessionID.String(),
 			},
 		}, 3)
+	case locitypes.DomainGastronomy:
+		// The gastronomy event went out when its part finished. All that is
+		// left to say is that there was nothing usable to send.
+		if data.Gastronomy == nil {
+			l.sendEvent(context.Background(), cc.EventCh, locitypes.StreamEvent{
+				Type:  locitypes.EventTypeError,
+				Error: fmt.Sprintf("We couldn't find the typical food of %s. Please try again.", cc.CityName),
+			}, 3)
+		}
 	case locitypes.DomainNearby:
 		// For nearby domain, the handleNearbyDomain already sends events directly
 		// Don't send another event here as it would overwrite the POI data with empty data

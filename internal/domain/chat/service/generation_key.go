@@ -322,15 +322,6 @@ func profileSnapshotHash(scoped *locitypes.UserPreferenceProfileResponse) string
 	return hex.EncodeToString(sum[:])
 }
 
-// normalizeRequestText folds the traveller's request into the form the key
-// hashes: lower-cased, whitespace collapsed, trailing punctuation dropped, so
-// "3 days in Funchal." and "3 days in funchal" are the same request.
-func normalizeRequestText(s string) string {
-	s = normalizeCacheComponent(s)
-	s = strings.TrimRight(s, ".,;:!?")
-	return strings.TrimSpace(s)
-}
-
 // liveWordsRE matches phrasing that pins a request to the present moment. An
 // answer to "what is open right now" is wrong an hour later, so such requests
 // are never served from a durable cache.
@@ -401,7 +392,7 @@ func buildGenerationKey(in generationKeyInput) string {
 		snapshot = ""
 	}
 
-	domain, query := string(in.Domain), normalizeRequestText(in.Query)
+	domain, query := string(in.Domain), canonicalRequestText(in.Query, in.CityName)
 	if isCityScopedPart(in.Part) {
 		domain, query = "", ""
 	}

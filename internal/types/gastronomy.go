@@ -26,6 +26,8 @@ type Dish struct {
 	Category    string            `json:"category"`
 	IsSignature bool              `json:"is_signature"`
 	Places      []GastronomyPlace `json:"places"`
+	// Tags are main-ingredient and diet tags (GastronomyTags), for filtering.
+	Tags []string `json:"tags,omitempty"`
 }
 
 // GastronomyPlace is a light reference to a well-known place to eat a dish.
@@ -50,6 +52,21 @@ const (
 	DishCategoryDessert    = "dessert"
 	DishCategoryDrink      = "drink"
 )
+
+// GastronomyTags is the tag vocabulary the prompt offers. Normalize keeps
+// only these, so a filter chip always matches the same spelling.
+var GastronomyTags = []string{
+	"seafood", "fish", "meat", "pork", "beef", "poultry", "vegetarian", "vegan",
+	"cheese", "pastry", "bread", "soup", "rice", "fruit", "spicy", "alcoholic",
+}
+
+var gastronomyTagSet = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(GastronomyTags))
+	for _, t := range GastronomyTags {
+		m[t] = struct{}{}
+	}
+	return m
+}()
 
 // MinGastronomyDishes is the fewest dishes an answer may have and still be
 // shown or cached. Fewer means the model did not really answer.
@@ -82,6 +99,7 @@ func (g *CityGastronomy) Normalize() {
 			places = append(places, p)
 		}
 		d.Places = places
+		d.Tags = normalizeTags(d.Tags)
 		dishes = append(dishes, d)
 	}
 	g.Dishes = dishes
@@ -99,4 +117,29 @@ func (g *CityGastronomy) Usable() bool {
 		}
 	}
 	return true
+}
+
+// normalizeTags lower-cases tags, keeps the known vocabulary, and drops
+// duplicates, preserving order.
+func normalizeTags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, t := range tags {
+		t = strings.ToLower(strings.TrimSpace(t))
+		if _, known := gastronomyTagSet[t]; !known {
+			continue
+		}
+		if _, dup := seen[t]; dup {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

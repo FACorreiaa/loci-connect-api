@@ -31,6 +31,8 @@ func DomainToProto(d string) chatv1.DomainType {
 		return chatv1.DomainType_DOMAIN_TYPE_ITINERARY
 	case "transport":
 		return chatv1.DomainType_DOMAIN_TYPE_TRANSPORT
+	case "gastronomy":
+		return chatv1.DomainType_DOMAIN_TYPE_GASTRONOMY
 	case "general", "nearby":
 		return chatv1.DomainType_DOMAIN_TYPE_GENERAL
 	default:

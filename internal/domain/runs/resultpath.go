@@ -21,6 +21,8 @@ func ResultPath(domain string, sessionID uuid.UUID, cityName string, tripID uuid
 		routeType, base = "activities", "/activities"
 	case "nearby":
 		routeType, base = "nearme", "/nearme"
+	case "gastronomy":
+		routeType, base = "gastronomy", "/gastronomy"
 	default:
 		routeType, base = "itinerary", "/itinerary"
 	}

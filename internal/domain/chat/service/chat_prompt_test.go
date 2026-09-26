@@ -232,12 +232,14 @@ var pinnedTemplateFingerprints = map[generationPart]string{
 	partHotels:      "8674f47c7d6334b224833f922def2cc7352c7a379d9192b56626c4abac523344",
 	partRestaurants: "da8ae369da2b7d7e045ec16552c85c26429ef4e474a227eb05588bf0336cc892",
 	partActivities:  "b44b4f30cb1bfabb94ebba67d1fea60f0204176543e519007ca0c4be4ac61244",
+	partGastronomy:  "baa201539d834052c4579acc83ed5cd058615f074e30c86923083f824e1b8c64",
 }
 
 func templateFingerprints() map[generationPart]string {
 	out := personalPrompts(fixtureRequest, fixtureProfile())
 	out[partCityData] = getCityDataPrompt(fixtureCity)
 	out[partGeneralPOIs] = getGeneralPOIPrompt(fixtureCity, fixtureRequest, fixtureTarget, fixtureDays, fixtureAssumed)
+	out[partGastronomy] = getGastronomyPrompt(fixtureCity)
 	for part, prompt := range out {
 		sum := sha256.Sum256([]byte(prompt))
 		out[part] = hex.EncodeToString(sum[:])

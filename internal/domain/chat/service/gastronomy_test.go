@@ -103,6 +103,7 @@ func TestPlanIncludesGastronomyOnlyForItineraryAndGeneral(t *testing.T) {
 	for domain, want := range map[locitypes.DomainType]bool{
 		locitypes.DomainItinerary:     true,
 		locitypes.DomainGeneral:       true,
+		locitypes.DomainGastronomy:    true,
 		locitypes.DomainDining:        false,
 		locitypes.DomainAccommodation: false,
 		locitypes.DomainActivities:    false,
@@ -236,5 +237,27 @@ func TestIsOptionalPart(t *testing.T) {
 		if isOptionalPart(p) {
 			t.Errorf("%s must not be optional", p)
 		}
+	}
+}
+
+// A gastronomy search is the city header and the gastronomy itself; nothing
+// personal, so it is served from the one city-scoped entry.
+func TestGastronomyDomainPlan(t *testing.T) {
+	l := newPlanService(t, nil)
+	cc := testChatContext(t, "food in Madeira")
+	cc.Domain = locitypes.DomainGastronomy
+	cc.CityName = "Madeira"
+	plan := l.planGeneration(cc)
+	if len(plan) != 2 || plan[0].Part != partCityData || plan[1].Part != partGastronomy {
+		t.Fatalf("plan = %+v, want city_data + gastronomy", plan)
+	}
+	if plan[1].CacheKey != gastronomyCacheKey(cc.CityID, cc.CityName, l.modelFor(cc.Ctx)) {
+		t.Error("the gastronomy search does not share the standalone lookup's key")
+	}
+	other := testChatContext(t, "gastronomy in madeira")
+	other.Domain = locitypes.DomainGastronomy
+	other.CityName = "Madeira"
+	if l.planGeneration(other)[1].CacheKey != plan[1].CacheKey {
+		t.Error("food in Madeira and gastronomy in Madeira miss each other")
 	}
 }

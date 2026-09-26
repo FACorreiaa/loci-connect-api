@@ -38,6 +38,7 @@ func ToCityGastronomy(g *locitypes.CityGastronomy) *gastronomyv1.CityGastronomy 
 			Category:    ToDishCategory(d.Category),
 			IsSignature: d.IsSignature,
 			Places:      places,
+			Tags:        d.Tags,
 		})
 	}
 	return &gastronomyv1.CityGastronomy{

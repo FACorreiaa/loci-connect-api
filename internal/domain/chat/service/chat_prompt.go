@@ -607,6 +607,7 @@ Only name places you are confident exist; never invent a place, an address or a 
 Leave a field empty ("") rather than guess. Give latitude/longitude only when you are sure; otherwise omit them.
 category is one of: "main", "street_food", "snack", "dessert", "drink".
 price_range is "€", "€€" or "€€€" (use the local currency symbol), or "".
+tags lists the dish's main ingredients and diet, chosen only from: %s.
 Respond ONLY WITH with JSON:
 {
     "gastronomy": {
@@ -621,6 +622,7 @@ Respond ONLY WITH with JSON:
                 "description": "What it is and how it is eaten (30-60 words)",
                 "category": "main",
                 "is_signature": true,
+                "tags": ["seafood"],
                 "places": [
                     {
                         "name": "Place name",
@@ -637,5 +639,5 @@ Respond ONLY WITH with JSON:
         ],
         "dining_tips": ["Practical tip: meal times, tipping, how to order"]
     }
-}`, cityName, cityName, cityName, cityName)
+}`, cityName, cityName, cityName, strings.Join(locitypes.GastronomyTags, ", "), cityName)
 }

@@ -3,6 +3,7 @@ package locitypes
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"time"
 	"unicode"
@@ -463,8 +464,11 @@ var (
 		"hotel", "hotels", "hostel", "hostels", "accommodation", "stay", "sleep", "room", "rooms",
 		"booking", "bookings", "airbnb", "lodge", "resort", "resorts", "guesthouse", "guesthouses",
 		// Dining keywords
-		"restaurant", "restaurants", "food", "eat", "dine", "meal", "meals", "cuisine",
+		"restaurant", "restaurants", "eat", "dine", "meal", "meals",
 		"drink", "drinks", "cafe", "cafes", "bar", "bars", "lunch", "dinner", "breakfast", "brunch",
+		// Gastronomy keywords
+		"gastronomy", "gastronomic", "food", "foods", "cuisine", "cuisines", "dish", "dishes",
+		"specialty", "specialties", "speciality", "specialities", "delicacy", "delicacies", "foodie",
 		// Activities keywords
 		"activity", "activities", "museum", "museums", "park", "parks", "attraction", "attractions", "tour", "tours", "visit",
 		"see", "do", "experience", "experiences", "adventure", "adventures", "shopping", "nightlife",
@@ -488,13 +492,22 @@ var (
 		"lodge": DomainAccommodation, "resort": DomainAccommodation, "resorts": DomainAccommodation,
 		"guesthouse": DomainAccommodation, "guesthouses": DomainAccommodation,
 		// Dining
-		"restaurant": DomainDining, "restaurants": DomainDining, "food": DomainDining,
+		"restaurant": DomainDining, "restaurants": DomainDining,
 		"eat": DomainDining, "dine": DomainDining,
-		"meal": DomainDining, "meals": DomainDining, "cuisine": DomainDining,
+		"meal": DomainDining, "meals": DomainDining,
 		"drink": DomainDining, "drinks": DomainDining, "cafe": DomainDining, "cafes": DomainDining,
 		"bar": DomainDining, "bars": DomainDining, "lunch": DomainDining,
 		"dinner": DomainDining, "breakfast": DomainDining,
 		"brunch": DomainDining,
+		// Gastronomy: what a place eats, not where to book a table. "food in
+		// Madeira" and "gastronomy in Madeira" are the same request.
+		"gastronomy": DomainGastronomy, "gastronomic": DomainGastronomy,
+		"food": DomainGastronomy, "foods": DomainGastronomy, "foodie": DomainGastronomy,
+		"cuisine": DomainGastronomy, "cuisines": DomainGastronomy,
+		"dish": DomainGastronomy, "dishes": DomainGastronomy,
+		"specialty": DomainGastronomy, "specialties": DomainGastronomy,
+		"speciality": DomainGastronomy, "specialities": DomainGastronomy,
+		"delicacy": DomainGastronomy, "delicacies": DomainGastronomy,
 		// Activities
 		"activity": DomainActivities, "activities": DomainActivities, "museum": DomainActivities, "museums": DomainActivities,
 		"park": DomainActivities, "parks": DomainActivities, "attraction": DomainActivities, "attractions": DomainActivities,
@@ -515,9 +528,10 @@ var (
 		DomainNearby:        0, // Highest priority - location-based queries
 		DomainItinerary:     1,
 		DomainAccommodation: 2,
-		DomainDining:        3,
-		DomainActivities:    4,
-		DomainGeneral:       5, // Lowest priority
+		DomainDining:        3, // "food restaurants" is a restaurant search
+		DomainGastronomy:    4,
+		DomainActivities:    5,
+		DomainGeneral:       6, // Lowest priority
 	}
 )
 
@@ -550,40 +564,24 @@ func (c *SimpleIntentClassifier) Classify(_ context.Context, message string) (In
 // DomainDetector detects the primary domain from user queries
 type DomainDetector struct{}
 
+// whatToEatRE catches the one gastronomy phrasing that is built from a
+// dining keyword: "what to eat in Porto" asks what the food is, not where to
+// book, while "where to eat" stays a restaurant search.
+var whatToEatRE = regexp.MustCompile(`\bwhat (?:to|should (?:i|we)|do (?:people|locals)) eat\b`)
+
 func (d *DomainDetector) DetectDomain(_ context.Context, message string) DomainType {
 	message = strings.ToLower(message)
+	if whatToEatRE.MatchString(message) {
+		if d := tokenScanDomain(message); d == DomainDining || domainPriority[d] >= domainPriority[DomainGastronomy] {
+			return DomainGastronomy
+		}
+	}
 
 	// Scan the message ONCE with the single matcher
 	matches := domainMatcher.FindAll(message)
 
 	if len(matches) == 0 {
-		// Fallback: lightweight token scan with simple singularization to catch forms
-		bestDomain := DomainGeneral
-		bestPriority := 999
-		seen := make(map[DomainType]bool)
-		for _, token := range strings.FieldsFunc(message, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-			if token == "" {
-				continue
-			}
-			candidates := []string{token}
-			if before, ok := strings.CutSuffix(token, "s"); ok {
-				candidates = append(candidates, before)
-			}
-			for _, c := range candidates {
-				if domain, ok := keywordToDomain[c]; ok {
-					if seen[domain] {
-						continue
-					}
-					seen[domain] = true
-					priority := domainPriority[domain]
-					if priority < bestPriority {
-						bestPriority = priority
-						bestDomain = domain
-					}
-				}
-			}
-		}
-		return bestDomain
+		return tokenScanDomain(message)
 	}
 
 	// If multiple matches found, select the highest priority domain
@@ -608,6 +606,9 @@ func (d *DomainDetector) DetectDomain(_ context.Context, message string) DomainT
 		}
 	}
 
+	if bestDomain == DomainGastronomy {
+		return tokenScanDomain(message)
+	}
 	return bestDomain
 }
 
@@ -711,4 +712,39 @@ type ActivityFeedFilter struct {
 	CityName string `json:"city_name,omitempty"`
 	// Ascending flips the default newest-first ordering.
 	Ascending bool `json:"ascending,omitempty"`
+}
+
+// tokenScanDomain picks the domain by splitting the message into words, with
+// a naive singular fallback. It is the detector's fallback when the matcher
+// finds nothing, and the check behind a gastronomy verdict: the matcher can
+// miss a keyword that directly follows another ("food restaurants" reports
+// only "food"), which would turn a restaurant search into a gastronomy one.
+func tokenScanDomain(message string) DomainType {
+	// Fallback: lightweight token scan with simple singularization to catch forms
+	bestDomain := DomainGeneral
+	bestPriority := 999
+	seen := make(map[DomainType]bool)
+	for _, token := range strings.FieldsFunc(message, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
+		if token == "" {
+			continue
+		}
+		candidates := []string{token}
+		if before, ok := strings.CutSuffix(token, "s"); ok {
+			candidates = append(candidates, before)
+		}
+		for _, c := range candidates {
+			if domain, ok := keywordToDomain[c]; ok {
+				if seen[domain] {
+					continue
+				}
+				seen[domain] = true
+				priority := domainPriority[domain]
+				if priority < bestPriority {
+					bestPriority = priority
+					bestDomain = domain
+				}
+			}
+		}
+	}
+	return bestDomain
 }
