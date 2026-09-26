@@ -34,6 +34,8 @@ const (
 	ShareContentType_SHARE_CONTENT_TYPE_ITINERARY   ShareContentType = 4
 	ShareContentType_SHARE_CONTENT_TYPE_LIST        ShareContentType = 5
 	ShareContentType_SHARE_CONTENT_TYPE_ACTIVITY    ShareContentType = 6
+	// A trip; its share code opens TripService.GetSharedTrip.
+	ShareContentType_SHARE_CONTENT_TYPE_TRIP ShareContentType = 7
 )
 
 // Enum value maps for ShareContentType.
@@ -46,6 +48,7 @@ var (
 		4: "SHARE_CONTENT_TYPE_ITINERARY",
 		5: "SHARE_CONTENT_TYPE_LIST",
 		6: "SHARE_CONTENT_TYPE_ACTIVITY",
+		7: "SHARE_CONTENT_TYPE_TRIP",
 	}
 	ShareContentType_value = map[string]int32{
 		"SHARE_CONTENT_TYPE_UNSPECIFIED": 0,
@@ -55,6 +58,7 @@ var (
 		"SHARE_CONTENT_TYPE_ITINERARY":   4,
 		"SHARE_CONTENT_TYPE_LIST":        5,
 		"SHARE_CONTENT_TYPE_ACTIVITY":    6,
+		"SHARE_CONTENT_TYPE_TRIP":        7,
 	}
 )
 
@@ -1231,7 +1235,7 @@ const file_loci_share_share_proto_rawDesc = "" +
 	"\x18GetSharedContentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x123\n" +
-	"\acontent\x18\x03 \x01(\v2\x19.loci.share.SharedContentR\acontent*\xf3\x01\n" +
+	"\acontent\x18\x03 \x01(\v2\x19.loci.share.SharedContentR\acontent*\x90\x02\n" +
 	"\x10ShareContentType\x12\"\n" +
 	"\x1eSHARE_CONTENT_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16SHARE_CONTENT_TYPE_POI\x10\x01\x12\x1c\n" +
@@ -1239,7 +1243,8 @@ const file_loci_share_share_proto_rawDesc = "" +
 	"\x1dSHARE_CONTENT_TYPE_RESTAURANT\x10\x03\x12 \n" +
 	"\x1cSHARE_CONTENT_TYPE_ITINERARY\x10\x04\x12\x1b\n" +
 	"\x17SHARE_CONTENT_TYPE_LIST\x10\x05\x12\x1f\n" +
-	"\x1bSHARE_CONTENT_TYPE_ACTIVITY\x10\x062\xa8\x02\n" +
+	"\x1bSHARE_CONTENT_TYPE_ACTIVITY\x10\x06\x12\x1b\n" +
+	"\x17SHARE_CONTENT_TYPE_TRIP\x10\a2\xa8\x02\n" +
 	"\fShareService\x12]\n" +
 	"\x10GetShareMetadata\x12#.loci.share.GetShareMetadataRequest\x1a$.loci.share.GetShareMetadataResponse\x12Z\n" +
 	"\x0fCreateShareLink\x12\".loci.share.CreateShareLinkRequest\x1a#.loci.share.CreateShareLinkResponse\x12]\n" +

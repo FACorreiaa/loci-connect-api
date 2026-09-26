@@ -45,6 +45,11 @@ type Handler struct {
 	// Optional, attached via WithChecklist. Nil makes the checklist RPCs
 	// answer Unimplemented.
 	checklist ChecklistRepository
+
+	// Optional, attached via WithSharing. Nil makes the sharing RPCs answer
+	// Unimplemented.
+	sharing SharingRepository
+	graph   SocialGraph
 }
 
 // WithAnalytics attaches the product-event recorder so a re-opened trip reaches
@@ -160,7 +165,18 @@ func (h *Handler) ShareTrip(ctx context.Context, req *connect.Request[tripv1.Sha
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid trip ID"))
 	}
 	code := newShareCode()
-	t, err := h.repo.SetShare(ctx, id, uid, req.Msg.GetIsPublic(), code)
+	var t *Trip
+	if h.sharing != nil {
+		// The old boolean maps onto visibility: shared means "anyone with
+		// the link", unshared means private.
+		vis := VisibilityPrivate
+		if req.Msg.GetIsPublic() {
+			vis = VisibilityLink
+		}
+		t, err = h.sharing.SetVisibility(ctx, id, uid, vis, false, code)
+	} else {
+		t, err = h.repo.SetShare(ctx, id, uid, req.Msg.GetIsPublic(), code)
+	}
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
@@ -170,7 +186,7 @@ func (h *Handler) ShareTrip(ctx context.Context, req *connect.Request[tripv1.Sha
 	}
 	return connect.NewResponse(&tripv1.ShareTripResponse{
 		ShareId:  shareCode,
-		ShareUrl: fmt.Sprintf("%s/trip/shared/%s", h.baseURL, shareCode),
+		ShareUrl: ShareURL(shareCode),
 	}), nil
 }
 

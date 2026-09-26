@@ -369,10 +369,12 @@ type CombinedFilters struct {
 // them. SearchFinished gates the web push sent when a search finishes or fails;
 // the other switches are recorded but nothing sends on them yet.
 type NotificationSettings struct {
-	Recommendations bool      `json:"recommendations"`
-	TripReminders   bool      `json:"trip_reminders"`
-	SearchFinished  bool      `json:"search_finished"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	Recommendations bool `json:"recommendations"`
+	TripReminders   bool `json:"trip_reminders"`
+	SearchFinished  bool `json:"search_finished"`
+	// FriendActivity gates pushes for friend requests and new friends.
+	FriendActivity bool      `json:"friend_activity"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // UpdateNotificationSettingsParams is a partial update: a nil field means the
@@ -381,4 +383,5 @@ type UpdateNotificationSettingsParams struct {
 	Recommendations *bool `json:"recommendations,omitempty"`
 	TripReminders   *bool `json:"trip_reminders,omitempty"`
 	SearchFinished  *bool `json:"search_finished,omitempty"`
+	FriendActivity  *bool `json:"friend_activity,omitempty"`
 }

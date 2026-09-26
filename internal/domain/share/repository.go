@@ -62,6 +62,38 @@ func (r *repository) Create(ctx context.Context, s *Share) error {
 	return err
 }
 
+// OwnershipChecker reports whether a user owns a piece of content. Shares of
+// owned content (lists, saved itineraries, trips) check it; places are
+// public and anyone may share them.
+type OwnershipChecker interface {
+	OwnsContent(ctx context.Context, userID uuid.UUID, contentType int32, contentID string) (bool, error)
+}
+
+// ownedContentTables names the table and owner column per owned content type
+// (ShareContentType numbers).
+var ownedContentTables = map[int32]string{
+	4: "user_saved_itineraries",
+	5: "lists",
+	7: "trips",
+}
+
+// OwnsContent implements OwnershipChecker. An id that is not a UUID is owned
+// by nobody.
+func (r *repository) OwnsContent(ctx context.Context, userID uuid.UUID, contentType int32, contentID string) (bool, error) {
+	table, ok := ownedContentTables[contentType]
+	if !ok {
+		return true, nil
+	}
+	id, err := uuid.Parse(contentID)
+	if err != nil {
+		return false, nil
+	}
+	var owned bool
+	err = r.db.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM `+table+` WHERE id = $1 AND user_id = $2)`, id, userID).Scan(&owned)
+	return owned, err
+}
+
 func (r *repository) GetByCode(ctx context.Context, code string) (*Share, error) {
 	s, err := scanShare(r.db.QueryRow(ctx, `SELECT `+shareCols+` FROM shares WHERE share_code = $1`, code))
 	if errors.Is(err, pgx.ErrNoRows) {
