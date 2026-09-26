@@ -7,6 +7,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gastronomy/gastronomyconnect"
 	"github.com/google/uuid"
 )
 
@@ -27,6 +28,9 @@ var meteredProcedures = map[string]struct{}{
 	chatconnect.ChatServiceStartChatProcedure:    {},
 	chatconnect.ChatServiceContinueChatProcedure: {},
 	chatconnect.ChatServiceStreamChatProcedure:   {},
+	// Metered on every call, cached or not: the quota is taken before the
+	// handler runs, so a hit cannot be told from a miss here.
+	gastronomyconnect.GastronomyServiceGetCityGastronomyProcedure: {},
 }
 
 func isMeteredProcedure(proc string) bool {

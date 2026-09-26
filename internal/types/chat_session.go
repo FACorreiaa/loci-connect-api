@@ -279,7 +279,10 @@ const (
 	EventTypeUnifiedChat     = "unified_chat"
 	EventTypeHotels          = "hotels"
 	EventTypeRestaurants     = "restaurants"
-	EventTypeChunk           = "chunk" // For immediate text chunks (Google GenAI pattern)
+	// EventTypeGastronomy carries the city's typical gastronomy
+	// (StreamGastronomyData), sent as soon as that part is parsed.
+	EventTypeGastronomy = "gastronomy"
+	EventTypeChunk      = "chunk" // For immediate text chunks (Google GenAI pattern)
 )
 
 // --- Typed stream payloads (Slice 1) ---
@@ -302,6 +305,12 @@ type StreamDomainListData struct {
 	GeneralCityData GeneralCityData   `json:"general_city_data"`
 	POIs            []POIDetailedInfo `json:"points_of_interest"`
 	SessionID       string            `json:"session_id"`
+}
+
+// StreamGastronomyData is the payload for EventTypeGastronomy.
+type StreamGastronomyData struct {
+	Gastronomy CityGastronomy `json:"gastronomy"`
+	SessionID  string         `json:"session_id"`
 }
 
 // StreamChunkData is the payload for EventTypeChunk (incremental text token).

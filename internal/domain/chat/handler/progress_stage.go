@@ -50,6 +50,7 @@ var progressDomainStages = map[string]string{
 	string(locitypes.DomainGeneral):       "searching places",
 	string(locitypes.DomainAccommodation): "checking hotels",
 	string(locitypes.DomainDining):        "finding restaurants",
+	string(locitypes.DomainGastronomy):    "tasting the local food",
 	string(locitypes.DomainActivities):    "finding things to do",
 	string(locitypes.DomainItinerary):     "planning your day",
 	string(locitypes.DomainTransport):     "checking how to get there",

@@ -591,3 +591,53 @@ Respond ONLY WITH with JSON:
     ]
 }`, locationDesc, requestBlock(request), countBlock(target, days, assumed, poiMix), basePreferences, cityName)
 }
+
+// getGastronomyPrompt asks for a city's typical gastronomy: signature dishes
+// and the well-known places to eat each one. It names nothing but the city, so
+// one answer serves every traveller and every query about that city (see
+// buildGenerationKey). Places are real, long-standing venues or nothing: a
+// dish with no place the model is sure of is better left out than padded.
+func getGastronomyPrompt(cityName string) string {
+	return fmt.Sprintf(`
+You are a food writer who knows %s well. Describe the city's typical gastronomy.
+Include 6-10 dishes, drinks, desserts or street foods that are genuinely typical of %s
+(regional specialities count), and mark the 3-4 the city is best known for as signature.
+For each dish name 1-3 real, well-known, long-established places in %s famous for it.
+Only name places you are confident exist; never invent a place, an address or a website.
+Leave a field empty ("") rather than guess. Give latitude/longitude only when you are sure; otherwise omit them.
+category is one of: "main", "street_food", "snack", "dessert", "drink".
+price_range is "€", "€€" or "€€€" (use the local currency symbol), or "".
+tags lists the dish's main ingredients and diet, chosen only from: %s.
+Respond ONLY WITH with JSON:
+{
+    "gastronomy": {
+        "city_name": "%s",
+        "country": "Country name",
+        "overview": "What defines the city's food, its ingredients and influences (80-120 words)",
+        "culinary_traditions": ["Short sentence about a food custom or tradition"],
+        "dishes": [
+            {
+                "name": "Dish name in English",
+                "local_name": "Name in the local language, or \"\"",
+                "description": "What it is and how it is eaten (30-60 words)",
+                "category": "main",
+                "is_signature": true,
+                "tags": ["seafood"],
+                "places": [
+                    {
+                        "name": "Place name",
+                        "neighborhood": "",
+                        "address": "",
+                        "why_famous": "Why this place is known for the dish (one sentence)",
+                        "price_range": "",
+                        "latitude": <float>,
+                        "longitude": <float>,
+                        "website": ""
+                    }
+                ]
+            }
+        ],
+        "dining_tips": ["Practical tip: meal times, tipping, how to order"]
+    }
+}`, cityName, cityName, cityName, strings.Join(locitypes.GastronomyTags, ", "), cityName)
+}

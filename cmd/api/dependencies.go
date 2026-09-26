@@ -30,6 +30,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/entitlement"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
+	gastronomydomain "github.com/FACorreiaa/loci-connect-api/internal/domain/gastronomy"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
@@ -167,10 +168,13 @@ type Dependencies struct {
 	ReviewSvc           reviewdomain.Service
 
 	// Handlers
-	AuthHandler       *handler.AuthHandler
-	ChatHandler       *chathandler.ChatHandler
-	ProfileHandler    *profilehandler.ProfileHandler
-	DiscoverHandler   *discoverdomain.Handler
+	AuthHandler     *handler.AuthHandler
+	ChatHandler     *chathandler.ChatHandler
+	ProfileHandler  *profilehandler.ProfileHandler
+	DiscoverHandler *discoverdomain.Handler
+	// GastronomyHandler is nil when the chat service cannot generate
+	// gastronomy (a test double); the route is then not registered.
+	GastronomyHandler *gastronomydomain.Handler
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
 	ListHandler       *itineraryhandler.ListHandler
 	StatisticsHandler *statistics.Handler
@@ -842,6 +846,9 @@ func (d *Dependencies) initHandlers() error {
 	d.initWatches(watchPusher)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
+	if gen, ok := d.ChatService.(gastronomydomain.Generator); ok {
+		d.GastronomyHandler = gastronomydomain.NewHandler(gen, d.Logger)
+	}
 	d.ItineraryHandler = itineraryhandler.NewItineraryHandler(d.ListSvc, d.ChatService, d.Logger).
 		WithItineraries(d.POIRepo)
 	d.ListHandler = itineraryhandler.NewListHandler(d.ListSvc, d.Logger)

@@ -27,6 +27,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	gastronomyconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gastronomy/gastronomyconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/integrations/integrationsv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
@@ -286,6 +287,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		discoverPath, discoverHandler := discoverconnect.NewDiscoverServiceHandler(deps.DiscoverHandler, opts)
 		mux.Handle(discoverPath, discoverHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", discoverPath)
+	}
+
+	if deps.GastronomyHandler != nil {
+		gastronomyPath, gastronomyHandler := gastronomyconnect.NewGastronomyServiceHandler(deps.GastronomyHandler, opts)
+		mux.Handle(gastronomyPath, gastronomyHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", gastronomyPath)
 	}
 
 	if deps.ProfileHandler != nil {
