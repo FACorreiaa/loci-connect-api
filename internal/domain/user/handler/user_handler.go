@@ -421,6 +421,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 		Recommendations: req.Msg.Recommendations,
 		TripReminders:   req.Msg.TripReminders,
 		SearchFinished:  req.Msg.SearchFinished,
+		FriendActivity:  req.Msg.FriendActivity,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -436,6 +437,7 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		Recommendations: s.Recommendations,
 		TripReminders:   s.TripReminders,
 		SearchFinished:  s.SearchFinished,
+		FriendActivity:  s.FriendActivity,
 		UpdatedAt:       timestamppb.New(s.UpdatedAt),
 	}
 }

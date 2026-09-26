@@ -41,6 +41,23 @@ const (
 	TripServiceListTripsProcedure = "/loci.trip.TripService/ListTrips"
 	// TripServiceShareTripProcedure is the fully-qualified name of the TripService's ShareTrip RPC.
 	TripServiceShareTripProcedure = "/loci.trip.TripService/ShareTrip"
+	// TripServiceSetTripVisibilityProcedure is the fully-qualified name of the TripService's
+	// SetTripVisibility RPC.
+	TripServiceSetTripVisibilityProcedure = "/loci.trip.TripService/SetTripVisibility"
+	// TripServiceGetSharedTripProcedure is the fully-qualified name of the TripService's GetSharedTrip
+	// RPC.
+	TripServiceGetSharedTripProcedure = "/loci.trip.TripService/GetSharedTrip"
+	// TripServiceGetFriendTripProcedure is the fully-qualified name of the TripService's GetFriendTrip
+	// RPC.
+	TripServiceGetFriendTripProcedure = "/loci.trip.TripService/GetFriendTrip"
+	// TripServiceListFriendTripsProcedure is the fully-qualified name of the TripService's
+	// ListFriendTrips RPC.
+	TripServiceListFriendTripsProcedure = "/loci.trip.TripService/ListFriendTrips"
+	// TripServiceListUserTripsProcedure is the fully-qualified name of the TripService's ListUserTrips
+	// RPC.
+	TripServiceListUserTripsProcedure = "/loci.trip.TripService/ListUserTrips"
+	// TripServiceCopyTripProcedure is the fully-qualified name of the TripService's CopyTrip RPC.
+	TripServiceCopyTripProcedure = "/loci.trip.TripService/CopyTrip"
 	// TripServiceReorderStopsProcedure is the fully-qualified name of the TripService's ReorderStops
 	// RPC.
 	TripServiceReorderStopsProcedure = "/loci.trip.TripService/ReorderStops"
@@ -84,6 +101,12 @@ var (
 	tripServiceGetTripMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("GetTrip")
 	tripServiceListTripsMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ListTrips")
 	tripServiceShareTripMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ShareTrip")
+	tripServiceSetTripVisibilityMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("SetTripVisibility")
+	tripServiceGetSharedTripMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("GetSharedTrip")
+	tripServiceGetFriendTripMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("GetFriendTrip")
+	tripServiceListFriendTripsMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("ListFriendTrips")
+	tripServiceListUserTripsMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("ListUserTrips")
+	tripServiceCopyTripMethodDescriptor                 = tripServiceServiceDescriptor.Methods().ByName("CopyTrip")
 	tripServiceReorderStopsMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("ReorderStops")
 	tripServiceRenameStopMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("RenameStop")
 	tripServiceEditStopDurationMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("EditStopDuration")
@@ -104,7 +127,30 @@ type TripServiceClient interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
+	// false sets PRIVATE. Use SetTripVisibility.
+	//
+	// Deprecated: do not use.
 	ShareTrip(context.Context, *connect.Request[trip.ShareTripRequest]) (*connect.Response[trip.ShareTripResponse], error)
+	// SetTripVisibility sets who may open the trip and returns its share link
+	// (minted on first use; empty for PRIVATE).
+	SetTripVisibility(context.Context, *connect.Request[trip.SetTripVisibilityRequest]) (*connect.Response[trip.SetTripVisibilityResponse], error)
+	// GetSharedTrip opens a trip by its share code. Accepts anonymous callers.
+	// PRIVATE trips, and trips whose owner blocked the caller, are NotFound.
+	// Stop notes and booking links are left out unless the owner opted in.
+	GetSharedTrip(context.Context, *connect.Request[trip.GetSharedTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetFriendTrip opens another user's trip by id when the caller may see it
+	// (FRIENDS for a friend, or PUBLIC); otherwise NotFound.
+	GetFriendTrip(context.Context, *connect.Request[trip.GetFriendTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// ListFriendTrips is the caller's feed: trips friends shared as FRIENDS or
+	// PUBLIC, most recently updated first.
+	ListFriendTrips(context.Context, *connect.Request[trip.ListFriendTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// ListUserTrips lists the trips of one user that the caller may see.
+	ListUserTrips(context.Context, *connect.Request[trip.ListUserTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// CopyTrip saves a trip the caller may see as a new trip of their own,
+	// private, with copied_from_trip_id set. Later changes to the source do
+	// not touch the copy.
+	CopyTrip(context.Context, *connect.Request[trip.CopyTripRequest]) (*connect.Response[trip.CopyTripResponse], error)
 	ReorderStops(context.Context, *connect.Request[trip.ReorderStopsRequest]) (*connect.Response[trip.TripDraft], error)
 	RenameStop(context.Context, *connect.Request[trip.RenameStopRequest]) (*connect.Response[trip.TripDraft], error)
 	EditStopDuration(context.Context, *connect.Request[trip.EditStopDurationRequest]) (*connect.Response[trip.TripDraft], error)
@@ -160,6 +206,42 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+TripServiceShareTripProcedure,
 			connect.WithSchema(tripServiceShareTripMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setTripVisibility: connect.NewClient[trip.SetTripVisibilityRequest, trip.SetTripVisibilityResponse](
+			httpClient,
+			baseURL+TripServiceSetTripVisibilityProcedure,
+			connect.WithSchema(tripServiceSetTripVisibilityMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getSharedTrip: connect.NewClient[trip.GetSharedTripRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceGetSharedTripProcedure,
+			connect.WithSchema(tripServiceGetSharedTripMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getFriendTrip: connect.NewClient[trip.GetFriendTripRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceGetFriendTripProcedure,
+			connect.WithSchema(tripServiceGetFriendTripMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listFriendTrips: connect.NewClient[trip.ListFriendTripsRequest, trip.ListTripsResponse](
+			httpClient,
+			baseURL+TripServiceListFriendTripsProcedure,
+			connect.WithSchema(tripServiceListFriendTripsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listUserTrips: connect.NewClient[trip.ListUserTripsRequest, trip.ListTripsResponse](
+			httpClient,
+			baseURL+TripServiceListUserTripsProcedure,
+			connect.WithSchema(tripServiceListUserTripsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		copyTrip: connect.NewClient[trip.CopyTripRequest, trip.CopyTripResponse](
+			httpClient,
+			baseURL+TripServiceCopyTripProcedure,
+			connect.WithSchema(tripServiceCopyTripMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		reorderStops: connect.NewClient[trip.ReorderStopsRequest, trip.TripDraft](
@@ -249,6 +331,12 @@ type tripServiceClient struct {
 	getTrip                  *connect.Client[trip.GetTripRequest, trip.TripDraft]
 	listTrips                *connect.Client[trip.ListTripsRequest, trip.ListTripsResponse]
 	shareTrip                *connect.Client[trip.ShareTripRequest, trip.ShareTripResponse]
+	setTripVisibility        *connect.Client[trip.SetTripVisibilityRequest, trip.SetTripVisibilityResponse]
+	getSharedTrip            *connect.Client[trip.GetSharedTripRequest, trip.TripDraft]
+	getFriendTrip            *connect.Client[trip.GetFriendTripRequest, trip.TripDraft]
+	listFriendTrips          *connect.Client[trip.ListFriendTripsRequest, trip.ListTripsResponse]
+	listUserTrips            *connect.Client[trip.ListUserTripsRequest, trip.ListTripsResponse]
+	copyTrip                 *connect.Client[trip.CopyTripRequest, trip.CopyTripResponse]
 	reorderStops             *connect.Client[trip.ReorderStopsRequest, trip.TripDraft]
 	renameStop               *connect.Client[trip.RenameStopRequest, trip.TripDraft]
 	editStopDuration         *connect.Client[trip.EditStopDurationRequest, trip.TripDraft]
@@ -280,8 +368,40 @@ func (c *tripServiceClient) ListTrips(ctx context.Context, req *connect.Request[
 }
 
 // ShareTrip calls loci.trip.TripService.ShareTrip.
+//
+// Deprecated: do not use.
 func (c *tripServiceClient) ShareTrip(ctx context.Context, req *connect.Request[trip.ShareTripRequest]) (*connect.Response[trip.ShareTripResponse], error) {
 	return c.shareTrip.CallUnary(ctx, req)
+}
+
+// SetTripVisibility calls loci.trip.TripService.SetTripVisibility.
+func (c *tripServiceClient) SetTripVisibility(ctx context.Context, req *connect.Request[trip.SetTripVisibilityRequest]) (*connect.Response[trip.SetTripVisibilityResponse], error) {
+	return c.setTripVisibility.CallUnary(ctx, req)
+}
+
+// GetSharedTrip calls loci.trip.TripService.GetSharedTrip.
+func (c *tripServiceClient) GetSharedTrip(ctx context.Context, req *connect.Request[trip.GetSharedTripRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.getSharedTrip.CallUnary(ctx, req)
+}
+
+// GetFriendTrip calls loci.trip.TripService.GetFriendTrip.
+func (c *tripServiceClient) GetFriendTrip(ctx context.Context, req *connect.Request[trip.GetFriendTripRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.getFriendTrip.CallUnary(ctx, req)
+}
+
+// ListFriendTrips calls loci.trip.TripService.ListFriendTrips.
+func (c *tripServiceClient) ListFriendTrips(ctx context.Context, req *connect.Request[trip.ListFriendTripsRequest]) (*connect.Response[trip.ListTripsResponse], error) {
+	return c.listFriendTrips.CallUnary(ctx, req)
+}
+
+// ListUserTrips calls loci.trip.TripService.ListUserTrips.
+func (c *tripServiceClient) ListUserTrips(ctx context.Context, req *connect.Request[trip.ListUserTripsRequest]) (*connect.Response[trip.ListTripsResponse], error) {
+	return c.listUserTrips.CallUnary(ctx, req)
+}
+
+// CopyTrip calls loci.trip.TripService.CopyTrip.
+func (c *tripServiceClient) CopyTrip(ctx context.Context, req *connect.Request[trip.CopyTripRequest]) (*connect.Response[trip.CopyTripResponse], error) {
+	return c.copyTrip.CallUnary(ctx, req)
 }
 
 // ReorderStops calls loci.trip.TripService.ReorderStops.
@@ -354,7 +474,30 @@ type TripServiceHandler interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
+	// false sets PRIVATE. Use SetTripVisibility.
+	//
+	// Deprecated: do not use.
 	ShareTrip(context.Context, *connect.Request[trip.ShareTripRequest]) (*connect.Response[trip.ShareTripResponse], error)
+	// SetTripVisibility sets who may open the trip and returns its share link
+	// (minted on first use; empty for PRIVATE).
+	SetTripVisibility(context.Context, *connect.Request[trip.SetTripVisibilityRequest]) (*connect.Response[trip.SetTripVisibilityResponse], error)
+	// GetSharedTrip opens a trip by its share code. Accepts anonymous callers.
+	// PRIVATE trips, and trips whose owner blocked the caller, are NotFound.
+	// Stop notes and booking links are left out unless the owner opted in.
+	GetSharedTrip(context.Context, *connect.Request[trip.GetSharedTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetFriendTrip opens another user's trip by id when the caller may see it
+	// (FRIENDS for a friend, or PUBLIC); otherwise NotFound.
+	GetFriendTrip(context.Context, *connect.Request[trip.GetFriendTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// ListFriendTrips is the caller's feed: trips friends shared as FRIENDS or
+	// PUBLIC, most recently updated first.
+	ListFriendTrips(context.Context, *connect.Request[trip.ListFriendTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// ListUserTrips lists the trips of one user that the caller may see.
+	ListUserTrips(context.Context, *connect.Request[trip.ListUserTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
+	// CopyTrip saves a trip the caller may see as a new trip of their own,
+	// private, with copied_from_trip_id set. Later changes to the source do
+	// not touch the copy.
+	CopyTrip(context.Context, *connect.Request[trip.CopyTripRequest]) (*connect.Response[trip.CopyTripResponse], error)
 	ReorderStops(context.Context, *connect.Request[trip.ReorderStopsRequest]) (*connect.Response[trip.TripDraft], error)
 	RenameStop(context.Context, *connect.Request[trip.RenameStopRequest]) (*connect.Response[trip.TripDraft], error)
 	EditStopDuration(context.Context, *connect.Request[trip.EditStopDurationRequest]) (*connect.Response[trip.TripDraft], error)
@@ -406,6 +549,42 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		TripServiceShareTripProcedure,
 		svc.ShareTrip,
 		connect.WithSchema(tripServiceShareTripMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceSetTripVisibilityHandler := connect.NewUnaryHandler(
+		TripServiceSetTripVisibilityProcedure,
+		svc.SetTripVisibility,
+		connect.WithSchema(tripServiceSetTripVisibilityMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceGetSharedTripHandler := connect.NewUnaryHandler(
+		TripServiceGetSharedTripProcedure,
+		svc.GetSharedTrip,
+		connect.WithSchema(tripServiceGetSharedTripMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceGetFriendTripHandler := connect.NewUnaryHandler(
+		TripServiceGetFriendTripProcedure,
+		svc.GetFriendTrip,
+		connect.WithSchema(tripServiceGetFriendTripMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceListFriendTripsHandler := connect.NewUnaryHandler(
+		TripServiceListFriendTripsProcedure,
+		svc.ListFriendTrips,
+		connect.WithSchema(tripServiceListFriendTripsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceListUserTripsHandler := connect.NewUnaryHandler(
+		TripServiceListUserTripsProcedure,
+		svc.ListUserTrips,
+		connect.WithSchema(tripServiceListUserTripsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceCopyTripHandler := connect.NewUnaryHandler(
+		TripServiceCopyTripProcedure,
+		svc.CopyTrip,
+		connect.WithSchema(tripServiceCopyTripMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	tripServiceReorderStopsHandler := connect.NewUnaryHandler(
@@ -496,6 +675,18 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceListTripsHandler.ServeHTTP(w, r)
 		case TripServiceShareTripProcedure:
 			tripServiceShareTripHandler.ServeHTTP(w, r)
+		case TripServiceSetTripVisibilityProcedure:
+			tripServiceSetTripVisibilityHandler.ServeHTTP(w, r)
+		case TripServiceGetSharedTripProcedure:
+			tripServiceGetSharedTripHandler.ServeHTTP(w, r)
+		case TripServiceGetFriendTripProcedure:
+			tripServiceGetFriendTripHandler.ServeHTTP(w, r)
+		case TripServiceListFriendTripsProcedure:
+			tripServiceListFriendTripsHandler.ServeHTTP(w, r)
+		case TripServiceListUserTripsProcedure:
+			tripServiceListUserTripsHandler.ServeHTTP(w, r)
+		case TripServiceCopyTripProcedure:
+			tripServiceCopyTripHandler.ServeHTTP(w, r)
 		case TripServiceReorderStopsProcedure:
 			tripServiceReorderStopsHandler.ServeHTTP(w, r)
 		case TripServiceRenameStopProcedure:
@@ -545,6 +736,30 @@ func (UnimplementedTripServiceHandler) ListTrips(context.Context, *connect.Reque
 
 func (UnimplementedTripServiceHandler) ShareTrip(context.Context, *connect.Request[trip.ShareTripRequest]) (*connect.Response[trip.ShareTripResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ShareTrip is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) SetTripVisibility(context.Context, *connect.Request[trip.SetTripVisibilityRequest]) (*connect.Response[trip.SetTripVisibilityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SetTripVisibility is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) GetSharedTrip(context.Context, *connect.Request[trip.GetSharedTripRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetSharedTrip is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) GetFriendTrip(context.Context, *connect.Request[trip.GetFriendTripRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetFriendTrip is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ListFriendTrips(context.Context, *connect.Request[trip.ListFriendTripsRequest]) (*connect.Response[trip.ListTripsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListFriendTrips is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ListUserTrips(context.Context, *connect.Request[trip.ListUserTripsRequest]) (*connect.Response[trip.ListTripsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListUserTrips is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) CopyTrip(context.Context, *connect.Request[trip.CopyTripRequest]) (*connect.Response[trip.CopyTripResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.CopyTrip is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) ReorderStops(context.Context, *connect.Request[trip.ReorderStopsRequest]) (*connect.Response[trip.TripDraft], error) {

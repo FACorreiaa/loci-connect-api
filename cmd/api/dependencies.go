@@ -56,6 +56,7 @@ import (
 	reviewdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/review"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/share"
+	socialdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/social"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/statistics"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	tagrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/tags"
@@ -175,6 +176,8 @@ type Dependencies struct {
 	// GastronomyHandler is nil when the chat service cannot generate
 	// gastronomy (a test double); the route is then not registered.
 	GastronomyHandler *gastronomydomain.Handler
+	// SocialHandler is the friends layer; nil without a database.
+	SocialHandler     *socialdomain.Handler
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
 	ListHandler       *itineraryhandler.ListHandler
 	StatisticsHandler *statistics.Handler
@@ -835,9 +838,12 @@ func (d *Dependencies) initHandlers() error {
 	// The same notifier announces a standing task's message on iPhones
 	// (APNs only); with APNs off, that message is only in the thread.
 	var watchPusher watch.ProactivePusher
+	// Friend requests and new friends go to every platform that is on.
+	var socialNotifier socialdomain.Notifier
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
+		socialNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
 		}
@@ -889,6 +895,11 @@ func (d *Dependencies) initHandlers() error {
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).WithPlaces(d.POIRepo)
 	if d.DB != nil {
 		d.TripHandler = d.TripHandler.WithChecklist(trip.NewChecklistRepository(d.DB.Pool))
+		// The friends layer, and trip sharing on top of it: one service is
+		// both SocialService and the graph trip visibility is checked against.
+		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
+		d.SocialHandler = socialdomain.NewHandler(socialSvc, d.Logger)
+		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(

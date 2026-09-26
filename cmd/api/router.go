@@ -43,6 +43,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation/recommendationconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/review/reviewv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/share/sharev1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social/socialconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/speech/speechv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/tags/tagsv1connect"
@@ -106,6 +107,15 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		// a teaser to a stranger and the whole pack to whoever bought it.
 		bundlev1connect.BundleServiceListBundlesProcedure,
 		bundlev1connect.BundleServiceGetBundleProcedure,
+
+		// A shared trip, an invite link and a profile are opened from a link
+		// by people who may not have an account yet. Optional-auth like the
+		// packs: a present token is still validated, and the handlers widen
+		// what they show to a signed-in friend.
+		tripconnect.TripServiceGetSharedTripProcedure,
+		tripconnect.TripServiceListUserTripsProcedure,
+		socialconnect.SocialServiceGetInviteProcedure,
+		socialconnect.SocialServiceGetPublicProfileProcedure,
 	}
 
 	tracer := otel.GetTracerProvider().Tracer("loci/api")
@@ -421,6 +431,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		// Register OG meta HTTP handler for social sharing
 		mux.Handle("/share/", deps.ShareHandler.OGMetaHandler())
 		deps.Logger.Info("registered OG meta handler", "path", "/share/")
+	}
+
+	if deps.SocialHandler != nil {
+		socialPath, socialHandler := socialconnect.NewSocialServiceHandler(deps.SocialHandler, opts)
+		mux.Handle(socialPath, socialHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", socialPath)
 	}
 
 	if deps.TripHandler != nil {

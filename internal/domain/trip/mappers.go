@@ -159,6 +159,14 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 	if t.SourceSessionID != nil {
 		p.SourceSessionId = t.SourceSessionID
 	}
+	p.Visibility = tripv1.TripVisibility(t.Visibility)
+	if t.ShareCode != nil && t.Visibility != VisibilityPrivate {
+		p.ShareCode = *t.ShareCode
+	}
+	if t.CopiedFromTripID != nil {
+		s := t.CopiedFromTripID.String()
+		p.CopiedFromTripId = &s
+	}
 	for _, d := range t.Days {
 		pd := &tripv1.TripDay{
 			Id:        d.ID.String(),

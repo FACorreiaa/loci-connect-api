@@ -76,6 +76,20 @@ func (h *Handler) CreateShareLink(
 			s.CreatedBy = &uid
 		}
 	}
+	// A list, saved itinerary or trip may only be shared by its owner:
+	// otherwise anyone who learnt an id could mint a public link to it.
+	if oc, ok := h.repo.(OwnershipChecker); ok {
+		if s.CreatedBy == nil {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+		}
+		owned, err := oc.OwnsContent(ctx, *s.CreatedBy, s.ContentType, s.ContentID)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		if !owned {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("content not found"))
+		}
+	}
 
 	if err := h.repo.Create(ctx, s); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)

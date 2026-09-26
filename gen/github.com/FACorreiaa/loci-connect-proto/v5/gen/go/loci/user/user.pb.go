@@ -921,8 +921,10 @@ type NotificationSettings struct {
 	TripReminders   bool                   `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3" json:"trip_reminders,omitempty"`
 	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	SearchFinished  bool                   `protobuf:"varint,4,opt,name=search_finished,json=searchFinished,proto3" json:"search_finished,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Friend requests and accepted friendships.
+	FriendActivity bool `protobuf:"varint,5,opt,name=friend_activity,json=friendActivity,proto3" json:"friend_activity,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *NotificationSettings) Reset() {
@@ -983,6 +985,13 @@ func (x *NotificationSettings) GetSearchFinished() bool {
 	return false
 }
 
+func (x *NotificationSettings) GetFriendActivity() bool {
+	if x != nil {
+		return x.FriendActivity
+	}
+	return false
+}
+
 type GetNotificationSettingsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1025,6 +1034,7 @@ type UpdateNotificationSettingsRequest struct {
 	Recommendations *bool `protobuf:"varint,1,opt,name=recommendations,proto3,oneof" json:"recommendations,omitempty"`
 	TripReminders   *bool `protobuf:"varint,2,opt,name=trip_reminders,json=tripReminders,proto3,oneof" json:"trip_reminders,omitempty"`
 	SearchFinished  *bool `protobuf:"varint,3,opt,name=search_finished,json=searchFinished,proto3,oneof" json:"search_finished,omitempty"`
+	FriendActivity  *bool `protobuf:"varint,4,opt,name=friend_activity,json=friendActivity,proto3,oneof" json:"friend_activity,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1076,6 +1086,13 @@ func (x *UpdateNotificationSettingsRequest) GetTripReminders() bool {
 func (x *UpdateNotificationSettingsRequest) GetSearchFinished() bool {
 	if x != nil && x.SearchFinished != nil {
 		return *x.SearchFinished
+	}
+	return false
+}
+
+func (x *UpdateNotificationSettingsRequest) GetFriendActivity() bool {
+	if x != nil && x.FriendActivity != nil {
+		return *x.FriendActivity
 	}
 	return false
 }
@@ -1445,21 +1462,24 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\bfilename\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\bfilename\"E\n" +
 	"\x14DeleteAccountRequest\x12-\n" +
-	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xcb\x01\n" +
+	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xf4\x01\n" +
 	"\x14NotificationSettings\x12(\n" +
 	"\x0frecommendations\x18\x01 \x01(\bR\x0frecommendations\x12%\n" +
 	"\x0etrip_reminders\x18\x02 \x01(\bR\rtripReminders\x129\n" +
 	"\n" +
 	"updated_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
-	"\x0fsearch_finished\x18\x04 \x01(\bR\x0esearchFinished\" \n" +
-	"\x1eGetNotificationSettingsRequest\"\xe7\x01\n" +
+	"\x0fsearch_finished\x18\x04 \x01(\bR\x0esearchFinished\x12'\n" +
+	"\x0ffriend_activity\x18\x05 \x01(\bR\x0efriendActivity\" \n" +
+	"\x1eGetNotificationSettingsRequest\"\xa9\x02\n" +
 	"!UpdateNotificationSettingsRequest\x12-\n" +
 	"\x0frecommendations\x18\x01 \x01(\bH\x00R\x0frecommendations\x88\x01\x01\x12*\n" +
 	"\x0etrip_reminders\x18\x02 \x01(\bH\x01R\rtripReminders\x88\x01\x01\x12,\n" +
-	"\x0fsearch_finished\x18\x03 \x01(\bH\x02R\x0esearchFinished\x88\x01\x01B\x12\n" +
+	"\x0fsearch_finished\x18\x03 \x01(\bH\x02R\x0esearchFinished\x88\x01\x01\x12,\n" +
+	"\x0ffriend_activity\x18\x04 \x01(\bH\x03R\x0efriendActivity\x88\x01\x01B\x12\n" +
 	"\x10_recommendationsB\x11\n" +
 	"\x0f_trip_remindersB\x12\n" +
-	"\x10_search_finished\"\xe1\x02\n" +
+	"\x10_search_finishedB\x12\n" +
+	"\x10_friend_activity\"\xe1\x02\n" +
 	"\x19RegisterPushDeviceRequest\x12?\n" +
 	"\bplatform\x18\x01 \x01(\x0e2\x17.loci.user.PushPlatformB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bplatform\x12&\n" +

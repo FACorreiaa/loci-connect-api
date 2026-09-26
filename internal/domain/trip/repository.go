@@ -118,8 +118,14 @@ type Trip struct {
 	SourceSessionID *string
 	IsPublic        bool
 	ShareCode       *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	// Visibility is who besides the owner may open the trip (TripVisibility).
+	Visibility Visibility
+	// ShareDetails includes stop notes and booking links in what others see.
+	ShareDetails bool
+	// CopiedFromTripID is the trip this one was copied from with CopyTrip.
+	CopiedFromTripID *uuid.UUID
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // Repository persists trips. SaveTrip enforces optimistic concurrency and writes
@@ -142,8 +148,7 @@ func NewRepository(db *pgxpool.Pool, logger *slog.Logger) Repository {
 
 func (r *repository) GetTrip(ctx context.Context, id, userID uuid.UUID) (*Trip, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, user_id, city_id, city_name, title, constraints, version,
-		       source_session_id, is_public, share_code, created_at, updated_at
+		SELECT `+tripColumns+`
 		FROM trips WHERE id = $1 AND user_id = $2`, id, userID)
 
 	t, err := scanTrip(row)
@@ -167,8 +172,7 @@ func (r *repository) ListTrips(ctx context.Context, userID uuid.UUID, limit, off
 	}
 
 	rows, err := r.db.Query(ctx, `
-		SELECT id, user_id, city_id, city_name, title, constraints, version,
-		       source_session_id, is_public, share_code, created_at, updated_at
+		SELECT `+tripColumns+`
 		FROM trips WHERE user_id = $1
 		ORDER BY updated_at DESC
 		LIMIT $2 OFFSET $3`, userID, limit, offset)
@@ -217,11 +221,13 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		// New trip: version starts at 1.
 		newVersion = 1
 		err = tx.QueryRow(ctx, `
-			INSERT INTO trips (user_id, city_id, city_name, title, constraints, version, source_session_id)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			RETURNING id, created_at, updated_at`,
-			t.UserID, t.CityID, t.CityName, t.Title, constraintsJSON, newVersion, t.SourceSessionID).
-			Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt)
+			INSERT INTO trips (user_id, city_id, city_name, title, constraints, version, source_session_id,
+			                   copied_from_trip_id)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			RETURNING id, created_at, updated_at, visibility, share_details`,
+			t.UserID, t.CityID, t.CityName, t.Title, constraintsJSON, newVersion, t.SourceSessionID,
+			t.CopiedFromTripID).
+			Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt, &t.Visibility, &t.ShareDetails)
 		if err != nil {
 			return nil, fmt.Errorf("insert trip: %w", err)
 		}
@@ -240,11 +246,15 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 			return nil, ErrVersionConflict
 		}
 		newVersion = storedVersion + 1
-		_, err = tx.Exec(ctx, `
+		// Sharing is not part of a save (SetTripVisibility owns it), so the
+		// stored values come back rather than whatever the client sent.
+		err = tx.QueryRow(ctx, `
 			UPDATE trips SET city_id = $1, city_name = $2, title = $3, constraints = $4,
 			                 version = $5, updated_at = NOW()
-			WHERE id = $6`,
-			t.CityID, t.CityName, t.Title, constraintsJSON, newVersion, t.ID)
+			WHERE id = $6
+			RETURNING is_public, share_code, visibility, share_details, copied_from_trip_id, created_at, updated_at`,
+			t.CityID, t.CityName, t.Title, constraintsJSON, newVersion, t.ID).
+			Scan(&t.IsPublic, &t.ShareCode, &t.Visibility, &t.ShareDetails, &t.CopiedFromTripID, &t.CreatedAt, &t.UpdatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("update trip: %w", err)
 		}
@@ -543,13 +553,19 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+// tripColumns is what scanTrip reads, in order.
+const tripColumns = `id, user_id, city_id, city_name, title, constraints, version,
+		       source_session_id, is_public, share_code, created_at, updated_at,
+		       visibility, share_details, copied_from_trip_id`
+
 func scanTrip(row rowScanner) (*Trip, error) {
 	var (
 		t               Trip
 		constraintsJSON []byte
 	)
 	if err := row.Scan(&t.ID, &t.UserID, &t.CityID, &t.CityName, &t.Title, &constraintsJSON,
-		&t.Version, &t.SourceSessionID, &t.IsPublic, &t.ShareCode, &t.CreatedAt, &t.UpdatedAt); err != nil {
+		&t.Version, &t.SourceSessionID, &t.IsPublic, &t.ShareCode, &t.CreatedAt, &t.UpdatedAt,
+		&t.Visibility, &t.ShareDetails, &t.CopiedFromTripID); err != nil {
 		return nil, err
 	}
 	if len(constraintsJSON) > 0 {
