@@ -3,6 +3,7 @@ package favorites
 import (
 	"encoding/json"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -21,11 +22,11 @@ func hotelToProto(h *locitypes.HotelDetailedInfo) *favoritesv1.HotelDetails {
 		Address:     h.Address,
 		Category:    h.Category,
 		Rating:      h.Rating,
-		PriceRange:  deref(h.PriceRange),
+		PriceRange:  util.Val(h.PriceRange),
 		Amenities:   h.Tags,
 		Images:      h.Images,
-		Phone:       deref(h.PhoneNumber),
-		Website:     deref(h.Website),
+		Phone:       util.Val(h.PhoneNumber),
+		Website:     util.Val(h.Website),
 	}
 	if h.LlmInteractionID != uuid.Nil {
 		out.LlmInteractionId = h.LlmInteractionID.String()
@@ -44,16 +45,16 @@ func restaurantToProto(r *locitypes.RestaurantDetailedInfo) *favoritesv1.Restaur
 		Description: r.Description,
 		Latitude:    r.Latitude,
 		Longitude:   r.Longitude,
-		Address:     deref(r.Address),
+		Address:     util.Val(r.Address),
 		Category:    r.Category,
 		Rating:      r.Rating,
-		CuisineType: deref(r.CuisineType),
-		PriceRange:  deref(r.PriceLevel),
+		CuisineType: util.Val(r.CuisineType),
+		PriceRange:  util.Val(r.PriceLevel),
 		Tags:        r.Tags,
 		Images:      r.Images,
-		Phone:       deref(r.PhoneNumber),
-		Website:     deref(r.Website),
-		Hours:       openingHours(deref(r.OpeningHours)),
+		Phone:       util.Val(r.PhoneNumber),
+		Website:     util.Val(r.Website),
+		Hours:       openingHours(util.Val(r.OpeningHours)),
 	}
 	if r.LlmInteractionID != uuid.Nil {
 		out.LlmInteractionId = r.LlmInteractionID.String()
@@ -71,9 +72,9 @@ func overlaySnapshotOnHotel(out *favoritesv1.HotelDetails, fav *locitypes.Favori
 		return
 	}
 	out.Id = fav.ItemID
-	out.City = firstNonEmpty(out.City, fav.CityName)
-	out.Description = firstNonEmpty(out.Description, fav.Description)
-	out.Category = firstNonEmpty(out.Category, fav.Category)
+	out.City = util.OrDefault(out.City, fav.CityName)
+	out.Description = util.OrDefault(out.Description, fav.Description)
+	out.Category = util.OrDefault(out.Category, fav.Category)
 	if out.Rating == 0 {
 		out.Rating = fav.Rating
 	}
@@ -85,9 +86,9 @@ func overlaySnapshotOnRestaurant(out *favoritesv1.RestaurantDetails, fav *locity
 		return
 	}
 	out.Id = fav.ItemID
-	out.City = firstNonEmpty(out.City, fav.CityName)
-	out.Description = firstNonEmpty(out.Description, fav.Description)
-	out.Category = firstNonEmpty(out.Category, fav.Category)
+	out.City = util.OrDefault(out.City, fav.CityName)
+	out.Description = util.OrDefault(out.Description, fav.Description)
+	out.Category = util.OrDefault(out.Category, fav.Category)
 	if out.Rating == 0 {
 		out.Rating = fav.Rating
 	}
@@ -133,18 +134,4 @@ func openingHours(raw string) map[string]string {
 		return nil
 	}
 	return hours
-}
-
-func deref(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
 }

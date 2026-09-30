@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -619,7 +620,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		resp.Payload = &chatv1.StreamEvent_Start{Start: &chatv1.StartPayload{
 			SessionId: sd.SessionID,
 			Domain:    runs.DomainToProto(sd.Domain),
-			CityName:  optString(sd.City),
+			CityName:  util.StrZeroPtr(sd.City),
 		}}
 
 	case locitypes.EventTypeItinerary:
@@ -1005,13 +1006,6 @@ func streamErrorFromEvent(event locitypes.StreamEvent) *chatv1.StreamError {
 		se.Retryable = true
 	}
 	return se
-}
-
-func optString(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }
 
 func (h *ChatHandler) ContinueChat(

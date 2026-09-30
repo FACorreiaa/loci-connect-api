@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -1028,8 +1029,8 @@ func (r *RepositoryImpl) GetUserActivityFeed(ctx context.Context, userID uuid.UU
 		offset,
 		nilIfEmptySlice(filter.Kinds),
 		nilIfEmptySlice(filter.Details),
-		nilIfEmptyString(filter.Search),
-		nilIfEmptyString(filter.CityName),
+		util.StrZeroPtr(filter.Search),
+		util.StrZeroPtr(filter.CityName),
 		nilIfZeroTime(filter.Since),
 		nilIfZeroTime(filter.Until),
 	)
@@ -1077,13 +1078,6 @@ func nilIfEmptySlice(v []string) []string {
 		return nil
 	}
 	return v
-}
-
-func nilIfEmptyString(v string) *string {
-	if v == "" {
-		return nil
-	}
-	return &v
 }
 
 func nilIfZeroTime(v time.Time) *time.Time {

@@ -11,6 +11,7 @@ import (
 
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.opentelemetry.io/otel"
@@ -1417,16 +1418,16 @@ func (r *RepositoryImpl) GetRestaurantByID(ctx context.Context, restaurantID uui
 		Description:  dbRow.Description,
 		Latitude:     dbRow.Latitude,
 		Longitude:    dbRow.Longitude,
-		Address:      stringPtr(dbRow.Address),
-		Website:      stringPtr(dbRow.Website),
-		PhoneNumber:  stringPtr(dbRow.PhoneNumber),
-		OpeningHours: stringPtr(dbRow.OpeningHours),
-		PriceLevel:   stringPtr(dbRow.PriceLevel),
+		Address:      util.StrZeroPtr(dbRow.Address),
+		Website:      util.StrZeroPtr(dbRow.Website),
+		PhoneNumber:  util.StrZeroPtr(dbRow.PhoneNumber),
+		OpeningHours: util.StrZeroPtr(dbRow.OpeningHours),
+		PriceLevel:   util.StrZeroPtr(dbRow.PriceLevel),
 		Category:     dbRow.Category,
 		Tags:         dbRow.Tags,
 		Images:       dbRow.Images,
 		Rating:       dbRow.Rating,
-		CuisineType:  stringPtr(dbRow.CuisineType),
+		CuisineType:  util.StrZeroPtr(dbRow.CuisineType),
 		LlmInteractionID: func() uuid.UUID {
 			if dbRow.LlmInteractionID == nil {
 				return uuid.Nil
@@ -1484,10 +1485,10 @@ func (r *RepositoryImpl) FindHotelsNear(ctx context.Context, lat, lon, radiusMet
 			Latitude:     dr.Latitude,
 			Longitude:    dr.Longitude,
 			Address:      dr.Address,
-			Website:      stringPtr(dr.Website),
-			PhoneNumber:  stringPtr(dr.PhoneNumber),
-			OpeningHours: stringPtr(dr.OpeningHours),
-			PriceRange:   stringPtr(dr.PriceRange),
+			Website:      util.StrZeroPtr(dr.Website),
+			PhoneNumber:  util.StrZeroPtr(dr.PhoneNumber),
+			OpeningHours: util.StrZeroPtr(dr.OpeningHours),
+			PriceRange:   util.StrZeroPtr(dr.PriceRange),
 			Category:     dr.Category,
 			Tags:         dr.Tags,
 			Images:       dr.Images,
@@ -1545,12 +1546,12 @@ func (r *RepositoryImpl) FindRestaurantsNear(ctx context.Context, lat, lon, radi
 			Description:  dr.Description,
 			Latitude:     dr.Latitude,
 			Longitude:    dr.Longitude,
-			Address:      stringPtr(dr.Address),
-			Website:      stringPtr(dr.Website),
-			PhoneNumber:  stringPtr(dr.PhoneNumber),
-			OpeningHours: stringPtr(dr.OpeningHours),
-			PriceLevel:   stringPtr(dr.PriceLevel),
-			CuisineType:  stringPtr(dr.CuisineType),
+			Address:      util.StrZeroPtr(dr.Address),
+			Website:      util.StrZeroPtr(dr.Website),
+			PhoneNumber:  util.StrZeroPtr(dr.PhoneNumber),
+			OpeningHours: util.StrZeroPtr(dr.OpeningHours),
+			PriceLevel:   util.StrZeroPtr(dr.PriceLevel),
+			CuisineType:  util.StrZeroPtr(dr.CuisineType),
 			Category:     dr.Category,
 			Tags:         dr.Tags,
 			Images:       dr.Images,
@@ -2003,13 +2004,6 @@ func (ips *ItineraryPOISource) Next() bool {
 func (ips *ItineraryPOISource) Values() ([]any, error) {
 	poi := ips.pois[ips.idx]
 	return []any{ips.itineraryID, poi.ID, ips.idx, poi.DescriptionPOI}, nil
-}
-
-func stringPtr(v string) *string {
-	if v == "" {
-		return nil
-	}
-	return &v
 }
 
 func (ips *ItineraryPOISource) Err() error {

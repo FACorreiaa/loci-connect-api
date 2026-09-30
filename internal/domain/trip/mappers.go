@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
@@ -329,18 +330,11 @@ func constraintToProto(c TripConstraint) *tripv1.TripConstraint {
 	return &tripv1.TripConstraint{
 		BudgetLevel:    c.BudgetLevel,
 		Pace:           tripv1.TripPace(c.Pace),
-		Mobility:       stringPtrOrNil(c.Mobility),
+		Mobility:       util.StrZeroPtr(c.Mobility),
 		Interests:      c.Interests,
 		DayStartMinute: c.DayStartMinute,
 		DayEndMinute:   c.DayEndMinute,
 	}
-}
-
-func stringPtrOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }
 
 // buildICS renders a trip as a minimal but valid iCalendar. Stops with a day
