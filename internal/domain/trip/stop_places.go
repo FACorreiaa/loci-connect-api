@@ -28,11 +28,22 @@ func (h *Handler) WithPlaces(places PlaceLookup) *Handler {
 	return h
 }
 
-// respond maps a trip and fills in each stop's place.
+// respond maps a trip and fills in each stop's place and picture.
 func (h *Handler) respond(ctx context.Context, t *Trip) *tripv1.TripDraft {
-	p := tripToProto(t)
-	h.hydrateStops(ctx, p)
-	return p
+	return h.respondAll(ctx, []*Trip{t})[0]
+}
+
+// respondAll maps a page of trips. Pictures are looked up once for the whole
+// page rather than once per trip.
+func (h *Handler) respondAll(ctx context.Context, trips []*Trip) []*tripv1.TripDraft {
+	out := make([]*tripv1.TripDraft, 0, len(trips))
+	for _, t := range trips {
+		p := tripToProto(t)
+		h.hydrateStops(ctx, p)
+		out = append(out, p)
+	}
+	h.fillStopImages(ctx, out...)
+	return out
 }
 
 // hydrateStops sets `poi` on every stop whose poi_id names a place the store

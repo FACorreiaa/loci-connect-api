@@ -9,21 +9,20 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 )
 
-// fakeTrips hands out a new id per SaveTrip, like the real insert.
+// fakeTrips hands out a new id per write, like the real insert.
 type fakeTrips struct{ saved []uuid.UUID }
 
-func (f *fakeTrips) SaveTrip(_ context.Context, t *trip.Trip, _ int64) (*trip.Trip, error) {
+func (f *fakeTrips) CreateTripTx(_ context.Context, _ pgx.Tx, _ *trip.Trip) (uuid.UUID, error) {
 	id := uuid.New()
 	f.saved = append(f.saved, id)
-	out := *t
-	out.ID = id
-	return &out, nil
+	return id, nil
 }
 
 func newClaimSvc(repo *fakeRepo, trips TripWriter) *Service {
@@ -63,11 +62,13 @@ func TestClaim_EachUserGetsTheirOwnTrip(t *testing.T) {
 func TestClaim_ConcurrentClaimAnswersWithTheWinner(t *testing.T) {
 	winner := uuid.New()
 	repo := &fakeRepo{bundle: pack(false, StatusPublished, 1), raceTrip: winner}
-	svc := newClaimSvc(repo, &fakeTrips{})
+	trips := &fakeTrips{}
+	svc := newClaimSvc(repo, trips)
 
 	got, err := svc.Claim(context.Background(), uuid.New(), repo.bundle.ID)
 	require.NoError(t, err)
 	assert.Equal(t, winner, got)
+	assert.Empty(t, trips.saved, "the loser of a race must not write a trip of its own")
 }
 
 func TestClaim_UnpaidPaidPackStillRefusedBeforeLookup(t *testing.T) {

@@ -38,6 +38,10 @@ type Handler struct {
 	// TripDraft response. Nil leaves stops with their id and name only.
 	places PlaceLookup
 
+	// Optional, attached via WithStopImages: fills each stop's `image` from
+	// the POI's first stored picture. Nil leaves stops without one.
+	images StopImageLookup
+
 	// Optional, attached via WithAnalytics. Nil records no product events,
 	// which is the normal state wherever no PostHog key is configured.
 	analytics *analytics.Recorder
@@ -151,12 +155,8 @@ func (h *Handler) ListTrips(ctx context.Context, req *connect.Request[tripv1.Lis
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	out := make([]*tripv1.TripDraft, 0, len(trips))
-	for _, t := range trips {
-		out = append(out, h.respond(ctx, t))
-	}
 	return connect.NewResponse(&tripv1.ListTripsResponse{
-		Trips:      out,
+		Trips:      h.respondAll(ctx, trips),
 		Pagination: paginationMeta(page, limit, total),
 	}), nil
 }

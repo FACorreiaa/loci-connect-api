@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"math"
+	"sort"
+	"strings"
 
 	"connectrpc.com/connect"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
@@ -21,10 +23,51 @@ type Handler struct {
 	reviewv1connect.UnimplementedReviewServiceHandler
 	service Service
 	logger  *slog.Logger
+
+	// adminEmails may moderate reviews, in addition to any caller whose token
+	// carries role "admin". Lower-cased. See WithAdmins.
+	adminEmails map[string]struct{}
 }
 
 func NewHandler(svc Service, logger *slog.Logger) *Handler {
 	return &Handler{service: svc, logger: logger.With(slog.String("component", "review-handler"))}
+}
+
+// WithAdmins names the accounts, by email, that may use the moderation RPCs
+// (ListReportedReviews, ResolveReviewReport). The server wires ADMIN_EMAIL
+// here. A caller whose JWT role is "admin" is a moderator whether listed or
+// not — the same rule NewRoleAuthInterceptor and GetSystemAnalytics apply.
+// With neither, the moderation RPCs answer PermissionDenied to everyone.
+func (h *Handler) WithAdmins(emails ...string) *Handler {
+	h.adminEmails = make(map[string]struct{}, len(emails))
+	for _, e := range emails {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			h.adminEmails[e] = struct{}{}
+		}
+	}
+	return h
+}
+
+// requireAdmin returns the moderator's user id, or the Connect error to
+// answer with.
+func (h *Handler) requireAdmin(ctx context.Context) (uuid.UUID, error) {
+	claims, err := interceptors.GetClaimsFromContext(ctx)
+	if err != nil {
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	id, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid user id in token"))
+	}
+	if claims.Role == "admin" {
+		return id, nil
+	}
+	if email := strings.ToLower(strings.TrimSpace(claims.Email)); email != "" {
+		if _, ok := h.adminEmails[email]; ok {
+			return id, nil
+		}
+	}
+	return uuid.Nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin role required"))
 }
 
 func ctxUser(ctx context.Context) (uuid.UUID, error) {
@@ -108,7 +151,7 @@ func (h *Handler) GetReview(ctx context.Context, req *connect.Request[reviewv1.G
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid review_id"))
 	}
-	r, err := h.service.GetReview(ctx, id)
+	r, err := h.service.GetReview(ctx, id, viewer(ctx))
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -126,7 +169,7 @@ func (h *Handler) GetPOIReviews(ctx context.Context, req *connect.Request[review
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid poi_id"))
 	}
 	limit, offset := pageBounds(req.Msg.Pagination)
-	list, total, err := h.service.ListPOIReviews(ctx, poiID, limit, offset)
+	list, total, err := h.service.ListPOIReviews(ctx, poiID, viewer(ctx), limit, offset)
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -150,11 +193,11 @@ func (h *Handler) GetUserReviews(ctx context.Context, req *connect.Request[revie
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user_id"))
 	}
 	limit, offset := pageBounds(req.Msg.Pagination)
-	list, total, err := h.service.ListUserReviews(ctx, userID, limit, offset)
+	list, total, err := h.service.ListUserReviews(ctx, userID, viewer(ctx), limit, offset)
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
-	st, err := h.service.GetUserStatistics(ctx, userID)
+	st, err := h.service.GetUserStatistics(ctx, userID, viewer(ctx))
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -195,7 +238,7 @@ func reviewerLevel(total int) string {
 
 func (h *Handler) GetRecentReviews(ctx context.Context, req *connect.Request[reviewv1.GetRecentReviewsRequest]) (*connect.Response[reviewv1.GetRecentReviewsResponse], error) {
 	limit, offset := pageBounds(req.Msg.Pagination)
-	list, total, err := h.service.ListRecentReviews(ctx, limit, offset)
+	list, total, err := h.service.ListRecentReviews(ctx, viewer(ctx), limit, offset)
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -338,7 +381,7 @@ func (h *Handler) GetContentReviews(ctx context.Context, req *connect.Request[re
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid content_id"))
 	}
 	limit, offset := pageBounds(req.Msg.Pagination)
-	list, total, err := h.service.ListPOIReviews(ctx, poiID, limit, offset)
+	list, total, err := h.service.ListPOIReviews(ctx, poiID, viewer(ctx), limit, offset)
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
@@ -444,6 +487,7 @@ func toProtoReview(r *Review) *reviewv1.Review {
 		ReportCount:  int32(r.ReportCount),
 		IsVerified:   r.IsVerified,
 		VotedByMe:    r.VotedByMe,
+		Hidden:       r.Hidden,
 		// Reviews are POI-only, so the generic content fields mirror poi_id.
 		ContentType: reviewv1.ReviewContentType_REVIEW_CONTENT_TYPE_POI,
 		ContentId:   r.POIID.String(),
@@ -469,4 +513,87 @@ func toProtoReviews(list []*Review) []*reviewv1.Review {
 		out = append(out, toProtoReview(r))
 	}
 	return out
+}
+
+// ListReportedReviews is the moderation queue. Admin only.
+func (h *Handler) ListReportedReviews(ctx context.Context, req *connect.Request[reviewv1.ListReportedReviewsRequest]) (*connect.Response[reviewv1.ListReportedReviewsResponse], error) {
+	if _, err := h.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	limit := int(req.Msg.GetLimit())
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	page := int(req.Msg.GetPage())
+	if page < 1 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+	list, total, err := h.service.ListReportedReviews(ctx, limit, offset)
+	if err != nil {
+		return nil, h.toConnectError(err)
+	}
+	out := make([]*reviewv1.ReportedReview, 0, len(list))
+	for _, rr := range list {
+		out = append(out, toProtoReported(rr))
+	}
+	return connect.NewResponse(&reviewv1.ListReportedReviewsResponse{
+		Reviews:    out,
+		Pagination: pageMeta(total, limit, offset),
+	}), nil
+}
+
+// ResolveReviewReport records a moderator's KEEP or REMOVE. Admin only.
+func (h *Handler) ResolveReviewReport(ctx context.Context, req *connect.Request[reviewv1.ResolveReviewReportRequest]) (*connect.Response[reviewv1.ResolveReviewReportResponse], error) {
+	moderator, err := h.requireAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(req.Msg.GetReviewId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid review_id"))
+	}
+	var action ModerationAction
+	switch req.Msg.GetAction() {
+	case reviewv1.ReviewModerationAction_REVIEW_MODERATION_ACTION_KEEP:
+		action = ModerationKeep
+	case reviewv1.ReviewModerationAction_REVIEW_MODERATION_ACTION_REMOVE:
+		action = ModerationRemove
+	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("action must be KEEP or REMOVE"))
+	}
+	if err := h.service.ResolveReport(ctx, id, moderator, action); err != nil {
+		return nil, h.toConnectError(err)
+	}
+	return connect.NewResponse(&reviewv1.ResolveReviewReportResponse{Response: okResponse()}), nil
+}
+
+func toProtoReported(rr *ReportedReview) *reviewv1.ReportedReview {
+	p := &reviewv1.ReportedReview{
+		Review:      toProtoReview(rr.Review),
+		ReportCount: int32(rr.OpenReports), //nolint:gosec // bounded by the row count
+		Details:     rr.Details,
+		Hidden:      rr.Review != nil && rr.Review.Hidden,
+	}
+	if !rr.LastReportedAt.IsZero() {
+		p.LastReportedAt = timestamppb.New(rr.LastReportedAt)
+	}
+	reasons := make([]string, 0, len(rr.Reasons))
+	for reason := range rr.Reasons {
+		reasons = append(reasons, reason)
+	}
+	// Most-given reason first; ties alphabetical, so the order is stable.
+	sort.Slice(reasons, func(i, j int) bool {
+		if rr.Reasons[reasons[i]] != rr.Reasons[reasons[j]] {
+			return rr.Reasons[reasons[i]] > rr.Reasons[reasons[j]]
+		}
+		return reasons[i] < reasons[j]
+	})
+	for _, reason := range reasons {
+		p.Reasons = append(p.Reasons, &reviewv1.ReviewReportReasonCount{
+			Reason: reason,
+			Count:  int32(rr.Reasons[reason]), //nolint:gosec // bounded by the row count
+		})
+	}
+	return p
 }
