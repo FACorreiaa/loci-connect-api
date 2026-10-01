@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
@@ -14,8 +15,6 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-func intPtr(i int) *int { return &i }
-
 func TestStreamEvent_IsTerminal(t *testing.T) {
 	cases := []struct {
 		ev   locitypes.StreamEvent
@@ -23,8 +22,8 @@ func TestStreamEvent_IsTerminal(t *testing.T) {
 	}{
 		{locitypes.StreamEvent{Type: locitypes.EventTypeComplete}, true},
 		{locitypes.StreamEvent{Type: locitypes.EventTypeError}, true},
-		{locitypes.StreamEvent{Type: locitypes.EventTypeError, StopIndex: intPtr(1)}, false},
-		{locitypes.StreamEvent{Type: locitypes.EventTypeItinerary, StopIndex: intPtr(0)}, false},
+		{locitypes.StreamEvent{Type: locitypes.EventTypeError, StopIndex: util.Ptr(1)}, false},
+		{locitypes.StreamEvent{Type: locitypes.EventTypeItinerary, StopIndex: util.Ptr(0)}, false},
 		{locitypes.StreamEvent{Type: locitypes.EventTypeRoute}, false},
 	}
 	for _, c := range cases {
@@ -70,7 +69,7 @@ func TestMapEventToProto_RouteAndStopIndex(t *testing.T) {
 		t.Fatal("a route event is not about one city")
 	}
 
-	tagged := locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "boom", StopIndex: intPtr(1)}
+	tagged := locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: "boom", StopIndex: util.Ptr(1)}
 	p, err := h.mapEventToProto(context.Background(), tagged, uuid.New())
 	if err != nil {
 		t.Fatal(err)

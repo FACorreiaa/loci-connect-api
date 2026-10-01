@@ -7,21 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/pashagolub/pgxmock/v4"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
-
-// Helper function to create a string pointer
-func strPtr(s string) *string {
-	return &s
-}
-
-// Helper function to create an int32 pointer
-func int32Ptr(i int32) *int32 {
-	return &i
-}
 
 func TestGetCityPOIsByInteraction(t *testing.T) {
 	mock, err := pgxmock.NewPool()
@@ -60,7 +51,7 @@ func TestGetCityPOIsByInteraction(t *testing.T) {
 		WithArgs(userID, cityName).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "name", "latitude", "longitude", "description", "address", "website", "phone_number", "opening_hours", "price_range", "category", "tags", "images", "rating", "created_at"}).
-				AddRow(poiID, "Eiffel Tower", 48.8584, 2.2945, strPtr("Famous landmark"), strPtr("Champ de Mars"), strPtr("https://www.toureiffel.paris"), strPtr("+33123456789"), strPtr("9:00-23:00"), strPtr("$$"), strPtr("landmark"), []string{"tourist", "landmark"}, []string{"image1.jpg"}, 4.5, now),
+				AddRow(poiID, "Eiffel Tower", 48.8584, 2.2945, util.Ptr("Famous landmark"), util.Ptr("Champ de Mars"), util.Ptr("https://www.toureiffel.paris"), util.Ptr("+33123456789"), util.Ptr("9:00-23:00"), util.Ptr("$$"), util.Ptr("landmark"), []string{"tourist", "landmark"}, []string{"image1.jpg"}, 4.5, now),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -123,7 +114,7 @@ func TestGetCityHotelsByInteraction(t *testing.T) {
 		WithArgs(userID, cityName).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "name", "latitude", "longitude", "category", "description", "address", "website", "phone_number", "price_range", "tags", "images", "rating", "llm_interaction_id"}).
-				AddRow(hotelID, "Le Meurice", 48.8651, 2.3281, strPtr("Luxury"), strPtr("5-star hotel"), strPtr("228 Rue de Rivoli"), strPtr("https://www.lemeurice.com"), strPtr("+33144581010"), strPtr("$$$"), []string{"luxury", "spa"}, []string{"hotel1.jpg"}, 4.8, llmInteractionID),
+				AddRow(hotelID, "Le Meurice", 48.8651, 2.3281, util.Ptr("Luxury"), util.Ptr("5-star hotel"), util.Ptr("228 Rue de Rivoli"), util.Ptr("https://www.lemeurice.com"), util.Ptr("+33144581010"), util.Ptr("$$$"), []string{"luxury", "spa"}, []string{"hotel1.jpg"}, 4.8, llmInteractionID),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -187,7 +178,7 @@ func TestGetCityRestaurantsByInteraction(t *testing.T) {
 		WithArgs(userID, cityName).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "name", "latitude", "longitude", "category", "description", "address", "website", "phone_number", "price_level", "cuisine_type", "tags", "images", "rating", "llm_interaction_id"}).
-				AddRow(restaurantID, "Le Cinq", 48.8696, 2.3005, strPtr("Fine Dining"), strPtr("Michelin starred"), strPtr("31 Avenue George V"), strPtr("https://www.lecinq.com"), strPtr("+33149527177"), strPtr("$$$$"), strPtr("French"), []string{"fine-dining", "michelin"}, []string{"resto1.jpg"}, 4.9, llmInteractionID),
+				AddRow(restaurantID, "Le Cinq", 48.8696, 2.3005, util.Ptr("Fine Dining"), util.Ptr("Michelin starred"), util.Ptr("31 Avenue George V"), util.Ptr("https://www.lecinq.com"), util.Ptr("+33149527177"), util.Ptr("$$$$"), util.Ptr("French"), []string{"fine-dining", "michelin"}, []string{"resto1.jpg"}, 4.9, llmInteractionID),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -252,7 +243,7 @@ func TestGetCityItinerariesByInteraction(t *testing.T) {
 		WithArgs(userID, cityName).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "user_id", "source_llm_interaction_id", "session_id", "primary_city_id", "title", "description", "markdown_content", "tags", "estimated_duration_days", "estimated_cost_level", "is_public", "created_at", "updated_at"}).
-				AddRow(itineraryID, userID, nil, nil, nil, "3 Days in Paris", strPtr("A romantic getaway"), "# Day 1\n...", []string{"romantic", "weekend"}, int32Ptr(3), int32Ptr(2), true, now, now),
+				AddRow(itineraryID, userID, nil, nil, nil, "3 Days in Paris", util.Ptr("A romantic getaway"), "# Day 1\n...", []string{"romantic", "weekend"}, util.Ptr[int32](3), util.Ptr[int32](2), true, now, now),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -340,7 +331,7 @@ func TestGetCityFavorites(t *testing.T) {
 		WithArgs(userID, cityName).
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "name", "latitude", "longitude", "description", "address", "website", "phone_number", "opening_hours", "price_range", "category", "tags", "images", "rating", "created_at"}).
-				AddRow(poiID, "Louvre Museum", 48.8606, 2.3376, strPtr("World's largest art museum"), strPtr("Rue de Rivoli"), strPtr("https://www.louvre.fr"), strPtr("+33140205050"), strPtr("9:00-18:00"), strPtr("$$"), strPtr("museum"), []string{"art", "museum"}, []string{"louvre.jpg"}, 4.7, now),
+				AddRow(poiID, "Louvre Museum", 48.8606, 2.3376, util.Ptr("World's largest art museum"), util.Ptr("Rue de Rivoli"), util.Ptr("https://www.louvre.fr"), util.Ptr("+33140205050"), util.Ptr("9:00-18:00"), util.Ptr("$$"), util.Ptr("museum"), []string{"art", "museum"}, []string{"louvre.jpg"}, 4.7, now),
 		)
 
 	repo := NewRepository(mock, slog.Default())
@@ -412,7 +403,7 @@ func TestGetUserRecentInteractions(t *testing.T) {
 		WithArgs(userID, "Paris").
 		WillReturnRows(
 			pgxmock.NewRows([]string{"id", "user_id", "city_name", "city_id", "prompt", "response", "model_name", "latency_ms", "created_at"}).
-				AddRow(interactionID, userID, "Paris", nil, "What to do in Paris?", strPtr("Visit the Eiffel Tower"), "gpt-4", 150, now),
+				AddRow(interactionID, userID, "Paris", nil, "What to do in Paris?", util.Ptr("Visit the Eiffel Tower"), "gpt-4", 150, now),
 		)
 
 	// Expect count query

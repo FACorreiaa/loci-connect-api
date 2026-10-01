@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"google.golang.org/protobuf/proto"
 
 	interestsdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
@@ -26,9 +27,6 @@ var (
 	testUserProfileDB      *pgxpool.Pool
 	testUserProfileService Service
 )
-
-func bp(b bool) *bool         { return &b }
-func f64p(v float64) *float64 { return &v }
 
 func TestMain(m *testing.M) {
 	testUserProfileDB = testsupport.MustPool()
@@ -71,8 +69,8 @@ func TestProfilesServiceImpl_Integration(t *testing.T) {
 		profile1, err := testUserProfileService.CreateSearchProfile(ctx, userID1,
 			locitypes.CreateUserPreferenceProfileParams{
 				ProfileName:    "Weekend Getaway",
-				IsDefault:      bp(true),
-				SearchRadiusKm: f64p(10.0),
+				IsDefault:      util.Ptr(true),
+				SearchRadiusKm: util.Ptr(10.0),
 			})
 		require.NoError(t, err)
 		require.NotNil(t, profile1)
@@ -83,7 +81,7 @@ func TestProfilesServiceImpl_Integration(t *testing.T) {
 		profile2, err := testUserProfileService.CreateSearchProfile(ctx, userID1,
 			locitypes.CreateUserPreferenceProfileParams{
 				ProfileName: "Quick Bites",
-				IsDefault:   bp(false),
+				IsDefault:   util.Ptr(false),
 			})
 		require.NoError(t, err)
 		require.NotNil(t, profile2)
@@ -120,7 +118,7 @@ func TestProfilesServiceImpl_Integration(t *testing.T) {
 		err := testUserProfileService.UpdateSearchProfile(ctx, userID1, profileID1,
 			locitypes.UpdateSearchProfileParams{
 				ProfileName:    proto.String("Updated Weekend Adventure"),
-				SearchRadiusKm: f64p(15.5),
+				SearchRadiusKm: util.Ptr(15.5),
 			})
 		require.NoError(t, err)
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
 
@@ -693,13 +694,8 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, provider string,
 		}
 
 		// Link OAuth identity to user
-		var accessToken, refreshToken *string
-		if gothUser.AccessToken != "" {
-			accessToken = &gothUser.AccessToken
-		}
-		if gothUser.RefreshToken != "" {
-			refreshToken = &gothUser.RefreshToken
-		}
+		accessToken := util.StrZeroPtr(gothUser.AccessToken)
+		refreshToken := util.StrZeroPtr(gothUser.RefreshToken)
 		if err := s.repo.CreateOrUpdateOAuthIdentity(ctx, provider, gothUser.UserID, user.ID, accessToken, refreshToken); err != nil {
 			return nil, false, fmt.Errorf("failed to link OAuth identity: %w", err)
 		}

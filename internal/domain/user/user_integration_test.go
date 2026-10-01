@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
@@ -23,9 +24,6 @@ var (
 	testUserService UserService
 	testUserRepo    UserRepo
 )
-
-func sp(s string) *string { return &s }
-func bp(b bool) *bool     { return &b }
 
 // TestMain normally starts (or reuses) the shared, fully-migrated Postgres
 // testcontainer via testsupport. Set PUSH_TEST_DSN to point at a real,
@@ -95,12 +93,12 @@ func TestServiceUserImpl_UserProfile_Integration(t *testing.T) {
 
 	t.Run("Update user profile", func(t *testing.T) {
 		updateParams := locitypes.UpdateProfileParams{
-			Username:    sp("integ_test_user_updated"),
-			Firstname:   sp("IntegrationUpdated"),
-			Lastname:    sp("TestUpdated"),
-			PhoneNumber: sp("0987654321"),
-			Country:     sp("Testlandia"),
-			City:        sp("IntegCity"),
+			Username:    util.Ptr("integ_test_user_updated"),
+			Firstname:   util.Ptr("IntegrationUpdated"),
+			Lastname:    util.Ptr("TestUpdated"),
+			PhoneNumber: util.Ptr("0987654321"),
+			Country:     util.Ptr("Testlandia"),
+			City:        util.Ptr("IntegCity"),
 		}
 		err := testUserService.UpdateUserProfile(ctx, createdUserID, updateParams)
 		require.NoError(t, err)
@@ -184,8 +182,8 @@ func TestServiceUserImpl_NotificationSettings_Integration(t *testing.T) {
 		// Seed recommendations/trip_reminders away from their defaults so a
 		// later search_finished-only update can prove it did not touch them.
 		seeded, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
-			Recommendations: bp(true),
-			TripReminders:   bp(true),
+			Recommendations: util.Ptr(true),
+			TripReminders:   util.Ptr(true),
 		})
 		require.NoError(t, err)
 		require.True(t, seeded.Recommendations)
@@ -193,7 +191,7 @@ func TestServiceUserImpl_NotificationSettings_Integration(t *testing.T) {
 		require.True(t, seeded.SearchFinished)
 
 		updated, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{
-			SearchFinished: bp(false),
+			SearchFinished: util.Ptr(false),
 		})
 		require.NoError(t, err)
 		require.NotNil(t, updated)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ import (
 func storedCity(name, country string) locitypes.CityDetail {
 	return locitypes.CityDetail{
 		ID: uuid.New(), Name: name, Country: country,
-		CenterLatitude: ptr(38.7), CenterLongitude: ptr(-9.1),
+		CenterLatitude: util.Ptr(38.7), CenterLongitude: util.Ptr(-9.1),
 	}
 }
 

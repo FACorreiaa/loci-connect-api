@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	travelhistoryv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-func ptr[T any](v T) *T { return &v }
 
 func TestSourceValid(t *testing.T) {
 	for _, s := range []Source{SourceTrip, SourceVisitEvent, SourceManual, SourceBackfill} {
@@ -105,7 +104,7 @@ func TestVisitInputNormalise(t *testing.T) {
 	})
 
 	t.Run("country code is upper-cased", func(t *testing.T) {
-		in := VisitInput{CityName: "Porto", CountryCode: ptr(" pt ")}
+		in := VisitInput{CityName: "Porto", CountryCode: util.Ptr(" pt ")}
 		in.Normalise(now)
 		if in.CountryCode == nil || *in.CountryCode != "PT" {
 			t.Fatalf("CountryCode = %v, want PT", in.CountryCode)
@@ -116,7 +115,7 @@ func TestVisitInputNormalise(t *testing.T) {
 		// A partial code would render as a wrong flag, which is worse than a
 		// missing one — the whole point of this domain is no fabricated data.
 		for _, bad := range []string{"P", "PRT", ""} {
-			in := VisitInput{CityName: "Porto", CountryCode: ptr(bad)}
+			in := VisitInput{CityName: "Porto", CountryCode: util.Ptr(bad)}
 			in.Normalise(now)
 			if in.CountryCode != nil {
 				t.Errorf("CountryCode for %q = %v, want nil", bad, *in.CountryCode)
@@ -261,7 +260,7 @@ func TestVisitedCityToProto(t *testing.T) {
 
 	got := visitedCityToProto(&VisitedCity{
 		ID: id, CityID: &cityID, CityName: "Porto", Country: "Portugal",
-		CountryCode: ptr("PT"), Latitude: 41.1579, Longitude: -8.6291,
+		CountryCode: util.Ptr("PT"), Latitude: 41.1579, Longitude: -8.6291,
 		Source: SourceTrip, TripID: &tripID,
 		FirstVisitAt: first, LastVisitAt: last, VisitCount: 3,
 	})
@@ -349,7 +348,7 @@ func TestVisitInputFromProto(t *testing.T) {
 		in, err := visitInputFromProto(&travelhistoryv1.RecordVisitRequest{
 			CityId: cityID.String(), CityName: "Porto",
 			Latitude: 41.1579, Longitude: -8.6291,
-			TripId: tripID.String(), PoiId: ptr("poi-1"), PoiName: ptr("Livraria Lello"),
+			TripId: tripID.String(), PoiId: util.Ptr("poi-1"), PoiName: util.Ptr("Livraria Lello"),
 			VisitedAt: timestamppb.New(at),
 		})
 		if err != nil {
