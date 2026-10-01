@@ -11,6 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 )
 
 // A client built before trip plans saves the whole TripDraft it holds, which
@@ -61,4 +63,53 @@ func mustGet(t *testing.T, repo Repository, id, userID uuid.UUID) *Trip {
 	got, err := repo.GetTrip(context.Background(), id, userID)
 	require.NoError(t, err)
 	return got
+}
+
+func TestPlanRepository_SavePlan(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := NewRepository(testTripDB, logger)
+	plans := NewPlanRepository(testTripDB, logger)
+	userID := newTripUser(t, "plan-save-"+uuid.NewString()+"@loci.test")
+
+	tr, err := repo.SaveTrip(ctx, &Trip{
+		UserID: userID, CityName: "Lisbon", Title: "Lisbon",
+		Days: []TripDay{
+			{DayNumber: 1, CityName: "Lisbon", Stops: []TripStop{{Name: "Belém", OrderIndex: 0}}},
+			{DayNumber: 2, CityName: "Lisbon"},
+		},
+	}, 0)
+	require.NoError(t, err)
+	stopID := tr.Days[0].Stops[0].ID
+
+	require.NoError(t, applyDates(tr, day("2026-11-12"), day("2026-11-13")))
+	require.NoError(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "Hotel Avenida", StarRating: "4"}))
+	f, err := appendFlight(tr, TripFlight{
+		Origin: flights.Place{Name: "New York", IATA: "JFK"}, Destination: flights.Place{Name: "Lisbon", IATA: "LIS"},
+		DepartDate: day("2026-11-12"), Links: []flights.Link{{Provider: "google_flights", Label: "Google Flights", URL: "https://example.test"}},
+	})
+	require.NoError(t, err)
+
+	saved, err := plans.SavePlan(ctx, tr, tr.Version)
+	require.NoError(t, err)
+	require.Equal(t, tr.Version, saved.Version)
+	require.Equal(t, "2026-11-13", saved.Days[1].Date.Format(time.DateOnly))
+	require.Equal(t, stopID, saved.Days[0].Stops[0].ID, "only dates move; stops keep their ids")
+	require.Len(t, saved.Stays, 1)
+	require.Len(t, saved.Flights, 1)
+	require.Equal(t, f.ID, saved.Flights[0].ID, "flight ids survive a save")
+	require.Equal(t, "https://example.test", saved.Flights[0].Links[0].URL)
+
+	// A save from a stale copy is refused and changes nothing.
+	stale := *saved
+	stale.Stays = nil
+	_, err = plans.SavePlan(ctx, &stale, saved.Version-1)
+	require.ErrorIs(t, err, ErrVersionConflict)
+	require.Len(t, mustGet(t, repo, tr.ID, userID).Stays, 1)
+
+	// Someone else's trip is not found, not overwritten.
+	other := *saved
+	other.UserID = newTripUser(t, "plan-other-"+uuid.NewString()+"@loci.test")
+	_, err = plans.SavePlan(ctx, &other, saved.Version)
+	require.ErrorIs(t, err, ErrNotFound)
 }
