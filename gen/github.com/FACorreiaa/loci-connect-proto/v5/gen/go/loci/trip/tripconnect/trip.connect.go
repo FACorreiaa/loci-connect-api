@@ -75,6 +75,21 @@ const (
 	TripServiceRemoveStopProcedure = "/loci.trip.TripService/RemoveStop"
 	// TripServiceReplaceStopProcedure is the fully-qualified name of the TripService's ReplaceStop RPC.
 	TripServiceReplaceStopProcedure = "/loci.trip.TripService/ReplaceStop"
+	// TripServiceSetTripDatesProcedure is the fully-qualified name of the TripService's SetTripDates
+	// RPC.
+	TripServiceSetTripDatesProcedure = "/loci.trip.TripService/SetTripDates"
+	// TripServiceSetStayProcedure is the fully-qualified name of the TripService's SetStay RPC.
+	TripServiceSetStayProcedure = "/loci.trip.TripService/SetStay"
+	// TripServiceClearStayProcedure is the fully-qualified name of the TripService's ClearStay RPC.
+	TripServiceClearStayProcedure = "/loci.trip.TripService/ClearStay"
+	// TripServiceAddFlightProcedure is the fully-qualified name of the TripService's AddFlight RPC.
+	TripServiceAddFlightProcedure = "/loci.trip.TripService/AddFlight"
+	// TripServiceRemoveFlightProcedure is the fully-qualified name of the TripService's RemoveFlight
+	// RPC.
+	TripServiceRemoveFlightProcedure = "/loci.trip.TripService/RemoveFlight"
+	// TripServiceBuildFlightLinksProcedure is the fully-qualified name of the TripService's
+	// BuildFlightLinks RPC.
+	TripServiceBuildFlightLinksProcedure = "/loci.trip.TripService/BuildFlightLinks"
 	// TripServiceExportTripProcedure is the fully-qualified name of the TripService's ExportTrip RPC.
 	TripServiceExportTripProcedure = "/loci.trip.TripService/ExportTrip"
 	// TripServiceSuggestPackingProcedure is the fully-qualified name of the TripService's
@@ -114,6 +129,12 @@ var (
 	tripServiceAddStopMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("AddStop")
 	tripServiceRemoveStopMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("RemoveStop")
 	tripServiceReplaceStopMethodDescriptor              = tripServiceServiceDescriptor.Methods().ByName("ReplaceStop")
+	tripServiceSetTripDatesMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("SetTripDates")
+	tripServiceSetStayMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("SetStay")
+	tripServiceClearStayMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ClearStay")
+	tripServiceAddFlightMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("AddFlight")
+	tripServiceRemoveFlightMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("RemoveFlight")
+	tripServiceBuildFlightLinksMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("BuildFlightLinks")
 	tripServiceExportTripMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("ExportTrip")
 	tripServiceSuggestPackingMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("SuggestPacking")
 	tripServiceGetTripChecklistMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("GetTripChecklist")
@@ -158,6 +179,14 @@ type TripServiceClient interface {
 	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
+	// The trip's plan. Each takes base_version and answers FailedPrecondition
+	// when it is stale, like the stop edits above.
+	SetTripDates(context.Context, *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error)
+	SetStay(context.Context, *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error)
+	ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error)
+	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
+	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
+	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
@@ -286,6 +315,42 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceReplaceStopMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		setTripDates: connect.NewClient[trip.SetTripDatesRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceSetTripDatesProcedure,
+			connect.WithSchema(tripServiceSetTripDatesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setStay: connect.NewClient[trip.SetStayRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceSetStayProcedure,
+			connect.WithSchema(tripServiceSetStayMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		clearStay: connect.NewClient[trip.ClearStayRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceClearStayProcedure,
+			connect.WithSchema(tripServiceClearStayMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		addFlight: connect.NewClient[trip.AddFlightRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceAddFlightProcedure,
+			connect.WithSchema(tripServiceAddFlightMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		removeFlight: connect.NewClient[trip.RemoveFlightRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceRemoveFlightProcedure,
+			connect.WithSchema(tripServiceRemoveFlightMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		buildFlightLinks: connect.NewClient[trip.BuildFlightLinksRequest, trip.BuildFlightLinksResponse](
+			httpClient,
+			baseURL+TripServiceBuildFlightLinksProcedure,
+			connect.WithSchema(tripServiceBuildFlightLinksMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		exportTrip: connect.NewClient[trip.ExportTripRequest, trip.ExportTripResponse](
 			httpClient,
 			baseURL+TripServiceExportTripProcedure,
@@ -344,6 +409,12 @@ type tripServiceClient struct {
 	addStop                  *connect.Client[trip.AddStopRequest, trip.TripDraft]
 	removeStop               *connect.Client[trip.RemoveStopRequest, trip.TripDraft]
 	replaceStop              *connect.Client[trip.ReplaceStopRequest, trip.TripDraft]
+	setTripDates             *connect.Client[trip.SetTripDatesRequest, trip.TripDraft]
+	setStay                  *connect.Client[trip.SetStayRequest, trip.TripDraft]
+	clearStay                *connect.Client[trip.ClearStayRequest, trip.TripDraft]
+	addFlight                *connect.Client[trip.AddFlightRequest, trip.TripDraft]
+	removeFlight             *connect.Client[trip.RemoveFlightRequest, trip.TripDraft]
+	buildFlightLinks         *connect.Client[trip.BuildFlightLinksRequest, trip.BuildFlightLinksResponse]
 	exportTrip               *connect.Client[trip.ExportTripRequest, trip.ExportTripResponse]
 	suggestPacking           *connect.Client[trip.SuggestPackingRequest, trip.SuggestPackingResponse]
 	getTripChecklist         *connect.Client[trip.GetTripChecklistRequest, trip.GetTripChecklistResponse]
@@ -439,6 +510,36 @@ func (c *tripServiceClient) ReplaceStop(ctx context.Context, req *connect.Reques
 	return c.replaceStop.CallUnary(ctx, req)
 }
 
+// SetTripDates calls loci.trip.TripService.SetTripDates.
+func (c *tripServiceClient) SetTripDates(ctx context.Context, req *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.setTripDates.CallUnary(ctx, req)
+}
+
+// SetStay calls loci.trip.TripService.SetStay.
+func (c *tripServiceClient) SetStay(ctx context.Context, req *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.setStay.CallUnary(ctx, req)
+}
+
+// ClearStay calls loci.trip.TripService.ClearStay.
+func (c *tripServiceClient) ClearStay(ctx context.Context, req *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.clearStay.CallUnary(ctx, req)
+}
+
+// AddFlight calls loci.trip.TripService.AddFlight.
+func (c *tripServiceClient) AddFlight(ctx context.Context, req *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.addFlight.CallUnary(ctx, req)
+}
+
+// RemoveFlight calls loci.trip.TripService.RemoveFlight.
+func (c *tripServiceClient) RemoveFlight(ctx context.Context, req *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.removeFlight.CallUnary(ctx, req)
+}
+
+// BuildFlightLinks calls loci.trip.TripService.BuildFlightLinks.
+func (c *tripServiceClient) BuildFlightLinks(ctx context.Context, req *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error) {
+	return c.buildFlightLinks.CallUnary(ctx, req)
+}
+
 // ExportTrip calls loci.trip.TripService.ExportTrip.
 func (c *tripServiceClient) ExportTrip(ctx context.Context, req *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error) {
 	return c.exportTrip.CallUnary(ctx, req)
@@ -505,6 +606,14 @@ type TripServiceHandler interface {
 	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
+	// The trip's plan. Each takes base_version and answers FailedPrecondition
+	// when it is stale, like the stop edits above.
+	SetTripDates(context.Context, *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error)
+	SetStay(context.Context, *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error)
+	ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error)
+	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
+	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
+	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
@@ -629,6 +738,42 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceReplaceStopMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceSetTripDatesHandler := connect.NewUnaryHandler(
+		TripServiceSetTripDatesProcedure,
+		svc.SetTripDates,
+		connect.WithSchema(tripServiceSetTripDatesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceSetStayHandler := connect.NewUnaryHandler(
+		TripServiceSetStayProcedure,
+		svc.SetStay,
+		connect.WithSchema(tripServiceSetStayMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceClearStayHandler := connect.NewUnaryHandler(
+		TripServiceClearStayProcedure,
+		svc.ClearStay,
+		connect.WithSchema(tripServiceClearStayMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceAddFlightHandler := connect.NewUnaryHandler(
+		TripServiceAddFlightProcedure,
+		svc.AddFlight,
+		connect.WithSchema(tripServiceAddFlightMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceRemoveFlightHandler := connect.NewUnaryHandler(
+		TripServiceRemoveFlightProcedure,
+		svc.RemoveFlight,
+		connect.WithSchema(tripServiceRemoveFlightMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceBuildFlightLinksHandler := connect.NewUnaryHandler(
+		TripServiceBuildFlightLinksProcedure,
+		svc.BuildFlightLinks,
+		connect.WithSchema(tripServiceBuildFlightLinksMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	tripServiceExportTripHandler := connect.NewUnaryHandler(
 		TripServiceExportTripProcedure,
 		svc.ExportTrip,
@@ -701,6 +846,18 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceRemoveStopHandler.ServeHTTP(w, r)
 		case TripServiceReplaceStopProcedure:
 			tripServiceReplaceStopHandler.ServeHTTP(w, r)
+		case TripServiceSetTripDatesProcedure:
+			tripServiceSetTripDatesHandler.ServeHTTP(w, r)
+		case TripServiceSetStayProcedure:
+			tripServiceSetStayHandler.ServeHTTP(w, r)
+		case TripServiceClearStayProcedure:
+			tripServiceClearStayHandler.ServeHTTP(w, r)
+		case TripServiceAddFlightProcedure:
+			tripServiceAddFlightHandler.ServeHTTP(w, r)
+		case TripServiceRemoveFlightProcedure:
+			tripServiceRemoveFlightHandler.ServeHTTP(w, r)
+		case TripServiceBuildFlightLinksProcedure:
+			tripServiceBuildFlightLinksHandler.ServeHTTP(w, r)
 		case TripServiceExportTripProcedure:
 			tripServiceExportTripHandler.ServeHTTP(w, r)
 		case TripServiceSuggestPackingProcedure:
@@ -788,6 +945,30 @@ func (UnimplementedTripServiceHandler) RemoveStop(context.Context, *connect.Requ
 
 func (UnimplementedTripServiceHandler) ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ReplaceStop is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) SetTripDates(context.Context, *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SetTripDates is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) SetStay(context.Context, *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SetStay is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ClearStay is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.AddFlight is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveFlight is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.BuildFlightLinks is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error) {
