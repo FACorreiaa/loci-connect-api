@@ -282,7 +282,10 @@ const (
 	// EventTypeGastronomy carries the city's typical gastronomy
 	// (StreamGastronomyData), sent as soon as that part is parsed.
 	EventTypeGastronomy = "gastronomy"
-	EventTypeChunk      = "chunk" // For immediate text chunks (Google GenAI pattern)
+	// EventTypeActionProposal carries a tripaction.Proposal: a change to the
+	// turn's trip the traveller can confirm with ApplyTripAction.
+	EventTypeActionProposal = "action_proposal"
+	EventTypeChunk          = "chunk" // For immediate text chunks (Google GenAI pattern)
 )
 
 // --- Typed stream payloads (Slice 1) ---

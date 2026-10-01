@@ -88,3 +88,38 @@ func FlightQuery(f TripFlight) flights.Query {
 		Passengers: int(f.Passengers), Cabin: f.Cabin,
 	}
 }
+
+// ReplaceDays swaps a trip's days for a re-planned set (the chat agent's
+// "make it 6 days"), keeping its dates, stays and flights. Days are
+// renumbered 1..n as new days and, when the trip is dated, dated from its
+// start, so the calendar follows the new plan.
+func (s *Service) ReplaceDays(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, days []TripDay) (*Trip, error) {
+	if len(days) == 0 || len(days) > MaxTripSpanDays {
+		return nil, invalid("a plan has 1 to %d days", MaxTripSpanDays)
+	}
+	t, err := s.trips.GetTrip(ctx, tripID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if t.Version != baseVersion {
+		return nil, ErrVersionConflict
+	}
+	t.Days = make([]TripDay, len(days))
+	for i, d := range days {
+		d.ID = uuid.Nil
+		d.DayNumber = int32(i + 1)
+		d.Date = nil
+		if t.StartDate != nil {
+			at := t.StartDate.AddDate(0, 0, i)
+			d.Date = &at
+		}
+		stops := make([]TripStop, len(d.Stops))
+		for j, st := range d.Stops {
+			st.ID = uuid.Nil
+			stops[j] = st
+		}
+		d.Stops = stops
+		t.Days[i] = d
+	}
+	return s.trips.SaveTrip(ctx, t, baseVersion)
+}

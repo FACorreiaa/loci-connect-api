@@ -65,6 +65,7 @@ import (
 	tagshandler "github.com/FACorreiaa/loci-connect-api/internal/domain/tags/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
@@ -932,6 +933,23 @@ func (d *Dependencies) initHandlers() error {
 		boardAdmins := append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)
 		boardsSvc := boardsdomain.NewService(boardsdomain.NewRepository(d.DB.Pool), boardAdmins, boardsdomain.DefaultLimits)
 		d.BoardsHandler = boardsdomain.NewHandler(boardsSvc, socialSvc, d.Logger)
+		// The chat agent's write path: trip-bound turns propose changes, and
+		// ApplyTripAction makes the one the traveller confirms.
+		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
+			tripActions := tripaction.NewService(tripaction.Deps{
+				LLM:      chatImpl.ActionLLM(),
+				Store:    tripaction.NewStore(d.DB.Pool),
+				Trips:    d.TripRepo,
+				Plans:    d.TripService,
+				Hotels:   d.POISvc,
+				Places:   newForwardGeocoder(d.AppCache),
+				Regen:    chatImpl,
+				Sessions: d.ChatRepo,
+				Logger:   d.Logger,
+			})
+			chatImpl.SetTripActions(tripActions)
+			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions)
+		}
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(
