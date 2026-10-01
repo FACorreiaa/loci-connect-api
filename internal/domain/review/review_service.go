@@ -41,20 +41,28 @@ type UpdateReviewInput struct {
 
 type Service interface {
 	CreateReview(ctx context.Context, in CreateReviewInput) (*Review, error)
-	GetReview(ctx context.Context, id uuid.UUID) (*Review, error)
-	ListPOIReviews(ctx context.Context, poiID uuid.UUID, limit, offset int) ([]*Review, int, error)
-	ListUserReviews(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error)
-	ListRecentReviews(ctx context.Context, limit, offset int) ([]*Review, int, error)
+	// GetReview answers ErrNotFound for a hidden review unless viewer wrote it.
+	GetReview(ctx context.Context, id, viewer uuid.UUID) (*Review, error)
+	// The list reads show hidden reviews to their author only (see Repository).
+	ListPOIReviews(ctx context.Context, poiID, viewer uuid.UUID, limit, offset int) ([]*Review, int, error)
+	ListUserReviews(ctx context.Context, userID, viewer uuid.UUID, limit, offset int) ([]*Review, int, error)
+	ListRecentReviews(ctx context.Context, viewer uuid.UUID, limit, offset int) ([]*Review, int, error)
 	UpdateReview(ctx context.Context, in UpdateReviewInput) (*Review, error)
 	DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error
 	LikeReview(ctx context.Context, userID, reviewID uuid.UUID, isLike bool) (int, error)
 	GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error)
-	GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error)
+	// GetUserStatistics counts userID's hidden reviews only for userID.
+	GetUserStatistics(ctx context.Context, userID, viewer uuid.UUID) (*UserStatistics, error)
 	GetMyPOIReview(ctx context.Context, userID, poiID uuid.UUID) (*Review, error)
 	// MarkVotedBy sets VotedByMe on each review viewer has marked helpful. A
 	// nil viewer (anonymous read) leaves every flag false.
 	MarkVotedBy(ctx context.Context, viewer uuid.UUID, reviews ...*Review) error
 	ReportReview(ctx context.Context, reporterID, reviewID uuid.UUID, reason, details string) error
+	// ListReportedReviews is the moderation queue. Callers check the caller
+	// is a moderator; the service does not.
+	ListReportedReviews(ctx context.Context, limit, offset int) ([]*ReportedReview, int, error)
+	// ResolveReport records a moderator's KEEP or REMOVE.
+	ResolveReport(ctx context.Context, reviewID, moderatorID uuid.UUID, action ModerationAction) error
 }
 
 type service struct {
@@ -96,20 +104,44 @@ func (s *service) CreateReview(ctx context.Context, in CreateReviewInput) (*Revi
 	return s.repo.GetByID(ctx, r.ID)
 }
 
-func (s *service) GetReview(ctx context.Context, id uuid.UUID) (*Review, error) {
-	return s.repo.GetByID(ctx, id)
+func (s *service) GetReview(ctx context.Context, id, viewer uuid.UUID) (*Review, error) {
+	r, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	// A hidden review is not found for anyone but its author, the same answer
+	// a deleted one gets, so a direct link does not get around the hiding.
+	if r.Hidden && r.UserID != viewer {
+		return nil, ErrNotFound
+	}
+	return r, nil
 }
 
-func (s *service) ListPOIReviews(ctx context.Context, poiID uuid.UUID, limit, offset int) ([]*Review, int, error) {
-	return s.repo.ListByPOI(ctx, poiID, limit, offset)
+func (s *service) ListPOIReviews(ctx context.Context, poiID, viewer uuid.UUID, limit, offset int) ([]*Review, int, error) {
+	return s.repo.ListByPOI(ctx, poiID, viewer, limit, offset)
 }
 
-func (s *service) ListUserReviews(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Review, int, error) {
-	return s.repo.ListByUser(ctx, userID, limit, offset)
+func (s *service) ListUserReviews(ctx context.Context, userID, viewer uuid.UUID, limit, offset int) ([]*Review, int, error) {
+	return s.repo.ListByUser(ctx, userID, viewer, limit, offset)
 }
 
-func (s *service) ListRecentReviews(ctx context.Context, limit, offset int) ([]*Review, int, error) {
-	return s.repo.ListRecent(ctx, limit, offset)
+func (s *service) ListRecentReviews(ctx context.Context, viewer uuid.UUID, limit, offset int) ([]*Review, int, error) {
+	return s.repo.ListRecent(ctx, viewer, limit, offset)
+}
+
+func (s *service) ListReportedReviews(ctx context.Context, limit, offset int) ([]*ReportedReview, int, error) {
+	return s.repo.ListReported(ctx, limit, offset)
+}
+
+func (s *service) ResolveReport(ctx context.Context, reviewID, moderatorID uuid.UUID, action ModerationAction) error {
+	if err := s.repo.Moderate(ctx, reviewID, moderatorID, action); err != nil {
+		return err
+	}
+	s.logger.InfoContext(ctx, "review moderated",
+		slog.String("review_id", reviewID.String()),
+		slog.String("moderator_id", moderatorID.String()),
+		slog.String("action", string(action)))
+	return nil
 }
 
 func (s *service) DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error {
@@ -150,8 +182,8 @@ func (s *service) GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statisti
 	return s.repo.Statistics(ctx, poiID)
 }
 
-func (s *service) GetUserStatistics(ctx context.Context, userID uuid.UUID) (*UserStatistics, error) {
-	return s.repo.UserStatistics(ctx, userID)
+func (s *service) GetUserStatistics(ctx context.Context, userID, viewer uuid.UUID) (*UserStatistics, error) {
+	return s.repo.UserStatistics(ctx, userID, userID == viewer)
 }
 
 func (s *service) GetMyPOIReview(ctx context.Context, userID, poiID uuid.UUID) (*Review, error) {

@@ -900,6 +900,9 @@ func (d *Dependencies) initHandlers() error {
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).WithPlaces(d.POIRepo)
 	if d.DB != nil {
 		d.TripHandler = d.TripHandler.WithChecklist(trip.NewChecklistRepository(d.DB.Pool))
+		// Every stop with a poi_id shows the POI's first stored picture, so a
+		// trip claimed from a City Pack keeps the photos the pack showed.
+		d.TripHandler = d.TripHandler.WithStopImages(trip.NewStopImageStore(d.DB.Pool))
 		// The friends layer, and trip sharing on top of it: one service is
 		// both SocialService and the graph trip visibility is checked against.
 		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
@@ -929,7 +932,7 @@ func (d *Dependencies) initHandlers() error {
 	bundleRepo := bundle.NewRepository(d.DB.Pool, d.Logger)
 	bundleSvc := bundle.NewService(
 		bundleRepo,
-		d.TripRepo,
+		trip.TxWriter{},
 		bundle.NewCheckoutAdapter(d.PaymentService),
 		bundle.NewUserEmailLookup(d.UserRepo),
 		bundle.Config{
@@ -963,7 +966,9 @@ func (d *Dependencies) initHandlers() error {
 	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService)
-	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
+	// Moderators of reported reviews: ADMIN_EMAIL, plus any token with role
+	// "admin" (see reviewdomain.Handler.WithAdmins).
+	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger).WithAdmins(d.Config.Auth.AdminEmail)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger).
 		WithCityResolver(placeCityResolverAdapter{resolver: d.CityResolver}).

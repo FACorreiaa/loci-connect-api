@@ -107,8 +107,8 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 	}), nil
 }
 
-// nearbyListLimit caps a query-less nearby listing. The distance search has
-// no LIMIT of its own, and a nearby card shows a handful of places.
+// nearbyListLimit caps a query-less nearby listing; a nearby card shows a
+// handful of places. It is applied in SQL, after ordering by distance.
 const nearbyListLimit = 50
 
 // errQueryRequired is the answer to a query-less search that also has no
@@ -125,7 +125,7 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 	if msg.GetLatitude() == 0 && msg.GetLongitude() == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errQueryRequired)
 	}
-	filter := locitypes.POIFilter{Radius: defaultHybridRadiusKm}
+	filter := locitypes.POIFilter{Radius: defaultHybridRadiusKm, Limit: nearbyListLimit}
 	filter.Location.Latitude = msg.GetLatitude()
 	filter.Location.Longitude = msg.GetLongitude()
 	if msg.RadiusKm != nil {
@@ -137,9 +137,6 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 	pois, err := h.service.SearchPOIs(ctx, filter)
 	if err != nil {
 		return nil, apierr.ToConnect(err)
-	}
-	if len(pois) > nearbyListLimit {
-		pois = pois[:nearbyListLimit]
 	}
 	return connect.NewResponse(&poiv1.SearchPOIResponse{
 		Pois: presenter.ToPOIProtos(pois),

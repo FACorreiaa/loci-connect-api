@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +22,7 @@ type fakeRepo struct {
 	lastMaxDays  int
 	loadDaysCall int
 	// claims is bundle_claims keyed by user; raceTrip, when set, is a claim a
-	// concurrent request records between the lookup and RecordClaim.
+	// concurrent request records between the lookup and ClaimOnce.
 	claims   map[uuid.UUID]uuid.UUID
 	raceTrip uuid.UUID
 }
@@ -79,18 +80,23 @@ func (f *fakeRepo) ClaimedTrip(_ context.Context, userID, _ uuid.UUID) (uuid.UUI
 	return id, ok, nil
 }
 
-func (f *fakeRepo) RecordClaim(_ context.Context, userID, _, tripID uuid.UUID) (uuid.UUID, error) {
+func (f *fakeRepo) ClaimOnce(ctx context.Context, userID, _ uuid.UUID, create func(context.Context, pgx.Tx) (uuid.UUID, error)) (uuid.UUID, bool, error) {
 	if f.claims == nil {
 		f.claims = map[uuid.UUID]uuid.UUID{}
 	}
+	// A concurrent claim won the lock and recorded its trip first.
 	if f.raceTrip != uuid.Nil {
 		f.claims[userID] = f.raceTrip
 	}
 	if held, ok := f.claims[userID]; ok {
-		return held, nil
+		return held, false, nil
 	}
-	f.claims[userID] = tripID
-	return tripID, nil
+	id, err := create(ctx, nil)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	f.claims[userID] = id
+	return id, true, nil
 }
 
 type fakeCheckout struct{ called bool }

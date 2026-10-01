@@ -385,9 +385,9 @@ func (h *Handler) listShared(ctx context.Context, viewer uuid.UUID, trips []*Tri
 	if err != nil {
 		h.logWarn("load trip owners", err)
 	}
-	out := make([]*tripv1.TripDraft, 0, len(trips))
-	for _, t := range trips {
-		out = append(out, redactForViewer(h.respond(ctx, t), t.ShareDetails, cards[t.UserID]))
+	out := h.respondAll(ctx, trips)
+	for i, t := range trips {
+		out[i] = redactForViewer(out[i], t.ShareDetails, cards[t.UserID])
 	}
 	return &tripv1.ListTripsResponse{Trips: out, Pagination: paginationMeta(page, limit, total)}
 }

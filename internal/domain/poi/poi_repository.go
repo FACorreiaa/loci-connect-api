@@ -1532,6 +1532,7 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 		attribute.Float64("location.longitude", filter.Location.Longitude),
 		attribute.Float64("radius", filter.Radius),
 		attribute.String("category", filter.Category),
+		attribute.Int("limit", filter.Limit),
 	))
 	defer span.End()
 
@@ -1569,8 +1570,13 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 		args = append(args, filter.Category) // $4
 	}
 
-	// Order by distance
+	// Order by distance. The cap goes in the same statement so a dense city
+	// does not ship every place within the radius only to be trimmed in Go.
 	query += ` ORDER BY distance_meters ASC`
+	if filter.Limit > 0 {
+		args = append(args, filter.Limit)
+		query += fmt.Sprintf(` LIMIT $%d`, len(args))
+	}
 
 	l.DebugContext(ctx, "Executing POI search query", slog.String("query", query), slog.Any("args", args))
 

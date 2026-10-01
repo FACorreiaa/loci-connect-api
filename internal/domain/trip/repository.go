@@ -250,9 +250,49 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback is a no-op after commit
 
+	if err := writeTrip(ctx, tx, t, baseVersion); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	// The client's draft carries no plan; what is stored is the truth.
+	if err := r.loadPlan(ctx, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+// CreateTripTx writes a new trip (t.ID must be nil) inside a transaction the
+// caller owns, so the trip commits or rolls back with the caller's other
+// writes. It sets t.ID, t.Version and the stored timestamps. City Pack claims
+// use it to write the trip and its claim row as one unit.
+func CreateTripTx(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if t.ID != uuid.Nil {
+		return fmt.Errorf("create trip: id %s already set", t.ID)
+	}
+	return writeTrip(ctx, tx, t, 0)
+}
+
+// TxWriter adapts CreateTripTx to an interface, for callers that take their
+// trip writer as a dependency.
+type TxWriter struct{}
+
+// CreateTripTx writes a new trip inside tx and returns its id.
+func (TxWriter) CreateTripTx(ctx context.Context, tx pgx.Tx, t *Trip) (uuid.UUID, error) {
+	if err := CreateTripTx(ctx, tx, t); err != nil {
+		return uuid.Nil, err
+	}
+	return t.ID, nil
+}
+
+// writeTrip is SaveTrip's body: everything but the transaction's begin and
+// commit and the plan read-back.
+func writeTrip(ctx context.Context, tx pgx.Tx, t *Trip, baseVersion int64) error {
 	constraintsJSON, err := json.Marshal(t.Constraints)
 	if err != nil {
-		return nil, fmt.Errorf("marshal constraints: %w", err)
+		return fmt.Errorf("marshal constraints: %w", err)
 	}
 
 	var newVersion int64
@@ -269,7 +309,7 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 			t.CopiedFromTripID).
 			Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt, &t.Visibility, &t.ShareDetails)
 		if err != nil {
-			return nil, fmt.Errorf("insert trip: %w", err)
+			return fmt.Errorf("insert trip: %w", err)
 		}
 	} else {
 		// Existing trip: lock the row and enforce the base version.
@@ -278,12 +318,12 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 			t.ID, t.UserID).Scan(&storedVersion)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrNotFound
+				return ErrNotFound
 			}
-			return nil, fmt.Errorf("lock trip: %w", err)
+			return fmt.Errorf("lock trip: %w", err)
 		}
 		if storedVersion != baseVersion {
-			return nil, ErrVersionConflict
+			return ErrVersionConflict
 		}
 		newVersion = storedVersion + 1
 		// Sharing is not part of a save (SetTripVisibility owns it), so the
@@ -298,7 +338,7 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 			Scan(&t.IsPublic, &t.ShareCode, &t.Visibility, &t.ShareDetails, &t.CopiedFromTripID, &t.CreatedAt, &t.UpdatedAt,
 				&t.StartDate, &t.EndDate)
 		if err != nil {
-			return nil, fmt.Errorf("update trip: %w", err)
+			return fmt.Errorf("update trip: %w", err)
 		}
 	}
 	t.Version = newVersion
@@ -310,17 +350,17 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	// stop). Only ids this trip owned before the save are honoured.
 	owned, err := ownedIDs(ctx, tx, t.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1`, t.ID); err != nil {
-		return nil, fmt.Errorf("clear days: %w", err)
+		return fmt.Errorf("clear days: %w", err)
 	}
 	if err := insertDays(ctx, tx, t, owned); err != nil {
-		return nil, err
+		return err
 	}
 	if existing {
 		if err := followDayOne(ctx, tx, t); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -333,13 +373,13 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	// legs that are gone lose their ids.
 	oldLegs, err := existingLegs(ctx, tx, t.ID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_legs WHERE trip_id = $1`, t.ID); err != nil {
-		return nil, fmt.Errorf("clear legs: %w", err)
+		return fmt.Errorf("clear legs: %w", err)
 	}
 	if err := insertLegs(ctx, tx, t, assignLegIDs(t.Legs, oldLegs)); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Cities, replace-all like days and legs — but only when some are sent.
@@ -347,25 +387,14 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	// must not cut the trip off from each city's results.
 	if len(t.Cities) > 0 {
 		if _, err := tx.Exec(ctx, `DELETE FROM trip_cities WHERE trip_id = $1`, t.ID); err != nil {
-			return nil, fmt.Errorf("clear cities: %w", err)
+			return fmt.Errorf("clear cities: %w", err)
 		}
 		if err := insertCities(ctx, tx, t); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	if err := insertSnapshot(ctx, tx, t); err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit: %w", err)
-	}
-	// The client's draft carries no plan; what is stored is the truth.
-	if err := r.loadPlan(ctx, t); err != nil {
-		return nil, err
-	}
-	return t, nil
+	return insertSnapshot(ctx, tx, t)
 }
 
 // followDayOne keeps a dated trip's start and end on its days. The calendars'
