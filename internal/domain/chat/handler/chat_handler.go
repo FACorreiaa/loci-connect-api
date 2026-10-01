@@ -31,6 +31,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -45,6 +46,7 @@ type ChatHandler struct {
 	runs        runs.Store
 	onRunFinish runs.FinishListener
 	searches    SearchScorer
+	tripActions TripActions
 }
 
 // SearchScorer awards the first search of a user's day (gamification.Service).
@@ -686,6 +688,15 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 			SessionId:  gd.SessionID,
 		}}
 
+	case locitypes.EventTypeActionProposal:
+		var p tripaction.Proposal
+		if !decodeData(event.Data, &p) {
+			return nil, fmt.Errorf("action proposal event %q: undecodable data", event.EventID)
+		}
+		resp.Payload = &chatv1.StreamEvent_ActionProposal{ActionProposal: &chatv1.ActionProposalPayload{
+			Proposal: tripaction.ToProto(&p),
+		}}
+
 	case "activities":
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
@@ -893,6 +904,8 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ROUTE
 	case locitypes.EventTypeGastronomy:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_GASTRONOMY
+	case locitypes.EventTypeActionProposal:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACTION_PROPOSAL
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
 	}
