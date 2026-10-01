@@ -139,7 +139,7 @@ func generateOGHTML(entry *Share, baseURL, code string) string {
 		Description:  entry.Description,
 		ImageURL:     imageURL,
 		CanonicalURL: canonicalURL,
-		AppURL:       fmt.Sprintf("%s/%s/%s", baseURL, strings.ToLower(contentType), entry.ContentID),
+		AppURL:       appURL(baseURL, code, sharev1.ShareContentType(entry.ContentType), entry.ContentID),
 		ContentType:  contentType,
 	}
 
@@ -169,4 +169,32 @@ func getContentTypeName(ct sharev1.ShareContentType) string {
 	default:
 		return "Content"
 	}
+}
+
+// webPath is the web app's page for a shared thing, or "" when there is none.
+func webPath(ct sharev1.ShareContentType, id string) string {
+	switch ct {
+	case sharev1.ShareContentType_SHARE_CONTENT_TYPE_POI,
+		sharev1.ShareContentType_SHARE_CONTENT_TYPE_HOTEL,
+		sharev1.ShareContentType_SHARE_CONTENT_TYPE_RESTAURANT,
+		sharev1.ShareContentType_SHARE_CONTENT_TYPE_ACTIVITY:
+		return "/places/" + id
+	case sharev1.ShareContentType_SHARE_CONTENT_TYPE_LIST:
+		return "/lists/" + id
+	case sharev1.ShareContentType_SHARE_CONTENT_TYPE_ITINERARY:
+		return "/itinerary/saved/" + id
+	case sharev1.ShareContentType_SHARE_CONTENT_TYPE_TRIP:
+		return "/trips/" + id
+	default:
+		return ""
+	}
+}
+
+// appURL is where the OG page sends a human: the real page when the web app
+// has one, else the share page itself (which renders a summary).
+func appURL(baseURL, code string, ct sharev1.ShareContentType, id string) string {
+	if path := webPath(ct, id); path != "" {
+		return baseURL + path
+	}
+	return fmt.Sprintf("%s/share/%s", baseURL, code)
 }

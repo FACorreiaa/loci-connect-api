@@ -906,7 +906,9 @@ func (d *Dependencies) initHandlers() error {
 	d.MessagingHandler = messaging.NewHandler(d.Messaging, d.Logger)
 	d.IntegrationsHandler = integrations.NewHandler(d.Integrations, d.Logger)
 	d.ExportHandler = export.NewHandler(d.Logger)
-	d.ShareHandler = share.NewHandler(d.Config.Server.BaseURL, d.ShareRepo)
+	// Share links must land on a page: the web app's origin (FRONTEND_URL, the
+	// same one the auth emails use), not the API's own BASE_URL.
+	d.ShareHandler = share.NewHandler(shareOrigin(d.Config.Server.BaseURL), d.ShareRepo)
 	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).WithPlaces(d.POIRepo)
 	if d.DB != nil {
 		d.TripHandler = d.TripHandler.WithChecklist(trip.NewChecklistRepository(d.DB.Pool))
@@ -1207,4 +1209,12 @@ func envInt(key string, def int) int {
 		return v
 	}
 	return def
+}
+
+// shareOrigin is FRONTEND_URL when set, else the API base URL (local dev).
+func shareOrigin(fallback string) string {
+	if origin := strings.TrimRight(os.Getenv("FRONTEND_URL"), "/"); origin != "" {
+		return origin
+	}
+	return fallback
 }
