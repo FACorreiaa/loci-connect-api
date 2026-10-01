@@ -44,6 +44,27 @@ type ChatHandler struct {
 	issuer      AttributionIssuer
 	runs        runs.Store
 	onRunFinish runs.FinishListener
+	searches    SearchScorer
+}
+
+// SearchScorer awards the first search of a user's day (gamification.Service).
+// It runs off the request path and never fails it.
+type SearchScorer interface {
+	SearchedToday(ctx context.Context, userID uuid.UUID)
+}
+
+// WithSearchScorer turns on points for the day's first search.
+func (h *ChatHandler) WithSearchScorer(s SearchScorer) *ChatHandler {
+	h.searches = s
+	return h
+}
+
+// scoreSearch awards the day's first search in the background.
+func (h *ChatHandler) scoreSearch(ctx context.Context, userID uuid.UUID) {
+	if h.searches == nil {
+		return
+	}
+	go h.searches.SearchedToday(context.WithoutCancel(ctx), userID)
 }
 
 // AttributionIssuer persists the exact traces emitted to an authenticated user.
@@ -101,6 +122,7 @@ func (h *ChatHandler) StartChat(
 		}
 	}
 
+	h.scoreSearch(ctx, userID)
 	resp, err := h.service.StartChat(ctx, userID, profileID, cityName, req.Msg.GetInitialMessage(), userLoc)
 	if err != nil {
 		return nil, h.toConnectError(err)
@@ -144,6 +166,7 @@ func (h *ChatHandler) StreamChat(
 		}
 	}
 
+	h.scoreSearch(ctx, userID)
 	eventCh := make(chan locitypes.StreamEvent, 100)
 
 	// Propagate trace/request IDs from the RPC context, but detach client cancel
@@ -1026,6 +1049,7 @@ func (h *ChatHandler) ContinueChat(
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid session ID"))
 	}
 
+	h.scoreSearch(ctx, userID)
 	resp, err := h.service.ContinueChat(ctx, userID, sessionID, req.Msg.GetMessage(), req.Msg.GetCityName())
 	if err != nil {
 		return nil, h.toConnectError(err)

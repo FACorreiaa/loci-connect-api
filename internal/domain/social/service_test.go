@@ -22,6 +22,9 @@ type fakeRepo struct {
 	hashes    map[string]uuid.UUID
 	stats     Stats
 	statsVis  []int32
+	// fbLinked users linked Facebook; fbFriends is who each link found.
+	fbLinked  map[uuid.UUID]bool
+	fbFriends map[uuid.UUID][]uuid.UUID
 }
 
 func newFake(ids ...uuid.UUID) *fakeRepo {
@@ -169,6 +172,10 @@ func (f *fakeRepo) MatchHashes(_ context.Context, hs []string) (map[string]uuid.
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeRepo) FacebookFriends(_ context.Context, id uuid.UUID) ([]uuid.UUID, bool, error) {
+	return f.fbFriends[id], f.fbLinked[id], nil
 }
 
 func (f *fakeRepo) SearchUsernames(context.Context, string, int) ([]uuid.UUID, error) {
@@ -409,5 +416,25 @@ func TestWindowLimiter(t *testing.T) {
 	}
 	if !l.Allow(k, t0.Add(61*time.Minute)) {
 		t.Fatal("limiter did not free up after the window")
+	}
+}
+
+func TestFacebookFriendsNeedsALinkAndHidesBlocks(t *testing.T) {
+	me, friend, blocker := uuid.New(), uuid.New(), uuid.New()
+	f := newFake(me, friend, blocker)
+	svc := NewService(f, nil, nil)
+	ctx := context.Background()
+	if _, err := svc.FacebookFriends(ctx, me); !errors.Is(err, ErrNotLinked) {
+		t.Fatalf("unlinked: err = %v, want ErrNotLinked", err)
+	}
+	f.fbLinked = map[uuid.UUID]bool{me: true}
+	f.fbFriends = map[uuid.UUID][]uuid.UUID{me: {friend, blocker}}
+	f.blocks[[2]uuid.UUID{blocker, me}] = true
+	got, err := svc.FacebookFriends(ctx, me)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].User.GetId() != friend.String() {
+		t.Fatalf("matches = %+v, want only the friend who did not block me", got)
 	}
 }

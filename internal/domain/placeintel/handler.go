@@ -65,6 +65,21 @@ type Handler struct {
 	logger *slog.Logger
 	cities cityResolver
 	pois   poiUpserter
+	scores ContributionScorer
+}
+
+// ContributionScorer awards points for scouting (gamification.Service).
+// Called after the transaction commits; it never fails the request.
+type ContributionScorer interface {
+	// ScoutCredited is keyed by user, valued by the claim that was credited.
+	ScoutCredited(ctx context.Context, credits map[uuid.UUID]uuid.UUID)
+	PlaceConfirmed(ctx context.Context, users []uuid.UUID, submissionID uuid.UUID, placeName string)
+}
+
+// WithScorer turns on points for confirmed reports and places.
+func (h *Handler) WithScorer(s ContributionScorer) *Handler {
+	h.scores = s
+	return h
 }
 
 func NewHandler(db *pgxpool.Pool, logger *slog.Logger) *Handler {
@@ -564,6 +579,7 @@ func (h *Handler) SubmitPlaceClaim(ctx context.Context, req *connect.Request[pla
 		}
 	}
 
+	var credited map[uuid.UUID]uuid.UUID
 	if status == placev1.PlaceClaimStatus_PLACE_CLAIM_STATUS_ACCEPTED {
 		// Facts are stored per answer so that each one corroborates on its own.
 		// For a field that can only have one answer, that means the answers it
@@ -576,13 +592,16 @@ func (h *Handler) SubmitPlaceClaim(ctx context.Context, req *connect.Request[pla
 				return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("clear superseded facts: %w", err))
 			}
 		}
-		if err := creditCorroborators(ctx, tx, poiID, fieldName(field), value); err != nil {
+		if credited, err = creditCorroborators(ctx, tx, poiID, fieldName(field), value); err != nil {
 			return nil, err
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit place claim: %w", err))
+	}
+	if h.scores != nil && len(credited) > 0 {
+		h.scores.ScoutCredited(ctx, credited)
 	}
 	h.logger.InfoContext(ctx, "place claim submitted",
 		slog.String("claim_id", claimID.String()),
@@ -597,34 +616,36 @@ func (h *Handler) SubmitPlaceClaim(ctx context.Context, req *connect.Request[pla
 // Reputation used to go only to whoever happened to submit last, even though
 // their claim was worth nothing without the earlier one it matched. Everyone
 // whose claim just flipped is credited.
-func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value string) error {
+func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value string) (map[uuid.UUID]uuid.UUID, error) {
 	rows, err := tx.Query(ctx, `
 		UPDATE place_claims SET status = 'accepted'
 		WHERE poi_id = $1 AND field = $2 AND value = $3 AND status = 'pending'
-		RETURNING user_id`, poiID, field, value)
+		RETURNING user_id, id`, poiID, field, value)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("accept corroborated claims: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("accept corroborated claims: %w", err))
 	}
 	defer rows.Close()
 
-	seen := make(map[uuid.UUID]struct{})
+	// Each scout's first accepted claim keys their points (the backfill in
+	// migration 0109 keys by claim too).
+	claims := make(map[uuid.UUID]uuid.UUID, claimsRequiredForVerification)
 	credited := make([]uuid.UUID, 0, claimsRequiredForVerification)
 	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return connect.NewError(connect.CodeInternal, fmt.Errorf("scan corroborating scout: %w", err))
+		var id, claimID uuid.UUID
+		if err := rows.Scan(&id, &claimID); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("scan corroborating scout: %w", err))
 		}
-		if _, duplicate := seen[id]; duplicate {
+		if _, duplicate := claims[id]; duplicate {
 			continue
 		}
-		seen[id] = struct{}{}
+		claims[id] = claimID
 		credited = append(credited, id)
 	}
 	if err := rows.Err(); err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("iterate corroborating scouts: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("iterate corroborating scouts: %w", err))
 	}
 	if len(credited) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -635,9 +656,9 @@ func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value str
 				THEN array_append(badges, 'local-scout') ELSE badges END,
 			updated_at = NOW()
 		WHERE user_id = ANY($1)`, credited); err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("reward contributors: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("reward contributors: %w", err))
 	}
-	return nil
+	return claims, nil
 }
 
 func (h *Handler) SubmitPlace(ctx context.Context, req *connect.Request[placev1.SubmitPlaceRequest]) (*connect.Response[placev1.SubmitPlaceResponse], error) {
@@ -701,6 +722,7 @@ func (h *Handler) SubmitPlace(ctx context.Context, req *connect.Request[placev1.
 		}
 		h.logger.InfoContext(ctx, "place submitted as a confirmation", slog.String("submission_id", id.String()))
 		outcome.log(ctx, h.logger, id)
+		h.score(ctx, outcome, id)
 		return connect.NewResponse(&placev1.SubmitPlaceResponse{
 			SubmissionId:        id.String(),
 			Status:              outcome.status,
@@ -784,6 +806,7 @@ func (h *Handler) ConfirmPlace(ctx context.Context, req *connect.Request[placev1
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("commit confirmation: %w", err))
 	}
 	outcome.log(ctx, h.logger, submissionID)
+	h.score(ctx, outcome, submissionID)
 
 	return connect.NewResponse(&placev1.ConfirmPlaceResponse{
 		Status:              outcome.status,
@@ -798,6 +821,17 @@ type confirmation struct {
 	needed   int32
 	poiID    *string
 	promoted bool
+	// credited and name are set when the place went live, for points.
+	credited []uuid.UUID
+	name     string
+}
+
+// score awards the people behind a place that just went live. Called after
+// the transaction commits.
+func (h *Handler) score(ctx context.Context, c confirmation, submissionID uuid.UUID) {
+	if h.scores != nil && c.promoted && len(c.credited) > 0 {
+		h.scores.PlaceConfirmed(ctx, c.credited, submissionID, c.name)
+	}
 }
 
 func (c confirmation) log(ctx context.Context, logger *slog.Logger, submissionID uuid.UUID) {
@@ -899,7 +933,8 @@ func (h *Handler) confirmSubmission(ctx context.Context, tx pgx.Tx, submissionID
 		return confirmation{}, connect.NewError(connect.CodeInternal, fmt.Errorf("accept submission: %w", err))
 	}
 
-	if err := creditPlaceContributors(ctx, tx, submissionID, submitter); err != nil {
+	credited, err := creditPlaceContributors(ctx, tx, submissionID, submitter)
+	if err != nil {
 		return confirmation{}, err
 	}
 
@@ -908,6 +943,8 @@ func (h *Handler) confirmSubmission(ctx context.Context, tx pgx.Tx, submissionID
 		status:   placev1.PlaceSubmissionStatus_PLACE_SUBMISSION_STATUS_ACCEPTED,
 		poiID:    &id,
 		promoted: true,
+		credited: credited,
+		name:     name,
 	}, nil
 }
 

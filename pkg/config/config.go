@@ -29,6 +29,18 @@ type Config struct {
 	Messaging     MessagingConfig
 	Voice         VoiceConfig
 	Push          PushConfig
+	Social        SocialConfig
+}
+
+// SocialConfig switches the friends-and-points layer's moving parts.
+type SocialConfig struct {
+	// GamificationEnabled awards points and serves progress and leaderboards.
+	// On by default: it is a kill switch, not a launch gate. Off, every award
+	// is a no-op and the reads return empty progress.
+	GamificationEnabled bool
+	// FacebookAppID is the Meta app the iOS SDK signs Limited Login tokens
+	// for; empty turns LinkFacebook off.
+	FacebookAppID string
 }
 
 type CacheConfig struct {
@@ -481,6 +493,10 @@ func Load() (*Config, error) {
 		},
 		Secrets: SecretsConfig{
 			EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
+		},
+		Social: SocialConfig{
+			GamificationEnabled: getEnvAsBool("GAMIFICATION_ENABLED", true),
+			FacebookAppID:       getEnv("FACEBOOK_APP_ID", ""),
 		},
 		Messaging: MessagingConfig{
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),

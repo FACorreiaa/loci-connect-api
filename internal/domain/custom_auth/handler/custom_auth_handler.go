@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
+	"github.com/google/uuid"
 	"github.com/markbates/goth"
 
 	customauth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth"
@@ -15,6 +16,7 @@ import (
 	authservice "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
 	cacommon "github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/custom_auth/service"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 // CustomAuthHandler implements the CustomAuthService Connect handlers
@@ -24,6 +26,88 @@ type CustomAuthHandler struct {
 	idTokenVerifier *service.IDTokenVerifier
 	phoneService    *service.PhoneService
 	authService     *authservice.AuthService
+	links           *service.AccountLinks
+}
+
+// WithAccountLinks turns on AttachVerifiedPhone and LinkFacebook.
+func (h *CustomAuthHandler) WithAccountLinks(links *service.AccountLinks) *CustomAuthHandler {
+	h.links = links
+	return h
+}
+
+func signedInCaller(ctx context.Context) (uuid.UUID, error) {
+	s, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok || s == "" {
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid session"))
+	}
+	return id, nil
+}
+
+// AttachVerifiedPhone checks the SMS code and attaches the number to the
+// caller, so friends who have it in their contacts can find them.
+func (h *CustomAuthHandler) AttachVerifiedPhone(
+	ctx context.Context,
+	req *connect.Request[customauth.AttachVerifiedPhoneRequest],
+) (*connect.Response[customauth.AttachVerifiedPhoneResponse], error) {
+	uid, err := signedInCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.links == nil || !h.phoneService.IsEnabled() {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("phone verification is not configured"))
+	}
+	valid, err := h.phoneService.CheckVerification(req.Msg.GetPhoneNumber(), req.Msg.GetCode())
+	if err != nil {
+		slog.WarnContext(ctx, "phone check failed", slog.String("error", err.Error()))
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("could not check the code, try again"))
+	}
+	if !valid {
+		return nil, connect.NewError(connect.CodeInvalidArgument, cacommon.ErrInvalidVerificationCode)
+	}
+	if err := h.links.AttachPhone(ctx, uid, req.Msg.GetPhoneNumber()); err != nil {
+		if errors.Is(err, service.ErrLinkedElsewhere) {
+			return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("that number is verified on another Loci account"))
+		}
+		slog.ErrorContext(ctx, "attach phone failed", slog.String("error", err.Error()))
+		return nil, connect.NewError(connect.CodeInternal, errors.New("something went wrong, try again"))
+	}
+	return connect.NewResponse(&customauth.AttachVerifiedPhoneResponse{PhoneNumber: req.Msg.GetPhoneNumber()}), nil
+}
+
+// LinkFacebook verifies a Limited Login token and links that Facebook account
+// to the caller, storing the friends it granted for MatchFacebookFriends.
+func (h *CustomAuthHandler) LinkFacebook(
+	ctx context.Context,
+	req *connect.Request[customauth.LinkFacebookRequest],
+) (*connect.Response[customauth.LinkFacebookResponse], error) {
+	uid, err := signedInCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.links == nil || !h.idTokenVerifier.IsConfigured("facebook") {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, cacommon.ErrOAuthProviderNotConfigured)
+	}
+	claims, err := h.idTokenVerifier.Verify(ctx, "facebook", req.Msg.GetIdToken(), req.Msg.GetNonce())
+	if err != nil {
+		if errors.Is(err, service.ErrIDTokenInvalid) {
+			slog.WarnContext(ctx, "facebook link token refused", slog.String("error", err.Error()))
+			return nil, connect.NewError(connect.CodeUnauthenticated, service.ErrIDTokenInvalid)
+		}
+		return nil, connect.NewError(connect.CodeUnavailable, err)
+	}
+	if err := h.links.LinkFacebook(ctx, uid, claims.Subject, claims.FriendIDs); err != nil {
+		if errors.Is(err, service.ErrLinkedElsewhere) {
+			return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("that Facebook account is linked to another Loci account"))
+		}
+		slog.ErrorContext(ctx, "link facebook failed", slog.String("error", err.Error()))
+		return nil, connect.NewError(connect.CodeInternal, errors.New("something went wrong, try again"))
+	}
+	slog.InfoContext(ctx, "facebook linked", slog.Int("friends_granted", len(claims.FriendIDs)))
+	return connect.NewResponse(&customauth.LinkFacebookResponse{Linked: true}), nil
 }
 
 // NewCustomAuthHandler creates a new handler for custom authentication methods
@@ -110,6 +194,12 @@ func (h *CustomAuthHandler) SignInWithIDToken(
 	req *connect.Request[customauth.SignInWithIDTokenRequest],
 ) (*connect.Response[customauth.OAuthCallbackResponse], error) {
 	provider := providerToString(req.Msg.Provider)
+
+	// Facebook finds friends for an account; it does not sign anyone in.
+	// LinkFacebook is the way in for it.
+	if provider == "facebook" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("sign in with Apple or Google, then connect Facebook to find friends"))
+	}
 
 	if !h.idTokenVerifier.IsConfigured(provider) {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, cacommon.ErrOAuthProviderNotConfigured)

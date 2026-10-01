@@ -135,11 +135,11 @@ func resolveCityError(name string, err error) error {
 // Deliberately the same shape as creditCorroborators: reputation used to go
 // only to whoever acted last, even though their vote was worth nothing without
 // the others it agreed with.
-func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submitter uuid.UUID) error {
+func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submitter uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := tx.Query(ctx, `
 		SELECT user_id FROM place_submission_confirmations WHERE submission_id = $1`, submissionID)
 	if err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("list confirmers: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list confirmers: %w", err))
 	}
 	defer rows.Close()
 
@@ -148,7 +148,7 @@ func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submi
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
-			return connect.NewError(connect.CodeInternal, fmt.Errorf("scan confirmer: %w", err))
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("scan confirmer: %w", err))
 		}
 		if _, duplicate := seen[id]; duplicate {
 			continue
@@ -157,7 +157,7 @@ func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submi
 		credited = append(credited, id)
 	}
 	if err := rows.Err(); err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("iterate confirmers: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("iterate confirmers: %w", err))
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -167,7 +167,7 @@ func creditPlaceContributors(ctx context.Context, tx pgx.Tx, submissionID, submi
 			accepted_claims = contributor_profiles.accepted_claims + 1,
 			reputation = LEAST(100, contributor_profiles.reputation + 3),
 			updated_at = NOW()`, credited); err != nil {
-		return connect.NewError(connect.CodeInternal, fmt.Errorf("credit place contributors: %w", err))
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("credit place contributors: %w", err))
 	}
-	return nil
+	return credited, nil
 }

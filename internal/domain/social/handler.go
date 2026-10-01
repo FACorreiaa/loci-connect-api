@@ -60,7 +60,7 @@ func (h *Handler) connectErr(err error) error {
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, ErrLimited):
 		return connect.NewError(connect.CodeResourceExhausted, err)
-	case errors.Is(err, ErrConflict):
+	case errors.Is(err, ErrConflict), errors.Is(err, ErrNotLinked):
 		return connect.NewError(connect.CodeFailedPrecondition, err)
 	default:
 		h.log.Error("social rpc failed", slog.Any("error", err))
@@ -377,4 +377,20 @@ func (h *Handler) GetPublicProfile(ctx context.Context, req *connect.Request[soc
 		resp.MemberSince = timestamppb.New(p.MemberSince.Truncate(24 * time.Hour))
 	}
 	return connect.NewResponse(resp), nil
+}
+
+func (h *Handler) MatchFacebookFriends(ctx context.Context, _ *connect.Request[socialv1.MatchFacebookFriendsRequest]) (*connect.Response[socialv1.MatchFacebookFriendsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	results, err := h.svc.FacebookFriends(ctx, uid)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	out := make([]*socialv1.UserResult, 0, len(results))
+	for _, r := range results {
+		out = append(out, &socialv1.UserResult{User: r.User, Relationship: socialv1.Relationship(r.Relation)})
+	}
+	return connect.NewResponse(&socialv1.MatchFacebookFriendsResponse{Matches: out}), nil
 }

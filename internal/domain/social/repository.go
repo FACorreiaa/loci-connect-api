@@ -105,6 +105,10 @@ type Repository interface {
 	// MatchHashes maps each hash that names a verified, active user's phone
 	// or email to that user.
 	MatchHashes(ctx context.Context, hashes []string) (map[string]uuid.UUID, error)
+	// FacebookFriends is the active users whose linked Facebook account is
+	// among the friends userID's own link granted. linked is false when
+	// userID has not linked Facebook.
+	FacebookFriends(ctx context.Context, userID uuid.UUID) (ids []uuid.UUID, linked bool, err error)
 	SearchUsernames(ctx context.Context, prefix string, limit int) ([]uuid.UUID, error)
 	Stats(ctx context.Context, owner uuid.UUID, tripVisibilities []int32) (Stats, error)
 }
@@ -540,4 +544,35 @@ func (r *repository) Stats(ctx context.Context, owner uuid.UUID, tripVisibilitie
 		  (SELECT COUNT(*) FROM friendships WHERE user_id = $1)`,
 		owner, tripVisibilities).Scan(&s.Cities, &s.Countries, &s.VisibleTrips, &s.Friends)
 	return s, err
+}
+
+func (r *repository) FacebookFriends(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, bool, error) {
+	var linked bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM user_providers WHERE user_id = $1 AND provider = 'facebook')`, userID).
+		Scan(&linked); err != nil {
+		return nil, false, fmt.Errorf("check facebook link: %w", err)
+	}
+	if !linked {
+		return nil, false, nil
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT p.user_id
+		FROM user_facebook_friends f
+		JOIN user_providers p ON p.provider = 'facebook' AND p.provider_user_id = f.facebook_id
+		JOIN users u ON u.id = p.user_id AND u.is_active
+		WHERE f.user_id = $1 AND p.user_id <> $1`, userID)
+	if err != nil {
+		return nil, true, fmt.Errorf("match facebook friends: %w", err)
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, true, fmt.Errorf("scan facebook friend: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, true, rows.Err()
 }
