@@ -178,7 +178,7 @@ func (c *Client) Get(ctx context.Context, source, url string) ([]byte, error) {
 				return nil, lastErr
 			}
 			if attempt < c.cfg.MaxRetries {
-				if werr := wait(ctx, retryDelay("", c.cfg.BaseDelay, c.cfg.MaxDelay, attempt)); werr != nil {
+				if werr := WaitForRetry(ctx, RetryDelay("", c.cfg.BaseDelay, c.cfg.MaxDelay, attempt)); werr != nil {
 					return nil, werr
 				}
 				continue
@@ -216,7 +216,7 @@ func (c *Client) Get(ctx context.Context, source, url string) ([]byte, error) {
 
 		c.record(source, "retryable_error", elapsed)
 		if attempt < c.cfg.MaxRetries {
-			if werr := wait(ctx, retryDelay(retryAfter, c.cfg.BaseDelay, c.cfg.MaxDelay, attempt)); werr != nil {
+			if werr := WaitForRetry(ctx, RetryDelay(retryAfter, c.cfg.BaseDelay, c.cfg.MaxDelay, attempt)); werr != nil {
 				return nil, werr
 			}
 			continue
@@ -241,11 +241,13 @@ func isRetryableStatus(status int) bool {
 	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
 }
 
-// retryDelay honours an explicit Retry-After when the provider sends one and
-// falls back to exponential backoff. Lifted from pkg/openrouter/chat.go, which
-// already got this right; keeping the behaviour identical means one rule for
-// outbound backoff across the server.
-func retryDelay(retryAfter string, baseDelay, maxDelay time.Duration, attempt int) time.Duration {
+// RetryDelay is the one rule for outbound backoff across the server; httpx and
+// pkg/openrouter both call it. An explicit Retry-After (in seconds) is honoured
+// but capped at maxDelay, so a provider asking for minutes cannot pin a request
+// open, and one asking for 30s is not retried after 1s either. Without a usable
+// header it doubles baseDelay per attempt, also capped at maxDelay. A
+// non-positive maxDelay disables both caps.
+func RetryDelay(retryAfter string, baseDelay, maxDelay time.Duration, attempt int) time.Duration {
 	if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds >= 0 {
 		delay := time.Duration(seconds) * time.Second
 		if maxDelay <= 0 || delay <= maxDelay {
@@ -263,7 +265,8 @@ func retryDelay(retryAfter string, baseDelay, maxDelay time.Duration, attempt in
 	return delay
 }
 
-func wait(ctx context.Context, delay time.Duration) error {
+// WaitForRetry sleeps for delay, returning ctx.Err() early if ctx is done first.
+func WaitForRetry(ctx context.Context, delay time.Duration) error {
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	select {

@@ -18,7 +18,6 @@ import (
 	"iter"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +25,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
+	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
 
@@ -274,7 +274,7 @@ func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (
 		if attempt >= c.maxRetries || !isRetryableStatus(resp.StatusCode) {
 			return nil, apiErr
 		}
-		delay := retryDelay(resp.Header.Get("Retry-After"), c.baseDelay, c.maxDelay, attempt)
+		delay := httpx.RetryDelay(resp.Header.Get("Retry-After"), c.baseDelay, c.maxDelay, attempt)
 		c.logger.WarnContext(
 			ctx,
 			"retrying llm request",
@@ -283,7 +283,7 @@ func (c *ChatClient) sendChatRequest(ctx context.Context, payload chatRequest) (
 			slog.Int("attempt", attempt+1),
 			slog.Duration("delay", delay),
 		)
-		if err := waitForRetry(ctx, delay); err != nil {
+		if err := httpx.WaitForRetry(ctx, delay); err != nil {
 			return nil, err
 		}
 	}
@@ -501,34 +501,6 @@ func readAPIError(resp *http.Response) error {
 
 func isRetryableStatus(status int) bool {
 	return status == http.StatusTooManyRequests || status >= http.StatusInternalServerError
-}
-
-func retryDelay(retryAfter string, baseDelay, maxDelay time.Duration, attempt int) time.Duration {
-	if seconds, err := strconv.Atoi(retryAfter); err == nil && seconds >= 0 {
-		delay := time.Duration(seconds) * time.Second
-		if maxDelay <= 0 || delay <= maxDelay {
-			return delay
-		}
-	}
-	delay := baseDelay
-	for range attempt {
-		delay *= 2
-		if maxDelay > 0 && delay >= maxDelay {
-			return maxDelay
-		}
-	}
-	return delay
-}
-
-func waitForRetry(ctx context.Context, delay time.Duration) error {
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 func withOptionalTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

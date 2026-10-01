@@ -155,7 +155,7 @@ func TestGet_HonoursRetryAfterHeader(t *testing.T) {
 // A Retry-After longer than MaxDelay must be capped, or one provider can pin a
 // request open for minutes.
 func TestRetryDelay_CapsRetryAfterAtMaxDelay(t *testing.T) {
-	got := retryDelay("3600", time.Millisecond, 5*time.Second, 0)
+	got := RetryDelay("3600", time.Millisecond, 5*time.Second, 0)
 	if got != 5*time.Second {
 		t.Errorf("got %v, want the 5s cap", got)
 	}
@@ -163,14 +163,50 @@ func TestRetryDelay_CapsRetryAfterAtMaxDelay(t *testing.T) {
 
 func TestRetryDelay_BacksOffExponentially(t *testing.T) {
 	base, max := 100*time.Millisecond, 10*time.Second
-	a0 := retryDelay("", base, max, 0)
-	a1 := retryDelay("", base, max, 1)
-	a2 := retryDelay("", base, max, 2)
+	a0 := RetryDelay("", base, max, 0)
+	a1 := RetryDelay("", base, max, 1)
+	a2 := RetryDelay("", base, max, 2)
 	if a0 >= a1 || a1 >= a2 {
 		t.Errorf("expected increasing delays, got %v %v %v", a0, a1, a2)
 	}
-	if got := retryDelay("", base, max, 20); got != max {
+	if got := RetryDelay("", base, max, 20); got != max {
 		t.Errorf("expected the cap at high attempts, got %v", got)
+	}
+}
+
+func TestRetryDelay(t *testing.T) {
+	const base, maxDelay = 100 * time.Millisecond, 5 * time.Second
+	tests := []struct {
+		name       string
+		retryAfter string
+		maxDelay   time.Duration
+		attempt    int
+		want       time.Duration
+	}{
+		{"retry-after within max is honoured", "2", maxDelay, 0, 2 * time.Second},
+		{"retry-after above max is capped", "30", maxDelay, 3, maxDelay},
+		{"retry-after uncapped without max", "30", 0, 0, 30 * time.Second},
+		{"no header, attempt 0", "", maxDelay, 0, 100 * time.Millisecond},
+		{"no header, attempt 1", "", maxDelay, 1, 200 * time.Millisecond},
+		{"no header, attempt 3", "", maxDelay, 3, 800 * time.Millisecond},
+		{"no header, capped", "", maxDelay, 6, maxDelay},
+		{"unparseable header falls back", "soon", maxDelay, 2, 400 * time.Millisecond},
+		{"negative header falls back", "-1", maxDelay, 1, 200 * time.Millisecond},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RetryDelay(tt.retryAfter, base, tt.maxDelay, tt.attempt); got != tt.want {
+				t.Errorf("RetryDelay(%q, attempt %d) = %v, want %v", tt.retryAfter, tt.attempt, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWaitForRetry_ReturnsContextErrorWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := WaitForRetry(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v, want context.Canceled", err)
 	}
 }
 
