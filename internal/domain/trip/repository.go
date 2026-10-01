@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 )
 
 var (
@@ -102,6 +104,36 @@ type TripCity struct {
 	OrderIndex int32
 }
 
+// TripStay is where the traveller sleeps in one city. Keyed by city name, not
+// by TripCity, because a single-city trip has no Cities entries.
+type TripStay struct {
+	ID         uuid.UUID
+	CityName   string
+	POIID      string
+	Name       string
+	StarRating string
+	CheckIn    *time.Time
+	CheckOut   *time.Time
+	BookingURL *string
+}
+
+// TripFlight is a flight the traveller chose. Links are server-built; the
+// pointer fields are whatever the traveller typed, never a quoted fare.
+type TripFlight struct {
+	ID          uuid.UUID
+	Origin      flights.Place
+	Destination flights.Place
+	DepartDate  time.Time
+	ReturnDate  *time.Time
+	Passengers  int32
+	Cabin       flights.Cabin
+	Links       []flights.Link
+	Carrier     *string
+	FlightNo    *string
+	PriceText   *string
+	Notes       *string
+}
+
 // Trip is the full editable trip aggregate.
 type Trip struct {
 	ID          uuid.UUID
@@ -114,7 +146,13 @@ type Trip struct {
 	// Legs is travel between the trip's cities. Empty for a single-city trip.
 	Legs []TripLeg
 	// Cities of a multi-city trip, in visiting order. Empty for one city.
-	Cities          []TripCity
+	Cities []TripCity
+	// The plan: dates, stays and flights. SaveTrip never writes these (see
+	// PlanRepository); it reads them back so its response is complete.
+	StartDate       *time.Time
+	EndDate         *time.Time
+	Stays           []TripStay
+	Flights         []TripFlight
 	Version         int64
 	SourceSessionID *string
 	IsPublic        bool
@@ -253,9 +291,11 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 			UPDATE trips SET city_id = $1, city_name = $2, title = $3, constraints = $4,
 			                 version = $5, updated_at = NOW()
 			WHERE id = $6
-			RETURNING is_public, share_code, visibility, share_details, copied_from_trip_id, created_at, updated_at`,
+			RETURNING is_public, share_code, visibility, share_details, copied_from_trip_id, created_at, updated_at,
+			          start_date, end_date`,
 			t.CityID, t.CityName, t.Title, constraintsJSON, newVersion, t.ID).
-			Scan(&t.IsPublic, &t.ShareCode, &t.Visibility, &t.ShareDetails, &t.CopiedFromTripID, &t.CreatedAt, &t.UpdatedAt)
+			Scan(&t.IsPublic, &t.ShareCode, &t.Visibility, &t.ShareDetails, &t.CopiedFromTripID, &t.CreatedAt, &t.UpdatedAt,
+				&t.StartDate, &t.EndDate)
 		if err != nil {
 			return nil, fmt.Errorf("update trip: %w", err)
 		}
@@ -308,21 +348,33 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		}
 	}
 
-	// Append an immutable snapshot for merge-safe reconciliation.
-	snapshotJSON, err := json.Marshal(t)
-	if err != nil {
-		return nil, fmt.Errorf("marshal snapshot: %w", err)
-	}
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO trip_snapshots (trip_id, version, data) VALUES ($1, $2, $3)`,
-		t.ID, newVersion, snapshotJSON); err != nil {
-		return nil, fmt.Errorf("insert snapshot: %w", err)
+	if err := insertSnapshot(ctx, tx, t); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit: %w", err)
 	}
+	// The client's draft carries no plan; what is stored is the truth.
+	if err := r.loadPlan(ctx, t); err != nil {
+		return nil, err
+	}
 	return t, nil
+}
+
+// insertSnapshot appends the immutable per-version snapshot every save writes,
+// for merge-safe reconciliation.
+func insertSnapshot(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	snapshotJSON, err := json.Marshal(t)
+	if err != nil {
+		return fmt.Errorf("marshal snapshot: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO trip_snapshots (trip_id, version, data) VALUES ($1, $2, $3)`,
+		t.ID, t.Version, snapshotJSON); err != nil {
+		return fmt.Errorf("insert snapshot: %w", err)
+	}
+	return nil
 }
 
 func (r *repository) SetShare(ctx context.Context, id, userID uuid.UUID, isPublic bool, shareCode string) (*Trip, error) {
@@ -572,6 +624,9 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 	if err := r.loadCities(ctx, t); err != nil {
 		return err
 	}
+	if err := r.loadPlan(ctx, t); err != nil {
+		return err
+	}
 	dayRows, err := r.db.Query(ctx, `
 		SELECT id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day
 		FROM trip_days WHERE trip_id = $1 ORDER BY day_number`, t.ID)
@@ -643,7 +698,7 @@ type rowScanner interface {
 // tripColumns is what scanTrip reads, in order.
 const tripColumns = `id, user_id, city_id, city_name, title, constraints, version,
 		       source_session_id, is_public, share_code, created_at, updated_at,
-		       visibility, share_details, copied_from_trip_id`
+		       visibility, share_details, copied_from_trip_id, start_date, end_date`
 
 func scanTrip(row rowScanner) (*Trip, error) {
 	var (
@@ -652,7 +707,7 @@ func scanTrip(row rowScanner) (*Trip, error) {
 	)
 	if err := row.Scan(&t.ID, &t.UserID, &t.CityID, &t.CityName, &t.Title, &constraintsJSON,
 		&t.Version, &t.SourceSessionID, &t.IsPublic, &t.ShareCode, &t.CreatedAt, &t.UpdatedAt,
-		&t.Visibility, &t.ShareDetails, &t.CopiedFromTripID); err != nil {
+		&t.Visibility, &t.ShareDetails, &t.CopiedFromTripID, &t.StartDate, &t.EndDate); err != nil {
 		return nil, err
 	}
 	if len(constraintsJSON) > 0 {
@@ -705,6 +760,57 @@ func (r *repository) loadCities(ctx context.Context, t *Trip) error {
 			return fmt.Errorf("scan city: %w", err)
 		}
 		t.Cities = append(t.Cities, c)
+	}
+	return rows.Err()
+}
+
+// loadPlan populates t.Stays and t.Flights. Dates come with the trip row.
+func (r *repository) loadPlan(ctx context.Context, t *Trip) error {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, city_name, poi_id, name, star_rating, check_in, check_out, booking_url
+		FROM trip_stays WHERE trip_id = $1 ORDER BY check_in NULLS LAST, city_name`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load stays: %w", err)
+	}
+	t.Stays = nil
+	for rows.Next() {
+		var s TripStay
+		if err := rows.Scan(&s.ID, &s.CityName, &s.POIID, &s.Name, &s.StarRating, &s.CheckIn, &s.CheckOut, &s.BookingURL); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan stay: %w", err)
+		}
+		t.Stays = append(t.Stays, s)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("load stays: %w", err)
+	}
+
+	rows, err = r.db.Query(ctx, `
+		SELECT id, origin_name, origin_iata, destination_name, destination_iata, depart_date, return_date,
+		       passengers, cabin, links, carrier, flight_no, price_text, notes
+		FROM trip_flights WHERE trip_id = $1 ORDER BY depart_date, created_at`, t.ID)
+	if err != nil {
+		return fmt.Errorf("load flights: %w", err)
+	}
+	defer rows.Close()
+	t.Flights = nil
+	for rows.Next() {
+		var (
+			f         TripFlight
+			cabin     int32
+			linksJSON []byte
+		)
+		if err := rows.Scan(&f.ID, &f.Origin.Name, &f.Origin.IATA, &f.Destination.Name, &f.Destination.IATA,
+			&f.DepartDate, &f.ReturnDate, &f.Passengers, &cabin, &linksJSON,
+			&f.Carrier, &f.FlightNo, &f.PriceText, &f.Notes); err != nil {
+			return fmt.Errorf("scan flight: %w", err)
+		}
+		f.Cabin = flights.Cabin(cabin)
+		if err := json.Unmarshal(linksJSON, &f.Links); err != nil {
+			return fmt.Errorf("unmarshal flight links: %w", err)
+		}
+		t.Flights = append(t.Flights, f)
 	}
 	return rows.Err()
 }
