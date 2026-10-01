@@ -418,6 +418,10 @@ func (h *UserHandler) UpdateNotificationSettings(
 		TripReminders:   req.Msg.TripReminders,
 		SearchFinished:  req.Msg.SearchFinished,
 		FriendActivity:  req.Msg.FriendActivity,
+
+		LeaderboardVisible: req.Msg.LeaderboardVisible,
+		StreakReminders:    req.Msg.StreakReminders,
+		ProgressUpdates:    req.Msg.ProgressUpdates,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -435,6 +439,10 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		SearchFinished:  s.SearchFinished,
 		FriendActivity:  s.FriendActivity,
 		UpdatedAt:       timestamppb.New(s.UpdatedAt),
+
+		LeaderboardVisible: s.LeaderboardVisible,
+		StreakReminders:    s.StreakReminders,
+		ProgressUpdates:    s.ProgressUpdates,
 	}
 }
 

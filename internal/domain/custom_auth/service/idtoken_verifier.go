@@ -39,6 +39,10 @@ const (
 	idTokenClockSkew    = time.Minute
 )
 
+// facebookJWKSURL is where Meta publishes the keys Limited Login tokens are
+// signed with. A var so tests can point it at a local key set.
+var facebookJWKSURL = "https://limited.facebook.com/.well-known/oauth/openid/jwks/"
+
 var (
 	// ErrIDTokenProviderNotConfigured means no audience is configured for the
 	// provider, so there is nothing a token could legitimately be issued to.
@@ -55,6 +59,10 @@ type IDTokenClaims struct {
 	// links an unknown subject to an existing account by email, so an
 	// unverified address must never reach it.
 	Email string
+	// FriendIDs are the app-scoped ids of the person's Facebook friends who
+	// also use the app, when the user_friends permission was granted
+	// (Facebook only).
+	FriendIDs []string
 }
 
 // idTokenIssuer is one provider's verification rules.
@@ -83,6 +91,8 @@ type IDTokenConfig struct {
 	// AppleAudiences are the app bundle IDs. The native sheet issues tokens to
 	// the bundle, not to the web Services ID.
 	AppleAudiences []string
+	// FacebookAudiences are the Meta app IDs Limited Login issues tokens to.
+	FacebookAudiences []string
 }
 
 // LoadIDTokenConfigFromEnv reads GOOGLE_IOS_CLIENT_IDS and APPLE_BUNDLE_IDS,
@@ -91,6 +101,8 @@ func LoadIDTokenConfigFromEnv() IDTokenConfig {
 	return IDTokenConfig{
 		GoogleAudiences: splitList(os.Getenv("GOOGLE_IOS_CLIENT_IDS")),
 		AppleAudiences:  splitList(os.Getenv("APPLE_BUNDLE_IDS")),
+		// FACEBOOK_APP_ID is one id; a list is accepted for symmetry.
+		FacebookAudiences: splitList(os.Getenv("FACEBOOK_APP_ID")),
 	}
 }
 
@@ -129,6 +141,14 @@ func newIDTokenVerifier(ctx context.Context, cfg IDTokenConfig, googleKeys, appl
 			issuers:     []string{"https://appleid.apple.com"},
 			audiences:   cfg.AppleAudiences,
 			hashedNonce: true,
+		}
+	}
+	if len(cfg.FacebookAudiences) > 0 {
+		// Limited Login puts the nonce the app chose in the token as-is.
+		v.providers["facebook"] = idTokenIssuer{
+			jwksURL:   facebookJWKSURL,
+			issuers:   []string{"https://www.facebook.com", "https://facebook.com"},
+			audiences: cfg.FacebookAudiences,
 		}
 	}
 	for _, p := range v.providers {
@@ -204,7 +224,37 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, provider, rawToken, rawNon
 	if email, ok := claimString(tok, "email"); ok && claimTrue(tok, "email_verified") {
 		claims.Email = email
 	}
+	if provider == "facebook" {
+		claims.FriendIDs = friendIDs(tok)
+	}
 	return claims, nil
+}
+
+// friendIDs reads Limited Login's user_friends claim. Meta has documented it
+// both as a list of ids and as a list of {"id": ...} objects; both are read.
+func friendIDs(tok jwt.Token) []string {
+	v, ok := tok.Get("user_friends")
+	if !ok {
+		return nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(list))
+	for _, item := range list {
+		switch f := item.(type) {
+		case string:
+			if f != "" {
+				out = append(out, f)
+			}
+		case map[string]any:
+			if id, ok := f["id"].(string); ok && id != "" {
+				out = append(out, id)
+			}
+		}
+	}
+	return out
 }
 
 func claimString(tok jwt.Token, name string) (string, bool) {

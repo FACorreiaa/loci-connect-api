@@ -269,6 +269,40 @@ func (s *Service) MatchContacts(ctx context.Context, userID uuid.UUID, hashes []
 	return out, nil
 }
 
+// ErrNotLinked is MatchFacebookFriends for a caller who never linked Facebook.
+var ErrNotLinked = errors.New("connect Facebook first")
+
+// FacebookFriends finds Loci users among the Facebook friends the caller's
+// link granted, hiding blocks both ways.
+func (s *Service) FacebookFriends(ctx context.Context, userID uuid.UUID) ([]Result, error) {
+	ids, linked, err := s.repo.FacebookFriends(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !linked {
+		return nil, ErrNotLinked
+	}
+	cards, err := s.repo.PublicUsers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Result, 0, len(ids))
+	for _, id := range ids {
+		if cards[id] == nil {
+			continue
+		}
+		rel, blockedBy, err := s.repo.RelationOf(ctx, userID, id)
+		if err != nil {
+			return nil, err
+		}
+		if blockedBy || rel == RelationBlocked {
+			continue
+		}
+		out = append(out, Result{User: cards[id], Relation: rel})
+	}
+	return out, nil
+}
+
 // Result is a user with the caller's relation to them.
 type Result struct {
 	User     *socialv1.PublicUser

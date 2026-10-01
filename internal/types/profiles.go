@@ -373,8 +373,14 @@ type NotificationSettings struct {
 	TripReminders   bool `json:"trip_reminders"`
 	SearchFinished  bool `json:"search_finished"`
 	// FriendActivity gates pushes for friend requests and new friends.
-	FriendActivity bool      `json:"friend_activity"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	FriendActivity bool `json:"friend_activity"`
+	// LeaderboardVisible shows the account on its friends' leaderboards.
+	LeaderboardVisible bool `json:"leaderboard_visible"`
+	// StreakReminders is read by the device, which sends the reminder itself.
+	StreakReminders bool `json:"streak_reminders"`
+	// ProgressUpdates gates pushes for badges earned and friends passing you.
+	ProgressUpdates bool      `json:"progress_updates"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // UpdateNotificationSettingsParams is a partial update: a nil field means the
@@ -384,4 +390,8 @@ type UpdateNotificationSettingsParams struct {
 	TripReminders   *bool `json:"trip_reminders,omitempty"`
 	SearchFinished  *bool `json:"search_finished,omitempty"`
 	FriendActivity  *bool `json:"friend_activity,omitempty"`
+	// Leaderboard and progress switches, as in NotificationSettings.
+	LeaderboardVisible *bool `json:"leaderboard_visible,omitempty"`
+	StreakReminders    *bool `json:"streak_reminders,omitempty"`
+	ProgressUpdates    *bool `json:"progress_updates,omitempty"`
 }

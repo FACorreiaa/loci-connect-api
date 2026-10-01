@@ -30,6 +30,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/entitlement"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/export"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/favorites"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/gamification"
 	gastronomydomain "github.com/FACorreiaa/loci-connect-api/internal/domain/gastronomy"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
@@ -177,7 +178,12 @@ type Dependencies struct {
 	// gastronomy (a test double); the route is then not registered.
 	GastronomyHandler *gastronomydomain.Handler
 	// SocialHandler is the friends layer; nil without a database.
-	SocialHandler     *socialdomain.Handler
+	SocialHandler *socialdomain.Handler
+	// GamificationHandler is points, streaks, badges and friend leaderboards;
+	// nil without a database.
+	GamificationHandler *gamification.Handler
+	// gamification awards points from other domains' handlers.
+	gamification      *gamification.Service
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
 	ListHandler       *itineraryhandler.ListHandler
 	StatisticsHandler *statistics.Handler
@@ -840,10 +846,13 @@ func (d *Dependencies) initHandlers() error {
 	var watchPusher watch.ProactivePusher
 	// Friend requests and new friends go to every platform that is on.
 	var socialNotifier socialdomain.Notifier
+	// Badges and leaderboard passes go the same way, gated by their own switch.
+	var progressNotifier gamification.Notifier
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
 		socialNotifier = notifier
+		progressNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
 		}
@@ -900,6 +909,13 @@ func (d *Dependencies) initHandlers() error {
 		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
 		d.SocialHandler = socialdomain.NewHandler(socialSvc, d.Logger)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
+		// Points ride on the friends graph: leaderboards are friends only.
+		d.gamification = gamification.NewService(
+			gamification.NewRepository(d.DB.Pool), socialSvc, progressNotifier, d.Logger,
+			d.Config.Social.GamificationEnabled,
+		)
+		d.GamificationHandler = gamification.NewHandler(d.gamification, d.Logger)
+		d.ChatHandler = d.ChatHandler.WithSearchScorer(d.gamification)
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(
@@ -909,6 +925,9 @@ func (d *Dependencies) initHandlers() error {
 		).WithOAuth(calendar.LoadOAuthConfigFromEnv()).WithSealer(d.sealer).WithPlans(d.SubscriptionService)
 	}
 	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger)
+	if d.gamification != nil {
+		d.TravelHistoryHandler = d.TravelHistoryHandler.WithScorer(d.gamification)
+	}
 
 	// City Packs. The catalog serves whether or not Stripe is configured; an
 	// empty STRIPE_PRICE_ID_CITY_PACK leaves checkout refusing rather than
@@ -950,11 +969,18 @@ func (d *Dependencies) initHandlers() error {
 	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService)
+	if d.DB != nil {
+		// Verified phone and Facebook links, which friends are found by.
+		d.CustomAuthHandler = d.CustomAuthHandler.WithAccountLinks(customauthservice.NewAccountLinks(d.DB.Pool))
+	}
 	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger).
 		WithCityResolver(placeCityResolverAdapter{resolver: d.CityResolver}).
 		WithPOIUpserter(placePOIUpserterAdapter{repo: d.POIRepo})
+	if d.gamification != nil {
+		d.PlaceIntelligenceHandler = d.PlaceIntelligenceHandler.WithScorer(d.gamification)
+	}
 
 	// Local context (weather now; booking/transport stubbed). Open-Meteo is the
 	// keyless default, so a deployment that configures nothing still gets real

@@ -27,6 +27,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/entitlement/v1/entitlementv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/export/exportv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification/gamificationconnect"
 	gastronomyconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gastronomy/gastronomyconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/integrations/integrationsv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
@@ -433,6 +434,11 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		deps.Logger.Info("registered OG meta handler", "path", "/share/")
 	}
 
+	if deps.GamificationHandler != nil {
+		gamificationPath, gamificationHandler := gamificationconnect.NewGamificationServiceHandler(deps.GamificationHandler, opts)
+		mux.Handle(gamificationPath, gamificationHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", gamificationPath)
+	}
 	if deps.SocialHandler != nil {
 		socialPath, socialHandler := socialconnect.NewSocialServiceHandler(deps.SocialHandler, opts)
 		mux.Handle(socialPath, socialHandler)

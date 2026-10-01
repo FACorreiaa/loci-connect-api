@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"connectrpc.com/connect"
 	travelhistoryv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory"
@@ -16,8 +17,36 @@ import (
 // Handler implements TravelHistoryService.
 type Handler struct {
 	travelhistoryconnect.UnimplementedTravelHistoryServiceHandler
-	repo Repository
-	log  *slog.Logger
+	repo   Repository
+	log    *slog.Logger
+	scorer VisitScorer
+}
+
+// VisitScorer awards points for a visit made on the spot. It returns the
+// points and never fails the visit (gamification.Service via an adapter).
+type VisitScorer interface {
+	ScoreOnTheSpot(ctx context.Context, userID uuid.UUID, v ScoredVisit) int
+}
+
+// ScoredVisit is what the scorer needs from a recorded visit.
+type ScoredVisit struct {
+	POIID string
+	// NewCity is set when this visit put the city on the user's globe.
+	NewCity *VisitedCity
+	Device  *DeviceFix
+}
+
+// DeviceFix is where the device was when it recorded the visit.
+type DeviceFix struct {
+	Latitude, Longitude float64
+	AccuracyM           float64
+	ObservedAt          time.Time
+}
+
+// WithScorer turns on points for visits recorded on the spot.
+func (h *Handler) WithScorer(s VisitScorer) *Handler {
+	h.scorer = s
+	return h
 }
 
 // NewHandler builds the travel-history Connect handler.
@@ -165,8 +194,26 @@ func (h *Handler) RecordVisit(
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
+	var points int
+	if h.scorer != nil && req.Msg.DeviceLocation != nil {
+		fix := req.Msg.GetDeviceLocation()
+		v := ScoredVisit{
+			POIID: in.POIID,
+			Device: &DeviceFix{
+				Latitude:   fix.GetLatitude(),
+				Longitude:  fix.GetLongitude(),
+				AccuracyM:  fix.GetAccuracyM(),
+				ObservedAt: fix.GetObservedAt().AsTime(),
+			},
+		}
+		if city != nil && city.VisitCount == 1 {
+			v.NewCity = city
+		}
+		points = h.scorer.ScoreOnTheSpot(ctx, uid, v)
+	}
 	return connect.NewResponse(&travelhistoryv1.RecordVisitResponse{
-		City: visitedCityToProto(city),
+		City:          visitedCityToProto(city),
+		PointsAwarded: int32(points),
 	}), nil
 }
 

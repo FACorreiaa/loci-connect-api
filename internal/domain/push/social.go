@@ -7,6 +7,8 @@ import (
 
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
 	"github.com/google/uuid"
+
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // SocialCategory is the notification category friend events carry; the app
@@ -63,6 +65,12 @@ func (n *Notifier) FriendAccepted(_ context.Context, to uuid.UUID, by *socialv1.
 // unless they switched friend activity off. Like OnRunFinished it returns at
 // once and never fails the caller.
 func (n *Notifier) notifySocial(to uuid.UUID, p Payload) {
+	n.notifyGated(to, p, func(s *locitypes.NotificationSettings) bool { return s.FriendActivity })
+}
+
+// notifyGated sends p to every device `to` registered, on every platform,
+// when allow says their switches let it through.
+func (n *Notifier) notifyGated(to uuid.UUID, p Payload, allow func(*locitypes.NotificationSettings) bool) {
 	if to == uuid.Nil || len(n.senders) == 0 {
 		return
 	}
@@ -76,7 +84,7 @@ func (n *Notifier) notifySocial(to uuid.UUID, p Payload) {
 			n.logger.Warn("read notification settings", "user_id", to, "error", err)
 			return
 		}
-		if !settings.FriendActivity {
+		if !allow(settings) {
 			return
 		}
 		body, err := json.Marshal(p)
