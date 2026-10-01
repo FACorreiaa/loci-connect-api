@@ -3,6 +3,7 @@ package presenter
 import (
 	"maps"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -48,9 +49,7 @@ func ToPOIProto(poi *locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	score, missing, rationale := locitypes.TrustSignals(*poi)
 	out.UncertaintyScore = &score
 	out.MissingData = missing
-	if rationale != "" {
-		out.RecommendationRationale = &rationale
-	}
+	out.RecommendationRationale = util.StrZeroPtr(rationale)
 	return out
 }
 
