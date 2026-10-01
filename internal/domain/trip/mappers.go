@@ -281,7 +281,7 @@ func placeFromProto(p *tripv1.FlightPlace) flights.Place {
 }
 
 func placeToProto(p flights.Place) *tripv1.FlightPlace {
-	return &tripv1.FlightPlace{Name: p.Name, Iata: stringPtrOrNil(p.IATA)}
+	return &tripv1.FlightPlace{Name: p.Name, Iata: util.StrZeroPtr(p.IATA)}
 }
 
 // flightFromProto reads what a client may set. id and links are ignored:
