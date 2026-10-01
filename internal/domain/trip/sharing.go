@@ -290,6 +290,17 @@ func redactForViewer(p *tripv1.TripDraft, shareDetails bool, owner *socialv1.Pub
 		for _, l := range p.GetLegs() {
 			l.BookingUrl = nil
 		}
+		for _, s := range p.GetStays() {
+			s.BookingUrl = nil
+		}
+		// What the traveller typed about a flight can place them (a flight
+		// number, a booking reference in notes); friends see the route and date.
+		for _, f := range p.GetFlights() {
+			f.Notes = nil
+			f.PriceText = nil
+			f.FlightNo = nil
+			f.Carrier = nil
+		}
 	}
 	return p
 }

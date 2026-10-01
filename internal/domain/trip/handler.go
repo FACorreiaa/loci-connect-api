@@ -50,6 +50,10 @@ type Handler struct {
 	// Unimplemented.
 	sharing SharingRepository
 	graph   SocialGraph
+
+	// Optional, attached via WithPlan. Nil makes the plan RPCs (dates, stays,
+	// flights) answer Unimplemented.
+	plan *Service
 }
 
 // WithAnalytics attaches the product-event recorder so a re-opened trip reaches
@@ -89,6 +93,8 @@ func toConnectErr(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, ErrVersionConflict):
 		return connect.NewError(connect.CodeFailedPrecondition, err)
+	case errors.Is(err, ErrInvalidEdit):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}
