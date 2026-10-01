@@ -242,6 +242,9 @@ type POIFilter struct {
 	Location GeoPoint `json:"location"` // e.g., "restaurant", "hotel", "bar"
 	Radius   float64  `json:"radius"`   // Radius in kilometers for filtering POIs
 	Category string   `json:"category"` // e.g., "restaurant", "hotel", "bar"
+	// Limit caps how many of the nearest matches are returned, applied in SQL
+	// after ordering by distance. Zero means no cap.
+	Limit int `json:"limit,omitempty"`
 }
 
 type GeoPoint struct {

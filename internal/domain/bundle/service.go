@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 )
@@ -52,9 +53,11 @@ type OneTimeCheckoutParams struct {
 	Metadata   map[string]string
 }
 
-// TripWriter writes the trip a claimed pack becomes.
+// TripWriter writes the trip a claimed pack becomes, inside the claim's
+// transaction, so the trip and its claim row commit together or not at all.
+// trip.TxWriter is the Postgres implementation.
 type TripWriter interface {
-	SaveTrip(ctx context.Context, t *trip.Trip, baseVersion int64) (*trip.Trip, error)
+	CreateTripTx(ctx context.Context, tx pgx.Tx, t *trip.Trip) (uuid.UUID, error)
 }
 
 // EmailLookup resolves the caller's email for Stripe.
@@ -292,9 +295,39 @@ func (s *Service) Claim(ctx context.Context, userID, bundleID uuid.UUID) (uuid.U
 		return tripID, nil
 	}
 
-	days, err := s.repo.LoadDays(ctx, b.ID, 0)
+	t, err := s.claimedTrip(ctx, userID, b)
 	if err != nil {
 		return uuid.Nil, err
+	}
+	// The lookup above answers repeat claims without a lock. A first claim
+	// goes through ClaimOnce, which serialises claims by this user of this
+	// pack and writes the trip and its claim row in one transaction: of two
+	// concurrent first claims, one writes the trip and the other waits and is
+	// answered with it. Neither writes a duplicate.
+	tripID, created, err := s.repo.ClaimOnce(ctx, userID, b.ID, func(ctx context.Context, tx pgx.Tx) (uuid.UUID, error) {
+		id, err := s.trips.CreateTripTx(ctx, tx, t)
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("save claimed trip: %w", err)
+		}
+		return id, nil
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !created {
+		s.logger.Info("concurrent bundle claim answered with the winner's trip",
+			"bundle_id", b.ID, "trip_id", tripID)
+	}
+	return tripID, nil
+}
+
+// claimedTrip builds the trip a claim of the pack writes: every day and stop,
+// owned by userID. It reads the pack before any lock is taken, so a claim
+// never holds a connection while waiting on another.
+func (s *Service) claimedTrip(ctx context.Context, userID uuid.UUID, b *Bundle) (*trip.Trip, error) {
+	days, err := s.repo.LoadDays(ctx, b.ID, 0)
+	if err != nil {
+		return nil, err
 	}
 
 	t := &trip.Trip{
@@ -337,21 +370,5 @@ func (s *Service) Claim(ctx context.Context, userID, bundleID uuid.UUID) (uuid.U
 		t.Days = append(t.Days, td)
 	}
 
-	saved, err := s.trips.SaveTrip(ctx, t, 0)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("save claimed trip: %w", err)
-	}
-	// Two concurrent claims can both get past the lookup above. The claim row
-	// is unique per user and pack, so both callers are answered with the trip
-	// that won; the loser's copy stays in the user's trips, since there is no
-	// trip delete to undo it with.
-	winner, err := s.repo.RecordClaim(ctx, userID, b.ID, saved.ID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("record bundle claim: %w", err)
-	}
-	if winner != saved.ID {
-		s.logger.Warn("concurrent bundle claim wrote a duplicate trip",
-			"bundle_id", b.ID, "kept_trip_id", winner, "duplicate_trip_id", saved.ID)
-	}
-	return winner, nil
+	return t, nil
 }

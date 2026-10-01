@@ -25,6 +25,10 @@ type nearbyService struct {
 
 func (s *nearbyService) SearchPOIs(_ context.Context, f locitypes.POIFilter) ([]locitypes.POIDetailedInfo, error) {
 	s.gotFilter = &f
+	// The repository applies the cap in SQL; the fake does what the SQL does.
+	if f.Limit > 0 && len(s.result) > f.Limit {
+		return s.result[:f.Limit], nil
+	}
 	return s.result, nil
 }
 
@@ -74,6 +78,9 @@ func TestSearchPOI_EmptyQueryListsNearby(t *testing.T) {
 	f := svc.gotFilter
 	if f.Location.Latitude != 38.7 || f.Location.Longitude != -9.1 || f.Radius != 10 || f.Category != "restaurant" {
 		t.Fatalf("filter = %+v", *f)
+	}
+	if f.Limit != nearbyListLimit {
+		t.Fatalf("filter.Limit = %d, want the %d cap pushed into the query", f.Limit, nearbyListLimit)
 	}
 	if got := len(resp.Msg.GetPois()); got != nearbyListLimit {
 		t.Fatalf("got %d POIs, want the %d cap", got, nearbyListLimit)

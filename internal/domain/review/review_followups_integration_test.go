@@ -69,7 +69,7 @@ func TestReviewRepo_UserStatisticsDistribution_Integration(t *testing.T) {
 	ctx := context.Background()
 	me := seedUser(t, pool)
 
-	st, err := repo.UserStatistics(ctx, me)
+	st, err := repo.UserStatistics(ctx, me, true)
 	require.NoError(t, err)
 	assert.Equal(t, UserStatistics{}, *st, "no reviews yields zeros")
 	// TestReviewRepo_UserStatistics_Integration covers count, average and helpful votes; this pins the star distribution.
@@ -87,7 +87,7 @@ func TestReviewRepo_UserStatisticsDistribution_Integration(t *testing.T) {
 	// Someone else's review does not count towards mine.
 	require.NoError(t, repo.Create(ctx, &Review{UserID: seedUser(t, pool), POIID: seedPOI(t, pool), Rating: 1, Content: "x"}))
 
-	st, err = repo.UserStatistics(ctx, me)
+	st, err = repo.UserStatistics(ctx, me, true)
 	require.NoError(t, err)
 	assert.Equal(t, 3, st.TotalReviews)
 	assert.InDelta(t, 13.0/3.0, st.AverageRatingGiven, 1e-9)

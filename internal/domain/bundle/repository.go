@@ -171,10 +171,13 @@ type Repository interface {
 	// ClaimedTrip returns the trip this user's claim of the pack produced, if
 	// there is one.
 	ClaimedTrip(ctx context.Context, userID, bundleID uuid.UUID) (tripID uuid.UUID, found bool, err error)
-	// RecordClaim records tripID as the user's claim of the pack and returns
-	// the trip that holds the claim: tripID, or the one an earlier claim
-	// recorded first.
-	RecordClaim(ctx context.Context, userID, bundleID, tripID uuid.UUID) (uuid.UUID, error)
+	// ClaimOnce makes this user's claim of the pack, at most once. Under a
+	// per-user-per-pack lock it reads the claim; when there is none it calls
+	// create with the claim's transaction and records the trip create wrote,
+	// committing both together. created reports whether this call wrote the
+	// trip; when it is false, tripID is the claim another call already holds
+	// and create was never called.
+	ClaimOnce(ctx context.Context, userID, bundleID uuid.UUID, create func(context.Context, pgx.Tx) (uuid.UUID, error)) (tripID uuid.UUID, created bool, err error)
 }
 
 var _ Repository = (*RepositoryImpl)(nil)
@@ -420,39 +423,61 @@ func (r *RepositoryImpl) ClaimedTrip(ctx context.Context, userID, bundleID uuid.
 	return tripID, true, nil
 }
 
-// RecordClaim inserts the claim, or leaves an existing one alone and returns
-// its trip.
-func (r *RepositoryImpl) RecordClaim(ctx context.Context, userID, bundleID, tripID uuid.UUID) (uuid.UUID, error) {
-	var held uuid.UUID
-	err := r.pgpool.QueryRow(ctx, `
-        WITH ins AS (
-            INSERT INTO bundle_claims (user_id, bundle_id, trip_id)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (user_id, bundle_id) DO NOTHING
-            RETURNING trip_id
-        )
-        SELECT trip_id FROM ins
-        UNION ALL
-        SELECT trip_id FROM bundle_claims
-        WHERE user_id = $1 AND bundle_id = $2
-          AND NOT EXISTS (SELECT 1 FROM ins)
-        LIMIT 1`, userID, bundleID, tripID).Scan(&held)
-	if errors.Is(err, pgx.ErrNoRows) {
-		// The conflicting claim committed after this statement's snapshot, so
-		// the fallback SELECT could not see it. A fresh read can.
-		existing, found, readErr := r.ClaimedTrip(ctx, userID, bundleID)
-		if readErr != nil {
-			return uuid.Nil, readErr
-		}
-		if !found {
-			return uuid.Nil, fmt.Errorf("record bundle claim: claim for bundle %s vanished", bundleID)
-		}
-		return existing, nil
-	}
+// ClaimOnce serialises claims of one pack by one user.
+//
+// The claim row cannot be written before the trip (bundle_claims.trip_id is a
+// NOT NULL foreign key), so "insert the claim first" is done with a lock
+// instead: a transaction-scoped advisory lock keyed by user and pack. The
+// first caller takes it, finds no claim, and writes the trip and the claim
+// row in that same transaction; commit releases the lock. A concurrent
+// caller waits on the lock, and its claim read — a fresh READ COMMITTED
+// snapshot taken after the lock is granted — sees the winner's row, so it
+// returns the winner's trip without writing one of its own.
+//
+// Everything happens on the one connection the transaction holds. A design
+// where the trip was written on a second pooled connection deadlocked under
+// load: the waiters held every connection in the pool, blocked on the lock,
+// and the lock holder could never get one to write its trip. It also left an
+// orphan trip whenever the claim insert failed; now both roll back together.
+func (r *RepositoryImpl) ClaimOnce(ctx context.Context, userID, bundleID uuid.UUID, create func(context.Context, pgx.Tx) (uuid.UUID, error)) (uuid.UUID, bool, error) {
+	tx, err := r.pgpool.Begin(ctx)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("record bundle claim: %w", err)
+		return uuid.Nil, false, fmt.Errorf("begin bundle claim: %w", err)
 	}
-	return held, nil
+	defer tx.Rollback(ctx) //nolint:errcheck // a no-op after commit
+
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
+		"bundle_claim:"+userID.String()+":"+bundleID.String()); err != nil {
+		return uuid.Nil, false, fmt.Errorf("lock bundle claim: %w", err)
+	}
+
+	var held uuid.UUID
+	err = tx.QueryRow(ctx, `
+        SELECT trip_id FROM bundle_claims
+        WHERE user_id = $1 AND bundle_id = $2`, userID, bundleID).Scan(&held)
+	switch {
+	case err == nil:
+		if err := tx.Commit(ctx); err != nil {
+			return uuid.Nil, false, fmt.Errorf("commit bundle claim read: %w", err)
+		}
+		return held, false, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return uuid.Nil, false, fmt.Errorf("read bundle claim: %w", err)
+	}
+
+	tripID, err := create(ctx, tx)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	if _, err := tx.Exec(ctx, `
+        INSERT INTO bundle_claims (user_id, bundle_id, trip_id)
+        VALUES ($1, $2, $3)`, userID, bundleID, tripID); err != nil {
+		return uuid.Nil, false, fmt.Errorf("record bundle claim: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, false, fmt.Errorf("commit bundle claim: %w", err)
+	}
+	return tripID, true, nil
 }
 
 // IsOwned reports whether the user holds a live purchase for this pack.

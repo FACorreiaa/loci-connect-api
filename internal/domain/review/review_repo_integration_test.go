@@ -67,12 +67,12 @@ func TestReviewRepo_CRUD_Helpful_Integration(t *testing.T) {
 	assert.Equal(t, "Rev POI", got.POIName)
 	assert.NotEmpty(t, got.ReviewerName)
 
-	list, total, err := repo.ListByPOI(ctx, poiID, 10, 0)
+	list, total, err := repo.ListByPOI(ctx, poiID, uuid.Nil, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 1, total)
 	require.Len(t, list, 1)
 
-	byUser, total, err := repo.ListByUser(ctx, author, 10, 0)
+	byUser, total, err := repo.ListByUser(ctx, author, uuid.Nil, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 1, total)
 	require.Len(t, byUser, 1)
@@ -104,7 +104,7 @@ func TestReviewRepo_ListRecent_Integration(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, &Review{UserID: u1, POIID: p1, Rating: 4, Content: "first"}))
 	require.NoError(t, repo.Create(ctx, &Review{UserID: u2, POIID: p2, Rating: 5, Content: "second"}))
 
-	list, total, err := repo.ListRecent(ctx, 10, 0)
+	list, total, err := repo.ListRecent(ctx, uuid.Nil, 10, 0)
 	require.NoError(t, err)
 	assert.Equal(t, 2, total)
 	require.Len(t, list, 2)
@@ -149,7 +149,7 @@ func TestReviewRepo_NullTitleAndMemberSince_Integration(t *testing.T) {
 	assert.Equal(t, "", got.Title)
 	assert.False(t, got.ReviewerSince.IsZero(), "member_since comes from users.created_at")
 
-	list, _, err := repo.ListByPOI(ctx, poiID, 10, 0)
+	list, _, err := repo.ListByPOI(ctx, poiID, uuid.Nil, 10, 0)
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 }
@@ -294,7 +294,7 @@ func TestReviewRepo_UserStatistics_Integration(t *testing.T) {
 	author, voter := seedUser(t, pool), seedUser(t, pool)
 	p1, p2 := seedPOI(t, pool), seedPOI(t, pool)
 
-	empty, err := repo.UserStatistics(ctx, author)
+	empty, err := repo.UserStatistics(ctx, author, true)
 	require.NoError(t, err)
 	assert.Equal(t, &UserStatistics{}, empty)
 
@@ -304,7 +304,7 @@ func TestReviewRepo_UserStatistics_Integration(t *testing.T) {
 	_, err = repo.SetHelpful(ctx, voter, first.ID, true)
 	require.NoError(t, err)
 
-	got, err := repo.UserStatistics(ctx, author)
+	got, err := repo.UserStatistics(ctx, author, true)
 	require.NoError(t, err)
 	assert.Equal(t, 2, got.TotalReviews)
 	assert.InDelta(t, 4.5, got.AverageRatingGiven, 0.001)

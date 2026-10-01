@@ -38,9 +38,12 @@ type fakeService struct {
 	viewerSeen uuid.UUID
 	myReview   *Review
 	reported   *reportCall
+
+	reportedQueue []*ReportedReview
+	resolved      *resolveCall
 }
 
-func (f *fakeService) GetUserStatistics(_ context.Context, userID uuid.UUID) (*UserStatistics, error) {
+func (f *fakeService) GetUserStatistics(_ context.Context, userID, _ uuid.UUID) (*UserStatistics, error) {
 	f.statsFor = userID
 	if f.err != nil {
 		return nil, f.err
@@ -100,12 +103,12 @@ func (f *fakeService) UpdateReview(_ context.Context, in UpdateReviewInput) (*Re
 	return &Review{ID: in.ReviewID, UserID: in.UserID, Rating: in.Rating, Title: in.Title, Content: in.Content}, nil
 }
 
-func (f *fakeService) ListUserReviews(_ context.Context, userID uuid.UUID, _, _ int) ([]*Review, int, error) {
+func (f *fakeService) ListUserReviews(_ context.Context, userID, _ uuid.UUID, _, _ int) ([]*Review, int, error) {
 	f.listedFor = userID
 	return f.list, len(f.list), f.err
 }
 
-func (f *fakeService) ListPOIReviews(_ context.Context, poiID uuid.UUID, _, _ int) ([]*Review, int, error) {
+func (f *fakeService) ListPOIReviews(_ context.Context, poiID, _ uuid.UUID, _, _ int) ([]*Review, int, error) {
 	f.listedFor = poiID
 	return f.list, len(f.list), f.err
 }
