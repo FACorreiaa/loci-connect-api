@@ -184,6 +184,11 @@ type AuthConfig struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	AdminEmail      string
+	// AdminEmails are the accounts that moderate community boards: they may
+	// delete any board, post or comment and mute or ban users. Comma-separated,
+	// matched case-insensitively against the session's email; AdminEmail counts
+	// too.
+	AdminEmails []string
 
 	// MFASecretKey encrypts TOTP secrets at rest. Must be exactly 32 bytes.
 	// Empty disables MFA entirely rather than storing secrets in plaintext —
@@ -463,6 +468,7 @@ func Load() (*Config, error) {
 			AccessTokenTTL:   getEnvAsDuration("JWT_ACCESS_TOKEN_TTL", time.Hour),
 			RefreshTokenTTL:  getEnvAsDuration("JWT_REFRESH_TOKEN_TTL", 30*24*time.Hour),
 			AdminEmail:       getEnv("ADMIN_EMAIL", ""),
+			AdminEmails:      getEnvAsSlice("ADMIN_EMAILS", nil),
 
 			MFASecretKey:       getEnv("MFA_SECRET_KEY", ""),
 			MFARequiredForRole: getEnv("MFA_REQUIRED_FOR_ROLE", ""),
