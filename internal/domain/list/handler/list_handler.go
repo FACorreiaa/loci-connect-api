@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	listpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
 	"github.com/google/uuid"
@@ -193,15 +194,11 @@ func (h *ListHandler) UpdateList(ctx context.Context, req *connect.Request[listp
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid list id"))
 	}
-	params := locitypes.UpdateListRequest{IsPublic: &req.Msg.IsPublic}
-	if req.Msg.Name != "" {
-		params.Name = &req.Msg.Name
-	}
-	if req.Msg.Description != "" {
-		params.Description = &req.Msg.Description
-	}
-	if req.Msg.ImageUrl != "" {
-		params.ImageURL = &req.Msg.ImageUrl
+	params := locitypes.UpdateListRequest{
+		IsPublic:    &req.Msg.IsPublic,
+		Name:        util.StrZeroPtr(req.Msg.Name),
+		Description: util.StrZeroPtr(req.Msg.Description),
+		ImageURL:    util.StrZeroPtr(req.Msg.ImageUrl),
 	}
 	if req.Msg.CityId != "" {
 		id, e := uuid.Parse(req.Msg.CityId)

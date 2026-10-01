@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,8 +34,6 @@ func insertUser(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	return id
 }
 
-func strptr(s string) *string { return &s }
-
 func TestCreateAndGetPayment(t *testing.T) {
 	repo, pool := newPaymentRepo(t)
 	ctx := context.Background()
@@ -43,12 +42,12 @@ func TestCreateAndGetPayment(t *testing.T) {
 	p := &Payment{
 		UserID:            userID,
 		Provider:          "stripe",
-		ExternalPaymentID: strptr("pi_test_123"),
+		ExternalPaymentID: util.Ptr("pi_test_123"),
 		Type:              "one_time",
 		Amount:            1999,
 		Currency:          "usd",
 		Status:            "succeeded",
-		Description:       strptr("Test charge"),
+		Description:       util.Ptr("Test charge"),
 		Metadata:          map[string]any{"order": "abc"},
 	}
 	require.NoError(t, repo.CreatePayment(ctx, p))
@@ -76,7 +75,7 @@ func TestUpdatePaymentStatus(t *testing.T) {
 	p := &Payment{UserID: userID, Provider: "stripe", Type: "one_time", Amount: 500, Currency: "usd", Status: "pending"}
 	require.NoError(t, repo.CreatePayment(ctx, p))
 
-	require.NoError(t, repo.UpdatePaymentStatus(ctx, p.ID, "failed", strptr("card_declined")))
+	require.NoError(t, repo.UpdatePaymentStatus(ctx, p.ID, "failed", util.Ptr("card_declined")))
 
 	got, err := repo.GetPaymentByID(ctx, p.ID)
 	require.NoError(t, err)
@@ -143,7 +142,7 @@ func TestUpsertSubscription_InsertThenUpdate(t *testing.T) {
 		Status:                 "active",
 		StartDate:              time.Now(),
 		ExternalProvider:       "stripe",
-		ExternalSubscriptionID: strptr("sub_initial"),
+		ExternalSubscriptionID: util.Ptr("sub_initial"),
 	}
 	require.NoError(t, repo.UpsertSubscription(ctx, sub))
 
@@ -162,7 +161,7 @@ func TestUpsertSubscription_InsertThenUpdate(t *testing.T) {
 		Status:                 "active",
 		StartDate:              time.Now(),
 		ExternalProvider:       "stripe",
-		ExternalSubscriptionID: strptr("sub_upgraded"),
+		ExternalSubscriptionID: util.Ptr("sub_upgraded"),
 	}
 	require.NoError(t, repo.UpsertSubscription(ctx, sub2))
 
@@ -185,8 +184,8 @@ func TestUpsertSubscription_CustomerIDRoundTripAndSticky(t *testing.T) {
 		Status:                 "active",
 		StartDate:              time.Now(),
 		ExternalProvider:       "stripe",
-		ExternalSubscriptionID: strptr("sub_1"),
-		ExternalCustomerID:     strptr("cus_abc"),
+		ExternalSubscriptionID: util.Ptr("sub_1"),
+		ExternalCustomerID:     util.Ptr("cus_abc"),
 	}
 	require.NoError(t, repo.UpsertSubscription(ctx, sub))
 
@@ -202,7 +201,7 @@ func TestUpsertSubscription_CustomerIDRoundTripAndSticky(t *testing.T) {
 		Status:                 "canceled",
 		StartDate:              time.Now(),
 		ExternalProvider:       "stripe",
-		ExternalSubscriptionID: strptr("sub_1"),
+		ExternalSubscriptionID: util.Ptr("sub_1"),
 	}
 	require.NoError(t, repo.UpsertSubscription(ctx, sub2))
 

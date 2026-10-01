@@ -77,6 +77,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
@@ -205,6 +206,7 @@ type Dependencies struct {
 	ExportHandler            *export.Handler
 	ShareHandler             *share.Handler
 	TripHandler              *trip.Handler
+	TripService              *trip.Service
 	CalendarHandler          *calendar.Handler
 	BundleHandler            *bundle.Handler
 	POIHandler               *poihandler.POIHandler
@@ -916,6 +918,10 @@ func (d *Dependencies) initHandlers() error {
 		)
 		d.GamificationHandler = gamification.NewHandler(d.gamification, d.Logger)
 		d.ChatHandler = d.ChatHandler.WithSearchScorer(d.gamification)
+		// Dates, stays and flights. The service is kept for the chat agent,
+		// which edits a trip's plan through the same rules as the editor.
+		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), flights.DeepLinks{})
+		d.TripHandler = d.TripHandler.WithPlan(d.TripService)
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(

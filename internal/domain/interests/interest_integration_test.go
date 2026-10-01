@@ -10,6 +10,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
@@ -48,9 +49,6 @@ func createTestUserForInterestTests(t *testing.T) uuid.UUID {
 	require.NoError(t, err)
 	return id
 }
-
-func sp(s string) *string { return &s }
-func bp(b bool) *bool     { return &b }
 
 func TestInterestsService_CreateInterest_Integration(t *testing.T) {
 	ctx := context.Background()
@@ -124,9 +122,9 @@ func TestInterestsService_UpdateInterests_Integration(t *testing.T) {
 
 	t.Run("Update interest details", func(t *testing.T) {
 		params := locitypes.UpdateinterestsParams{
-			Name:        sp("Updated Interest Name"),
-			Description: sp("This is an updated description."),
-			Active:      bp(false),
+			Name:        util.Ptr("Updated Interest Name"),
+			Description: util.Ptr("This is an updated description."),
+			Active:      util.Ptr(false),
 		}
 		err := testinterestsService.UpdateInterests(ctx, userID, created.ID, params)
 		require.NoError(t, err)
@@ -143,7 +141,7 @@ func TestInterestsService_UpdateInterests_Integration(t *testing.T) {
 	})
 
 	t.Run("Update non-existent interest", func(t *testing.T) {
-		params := locitypes.UpdateinterestsParams{Name: sp("NonExistentUpdate")}
+		params := locitypes.UpdateinterestsParams{Name: util.Ptr("NonExistentUpdate")}
 		err := testinterestsService.UpdateInterests(ctx, userID, uuid.New(), params)
 		require.Error(t, err)
 	})

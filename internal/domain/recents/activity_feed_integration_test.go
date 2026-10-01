@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -102,7 +103,7 @@ func TestActivityFeed_MergesThreeSourcesNewestFirst(t *testing.T) {
 	insertPrompt(t, user, "Unified Chat Stream - Domain: itinerary, Message: Three days in Porto", nil, "Porto", base.Add(-4*time.Hour))
 	insertSavedItinerary(t, user, "Porto weekend", base.Add(-3*time.Hour))
 	insertFavourite(t, user, "Livraria Lello", "poi", base.Add(-2*time.Hour))
-	insertPrompt(t, user, "Unified Chat Stream - Domain: dining, Message: seafood in Cascais", strPtrLocal("dining"), "Cascais", base.Add(-1*time.Hour))
+	insertPrompt(t, user, "Unified Chat Stream - Domain: dining, Message: seafood in Cascais", util.Ptr("dining"), "Cascais", base.Add(-1*time.Hour))
 
 	entries, err := quietRepo().GetUserActivityFeed(context.Background(), user, 10, 0, locitypes.ActivityFeedFilter{})
 	if err != nil {
@@ -276,5 +277,3 @@ func TestActivityFeed_IsScopedToTheUser(t *testing.T) {
 		t.Fatalf("want only my row, got %v", labels(entries))
 	}
 }
-
-func strPtrLocal(s string) *string { return &s }

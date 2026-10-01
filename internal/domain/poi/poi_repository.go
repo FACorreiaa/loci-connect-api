@@ -1026,19 +1026,6 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 
 	hotels := make([]locitypes.HotelDetailedInfo, len(dbRows))
 	for i, row := range dbRows {
-		var website, phoneNumber, openingHours, priceRange *string
-		if row.Website != "" {
-			website = &row.Website
-		}
-		if row.PhoneNumber != "" {
-			phoneNumber = &row.PhoneNumber
-		}
-		if row.OpeningHours != "" {
-			openingHours = &row.OpeningHours
-		}
-		if row.PriceRange != "" {
-			priceRange = &row.PriceRange
-		}
 		hotels[i] = locitypes.HotelDetailedInfo{
 			ID:           row.ID,
 			Name:         row.Name,
@@ -1046,10 +1033,10 @@ func (r *RepositoryImpl) FindHotelDetails(ctx context.Context, cityID uuid.UUID,
 			Latitude:     row.Latitude,
 			Longitude:    row.Longitude,
 			Address:      row.Address,
-			Website:      website,
-			PhoneNumber:  phoneNumber,
-			OpeningHours: openingHours,
-			PriceRange:   priceRange,
+			Website:      util.StrZeroPtr(row.Website),
+			PhoneNumber:  util.StrZeroPtr(row.PhoneNumber),
+			OpeningHours: util.StrZeroPtr(row.OpeningHours),
+			PriceRange:   util.StrZeroPtr(row.PriceRange),
 			Category:     row.Category,
 			Tags:         row.Tags,
 			Images:       row.Images,
@@ -1156,23 +1143,6 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 		return nil, fmt.Errorf("failed to collect hotel_details by ID: %w", err)
 	}
 
-	var openingHours *string
-	if dbRow.OpeningHours != "" {
-		openingHours = &dbRow.OpeningHours
-	}
-	var website *string
-	if dbRow.Website != "" {
-		website = &dbRow.Website
-	}
-	var phoneNumber *string
-	if dbRow.PhoneNumber != "" {
-		phoneNumber = &dbRow.PhoneNumber
-	}
-	var priceRange *string
-	if dbRow.PriceRange != "" {
-		priceRange = &dbRow.PriceRange
-	}
-
 	hotel := locitypes.HotelDetailedInfo{
 		ID:               dbRow.ID,
 		Name:             dbRow.Name,
@@ -1180,10 +1150,10 @@ func (r *RepositoryImpl) GetHotelByID(ctx context.Context, hotelID uuid.UUID) (*
 		Latitude:         dbRow.Latitude,
 		Longitude:        dbRow.Longitude,
 		Address:          dbRow.Address,
-		Website:          website,
-		PhoneNumber:      phoneNumber,
-		OpeningHours:     openingHours,
-		PriceRange:       priceRange,
+		Website:          util.StrZeroPtr(dbRow.Website),
+		PhoneNumber:      util.StrZeroPtr(dbRow.PhoneNumber),
+		OpeningHours:     util.StrZeroPtr(dbRow.OpeningHours),
+		PriceRange:       util.StrZeroPtr(dbRow.PriceRange),
 		Category:         dbRow.Category,
 		Tags:             dbRow.Tags,
 		Images:           dbRow.Images,
@@ -1265,41 +1235,22 @@ func (r *RepositoryImpl) FindRestaurantDetails(ctx context.Context, cityID uuid.
 
 	restaurants := make([]locitypes.RestaurantDetailedInfo, len(dbRows))
 	for i, row := range dbRows {
-		var address, website, phoneNumber, openingHours, priceLevel, cuisineType *string
-		if row.Address != "" {
-			address = &row.Address
-		}
-		if row.Website != "" {
-			website = &row.Website
-		}
-		if row.PhoneNumber != "" {
-			phoneNumber = &row.PhoneNumber
-		}
-		if row.OpeningHours != "" {
-			openingHours = &row.OpeningHours
-		}
-		if row.PriceLevel != "" {
-			priceLevel = &row.PriceLevel
-		}
-		if row.CuisineType != "" {
-			cuisineType = &row.CuisineType
-		}
 		restaurants[i] = locitypes.RestaurantDetailedInfo{
 			ID:           row.ID,
 			Name:         row.Name,
 			Description:  row.Description,
 			Latitude:     row.Latitude,
 			Longitude:    row.Longitude,
-			Address:      address,
-			Website:      website,
-			PhoneNumber:  phoneNumber,
-			OpeningHours: openingHours,
-			PriceLevel:   priceLevel,
+			Address:      util.StrZeroPtr(row.Address),
+			Website:      util.StrZeroPtr(row.Website),
+			PhoneNumber:  util.StrZeroPtr(row.PhoneNumber),
+			OpeningHours: util.StrZeroPtr(row.OpeningHours),
+			PriceLevel:   util.StrZeroPtr(row.PriceLevel),
 			Category:     row.Category,
 			Tags:         row.Tags,
 			Images:       row.Images,
 			Rating:       row.Rating,
-			CuisineType:  cuisineType,
+			CuisineType:  util.StrZeroPtr(row.CuisineType),
 			LlmInteractionID: func() uuid.UUID {
 				if row.LlmInteractionID == nil {
 					return uuid.Nil

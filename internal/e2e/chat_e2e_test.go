@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 
 	authv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth/authconnect"
@@ -65,7 +66,7 @@ func TestChatE2E(t *testing.T) {
 	// 3) StreamChat (authed) → collect typed events.
 	req := connect.NewRequest(&chatv1.ChatRequest{
 		Message:  "Plan a relaxed one-day trip in Lisbon with a few classic sights.",
-		CityName: proto("Lisbon"),
+		CityName: util.Ptr("Lisbon"),
 	})
 	req.Header().Set("Authorization", "Bearer "+token)
 
@@ -110,5 +111,3 @@ func TestChatE2E(t *testing.T) {
 	}
 	t.Logf("E2E OK: itinerary=%d complete=%d error=%d", withItinerary, gotComplete, gotError)
 }
-
-func proto(s string) *string { return &s }

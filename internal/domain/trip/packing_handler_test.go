@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
@@ -68,8 +69,6 @@ func rainyDays(n int) []localcontext.WeatherDay {
 	return out
 }
 
-func f64p(v float64) *float64 { return &v }
-
 func authed(ctx context.Context, userID uuid.UUID) context.Context {
 	return interceptors.ContextWithClaims(ctx, &interceptors.Claims{UserID: userID.String()})
 }
@@ -94,8 +93,8 @@ func TestSuggestPacking_UsesTheTripsOwnForecast(t *testing.T) {
 	tr := &Trip{
 		ID: uuid.New(), UserID: userID, CityName: "Lisbon", Title: "Lisbon",
 		Days: []TripDay{
-			{DayNumber: 1, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)},
-			{DayNumber: 2, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)},
+			{DayNumber: 1, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)},
+			{DayNumber: 2, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)},
 		},
 	}
 	w := &fakeWeather{byCoord: map[string][]localcontext.WeatherDay{
@@ -149,7 +148,7 @@ func TestSuggestPacking_SurvivesForecastFailure(t *testing.T) {
 	userID := uuid.New()
 	tr := &Trip{
 		ID: uuid.New(), UserID: userID, CityName: "Lisbon",
-		Days: []TripDay{{DayNumber: 1, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)}},
+		Days: []TripDay{{DayNumber: 1, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)}},
 	}
 
 	h := newPackingHandler(t, tr, &fakeWeather{err: errors.New("provider down")}, false)
@@ -172,9 +171,9 @@ func TestSuggestPacking_AsksPerCityForItsOwnDays(t *testing.T) {
 	tr := &Trip{
 		ID: uuid.New(), UserID: userID, CityName: "Lisbon",
 		Days: []TripDay{
-			{DayNumber: 1, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)},
-			{DayNumber: 2, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)},
-			{DayNumber: 3, CityName: "Porto", CityLat: f64p(41.15), CityLon: f64p(-8.61), TravelDay: true},
+			{DayNumber: 1, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)},
+			{DayNumber: 2, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)},
+			{DayNumber: 3, CityName: "Porto", CityLat: util.Ptr(41.15), CityLon: util.Ptr(-8.61), TravelDay: true},
 		},
 		Legs: []TripLeg{{AfterDay: 2, FromName: "Lisbon", ToName: "Porto", DurationMins: 200}},
 	}
@@ -222,7 +221,7 @@ func TestSuggestPacking_FlagsEstimatedWeatherOnlyWhenUsed(t *testing.T) {
 	userID := uuid.New()
 	withCoords := &Trip{
 		ID: uuid.New(), UserID: userID, CityName: "Lisbon",
-		Days: []TripDay{{DayNumber: 1, CityName: "Lisbon", CityLat: f64p(38.72), CityLon: f64p(-9.14)}},
+		Days: []TripDay{{DayNumber: 1, CityName: "Lisbon", CityLat: util.Ptr(38.72), CityLon: util.Ptr(-9.14)}},
 	}
 	w := &fakeWeather{byCoord: map[string][]localcontext.WeatherDay{
 		coordKey(38.72, -9.14): rainyDays(1),

@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
@@ -21,8 +22,6 @@ var (
 	testCityDB   *pgxpool.Pool
 	testCityRepo Repository
 )
-
-func f64(v float64) *float64 { return &v }
 
 func TestMain(m *testing.M) {
 	testCityDB = testsupport.MustPool()
@@ -47,8 +46,8 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 			Country:         "TestCountry",
 			StateProvince:   "TestState",
 			AiSummary:       "A beautiful test city with amazing attractions",
-			CenterLatitude:  f64(38.7223),
-			CenterLongitude: f64(-9.1393),
+			CenterLatitude:  util.Ptr(38.7223),
+			CenterLongitude: util.Ptr(-9.1393),
 		}
 
 		cityID, err := testCityRepo.SaveCity(ctx, city)
@@ -102,8 +101,8 @@ func TestCityRepository_SaveCity_Integration(t *testing.T) {
 			Country:         "TestCountry",
 			StateProvince:   "", // Empty state province
 			AiSummary:       "City without state province",
-			CenterLatitude:  f64(40.7128),
-			CenterLongitude: f64(-74.0060),
+			CenterLatitude:  util.Ptr(40.7128),
+			CenterLongitude: util.Ptr(-74.0060),
 		}
 
 		cityID, err := testCityRepo.SaveCity(ctx, city)
@@ -136,24 +135,24 @@ func TestCityRepository_FindCityByNameAndCountry_Integration(t *testing.T) {
 			Country:         "Portugal",
 			StateProvince:   "Lisbon",
 			AiSummary:       "Capital city of Portugal",
-			CenterLatitude:  f64(38.7223),
-			CenterLongitude: f64(-9.1393),
+			CenterLatitude:  util.Ptr(38.7223),
+			CenterLongitude: util.Ptr(-9.1393),
 		},
 		{
 			Name:            "TestCityFind2",
 			Country:         "Spain",
 			StateProvince:   "Madrid",
 			AiSummary:       "Capital city of Spain",
-			CenterLatitude:  f64(40.4168),
-			CenterLongitude: f64(-3.7038),
+			CenterLatitude:  util.Ptr(40.4168),
+			CenterLongitude: util.Ptr(-3.7038),
 		},
 		{
 			Name:            "TestCityFind3",
 			Country:         "Portugal",
 			StateProvince:   "Porto",
 			AiSummary:       "Second largest city in Portugal",
-			CenterLatitude:  f64(41.1579),
-			CenterLongitude: f64(-8.6291),
+			CenterLatitude:  util.Ptr(41.1579),
+			CenterLongitude: util.Ptr(-8.6291),
 		},
 	}
 
@@ -213,8 +212,8 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 			Country:         "Brasil",
 			StateProvince:   "São Paulo",
 			AiSummary:       "City with special characters: áéíóú àèìòù ãõ ç",
-			CenterLatitude:  f64(-23.5505),
-			CenterLongitude: f64(-46.6333),
+			CenterLatitude:  util.Ptr(-23.5505),
+			CenterLongitude: util.Ptr(-46.6333),
 		}
 
 		cityID, err := testCityRepo.SaveCity(ctx, city)
@@ -240,8 +239,8 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 			Name:            "TestCityLong",
 			Country:         "TestCountry",
 			AiSummary:       longSummary,
-			CenterLatitude:  f64(0.0),
-			CenterLongitude: f64(0.0),
+			CenterLatitude:  util.Ptr(0.0),
+			CenterLongitude: util.Ptr(0.0),
 		}
 
 		cityID, err := testCityRepo.SaveCity(ctx, city)
@@ -261,8 +260,8 @@ func TestCityRepository_EdgeCases_Integration(t *testing.T) {
 			Name:            "TestCityPrecision",
 			Country:         "TestCountry",
 			AiSummary:       "City for testing coordinate precision",
-			CenterLatitude:  f64(38.722252),
-			CenterLongitude: f64(-9.139337),
+			CenterLatitude:  util.Ptr(38.722252),
+			CenterLongitude: util.Ptr(-9.139337),
 		}
 
 		cityID, err := testCityRepo.SaveCity(ctx, city)
@@ -290,9 +289,9 @@ func TestCityRepository_SearchCitiesByName_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	for _, c := range []locitypes.CityDetail{
-		{Name: "TestCityAlfa", Country: "Portugal", CenterLatitude: f64(38.7), CenterLongitude: f64(-9.1)},
-		{Name: "TestCityBravo", Country: "Spain", CenterLatitude: f64(40.4), CenterLongitude: f64(-3.7)},
-		{Name: "TestCityCharlie", Country: "France", CenterLatitude: f64(48.8), CenterLongitude: f64(2.3)},
+		{Name: "TestCityAlfa", Country: "Portugal", CenterLatitude: util.Ptr(38.7), CenterLongitude: util.Ptr(-9.1)},
+		{Name: "TestCityBravo", Country: "Spain", CenterLatitude: util.Ptr(40.4), CenterLongitude: util.Ptr(-3.7)},
+		{Name: "TestCityCharlie", Country: "France", CenterLatitude: util.Ptr(48.8), CenterLongitude: util.Ptr(2.3)},
 	} {
 		_, err := testCityRepo.SaveCity(ctx, c)
 		require.NoError(t, err)

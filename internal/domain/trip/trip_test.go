@@ -5,12 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-func ptrI32(v int32) *int32 { return &v }
 
 func TestBuildICS(t *testing.T) {
 	date := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
@@ -21,7 +20,7 @@ func TestBuildICS(t *testing.T) {
 			DayNumber: 1,
 			Date:      &date,
 			Stops: []TripStop{
-				{ID: uuid.New(), Name: "Jerónimos Monastery", StartMinute: ptrI32(600), DurationMinutes: ptrI32(90), Notes: "Book ahead; skip line"},
+				{ID: uuid.New(), Name: "Jerónimos Monastery", StartMinute: util.Ptr[int32](600), DurationMinutes: util.Ptr[int32](90), Notes: "Book ahead; skip line"},
 				{ID: uuid.New(), Name: "No time stop"}, // skipped (no start_minute)
 			},
 		}},
@@ -89,14 +88,14 @@ func TestTripProtoRoundTrip(t *testing.T) {
 		Id:          uuid.New().String(),
 		CityName:    "Porto",
 		Title:       "Food Tour",
-		Constraints: &tripv1.TripConstraint{BudgetLevel: ptrI32(3), Pace: tripv1.TripPace_TRIP_PACE_PACKED, Mobility: strPtr("walking"), Interests: []string{"food", "wine"}},
+		Constraints: &tripv1.TripConstraint{BudgetLevel: util.Ptr[int32](3), Pace: tripv1.TripPace_TRIP_PACE_PACKED, Mobility: util.Ptr("walking"), Interests: []string{"food", "wine"}},
 		Days: []*tripv1.TripDay{{
 			Id:        uuid.New().String(),
 			DayNumber: 1,
 			Date:      timestamppb.New(now),
 			Stops: []*tripv1.TripStop{{
 				Id: uuid.New().String(), PoiId: "poi-1", OrderIndex: 0, Name: "Cafe",
-				StartMinute: ptrI32(540), DurationMinutes: ptrI32(60), Notes: "coffee", BookingUrl: strPtr("https://example.com/book"),
+				StartMinute: util.Ptr[int32](540), DurationMinutes: util.Ptr[int32](60), Notes: "coffee", BookingUrl: util.Ptr("https://example.com/book"),
 			}},
 		}},
 	}
@@ -142,8 +141,6 @@ func TestSortStopsByOrder(t *testing.T) {
 		t.Fatalf("expected abc, got %s", got)
 	}
 }
-
-func strPtr(s string) *string { return &s }
 
 func TestTripCitiesRoundTripThroughProto(t *testing.T) {
 	sid := uuid.New()
