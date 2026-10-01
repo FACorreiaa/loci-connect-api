@@ -169,6 +169,16 @@ func toDayPB(d Day) *bundlev1.BundleDay {
 				ts.Poi.Website = *s.Website
 			}
 		}
+		// The linked POI's stored picture, with its credit. Without it every
+		// pack card fell back to a gradient. It also goes onto the hydrated
+		// POI so components that already render POI image credits show it.
+		if img := stopImagePB(s.Image); img != nil {
+			ts.Image = img
+			if ts.Poi != nil {
+				ts.Poi.Images = []string{img.GetUrl()}
+				ts.Poi.ImageCredits = []*poipb.POIImage{img}
+			}
+		}
 
 		stops = append(stops, ts)
 	}
@@ -176,6 +186,22 @@ func toDayPB(d Day) *bundlev1.BundleDay {
 		DayNumber: int32(d.DayNumber),
 		Title:     d.Title,
 		Stops:     stops,
+	}
+}
+
+// stopImagePB maps a stop's picture, or nil when it has none. A row that
+// somehow lacks a URL, licence or attribution is dropped rather than sent:
+// the proto requires all three and an uncredited picture cannot be shown.
+func stopImagePB(img *StopImage) *poipb.POIImage {
+	if img == nil || img.URL == "" || img.Licence == "" || img.Attribution == "" {
+		return nil
+	}
+	return &poipb.POIImage{
+		Url:           img.URL,
+		Source:        img.Source,
+		Licence:       img.Licence,
+		Attribution:   img.Attribution,
+		SourcePageUrl: img.SourcePageURL,
 	}
 }
 

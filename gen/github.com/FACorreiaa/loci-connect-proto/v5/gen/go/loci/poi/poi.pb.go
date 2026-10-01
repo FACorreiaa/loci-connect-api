@@ -885,7 +885,11 @@ func (x *POIFilters) GetPriceRange() string {
 // SearchPOIRequest for searching POIs
 type SearchPOIRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Query string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	// Optional. Empty asks for a nearby listing rather than a search: the places
+	// around latitude/longitude, nearest first, at most 50, optionally narrowed
+	// to the category in search_tags[0]. An empty query with no location is
+	// rejected with INVALID_ARGUMENT, since there is nothing to rank by.
+	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	// Optional. Empty means "no city": the server searches around
 	// latitude/longitude when they are set, otherwise across every city.
 	// "nearby" is treated the same as empty.
@@ -1403,10 +1407,10 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"priceRange\x88\x01\x01B\a\n" +
 	"\x05_cityB\v\n" +
 	"\t_categoryB\x0e\n" +
-	"\f_price_range\"\xff\x05\n" +
-	"\x10SearchPOIRequest\x12 \n" +
-	"\x05query\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\x05query\x12*\n" +
+	"\f_price_range\"\x82\x06\n" +
+	"\x10SearchPOIRequest\x12#\n" +
+	"\x05query\x18\x01 \x01(\tB\r\xbaH\n" +
+	"\xd8\x01\x01r\x05\x10\x01\x18\xf4\x03R\x05query\x12*\n" +
 	"\tcity_name\x18\x02 \x01(\tB\r\xbaH\n" +
 	"\xd8\x01\x01r\x05\x10\x01\x18\xc8\x01R\bcityName\x123\n" +
 	"\blatitude\x18\x03 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0R\blatitude\x125\n" +

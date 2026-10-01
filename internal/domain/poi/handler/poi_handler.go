@@ -74,7 +74,10 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 	if req.Msg.SearchType != nil {
 		searchType = *req.Msg.SearchType
 	}
-	query := req.Msg.Query
+	query := strings.TrimSpace(req.Msg.Query)
+	if query == "" {
+		return h.listNearby(ctx, req.Msg)
+	}
 	mode, cityName := resolveSearch(searchType, req.Msg.CityName, req.Msg.Latitude, req.Msg.Longitude)
 
 	var pois []locitypes.POIDetailedInfo
@@ -99,6 +102,45 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 		return nil, apierr.ToConnect(err)
 	}
 
+	return connect.NewResponse(&poiv1.SearchPOIResponse{
+		Pois: presenter.ToPOIProtos(pois),
+	}), nil
+}
+
+// nearbyListLimit caps a query-less nearby listing. The distance search has
+// no LIMIT of its own, and a nearby card shows a handful of places.
+const nearbyListLimit = 50
+
+// errQueryRequired is the answer to a query-less search that also has no
+// location: there is nothing to rank by.
+var errQueryRequired = errors.New("query is required unless latitude and longitude are set")
+
+// listNearby answers a SearchPOI with no query: the places around
+// latitude/longitude, nearest first, optionally narrowed to one category (the
+// first search tag). This is what web's "near me" list asks for. city_name is
+// ignored; a location is what "nearby" means. Without a location there is
+// nothing to rank by, so the request is rejected instead of returning an
+// arbitrary slice of every city.
+func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest) (*connect.Response[poiv1.SearchPOIResponse], error) {
+	if msg.GetLatitude() == 0 && msg.GetLongitude() == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errQueryRequired)
+	}
+	filter := locitypes.POIFilter{Radius: defaultHybridRadiusKm}
+	filter.Location.Latitude = msg.GetLatitude()
+	filter.Location.Longitude = msg.GetLongitude()
+	if msg.RadiusKm != nil {
+		filter.Radius = msg.GetRadiusKm()
+	}
+	if tags := msg.GetSearchTags(); len(tags) > 0 {
+		filter.Category = strings.TrimSpace(tags[0])
+	}
+	pois, err := h.service.SearchPOIs(ctx, filter)
+	if err != nil {
+		return nil, apierr.ToConnect(err)
+	}
+	if len(pois) > nearbyListLimit {
+		pois = pois[:nearbyListLimit]
+	}
 	return connect.NewResponse(&poiv1.SearchPOIResponse{
 		Pois: presenter.ToPOIProtos(pois),
 	}), nil

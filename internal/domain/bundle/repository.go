@@ -107,6 +107,22 @@ type Stop struct {
 	Notes           string
 	StartMinute     *int
 	DurationMinutes *int
+	// Image is the linked POI's first stored picture (poi_images, by
+	// position), read live rather than snapshotted: it is enrichment, and the
+	// nightly image backfill keeps adding pictures after a pack is published.
+	// Nil when the stop has no POIID or the POI has no picture yet.
+	Image *StopImage
+}
+
+// StopImage is one picture with the credit its licence requires. It comes
+// only from poi_images, which refuses rows without a licence and an
+// attribution, so every StopImage can be shown lawfully.
+type StopImage struct {
+	URL           string
+	Source        string
+	Licence       string
+	Attribution   string
+	SourcePageURL string
 }
 
 // Purchase is one person's ownership of one pack.
@@ -339,13 +355,24 @@ func (r *RepositoryImpl) LoadDays(ctx context.Context, bundleID uuid.UUID, maxDa
 		dayIDs = append(dayIDs, d.ID)
 	}
 
+	// The picture comes from the linked POI's stored images, one per stop.
+	// bundle_stops.image_url is not used: it is an authored URL with no
+	// licence or attribution, and an uncredited picture cannot be displayed.
 	stopRows, err := r.pgpool.Query(ctx, `
-        SELECT id, bundle_day_id, order_index, poi_id, name, category, description,
-               latitude, longitude, address, website, booking_url, image_url,
-               notes, start_minute, duration_minutes
-        FROM bundle_stops
-        WHERE bundle_day_id = ANY($1)
-        ORDER BY bundle_day_id, order_index ASC`, dayIDs)
+        SELECT s.id, s.bundle_day_id, s.order_index, s.poi_id, s.name, s.category, s.description,
+               s.latitude, s.longitude, s.address, s.website, s.booking_url, s.image_url,
+               s.notes, s.start_minute, s.duration_minutes,
+               img.url, img.source, img.licence, img.attribution, img.source_page_url
+        FROM bundle_stops s
+        LEFT JOIN LATERAL (
+            SELECT pi.url, pi.source, pi.licence, pi.attribution, pi.source_page_url
+            FROM poi_images pi
+            WHERE pi.poi_id = s.poi_id
+            ORDER BY pi.position, pi.fetched_at
+            LIMIT 1
+        ) img ON TRUE
+        WHERE s.bundle_day_id = ANY($1)
+        ORDER BY s.bundle_day_id, s.order_index ASC`, dayIDs)
 	if err != nil {
 		return nil, fmt.Errorf("load bundle stops: %w", err)
 	}
@@ -353,12 +380,20 @@ func (r *RepositoryImpl) LoadDays(ctx context.Context, bundleID uuid.UUID, maxDa
 
 	for stopRows.Next() {
 		var s Stop
+		var imgURL, imgSource, imgLicence, imgAttribution, imgPage *string
 		if err := stopRows.Scan(
 			&s.ID, &s.DayID, &s.OrderIndex, &s.POIID, &s.Name, &s.Category,
 			&s.Description, &s.Latitude, &s.Longitude, &s.Address, &s.Website,
 			&s.BookingURL, &s.ImageURL, &s.Notes, &s.StartMinute, &s.DurationMinutes,
+			&imgURL, &imgSource, &imgLicence, &imgAttribution, &imgPage,
 		); err != nil {
 			return nil, fmt.Errorf("scan bundle stop: %w", err)
+		}
+		if imgURL != nil && imgLicence != nil && imgAttribution != nil {
+			s.Image = &StopImage{
+				URL: *imgURL, Licence: *imgLicence, Attribution: *imgAttribution,
+				Source: derefString(imgSource), SourcePageURL: derefString(imgPage),
+			}
 		}
 		if i, ok := index[s.DayID]; ok {
 			days[i].Stops = append(days[i].Stops, s)
@@ -533,4 +568,11 @@ func (r *RepositoryImpl) MarkRefunded(ctx context.Context, paymentIntentID strin
 		return fmt.Errorf("mark bundle purchase refunded: %w", err)
 	}
 	return nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }

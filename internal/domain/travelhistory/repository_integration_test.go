@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
+	travelhistoryv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 func newTestRepo(t *testing.T, now time.Time) (*repository, *pgxpool.Pool) {
@@ -125,4 +128,29 @@ func TestGlobeData_ArcsCarryLegIDAndDuration(t *testing.T) {
 	p := arcToProto(arcs[0])
 	assert.Equal(t, legID.String(), p.GetId())
 	assert.EqualValues(t, 170, p.GetDurationMins())
+}
+
+// Both RPCs that carry a TravelSummary say the period counts are real, so a
+// traveller with nothing this period but something last period reads as a
+// drop (0 vs 1), not as the all-time fallback's fake rise.
+func TestHandler_SummariesSetHasPeriodCounts(t *testing.T) {
+	now := time.Now()
+	repo, pool := newTestRepo(t, now)
+	user := seedTraveller(t, pool)
+	seedCityVisit(t, pool, user, "Porto", "Portugal", now.AddDate(0, 0, -150))
+
+	h := NewHandler(repo, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx := context.WithValue(context.Background(), interceptors.UserIDKey, user.String())
+
+	globe, err := h.GetGlobeData(ctx, connect.NewRequest(&travelhistoryv1.GetGlobeDataRequest{PeriodDays: 100}))
+	require.NoError(t, err)
+	gs := globe.Msg.GetSummary()
+	assert.True(t, gs.GetHasPeriodCounts())
+	assert.EqualValues(t, 0, gs.GetCitiesVisitedThisPeriod())
+	assert.EqualValues(t, 1, gs.GetCitiesVisitedPrevPeriod())
+
+	summary, err := h.GetTravelSummary(ctx, connect.NewRequest(&travelhistoryv1.GetTravelSummaryRequest{PeriodDays: 100}))
+	require.NoError(t, err)
+	assert.True(t, summary.Msg.GetSummary().GetHasPeriodCounts())
+	assert.EqualValues(t, 0, summary.Msg.GetSummary().GetCitiesVisitedThisPeriod())
 }

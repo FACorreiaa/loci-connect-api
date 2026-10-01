@@ -322,6 +322,25 @@ func TestSummaryToProtoCarriesPrevPeriod(t *testing.T) {
 	}
 }
 
+// A quiet period after a busy one used to be indistinguishable from an old
+// server that never sent *_this_period, so clients fell back to all-time math
+// and drew an up arrow. has_period_counts says the zero is real.
+func TestSummaryToProtoMarksPeriodCountsAsReal(t *testing.T) {
+	got := summaryToProto(&Summary{
+		CitiesVisited: 4, PeriodDays: 365,
+		CitiesVisitedPrev: 3, CountriesVisitedPrev: 1, POIsVisitedPrev: 8,
+	})
+	if !got.GetHasPeriodCounts() {
+		t.Fatal("HasPeriodCounts = false, want true on every summary this server sends")
+	}
+	if got.GetCitiesVisitedThisPeriod() != 0 || got.GetCitiesVisitedPrevPeriod() != 3 {
+		t.Errorf("this=%d prev=%d, want 0 and 3", got.GetCitiesVisitedThisPeriod(), got.GetCitiesVisitedPrevPeriod())
+	}
+	if !summaryToProto(&Summary{}).GetHasPeriodCounts() {
+		t.Error("an empty history still has real (zero) period counts")
+	}
+}
+
 func TestVisitInputFromProto(t *testing.T) {
 	cityID, tripID := uuid.New(), uuid.New()
 	at := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)

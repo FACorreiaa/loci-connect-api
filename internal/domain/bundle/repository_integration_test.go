@@ -308,3 +308,69 @@ func TestCreateDraft_IsAllOrNothing(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, exists, "the failed draft must have rolled back entirely")
 }
+
+// Pack stops used to carry no picture, so every card fell back to a gradient.
+// A stop linked to a POI takes that POI's first stored image (lowest position)
+// with its credit; an unlinked stop, or a POI with no image, has none.
+func TestLoadDays_StopsCarryTheLinkedPOIImage(t *testing.T) {
+	var cityID uuid.UUID
+	require.NoError(t, testDB.QueryRow(ctx(), `
+        INSERT INTO cities (name, country) VALUES ($1, 'Portugal') RETURNING id`,
+		"PackImageCity-"+uuid.NewString()[:8]).Scan(&cityID))
+	newPOI := func(name string) uuid.UUID {
+		var id uuid.UUID
+		require.NoError(t, testDB.QueryRow(ctx(), `
+            INSERT INTO points_of_interest (name, location, city_id)
+            VALUES ($1, ST_SetSRID(ST_MakePoint(-9.14, 38.72), 4326), $2) RETURNING id`,
+			name, cityID).Scan(&id))
+		return id
+	}
+	pictured, bare := newPOI("Belém Tower"), newPOI("Bare place")
+	_, err := testDB.Exec(ctx(), `
+        INSERT INTO poi_images (poi_id, url, source, licence, attribution, source_page_url, position) VALUES
+        ($1, 'https://upload.test/second.jpg', 'wikimedia', 'CC BY-SA 4.0', 'B. Author', '', 1),
+        ($1, 'https://upload.test/first.jpg', 'wikimedia', 'CC BY 2.0', 'A. Author', 'https://commons.test/File:first.jpg', 0)`,
+		pictured)
+	require.NoError(t, err)
+
+	id := seedBundle(t, "img-"+uuid.NewString()[:8], false, StatusPublished, 1)
+	var dayID uuid.UUID
+	require.NoError(t, testDB.QueryRow(ctx(),
+		"SELECT id FROM bundle_days WHERE bundle_id = $1", id).Scan(&dayID))
+	_, err = testDB.Exec(ctx(), `
+        INSERT INTO bundle_stops (bundle_day_id, order_index, poi_id, name, latitude, longitude) VALUES
+        ($1, 5, $2, 'Belém Tower', 38.69, -9.21),
+        ($1, 6, $3, 'Bare place', 38.70, -9.20)`, dayID, pictured, bare)
+	require.NoError(t, err)
+
+	days, err := testRepo.LoadDays(ctx(), id, 0)
+	require.NoError(t, err)
+	require.Len(t, days, 1)
+	byName := map[string]Stop{}
+	for _, s := range days[0].Stops {
+		byName[s.Name] = s
+	}
+	require.Len(t, byName, 4, "the lateral join must not duplicate stops")
+
+	img := byName["Belém Tower"].Image
+	require.NotNil(t, img)
+	assert.Equal(t, "https://upload.test/first.jpg", img.URL, "lowest position wins")
+	assert.Equal(t, "CC BY 2.0", img.Licence)
+	assert.Equal(t, "A. Author", img.Attribution)
+	assert.Equal(t, "wikimedia", img.Source)
+	assert.Equal(t, "https://commons.test/File:first.jpg", img.SourcePageURL)
+
+	assert.Nil(t, byName["Bare place"].Image, "a POI with no stored image")
+	assert.Nil(t, byName["day1-stop0"].Image, "a stop with no POI link")
+
+	// And it reaches the wire on the stop and on the hydrated POI.
+	pb := toDayPB(days[0])
+	for _, s := range pb.GetStops() {
+		if s.GetName() == "Belém Tower" {
+			assert.Equal(t, "https://upload.test/first.jpg", s.GetImage().GetUrl())
+			assert.Equal(t, "A. Author", s.GetPoi().GetImageCredits()[0].GetAttribution())
+		} else {
+			assert.Nil(t, s.GetImage(), s.GetName())
+		}
+	}
+}

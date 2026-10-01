@@ -159,6 +159,10 @@ func summaryToProto(s *Summary) *travelhistoryv1.TravelSummary {
 		CitiesVisitedThisPeriod:    s.CitiesVisitedThisPeriod,
 		CountriesVisitedThisPeriod: s.CountriesVisitedThisPeriod,
 		PoisVisitedThisPeriod:      s.POIsVisitedThisPeriod,
+		// The windowed counts above are always computed, so a zero in them is
+		// a real zero. Saying so stops clients falling back to all-time math,
+		// which showed a fake up arrow for a quiet period after a busy one.
+		HasPeriodCounts: true,
 	}
 }
 

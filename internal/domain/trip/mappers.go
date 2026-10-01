@@ -216,10 +216,12 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 }
 
 // legFromProto / legToProto convert travel between cities. The proto id is
-// ignored on the way in: legs are replace-all on save, so the database assigns
-// identity.
+// carried in so SaveTrip can keep it (it is honoured only when the trip owned
+// it); an id that does not parse is treated as absent.
 func legFromProto(pl *tripv1.TripLeg) TripLeg {
+	id, _ := uuid.Parse(pl.GetId())
 	l := TripLeg{
+		ID:           id,
 		AfterDay:     pl.GetAfterDay(),
 		FromName:     pl.GetFromName(),
 		ToName:       pl.GetToName(),

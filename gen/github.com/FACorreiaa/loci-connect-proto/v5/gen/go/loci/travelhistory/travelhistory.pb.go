@@ -367,8 +367,18 @@ type TravelSummary struct {
 	CitiesVisitedThisPeriod    int32 `protobuf:"varint,12,opt,name=cities_visited_this_period,json=citiesVisitedThisPeriod,proto3" json:"cities_visited_this_period,omitempty"`
 	CountriesVisitedThisPeriod int32 `protobuf:"varint,13,opt,name=countries_visited_this_period,json=countriesVisitedThisPeriod,proto3" json:"countries_visited_this_period,omitempty"`
 	PoisVisitedThisPeriod      int32 `protobuf:"varint,14,opt,name=pois_visited_this_period,json=poisVisitedThisPeriod,proto3" json:"pois_visited_this_period,omitempty"`
-	unknownFields              protoimpl.UnknownFields
-	sizeCache                  protoimpl.SizeCache
+	// True when the *_this_period and *_prev_period fields above are the real
+	// windowed counts, so a zero in them means "nothing in this window" and can
+	// be trusted. Every server that sets this sends it as true.
+	//
+	// False only from servers that predate it. Those may have sent zero
+	// *_this_period fields because the field did not exist yet, which is why
+	// clients fell back to all-time-minus-previous math on zero; that fallback
+	// turns "no activity this period, some last period" into a fake up arrow.
+	// When this is true, use *_this_period as sent and never fall back.
+	HasPeriodCounts bool `protobuf:"varint,15,opt,name=has_period_counts,json=hasPeriodCounts,proto3" json:"has_period_counts,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *TravelSummary) Reset() {
@@ -499,6 +509,13 @@ func (x *TravelSummary) GetPoisVisitedThisPeriod() int32 {
 	return 0
 }
 
+func (x *TravelSummary) GetHasPeriodCounts() bool {
+	if x != nil {
+		return x.HasPeriodCounts
+	}
+	return false
+}
+
 // GlobeArc is one leg between two placed points, ready to draw as a great
 // circle. Sourced from real TripLeg rows — never synthesised between cities
 // that merely appear in the same trip.
@@ -516,8 +533,11 @@ type GlobeArc struct {
 	// when the trip did not record one.
 	Mode       string                 `protobuf:"bytes,9,opt,name=mode,proto3" json:"mode,omitempty"`
 	OccurredAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
-	// The trip_legs row id. Stable across reads; it changes only when the trip
-	// is saved again, because SaveTrip rewrites a trip's legs.
+	// The trip_legs row id. Stable across reads and across saves: SaveTrip keeps
+	// a leg's id when the client sends it back, or when the saved leg is on the
+	// same hop (after_day, from and to) as an existing one. Only a leg that is
+	// removed from the trip, or a brand-new hop, has a new id. Servers before
+	// this guarantee issued new ids on every save.
 	Id string `protobuf:"bytes,11,opt,name=id,proto3" json:"id,omitempty"`
 	// Travel time recorded on the leg, in minutes. Zero when unknown.
 	DurationMins  int32 `protobuf:"varint,12,opt,name=duration_mins,json=durationMins,proto3" json:"duration_mins,omitempty"`
@@ -1341,7 +1361,7 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"visited_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tvisitedAtB\v\n" +
 	"\t_latitudeB\f\n" +
 	"\n" +
-	"_longitude\"\xe5\x05\n" +
+	"_longitude\"\x91\x06\n" +
 	"\rTravelSummary\x12%\n" +
 	"\x0ecities_visited\x18\x01 \x01(\x05R\rcitiesVisited\x12+\n" +
 	"\x11countries_visited\x18\x02 \x01(\x05R\x10countriesVisited\x12!\n" +
@@ -1359,7 +1379,8 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"periodDays\x12;\n" +
 	"\x1acities_visited_this_period\x18\f \x01(\x05R\x17citiesVisitedThisPeriod\x12A\n" +
 	"\x1dcountries_visited_this_period\x18\r \x01(\x05R\x1acountriesVisitedThisPeriod\x127\n" +
-	"\x18pois_visited_this_period\x18\x0e \x01(\x05R\x15poisVisitedThisPeriod\"\xfe\x03\n" +
+	"\x18pois_visited_this_period\x18\x0e \x01(\x05R\x15poisVisitedThisPeriod\x12*\n" +
+	"\x11has_period_counts\x18\x0f \x01(\bR\x0fhasPeriodCounts\"\xfe\x03\n" +
 	"\bGlobeArc\x12%\n" +
 	"\tfrom_name\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bfromName\x12!\n" +
 	"\ato_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x06toName\x122\n" +

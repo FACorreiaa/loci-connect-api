@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -277,12 +278,21 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		return nil, err
 	}
 
-	// Legs, replace-all like days for the same reason: trip-sized data, and a
-	// partial update is not worth the bookkeeping.
+	// Legs, replace-all like days, and with ids kept the same way: the globe
+	// draws each leg as an arc keyed by GlobeArc.id, so a leg that survives an
+	// edit must survive it under the same id. A leg the client sends back with
+	// an id this trip owned keeps it; a leg sent without one (clients that
+	// predate stable leg ids, or the multi-city planner rebuilding the route)
+	// takes the id of the old leg on the same hop, after_day + from + to. Only
+	// legs that are gone lose their ids.
+	oldLegs, err := existingLegs(ctx, tx, t.ID)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_legs WHERE trip_id = $1`, t.ID); err != nil {
 		return nil, fmt.Errorf("clear legs: %w", err)
 	}
-	if err := insertLegs(ctx, tx, t); err != nil {
+	if err := insertLegs(ctx, tx, t, assignLegIDs(t.Legs, oldLegs)); err != nil {
 		return nil, err
 	}
 
@@ -447,20 +457,97 @@ func insertDays(ctx context.Context, tx pgx.Tx, t *Trip, owned map[uuid.UUID]boo
 	return nil
 }
 
-// insertLegs writes a trip's legs in one batched round trip, assigning the
-// returned ids back onto t in place.
-func insertLegs(ctx context.Context, tx pgx.Tx, t *Trip) error {
+// legKey identifies a hop for matching a re-sent leg to the one it replaces
+// when the client did not send the id back.
+type legKey struct {
+	afterDay int32
+	from, to string
+}
+
+func keyOfLeg(l TripLeg) legKey {
+	return legKey{afterDay: l.AfterDay, from: strings.ToLower(strings.TrimSpace(l.FromName)), to: strings.ToLower(strings.TrimSpace(l.ToName))}
+}
+
+// existingLegs is the trip's legs as they stand before a save: id and hop.
+// Empty for a new trip.
+func existingLegs(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) ([]TripLeg, error) {
+	if tripID == uuid.Nil {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT id, after_day, from_name, to_name FROM trip_legs
+		WHERE trip_id = $1 ORDER BY after_day, created_at, id`, tripID)
+	if err != nil {
+		return nil, fmt.Errorf("existing legs: %w", err)
+	}
+	defer rows.Close()
+	var out []TripLeg
+	for rows.Next() {
+		var l TripLeg
+		if err := rows.Scan(&l.ID, &l.AfterDay, &l.FromName, &l.ToName); err != nil {
+			return nil, fmt.Errorf("existing legs: %w", err)
+		}
+		out = append(out, l)
+	}
+	return out, rows.Err()
+}
+
+// assignLegIDs decides the id each incoming leg is written under, by index;
+// nil means a fresh one. An id the client sent back wins when this trip owned
+// it; otherwise the first unclaimed old leg on the same hop lends its id. No
+// id is handed out twice, so duplicate or replayed ids cannot collide on the
+// primary key, and an id from another trip is never honoured.
+func assignLegIDs(incoming, old []TripLeg) []*uuid.UUID {
+	out := make([]*uuid.UUID, len(incoming))
+	owned := make(map[uuid.UUID]bool, len(old))
+	for _, l := range old {
+		owned[l.ID] = true
+	}
+	claimed := map[uuid.UUID]bool{}
+	// Explicit ids first, so a hop match cannot steal an id a later leg sends.
+	for i, l := range incoming {
+		if l.ID != uuid.Nil && owned[l.ID] && !claimed[l.ID] {
+			id := l.ID
+			out[i] = &id
+			claimed[id] = true
+		}
+	}
+	for i, l := range incoming {
+		if out[i] != nil {
+			continue
+		}
+		k := keyOfLeg(l)
+		for _, o := range old {
+			if !claimed[o.ID] && keyOfLeg(o) == k {
+				id := o.ID
+				out[i] = &id
+				claimed[id] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+// insertLegs writes a trip's legs in one batched round trip, each under the
+// id ids gives it (nil: the database picks), assigning the stored ids back
+// onto t in place.
+func insertLegs(ctx context.Context, tx pgx.Tx, t *Trip, ids []*uuid.UUID) error {
 	if len(t.Legs) == 0 {
 		return nil
 	}
 	legs := &pgx.Batch{}
 	for li := range t.Legs {
 		leg := &t.Legs[li]
+		var id *uuid.UUID
+		if li < len(ids) {
+			id = ids[li]
+		}
 		legs.Queue(`
-			INSERT INTO trip_legs (trip_id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
+			INSERT INTO trip_legs (id, trip_id, after_day, from_name, to_name, from_lat, from_lon, to_lat, to_lon,
 				distance_km, duration_mins, mode, booking_url)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
-			t.ID, leg.AfterDay, leg.FromName, leg.ToName, leg.FromLat, leg.FromLon, leg.ToLat, leg.ToLon,
+			VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+			id, t.ID, leg.AfterDay, leg.FromName, leg.ToName, leg.FromLat, leg.FromLon, leg.ToLat, leg.ToLon,
 			leg.DistanceKm, leg.DurationMins, leg.Mode, leg.BookingURL)
 	}
 	br := tx.SendBatch(ctx, legs)
