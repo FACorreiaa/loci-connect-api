@@ -31,7 +31,15 @@ func (m *memTrips) ListTrips(context.Context, uuid.UUID, int, int) ([]*Trip, int
 	return nil, 0, nil
 }
 
-func (m *memTrips) SaveTrip(context.Context, *Trip, int64) (*Trip, error) { panic("not used") }
+func (m *memTrips) SaveTrip(_ context.Context, t *Trip, base int64) (*Trip, error) {
+	if m.trip.Version != base {
+		return nil, ErrVersionConflict
+	}
+	m.saves++
+	t.Version = base + 1
+	m.trip = t
+	return t, nil
+}
 
 func (m *memTrips) SetShare(context.Context, uuid.UUID, uuid.UUID, bool, string) (*Trip, error) {
 	panic("not used")
@@ -119,4 +127,35 @@ func TestService_FlightLinksRejectsWhatTheProtoWould(t *testing.T) {
 	links, err := svc.FlightLinks(flights.Query{Origin: flights.Place{Name: "NYC"}, Destination: flights.Place{Name: "Lisbon"}, Depart: day("2026-11-12")})
 	require.NoError(t, err)
 	require.NotEmpty(t, links)
+}
+
+func TestService_ReplaceDaysRenumbersAndDatesFromStart(t *testing.T) {
+	svc, mem, uid, tid := newServiceFixture()
+	start, end := day("2026-11-12"), day("2026-11-17")
+	mem.trip.StartDate, mem.trip.EndDate = &start, &end
+	mem.trip.Stays = []TripStay{{CityName: "Lisbon", Name: "Hotel Avenida"}}
+	oldID := uuid.New()
+	got, err := svc.ReplaceDays(context.Background(), uid, tid, 3, []TripDay{
+		{ID: oldID, DayNumber: 7, Stops: []TripStop{{ID: uuid.New(), Name: "Belém"}}},
+		{DayNumber: 9},
+		{DayNumber: 2},
+	})
+	require.NoError(t, err)
+	require.Len(t, got.Days, 3)
+	for i, d := range got.Days {
+		require.EqualValues(t, i+1, d.DayNumber)
+		require.Equal(t, start.AddDate(0, 0, i), *d.Date)
+	}
+	require.Equal(t, uuid.Nil, got.Days[0].ID, "a re-plan's days are new days")
+	require.Equal(t, uuid.Nil, got.Days[0].Stops[0].ID)
+	require.Len(t, got.Stays, 1, "stays survive a re-plan")
+}
+
+func TestService_ReplaceDaysRejects(t *testing.T) {
+	svc, mem, uid, tid := newServiceFixture()
+	_, err := svc.ReplaceDays(context.Background(), uid, tid, 2, []TripDay{{}})
+	require.ErrorIs(t, err, ErrVersionConflict)
+	_, err = svc.ReplaceDays(context.Background(), uid, tid, 3, nil)
+	require.ErrorIs(t, err, ErrInvalidEdit)
+	require.Zero(t, mem.saves)
 }

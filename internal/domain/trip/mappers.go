@@ -490,3 +490,11 @@ func icsEscape(s string) string {
 	r := strings.NewReplacer("\\", "\\\\", ";", "\\;", ",", "\\,", "\n", "\\n")
 	return r.Replace(s)
 }
+
+// ToProto, StayToProto and FlightToProto are the wire forms other domains
+// (the chat agent's proposals) return; the trip handler keeps using its own.
+func ToProto(t *Trip) *tripv1.TripDraft { return tripToProto(t) }
+
+func StayToProto(s TripStay) *tripv1.TripStay { return stayToProto(s) }
+
+func FlightToProto(f TripFlight) *tripv1.TripFlight { return flightToProto(f) }
