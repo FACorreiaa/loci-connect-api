@@ -114,8 +114,11 @@ type ServiceImpl struct {
 	poiSvc    poi.Service // POI service for nearby queries with cache + DB + LLM fallback
 	listSvc   itinerarylist.Service
 	tripRepo  trip.Repository // auto-persist generated itineraries as editable trips
-	cache     cachestore.Store
-	model     string
+	// Optional, attached with SetTripActions: turns bound to a trip propose
+	// changes to it (dates, hotels, re-plan, flights) instead of regenerating.
+	tripActions TripActionProposer
+	cache       cachestore.Store
+	model       string
 	// provider is the configured upstream, used to attribute an interaction
 	// whose model id does not name its vendor.
 	provider    string

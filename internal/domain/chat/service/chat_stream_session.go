@@ -665,6 +665,16 @@ func (l *ServiceImpl) handleSemanticAddPOIStreamed(ctx context.Context, message 
 // answered by running the single-city pipeline once per city; anything else
 // is exactly the single-city turn it always was.
 func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) error {
+	// A turn bound to a trip (ChatRequest.trip_id) is about that trip. When it
+	// asks for changes they are proposed, not regenerated; otherwise it is
+	// answered as usual, but never saved as a new trip, since the traveller
+	// is editing one.
+	if cc.TripID != uuid.Nil && l.tripActions != nil {
+		if l.proposeTripActions(cc) {
+			return nil
+		}
+		cc.SuppressTripSave = true
+	}
 	if !cc.StopRun {
 		route, err := l.planMultiCity(&cc)
 		if err != nil {
