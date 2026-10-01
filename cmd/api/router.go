@@ -18,6 +18,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/calendar/calendarv1connect"
 
 	authhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/boards/v1/boardsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/city/cityconnect"
@@ -116,6 +117,13 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		tripconnect.TripServiceListUserTripsProcedure,
 		socialconnect.SocialServiceGetInviteProcedure,
 		socialconnect.SocialServiceGetPublicProfileProcedure,
+		// Boards are readable signed out; a present token adds my_vote and
+		// admin controls. Writes refuse anonymous callers in the service.
+		boardsv1connect.BoardsServiceListBoardsProcedure,
+		boardsv1connect.BoardsServiceGetBoardProcedure,
+		boardsv1connect.BoardsServiceListPostsProcedure,
+		boardsv1connect.BoardsServiceGetPostProcedure,
+		boardsv1connect.BoardsServiceGetBoardsViewerProcedure,
 	}
 
 	tracer := otel.GetTracerProvider().Tracer("loci/api")
@@ -437,6 +445,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		socialPath, socialHandler := socialconnect.NewSocialServiceHandler(deps.SocialHandler, opts)
 		mux.Handle(socialPath, socialHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", socialPath)
+	}
+
+	if deps.BoardsHandler != nil {
+		boardsPath, boardsHandler := boardsv1connect.NewBoardsServiceHandler(deps.BoardsHandler, opts)
+		mux.Handle(boardsPath, boardsHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", boardsPath)
 	}
 
 	if deps.TripHandler != nil {
