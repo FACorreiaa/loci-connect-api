@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,8 +34,6 @@ func newTripUser(t *testing.T, email string) uuid.UUID {
 	return id
 }
 
-func f64(v float64) *float64 { return &v }
-
 // A multi-city trip has to survive the round trip through the database: which
 // city each day is spent in, and the travel between them. Before this, a trip
 // was single-city by construction and "do both" could only be notes in a stop.
@@ -56,8 +55,8 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 				DayNumber: 1,
 				Date:      &start,
 				CityName:  "Évora",
-				CityLat:   f64(38.5714),
-				CityLon:   f64(-7.9135),
+				CityLat:   util.Ptr(38.5714),
+				CityLon:   util.Ptr(-7.9135),
 				TravelDay: true,
 				Stops:     []TripStop{{Name: "Roman Temple", OrderIndex: 0}},
 			},
@@ -65,8 +64,8 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 				DayNumber: 2,
 				Date:      &day2Date,
 				CityName:  "Beja",
-				CityLat:   f64(38.0153),
-				CityLon:   f64(-7.8624),
+				CityLat:   util.Ptr(38.0153),
+				CityLon:   util.Ptr(-7.8624),
 				TravelDay: true,
 				Stops:     []TripStop{{Name: "Beja Castle", OrderIndex: 0}},
 			},
@@ -74,14 +73,14 @@ func TestRepository_MultiCityTripRoundTrip(t *testing.T) {
 		Legs: []TripLeg{
 			{
 				AfterDay: 0, FromName: "Porto", ToName: "Évora",
-				FromLat: f64(41.15), FromLon: f64(-8.61),
-				ToLat: f64(38.5714), ToLon: f64(-7.9135),
+				FromLat: util.Ptr(41.15), FromLon: util.Ptr(-8.61),
+				ToLat: util.Ptr(38.5714), ToLon: util.Ptr(-7.9135),
 				DistanceKm: 290, DurationMins: 217, Mode: "drive",
 			},
 			{
 				AfterDay: 1, FromName: "Évora", ToName: "Beja",
-				FromLat: f64(38.5714), FromLon: f64(-7.9135),
-				ToLat: f64(38.0153), ToLon: f64(-7.8624),
+				FromLat: util.Ptr(38.5714), FromLon: util.Ptr(-7.9135),
+				ToLat: util.Ptr(38.0153), ToLon: util.Ptr(-7.8624),
 				DistanceKm: 62, DurationMins: 46, Mode: "drive",
 			},
 		},

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -429,12 +430,8 @@ func (r *PostgresAuthRepository) DeleteOtherUserSessions(ctx context.Context, us
 
 // SetPendingEmail stages an email change. An empty address clears it.
 func (r *PostgresAuthRepository) SetPendingEmail(ctx context.Context, userID uuid.UUID, email string) error {
-	var pending *string
-	if email != "" {
-		pending = &email
-	}
 	query := `UPDATE users SET pending_email = $1, updated_at = $2 WHERE id = $3`
-	_, err := r.pgpool.Exec(ctx, query, pending, time.Now(), userID)
+	_, err := r.pgpool.Exec(ctx, query, util.StrZeroPtr(email), time.Now(), userID)
 	return err
 }
 

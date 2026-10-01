@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -41,11 +42,9 @@ func TestEventWeight(t *testing.T) {
 	}))
 	assert.Equal(t, float32(0.8), eventWeight(&recommendationv1.RecommendationEvent{
 		EventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED,
-		Rating:    int32Pointer(4),
+		Rating:    util.Ptr[int32](4),
 	}))
 }
-
-func int32Pointer(value int32) *int32 { return &value }
 
 func TestValidateTrace(t *testing.T) {
 	t.Parallel()

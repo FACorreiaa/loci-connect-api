@@ -68,6 +68,12 @@ const (
 	// ReviewServiceGetRecentReviewsProcedure is the fully-qualified name of the ReviewService's
 	// GetRecentReviews RPC.
 	ReviewServiceGetRecentReviewsProcedure = "/loci.review.ReviewService/GetRecentReviews"
+	// ReviewServiceListReportedReviewsProcedure is the fully-qualified name of the ReviewService's
+	// ListReportedReviews RPC.
+	ReviewServiceListReportedReviewsProcedure = "/loci.review.ReviewService/ListReportedReviews"
+	// ReviewServiceResolveReviewReportProcedure is the fully-qualified name of the ReviewService's
+	// ResolveReviewReport RPC.
+	ReviewServiceResolveReviewReportProcedure = "/loci.review.ReviewService/ResolveReviewReport"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -85,6 +91,8 @@ var (
 	reviewServiceGetMyPOIReviewMethodDescriptor      = reviewServiceServiceDescriptor.Methods().ByName("GetMyPOIReview")
 	reviewServiceGetReviewStatisticsMethodDescriptor = reviewServiceServiceDescriptor.Methods().ByName("GetReviewStatistics")
 	reviewServiceGetRecentReviewsMethodDescriptor    = reviewServiceServiceDescriptor.Methods().ByName("GetRecentReviews")
+	reviewServiceListReportedReviewsMethodDescriptor = reviewServiceServiceDescriptor.Methods().ByName("ListReportedReviews")
+	reviewServiceResolveReviewReportMethodDescriptor = reviewServiceServiceDescriptor.Methods().ByName("ResolveReviewReport")
 )
 
 // ReviewServiceClient is a client for the loci.review.ReviewService service.
@@ -115,6 +123,14 @@ type ReviewServiceClient interface {
 	GetReviewStatistics(context.Context, *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error)
 	// Get the most recent reviews across all content (global feed)
 	GetRecentReviews(context.Context, *connect.Request[review.GetRecentReviewsRequest]) (*connect.Response[review.GetRecentReviewsResponse], error)
+	// Admin only: reviews with open reports (reports made since the review was
+	// last moderated), most-reported first, with their report counts and
+	// reasons. PermissionDenied for everyone but admins.
+	ListReportedReviews(context.Context, *connect.Request[review.ListReportedReviewsRequest]) (*connect.Response[review.ListReportedReviewsResponse], error)
+	// Admin only: settle a review's open reports. KEEP closes them and leaves
+	// the review public (later reports open a new round); REMOVE takes the
+	// review out of every public read for good. The author still sees it.
+	ResolveReviewReport(context.Context, *connect.Request[review.ResolveReviewReportRequest]) (*connect.Response[review.ResolveReviewReportResponse], error)
 }
 
 // NewReviewServiceClient constructs a client for the loci.review.ReviewService service. By default,
@@ -199,6 +215,18 @@ func NewReviewServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(reviewServiceGetRecentReviewsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listReportedReviews: connect.NewClient[review.ListReportedReviewsRequest, review.ListReportedReviewsResponse](
+			httpClient,
+			baseURL+ReviewServiceListReportedReviewsProcedure,
+			connect.WithSchema(reviewServiceListReportedReviewsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		resolveReviewReport: connect.NewClient[review.ResolveReviewReportRequest, review.ResolveReviewReportResponse](
+			httpClient,
+			baseURL+ReviewServiceResolveReviewReportProcedure,
+			connect.WithSchema(reviewServiceResolveReviewReportMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -216,6 +244,8 @@ type reviewServiceClient struct {
 	getMyPOIReview      *connect.Client[review.GetMyPOIReviewRequest, review.GetMyPOIReviewResponse]
 	getReviewStatistics *connect.Client[review.GetReviewStatisticsRequest, review.GetReviewStatisticsResponse]
 	getRecentReviews    *connect.Client[review.GetRecentReviewsRequest, review.GetRecentReviewsResponse]
+	listReportedReviews *connect.Client[review.ListReportedReviewsRequest, review.ListReportedReviewsResponse]
+	resolveReviewReport *connect.Client[review.ResolveReviewReportRequest, review.ResolveReviewReportResponse]
 }
 
 // CreateReview calls loci.review.ReviewService.CreateReview.
@@ -278,6 +308,16 @@ func (c *reviewServiceClient) GetRecentReviews(ctx context.Context, req *connect
 	return c.getRecentReviews.CallUnary(ctx, req)
 }
 
+// ListReportedReviews calls loci.review.ReviewService.ListReportedReviews.
+func (c *reviewServiceClient) ListReportedReviews(ctx context.Context, req *connect.Request[review.ListReportedReviewsRequest]) (*connect.Response[review.ListReportedReviewsResponse], error) {
+	return c.listReportedReviews.CallUnary(ctx, req)
+}
+
+// ResolveReviewReport calls loci.review.ReviewService.ResolveReviewReport.
+func (c *reviewServiceClient) ResolveReviewReport(ctx context.Context, req *connect.Request[review.ResolveReviewReportRequest]) (*connect.Response[review.ResolveReviewReportResponse], error) {
+	return c.resolveReviewReport.CallUnary(ctx, req)
+}
+
 // ReviewServiceHandler is an implementation of the loci.review.ReviewService service.
 type ReviewServiceHandler interface {
 	// Create a new review
@@ -306,6 +346,14 @@ type ReviewServiceHandler interface {
 	GetReviewStatistics(context.Context, *connect.Request[review.GetReviewStatisticsRequest]) (*connect.Response[review.GetReviewStatisticsResponse], error)
 	// Get the most recent reviews across all content (global feed)
 	GetRecentReviews(context.Context, *connect.Request[review.GetRecentReviewsRequest]) (*connect.Response[review.GetRecentReviewsResponse], error)
+	// Admin only: reviews with open reports (reports made since the review was
+	// last moderated), most-reported first, with their report counts and
+	// reasons. PermissionDenied for everyone but admins.
+	ListReportedReviews(context.Context, *connect.Request[review.ListReportedReviewsRequest]) (*connect.Response[review.ListReportedReviewsResponse], error)
+	// Admin only: settle a review's open reports. KEEP closes them and leaves
+	// the review public (later reports open a new round); REMOVE takes the
+	// review out of every public read for good. The author still sees it.
+	ResolveReviewReport(context.Context, *connect.Request[review.ResolveReviewReportRequest]) (*connect.Response[review.ResolveReviewReportResponse], error)
 }
 
 // NewReviewServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -386,6 +434,18 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(reviewServiceGetRecentReviewsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	reviewServiceListReportedReviewsHandler := connect.NewUnaryHandler(
+		ReviewServiceListReportedReviewsProcedure,
+		svc.ListReportedReviews,
+		connect.WithSchema(reviewServiceListReportedReviewsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	reviewServiceResolveReviewReportHandler := connect.NewUnaryHandler(
+		ReviewServiceResolveReviewReportProcedure,
+		svc.ResolveReviewReport,
+		connect.WithSchema(reviewServiceResolveReviewReportMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.review.ReviewService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ReviewServiceCreateReviewProcedure:
@@ -412,6 +472,10 @@ func NewReviewServiceHandler(svc ReviewServiceHandler, opts ...connect.HandlerOp
 			reviewServiceGetReviewStatisticsHandler.ServeHTTP(w, r)
 		case ReviewServiceGetRecentReviewsProcedure:
 			reviewServiceGetRecentReviewsHandler.ServeHTTP(w, r)
+		case ReviewServiceListReportedReviewsProcedure:
+			reviewServiceListReportedReviewsHandler.ServeHTTP(w, r)
+		case ReviewServiceResolveReviewReportProcedure:
+			reviewServiceResolveReviewReportHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -467,4 +531,12 @@ func (UnimplementedReviewServiceHandler) GetReviewStatistics(context.Context, *c
 
 func (UnimplementedReviewServiceHandler) GetRecentReviews(context.Context, *connect.Request[review.GetRecentReviewsRequest]) (*connect.Response[review.GetRecentReviewsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.review.ReviewService.GetRecentReviews is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) ListReportedReviews(context.Context, *connect.Request[review.ListReportedReviewsRequest]) (*connect.Response[review.ListReportedReviewsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.review.ReviewService.ListReportedReviews is not implemented"))
+}
+
+func (UnimplementedReviewServiceHandler) ResolveReviewReport(context.Context, *connect.Request[review.ResolveReviewReportRequest]) (*connect.Response[review.ResolveReviewReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.review.ReviewService.ResolveReviewReport is not implemented"))
 }
