@@ -24,6 +24,7 @@ const (
 	hotelRadiusMeters = 5000
 	maxHotelOptions   = 5
 	sourceLabel       = "Trip planner"
+	giveBackTimeout   = 5 * time.Second
 )
 
 // Trips reads the trip a proposal is about (trip.Repository).
@@ -45,9 +46,11 @@ type Hotels interface {
 	GetNearbyHotels(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, starRating, amenities string) ([]locitypes.POIDetailedInfo, error)
 }
 
-// Regenerator plans n days for a city without saving a trip (the chat service).
+// Regenerator plans n days for a city without saving a trip (the chat
+// service). The generation's session hangs under parentSessionID, so a
+// re-plan never shows up as a search of its own.
 type Regenerator interface {
-	GenerateDays(ctx context.Context, userID uuid.UUID, cityName string, days int) ([]trip.TripDay, error)
+	GenerateDays(ctx context.Context, userID, parentSessionID uuid.UUID, cityName string, days int) ([]trip.TripDay, error)
 }
 
 // Sessions is the chat thread a confirmation is posted into.
@@ -98,6 +101,11 @@ func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UU
 
 	out := make([]Proposal, 0, len(actions))
 	for _, a := range actions {
+		// A multi-city trip cannot be re-planned from chat yet; a card that
+		// could only be refused is not offered.
+		if a.Kind == KindRegenerateDays && len(t.Cities) > 1 {
+			continue
+		}
 		p := Proposal{UserID: userID, TripID: tripID, SessionID: sessionID, Action: a, ExpiresAt: now.Add(proposalTTL)}
 		s.resolve(ctx, userID, &p)
 		if err := s.d.Store.Create(ctx, &p); err != nil {
@@ -278,7 +286,12 @@ func (s *Service) Apply(ctx context.Context, userID, proposalID uuid.UUID, optio
 	}
 	t, err := s.apply(ctx, userID, p, opt, baseVersion)
 	if err != nil {
-		if rerr := s.d.Store.Transition(ctx, p.ID, StatusApplied, StatusPending); rerr != nil {
+		// The likeliest failure is the context itself (the client left, or
+		// the RPC deadline hit mid re-plan), so giving the proposal back
+		// cannot share it: a proposal stuck as applied could never be retried.
+		backCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), giveBackTimeout)
+		defer cancel()
+		if rerr := s.d.Store.Transition(backCtx, p.ID, StatusApplied, StatusPending); rerr != nil {
 			s.d.Logger.WarnContext(ctx, "trip action: could not give a failed proposal back", slog.Any("error", rerr))
 		}
 		return nil, nil, err
@@ -339,13 +352,24 @@ func (s *Service) apply(ctx context.Context, userID uuid.UUID, p *Proposal, opt 
 		if len(t.Cities) > 1 {
 			return nil, fmt.Errorf("%w: re-planning a multi-city trip from chat is not supported yet", trip.ErrInvalidEdit)
 		}
-		days, err := s.d.Regen.GenerateDays(ctx, userID, t.CityName, a.Days)
+		days, err := s.d.Regen.GenerateDays(ctx, userID, parentSession(t, p), t.CityName, a.Days)
 		if err != nil {
 			return nil, fmt.Errorf("re-plan %s: %w", t.CityName, err)
 		}
 		return s.d.Plans.ReplaceDays(ctx, userID, p.TripID, base, days)
 	}
 	return nil, fmt.Errorf("%w: unknown action %q", trip.ErrInvalidEdit, a.Kind)
+}
+
+// parentSession is the thread a re-plan's generation hangs under: the one
+// the trip was generated in, else the one the proposal came from.
+func parentSession(t *trip.Trip, p *Proposal) uuid.UUID {
+	if t.SourceSessionID != nil {
+		if id, err := uuid.Parse(*t.SourceSessionID); err == nil {
+			return id
+		}
+	}
+	return p.SessionID
 }
 
 // confirm builds the thread message for an applied proposal and posts it

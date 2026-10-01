@@ -6,18 +6,20 @@ import (
 	"strings"
 )
 
-// starsOf reads a hotel's star rating as stored: "4", "4.5", "4 stars" or
-// "★★★★". ok is false when it says nothing usable.
+// starsOf reads a hotel's star rating as stored: "4", "4.5", "4 stars",
+// "4★" or "★★★★". A number wins over glyphs ("4★" is four stars, not one);
+// glyphs are counted only when there is no number. ok is false when it says
+// nothing usable.
 func starsOf(s string) (float64, bool) {
-	if n := strings.Count(s, "★"); n > 0 {
-		return float64(n), n <= 5
-	}
 	s = strings.TrimSpace(s)
 	end := 0
 	for end < len(s) && (s[end] >= '0' && s[end] <= '9' || s[end] == '.') {
 		end++
 	}
 	if end == 0 {
+		if n := strings.Count(s, "★"); n > 0 {
+			return float64(n), n <= 5
+		}
 		return 0, false
 	}
 	v, err := strconv.ParseFloat(s[:end], 64)

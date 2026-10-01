@@ -668,14 +668,17 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	// A turn bound to a trip (ChatRequest.trip_id) is about that trip. When it
 	// asks for changes they are proposed, not regenerated; otherwise it is
 	// answered as usual, but never saved as a new trip, since the traveller
-	// is editing one.
-	if cc.TripID != uuid.Nil && l.tripActions != nil {
-		if l.proposeTripActions(cc) {
+	// is editing one. A resumed turn already proposed (its cards stand), and
+	// a bound turn is never planned as a new multi-city trip, which would
+	// save one.
+	bound := cc.TripID != uuid.Nil && l.tripActions != nil
+	if bound {
+		if cc.ResumeToken == "" && l.proposeTripActions(cc) {
 			return nil
 		}
 		cc.SuppressTripSave = true
 	}
-	if !cc.StopRun {
+	if !cc.StopRun && !bound {
 		route, err := l.planMultiCity(&cc)
 		if err != nil {
 			l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeError, Error: err.Error()}, 3)

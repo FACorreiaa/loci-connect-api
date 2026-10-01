@@ -37,7 +37,10 @@ func (m *memStore) Get(_ context.Context, id, userID uuid.UUID) (*Proposal, erro
 	return &cp, nil
 }
 
-func (m *memStore) Transition(_ context.Context, id uuid.UUID, from, to Status) error {
+func (m *memStore) Transition(ctx context.Context, id uuid.UUID, from, to Status) error {
+	if err := ctx.Err(); err != nil {
+		return err // like pgx on a dead context
+	}
 	p, ok := m.byID[id]
 	if !ok || p.Status != from {
 		return ErrNotPending
@@ -109,12 +112,19 @@ func (fakePlaces) Search(context.Context, string, int) ([]geocode.Place, error) 
 }
 
 type fakeRegen struct {
-	calls int
-	err   error
+	calls  int
+	err    error
+	parent uuid.UUID
+	cancel context.CancelFunc
 }
 
-func (f *fakeRegen) GenerateDays(context.Context, uuid.UUID, string, int) ([]trip.TripDay, error) {
+func (f *fakeRegen) GenerateDays(_ context.Context, _, parent uuid.UUID, _ string, _ int) ([]trip.TripDay, error) {
 	f.calls++
+	f.parent = parent
+	if f.cancel != nil {
+		f.cancel() // the client went away mid re-plan
+		return nil, context.Canceled
+	}
 	return []trip.TripDay{{DayNumber: 1}}, f.err
 }
 
@@ -309,10 +319,46 @@ func TestApply_FailureGivesTheProposalBack(t *testing.T) {
 }
 
 func TestApply_MultiCityRePlanIsRefused(t *testing.T) {
-	f := newFixture(t, `{"actions":[{"kind":"regenerate_days","days":4}]}`, nil)
+	f := newFixture(t, `{"actions":[]}`, nil)
 	f.plans.trips.t.Cities = []trip.TripCity{{CityName: "Lisbon"}, {CityName: "Porto"}}
-	ps := proposeAll(t, f)
-	_, _, err := f.svc.Apply(context.Background(), f.uid, ps[0].ID, nil, 3)
+	p := &Proposal{UserID: f.uid, TripID: f.tid, Action: Action{Kind: KindRegenerateDays, Days: 4}, ExpiresAt: f.now.Add(time.Hour)}
+	require.NoError(t, f.store.Create(context.Background(), p))
+	_, _, err := f.svc.Apply(context.Background(), f.uid, p.ID, nil, 3)
 	require.ErrorIs(t, err, trip.ErrInvalidEdit)
 	require.Zero(t, f.regen.calls)
+}
+
+// A multi-city trip is never offered a re-plan card it could only refuse.
+func TestPropose_NoRePlanCardOnAMultiCityTrip(t *testing.T) {
+	f := newFixture(t, `{"actions":[{"kind":"regenerate_days","days":4},{"kind":"set_dates","start_date":"2026-11-12","end_date":"2026-11-15"}]}`, nil)
+	f.plans.trips.t.Cities = []trip.TripCity{{CityName: "Lisbon"}, {CityName: "Porto"}}
+	got, err := f.svc.Propose(context.Background(), f.uid, f.tid, uuid.Nil, "4 days, 12 to 15 Nov")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, KindSetDates, got[0].Action.Kind)
+}
+
+// The client going away mid re-plan (or the RPC deadline) must not strand
+// the proposal as applied: giving it back cannot share the dead context.
+func TestApply_CancelledRePlanGivesTheProposalBack(t *testing.T) {
+	f := newFixture(t, allFour, nil)
+	ps := proposeAll(t, f)
+	ctx, cancel := context.WithCancel(context.Background())
+	f.regen.cancel = cancel
+	_, _, err := f.svc.Apply(ctx, f.uid, ps[2].ID, nil, 3)
+	require.Error(t, err)
+	require.Equal(t, StatusPending, f.store.byID[ps[2].ID].Status)
+}
+
+// A re-plan's generated session hangs under the trip's own thread, so it
+// never shows up as a search of its own in the history.
+func TestApply_RePlanHangsUnderTheTripsSession(t *testing.T) {
+	f := newFixture(t, allFour, nil)
+	src := uuid.New()
+	s := src.String()
+	f.plans.trips.t.SourceSessionID = &s
+	ps := proposeAll(t, f)
+	_, _, err := f.svc.Apply(context.Background(), f.uid, ps[2].ID, nil, 3)
+	require.NoError(t, err)
+	require.Equal(t, src, f.regen.parent)
 }

@@ -81,7 +81,9 @@ func isChatUnaryProcedure(procedure string) bool {
 	return strings.Contains(procedure, "StartChat") ||
 		strings.Contains(procedure, "ContinueChat") ||
 		// A gastronomy cache miss is one full generation.
-		strings.Contains(procedure, "GetCityGastronomy")
+		strings.Contains(procedure, "GetCityGastronomy") ||
+		// A confirmed "re-plan as N days" is one too.
+		strings.Contains(procedure, "ApplyTripAction")
 }
 
 func parseClientTimeout(header http.Header) (time.Duration, bool) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/genai"
@@ -39,12 +40,19 @@ func (a actionLLM) GenerateText(ctx context.Context, prompt string) (string, err
 	return a.l.aiClient.GenerateText(ctx, prompt, &genai.GenerateContentConfig{Temperature: genai.Ptr[float32](0.1)})
 }
 
+// proposeTimeout bounds extraction: a hanging free model must not hold the
+// traveller's answer. Past it the turn is answered as usual. A var so tests
+// can shorten it.
+var proposeTimeout = 20 * time.Second
+
 // proposeTripActions handles a trip-bound turn that asks for changes: one
 // action_proposal event per change, then completion. false means the
 // message asked for none, or extraction failed, and the turn is answered as
 // usual; extraction trouble never costs the traveller their answer.
 func (l *ServiceImpl) proposeTripActions(cc common.ChatContext) bool {
-	props, err := l.tripActions.Propose(cc.Ctx, cc.UserID, cc.TripID, cc.RequestedSessionID, cc.Message)
+	ctx, cancel := context.WithTimeout(cc.Ctx, proposeTimeout)
+	defer cancel()
+	props, err := l.tripActions.Propose(ctx, cc.UserID, cc.TripID, cc.RequestedSessionID, cc.Message)
 	if err != nil {
 		l.logger.WarnContext(cc.Ctx, "trip actions: proposing failed; answering instead", slog.Any("error", err))
 		return false
@@ -66,7 +74,7 @@ func (l *ServiceImpl) proposeTripActions(cc common.ChatContext) bool {
 // GenerateDays plans days for city without saving a trip, for a confirmed
 // "re-plan as N days". It runs the same per-city generation a multi-city stop
 // does (runStop): city preset, trip length preset, no trip save.
-func (l *ServiceImpl) GenerateDays(ctx context.Context, userID uuid.UUID, cityName string, days int) ([]trip.TripDay, error) {
+func (l *ServiceImpl) GenerateDays(ctx context.Context, userID, parentSessionID uuid.UUID, cityName string, days int) ([]trip.TripDay, error) {
 	ch := make(chan locitypes.StreamEvent, 100)
 	drained := make(chan struct{})
 	go func() {
@@ -78,6 +86,9 @@ func (l *ServiceImpl) GenerateDays(ctx context.Context, userID uuid.UUID, cityNa
 		Ctx: ctx, UserID: userID, CityName: cityName,
 		Message: fmt.Sprintf("Plan a %d-day itinerary in %s", days, cityName),
 		EventCh: ch, StopRun: true, PresetTripDays: days, SuppressTripSave: true,
+		// Hidden under the trip's thread, as multi-city stops are, so a
+		// re-plan never shows up as a search of its own.
+		ParentSessionID: parentSessionID,
 	}
 	data, err := l.runCity(cc)
 	close(ch)

@@ -77,7 +77,7 @@ func TestNormalize_UnknownKind(t *testing.T) {
 }
 
 func TestStars(t *testing.T) {
-	for in, want := range map[string]float64{"4": 4, "4.5": 4.5, "4 stars": 4, "★★★★": 4, " 3 ": 3} {
+	for in, want := range map[string]float64{"4": 4, "4.5": 4.5, "4 stars": 4, "★★★★": 4, " 3 ": 3, "4★": 4, "4.5 ★": 4.5} {
 		got, ok := starsOf(in)
 		require.True(t, ok, in)
 		require.Equal(t, want, got, in)
