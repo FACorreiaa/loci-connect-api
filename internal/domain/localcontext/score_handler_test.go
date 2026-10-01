@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
@@ -57,8 +58,6 @@ func (f fakePOIs) GetPOIsByCityID(context.Context, uuid.UUID) ([]locitypes.POIDe
 	return make([]locitypes.POIDetailedInfo, f.n), nil
 }
 
-func f64(v float64) *float64 { return &v }
-
 func testHandler(w WeatherAdapter, cities CityResolver, pois POICounter) *Handler {
 	return NewHandler(w, false, slog.New(slog.NewTextHandler(io.Discard, nil))).WithScoring(cities, pois)
 }
@@ -66,7 +65,7 @@ func testHandler(w WeatherAdapter, cities CityResolver, pois POICounter) *Handle
 func lisbon() *locitypes.CityDetail {
 	return &locitypes.CityDetail{
 		ID: uuid.New(), Name: "Lisbon", Country: "Portugal",
-		CenterLatitude: f64(38.72), CenterLongitude: f64(-9.14),
+		CenterLatitude: util.Ptr(38.72), CenterLongitude: util.Ptr(-9.14),
 	}
 }
 
@@ -75,9 +74,9 @@ func TestGetGoScore_ResolvesCityByNameAndScoresIt(t *testing.T) {
 
 	start := time.Date(2026, 9, 12, 9, 0, 0, 0, time.UTC)
 	resp, err := h.GetGoScore(context.Background(), connect.NewRequest(&lcv1.GetGoScoreRequest{
-		CityName:  strptr("lisboa"),
-		OriginLat: f64(41.15),
-		OriginLon: f64(-8.61),
+		CityName:  util.Ptr("lisboa"),
+		OriginLat: util.Ptr(41.15),
+		OriginLon: util.Ptr(-8.61),
 		Start:     timestamppb.New(start),
 		End:       timestamppb.New(start.Add(48 * time.Hour)),
 	}))
@@ -102,8 +101,8 @@ func TestGetGoScore_AcceptsCoordinatesWithoutACityRow(t *testing.T) {
 	h := testHandler(fakeWeather{days: dry(2)}, fakeCities{}, fakePOIs{n: 5})
 
 	resp, err := h.GetGoScore(context.Background(), connect.NewRequest(&lcv1.GetGoScoreRequest{
-		Latitude:  f64(38.72),
-		Longitude: f64(-9.14),
+		Latitude:  util.Ptr(38.72),
+		Longitude: util.Ptr(-9.14),
 	}))
 	if err != nil {
 		t.Fatalf("GetGoScore: %v", err)
@@ -119,7 +118,7 @@ func TestGetGoScore_SurvivesWeatherOutage(t *testing.T) {
 	h := testHandler(fakeWeather{err: errors.New("provider down")}, fakeCities{city: lisbon()}, fakePOIs{n: 6})
 
 	resp, err := h.GetGoScore(context.Background(), connect.NewRequest(&lcv1.GetGoScoreRequest{
-		CityName: strptr("Lisbon"),
+		CityName: util.Ptr("Lisbon"),
 	}))
 	if err != nil {
 		t.Fatalf("weather failure should not fail the RPC: %v", err)
@@ -145,7 +144,7 @@ func TestGetGoScore_UnknownCityIsInvalidArgument(t *testing.T) {
 	h := testHandler(fakeWeather{days: dry(2)}, fakeCities{city: nil}, fakePOIs{n: 6})
 
 	_, err := h.GetGoScore(context.Background(), connect.NewRequest(&lcv1.GetGoScoreRequest{
-		CityName: strptr("Atlantis"),
+		CityName: util.Ptr("Atlantis"),
 	}))
 	if err == nil || connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("expected InvalidArgument for an unresolvable city, got %v", err)
@@ -160,9 +159,9 @@ func TestGetGoScore_WindowLengthReachesTheScore(t *testing.T) {
 
 	score := func(hours int) int32 {
 		resp, err := h.GetGoScore(context.Background(), connect.NewRequest(&lcv1.GetGoScoreRequest{
-			CityName:  strptr("Lisbon"),
-			OriginLat: f64(41.15),
-			OriginLon: f64(-8.61),
+			CityName:  util.Ptr("Lisbon"),
+			OriginLat: util.Ptr(41.15),
+			OriginLon: util.Ptr(-8.61),
 			Start:     timestamppb.New(start),
 			End:       timestamppb.New(start.Add(time.Duration(hours) * time.Hour)),
 		}))
@@ -176,5 +175,3 @@ func TestGetGoScore_WindowLengthReachesTheScore(t *testing.T) {
 		t.Fatalf("same trip should score better over a longer window: 120h=%d vs 24h=%d", long, short)
 	}
 }
-
-func strptr(s string) *string { return &s }

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/google/uuid"
 )
@@ -34,7 +35,7 @@ func TestEventsFromTrips_includesDatedDayInRange(t *testing.T) {
 			ID:        uuid.MustParse("22222222-2222-2222-2222-222222222222"),
 			DayNumber: 1,
 			Date:      &day,
-			Stops:     []trip.TripStop{{StartMinute: &start, DurationMinutes: intPtr(120)}},
+			Stops:     []trip.TripStop{{StartMinute: &start, DurationMinutes: util.Ptr[int32](120)}},
 		}},
 	}
 	from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
@@ -50,5 +51,3 @@ func TestEventsFromTrips_includesDatedDayInRange(t *testing.T) {
 		t.Fatalf("start hour %d, want 10", got[0].Start.Hour())
 	}
 }
-
-func intPtr(v int32) *int32 { return &v }

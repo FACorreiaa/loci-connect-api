@@ -10,12 +10,11 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
 	"github.com/google/uuid"
 )
-
-func ptr(f float64) *float64 { return &f }
 
 func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -183,7 +182,7 @@ func TestResolve_ClientCoordinatesAttachNearbyCity(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeRepo{near: &locitypes.CityDetail{
 		ID: id, Name: "Porto", Country: "Portugal",
-		CenterLatitude: ptr(41.14961), CenterLongitude: ptr(-8.61099),
+		CenterLatitude: util.Ptr(41.14961), CenterLongitude: util.Ptr(-8.61099),
 	}}
 	r := NewResolver(repo, &fakeForward{}, quietLogger())
 
@@ -205,7 +204,7 @@ func TestResolve_ClientCoordinatesAttachNearbyCity(t *testing.T) {
 func TestResolve_DatabaseHitSkipsGeocoder(t *testing.T) {
 	repo := &fakeRepo{candidates: []locitypes.CityDetail{{
 		ID: uuid.New(), Name: "Porto", Country: "Portugal",
-		CenterLatitude: ptr(41.14961), CenterLongitude: ptr(-8.61099),
+		CenterLatitude: util.Ptr(41.14961), CenterLongitude: util.Ptr(-8.61099),
 	}}}
 	fwd := &fakeForward{places: []geocode.Place{portoPT}}
 	r := NewResolver(repo, fwd, quietLogger())
@@ -444,8 +443,8 @@ func TestResolve_DropsNonPopulatedPlaces(t *testing.T) {
 // LOWER('Evora') never equals 'Évora'.
 func TestResolve_FoldsAccentsAgainstStoredRows(t *testing.T) {
 	repo := &fakeRepo{candidates: []locitypes.CityDetail{
-		{ID: uuid.New(), Name: "Evoramonte", Country: "Portugal", CenterLatitude: ptr(38.7), CenterLongitude: ptr(-7.7)},
-		{ID: uuid.New(), Name: "Évora", Country: "Portugal", CenterLatitude: ptr(38.5714), CenterLongitude: ptr(-7.9135)},
+		{ID: uuid.New(), Name: "Evoramonte", Country: "Portugal", CenterLatitude: util.Ptr(38.7), CenterLongitude: util.Ptr(-7.7)},
+		{ID: uuid.New(), Name: "Évora", Country: "Portugal", CenterLatitude: util.Ptr(38.5714), CenterLongitude: util.Ptr(-7.9135)},
 	}}
 	fwd := &fakeForward{}
 	r := NewResolver(repo, fwd, quietLogger())
@@ -588,7 +587,7 @@ func TestResolve_SecondResolveUsesStoredRow(t *testing.T) {
 	// The row now exists, exactly as it would on a later request.
 	repo.candidates = []locitypes.CityDetail{{
 		ID: id, Name: "Porto", Country: "Portugal",
-		CenterLatitude: ptr(portoPT.Lat), CenterLongitude: ptr(portoPT.Lon),
+		CenterLatitude: util.Ptr(portoPT.Lat), CenterLongitude: util.Ptr(portoPT.Lon),
 	}}
 
 	got, err := r.Resolve(context.Background(), ResolveQuery{Name: "Porto"})
@@ -605,7 +604,7 @@ func TestResolve_SecondResolveUsesStoredRow(t *testing.T) {
 
 func TestResolve_NilGeocoderDegradesToDatabaseOnly(t *testing.T) {
 	stored := &fakeRepo{candidates: []locitypes.CityDetail{{
-		ID: uuid.New(), Name: "Porto", CenterLatitude: ptr(41.1), CenterLongitude: ptr(-8.6),
+		ID: uuid.New(), Name: "Porto", CenterLatitude: util.Ptr(41.1), CenterLongitude: util.Ptr(-8.6),
 	}}}
 	r := NewResolver(stored, nil, quietLogger())
 	if _, err := r.Resolve(context.Background(), ResolveQuery{Name: "Porto"}); err != nil {

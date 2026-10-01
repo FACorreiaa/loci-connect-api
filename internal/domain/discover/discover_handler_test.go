@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
@@ -132,8 +133,8 @@ func TestPresenter_ToDiscoverResults(t *testing.T) {
 			Address:     "addr",
 			Tags:        []string{"tag"},
 			Images:      []string{"img"},
-			CuisineType: ptr("asian"),
-			StarRating:  ptr("5"),
+			CuisineType: util.Ptr("asian"),
+			StarRating:  util.Ptr("5"),
 		},
 	}
 
@@ -143,5 +144,3 @@ func TestPresenter_ToDiscoverResults(t *testing.T) {
 	require.Equal(t, "asian", proto[0].GetCuisineType())
 	require.Equal(t, "5", proto[0].GetStarRating())
 }
-
-func ptr[T any](v T) *T { return &v }
