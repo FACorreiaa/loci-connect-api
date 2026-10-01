@@ -68,8 +68,17 @@ func (s *Service) RemoveFlight(ctx context.Context, userID, tripID uuid.UUID, ba
 	return s.editPlan(ctx, userID, tripID, baseVersion, func(t *Trip) error { return removeFlight(t, flightID) })
 }
 
-// FlightLinks is the manual form's search: links only, nothing saved.
-func (s *Service) FlightLinks(q flights.Query) []flights.Link { return s.links.Links(q) }
+// FlightLinks is the manual form's search: links only, nothing saved. It
+// checks the query as AddFlight would, since the agent calls it directly.
+func (s *Service) FlightLinks(q flights.Query) ([]flights.Link, error) {
+	if err := validateQuery(q); err != nil {
+		return nil, err
+	}
+	if q.Passengers < 1 {
+		q.Passengers = 1
+	}
+	return s.links.Links(q), nil
+}
 
 // FlightQuery is the search a saved flight stands for.
 func FlightQuery(f TripFlight) flights.Query {

@@ -113,3 +113,43 @@ func TestPlanRepository_SavePlan(t *testing.T) {
 	_, err = plans.SavePlan(ctx, &other, saved.Version)
 	require.ErrorIs(t, err, ErrNotFound)
 }
+
+// The calendar's "Pin dates" (web and iOS) re-dates a trip by sending its
+// days back through SaveTrip. The trip's start and end must move with them,
+// or the editor and the calendar show two different trips.
+func TestRepository_SaveTripMovesPlanDatesWithDayOne(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := NewRepository(testTripDB, logger)
+	plans := NewPlanRepository(testTripDB, logger)
+	userID := newTripUser(t, "plan-pin-"+uuid.NewString()+"@loci.test")
+
+	tr, err := repo.SaveTrip(ctx, &Trip{
+		UserID: userID, CityName: "Lisbon", Title: "Lisbon",
+		Days: []TripDay{{DayNumber: 1, CityName: "Lisbon"}, {DayNumber: 2, CityName: "Lisbon"}, {DayNumber: 3, CityName: "Lisbon"}},
+	}, 0)
+	require.NoError(t, err)
+	require.NoError(t, applyDates(tr, day("2026-11-12"), day("2026-11-15")))
+	dated, err := plans.SavePlan(ctx, tr, tr.Version)
+	require.NoError(t, err)
+
+	pinned := *dated
+	pinned.Days = append([]TripDay(nil), dated.Days...)
+	for i := range pinned.Days {
+		d := day("2026-12-01").AddDate(0, 0, int(pinned.Days[i].DayNumber)-1)
+		pinned.Days[i].Date = &d
+	}
+	saved, err := repo.SaveTrip(ctx, &pinned, dated.Version)
+	require.NoError(t, err)
+
+	for _, got := range []*Trip{saved, mustGet(t, repo, tr.ID, userID)} {
+		require.Equal(t, "2026-12-01", got.StartDate.Format(time.DateOnly))
+		require.Equal(t, "2026-12-04", got.EndDate.Format(time.DateOnly), "the span is kept")
+		require.Equal(t, "2026-12-03", got.Days[2].Date.Format(time.DateOnly))
+	}
+
+	// Day dates the client hands back unchanged move nothing.
+	again, err := repo.SaveTrip(ctx, saved, saved.Version)
+	require.NoError(t, err)
+	require.Equal(t, "2026-12-01", again.StartDate.Format(time.DateOnly))
+}

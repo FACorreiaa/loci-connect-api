@@ -109,3 +109,14 @@ func TestService_SetDatesThenRemoveFlightRoundTrip(t *testing.T) {
 	require.Empty(t, tr.Flights)
 	require.EqualValues(t, 6, tr.Version)
 }
+
+func TestService_FlightLinksRejectsWhatTheProtoWould(t *testing.T) {
+	svc, _, _, _ := newServiceFixture()
+	_, err := svc.FlightLinks(flights.Query{Origin: flights.Place{Name: "NYC"}, Destination: flights.Place{Name: "Lisbon"}, Depart: day("2026-11-12"), Passengers: 40})
+	require.ErrorIs(t, err, ErrInvalidEdit)
+	_, err = svc.FlightLinks(flights.Query{Depart: day("2026-11-12"), Passengers: 1})
+	require.ErrorIs(t, err, ErrInvalidEdit, "no places")
+	links, err := svc.FlightLinks(flights.Query{Origin: flights.Place{Name: "NYC"}, Destination: flights.Place{Name: "Lisbon"}, Depart: day("2026-11-12")})
+	require.NoError(t, err)
+	require.NotEmpty(t, links)
+}

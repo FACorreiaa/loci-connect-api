@@ -123,11 +123,14 @@ func (h *Handler) BuildFlightLinks(ctx context.Context, req *connect.Request[tri
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	links := h.plan.FlightLinks(flights.Query{
+	links, err := h.plan.FlightLinks(flights.Query{
 		Origin: placeFromProto(req.Msg.GetOrigin()), Destination: placeFromProto(req.Msg.GetDestination()),
 		Depart: depart, Return: ret,
 		Passengers: int(req.Msg.GetPassengers()), Cabin: flights.Cabin(req.Msg.GetCabin()),
 	})
+	if err != nil {
+		return nil, toConnectErr(err)
+	}
 	res := &tripv1.BuildFlightLinksResponse{}
 	for _, l := range links {
 		res.Links = append(res.Links, &tripv1.FlightLink{Provider: l.Provider, Label: l.Label, Url: l.URL})

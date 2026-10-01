@@ -256,7 +256,8 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	}
 
 	var newVersion int64
-	if t.ID == uuid.Nil {
+	existing := t.ID != uuid.Nil
+	if !existing {
 		// New trip: version starts at 1.
 		newVersion = 1
 		err = tx.QueryRow(ctx, `
@@ -317,6 +318,11 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 	if err := insertDays(ctx, tx, t, owned); err != nil {
 		return nil, err
 	}
+	if existing {
+		if err := followDayOne(ctx, tx, t); err != nil {
+			return nil, err
+		}
+	}
 
 	// Legs, replace-all like days, and with ids kept the same way: the globe
 	// draws each leg as an arc keyed by GlobeArc.id, so a leg that survives an
@@ -360,6 +366,36 @@ func (r *repository) SaveTrip(ctx context.Context, t *Trip, baseVersion int64) (
 		return nil, err
 	}
 	return t, nil
+}
+
+// followDayOne keeps a dated trip's start and end on its days. The calendars'
+// "Pin dates" (web and iOS) re-date a trip by sending its days back through
+// SaveTrip; when day 1 arrives on a new date, the plan's dates move by the
+// same number of days, keeping their span, so the editor and the calendar
+// never show two different trips. t.StartDate/EndDate are the stored values
+// here (SaveTrip's UPDATE returns them).
+func followDayOne(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if t.StartDate == nil || t.EndDate == nil {
+		return nil
+	}
+	for _, d := range t.Days {
+		if d.DayNumber != 1 || d.Date == nil {
+			continue
+		}
+		start, first := dateOnly(*t.StartDate), dateOnly(*d.Date)
+		if first.Equal(start) {
+			return nil
+		}
+		shift := int(first.Sub(start).Hours() / 24)
+		end := dateOnly(*t.EndDate).AddDate(0, 0, shift)
+		if _, err := tx.Exec(ctx, `UPDATE trips SET start_date = $1, end_date = $2 WHERE id = $3`,
+			first, end, t.ID); err != nil {
+			return fmt.Errorf("move plan dates: %w", err)
+		}
+		t.StartDate, t.EndDate = &first, &end
+		return nil
+	}
+	return nil
 }
 
 // insertSnapshot appends the immutable per-version snapshot every save writes,

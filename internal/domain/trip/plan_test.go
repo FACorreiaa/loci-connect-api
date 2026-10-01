@@ -1,6 +1,7 @@
 package trip
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -45,7 +46,7 @@ func TestUpsertStay_MatchesCityLooselyAndReplaces(t *testing.T) {
 	require.NoError(t, upsertStay(tr, TripStay{CityName: "  lisbon ", Name: "Pestana Palace", StarRating: "5"}))
 	require.Len(t, tr.Stays, 1, "same city, different spelling, replaces")
 	require.Equal(t, "Pestana Palace", tr.Stays[0].Name)
-	require.Equal(t, "lisbon", tr.Stays[0].CityName, "stored trimmed")
+	require.Equal(t, "Lisbon", tr.Stays[0].CityName, "stored under the trip's spelling")
 }
 
 func TestUpsertStay_Rejects(t *testing.T) {
@@ -100,6 +101,58 @@ func TestAppendFlight_Rejects(t *testing.T) {
 	}
 	for name, f := range cases {
 		t.Run(name, func(t *testing.T) {
+			_, err := appendFlight(threeDayLisbon(), f)
+			require.ErrorIs(t, err, ErrInvalidEdit)
+		})
+	}
+}
+
+// The stay takes the trip's spelling of the city, so a client matching stays
+// to cities by name finds it.
+func TestUpsertStay_StoresTheTripsSpellingOfTheCity(t *testing.T) {
+	tr := threeDayLisbon()
+	require.NoError(t, upsertStay(tr, TripStay{CityName: "  lisbon ", Name: "Pestana Palace"}))
+	require.Equal(t, "Lisbon", tr.Stays[0].CityName)
+}
+
+// The proto's limits only run on Connect requests. The chat agent calls the
+// Service directly, and a stored value the proto would reject makes every
+// later SaveTrip that sends the draft back fail validation.
+func TestUpsertStay_EnforcesTheProtoLimits(t *testing.T) {
+	long := func(n int) string { return strings.Repeat("x", n) }
+	http, js, ok := "http://hotel.example", "javascript:alert(1)", "https://hotel.example"
+	cases := map[string]TripStay{
+		"name over 300":        {CityName: "Lisbon", Name: long(301)},
+		"star rating over 10":  {CityName: "Lisbon", Name: "X", StarRating: "4-star superior"},
+		"poi id over 100":      {CityName: "Lisbon", Name: "X", POIID: long(101)},
+		"http booking link":    {CityName: "Lisbon", Name: "X", BookingURL: &http},
+		"script booking link":  {CityName: "Lisbon", Name: "X", BookingURL: &js},
+		"booking link over 2k": {CityName: "Lisbon", Name: "X", BookingURL: func() *string { s := "https://" + long(2000); return &s }()},
+	}
+	for name, s := range cases {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, upsertStay(threeDayLisbon(), s), ErrInvalidEdit)
+		})
+	}
+	require.NoError(t, upsertStay(threeDayLisbon(), TripStay{CityName: "Lisbon", Name: long(300), StarRating: "4.5", BookingURL: &ok}))
+}
+
+func TestAppendFlight_EnforcesTheProtoLimits(t *testing.T) {
+	long := func(n int) *string { s := strings.Repeat("x", n); return &s }
+	base := func() TripFlight {
+		return TripFlight{Origin: flights.Place{Name: "NYC"}, Destination: flights.Place{Name: "Lisbon"}, DepartDate: day("2026-11-12")}
+	}
+	cases := map[string]func(*TripFlight){
+		"origin over 200":   func(f *TripFlight) { f.Origin.Name = *long(201) },
+		"carrier over 100":  func(f *TripFlight) { f.Carrier = long(101) },
+		"flight no over 20": func(f *TripFlight) { f.FlightNo = long(21) },
+		"price over 50":     func(f *TripFlight) { f.PriceText = long(51) },
+		"notes over 1000":   func(f *TripFlight) { f.Notes = long(1001) },
+	}
+	for name, mut := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := base()
+			mut(&f)
 			_, err := appendFlight(threeDayLisbon(), f)
 			require.ErrorIs(t, err, ErrInvalidEdit)
 		})
