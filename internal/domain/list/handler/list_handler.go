@@ -282,6 +282,64 @@ func (h *ListHandler) AddListItem(ctx context.Context, req *connect.Request[list
 	return connect.NewResponse(&listpb.AddListItemResponse{Success: true, Message: "Added to list", Item: protoItem}), nil
 }
 
+// UpdateListItem changes what the request sets on an item of a list the
+// caller owns: notes, day, time slot, duration, position, content type. A
+// zero or empty field is "leave it", not "clear it" — the proto has no
+// presence on these scalars, so an update that only moves a day must not
+// wipe the notes.
+func (h *ListHandler) UpdateListItem(ctx context.Context, req *connect.Request[listpb.UpdateListItemRequest]) (*connect.Response[listpb.UpdateListItemResponse], error) {
+	userID, err := userFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	listID, err := uuid.Parse(req.Msg.GetListId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid list id"))
+	}
+	itemID, err := uuid.Parse(req.Msg.GetItemId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid item id"))
+	}
+	params := locitypes.UpdateListItemRequest{}
+	if contentType, ok := contentTypeFromProto(req.Msg.GetContentType()); ok {
+		params.ContentType = &contentType
+	}
+	if req.Msg.GetPosition() > 0 {
+		position := int(req.Msg.GetPosition())
+		params.Position = &position
+	}
+	if notes := req.Msg.GetNotes(); notes != "" {
+		params.Notes = &notes
+	}
+	if req.Msg.GetDayNumber() > 0 {
+		day := int(req.Msg.GetDayNumber())
+		params.DayNumber = &day
+	}
+	if req.Msg.GetTimeSlot() != nil && req.Msg.GetTimeSlot().CheckValid() == nil {
+		timeSlot := req.Msg.GetTimeSlot().AsTime()
+		params.TimeSlot = &timeSlot
+	}
+	if req.Msg.GetDurationMinutes() > 0 {
+		duration := int(req.Msg.GetDurationMinutes())
+		params.DurationMinutes = &duration
+	}
+	if source := req.Msg.GetSourceLlmInteractionId(); source != "" {
+		parsed, parseErr := uuid.Parse(source)
+		if parseErr != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid source interaction id"))
+		}
+		params.SourceLlmInteractionID = &parsed
+	}
+	if description := req.Msg.GetItemAiDescription(); description != "" {
+		params.ItemAIDescription = &description
+	}
+	item, err := h.service.UpdateListItem(ctx, userID, listID, itemID, params)
+	if err != nil {
+		return nil, apierr.ToConnect(err)
+	}
+	return connect.NewResponse(&listpb.UpdateListItemResponse{Success: true, Message: "Updated", Item: toProtoListItem(item)}), nil
+}
+
 // RemoveListItem removes an item from a list the caller owns. content_type
 // narrows the match when set; UNSPECIFIED removes the item whatever its type.
 func (h *ListHandler) RemoveListItem(ctx context.Context, req *connect.Request[listpb.RemoveListItemRequest]) (*connect.Response[listpb.RemoveListItemResponse], error) {
