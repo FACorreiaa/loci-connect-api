@@ -30,6 +30,19 @@ type stubService struct {
 
 	removedAny  []uuid.UUID
 	removedType []locitypes.ContentType
+
+	updatedItem   locitypes.UpdateListItemRequest
+	updatedItemID uuid.UUID
+}
+
+func (s *stubService) UpdateListItem(_ context.Context, _, listID, itemID uuid.UUID, p locitypes.UpdateListItemRequest) (*locitypes.ListItem, error) {
+	s.updatedItem = p
+	s.updatedItemID = itemID
+	notes := ""
+	if p.Notes != nil {
+		notes = *p.Notes
+	}
+	return &locitypes.ListItem{ListID: listID, ItemID: itemID, Notes: notes}, nil
 }
 
 func (s *stubService) GetAllUserLists(context.Context, uuid.UUID) ([]*locitypes.List, error) {
@@ -220,5 +233,39 @@ func TestRemoveListItem_ContentTypeNarrowsTheMatch(t *testing.T) {
 
 func TestRemoveListItem_RequiresSignIn(t *testing.T) {
 	_, err := newTestHandler(&stubService{}).RemoveListItem(context.Background(), connect.NewRequest(&listpb.RemoveListItemRequest{}))
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
+}
+
+// Only what the request sets reaches the service: a zero day or an empty
+// time slot means "leave it", not "clear it".
+func TestUpdateListItem_SendsOnlyTheFieldsSet(t *testing.T) {
+	ctx, _ := signedIn(t)
+	svc := &stubService{}
+	h := newTestHandler(svc)
+	listID, itemID := uuid.NewString(), uuid.New()
+
+	res, err := h.UpdateListItem(ctx, connect.NewRequest(&listpb.UpdateListItemRequest{
+		ListId: listID, ItemId: itemID.String(), Notes: "Go at dusk", DayNumber: 2,
+	}))
+	require.NoError(t, err)
+	assert.True(t, res.Msg.Success)
+	assert.Equal(t, itemID.String(), res.Msg.Item.ItemId)
+	assert.Equal(t, "Go at dusk", res.Msg.Item.Notes)
+	assert.Equal(t, itemID, svc.updatedItemID)
+	require.NotNil(t, svc.updatedItem.Notes)
+	assert.Equal(t, "Go at dusk", *svc.updatedItem.Notes)
+	require.NotNil(t, svc.updatedItem.DayNumber)
+	assert.Equal(t, 2, *svc.updatedItem.DayNumber)
+	assert.Nil(t, svc.updatedItem.TimeSlot, "no time slot sent, none changed")
+	assert.Nil(t, svc.updatedItem.DurationMinutes)
+	assert.Nil(t, svc.updatedItem.ContentType, "UNSPECIFIED content type is not a change")
+	assert.Nil(t, svc.updatedItem.Position, "position zero is not a change on an update")
+
+	_, err = h.UpdateListItem(ctx, connect.NewRequest(&listpb.UpdateListItemRequest{ListId: listID, ItemId: "x"}))
+	assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+}
+
+func TestUpdateListItem_RequiresSignIn(t *testing.T) {
+	_, err := newTestHandler(&stubService{}).UpdateListItem(context.Background(), connect.NewRequest(&listpb.UpdateListItemRequest{}))
 	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
 }
