@@ -29,6 +29,10 @@ const (
 	OAuthProvider_OAUTH_PROVIDER_UNSPECIFIED OAuthProvider = 0
 	OAuthProvider_OAUTH_PROVIDER_GOOGLE      OAuthProvider = 1
 	OAuthProvider_OAUTH_PROVIDER_APPLE       OAuthProvider = 2
+	// Facebook Limited Login: the iOS SDK hands over an OIDC token signed by
+	// Meta. It may carry no email, so it can link to a signed-in account but
+	// cannot create one on its own.
+	OAuthProvider_OAUTH_PROVIDER_FACEBOOK OAuthProvider = 3
 )
 
 // Enum value maps for OAuthProvider.
@@ -37,11 +41,13 @@ var (
 		0: "OAUTH_PROVIDER_UNSPECIFIED",
 		1: "OAUTH_PROVIDER_GOOGLE",
 		2: "OAUTH_PROVIDER_APPLE",
+		3: "OAUTH_PROVIDER_FACEBOOK",
 	}
 	OAuthProvider_value = map[string]int32{
 		"OAUTH_PROVIDER_UNSPECIFIED": 0,
 		"OAUTH_PROVIDER_GOOGLE":      1,
 		"OAUTH_PROVIDER_APPLE":       2,
+		"OAUTH_PROVIDER_FACEBOOK":    3,
 	}
 )
 
@@ -620,6 +626,205 @@ func (x *VerifyPhoneResponse) GetIsNewUser() bool {
 	return false
 }
 
+// AttachVerifiedPhoneRequest checks an SMS code (sent with
+// SendPhoneVerification) and attaches the number to the signed-in caller, so
+// friends can find them from their contacts.
+type AttachVerifiedPhoneRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PhoneNumber   string                 `protobuf:"bytes,1,opt,name=phone_number,json=phoneNumber,proto3" json:"phone_number,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttachVerifiedPhoneRequest) Reset() {
+	*x = AttachVerifiedPhoneRequest{}
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachVerifiedPhoneRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachVerifiedPhoneRequest) ProtoMessage() {}
+
+func (x *AttachVerifiedPhoneRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachVerifiedPhoneRequest.ProtoReflect.Descriptor instead.
+func (*AttachVerifiedPhoneRequest) Descriptor() ([]byte, []int) {
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AttachVerifiedPhoneRequest) GetPhoneNumber() string {
+	if x != nil {
+		return x.PhoneNumber
+	}
+	return ""
+}
+
+func (x *AttachVerifiedPhoneRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+type AttachVerifiedPhoneResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The number as stored, E.164.
+	PhoneNumber   string `protobuf:"bytes,1,opt,name=phone_number,json=phoneNumber,proto3" json:"phone_number,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AttachVerifiedPhoneResponse) Reset() {
+	*x = AttachVerifiedPhoneResponse{}
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachVerifiedPhoneResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachVerifiedPhoneResponse) ProtoMessage() {}
+
+func (x *AttachVerifiedPhoneResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachVerifiedPhoneResponse.ProtoReflect.Descriptor instead.
+func (*AttachVerifiedPhoneResponse) Descriptor() ([]byte, []int) {
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AttachVerifiedPhoneResponse) GetPhoneNumber() string {
+	if x != nil {
+		return x.PhoneNumber
+	}
+	return ""
+}
+
+// LinkFacebookRequest links a Facebook account to the signed-in caller so
+// friends who also linked theirs can be found. The token is a Limited Login
+// token, verified like SignInWithIDToken.
+type LinkFacebookRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdToken       string                 `protobuf:"bytes,1,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	Nonce         string                 `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkFacebookRequest) Reset() {
+	*x = LinkFacebookRequest{}
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkFacebookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkFacebookRequest) ProtoMessage() {}
+
+func (x *LinkFacebookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkFacebookRequest.ProtoReflect.Descriptor instead.
+func (*LinkFacebookRequest) Descriptor() ([]byte, []int) {
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LinkFacebookRequest) GetIdToken() string {
+	if x != nil {
+		return x.IdToken
+	}
+	return ""
+}
+
+func (x *LinkFacebookRequest) GetNonce() string {
+	if x != nil {
+		return x.Nonce
+	}
+	return ""
+}
+
+type LinkFacebookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Linked        bool                   `protobuf:"varint,1,opt,name=linked,proto3" json:"linked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkFacebookResponse) Reset() {
+	*x = LinkFacebookResponse{}
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkFacebookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkFacebookResponse) ProtoMessage() {}
+
+func (x *LinkFacebookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_custom_auth_custom_auth_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkFacebookResponse.ProtoReflect.Descriptor instead.
+func (*LinkFacebookResponse) Descriptor() ([]byte, []int) {
+	return file_loci_custom_auth_custom_auth_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *LinkFacebookResponse) GetLinked() bool {
+	if x != nil {
+		return x.Linked
+	}
+	return false
+}
+
 var File_loci_custom_auth_custom_auth_proto protoreflect.FileDescriptor
 
 const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
@@ -667,17 +872,32 @@ const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1e\n" +
-	"\vis_new_user\x18\x04 \x01(\bR\tisNewUser*d\n" +
+	"\vis_new_user\x18\x04 \x01(\bR\tisNewUser\"|\n" +
+	"\x1aAttachVerifiedPhoneRequest\x12?\n" +
+	"\fphone_number\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\n" +
+	"\x18\x142\x11^\\+[1-9]\\d{1,14}$R\vphoneNumber\x12\x1d\n" +
+	"\x04code\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x04\x18\bR\x04code\"@\n" +
+	"\x1bAttachVerifiedPhoneResponse\x12!\n" +
+	"\fphone_number\x18\x01 \x01(\tR\vphoneNumber\"_\n" +
+	"\x13LinkFacebookRequest\x12&\n" +
+	"\bid_token\x18\x01 \x01(\tB\v\xbaH\br\x06\x10\x01\x18\x80\x80\x01R\aidToken\x12 \n" +
+	"\x05nonce\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x10\x18\x80\x02R\x05nonce\".\n" +
+	"\x14LinkFacebookResponse\x12\x16\n" +
+	"\x06linked\x18\x01 \x01(\bR\x06linked*\x81\x01\n" +
 	"\rOAuthProvider\x12\x1e\n" +
 	"\x1aOAUTH_PROVIDER_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15OAUTH_PROVIDER_GOOGLE\x10\x01\x12\x18\n" +
-	"\x14OAUTH_PROVIDER_APPLE\x10\x022\x91\x04\n" +
+	"\x14OAUTH_PROVIDER_APPLE\x10\x02\x12\x1b\n" +
+	"\x17OAUTH_PROVIDER_FACEBOOK\x10\x032\xe4\x05\n" +
 	"\x11CustomAuthService\x12Z\n" +
 	"\vGetOAuthURL\x12$.loci.custom_auth.GetOAuthURLRequest\x1a%.loci.custom_auth.GetOAuthURLResponse\x12`\n" +
 	"\rOAuthCallback\x12&.loci.custom_auth.OAuthCallbackRequest\x1a'.loci.custom_auth.OAuthCallbackResponse\x12h\n" +
 	"\x11SignInWithIDToken\x12*.loci.custom_auth.SignInWithIDTokenRequest\x1a'.loci.custom_auth.OAuthCallbackResponse\x12x\n" +
 	"\x15SendPhoneVerification\x12..loci.custom_auth.SendPhoneVerificationRequest\x1a/.loci.custom_auth.SendPhoneVerificationResponse\x12Z\n" +
-	"\vVerifyPhone\x12$.loci.custom_auth.VerifyPhoneRequest\x1a%.loci.custom_auth.VerifyPhoneResponseBPZNgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth;customauthb\x06proto3"
+	"\vVerifyPhone\x12$.loci.custom_auth.VerifyPhoneRequest\x1a%.loci.custom_auth.VerifyPhoneResponse\x12r\n" +
+	"\x13AttachVerifiedPhone\x12,.loci.custom_auth.AttachVerifiedPhoneRequest\x1a-.loci.custom_auth.AttachVerifiedPhoneResponse\x12]\n" +
+	"\fLinkFacebook\x12%.loci.custom_auth.LinkFacebookRequest\x1a&.loci.custom_auth.LinkFacebookResponseBPZNgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/custom_auth;customauthb\x06proto3"
 
 var (
 	file_loci_custom_auth_custom_auth_proto_rawDescOnce sync.Once
@@ -692,7 +912,7 @@ func file_loci_custom_auth_custom_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_custom_auth_custom_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_custom_auth_custom_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_loci_custom_auth_custom_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_loci_custom_auth_custom_auth_proto_goTypes = []any{
 	(OAuthProvider)(0),                    // 0: loci.custom_auth.OAuthProvider
 	(*GetOAuthURLRequest)(nil),            // 1: loci.custom_auth.GetOAuthURLRequest
@@ -704,26 +924,34 @@ var file_loci_custom_auth_custom_auth_proto_goTypes = []any{
 	(*SendPhoneVerificationResponse)(nil), // 7: loci.custom_auth.SendPhoneVerificationResponse
 	(*VerifyPhoneRequest)(nil),            // 8: loci.custom_auth.VerifyPhoneRequest
 	(*VerifyPhoneResponse)(nil),           // 9: loci.custom_auth.VerifyPhoneResponse
+	(*AttachVerifiedPhoneRequest)(nil),    // 10: loci.custom_auth.AttachVerifiedPhoneRequest
+	(*AttachVerifiedPhoneResponse)(nil),   // 11: loci.custom_auth.AttachVerifiedPhoneResponse
+	(*LinkFacebookRequest)(nil),           // 12: loci.custom_auth.LinkFacebookRequest
+	(*LinkFacebookResponse)(nil),          // 13: loci.custom_auth.LinkFacebookResponse
 }
 var file_loci_custom_auth_custom_auth_proto_depIdxs = []int32{
-	0, // 0: loci.custom_auth.GetOAuthURLRequest.provider:type_name -> loci.custom_auth.OAuthProvider
-	0, // 1: loci.custom_auth.OAuthCallbackRequest.provider:type_name -> loci.custom_auth.OAuthProvider
-	0, // 2: loci.custom_auth.SignInWithIDTokenRequest.provider:type_name -> loci.custom_auth.OAuthProvider
-	1, // 3: loci.custom_auth.CustomAuthService.GetOAuthURL:input_type -> loci.custom_auth.GetOAuthURLRequest
-	3, // 4: loci.custom_auth.CustomAuthService.OAuthCallback:input_type -> loci.custom_auth.OAuthCallbackRequest
-	5, // 5: loci.custom_auth.CustomAuthService.SignInWithIDToken:input_type -> loci.custom_auth.SignInWithIDTokenRequest
-	6, // 6: loci.custom_auth.CustomAuthService.SendPhoneVerification:input_type -> loci.custom_auth.SendPhoneVerificationRequest
-	8, // 7: loci.custom_auth.CustomAuthService.VerifyPhone:input_type -> loci.custom_auth.VerifyPhoneRequest
-	2, // 8: loci.custom_auth.CustomAuthService.GetOAuthURL:output_type -> loci.custom_auth.GetOAuthURLResponse
-	4, // 9: loci.custom_auth.CustomAuthService.OAuthCallback:output_type -> loci.custom_auth.OAuthCallbackResponse
-	4, // 10: loci.custom_auth.CustomAuthService.SignInWithIDToken:output_type -> loci.custom_auth.OAuthCallbackResponse
-	7, // 11: loci.custom_auth.CustomAuthService.SendPhoneVerification:output_type -> loci.custom_auth.SendPhoneVerificationResponse
-	9, // 12: loci.custom_auth.CustomAuthService.VerifyPhone:output_type -> loci.custom_auth.VerifyPhoneResponse
-	8, // [8:13] is the sub-list for method output_type
-	3, // [3:8] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0,  // 0: loci.custom_auth.GetOAuthURLRequest.provider:type_name -> loci.custom_auth.OAuthProvider
+	0,  // 1: loci.custom_auth.OAuthCallbackRequest.provider:type_name -> loci.custom_auth.OAuthProvider
+	0,  // 2: loci.custom_auth.SignInWithIDTokenRequest.provider:type_name -> loci.custom_auth.OAuthProvider
+	1,  // 3: loci.custom_auth.CustomAuthService.GetOAuthURL:input_type -> loci.custom_auth.GetOAuthURLRequest
+	3,  // 4: loci.custom_auth.CustomAuthService.OAuthCallback:input_type -> loci.custom_auth.OAuthCallbackRequest
+	5,  // 5: loci.custom_auth.CustomAuthService.SignInWithIDToken:input_type -> loci.custom_auth.SignInWithIDTokenRequest
+	6,  // 6: loci.custom_auth.CustomAuthService.SendPhoneVerification:input_type -> loci.custom_auth.SendPhoneVerificationRequest
+	8,  // 7: loci.custom_auth.CustomAuthService.VerifyPhone:input_type -> loci.custom_auth.VerifyPhoneRequest
+	10, // 8: loci.custom_auth.CustomAuthService.AttachVerifiedPhone:input_type -> loci.custom_auth.AttachVerifiedPhoneRequest
+	12, // 9: loci.custom_auth.CustomAuthService.LinkFacebook:input_type -> loci.custom_auth.LinkFacebookRequest
+	2,  // 10: loci.custom_auth.CustomAuthService.GetOAuthURL:output_type -> loci.custom_auth.GetOAuthURLResponse
+	4,  // 11: loci.custom_auth.CustomAuthService.OAuthCallback:output_type -> loci.custom_auth.OAuthCallbackResponse
+	4,  // 12: loci.custom_auth.CustomAuthService.SignInWithIDToken:output_type -> loci.custom_auth.OAuthCallbackResponse
+	7,  // 13: loci.custom_auth.CustomAuthService.SendPhoneVerification:output_type -> loci.custom_auth.SendPhoneVerificationResponse
+	9,  // 14: loci.custom_auth.CustomAuthService.VerifyPhone:output_type -> loci.custom_auth.VerifyPhoneResponse
+	11, // 15: loci.custom_auth.CustomAuthService.AttachVerifiedPhone:output_type -> loci.custom_auth.AttachVerifiedPhoneResponse
+	13, // 16: loci.custom_auth.CustomAuthService.LinkFacebook:output_type -> loci.custom_auth.LinkFacebookResponse
+	10, // [10:17] is the sub-list for method output_type
+	3,  // [3:10] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_loci_custom_auth_custom_auth_proto_init() }
@@ -737,7 +965,7 @@ func file_loci_custom_auth_custom_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_custom_auth_custom_auth_proto_rawDesc), len(file_loci_custom_auth_custom_auth_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

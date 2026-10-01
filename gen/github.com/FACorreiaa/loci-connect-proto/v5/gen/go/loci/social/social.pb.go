@@ -1646,6 +1646,86 @@ func (x *MatchContactsResponse) GetMatches() []*ContactMatch {
 	return nil
 }
 
+type MatchFacebookFriendsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MatchFacebookFriendsRequest) Reset() {
+	*x = MatchFacebookFriendsRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MatchFacebookFriendsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchFacebookFriendsRequest) ProtoMessage() {}
+
+func (x *MatchFacebookFriendsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchFacebookFriendsRequest.ProtoReflect.Descriptor instead.
+func (*MatchFacebookFriendsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{31}
+}
+
+type MatchFacebookFriendsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Matches       []*UserResult          `protobuf:"bytes,1,rep,name=matches,proto3" json:"matches,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MatchFacebookFriendsResponse) Reset() {
+	*x = MatchFacebookFriendsResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MatchFacebookFriendsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchFacebookFriendsResponse) ProtoMessage() {}
+
+func (x *MatchFacebookFriendsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchFacebookFriendsResponse.ProtoReflect.Descriptor instead.
+func (*MatchFacebookFriendsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *MatchFacebookFriendsResponse) GetMatches() []*UserResult {
+	if x != nil {
+		return x.Matches
+	}
+	return nil
+}
+
 type SearchUsersRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
@@ -1656,7 +1736,7 @@ type SearchUsersRequest struct {
 
 func (x *SearchUsersRequest) Reset() {
 	*x = SearchUsersRequest{}
-	mi := &file_loci_social_social_proto_msgTypes[31]
+	mi := &file_loci_social_social_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1748,7 @@ func (x *SearchUsersRequest) String() string {
 func (*SearchUsersRequest) ProtoMessage() {}
 
 func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_social_social_proto_msgTypes[31]
+	mi := &file_loci_social_social_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1761,7 @@ func (x *SearchUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchUsersRequest.ProtoReflect.Descriptor instead.
 func (*SearchUsersRequest) Descriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{31}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SearchUsersRequest) GetQuery() string {
@@ -1708,7 +1788,7 @@ type UserResult struct {
 
 func (x *UserResult) Reset() {
 	*x = UserResult{}
-	mi := &file_loci_social_social_proto_msgTypes[32]
+	mi := &file_loci_social_social_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1720,7 +1800,7 @@ func (x *UserResult) String() string {
 func (*UserResult) ProtoMessage() {}
 
 func (x *UserResult) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_social_social_proto_msgTypes[32]
+	mi := &file_loci_social_social_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1733,7 +1813,7 @@ func (x *UserResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserResult.ProtoReflect.Descriptor instead.
 func (*UserResult) Descriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{32}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *UserResult) GetUser() *PublicUser {
@@ -1759,7 +1839,7 @@ type SearchUsersResponse struct {
 
 func (x *SearchUsersResponse) Reset() {
 	*x = SearchUsersResponse{}
-	mi := &file_loci_social_social_proto_msgTypes[33]
+	mi := &file_loci_social_social_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1771,7 +1851,7 @@ func (x *SearchUsersResponse) String() string {
 func (*SearchUsersResponse) ProtoMessage() {}
 
 func (x *SearchUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_social_social_proto_msgTypes[33]
+	mi := &file_loci_social_social_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1784,7 +1864,7 @@ func (x *SearchUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchUsersResponse.ProtoReflect.Descriptor instead.
 func (*SearchUsersResponse) Descriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{33}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SearchUsersResponse) GetUsers() []*UserResult {
@@ -1807,7 +1887,7 @@ type GetPublicProfileRequest struct {
 
 func (x *GetPublicProfileRequest) Reset() {
 	*x = GetPublicProfileRequest{}
-	mi := &file_loci_social_social_proto_msgTypes[34]
+	mi := &file_loci_social_social_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1819,7 +1899,7 @@ func (x *GetPublicProfileRequest) String() string {
 func (*GetPublicProfileRequest) ProtoMessage() {}
 
 func (x *GetPublicProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_social_social_proto_msgTypes[34]
+	mi := &file_loci_social_social_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1832,7 +1912,7 @@ func (x *GetPublicProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPublicProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetPublicProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{34}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetPublicProfileRequest) GetTarget() isGetPublicProfileRequest_Target {
@@ -1889,7 +1969,7 @@ type GetPublicProfileResponse struct {
 
 func (x *GetPublicProfileResponse) Reset() {
 	*x = GetPublicProfileResponse{}
-	mi := &file_loci_social_social_proto_msgTypes[35]
+	mi := &file_loci_social_social_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1901,7 +1981,7 @@ func (x *GetPublicProfileResponse) String() string {
 func (*GetPublicProfileResponse) ProtoMessage() {}
 
 func (x *GetPublicProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_social_social_proto_msgTypes[35]
+	mi := &file_loci_social_social_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1914,7 +1994,7 @@ func (x *GetPublicProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPublicProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetPublicProfileResponse) Descriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{35}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *GetPublicProfileResponse) GetUser() *PublicUser {
@@ -2032,7 +2112,10 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\x04user\x18\x02 \x01(\v2\x17.loci.social.PublicUserR\x04user\x12=\n" +
 	"\frelationship\x18\x03 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\"L\n" +
 	"\x15MatchContactsResponse\x123\n" +
-	"\amatches\x18\x01 \x03(\v2\x19.loci.social.ContactMatchR\amatches\"V\n" +
+	"\amatches\x18\x01 \x03(\v2\x19.loci.social.ContactMatchR\amatches\"\x1d\n" +
+	"\x1bMatchFacebookFriendsRequest\"Q\n" +
+	"\x1cMatchFacebookFriendsResponse\x121\n" +
+	"\amatches\x18\x01 \x03(\v2\x17.loci.social.UserResultR\amatches\"V\n" +
 	"\x12SearchUsersRequest\x12\x1f\n" +
 	"\x05query\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x02\x18dR\x05query\x12\x1f\n" +
 	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x182(\x00R\x05limit\"x\n" +
@@ -2062,8 +2145,7 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\x10RequestDirection\x12!\n" +
 	"\x1dREQUEST_DIRECTION_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aREQUEST_DIRECTION_INCOMING\x10\x01\x12\x1e\n" +
-	"\x1aREQUEST_DIRECTION_OUTGOING\x10\x022\xc8\n" +
-	"\n" +
+	"\x1aREQUEST_DIRECTION_OUTGOING\x10\x022\xb5\v\n" +
 	"\rSocialService\x12P\n" +
 	"\vGetMyInvite\x12\x1f.loci.social.GetMyInviteRequest\x1a .loci.social.GetMyInviteResponse\x12R\n" +
 	"\fRotateInvite\x12 .loci.social.RotateInviteRequest\x1a .loci.social.GetMyInviteResponse\x12J\n" +
@@ -2077,7 +2159,8 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\fRemoveFriend\x12 .loci.social.RemoveFriendRequest\x1a!.loci.social.RemoveFriendResponse\x12J\n" +
 	"\tBlockUser\x12\x1d.loci.social.BlockUserRequest\x1a\x1e.loci.social.BlockUserResponse\x12P\n" +
 	"\vUnblockUser\x12\x1f.loci.social.UnblockUserRequest\x1a .loci.social.UnblockUserResponse\x12V\n" +
-	"\rMatchContacts\x12!.loci.social.MatchContactsRequest\x1a\".loci.social.MatchContactsResponse\x12P\n" +
+	"\rMatchContacts\x12!.loci.social.MatchContactsRequest\x1a\".loci.social.MatchContactsResponse\x12k\n" +
+	"\x14MatchFacebookFriends\x12(.loci.social.MatchFacebookFriendsRequest\x1a).loci.social.MatchFacebookFriendsResponse\x12P\n" +
 	"\vSearchUsers\x12\x1f.loci.social.SearchUsersRequest\x1a .loci.social.SearchUsersResponse\x12_\n" +
 	"\x10GetPublicProfile\x12$.loci.social.GetPublicProfileRequest\x1a%.loci.social.GetPublicProfileResponseBGZEgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social;socialb\x06proto3"
 
@@ -2094,7 +2177,7 @@ func file_loci_social_social_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_social_social_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_loci_social_social_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
+var file_loci_social_social_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_loci_social_social_proto_goTypes = []any{
 	(Relationship)(0),                    // 0: loci.social.Relationship
 	(RequestDirection)(0),                // 1: loci.social.RequestDirection
@@ -2129,20 +2212,22 @@ var file_loci_social_social_proto_goTypes = []any{
 	(*MatchContactsRequest)(nil),         // 30: loci.social.MatchContactsRequest
 	(*ContactMatch)(nil),                 // 31: loci.social.ContactMatch
 	(*MatchContactsResponse)(nil),        // 32: loci.social.MatchContactsResponse
-	(*SearchUsersRequest)(nil),           // 33: loci.social.SearchUsersRequest
-	(*UserResult)(nil),                   // 34: loci.social.UserResult
-	(*SearchUsersResponse)(nil),          // 35: loci.social.SearchUsersResponse
-	(*GetPublicProfileRequest)(nil),      // 36: loci.social.GetPublicProfileRequest
-	(*GetPublicProfileResponse)(nil),     // 37: loci.social.GetPublicProfileResponse
-	(*timestamppb.Timestamp)(nil),        // 38: google.protobuf.Timestamp
+	(*MatchFacebookFriendsRequest)(nil),  // 33: loci.social.MatchFacebookFriendsRequest
+	(*MatchFacebookFriendsResponse)(nil), // 34: loci.social.MatchFacebookFriendsResponse
+	(*SearchUsersRequest)(nil),           // 35: loci.social.SearchUsersRequest
+	(*UserResult)(nil),                   // 36: loci.social.UserResult
+	(*SearchUsersResponse)(nil),          // 37: loci.social.SearchUsersResponse
+	(*GetPublicProfileRequest)(nil),      // 38: loci.social.GetPublicProfileRequest
+	(*GetPublicProfileResponse)(nil),     // 39: loci.social.GetPublicProfileResponse
+	(*timestamppb.Timestamp)(nil),        // 40: google.protobuf.Timestamp
 }
 var file_loci_social_social_proto_depIdxs = []int32{
 	2,  // 0: loci.social.Friend.user:type_name -> loci.social.PublicUser
-	38, // 1: loci.social.Friend.since:type_name -> google.protobuf.Timestamp
+	40, // 1: loci.social.Friend.since:type_name -> google.protobuf.Timestamp
 	2,  // 2: loci.social.FriendRequest.from:type_name -> loci.social.PublicUser
 	2,  // 3: loci.social.FriendRequest.to:type_name -> loci.social.PublicUser
-	38, // 4: loci.social.FriendRequest.created_at:type_name -> google.protobuf.Timestamp
-	38, // 5: loci.social.Invite.expires_at:type_name -> google.protobuf.Timestamp
+	40, // 4: loci.social.FriendRequest.created_at:type_name -> google.protobuf.Timestamp
+	40, // 5: loci.social.Invite.expires_at:type_name -> google.protobuf.Timestamp
 	2,  // 6: loci.social.Invite.inviter:type_name -> loci.social.PublicUser
 	5,  // 7: loci.social.GetMyInviteResponse.invite:type_name -> loci.social.Invite
 	5,  // 8: loci.social.GetInviteResponse.invite:type_name -> loci.social.Invite
@@ -2157,48 +2242,51 @@ var file_loci_social_social_proto_depIdxs = []int32{
 	2,  // 17: loci.social.ContactMatch.user:type_name -> loci.social.PublicUser
 	0,  // 18: loci.social.ContactMatch.relationship:type_name -> loci.social.Relationship
 	31, // 19: loci.social.MatchContactsResponse.matches:type_name -> loci.social.ContactMatch
-	2,  // 20: loci.social.UserResult.user:type_name -> loci.social.PublicUser
-	0,  // 21: loci.social.UserResult.relationship:type_name -> loci.social.Relationship
-	34, // 22: loci.social.SearchUsersResponse.users:type_name -> loci.social.UserResult
-	2,  // 23: loci.social.GetPublicProfileResponse.user:type_name -> loci.social.PublicUser
-	6,  // 24: loci.social.GetPublicProfileResponse.stats:type_name -> loci.social.ProfileStats
-	0,  // 25: loci.social.GetPublicProfileResponse.relationship:type_name -> loci.social.Relationship
-	38, // 26: loci.social.GetPublicProfileResponse.member_since:type_name -> google.protobuf.Timestamp
-	7,  // 27: loci.social.SocialService.GetMyInvite:input_type -> loci.social.GetMyInviteRequest
-	9,  // 28: loci.social.SocialService.RotateInvite:input_type -> loci.social.RotateInviteRequest
-	10, // 29: loci.social.SocialService.GetInvite:input_type -> loci.social.GetInviteRequest
-	12, // 30: loci.social.SocialService.AcceptInvite:input_type -> loci.social.AcceptInviteRequest
-	14, // 31: loci.social.SocialService.SendFriendRequest:input_type -> loci.social.SendFriendRequestRequest
-	16, // 32: loci.social.SocialService.RespondFriendRequest:input_type -> loci.social.RespondFriendRequestRequest
-	18, // 33: loci.social.SocialService.CancelFriendRequest:input_type -> loci.social.CancelFriendRequestRequest
-	20, // 34: loci.social.SocialService.ListFriendRequests:input_type -> loci.social.ListFriendRequestsRequest
-	22, // 35: loci.social.SocialService.ListFriends:input_type -> loci.social.ListFriendsRequest
-	24, // 36: loci.social.SocialService.RemoveFriend:input_type -> loci.social.RemoveFriendRequest
-	26, // 37: loci.social.SocialService.BlockUser:input_type -> loci.social.BlockUserRequest
-	28, // 38: loci.social.SocialService.UnblockUser:input_type -> loci.social.UnblockUserRequest
-	30, // 39: loci.social.SocialService.MatchContacts:input_type -> loci.social.MatchContactsRequest
-	33, // 40: loci.social.SocialService.SearchUsers:input_type -> loci.social.SearchUsersRequest
-	36, // 41: loci.social.SocialService.GetPublicProfile:input_type -> loci.social.GetPublicProfileRequest
-	8,  // 42: loci.social.SocialService.GetMyInvite:output_type -> loci.social.GetMyInviteResponse
-	8,  // 43: loci.social.SocialService.RotateInvite:output_type -> loci.social.GetMyInviteResponse
-	11, // 44: loci.social.SocialService.GetInvite:output_type -> loci.social.GetInviteResponse
-	13, // 45: loci.social.SocialService.AcceptInvite:output_type -> loci.social.AcceptInviteResponse
-	15, // 46: loci.social.SocialService.SendFriendRequest:output_type -> loci.social.SendFriendRequestResponse
-	17, // 47: loci.social.SocialService.RespondFriendRequest:output_type -> loci.social.RespondFriendRequestResponse
-	19, // 48: loci.social.SocialService.CancelFriendRequest:output_type -> loci.social.CancelFriendRequestResponse
-	21, // 49: loci.social.SocialService.ListFriendRequests:output_type -> loci.social.ListFriendRequestsResponse
-	23, // 50: loci.social.SocialService.ListFriends:output_type -> loci.social.ListFriendsResponse
-	25, // 51: loci.social.SocialService.RemoveFriend:output_type -> loci.social.RemoveFriendResponse
-	27, // 52: loci.social.SocialService.BlockUser:output_type -> loci.social.BlockUserResponse
-	29, // 53: loci.social.SocialService.UnblockUser:output_type -> loci.social.UnblockUserResponse
-	32, // 54: loci.social.SocialService.MatchContacts:output_type -> loci.social.MatchContactsResponse
-	35, // 55: loci.social.SocialService.SearchUsers:output_type -> loci.social.SearchUsersResponse
-	37, // 56: loci.social.SocialService.GetPublicProfile:output_type -> loci.social.GetPublicProfileResponse
-	42, // [42:57] is the sub-list for method output_type
-	27, // [27:42] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	36, // 20: loci.social.MatchFacebookFriendsResponse.matches:type_name -> loci.social.UserResult
+	2,  // 21: loci.social.UserResult.user:type_name -> loci.social.PublicUser
+	0,  // 22: loci.social.UserResult.relationship:type_name -> loci.social.Relationship
+	36, // 23: loci.social.SearchUsersResponse.users:type_name -> loci.social.UserResult
+	2,  // 24: loci.social.GetPublicProfileResponse.user:type_name -> loci.social.PublicUser
+	6,  // 25: loci.social.GetPublicProfileResponse.stats:type_name -> loci.social.ProfileStats
+	0,  // 26: loci.social.GetPublicProfileResponse.relationship:type_name -> loci.social.Relationship
+	40, // 27: loci.social.GetPublicProfileResponse.member_since:type_name -> google.protobuf.Timestamp
+	7,  // 28: loci.social.SocialService.GetMyInvite:input_type -> loci.social.GetMyInviteRequest
+	9,  // 29: loci.social.SocialService.RotateInvite:input_type -> loci.social.RotateInviteRequest
+	10, // 30: loci.social.SocialService.GetInvite:input_type -> loci.social.GetInviteRequest
+	12, // 31: loci.social.SocialService.AcceptInvite:input_type -> loci.social.AcceptInviteRequest
+	14, // 32: loci.social.SocialService.SendFriendRequest:input_type -> loci.social.SendFriendRequestRequest
+	16, // 33: loci.social.SocialService.RespondFriendRequest:input_type -> loci.social.RespondFriendRequestRequest
+	18, // 34: loci.social.SocialService.CancelFriendRequest:input_type -> loci.social.CancelFriendRequestRequest
+	20, // 35: loci.social.SocialService.ListFriendRequests:input_type -> loci.social.ListFriendRequestsRequest
+	22, // 36: loci.social.SocialService.ListFriends:input_type -> loci.social.ListFriendsRequest
+	24, // 37: loci.social.SocialService.RemoveFriend:input_type -> loci.social.RemoveFriendRequest
+	26, // 38: loci.social.SocialService.BlockUser:input_type -> loci.social.BlockUserRequest
+	28, // 39: loci.social.SocialService.UnblockUser:input_type -> loci.social.UnblockUserRequest
+	30, // 40: loci.social.SocialService.MatchContacts:input_type -> loci.social.MatchContactsRequest
+	33, // 41: loci.social.SocialService.MatchFacebookFriends:input_type -> loci.social.MatchFacebookFriendsRequest
+	35, // 42: loci.social.SocialService.SearchUsers:input_type -> loci.social.SearchUsersRequest
+	38, // 43: loci.social.SocialService.GetPublicProfile:input_type -> loci.social.GetPublicProfileRequest
+	8,  // 44: loci.social.SocialService.GetMyInvite:output_type -> loci.social.GetMyInviteResponse
+	8,  // 45: loci.social.SocialService.RotateInvite:output_type -> loci.social.GetMyInviteResponse
+	11, // 46: loci.social.SocialService.GetInvite:output_type -> loci.social.GetInviteResponse
+	13, // 47: loci.social.SocialService.AcceptInvite:output_type -> loci.social.AcceptInviteResponse
+	15, // 48: loci.social.SocialService.SendFriendRequest:output_type -> loci.social.SendFriendRequestResponse
+	17, // 49: loci.social.SocialService.RespondFriendRequest:output_type -> loci.social.RespondFriendRequestResponse
+	19, // 50: loci.social.SocialService.CancelFriendRequest:output_type -> loci.social.CancelFriendRequestResponse
+	21, // 51: loci.social.SocialService.ListFriendRequests:output_type -> loci.social.ListFriendRequestsResponse
+	23, // 52: loci.social.SocialService.ListFriends:output_type -> loci.social.ListFriendsResponse
+	25, // 53: loci.social.SocialService.RemoveFriend:output_type -> loci.social.RemoveFriendResponse
+	27, // 54: loci.social.SocialService.BlockUser:output_type -> loci.social.BlockUserResponse
+	29, // 55: loci.social.SocialService.UnblockUser:output_type -> loci.social.UnblockUserResponse
+	32, // 56: loci.social.SocialService.MatchContacts:output_type -> loci.social.MatchContactsResponse
+	34, // 57: loci.social.SocialService.MatchFacebookFriends:output_type -> loci.social.MatchFacebookFriendsResponse
+	37, // 58: loci.social.SocialService.SearchUsers:output_type -> loci.social.SearchUsersResponse
+	39, // 59: loci.social.SocialService.GetPublicProfile:output_type -> loci.social.GetPublicProfileResponse
+	44, // [44:60] is the sub-list for method output_type
+	28, // [28:44] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_loci_social_social_proto_init() }
@@ -2210,7 +2298,7 @@ func file_loci_social_social_proto_init() {
 		(*SendFriendRequestRequest_UserId)(nil),
 		(*SendFriendRequestRequest_Username)(nil),
 	}
-	file_loci_social_social_proto_msgTypes[34].OneofWrappers = []any{
+	file_loci_social_social_proto_msgTypes[36].OneofWrappers = []any{
 		(*GetPublicProfileRequest_UserId)(nil),
 		(*GetPublicProfileRequest_Username)(nil),
 	}
@@ -2220,7 +2308,7 @@ func file_loci_social_social_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_social_social_proto_rawDesc), len(file_loci_social_social_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   36,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

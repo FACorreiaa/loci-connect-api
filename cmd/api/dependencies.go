@@ -16,6 +16,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
+	boardsdomain "github.com/FACorreiaa/loci-connect-api/internal/domain/boards"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/bundle"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/calendar"
 	chathandler "github.com/FACorreiaa/loci-connect-api/internal/domain/chat/handler"
@@ -184,7 +185,9 @@ type Dependencies struct {
 	// nil without a database.
 	GamificationHandler *gamification.Handler
 	// gamification awards points from other domains' handlers.
-	gamification      *gamification.Service
+	gamification *gamification.Service
+	// BoardsHandler is the community boards; nil without a database.
+	BoardsHandler     *boardsdomain.Handler
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
 	ListHandler       *itineraryhandler.ListHandler
 	StatisticsHandler *statistics.Handler
@@ -922,6 +925,10 @@ func (d *Dependencies) initHandlers() error {
 		// which edits a trip's plan through the same rules as the editor.
 		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), flights.DeepLinks{})
 		d.TripHandler = d.TripHandler.WithPlan(d.TripService)
+		// Boards moderators are ADMIN_EMAILS plus the single ADMIN_EMAIL.
+		boardAdmins := append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)
+		boardsSvc := boardsdomain.NewService(boardsdomain.NewRepository(d.DB.Pool), boardAdmins, boardsdomain.DefaultLimits)
+		d.BoardsHandler = boardsdomain.NewHandler(boardsSvc, socialSvc, d.Logger)
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(

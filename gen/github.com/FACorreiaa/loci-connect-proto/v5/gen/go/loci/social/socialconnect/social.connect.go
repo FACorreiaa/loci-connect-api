@@ -70,6 +70,9 @@ const (
 	// SocialServiceMatchContactsProcedure is the fully-qualified name of the SocialService's
 	// MatchContacts RPC.
 	SocialServiceMatchContactsProcedure = "/loci.social.SocialService/MatchContacts"
+	// SocialServiceMatchFacebookFriendsProcedure is the fully-qualified name of the SocialService's
+	// MatchFacebookFriends RPC.
+	SocialServiceMatchFacebookFriendsProcedure = "/loci.social.SocialService/MatchFacebookFriends"
 	// SocialServiceSearchUsersProcedure is the fully-qualified name of the SocialService's SearchUsers
 	// RPC.
 	SocialServiceSearchUsersProcedure = "/loci.social.SocialService/SearchUsers"
@@ -94,6 +97,7 @@ var (
 	socialServiceBlockUserMethodDescriptor            = socialServiceServiceDescriptor.Methods().ByName("BlockUser")
 	socialServiceUnblockUserMethodDescriptor          = socialServiceServiceDescriptor.Methods().ByName("UnblockUser")
 	socialServiceMatchContactsMethodDescriptor        = socialServiceServiceDescriptor.Methods().ByName("MatchContacts")
+	socialServiceMatchFacebookFriendsMethodDescriptor = socialServiceServiceDescriptor.Methods().ByName("MatchFacebookFriends")
 	socialServiceSearchUsersMethodDescriptor          = socialServiceServiceDescriptor.Methods().ByName("SearchUsers")
 	socialServiceGetPublicProfileMethodDescriptor     = socialServiceServiceDescriptor.Methods().ByName("GetPublicProfile")
 )
@@ -127,6 +131,11 @@ type SocialServiceClient interface {
 	// verified phone numbers and emails match, and nothing is stored for
 	// contacts who are not on Loci.
 	MatchContacts(context.Context, *connect.Request[social.MatchContactsRequest]) (*connect.Response[social.MatchContactsResponse], error)
+	// MatchFacebookFriends finds Loci users among the caller's Facebook friends.
+	// It reads the friend list Facebook granted at LinkFacebook, so it only
+	// finds friends who also linked Facebook to Loci; it is FailedPrecondition
+	// when the caller has not linked Facebook.
+	MatchFacebookFriends(context.Context, *connect.Request[social.MatchFacebookFriendsRequest]) (*connect.Response[social.MatchFacebookFriendsResponse], error)
 	// SearchUsers finds users by username prefix.
 	SearchUsers(context.Context, *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error)
 	// GetPublicProfile is a user's profile as the caller may see it. A user who
@@ -222,6 +231,12 @@ func NewSocialServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(socialServiceMatchContactsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		matchFacebookFriends: connect.NewClient[social.MatchFacebookFriendsRequest, social.MatchFacebookFriendsResponse](
+			httpClient,
+			baseURL+SocialServiceMatchFacebookFriendsProcedure,
+			connect.WithSchema(socialServiceMatchFacebookFriendsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		searchUsers: connect.NewClient[social.SearchUsersRequest, social.SearchUsersResponse](
 			httpClient,
 			baseURL+SocialServiceSearchUsersProcedure,
@@ -252,6 +267,7 @@ type socialServiceClient struct {
 	blockUser            *connect.Client[social.BlockUserRequest, social.BlockUserResponse]
 	unblockUser          *connect.Client[social.UnblockUserRequest, social.UnblockUserResponse]
 	matchContacts        *connect.Client[social.MatchContactsRequest, social.MatchContactsResponse]
+	matchFacebookFriends *connect.Client[social.MatchFacebookFriendsRequest, social.MatchFacebookFriendsResponse]
 	searchUsers          *connect.Client[social.SearchUsersRequest, social.SearchUsersResponse]
 	getPublicProfile     *connect.Client[social.GetPublicProfileRequest, social.GetPublicProfileResponse]
 }
@@ -321,6 +337,11 @@ func (c *socialServiceClient) MatchContacts(ctx context.Context, req *connect.Re
 	return c.matchContacts.CallUnary(ctx, req)
 }
 
+// MatchFacebookFriends calls loci.social.SocialService.MatchFacebookFriends.
+func (c *socialServiceClient) MatchFacebookFriends(ctx context.Context, req *connect.Request[social.MatchFacebookFriendsRequest]) (*connect.Response[social.MatchFacebookFriendsResponse], error) {
+	return c.matchFacebookFriends.CallUnary(ctx, req)
+}
+
 // SearchUsers calls loci.social.SocialService.SearchUsers.
 func (c *socialServiceClient) SearchUsers(ctx context.Context, req *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error) {
 	return c.searchUsers.CallUnary(ctx, req)
@@ -360,6 +381,11 @@ type SocialServiceHandler interface {
 	// verified phone numbers and emails match, and nothing is stored for
 	// contacts who are not on Loci.
 	MatchContacts(context.Context, *connect.Request[social.MatchContactsRequest]) (*connect.Response[social.MatchContactsResponse], error)
+	// MatchFacebookFriends finds Loci users among the caller's Facebook friends.
+	// It reads the friend list Facebook granted at LinkFacebook, so it only
+	// finds friends who also linked Facebook to Loci; it is FailedPrecondition
+	// when the caller has not linked Facebook.
+	MatchFacebookFriends(context.Context, *connect.Request[social.MatchFacebookFriendsRequest]) (*connect.Response[social.MatchFacebookFriendsResponse], error)
 	// SearchUsers finds users by username prefix.
 	SearchUsers(context.Context, *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error)
 	// GetPublicProfile is a user's profile as the caller may see it. A user who
@@ -451,6 +477,12 @@ func NewSocialServiceHandler(svc SocialServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(socialServiceMatchContactsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	socialServiceMatchFacebookFriendsHandler := connect.NewUnaryHandler(
+		SocialServiceMatchFacebookFriendsProcedure,
+		svc.MatchFacebookFriends,
+		connect.WithSchema(socialServiceMatchFacebookFriendsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	socialServiceSearchUsersHandler := connect.NewUnaryHandler(
 		SocialServiceSearchUsersProcedure,
 		svc.SearchUsers,
@@ -491,6 +523,8 @@ func NewSocialServiceHandler(svc SocialServiceHandler, opts ...connect.HandlerOp
 			socialServiceUnblockUserHandler.ServeHTTP(w, r)
 		case SocialServiceMatchContactsProcedure:
 			socialServiceMatchContactsHandler.ServeHTTP(w, r)
+		case SocialServiceMatchFacebookFriendsProcedure:
+			socialServiceMatchFacebookFriendsHandler.ServeHTTP(w, r)
 		case SocialServiceSearchUsersProcedure:
 			socialServiceSearchUsersHandler.ServeHTTP(w, r)
 		case SocialServiceGetPublicProfileProcedure:
@@ -554,6 +588,10 @@ func (UnimplementedSocialServiceHandler) UnblockUser(context.Context, *connect.R
 
 func (UnimplementedSocialServiceHandler) MatchContacts(context.Context, *connect.Request[social.MatchContactsRequest]) (*connect.Response[social.MatchContactsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.MatchContacts is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) MatchFacebookFriends(context.Context, *connect.Request[social.MatchFacebookFriendsRequest]) (*connect.Response[social.MatchFacebookFriendsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.MatchFacebookFriends is not implemented"))
 }
 
 func (UnimplementedSocialServiceHandler) SearchUsers(context.Context, *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error) {
