@@ -65,3 +65,30 @@ func TestToDayPB_LeavesAPositionlessStopWithoutAPoi(t *testing.T) {
 	got := toDayPB(Day{DayNumber: 1, Stops: []Stop{{Name: "nowhere"}}})
 	assert.Nil(t, got.Stops[0].Poi)
 }
+
+// A stop's picture travels with its credit, on the stop and on the hydrated
+// POI; one missing its licence or attribution is not sent at all.
+func TestToDayPB_CarriesTheStopImage(t *testing.T) {
+	lat, lon := 38.69, -9.21
+	img := &StopImage{URL: "https://upload.test/a.jpg", Source: "wikimedia", Licence: "CC BY 2.0", Attribution: "A. Author"}
+	got := toDayPB(Day{DayNumber: 1, Stops: []Stop{
+		{Name: "pictured", Latitude: &lat, Longitude: &lon, Image: img},
+		{Name: "no position", Image: img},
+		{Name: "uncredited", Image: &StopImage{URL: "https://upload.test/b.jpg", Licence: "CC BY 2.0"}},
+		{Name: "none"},
+	}})
+	require.Len(t, got.GetStops(), 4)
+
+	s := got.GetStops()[0]
+	require.NotNil(t, s.GetImage())
+	assert.Equal(t, "https://upload.test/a.jpg", s.GetImage().GetUrl())
+	assert.Equal(t, "CC BY 2.0", s.GetImage().GetLicence())
+	assert.Equal(t, []string{"https://upload.test/a.jpg"}, s.GetPoi().GetImages())
+	require.Len(t, s.GetPoi().GetImageCredits(), 1)
+	assert.Equal(t, "A. Author", s.GetPoi().GetImageCredits()[0].GetAttribution())
+
+	assert.Equal(t, "https://upload.test/a.jpg", got.GetStops()[1].GetImage().GetUrl(), "image does not need a position")
+	assert.Nil(t, got.GetStops()[1].GetPoi())
+	assert.Nil(t, got.GetStops()[2].GetImage(), "an uncredited picture is never sent")
+	assert.Nil(t, got.GetStops()[3].GetImage())
+}

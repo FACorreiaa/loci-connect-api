@@ -79,3 +79,61 @@ func TestRepository_SaveTripKeepsDayAndStopIDs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, foreign, otherBack.Days[0].ID)
 }
+
+// Legs used to be deleted and re-inserted on every save, so the globe's arc
+// ids (GlobeArc.id is the trip_legs id) changed whenever a trip was edited.
+// A leg kept across a save keeps its id, whether the client sends the id back
+// or just the same hop; only removed legs lose theirs.
+func TestRepository_SaveTripKeepsLegIDs(t *testing.T) {
+	ctx := context.Background()
+	repo := NewRepository(testTripDB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	userID := newTripUser(t, "legids-"+uuid.NewString()+"@loci.test")
+
+	lat, lon := 41.15, -8.61
+	first, err := repo.SaveTrip(ctx, &Trip{
+		UserID: userID, CityName: "Porto", Title: "Portugal",
+		Days: []TripDay{{DayNumber: 1, CityName: "Porto"}, {DayNumber: 2, CityName: "Lisbon"}, {DayNumber: 3, CityName: "Faro"}},
+		Legs: []TripLeg{
+			{AfterDay: 1, FromName: "Porto", ToName: "Lisbon", FromLat: &lat, FromLon: &lon, Mode: "rail"},
+			{AfterDay: 2, FromName: "Lisbon", ToName: "Faro", Mode: "drive"},
+		},
+	}, 0)
+	require.NoError(t, err)
+	require.Len(t, first.Legs, 2)
+	portoLisbon, lisbonFaro := first.Legs[0].ID, first.Legs[1].ID
+	require.NotEqual(t, uuid.Nil, portoLisbon)
+
+	// Edit: the first leg comes back with its id, the second without an id
+	// (as the multi-city planner rebuilds it), and a new leg is added.
+	edit := *first
+	edit.Legs = []TripLeg{
+		{ID: portoLisbon, AfterDay: 1, FromName: "Porto", ToName: "Lisbon", Mode: "drive"},
+		{AfterDay: 2, FromName: "Lisbon", ToName: "Faro", Mode: "drive", DurationMins: 170},
+		{AfterDay: 3, FromName: "Faro", ToName: "Seville", Mode: "bus"},
+	}
+	second, err := repo.SaveTrip(ctx, &edit, first.Version)
+	require.NoError(t, err)
+	require.Equal(t, portoLisbon, second.Legs[0].ID, "a leg sent back with its id keeps it")
+	require.Equal(t, lisbonFaro, second.Legs[1].ID, "a leg on the same hop keeps its id")
+	require.NotContains(t, []uuid.UUID{uuid.Nil, portoLisbon, lisbonFaro}, second.Legs[2].ID)
+
+	back, err := repo.GetTrip(ctx, first.ID, userID)
+	require.NoError(t, err)
+	got := map[uuid.UUID]TripLeg{}
+	for _, l := range back.Legs {
+		got[l.ID] = l
+	}
+	require.Len(t, got, 3)
+	require.Equal(t, "drive", got[portoLisbon].Mode, "the kept id carries the edited row")
+	require.Equal(t, int32(170), got[lisbonFaro].DurationMins)
+
+	// Remove the middle leg: only it loses its id.
+	edit2 := *second
+	edit2.Legs = []TripLeg{second.Legs[0], second.Legs[2]}
+	third, err := repo.SaveTrip(ctx, &edit2, second.Version)
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{portoLisbon, second.Legs[2].ID}, []uuid.UUID{third.Legs[0].ID, third.Legs[1].ID})
+	back, err = repo.GetTrip(ctx, first.ID, userID)
+	require.NoError(t, err)
+	require.Len(t, back.Legs, 2)
+}
