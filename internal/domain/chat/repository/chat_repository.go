@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -246,13 +247,6 @@ type chatSessionAggRow struct {
 	InteractionsJSON      string    `db:"interactions"`
 }
 
-func ptrToInt64(v *int64) int64 {
-	if v == nil {
-		return 0
-	}
-	return *v
-}
-
 func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 	return &RepositoryImpl{
 		logger: logger,
@@ -288,15 +282,6 @@ const saveInteractionQuery = `
         RETURNING id
     `
 
-// nullIfEmpty maps "" to NULL for nullable text columns, so an unset field
-// is stored as absent rather than as an empty string.
-func nullIfEmpty(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 // nullIfEmptyJSON maps an empty payload to NULL: an empty json.RawMessage is
 // not valid JSON and would be rejected by a JSONB column.
 func nullIfEmptyJSON(raw json.RawMessage) []byte {
@@ -329,17 +314,17 @@ func (r *RepositoryImpl) SaveInteraction(ctx context.Context, interaction locity
 			interaction.ModelUsed,
 			interaction.LatencyMs,
 			interaction.CityName,
-			nullIfEmpty(interaction.CacheKey),
+			util.StrZeroPtr(interaction.CacheKey),
 			interaction.CacheHit,
-			nullIfEmpty(interaction.PromptHash),
-			nullIfEmpty(interaction.Provider),
+			util.StrZeroPtr(interaction.PromptHash),
+			util.StrZeroPtr(interaction.Provider),
 			interaction.PromptTokens,
 			interaction.CompletionTokens,
 			interaction.TotalTokens,
 			interaction.IsStreaming,
 			nullIfEmptyJSON(interaction.ResponsePayload),
-			nullIfEmpty(interaction.Intent),
-			nullIfEmpty(interaction.SearchType),
+			util.StrZeroPtr(interaction.Intent),
+			util.StrZeroPtr(interaction.SearchType),
 			interaction.CityID,
 		).Scan(&interactionID)
 		if err != nil {
@@ -1214,12 +1199,12 @@ func (r *RepositoryImpl) GetUserChatSessions(ctx context.Context, userID uuid.UU
 
 		// Calculate enriched metrics
 		performanceMetrics := locitypes.SessionPerformanceMetrics{
-			AvgResponseTimeMs: int(ptrToInt64(row.AvgLatencyMs)),
-			TotalTokens:       int(ptrToInt64(row.TotalTokens)),
-			PromptTokens:      int(ptrToInt64(row.TotalPromptTokens)),
-			CompletionTokens:  int(ptrToInt64(row.TotalCompletionTokens)),
+			AvgResponseTimeMs: int(util.Val(row.AvgLatencyMs)),
+			TotalTokens:       int(util.Val(row.TotalTokens)),
+			PromptTokens:      int(util.Val(row.TotalPromptTokens)),
+			CompletionTokens:  int(util.Val(row.TotalCompletionTokens)),
 			ModelsUsed:        row.ModelsUsed,
-			TotalLatencyMs:    int(ptrToInt64(row.TotalLatencyMs)),
+			TotalLatencyMs:    int(util.Val(row.TotalLatencyMs)),
 		}
 
 		// Calculate unique cities covered

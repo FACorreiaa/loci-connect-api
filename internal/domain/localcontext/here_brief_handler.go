@@ -3,11 +3,11 @@ package localcontext
 import (
 	"context"
 	"log/slog"
-	"math"
 	"sync"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	lcv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext"
 )
 
@@ -29,7 +29,7 @@ func (h *Handler) WithPlaces(p PlaceResolver) *Handler {
 // weather, alerts, cache keys — sees only the rounded value, and none of it
 // is logged.
 func roundCoord(v float64) float64 {
-	return math.Round(v*100) / 100
+	return util.RoundHalfUpToScale(v, 2)
 }
 
 func (h *Handler) GetHereBrief(

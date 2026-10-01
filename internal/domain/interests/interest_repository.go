@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -57,10 +58,6 @@ func NewRepositoryImpl(pgxpool PgxPool, logger *slog.Logger) *RepositoryImpl {
 		logger: logger,
 		pgpool: pgxpool,
 	}
-}
-
-func pointerBool(v bool) *bool {
-	return &v
 }
 
 // CreateInterest implements user.CreateInterest
@@ -127,7 +124,7 @@ func (r *RepositoryImpl) CreateInterest(ctx context.Context, name string, descri
 	interest := locitypes.Interest{
 		ID:        dbRow.ID,
 		Name:      dbRow.Name,
-		Active:    pointerBool(dbRow.Active),
+		Active:    util.Ptr(dbRow.Active),
 		CreatedAt: dbRow.CreatedAt,
 		Source:    "custom",
 	}

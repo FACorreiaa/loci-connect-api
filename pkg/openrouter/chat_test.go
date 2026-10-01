@@ -1,6 +1,7 @@
 package openrouter
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -192,5 +193,75 @@ func TestChatRequestOmitsReasoningForOtherBackends(t *testing.T) {
 	}
 	if _, present := sent["reasoning"]; present {
 		t.Errorf("reasoning was sent to a non-OpenRouter backend: %s", body)
+	}
+}
+
+// retryDelayFor sends one request that is answered 429 (with retryAfter as the
+// Retry-After header when non-empty) and then 200, and returns the delay the
+// client chose before retrying, as it logged it.
+func retryDelayFor(t *testing.T, retryAfter string, baseDelay, maxDelay time.Duration) time.Duration {
+	t.Helper()
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		if requests == 1 {
+			if retryAfter != "" {
+				w.Header().Set("Retry-After", retryAfter)
+			}
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"req-1","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}]}`)
+	}))
+	defer server.Close()
+
+	var logs bytes.Buffer
+	cfg := testAIConfig()
+	cfg.MaxRetries = 1
+	cfg.RetryBaseDelay = baseDelay
+	cfg.RetryMaxDelay = maxDelay
+	cfg.GenerateTimeout = 5 * time.Second
+	client, err := NewChatClient(cfg, slog.New(slog.NewJSONHandler(&logs, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.baseURL = server.URL
+	if _, err := client.Generate(context.Background(), "hi", nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("requests = %d, want 2", requests)
+	}
+
+	var record struct {
+		Delay *time.Duration `json:"delay"`
+	}
+	for line := range strings.SplitSeq(strings.TrimSpace(logs.String()), "\n") {
+		if err := json.Unmarshal([]byte(line), &record); err == nil && record.Delay != nil {
+			return *record.Delay
+		}
+	}
+	t.Fatalf("no retry delay logged: %s", logs.String())
+	return 0
+}
+
+// A 429 asking for 30s must not be retried after the exponential 1ms. The wait
+// is capped at the configured maximum instead, as in pkg/httpx.
+func TestChatClientCapsRetryAfterAtMaxDelay(t *testing.T) {
+	if got, want := retryDelayFor(t, "30", time.Millisecond, 50*time.Millisecond), 50*time.Millisecond; got != want {
+		t.Fatalf("delay = %v, want %v", got, want)
+	}
+}
+
+func TestChatClientHonoursRetryAfterWithinMaxDelay(t *testing.T) {
+	if got, want := retryDelayFor(t, "1", time.Millisecond, 2*time.Second), time.Second; got != want {
+		t.Fatalf("delay = %v, want %v", got, want)
+	}
+}
+
+func TestChatClientBacksOffExponentiallyWithoutRetryAfter(t *testing.T) {
+	if got, want := retryDelayFor(t, "", 3*time.Millisecond, time.Second), 3*time.Millisecond; got != want {
+		t.Fatalf("delay = %v, want %v", got, want)
 	}
 }

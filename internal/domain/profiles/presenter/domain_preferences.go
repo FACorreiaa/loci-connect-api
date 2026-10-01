@@ -1,6 +1,7 @@
 package presenter
 
 import (
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	interestv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest"
 	profilev1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile"
@@ -13,13 +14,6 @@ import (
 // messages alike. Until these converters existed the presenter simply skipped
 // them, which left the repository code that persists them unreachable and gave
 // every user the hard-coded defaults seeded by migration 0018.
-
-func optionalString(v string) *string {
-	if v == "" {
-		return nil
-	}
-	return &v
-}
 
 func fromProtoRangeFilter(r *commonpb.RangeFilter) *locitypes.RangeFilter {
 	if r == nil {
@@ -63,9 +57,9 @@ func ToProtoAccommodationPreferences(p *locitypes.AccommodationPreferences) *pro
 		PriceRangePerNight: toProtoRangeFilter(p.PriceRangePerNight),
 		Amenities:          p.Amenities,
 		RoomType:           p.RoomType,
-		ChainPreference:    optionalString(p.ChainPreference),
+		ChainPreference:    util.StrZeroPtr(p.ChainPreference),
 		CancellationPolicy: p.CancellationPolicy,
-		BookingFlexibility: optionalString(p.BookingFlexibility),
+		BookingFlexibility: util.StrZeroPtr(p.BookingFlexibility),
 		CreatedAt:          timestamppb.New(p.CreatedAt),
 		UpdatedAt:          timestamppb.New(p.UpdatedAt),
 	}
@@ -105,7 +99,7 @@ func ToProtoDiningPreferences(p *locitypes.DiningPreferences) *profilev1.DiningP
 		AllergenFree:            p.AllergenFree,
 		MichelinRated:           p.MichelinRated,
 		LocalRecommendations:    p.LocalRecommendations,
-		ChainVsLocal:            optionalString(p.ChainVsLocal),
+		ChainVsLocal:            util.StrZeroPtr(p.ChainVsLocal),
 		OrganicPreference:       p.OrganicPreference,
 		OutdoorSeatingPreferred: p.OutdoorSeatingPref,
 		CreatedAt:               timestamppb.New(p.CreatedAt),
@@ -139,10 +133,10 @@ func ToProtoActivityPreferences(p *locitypes.ActivityPreferences) *profilev1.Act
 		Id:                       p.ID.String(),
 		UserPreferenceId:         p.UserPreferenceID.String(),
 		ActivityCategories:       p.ActivityCategories,
-		PhysicalActivityLevel:    optionalString(p.PhysicalActivityLevel),
-		IndoorOutdoorPreference:  optionalString(p.IndoorOutdoorPref),
-		CulturalImmersionLevel:   optionalString(p.CulturalImmersionLevel),
-		MustSeeVsHiddenGems:      optionalString(p.MustSeeVsHiddenGems),
+		PhysicalActivityLevel:    util.StrZeroPtr(p.PhysicalActivityLevel),
+		IndoorOutdoorPreference:  util.StrZeroPtr(p.IndoorOutdoorPref),
+		CulturalImmersionLevel:   util.StrZeroPtr(p.CulturalImmersionLevel),
+		MustSeeVsHiddenGems:      util.StrZeroPtr(p.MustSeeVsHiddenGems),
 		EducationalPreference:    p.EducationalPreference,
 		PhotographyOpportunities: p.PhotoOpportunities,
 		SeasonSpecificActivities: p.SeasonSpecific,
@@ -177,15 +171,15 @@ func ToProtoItineraryPreferences(p *locitypes.ItineraryPreferences) *profilev1.I
 	return &profilev1.ItineraryPreferences{
 		Id:                    p.ID.String(),
 		UserPreferenceId:      p.UserPreferenceID.String(),
-		PlanningStyle:         optionalString(p.PlanningStyle),
-		PreferredPace:         optionalString(p.PreferredPace),
-		TimeFlexibility:       optionalString(p.TimeFlexibility),
-		MorningVsEvening:      optionalString(p.MorningVsEvening),
-		WeekendVsWeekday:      optionalString(p.WeekendVsWeekday),
+		PlanningStyle:         util.StrZeroPtr(p.PlanningStyle),
+		PreferredPace:         util.StrZeroPtr(p.PreferredPace),
+		TimeFlexibility:       util.StrZeroPtr(p.TimeFlexibility),
+		MorningVsEvening:      util.StrZeroPtr(p.MorningVsEvening),
+		WeekendVsWeekday:      util.StrZeroPtr(p.WeekendVsWeekday),
 		PreferredSeasons:      p.PreferredSeasons,
 		AvoidPeakSeason:       p.AvoidPeakSeason,
-		AdventureVsRelaxation: optionalString(p.AdventureVsRelaxation),
-		SpontaneousVsPlanned:  optionalString(p.SpontaneousVsPlanned),
+		AdventureVsRelaxation: util.StrZeroPtr(p.AdventureVsRelaxation),
+		SpontaneousVsPlanned:  util.StrZeroPtr(p.SpontaneousVsPlanned),
 		CreatedAt:             timestamppb.New(p.CreatedAt),
 		UpdatedAt:             timestamppb.New(p.UpdatedAt),
 	}

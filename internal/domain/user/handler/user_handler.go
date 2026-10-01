@@ -11,6 +11,7 @@ import (
 
 	"connectrpc.com/connect"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	commonpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/common"
 	userpb "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/user/userconnect"
@@ -151,7 +152,7 @@ func toProtoProfile(p *locitypes.UserProfile) *userpb.UserProfile {
 		proto.PhoneNumber = p.PhoneNumber
 	}
 	if p.Age != nil {
-		proto.Age = ptrTo(int32(*p.Age))
+		proto.Age = util.Ptr(int32(*p.Age))
 	}
 	if p.City != nil {
 		proto.City = p.City
@@ -304,11 +305,6 @@ func validateTimezone(tz *string) error {
 		return fmt.Errorf("%q is not a time zone this server knows: %w", *tz, err)
 	}
 	return nil
-}
-
-// ptrTo returns a pointer to the given value.
-func ptrTo[T any](v T) *T {
-	return &v
 }
 
 // ExportUserData returns a machine-readable copy of the caller's data (GDPR-style

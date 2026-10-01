@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
 )
@@ -88,8 +89,8 @@ func clonePOISlice(pois []locitypes.POIDetailedInfo) []locitypes.POIDetailedInfo
 func generateFilteredPOICacheKey(lat, lon, distance float64, userID uuid.UUID) string {
 	// Round coordinates to 4 decimal places (~11m accuracy) to avoid cache misses
 	// from minor GPS fluctuations. Round distance to nearest km.
-	roundedLat := math.Round(lat*10000) / 10000
-	roundedLon := math.Round(lon*10000) / 10000
+	roundedLat := util.RoundHalfUpToScale(lat, 4)
+	roundedLon := util.RoundHalfUpToScale(lon, 4)
 	roundedDistance := math.Round(distance / 1000) // Round to nearest km
 	return fmt.Sprintf("poi_filtered:%.4f:%.4f:%.0f:%s", roundedLat, roundedLon, roundedDistance, userID.String())
 }

@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -336,7 +336,7 @@ func hasLiveWords(s string) bool {
 // finer than the prompt's own four-decimal rendering needs to be distinct and
 // coarse enough that GPS jitter does not mint a new key per request.
 func roundCoord(v float64) float64 {
-	return math.Round(v*1000) / 1000
+	return util.RoundHalfUpToScale(v, 3)
 }
 
 // generationKeyInput is everything a generation key may depend on. Which

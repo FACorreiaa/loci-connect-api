@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -247,7 +248,7 @@ func summarizeRecommendations(ctx context.Context, deps Deps, pois []locitypes.P
 			EventType:     recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DELIVERED,
 			Trace:         traceToProto(trace, surface),
 			OccurredAt:    timestamppb.New(time.Now()),
-			PoiId:         stringPointer(out.Results[index].ID),
+			PoiId:         util.StrZeroPtr(out.Results[index].ID),
 		})
 	}
 	if deps.Recommendation != nil && len(events) > 0 {
@@ -280,13 +281,6 @@ func traceToProto(trace *RecommendationTrace, surface recommendationv1.Recommend
 	}
 }
 
-func stringPointer(value string) *string {
-	if value == "" {
-		return nil
-	}
-	return &value
-}
-
 func recordMCPOutcome(ctx context.Context, deps Deps, trace *RecommendationTrace, poiID string, eventType recommendationv1.RecommendationEventType) {
 	if deps.Recommendation == nil || trace == nil {
 		return
@@ -298,7 +292,7 @@ func recordMCPOutcome(ctx context.Context, deps Deps, trace *RecommendationTrace
 	_, _ = deps.Recommendation.RecordEvents(ctx, connect.NewRequest(&recommendationv1.RecordEventsRequest{
 		Events: []*recommendationv1.RecommendationEvent{{
 			ClientEventId: uuid.NewString(), EventType: eventType, Trace: traceToProto(trace, surface),
-			OccurredAt: timestamppb.Now(), PoiId: stringPointer(poiID),
+			OccurredAt: timestamppb.Now(), PoiId: util.StrZeroPtr(poiID),
 		}},
 	}))
 }

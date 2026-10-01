@@ -3,6 +3,7 @@ package travelhistory
 import (
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	travelhistoryv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -30,13 +31,6 @@ func uuidPtrToString(id *uuid.UUID) string {
 	return id.String()
 }
 
-func stringPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
 // timestampOrNil keeps a zero time as a nil Timestamp rather than as the Unix
 // epoch, so the client can tell "no date" from "1 January 1970".
 func timestampOrNil(t time.Time) *timestamppb.Timestamp {
@@ -62,7 +56,7 @@ func visitedCityToProto(c *VisitedCity) *travelhistoryv1.VisitedCity {
 		CityId:       uuidPtrToString(c.CityID),
 		CityName:     c.CityName,
 		Country:      c.Country,
-		CountryCode:  stringPtr(c.CountryCode),
+		CountryCode:  util.Val(c.CountryCode),
 		Latitude:     c.Latitude,
 		Longitude:    c.Longitude,
 		Source:       sourceToProto(c.Source),

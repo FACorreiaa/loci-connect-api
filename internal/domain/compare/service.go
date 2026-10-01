@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	cityrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/city"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
@@ -357,7 +358,7 @@ func (s *Service) buildColumn(
 			DurationMins: int32(t.DurationMins),
 		}
 		if t.Mode == "drive" {
-			link.Url = ptr(s.transport.RideURL(originLat, originLon, lat, lon))
+			link.Url = util.Ptr(s.transport.RideURL(originLat, originLon, lat, lon))
 		}
 		col.TransportOptions = append(col.TransportOptions, link)
 	}
@@ -373,5 +374,3 @@ func (s *Service) buildColumn(
 		scorePB:  col.GoScore,
 	}, nil
 }
-
-func ptr(s string) *string { return &s }

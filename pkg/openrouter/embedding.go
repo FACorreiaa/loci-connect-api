@@ -13,6 +13,7 @@ import (
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/pkg/config"
+	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
 
@@ -214,7 +215,7 @@ func (c *EmbeddingClient) sendEmbeddingRequest(
 		if attempt >= c.transport.maxRetries || !isRetryableStatus(resp.StatusCode) {
 			return nil, apiErr
 		}
-		delay := retryDelay(
+		delay := httpx.RetryDelay(
 			resp.Header.Get("Retry-After"),
 			c.transport.baseDelay,
 			c.transport.maxDelay,
@@ -227,7 +228,7 @@ func (c *EmbeddingClient) sendEmbeddingRequest(
 			slog.Int("attempt", attempt+1),
 			slog.Duration("delay", delay),
 		)
-		if err := waitForRetry(ctx, delay); err != nil {
+		if err := httpx.WaitForRetry(ctx, delay); err != nil {
 			return nil, err
 		}
 	}

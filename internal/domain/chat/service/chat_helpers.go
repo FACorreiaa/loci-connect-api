@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/FACorreiaa/go-utils/pkg/util"
 	"github.com/google/uuid"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
@@ -23,8 +24,8 @@ var (
 )
 
 func generatePOICacheKey(city string, lat, lon, distance float64, userID uuid.UUID) string {
-	roundedLat := math.Round(lat*10000) / 10000
-	roundedLon := math.Round(lon*10000) / 10000
+	roundedLat := util.RoundHalfUpToScale(lat, 4)
+	roundedLon := util.RoundHalfUpToScale(lon, 4)
 	roundedDistance := math.Round(distance / 1000)
 	return fmt.Sprintf("poi:%s:%.4f:%.4f:%.0f:%s", city, roundedLat, roundedLon, roundedDistance, userID.String())
 }
