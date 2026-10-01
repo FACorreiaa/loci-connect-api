@@ -84,8 +84,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # k3s/ArgoCD delivery. Opens a PR against the infra repo bumping both image
-  # tags; merging it is what deploys. Self-gating: without INFRA_TOKEN it skips
-  # rather than fails, so a fork or a repo without the secret still goes green.
+  # tags; merging it is what deploys. Without INFRA_TOKEN the job fails. It
+  # used to skip and go green, and from 2026-09-26 that hid four days of
+  # built-but-undeployed images (GetCityGastronomy 404'd in production while
+  # every CD run reported success).
   #
   # Replaces a compose-over-SSH deploy that never once succeeded between
   # 2026-08-15 and 2026-09-07 — every run failed on an unset VPS_SSH_KEY — and
@@ -191,7 +193,5 @@ jobs:
       - name: Report when delivery is not configured
         if: steps.gate.outputs.configured == 'false'
         run: |
-          echo "INFRA_TOKEN is not set, so no promote PR was opened."
-          echo "The images are built and pushed; nothing will deploy until the"
-          echo "secret exists. It needs contents:write and pull-requests:write"
-          echo "on LuminaVault/LuminaVaultInfra."
+          echo "::error title=Not deployed::INFRA_TOKEN is not set, so no promote PR was opened. The images are built and pushed; nothing will deploy until the secret exists (contents:write and pull-requests:write on LuminaVault/LuminaVaultInfra), or until a promote PR is opened by hand."
+          exit 1
