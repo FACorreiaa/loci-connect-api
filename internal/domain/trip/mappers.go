@@ -13,6 +13,8 @@ import (
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 )
 
 func newShareCode() string {
@@ -212,6 +214,105 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 			pc.SessionId = c.SessionID.String()
 		}
 		p.Cities = append(p.Cities, pc)
+	}
+	p.StartDate = formatOptionalDate(t.StartDate)
+	p.EndDate = formatOptionalDate(t.EndDate)
+	for _, s := range t.Stays {
+		p.Stays = append(p.Stays, stayToProto(s))
+	}
+	for _, f := range t.Flights {
+		p.Flights = append(p.Flights, flightToProto(f))
+	}
+	return p
+}
+
+func parseDate(s string) (time.Time, error) {
+	d, err := time.Parse(time.DateOnly, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%w: %q is not a YYYY-MM-DD date", ErrInvalidEdit, s)
+	}
+	return d, nil
+}
+
+func parseOptionalDate(s *string) (*time.Time, error) {
+	if s == nil {
+		return nil, nil
+	}
+	d, err := parseDate(*s)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
+}
+
+func formatOptionalDate(d *time.Time) *string {
+	if d == nil {
+		return nil
+	}
+	s := d.Format(time.DateOnly)
+	return &s
+}
+
+func stayToProto(s TripStay) *tripv1.TripStay {
+	return &tripv1.TripStay{
+		CityName: s.CityName, PoiId: s.POIID, Name: s.Name, StarRating: s.StarRating,
+		CheckIn: formatOptionalDate(s.CheckIn), CheckOut: formatOptionalDate(s.CheckOut),
+		BookingUrl: s.BookingURL,
+	}
+}
+
+func stayFromProto(p *tripv1.TripStay) (TripStay, error) {
+	in, err := parseOptionalDate(p.CheckIn)
+	if err != nil {
+		return TripStay{}, err
+	}
+	out, err := parseOptionalDate(p.CheckOut)
+	if err != nil {
+		return TripStay{}, err
+	}
+	return TripStay{
+		CityName: p.GetCityName(), POIID: p.GetPoiId(), Name: p.GetName(), StarRating: p.GetStarRating(),
+		CheckIn: in, CheckOut: out, BookingURL: p.BookingUrl,
+	}, nil
+}
+
+func placeFromProto(p *tripv1.FlightPlace) flights.Place {
+	return flights.Place{Name: p.GetName(), IATA: p.GetIata()}
+}
+
+func placeToProto(p flights.Place) *tripv1.FlightPlace {
+	return &tripv1.FlightPlace{Name: p.Name, Iata: stringPtrOrNil(p.IATA)}
+}
+
+// flightFromProto reads what a client may set. id and links are ignored:
+// the server assigns one and builds the other.
+func flightFromProto(p *tripv1.TripFlight) (TripFlight, error) {
+	depart, err := parseDate(p.GetDepartDate())
+	if err != nil {
+		return TripFlight{}, err
+	}
+	ret, err := parseOptionalDate(p.ReturnDate)
+	if err != nil {
+		return TripFlight{}, err
+	}
+	return TripFlight{
+		Origin: placeFromProto(p.GetOrigin()), Destination: placeFromProto(p.GetDestination()),
+		DepartDate: depart, ReturnDate: ret,
+		Passengers: p.GetPassengers(), Cabin: flights.Cabin(p.GetCabin()),
+		Carrier: p.Carrier, FlightNo: p.FlightNo, PriceText: p.PriceText, Notes: p.Notes,
+	}, nil
+}
+
+func flightToProto(f TripFlight) *tripv1.TripFlight {
+	p := &tripv1.TripFlight{
+		Id:     f.ID.String(),
+		Origin: placeToProto(f.Origin), Destination: placeToProto(f.Destination),
+		DepartDate: f.DepartDate.Format(time.DateOnly), ReturnDate: formatOptionalDate(f.ReturnDate),
+		Passengers: f.Passengers, Cabin: tripv1.FlightCabin(f.Cabin),
+		Carrier: f.Carrier, FlightNo: f.FlightNo, PriceText: f.PriceText, Notes: f.Notes,
+	}
+	for _, l := range f.Links {
+		p.Links = append(p.Links, &tripv1.FlightLink{Provider: l.Provider, Label: l.Label, Url: l.URL})
 	}
 	return p
 }
