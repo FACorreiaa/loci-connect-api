@@ -48,6 +48,12 @@ const (
 	// CustomAuthServiceVerifyPhoneProcedure is the fully-qualified name of the CustomAuthService's
 	// VerifyPhone RPC.
 	CustomAuthServiceVerifyPhoneProcedure = "/loci.custom_auth.CustomAuthService/VerifyPhone"
+	// CustomAuthServiceAttachVerifiedPhoneProcedure is the fully-qualified name of the
+	// CustomAuthService's AttachVerifiedPhone RPC.
+	CustomAuthServiceAttachVerifiedPhoneProcedure = "/loci.custom_auth.CustomAuthService/AttachVerifiedPhone"
+	// CustomAuthServiceLinkFacebookProcedure is the fully-qualified name of the CustomAuthService's
+	// LinkFacebook RPC.
+	CustomAuthServiceLinkFacebookProcedure = "/loci.custom_auth.CustomAuthService/LinkFacebook"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -58,6 +64,8 @@ var (
 	customAuthServiceSignInWithIDTokenMethodDescriptor     = customAuthServiceServiceDescriptor.Methods().ByName("SignInWithIDToken")
 	customAuthServiceSendPhoneVerificationMethodDescriptor = customAuthServiceServiceDescriptor.Methods().ByName("SendPhoneVerification")
 	customAuthServiceVerifyPhoneMethodDescriptor           = customAuthServiceServiceDescriptor.Methods().ByName("VerifyPhone")
+	customAuthServiceAttachVerifiedPhoneMethodDescriptor   = customAuthServiceServiceDescriptor.Methods().ByName("AttachVerifiedPhone")
+	customAuthServiceLinkFacebookMethodDescriptor          = customAuthServiceServiceDescriptor.Methods().ByName("LinkFacebook")
 )
 
 // CustomAuthServiceClient is a client for the loci.custom_auth.CustomAuthService service.
@@ -69,6 +77,12 @@ type CustomAuthServiceClient interface {
 	// Phone authentication
 	SendPhoneVerification(context.Context, *connect.Request[custom_auth.SendPhoneVerificationRequest]) (*connect.Response[custom_auth.SendPhoneVerificationResponse], error)
 	VerifyPhone(context.Context, *connect.Request[custom_auth.VerifyPhoneRequest]) (*connect.Response[custom_auth.VerifyPhoneResponse], error)
+	// AttachVerifiedPhone needs a session. A number already verified on another
+	// account is AlreadyExists.
+	AttachVerifiedPhone(context.Context, *connect.Request[custom_auth.AttachVerifiedPhoneRequest]) (*connect.Response[custom_auth.AttachVerifiedPhoneResponse], error)
+	// LinkFacebook needs a session. A Facebook account linked to another Loci
+	// account is AlreadyExists.
+	LinkFacebook(context.Context, *connect.Request[custom_auth.LinkFacebookRequest]) (*connect.Response[custom_auth.LinkFacebookResponse], error)
 }
 
 // NewCustomAuthServiceClient constructs a client for the loci.custom_auth.CustomAuthService
@@ -111,6 +125,18 @@ func NewCustomAuthServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(customAuthServiceVerifyPhoneMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		attachVerifiedPhone: connect.NewClient[custom_auth.AttachVerifiedPhoneRequest, custom_auth.AttachVerifiedPhoneResponse](
+			httpClient,
+			baseURL+CustomAuthServiceAttachVerifiedPhoneProcedure,
+			connect.WithSchema(customAuthServiceAttachVerifiedPhoneMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		linkFacebook: connect.NewClient[custom_auth.LinkFacebookRequest, custom_auth.LinkFacebookResponse](
+			httpClient,
+			baseURL+CustomAuthServiceLinkFacebookProcedure,
+			connect.WithSchema(customAuthServiceLinkFacebookMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -121,6 +147,8 @@ type customAuthServiceClient struct {
 	signInWithIDToken     *connect.Client[custom_auth.SignInWithIDTokenRequest, custom_auth.OAuthCallbackResponse]
 	sendPhoneVerification *connect.Client[custom_auth.SendPhoneVerificationRequest, custom_auth.SendPhoneVerificationResponse]
 	verifyPhone           *connect.Client[custom_auth.VerifyPhoneRequest, custom_auth.VerifyPhoneResponse]
+	attachVerifiedPhone   *connect.Client[custom_auth.AttachVerifiedPhoneRequest, custom_auth.AttachVerifiedPhoneResponse]
+	linkFacebook          *connect.Client[custom_auth.LinkFacebookRequest, custom_auth.LinkFacebookResponse]
 }
 
 // GetOAuthURL calls loci.custom_auth.CustomAuthService.GetOAuthURL.
@@ -148,6 +176,16 @@ func (c *customAuthServiceClient) VerifyPhone(ctx context.Context, req *connect.
 	return c.verifyPhone.CallUnary(ctx, req)
 }
 
+// AttachVerifiedPhone calls loci.custom_auth.CustomAuthService.AttachVerifiedPhone.
+func (c *customAuthServiceClient) AttachVerifiedPhone(ctx context.Context, req *connect.Request[custom_auth.AttachVerifiedPhoneRequest]) (*connect.Response[custom_auth.AttachVerifiedPhoneResponse], error) {
+	return c.attachVerifiedPhone.CallUnary(ctx, req)
+}
+
+// LinkFacebook calls loci.custom_auth.CustomAuthService.LinkFacebook.
+func (c *customAuthServiceClient) LinkFacebook(ctx context.Context, req *connect.Request[custom_auth.LinkFacebookRequest]) (*connect.Response[custom_auth.LinkFacebookResponse], error) {
+	return c.linkFacebook.CallUnary(ctx, req)
+}
+
 // CustomAuthServiceHandler is an implementation of the loci.custom_auth.CustomAuthService service.
 type CustomAuthServiceHandler interface {
 	// OAuth authentication
@@ -157,6 +195,12 @@ type CustomAuthServiceHandler interface {
 	// Phone authentication
 	SendPhoneVerification(context.Context, *connect.Request[custom_auth.SendPhoneVerificationRequest]) (*connect.Response[custom_auth.SendPhoneVerificationResponse], error)
 	VerifyPhone(context.Context, *connect.Request[custom_auth.VerifyPhoneRequest]) (*connect.Response[custom_auth.VerifyPhoneResponse], error)
+	// AttachVerifiedPhone needs a session. A number already verified on another
+	// account is AlreadyExists.
+	AttachVerifiedPhone(context.Context, *connect.Request[custom_auth.AttachVerifiedPhoneRequest]) (*connect.Response[custom_auth.AttachVerifiedPhoneResponse], error)
+	// LinkFacebook needs a session. A Facebook account linked to another Loci
+	// account is AlreadyExists.
+	LinkFacebook(context.Context, *connect.Request[custom_auth.LinkFacebookRequest]) (*connect.Response[custom_auth.LinkFacebookResponse], error)
 }
 
 // NewCustomAuthServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -195,6 +239,18 @@ func NewCustomAuthServiceHandler(svc CustomAuthServiceHandler, opts ...connect.H
 		connect.WithSchema(customAuthServiceVerifyPhoneMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	customAuthServiceAttachVerifiedPhoneHandler := connect.NewUnaryHandler(
+		CustomAuthServiceAttachVerifiedPhoneProcedure,
+		svc.AttachVerifiedPhone,
+		connect.WithSchema(customAuthServiceAttachVerifiedPhoneMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	customAuthServiceLinkFacebookHandler := connect.NewUnaryHandler(
+		CustomAuthServiceLinkFacebookProcedure,
+		svc.LinkFacebook,
+		connect.WithSchema(customAuthServiceLinkFacebookMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.custom_auth.CustomAuthService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CustomAuthServiceGetOAuthURLProcedure:
@@ -207,6 +263,10 @@ func NewCustomAuthServiceHandler(svc CustomAuthServiceHandler, opts ...connect.H
 			customAuthServiceSendPhoneVerificationHandler.ServeHTTP(w, r)
 		case CustomAuthServiceVerifyPhoneProcedure:
 			customAuthServiceVerifyPhoneHandler.ServeHTTP(w, r)
+		case CustomAuthServiceAttachVerifiedPhoneProcedure:
+			customAuthServiceAttachVerifiedPhoneHandler.ServeHTTP(w, r)
+		case CustomAuthServiceLinkFacebookProcedure:
+			customAuthServiceLinkFacebookHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -234,4 +294,12 @@ func (UnimplementedCustomAuthServiceHandler) SendPhoneVerification(context.Conte
 
 func (UnimplementedCustomAuthServiceHandler) VerifyPhone(context.Context, *connect.Request[custom_auth.VerifyPhoneRequest]) (*connect.Response[custom_auth.VerifyPhoneResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.custom_auth.CustomAuthService.VerifyPhone is not implemented"))
+}
+
+func (UnimplementedCustomAuthServiceHandler) AttachVerifiedPhone(context.Context, *connect.Request[custom_auth.AttachVerifiedPhoneRequest]) (*connect.Response[custom_auth.AttachVerifiedPhoneResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.custom_auth.CustomAuthService.AttachVerifiedPhone is not implemented"))
+}
+
+func (UnimplementedCustomAuthServiceHandler) LinkFacebook(context.Context, *connect.Request[custom_auth.LinkFacebookRequest]) (*connect.Response[custom_auth.LinkFacebookResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.custom_auth.CustomAuthService.LinkFacebook is not implemented"))
 }

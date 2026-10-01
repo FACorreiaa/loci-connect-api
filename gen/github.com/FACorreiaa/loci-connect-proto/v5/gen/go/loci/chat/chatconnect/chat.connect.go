@@ -68,6 +68,12 @@ const (
 	// ChatServiceGetRunStatusProcedure is the fully-qualified name of the ChatService's GetRunStatus
 	// RPC.
 	ChatServiceGetRunStatusProcedure = "/loci.chat.ChatService/GetRunStatus"
+	// ChatServiceApplyTripActionProcedure is the fully-qualified name of the ChatService's
+	// ApplyTripAction RPC.
+	ChatServiceApplyTripActionProcedure = "/loci.chat.ChatService/ApplyTripAction"
+	// ChatServiceDismissTripActionProcedure is the fully-qualified name of the ChatService's
+	// DismissTripAction RPC.
+	ChatServiceDismissTripActionProcedure = "/loci.chat.ChatService/DismissTripAction"
 	// WatchServiceProposeWatchProcedure is the fully-qualified name of the WatchService's ProposeWatch
 	// RPC.
 	WatchServiceProposeWatchProcedure = "/loci.chat.WatchService/ProposeWatch"
@@ -97,6 +103,8 @@ var (
 	chatServiceRemoveBookmarkMethodDescriptor        = chatServiceServiceDescriptor.Methods().ByName("RemoveBookmark")
 	chatServiceStreamChatMethodDescriptor            = chatServiceServiceDescriptor.Methods().ByName("StreamChat")
 	chatServiceGetRunStatusMethodDescriptor          = chatServiceServiceDescriptor.Methods().ByName("GetRunStatus")
+	chatServiceApplyTripActionMethodDescriptor       = chatServiceServiceDescriptor.Methods().ByName("ApplyTripAction")
+	chatServiceDismissTripActionMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("DismissTripAction")
 	watchServiceServiceDescriptor                    = chat.File_loci_chat_chat_proto.Services().ByName("WatchService")
 	watchServiceProposeWatchMethodDescriptor         = watchServiceServiceDescriptor.Methods().ByName("ProposeWatch")
 	watchServiceCreateWatchMethodDescriptor          = watchServiceServiceDescriptor.Methods().ByName("CreateWatch")
@@ -124,6 +132,11 @@ type ChatServiceClient interface {
 	// Where the caller's runs are: running, done or failed. Used after a
 	// reload or on returning to the app to settle runs nobody was listening to.
 	GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error)
+	// Applies a proposal the agent streamed (action_proposal) to its trip.
+	// FailedPrecondition when it was already applied or dismissed, has
+	// expired, or base_version is stale.
+	ApplyTripAction(context.Context, *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error)
+	DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error)
 }
 
 // NewChatServiceClient constructs a client for the loci.chat.ChatService service. By default, it
@@ -208,6 +221,18 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceGetRunStatusMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		applyTripAction: connect.NewClient[chat.ApplyTripActionRequest, chat.ApplyTripActionResponse](
+			httpClient,
+			baseURL+ChatServiceApplyTripActionProcedure,
+			connect.WithSchema(chatServiceApplyTripActionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		dismissTripAction: connect.NewClient[chat.DismissTripActionRequest, chat.DismissTripActionResponse](
+			httpClient,
+			baseURL+ChatServiceDismissTripActionProcedure,
+			connect.WithSchema(chatServiceDismissTripActionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -225,6 +250,8 @@ type chatServiceClient struct {
 	removeBookmark        *connect.Client[chat.BookmarkRequest, chat.BookmarkResponse]
 	streamChat            *connect.Client[chat.ChatRequest, chat.StreamEvent]
 	getRunStatus          *connect.Client[chat.GetRunStatusRequest, chat.GetRunStatusResponse]
+	applyTripAction       *connect.Client[chat.ApplyTripActionRequest, chat.ApplyTripActionResponse]
+	dismissTripAction     *connect.Client[chat.DismissTripActionRequest, chat.DismissTripActionResponse]
 }
 
 // StartChat calls loci.chat.ChatService.StartChat.
@@ -287,6 +314,16 @@ func (c *chatServiceClient) GetRunStatus(ctx context.Context, req *connect.Reque
 	return c.getRunStatus.CallUnary(ctx, req)
 }
 
+// ApplyTripAction calls loci.chat.ChatService.ApplyTripAction.
+func (c *chatServiceClient) ApplyTripAction(ctx context.Context, req *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error) {
+	return c.applyTripAction.CallUnary(ctx, req)
+}
+
+// DismissTripAction calls loci.chat.ChatService.DismissTripAction.
+func (c *chatServiceClient) DismissTripAction(ctx context.Context, req *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error) {
+	return c.dismissTripAction.CallUnary(ctx, req)
+}
+
 // ChatServiceHandler is an implementation of the loci.chat.ChatService service.
 type ChatServiceHandler interface {
 	StartChat(context.Context, *connect.Request[chat.StartChatRequest]) (*connect.Response[chat.ChatResponse], error)
@@ -307,6 +344,11 @@ type ChatServiceHandler interface {
 	// Where the caller's runs are: running, done or failed. Used after a
 	// reload or on returning to the app to settle runs nobody was listening to.
 	GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error)
+	// Applies a proposal the agent streamed (action_proposal) to its trip.
+	// FailedPrecondition when it was already applied or dismissed, has
+	// expired, or base_version is stale.
+	ApplyTripAction(context.Context, *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error)
+	DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error)
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -387,6 +429,18 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceGetRunStatusMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceApplyTripActionHandler := connect.NewUnaryHandler(
+		ChatServiceApplyTripActionProcedure,
+		svc.ApplyTripAction,
+		connect.WithSchema(chatServiceApplyTripActionMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceDismissTripActionHandler := connect.NewUnaryHandler(
+		ChatServiceDismissTripActionProcedure,
+		svc.DismissTripAction,
+		connect.WithSchema(chatServiceDismissTripActionMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.chat.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatServiceStartChatProcedure:
@@ -413,6 +467,10 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceStreamChatHandler.ServeHTTP(w, r)
 		case ChatServiceGetRunStatusProcedure:
 			chatServiceGetRunStatusHandler.ServeHTTP(w, r)
+		case ChatServiceApplyTripActionProcedure:
+			chatServiceApplyTripActionHandler.ServeHTTP(w, r)
+		case ChatServiceDismissTripActionProcedure:
+			chatServiceDismissTripActionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -468,6 +526,14 @@ func (UnimplementedChatServiceHandler) StreamChat(context.Context, *connect.Requ
 
 func (UnimplementedChatServiceHandler) GetRunStatus(context.Context, *connect.Request[chat.GetRunStatusRequest]) (*connect.Response[chat.GetRunStatusResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.GetRunStatus is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ApplyTripAction(context.Context, *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.ApplyTripAction is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.DismissTripAction is not implemented"))
 }
 
 // WatchServiceClient is a client for the loci.chat.WatchService service.
