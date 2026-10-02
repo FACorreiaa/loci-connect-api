@@ -76,3 +76,21 @@ func TestExtract_CapsActions(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, maxActions)
 }
+
+// "4 days in Rome" after a Lisbon trip is a new trip, not "re-plan Lisbon as
+// 4 days". The model names the other city; extraction then proposes nothing,
+// so the turn is answered as usual and the chat's new-trip hand-off runs.
+func TestExtract_AnotherCityIsANewTripNotAChange(t *testing.T) {
+	gen := &scripted{replies: []string{`{"other_city":"Rome","actions":[{"kind":"regenerate_days","days":4}]}`}}
+	got, err := Extract(context.Background(), gen, "4 days in Rome", snap)
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Contains(t, gen.prompts[0], `"other_city"`)
+
+	for _, same := range []string{"", "lisbon", " Lisbon "} {
+		gen = &scripted{replies: []string{`{"other_city":"` + same + `","actions":[{"kind":"regenerate_days","days":4}]}`}}
+		got, err = Extract(context.Background(), gen, "make it 4 days", snap)
+		require.NoError(t, err)
+		require.Len(t, got, 1, "other_city %q is the trip's own", same)
+	}
+}

@@ -92,6 +92,11 @@ var actionEvery = rate.Every(2 * time.Second)
 // written, so the three minutes an itinerary may take does not apply.
 const pageTimeout = 20 * time.Second
 
+// applyTimeout bounds a press that applies a trip proposal. Re-planning a
+// trip's days is a model generation, about a minute on the free chain; a page
+// is a read and keeps pageTimeout.
+const applyTimeout = 3 * time.Minute
+
 // maxEchoChars caps the transcript echoed back before the answer.
 //
 // The echo is a check on what was heard, not a transcript service, and a
@@ -230,7 +235,11 @@ func (b bridge) answerCallback(ctx context.Context, q *CallbackQuery) {
 		return
 	}
 
-	pageCtx, cancel := context.WithTimeout(ctx, pageTimeout)
+	timeout := pageTimeout
+	if messaging.IsApplyToken(q.Data) {
+		timeout = applyTimeout
+	}
+	pageCtx, cancel := context.WithTimeout(ctx, timeout)
 	out, err := b.handler.HandleAction(pageCtx, messaging.InboundAction{
 		Platform: messaging.PlatformTelegram,
 		ChatID:   chatID,
@@ -253,9 +262,13 @@ func (b bridge) answerCallback(ctx context.Context, q *CallbackQuery) {
 	// Strip the button off the page that was just read. Best effort: Telegram
 	// errors when the markup is already what it is being set to, which is the
 	// harmless case of a double tap.
-	if err := b.client.EditMessageReplyMarkup(sendCtx, chatID, q.Message.MessageID, nil); err != nil {
-		b.logger.DebugContext(ctx, "could not clear a telegram keyboard",
-			slog.String("error", err.Error()))
+	// A press that settled nothing keeps its buttons, so "try again" has
+	// something to press.
+	if !out.KeepButtons {
+		if err := b.client.EditMessageReplyMarkup(sendCtx, chatID, q.Message.MessageID, nil); err != nil {
+			b.logger.DebugContext(ctx, "could not clear a telegram keyboard",
+				slog.String("error", err.Error()))
+		}
 	}
 	b.sendWithButtons(sendCtx, chatID, out)
 }
@@ -265,6 +278,11 @@ func (b bridge) sendWithButtons(ctx context.Context, chatID string, out messagin
 	if err := b.client.SendMessageWithMarkup(ctx, chatID, out.Text, keyboardFor(b.logger, out.Buttons)); err != nil {
 		b.logger.ErrorContext(ctx, "could not send a telegram reply",
 			slog.String("error", err.Error()))
+		return
+	}
+	// One message per trip proposal, so a press clears only its own buttons.
+	for _, extra := range out.Extra {
+		b.sendWithButtons(ctx, chatID, extra)
 	}
 }
 

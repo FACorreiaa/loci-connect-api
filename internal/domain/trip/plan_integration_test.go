@@ -153,3 +153,25 @@ func TestRepository_SaveTripMovesPlanDatesWithDayOne(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "2026-12-01", again.StartDate.Format(time.DateOnly))
 }
+
+func TestRepository_LatestForSession(t *testing.T) {
+	ctx := context.Background()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := NewRepository(testTripDB, logger)
+	lookup := NewSessionTrips(testTripDB, logger)
+	userID := newTripUser(t, "session-trip-"+uuid.NewString()+"@loci.test")
+	session := uuid.New()
+	s := session.String()
+
+	saved, err := repo.SaveTrip(ctx, &Trip{UserID: userID, CityName: "Lisbon", Title: "Lisbon", SourceSessionID: &s}, 0)
+	require.NoError(t, err)
+
+	got, err := lookup.LatestForSession(ctx, userID, session)
+	require.NoError(t, err)
+	require.Equal(t, saved.ID, got.ID)
+
+	_, err = lookup.LatestForSession(ctx, userID, uuid.New())
+	require.ErrorIs(t, err, ErrNotFound, "a conversation that produced no trip")
+	_, err = lookup.LatestForSession(ctx, newTripUser(t, "other-"+uuid.NewString()+"@loci.test"), session)
+	require.ErrorIs(t, err, ErrNotFound, "someone else's trip")
+}

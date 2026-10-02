@@ -78,6 +78,12 @@ type OutboundMessage struct {
 	Silent bool
 	// Buttons are offered under the reply, where the platform supports them.
 	Buttons []Button
+	// Extra replies follow this one, each with its own buttons. Trip proposals
+	// go one per message, so pressing one clears only its own keyboard.
+	Extra []OutboundMessage
+	// KeepButtons leaves the pressed message's buttons in place: the press
+	// settled nothing, and the reply says to try again.
+	KeepButtons bool
 }
 
 // InboundAction is a button press.
@@ -134,6 +140,7 @@ type Service struct {
 	repo      Repository
 	answerer  Answerer
 	paginator Paginator
+	trips     TripPlanner
 	quota     Quota
 	botHandle string
 	logger    *slog.Logger
@@ -289,6 +296,24 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 		text = strings.TrimSpace(spoken)
 	}
 
+	if s.trips != nil {
+		proposeCtx, cancel := context.WithTimeout(ctx, tripProposeTimeout)
+		cards, err := s.trips.Propose(proposeCtx, link.UserID, link.Email, text)
+		cancel()
+		if err != nil {
+			// Proposing is an extra: its failure never costs the traveller the answer.
+			s.logger.WarnContext(ctx, "could not propose trip changes",
+				slog.String("user_id", link.UserID.String()),
+				slog.String("error", err.Error()))
+		} else if len(cards) > 0 {
+			out := OutboundMessage{Text: tripsLead}
+			for _, c := range cards {
+				out.Extra = append(out.Extra, OutboundMessage{Text: c.Text, Buttons: c.Buttons})
+			}
+			return out, nil
+		}
+	}
+
 	answer, next, err := s.answerer.Answer(ctx, link.UserID, link.Email, text)
 	if err != nil {
 		s.logger.ErrorContext(ctx, "could not answer a chat message",
@@ -329,12 +354,24 @@ func (s *Service) HandleAction(ctx context.Context, in InboundAction) (OutboundM
 		return OutboundMessage{}, err
 	}
 
-	if s.paginator == nil {
-		return OutboundMessage{Text: "I cannot look that up right now. Try again shortly."}, nil
-	}
-
 	if err := s.repo.TouchLink(ctx, in.Platform, in.ChatID, ""); err != nil {
 		s.logger.WarnContext(ctx, "could not record chat activity", slog.String("error", err.Error()))
+	}
+
+	// A trip proposal's button: apply or drop it. Never a page.
+	if tok, ok := parseTripToken(in.Data); ok {
+		if s.trips == nil {
+			return OutboundMessage{Text: "I cannot change trips from here right now."}, nil
+		}
+		if tok.apply {
+			reply, final := s.trips.Apply(ctx, link.UserID, link.Email, tok.proposalID, tok.option)
+			return OutboundMessage{Text: reply, KeepButtons: !final}, nil
+		}
+		return OutboundMessage{Text: s.trips.Dismiss(ctx, link.UserID, tok.proposalID)}, nil
+	}
+
+	if s.paginator == nil {
+		return OutboundMessage{Text: "I cannot look that up right now. Try again shortly."}, nil
 	}
 
 	text, next, err := s.paginator.Page(ctx, link.UserID, link.Email, in.Data)
@@ -476,6 +513,8 @@ func (s *Service) handleCommand(ctx context.Context, in InboundMessage, link Lin
 			"Ask me for an itinerary in plain language — \"three days in Lisbon, we like food and old buildings\".",
 			"",
 			"What you ask here and what you ask in the Loci app are the same conversation.",
+			"",
+			"Right after I plan a trip, ask me to change it — dates, hotels by stars, more days, flights — and I'll offer buttons to confirm.",
 			"",
 			"/more — the next few places from your last answer.",
 			"/unlink — disconnect this chat from your Loci account.",
