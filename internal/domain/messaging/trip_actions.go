@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -71,6 +72,11 @@ func parseTripToken(data string) (tripToken, bool) {
 	}
 	return tok, true
 }
+
+// tripProposeTimeout bounds asking the planner for changes. It runs inside the
+// answer's own deadline, so a hung model must give up long before that, or the
+// traveller loses the answer too. A var so tests can shorten it.
+var tripProposeTimeout = 20 * time.Second
 
 // TripCard is one proposed trip change: a message and its buttons.
 type TripCard struct {

@@ -294,7 +294,9 @@ func (s *Service) Handle(ctx context.Context, in InboundMessage) (OutboundMessag
 	}
 
 	if s.trips != nil {
-		cards, err := s.trips.Propose(ctx, link.UserID, link.Email, text)
+		proposeCtx, cancel := context.WithTimeout(ctx, tripProposeTimeout)
+		cards, err := s.trips.Propose(proposeCtx, link.UserID, link.Email, text)
+		cancel()
 		if err != nil {
 			// Proposing is an extra: its failure never costs the traveller the answer.
 			s.logger.WarnContext(ctx, "could not propose trip changes",

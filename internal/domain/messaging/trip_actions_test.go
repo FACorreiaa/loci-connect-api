@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -123,4 +124,35 @@ func TestHandleAction_TripTokenWithoutAPlanner(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, out.Text, "cannot change trips")
 	require.Zero(t, pages.calls)
+}
+
+// blockingPlanner is a model that never answers: it holds until its context
+// ends, as a hung free model does.
+type blockingPlanner struct{ fakePlanner }
+
+func (b *blockingPlanner) Propose(ctx context.Context, _ uuid.UUID, _, _ string) ([]TripCard, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A hung extraction must not eat the time the answer needs: the answer's own
+// deadline is minutes, and proposing gets a short bound inside it.
+func TestHandle_ASlowPlannerIsCutShortAndTheAnswerStillComes(t *testing.T) {
+	old := tripProposeTimeout
+	tripProposeTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { tripProposeTimeout = old })
+
+	svc, repo, answerer := newService(t)
+	svc.WithTripPlanner(&blockingPlanner{})
+	linkChat(t, repo, "9001")
+
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	start := time.Now()
+	out, err := svc.Handle(ctx, InboundMessage{Platform: PlatformTelegram, ChatID: "9001", Text: "what's good for dinner?"})
+	require.NoError(t, err)
+	require.Less(t, time.Since(start), time.Second, "proposing held the answer until the whole deadline")
+	require.NoError(t, ctx.Err())
+	require.Equal(t, 1, answerer.calls)
+	require.Equal(t, "here is a plan", out.Text)
 }
