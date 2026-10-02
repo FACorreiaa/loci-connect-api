@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 )
 
@@ -242,5 +244,78 @@ func TestABusyPressIsStillAcknowledged(t *testing.T) {
 	}
 	if len(api.callsTo("sendMessage")) != 0 {
 		t.Error("a busy press added a message to the chat")
+	}
+}
+
+type tripCardsHandler struct{ deadline time.Duration }
+
+func (h *tripCardsHandler) Handle(context.Context, messaging.InboundMessage) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{Text: "lead", Extra: []messaging.OutboundMessage{
+		{Text: "dates", Buttons: []messaging.Button{{Label: "Confirm", Data: "a|x|-"}}},
+		{Text: "hotels", Buttons: []messaging.Button{{Label: "Stay at 1", Data: "a|x|0"}}},
+	}}, nil
+}
+
+func (h *tripCardsHandler) HandleAction(ctx context.Context, _ messaging.InboundAction) (messaging.OutboundMessage, error) {
+	if d, ok := ctx.Deadline(); ok {
+		h.deadline = time.Until(d)
+	}
+	return messaging.OutboundMessage{Text: "done"}, nil
+}
+
+// One message per trip proposal: a press strips the keyboard of the message it
+// came from, so proposals sharing a message would lose each other's buttons.
+func TestExtraRepliesEachCarryTheirOwnKeyboard(t *testing.T) {
+	api := newFakeAPI(t)
+	b := newBridge(api.client(), &tripCardsHandler{}, slog.New(slog.DiscardHandler))
+
+	b.handle(context.Background(), Update{UpdateID: 1, Message: &Message{
+		MessageID: 5, Text: "4-star hotels please",
+		Chat: struct {
+			ID int64 `json:"id"`
+		}{ID: 99},
+	}})
+
+	sends := api.callsTo("sendMessage")
+	if len(sends) != 3 {
+		t.Fatalf("%d sendMessage calls, want 3", len(sends))
+	}
+	for i, want := range []string{"lead", "dates", "hotels"} {
+		if text, _ := sends[i].body["text"].(string); text != want {
+			t.Errorf("message %d = %q, want %q", i+1, text, want)
+		}
+		_, hasKeyboard := sends[i].body["reply_markup"]
+		if hasKeyboard != (i > 0) {
+			t.Errorf("message %d: reply_markup present = %v", i+1, hasKeyboard)
+		}
+	}
+}
+
+// Applying a proposal can re-plan the trip's days, a model generation; paging
+// is a read and keeps its short bound.
+func TestApplyPressGetsTheLongTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		data      string
+		long      bool
+		chatIDInt int64
+	}{
+		{data: messaging.ApplyToken(uuid.New(), nil), long: true, chatIDInt: 1},
+		{data: "p|abc|2|i", long: false, chatIDInt: 2},
+	} {
+		api := newFakeAPI(t)
+		h := &tripCardsHandler{}
+		b := newBridge(api.client(), h, slog.New(slog.DiscardHandler))
+		b.handle(context.Background(), Update{UpdateID: 1, CallbackQuery: &CallbackQuery{
+			ID: "q", Data: tc.data,
+			Message: &Message{MessageID: 5, Chat: struct {
+				ID int64 `json:"id"`
+			}{ID: tc.chatIDInt}},
+		}})
+		if tc.long && h.deadline <= 2*time.Minute {
+			t.Errorf("%s: deadline %v, want more than 2m", tc.data, h.deadline)
+		}
+		if !tc.long && h.deadline > pageTimeout {
+			t.Errorf("%s: deadline %v, want at most %v", tc.data, h.deadline, pageTimeout)
+		}
 	}
 }
