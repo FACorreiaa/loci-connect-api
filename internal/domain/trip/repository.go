@@ -879,3 +879,30 @@ func (r *repository) loadPlan(ctx context.Context, t *Trip) error {
 	}
 	return rows.Err()
 }
+
+// SessionTrips finds the trip a chat conversation produced, for a chat
+// platform that knows the conversation but not the trip (Telegram).
+type SessionTrips interface {
+	LatestForSession(ctx context.Context, userID, sessionID uuid.UUID) (*Trip, error)
+}
+
+// NewSessionTrips is the Postgres SessionTrips.
+func NewSessionTrips(db *pgxpool.Pool, logger *slog.Logger) SessionTrips {
+	return &repository{db: db, logger: logger.With(slog.String("component", "trip-session-lookup"))}
+}
+
+// LatestForSession is the user's most recently edited trip generated in
+// sessionID (trips.source_session_id), or ErrNotFound.
+func (r *repository) LatestForSession(ctx context.Context, userID, sessionID uuid.UUID) (*Trip, error) {
+	var id uuid.UUID
+	err := r.db.QueryRow(ctx, `
+		SELECT id FROM trips WHERE user_id = $1 AND source_session_id = $2
+		ORDER BY updated_at DESC LIMIT 1`, userID, sessionID.String()).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("trip for session: %w", err)
+	}
+	return r.GetTrip(ctx, id, userID)
+}
