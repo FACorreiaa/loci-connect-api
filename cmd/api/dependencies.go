@@ -43,6 +43,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/chatbridge"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/telegram"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/tripcards"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
@@ -951,6 +952,11 @@ func (d *Dependencies) initHandlers() error {
 			})
 			chatImpl.SetTripActions(tripActions)
 			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions)
+			// Telegram gets the same proposals as buttons. The bridge was built
+			// earlier (initMessaging); WithTripPlanner attaches to it in place.
+			if d.Messaging != nil {
+				d.Messaging.WithTripPlanner(tripcards.New(d.ChatService, trip.NewSessionTrips(d.DB.Pool, d.Logger), tripActions, d.Logger))
+			}
 		}
 	}
 	if d.DB != nil && d.TripRepo != nil {
