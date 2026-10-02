@@ -362,3 +362,17 @@ func TestApply_RePlanHangsUnderTheTripsSession(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, src, f.regen.parent)
 }
+
+func TestApplyCurrent_UsesTheTripsVersionNow(t *testing.T) {
+	f := newFixture(t, allFour, lisbonHotels)
+	ps := proposeAll(t, f)
+	f.plans.trips.t.Version = 9 // edited elsewhere since the proposal
+	tr, msg, err := f.svc.ApplyCurrent(context.Background(), f.uid, ps[0].ID, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 10, tr.Version)
+	require.NotNil(t, msg)
+	_, _, err = f.svc.ApplyCurrent(context.Background(), f.uid, ps[0].ID, nil)
+	require.ErrorIs(t, err, ErrNotPending, "still applied once")
+	_, _, err = f.svc.ApplyCurrent(context.Background(), uuid.New(), ps[1].ID, intp(0))
+	require.ErrorIs(t, err, ErrNotFound)
+}

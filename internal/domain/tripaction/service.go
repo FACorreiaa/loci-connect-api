@@ -299,6 +299,22 @@ func (s *Service) Apply(ctx context.Context, userID, proposalID uuid.UUID, optio
 	return t, s.confirm(ctx, p, opt), nil
 }
 
+// ApplyCurrent applies a proposal against the trip as it is now. It is for
+// surfaces whose button cannot carry the version it was shown with: a
+// Telegram callback holds 64 bytes. The proposal still applies once and still
+// expires; a change made in between is simply built on.
+func (s *Service) ApplyCurrent(ctx context.Context, userID, proposalID uuid.UUID, option *int) (*trip.Trip, *locitypes.ConversationMessage, error) {
+	p, err := s.d.Store.Get(ctx, proposalID, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	t, err := s.d.Trips.GetTrip(ctx, p.TripID, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.Apply(ctx, userID, proposalID, option, t.Version)
+}
+
 // pick is the option a pick-one action is applied with. Flights have one,
 // taken by default; hotels need the traveller's choice.
 func pick(p *Proposal, option *int) (*Option, error) {
