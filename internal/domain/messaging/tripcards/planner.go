@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"unicode"
 
 	"github.com/google/uuid"
 
@@ -53,6 +54,9 @@ func asUser(ctx context.Context, userID uuid.UUID, email string) context.Context
 // a trip. Otherwise "4 days in Rome" would be read as a change to whatever
 // trip they planned last.
 func (p *Planner) Propose(ctx context.Context, userID uuid.UUID, email, text string) ([]messaging.TripCard, error) {
+	if !mightAskForChange(text) {
+		return nil, nil
+	}
 	ctx = asUser(ctx, userID, email)
 	res, err := p.sessions.GetUserChatSessions(ctx, userID, 1, 1)
 	if err != nil || res == nil || len(res.Sessions) == 0 {
@@ -75,6 +79,35 @@ func (p *Planner) Propose(ctx context.Context, userID uuid.UUID, email, text str
 		cards = append(cards, card(pr))
 	}
 	return cards, nil
+}
+
+// changeWords are what a message asking to change a trip's dates, length,
+// stay or flights almost always contains, in English and Portuguese. Matched
+// as substrings of the lowercased text, so "hotels" and "re-plan" count.
+var changeWords = []string{
+	"hotel", "hotéis", "stay", "star", "★", "estrela", "alojamento",
+	"flight", "fly", "plane", "airport", "voo", "voar", "aeroporto",
+	"day", "night", "week", "date", "dia", "noite", "semana", "data",
+	"plan", "longer", "shorter",
+	"jan", "feb", "fev", "mar", "apr", "abr", "may", "maio", "jun", "jul",
+	"aug", "agosto", "sep", "setembro", "oct", "outubro", "nov", "dec", "dez",
+}
+
+// mightAskForChange is a cheap gate before the extraction call, which would
+// otherwise run ahead of every answer once a trip exists. It errs towards yes:
+// a false yes costs one model call, a false no costs only the cards for a
+// message that named no number, date or travel word.
+func mightAskForChange(text string) bool {
+	lower := strings.ToLower(text)
+	if strings.IndexFunc(lower, unicode.IsDigit) >= 0 {
+		return true
+	}
+	for _, w := range changeWords {
+		if strings.Contains(lower, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // card is one proposal as plain text and buttons. Hotels list their options

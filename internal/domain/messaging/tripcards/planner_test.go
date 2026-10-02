@@ -90,7 +90,7 @@ func TestPropose_CardsAndButtons(t *testing.T) {
 		},
 	}}
 	p := New(fakeSessions{latest: session}, fakeTrips{bySession: map[uuid.UUID]*trip.Trip{session: {ID: tripID}}}, actions, quiet)
-	cards, err := p.Propose(context.Background(), uuid.New(), "a@b.c", "the lot")
+	cards, err := p.Propose(context.Background(), uuid.New(), "a@b.c", "dates, hotels and flights")
 	require.NoError(t, err)
 	require.Len(t, cards, 3)
 
@@ -128,5 +128,30 @@ func TestApply_SaysWhatHappenedInPlainWords(t *testing.T) {
 	for err, want := range cases {
 		p := New(fakeSessions{}, fakeTrips{}, &fakeActions{applyErr: err}, quiet)
 		require.Contains(t, p.Apply(context.Background(), uuid.New(), "a@b.c", uuid.New(), nil), want)
+	}
+}
+
+// Once a trip exists, every message would otherwise cost an extraction call
+// before its answer. Only one that could ask for a change is sent to the model.
+func TestPropose_OnlyMessagesThatCouldAskForAChangeReachTheModel(t *testing.T) {
+	session := uuid.New()
+	trips := fakeTrips{bySession: map[uuid.UUID]*trip.Trip{session: {ID: uuid.New()}}}
+	for text, want := range map[string]int{
+		"what's good for dinner near here?": 0,
+		"thanks!":                           0,
+		"is the castle worth it?":           0,
+		"4-star hotels please":              1,
+		"make it 5 days":                    1,
+		"from 12 to 15 November":            1,
+		"find me flights from London":       1,
+		"hotéis de 4 estrelas":              1,
+		"voos de Londres":                   1,
+		"re-plan it shorter":                1,
+	} {
+		actions := &fakeActions{}
+		p := New(fakeSessions{latest: session}, trips, actions, quiet)
+		_, err := p.Propose(context.Background(), uuid.New(), "a@b.c", text)
+		require.NoError(t, err)
+		require.Equal(t, want, actions.proposed, text)
 	}
 }
