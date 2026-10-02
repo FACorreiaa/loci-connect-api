@@ -145,31 +145,33 @@ func card(p tripaction.Proposal) messaging.TripCard {
 	return messaging.TripCard{Text: b.String(), Buttons: buttons}
 }
 
-// Apply makes the change and says, in plain words, what happened.
-func (p *Planner) Apply(ctx context.Context, userID uuid.UUID, email string, proposalID uuid.UUID, option *int) string {
+// Apply makes the change and says, in plain words, what happened. final is
+// false for the failures that leave the proposal pending (tripaction gives a
+// failed change back), where pressing again can still work.
+func (p *Planner) Apply(ctx context.Context, userID uuid.UUID, email string, proposalID uuid.UUID, option *int) (string, bool) {
 	_, msg, err := p.actions.ApplyCurrent(asUser(ctx, userID, email), userID, proposalID, option)
 	switch {
 	case err == nil:
 		if msg != nil && msg.Content != "" {
-			return msg.Content
+			return msg.Content, true
 		}
-		return "Done."
+		return "Done.", true
 	case errors.Is(err, tripaction.ErrNotPending):
-		return "That one was already used or dismissed."
+		return "That one was already used or dismissed.", true
 	case errors.Is(err, tripaction.ErrExpired):
-		return "That suggestion has expired. Ask me again."
+		return "That suggestion has expired. Ask me again.", true
 	case errors.Is(err, tripaction.ErrNotFound), errors.Is(err, trip.ErrNotFound):
-		return "I can't find that suggestion any more."
-	case errors.Is(err, tripaction.ErrNoOption):
-		return "Pick one of the options first."
-	case errors.Is(err, trip.ErrVersionConflict):
-		return "The trip changed while I was working on it. Ask me again."
+		return "I can't find that suggestion any more.", true
 	case errors.Is(err, trip.ErrInvalidEdit):
-		return "That change can't be made to this trip."
+		return "That change can't be made to this trip.", true
+	case errors.Is(err, tripaction.ErrNoOption):
+		return "Pick one of the options first.", false
+	case errors.Is(err, trip.ErrVersionConflict):
+		return "The trip changed while I was working on it. Try again.", false
 	default:
 		p.logger.ErrorContext(ctx, "could not apply a trip change from chat",
 			slog.String("user_id", userID.String()), slog.String("error", err.Error()))
-		return "Something went wrong making that change. Try again in a moment."
+		return "Something went wrong making that change. Try again in a moment.", false
 	}
 }
 

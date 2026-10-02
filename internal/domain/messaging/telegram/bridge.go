@@ -262,9 +262,13 @@ func (b bridge) answerCallback(ctx context.Context, q *CallbackQuery) {
 	// Strip the button off the page that was just read. Best effort: Telegram
 	// errors when the markup is already what it is being set to, which is the
 	// harmless case of a double tap.
-	if err := b.client.EditMessageReplyMarkup(sendCtx, chatID, q.Message.MessageID, nil); err != nil {
-		b.logger.DebugContext(ctx, "could not clear a telegram keyboard",
-			slog.String("error", err.Error()))
+	// A press that settled nothing keeps its buttons, so "try again" has
+	// something to press.
+	if !out.KeepButtons {
+		if err := b.client.EditMessageReplyMarkup(sendCtx, chatID, q.Message.MessageID, nil); err != nil {
+			b.logger.DebugContext(ctx, "could not clear a telegram keyboard",
+				slog.String("error", err.Error()))
+		}
 	}
 	b.sendWithButtons(sendCtx, chatID, out)
 }

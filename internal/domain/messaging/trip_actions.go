@@ -90,8 +90,9 @@ type TripPlanner interface {
 	// latest conversation produced, and none (with a nil error) otherwise.
 	Propose(ctx context.Context, userID uuid.UUID, email, text string) ([]TripCard, error)
 	// Apply makes the change and returns what to tell the traveller: the
-	// confirmation, or in plain words why it could not be made.
-	Apply(ctx context.Context, userID uuid.UUID, email string, proposalID uuid.UUID, option *int) string
+	// confirmation, or in plain words why it could not be made. final is false
+	// when the proposal is still pending, so pressing again can work.
+	Apply(ctx context.Context, userID uuid.UUID, email string, proposalID uuid.UUID, option *int) (reply string, final bool)
 	// Dismiss drops the proposal and returns the reply.
 	Dismiss(ctx context.Context, userID, proposalID uuid.UUID) string
 }

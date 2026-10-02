@@ -81,6 +81,9 @@ type OutboundMessage struct {
 	// Extra replies follow this one, each with its own buttons. Trip proposals
 	// go one per message, so pressing one clears only its own keyboard.
 	Extra []OutboundMessage
+	// KeepButtons leaves the pressed message's buttons in place: the press
+	// settled nothing, and the reply says to try again.
+	KeepButtons bool
 }
 
 // InboundAction is a button press.
@@ -361,7 +364,8 @@ func (s *Service) HandleAction(ctx context.Context, in InboundAction) (OutboundM
 			return OutboundMessage{Text: "I cannot change trips from here right now."}, nil
 		}
 		if tok.apply {
-			return OutboundMessage{Text: s.trips.Apply(ctx, link.UserID, link.Email, tok.proposalID, tok.option)}, nil
+			reply, final := s.trips.Apply(ctx, link.UserID, link.Email, tok.proposalID, tok.option)
+			return OutboundMessage{Text: reply, KeepButtons: !final}, nil
 		}
 		return OutboundMessage{Text: s.trips.Dismiss(ctx, link.UserID, tok.proposalID)}, nil
 	}

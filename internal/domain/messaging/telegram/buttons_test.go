@@ -319,3 +319,27 @@ func TestApplyPressGetsTheLongTimeout(t *testing.T) {
 		}
 	}
 }
+
+type keepButtonsHandler struct{ tripCardsHandler }
+
+func (h *keepButtonsHandler) HandleAction(context.Context, messaging.InboundAction) (messaging.OutboundMessage, error) {
+	return messaging.OutboundMessage{Text: "Something went wrong. Try again in a moment.", KeepButtons: true}, nil
+}
+
+// A failed apply says "try again", so the card it came from keeps its buttons.
+func TestAFailedApplyLeavesTheCardsButtons(t *testing.T) {
+	api := newFakeAPI(t)
+	b := newBridge(api.client(), &keepButtonsHandler{}, slog.New(slog.DiscardHandler))
+	b.handle(context.Background(), Update{UpdateID: 1, CallbackQuery: &CallbackQuery{
+		ID: "q", Data: messaging.ApplyToken(uuid.New(), nil),
+		Message: &Message{MessageID: 5, Chat: struct {
+			ID int64 `json:"id"`
+		}{ID: 7}},
+	}})
+	if n := len(api.callsTo("editMessageReplyMarkup")); n != 0 {
+		t.Errorf("the card's keyboard was cleared %d times; want it kept", n)
+	}
+	if len(api.callsTo("sendMessage")) != 1 {
+		t.Error("the failure was not reported")
+	}
+}

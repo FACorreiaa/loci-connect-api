@@ -13,6 +13,7 @@ import (
 )
 
 type fakePlanner struct {
+	notFinal  bool
 	cards     []TripCard
 	err       error
 	proposed  []string
@@ -25,13 +26,16 @@ func (f *fakePlanner) Propose(_ context.Context, _ uuid.UUID, _, text string) ([
 	return f.cards, f.err
 }
 
-func (f *fakePlanner) Apply(_ context.Context, _ uuid.UUID, _ string, id uuid.UUID, option *int) string {
+func (f *fakePlanner) Apply(_ context.Context, _ uuid.UUID, _ string, id uuid.UUID, option *int) (string, bool) {
 	o := "-"
 	if option != nil {
 		o = strconv.Itoa(*option)
 	}
 	f.applied = append(f.applied, id.String()+"/"+o)
-	return "Dates set: 12 Nov – 17 Nov 2026."
+	if f.notFinal {
+		return "Something went wrong making that change. Try again in a moment.", false
+	}
+	return "Dates set: 12 Nov – 17 Nov 2026.", true
 }
 
 func (f *fakePlanner) Dismiss(_ context.Context, _, id uuid.UUID) string {
@@ -155,4 +159,17 @@ func TestHandle_ASlowPlannerIsCutShortAndTheAnswerStillComes(t *testing.T) {
 	require.NoError(t, ctx.Err())
 	require.Equal(t, 1, answerer.calls)
 	require.Equal(t, "here is a plan", out.Text)
+}
+
+// A press that settled nothing leaves its buttons, so "try again" has
+// something to press; one that settled the proposal takes them away.
+func TestHandleAction_AFailedApplyKeepsItsButtons(t *testing.T) {
+	for _, notFinal := range []bool{false, true} {
+		svc, repo, _, _ := newPagedService(t)
+		svc.WithTripPlanner(&fakePlanner{notFinal: notFinal})
+		linkChat(t, repo, "9001")
+		out, err := svc.HandleAction(context.Background(), InboundAction{Platform: PlatformTelegram, ChatID: "9001", Data: ApplyToken(uuid.New(), nil)})
+		require.NoError(t, err)
+		require.Equal(t, notFinal, out.KeepButtons)
+	}
 }

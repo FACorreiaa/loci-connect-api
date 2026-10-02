@@ -116,18 +116,26 @@ func labels(c messaging.TripCard) []string {
 }
 
 func TestApply_SaysWhatHappenedInPlainWords(t *testing.T) {
-	cases := map[error]string{
-		nil:                      "Dates set",
-		tripaction.ErrNotPending: "already used",
-		tripaction.ErrExpired:    "expired",
-		tripaction.ErrNotFound:   "can't find",
-		trip.ErrVersionConflict:  "changed while",
-		trip.ErrInvalidEdit:      "can't be made",
-		errors.New("db down"):    "Something went wrong",
+	type want struct {
+		text  string
+		final bool
 	}
-	for err, want := range cases {
+	cases := map[error]want{
+		nil:                      {"Dates set", true},
+		tripaction.ErrNotPending: {"already used", true},
+		tripaction.ErrExpired:    {"expired", true},
+		tripaction.ErrNotFound:   {"can't find", true},
+		trip.ErrInvalidEdit:      {"can't be made", true},
+		// The proposal is still pending after these, so its buttons must stay.
+		tripaction.ErrNoOption:  {"Pick one", false},
+		trip.ErrVersionConflict: {"changed while", false},
+		errors.New("db down"):   {"Something went wrong", false},
+	}
+	for err, w := range cases {
 		p := New(fakeSessions{}, fakeTrips{}, &fakeActions{applyErr: err}, quiet)
-		require.Contains(t, p.Apply(context.Background(), uuid.New(), "a@b.c", uuid.New(), nil), want)
+		text, final := p.Apply(context.Background(), uuid.New(), "a@b.c", uuid.New(), nil)
+		require.Contains(t, text, w.text)
+		require.Equal(t, w.final, final, "%v", err)
 	}
 }
 
