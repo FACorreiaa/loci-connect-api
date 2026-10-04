@@ -483,127 +483,237 @@ func (g *PDFGenerator) GenerateActivitiesPDF(activities []*exportv1.ExportActivi
 	return doc.GetBytes(), nil
 }
 
-// GenerateItineraryPDF generates a PDF for an itinerary
+// itineraryDayLabel returns a human-readable day header, e.g. "Day 1" or "Day 1 of 2".
+func itineraryDayLabel(day, totalDays int32) string {
+	if totalDays > 1 {
+		return fmt.Sprintf("Day %d of %d", day, totalDays)
+	}
+	return fmt.Sprintf("Day %d", day)
+}
+
+// formatDuration converts minutes to a compact string, e.g. "1 h 30 min" or "45 min".
+func formatDuration(minutes int32) string {
+	if minutes <= 0 {
+		return ""
+	}
+	if minutes < 60 {
+		return fmt.Sprintf("%d min", minutes)
+	}
+	h := minutes / 60
+	m := minutes % 60
+	if m == 0 {
+		return fmt.Sprintf("%d h", h)
+	}
+	return fmt.Sprintf("%d h %d min", h, m)
+}
+
+// GenerateItineraryPDF generates a polished PDF for an itinerary.
 func (g *PDFGenerator) GenerateItineraryPDF(itinerary *exportv1.ExportItinerary) ([]byte, error) {
-	m := g.getMaroto()
+	cfg := config.NewBuilder().
+		WithLeftMargin(12).
+		WithTopMargin(14).
+		WithRightMargin(12).
+		WithBottomMargin(14).
+		Build()
+	m := maroto.New(cfg)
 
 	title := itinerary.Title
 	if title == "" {
 		title = "Travel Itinerary"
 	}
-	subtitle := ""
+
+	// ── Cover / header block ──────────────────────────────────────────────────
+	m.AddRow(14,
+		col.New(12).Add(
+			text.New(title, props.Text{
+				Size:  18,
+				Style: fontstyle.Bold,
+				Align: align.Center,
+				Color: &props.Color{Red: 22, Green: 78, Blue: 140},
+			}),
+		),
+	)
+
+	// City + duration sub-line
+	var subParts []string
 	if itinerary.CityName != "" {
-		subtitle = itinerary.CityName
+		subParts = append(subParts, itinerary.CityName)
 	}
 	if itinerary.TotalDays > 0 {
-		if subtitle != "" {
-			subtitle += " • "
+		dayWord := "day"
+		if itinerary.TotalDays != 1 {
+			dayWord = "days"
 		}
-		subtitle += fmt.Sprintf("%d days", itinerary.TotalDays)
+		subParts = append(subParts, fmt.Sprintf("%d %s", itinerary.TotalDays, dayWord))
 	}
-	g.addHeader(m, title, subtitle)
-
-	// Description
-	if itinerary.Description != "" {
-		m.AddRow(12,
+	if len(subParts) > 0 {
+		m.AddRow(7,
 			col.New(12).Add(
-				text.New(itinerary.Description, props.Text{
-					Size: 10,
+				text.New(strings.Join(subParts, "  |  "), props.Text{
+					Size:  10,
+					Align: align.Center,
+					Color: &props.Color{Red: 90, Green: 90, Blue: 90},
 				}),
 			),
 		)
-		m.AddRow(5)
 	}
 
-	// Group items by day
+	m.AddRow(5,
+		col.New(12).Add(
+			text.New(fmt.Sprintf("Generated on %s", time.Now().Format("January 2, 2006")), props.Text{
+				Size:  8,
+				Align: align.Center,
+				Color: &props.Color{Red: 160, Green: 160, Blue: 160},
+			}),
+		),
+	)
+
+	// Trip summary / intro paragraph
+	if itinerary.Description != "" {
+		m.AddRow(4) // breathing space before paragraph
+		m.AddRow(20,
+			col.New(12).Add(
+				text.New(itinerary.Description, props.Text{
+					Size:  9,
+					Align: align.Left,
+					Color: &props.Color{Red: 55, Green: 55, Blue: 55},
+				}),
+			),
+		)
+	}
+
+	m.AddRow(6) // gap before first day
+
+	// ── Group items by day ────────────────────────────────────────────────────
 	dayItems := make(map[int32][]*exportv1.ExportItineraryItem)
 	for _, item := range itinerary.Items {
 		dayItems[item.DayNumber] = append(dayItems[item.DayNumber], item)
 	}
 
-	// Iterate through days
+	accentBlue := &props.Color{Red: 22, Green: 78, Blue: 140}
+	mutedGrey := &props.Color{Red: 110, Green: 110, Blue: 110}
+	darkGrey := &props.Color{Red: 45, Green: 45, Blue: 45}
+
 	for day := int32(1); day <= itinerary.TotalDays; day++ {
 		items := dayItems[day]
 		if len(items) == 0 {
 			continue
 		}
 
-		// Day header
-		m.AddRow(10,
+		// ── Day banner ────────────────────────────────────────────────────────
+		m.AddRow(9,
 			col.New(12).Add(
-				text.New(fmt.Sprintf("Day %d", day), props.Text{
-					Size:  14,
-					Style: fontstyle.Bold,
-					Color: &props.Color{Red: 30, Green: 100, Blue: 180},
+				text.New(strings.ToUpper(itineraryDayLabel(day, itinerary.TotalDays)), props.Text{
+					Size:            10,
+					Style:           fontstyle.Bold,
+					Align:           align.Left,
+					Color:           &props.Color{Red: 255, Green: 255, Blue: 255},
+					VerticalPadding: 2,
+					Left:            2,
 				}),
-			),
+			).WithStyle(&props.Cell{
+				BackgroundColor: accentBlue,
+			}),
 		)
 
-		for _, item := range items {
-			// Time and name
-			timeStr := item.TimeSlot
-			if timeStr == "" {
-				timeStr = "Flexible"
-			}
+		m.AddRow(3) // gap after banner
+
+		// ── Stops ─────────────────────────────────────────────────────────────
+		for idx, item := range items {
+			stopNum := fmt.Sprintf("%d", idx+1)
+
+			// Row 1 — stop number | name
 			m.AddRow(8,
-				col.New(3).Add(
-					text.New(timeStr, props.Text{
+				col.New(1).Add(
+					text.New(stopNum, props.Text{
 						Size:  9,
 						Style: fontstyle.Bold,
-						Color: &props.Color{Red: 80, Green: 80, Blue: 80},
+						Align: align.Center,
+						Color: &props.Color{Red: 255, Green: 255, Blue: 255},
 					}),
-				),
-				col.New(9).Add(
+				).WithStyle(&props.Cell{
+					BackgroundColor: accentBlue,
+				}),
+				col.New(11).Add(
 					text.New(item.Name, props.Text{
-						Size:  10,
+						Size:  11,
 						Style: fontstyle.Bold,
+						Color: darkGrey,
+						Left:  3,
 					}),
 				),
 			)
 
-			// Description
-			if item.Description != "" {
-				m.AddRow(8,
-					col.New(3),
-					col.New(9).Add(
-						text.New(item.Description, props.Text{
-							Size: 8,
-						}),
-					),
-				)
+			// Row 2 — time slot | category tag
+			var metaParts []string
+			if item.TimeSlot != "" && item.TimeSlot != "Flexible" {
+				metaParts = append(metaParts, item.TimeSlot)
 			}
-
-			// Duration
-			if item.DurationMinutes > 0 {
-				m.AddRow(5,
-					col.New(3),
-					col.New(9).Add(
-						text.New(fmt.Sprintf("⏱️ %d minutes", item.DurationMinutes), props.Text{
-							Size:  8,
-							Color: &props.Color{Red: 100, Green: 100, Blue: 100},
-						}),
-					),
-				)
-			}
-
-			// Notes
 			if item.Notes != "" {
+				metaParts = append(metaParts, item.Notes)
+			}
+			dur := formatDuration(item.DurationMinutes)
+			if dur != "" {
+				metaParts = append(metaParts, dur)
+			}
+			if len(metaParts) > 0 {
 				m.AddRow(5,
-					col.New(3),
-					col.New(9).Add(
-						text.New(fmt.Sprintf("📝 %s", item.Notes), props.Text{
+					col.New(1),
+					col.New(11).Add(
+						text.New(strings.Join(metaParts, "  ·  "), props.Text{
 							Size:  8,
-							Color: &props.Color{Red: 100, Green: 100, Blue: 100},
+							Color: mutedGrey,
+							Left:  3,
 						}),
 					),
 				)
 			}
 
-			m.AddRow(3) // Small spacer between items
+			// Row 3 — description (full text, no truncation)
+			if item.Description != "" {
+				descLines := estimateDescriptionRows(item.Description)
+				m.AddRow(descLines,
+					col.New(1),
+					col.New(11).Add(
+						text.New(item.Description, props.Text{
+							Size:  9,
+							Color: darkGrey,
+							Left:  3,
+						}),
+					),
+				)
+			}
+
+			// Row 4 — address (if present)
+			if item.Address != "" {
+				m.AddRow(5,
+					col.New(1),
+					col.New(11).Add(
+						text.New("Address: "+item.Address, props.Text{
+							Size:  8,
+							Color: mutedGrey,
+							Left:  3,
+						}),
+					),
+				)
+			}
+
+			m.AddRow(4) // gap between stops
 		}
 
-		m.AddRow(5) // Spacer between days
+		m.AddRow(6) // gap between days
 	}
+
+	// ── Footer branding ───────────────────────────────────────────────────────
+	m.AddRow(5,
+		col.New(12).Add(
+			text.New("Generated by Loci  —  loci.travel", props.Text{
+				Size:  7,
+				Align: align.Center,
+				Color: &props.Color{Red: 180, Green: 180, Blue: 180},
+			}),
+		),
+	)
 
 	doc, err := m.Generate()
 	if err != nil {
@@ -611,6 +721,25 @@ func (g *PDFGenerator) GenerateItineraryPDF(itinerary *exportv1.ExportItinerary)
 	}
 
 	return doc.GetBytes(), nil
+}
+
+// estimateDescriptionRows returns an approximate maroto row height (mm) for a
+// description string rendered at 9pt in an 11-column layout (~155mm wide).
+// We target ~110 characters per line at that size, then add 6mm per line.
+func estimateDescriptionRows(desc string) float64 {
+	const charsPerLine = 110
+	const mmPerLine = 6.0
+	const minRows = 8.0
+
+	lines := (len(desc) + charsPerLine - 1) / charsPerLine
+	if lines < 1 {
+		lines = 1
+	}
+	h := float64(lines) * mmPerLine
+	if h < minRows {
+		h = minRows
+	}
+	return h
 }
 
 // GenerateListPDF generates a PDF for a list with mixed content
