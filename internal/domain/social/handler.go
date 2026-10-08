@@ -77,12 +77,16 @@ func parseID(s, what string) (uuid.UUID, error) {
 }
 
 func inviteProto(inv *Invite, inviter *socialv1.PublicUser) *socialv1.Invite {
-	return &socialv1.Invite{
+	out := &socialv1.Invite{
 		Code:      inv.Code,
 		Url:       InviteURL(inv.Code),
-		ExpiresAt: timestamppb.New(inv.ExpiresAt),
 		Inviter:   inviter,
+		ShareText: ShareText,
 	}
+	if inv.ExpiresAt != nil {
+		out.ExpiresAt = timestamppb.New(*inv.ExpiresAt)
+	}
+	return out
 }
 
 func (h *Handler) card(ctx context.Context, id uuid.UUID) (*socialv1.PublicUser, error) {

@@ -18,9 +18,15 @@ import (
 // which the iOS app also claims as a Universal Link.
 const InviteOrigin = "https://lociai.fyi"
 
+// ShareText is the message sent with an invite link, without the url.
+const ShareText = "I'm using Loci to plan places that fit. Join me:"
+
+// maxInviteCodeLen bounds a code taken from a signup request, which carries
+// no validation so that a bad code never fails the signup.
+const maxInviteCodeLen = 64
+
 // Limits on actions a person could use to spam or to probe who is on Loci.
 const (
-	inviteLifetime        = 30 * 24 * time.Hour
 	maxRequestsPerDay     = 20
 	maxContactMatchPerDay = 5
 	maxSearchesPerHour    = 100
@@ -95,10 +101,11 @@ func newCode() string {
 // InviteURL is the link an invite code opens.
 func InviteURL(code string) string { return InviteOrigin + "/invite/" + code }
 
-// MyInvite returns the caller's live invite, minting or renewing it.
+// MyInvite returns the caller's invite, minting one on first use or when a
+// code from before codes became permanent has run out.
 func (s *Service) MyInvite(ctx context.Context, userID uuid.UUID) (*Invite, error) {
 	inv, err := s.repo.InviteFor(ctx, userID)
-	if err == nil && inv.ExpiresAt.After(s.now()) {
+	if err == nil && s.live(inv) {
 		return inv, nil
 	}
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -107,9 +114,10 @@ func (s *Service) MyInvite(ctx context.Context, userID uuid.UUID) (*Invite, erro
 	return s.RotateInvite(ctx, userID)
 }
 
-// RotateInvite replaces the caller's code; the old link stops working.
+// RotateInvite replaces the caller's code; the old link stops working. The
+// new code does not expire.
 func (s *Service) RotateInvite(ctx context.Context, userID uuid.UUID) (*Invite, error) {
-	inv := Invite{UserID: userID, Code: newCode(), ExpiresAt: s.now().Add(inviteLifetime)}
+	inv := Invite{UserID: userID, Code: newCode()}
 	if err := s.repo.SaveInvite(ctx, inv); err != nil {
 		return nil, fmt.Errorf("save invite: %w", err)
 	}
@@ -122,10 +130,45 @@ func (s *Service) LookupInvite(ctx context.Context, code string) (*Invite, error
 	if err != nil {
 		return nil, err
 	}
-	if !inv.ExpiresAt.After(s.now()) {
+	if !s.live(inv) {
 		return nil, ErrNotFound
 	}
 	return inv, nil
+}
+
+func (s *Service) live(inv *Invite) bool {
+	return inv.ExpiresAt == nil || inv.ExpiresAt.After(s.now())
+}
+
+// OnSignup runs once a new account exists: it gives the account its own
+// invite code and, when the signup came from someone's invite link, records
+// that person as the inviter. Best effort: it never fails the signup, and a
+// missing, unknown or self code is ignored.
+func (s *Service) OnSignup(ctx context.Context, userID uuid.UUID, inviteCode string) {
+	if _, err := s.MyInvite(ctx, userID); err != nil {
+		s.log.WarnContext(ctx, "invite: mint code at signup", "user_id", userID, "error", err)
+	}
+	if inviteCode == "" || len(inviteCode) > maxInviteCodeLen {
+		return
+	}
+	inv, err := s.LookupInvite(ctx, inviteCode)
+	if err != nil {
+		if !errors.Is(err, ErrNotFound) {
+			s.log.WarnContext(ctx, "invite: look up signup code", "user_id", userID, "error", err)
+		}
+		return
+	}
+	if inv.UserID == userID {
+		return
+	}
+	set, err := s.repo.SetInvitedBy(ctx, userID, inv.UserID)
+	if err != nil {
+		s.log.WarnContext(ctx, "invite: record inviter", "user_id", userID, "error", err)
+		return
+	}
+	if set {
+		s.log.InfoContext(ctx, "invite attributed", "inviter_id", inv.UserID, "invitee_id", userID)
+	}
 }
 
 // AcceptInvite makes the caller and the inviter friends. A blocked pair is

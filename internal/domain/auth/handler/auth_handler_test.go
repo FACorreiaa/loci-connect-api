@@ -12,6 +12,7 @@ import (
 
 	"connectrpc.com/connect"
 	auth "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/auth"
+	"github.com/google/uuid"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
@@ -66,6 +67,53 @@ func TestAuthHandler_Register_Success(t *testing.T) {
 		if session.ClientIP == nil || *session.ClientIP != "unknown" {
 			t.Fatalf("expected default client IP stored, got %v", session.ClientIP)
 		}
+	}
+}
+
+type recordingSignupHook struct {
+	calls []string
+	ctxOK bool
+}
+
+func (r *recordingSignupHook) OnSignup(ctx context.Context, _ uuid.UUID, code string) {
+	r.calls = append(r.calls, code)
+	r.ctxOK = ctx.Err() == nil
+}
+
+// An invite code rides along with signup but never decides it: a garbage
+// code still creates the account, and the hook sees the code even when the
+// caller has already gone.
+func TestAuthHandler_Register_InviteCodeNeverFailsSignup(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	svc, repo, tokens, _ := servicetest.NewTestAuthService()
+	hook := &recordingSignupHook{}
+	handler := NewAuthHandler(svc, slog.Default()).WithSignupHook(hook)
+	tokens.GenerateFunc = func(_, _, _, _ string) (*service.TokenPair, error) {
+		cancel() // the client hangs up as the account is created
+		return &service.TokenPair{AccessToken: "a", RefreshToken: "r", ExpiresAt: time.Now().Add(time.Hour)}, nil
+	}
+
+	code := "!!garbage!!"
+	resp, err := handler.Register(ctx, connect.NewRequest(&auth.RegisterRequest{
+		Email:      "invited@example.com",
+		Username:   "invited",
+		Password:   "Str0ng!Pass",
+		InviteCode: &code,
+	}))
+	if err != nil || !resp.Msg.GetSuccess() {
+		t.Fatalf("Register with a bad invite code: %v", err)
+	}
+	if _, err := repo.GetUserByEmail(context.Background(), "invited@example.com"); err != nil {
+		t.Fatalf("user not stored: %v", err)
+	}
+	if len(hook.calls) != 1 || hook.calls[0] != code {
+		t.Fatalf("signup hook calls = %q, want one with %q", hook.calls, code)
+	}
+	if ctx.Err() == nil {
+		t.Fatal("test setup: the request context was never cancelled")
+	}
+	if !hook.ctxOK {
+		t.Fatal("the signup hook ran on a cancelled context")
 	}
 }
 
