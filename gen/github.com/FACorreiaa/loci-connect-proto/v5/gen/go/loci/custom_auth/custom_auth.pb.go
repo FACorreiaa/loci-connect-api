@@ -186,10 +186,13 @@ func (x *GetOAuthURLResponse) GetState() string {
 
 // OAuthCallbackRequest for handling OAuth callback
 type OAuthCallbackRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Provider      OAuthProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=loci.custom_auth.OAuthProvider" json:"provider,omitempty"`
-	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
-	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Provider OAuthProvider          `protobuf:"varint,1,opt,name=provider,proto3,enum=loci.custom_auth.OAuthProvider" json:"provider,omitempty"`
+	Code     string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	State    string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	// Invite code from the link that brought this person here. Used only when
+	// the sign-in creates the account; a bad code is ignored, never an error.
+	InviteCode    *string `protobuf:"bytes,4,opt,name=invite_code,json=inviteCode,proto3,oneof" json:"invite_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -241,6 +244,13 @@ func (x *OAuthCallbackRequest) GetCode() string {
 func (x *OAuthCallbackRequest) GetState() string {
 	if x != nil {
 		return x.State
+	}
+	return ""
+}
+
+func (x *OAuthCallbackRequest) GetInviteCode() string {
+	if x != nil && x.InviteCode != nil {
+		return *x.InviteCode
 	}
 	return ""
 }
@@ -343,7 +353,10 @@ type SignInWithIDTokenRequest struct {
 	Nonce string `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
 	// Apple hands over the person's name once, on first consent, and never puts
 	// it in the token. Empty otherwise.
-	FullName      string `protobuf:"bytes,4,opt,name=full_name,json=fullName,proto3" json:"full_name,omitempty"`
+	FullName string `protobuf:"bytes,4,opt,name=full_name,json=fullName,proto3" json:"full_name,omitempty"`
+	// Invite code from the link that brought this person here. Used only when
+	// the sign-in creates the account; a bad code is ignored, never an error.
+	InviteCode    *string `protobuf:"bytes,5,opt,name=invite_code,json=inviteCode,proto3,oneof" json:"invite_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -402,6 +415,13 @@ func (x *SignInWithIDTokenRequest) GetNonce() string {
 func (x *SignInWithIDTokenRequest) GetFullName() string {
 	if x != nil {
 		return x.FullName
+	}
+	return ""
+}
+
+func (x *SignInWithIDTokenRequest) GetInviteCode() string {
+	if x != nil && x.InviteCode != nil {
+		return *x.InviteCode
 	}
 	return ""
 }
@@ -837,19 +857,22 @@ const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\vredirectUri\"F\n" +
 	"\x13GetOAuthURLResponse\x12\x19\n" +
 	"\bauth_url\x18\x01 \x01(\tR\aauthUrl\x12\x14\n" +
-	"\x05state\x18\x02 \x01(\tR\x05state\"\x9b\x01\n" +
+	"\x05state\x18\x02 \x01(\tR\x05state\"\xd1\x01\n" +
 	"\x14OAuthCallbackRequest\x12G\n" +
 	"\bprovider\x18\x01 \x01(\x0e2\x1f.loci.custom_auth.OAuthProviderB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bprovider\x12\x1b\n" +
 	"\x04code\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x04code\x12\x1d\n" +
-	"\x05state\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05state\"\xca\x01\n" +
+	"\x05state\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05state\x12$\n" +
+	"\vinvite_code\x18\x04 \x01(\tH\x00R\n" +
+	"inviteCode\x88\x01\x01B\x0e\n" +
+	"\f_invite_code\"\xca\x01\n" +
 	"\x15OAuthCallbackResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x14\n" +
 	"\x05email\x18\x04 \x01(\tR\x05email\x12\x1a\n" +
 	"\busername\x18\x05 \x01(\tR\busername\x12\x1e\n" +
-	"\vis_new_user\x18\x06 \x01(\bR\tisNewUser\"\xd3\x01\n" +
+	"\vis_new_user\x18\x06 \x01(\bR\tisNewUser\"\x89\x02\n" +
 	"\x18SignInWithIDTokenRequest\x12G\n" +
 	"\bprovider\x18\x01 \x01(\x0e2\x1f.loci.custom_auth.OAuthProviderB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bprovider\x12%\n" +
@@ -857,7 +880,10 @@ const file_loci_custom_auth_custom_auth_proto_rawDesc = "" +
 	"\xbaH\ar\x05\x10\x01\x18\x80@R\aidToken\x12 \n" +
 	"\x05nonce\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x10\x18\x80\x02R\x05nonce\x12%\n" +
-	"\tfull_name\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bfullName\"_\n" +
+	"\tfull_name\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bfullName\x12$\n" +
+	"\vinvite_code\x18\x05 \x01(\tH\x00R\n" +
+	"inviteCode\x88\x01\x01B\x0e\n" +
+	"\f_invite_code\"_\n" +
 	"\x1cSendPhoneVerificationRequest\x12?\n" +
 	"\fphone_number\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\n" +
 	"\x18\x142\x11^\\+[1-9]\\d{1,14}$R\vphoneNumber\"S\n" +
@@ -959,6 +985,8 @@ func file_loci_custom_auth_custom_auth_proto_init() {
 	if File_loci_custom_auth_custom_auth_proto != nil {
 		return
 	}
+	file_loci_custom_auth_custom_auth_proto_msgTypes[2].OneofWrappers = []any{}
+	file_loci_custom_auth_custom_auth_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
