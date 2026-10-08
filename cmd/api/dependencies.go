@@ -189,6 +189,9 @@ type Dependencies struct {
 	GamificationHandler *gamification.Handler
 	// gamification awards points from other domains' handlers.
 	gamification *gamification.Service
+	// signups runs after an account is created: its invite code, and who
+	// invited it. Nil without a database.
+	signups service.SignupHook
 	// BoardsHandler is the community boards; nil without a database.
 	BoardsHandler     *boardsdomain.Handler
 	ItineraryHandler  *itineraryhandler.ItineraryHandler
@@ -933,6 +936,10 @@ func (d *Dependencies) initHandlers() error {
 		// both SocialService and the graph trip visibility is checked against.
 		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
 		d.SocialHandler = socialdomain.NewHandler(socialSvc, d.Logger)
+		// Every new account gets an invite code, and remembers whose link
+		// brought it here.
+		d.signups = socialSvc
+		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
 		// The field score rides on the friends graph for its friends board, and
 		// on the reverse geocoder for neighborhoods.
@@ -1037,7 +1044,8 @@ func (d *Dependencies) initHandlers() error {
 	// SuggestPacking is wired below, once the weather adapter exists — a packing
 	// list is only worth generating if it knows the forecast.
 	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
-	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService)
+	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService).
+		WithSignupHook(d.signups)
 	if d.DB != nil {
 		// Verified phone and Facebook links, which friends are found by.
 		d.CustomAuthHandler = d.CustomAuthHandler.WithAccountLinks(customauthservice.NewAccountLinks(d.DB.Pool))

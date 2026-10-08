@@ -3,6 +3,7 @@ package social
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +20,7 @@ type fakeRepo struct {
 	pending   map[[2]uuid.UUID]uuid.UUID
 	sentToday int
 	invites   map[string]Invite
+	invitedBy map[uuid.UUID]uuid.UUID
 	hashes    map[string]uuid.UUID
 	stats     Stats
 	statsVis  []int32
@@ -32,6 +34,7 @@ func newFake(ids ...uuid.UUID) *fakeRepo {
 		users: map[uuid.UUID]*socialv1.PublicUser{}, friends: map[[2]uuid.UUID]bool{},
 		blocks: map[[2]uuid.UUID]bool{}, pending: map[[2]uuid.UUID]uuid.UUID{},
 		invites: map[string]Invite{}, hashes: map[string]uuid.UUID{},
+		invitedBy: map[uuid.UUID]uuid.UUID{},
 	}
 	for _, id := range ids {
 		f.users[id] = &socialv1.PublicUser{Id: id.String(), Username: "u" + id.String()[:4], DisplayName: "User"}
@@ -162,6 +165,14 @@ func (f *fakeRepo) InviteByCode(_ context.Context, code string) (*Invite, error)
 		return nil, ErrNotFound
 	}
 	return &inv, nil
+}
+
+func (f *fakeRepo) SetInvitedBy(_ context.Context, invitee, inviter uuid.UUID) (bool, error) {
+	if _, ok := f.invitedBy[invitee]; ok || invitee == inviter {
+		return false, nil
+	}
+	f.invitedBy[invitee] = inviter
+	return true, nil
 }
 
 func (f *fakeRepo) MatchHashes(_ context.Context, hs []string) (map[string]uuid.UUID, error) {
@@ -305,17 +316,82 @@ func TestInvites(t *testing.T) {
 		t.Fatalf("inviter not told: %v", n.accepts)
 	}
 
+	// Codes do not expire: a link sent years ago still opens.
+	svc.now = func() time.Time { return now.Add(5 * 365 * 24 * time.Hour) }
+	if _, err := svc.LookupInvite(ctx, inv.Code); err != nil {
+		t.Fatalf("a permanent code stopped working: %v", err)
+	}
+	if later, _ := svc.MyInvite(ctx, ana); later.Code != inv.Code {
+		t.Fatal("a permanent code was replaced")
+	}
+
 	rotated, _ := svc.RotateInvite(ctx, ana)
+	if rotated.ExpiresAt != nil {
+		t.Fatal("a rotated code expires")
+	}
 	if _, err := svc.LookupInvite(ctx, inv.Code); !errors.Is(err, ErrNotFound) {
 		t.Fatal("a rotated code still works")
 	}
-	svc.now = func() time.Time { return now.Add(inviteLifetime + time.Hour) }
-	if _, err := svc.LookupInvite(ctx, rotated.Code); !errors.Is(err, ErrNotFound) {
-		t.Fatal("an expired code still works")
+	if _, err := svc.LookupInvite(ctx, rotated.Code); err != nil {
+		t.Fatalf("the rotated-in code does not work: %v", err)
 	}
-	renewed, _ := svc.MyInvite(ctx, ana)
-	if renewed.Code == rotated.Code {
-		t.Fatal("an expired invite was not renewed")
+}
+
+// A code from before codes became permanent keeps its expiry, and is
+// replaced once it runs out.
+func TestInviteLegacyExpiry(t *testing.T) {
+	ctx := context.Background()
+	ana := uuid.New()
+	f := newFake(ana)
+	svc, _ := newSvc(f)
+	now := time.Now()
+	svc.now = func() time.Time { return now }
+	past := now.Add(-time.Hour)
+	f.invites["old"] = Invite{UserID: ana, Code: "old", ExpiresAt: &past}
+
+	if _, err := svc.LookupInvite(ctx, "old"); !errors.Is(err, ErrNotFound) {
+		t.Fatal("an expired legacy code still works")
+	}
+	renewed, err := svc.MyInvite(ctx, ana)
+	if err != nil || renewed.Code == "old" || renewed.ExpiresAt != nil {
+		t.Fatalf("an expired legacy code was not replaced by a permanent one: %+v %v", renewed, err)
+	}
+}
+
+func TestOnSignup(t *testing.T) {
+	ctx := context.Background()
+	ana, rui, eva := uuid.New(), uuid.New(), uuid.New()
+	f := newFake(ana, rui, eva)
+	svc, _ := newSvc(f)
+	inv, _ := svc.MyInvite(ctx, ana)
+
+	// No code, an unknown code, an oversized code: the account still gets
+	// its own code, and nobody is recorded as its inviter.
+	for _, code := range []string{"", "nope", strings.Repeat("x", maxInviteCodeLen+1)} {
+		svc.OnSignup(ctx, eva, code)
+	}
+	if _, ok := f.invitedBy[eva]; ok {
+		t.Fatal("an inviter was recorded from a bad code")
+	}
+	if own, err := f.InviteFor(ctx, eva); err != nil || own.Code == "" {
+		t.Fatal("a new account got no invite code")
+	}
+
+	// Your own code is not an invite.
+	svc.OnSignup(ctx, ana, inv.Code)
+	if _, ok := f.invitedBy[ana]; ok {
+		t.Fatal("an account was recorded as inviting itself")
+	}
+
+	svc.OnSignup(ctx, rui, inv.Code)
+	if f.invitedBy[rui] != ana {
+		t.Fatalf("inviter = %v, want %v", f.invitedBy[rui], ana)
+	}
+	// Written once: a later code does not move it.
+	evaInv, _ := svc.MyInvite(ctx, eva)
+	svc.OnSignup(ctx, rui, evaInv.Code)
+	if f.invitedBy[rui] != ana {
+		t.Fatal("the inviter was overwritten")
 	}
 }
 

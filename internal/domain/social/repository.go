@@ -56,9 +56,10 @@ type Request struct {
 
 // Invite is a user's invite code.
 type Invite struct {
-	UserID    uuid.UUID
-	Code      string
-	ExpiresAt time.Time
+	UserID uuid.UUID
+	Code   string
+	// ExpiresAt nil: the code never expires.
+	ExpiresAt *time.Time
 }
 
 // Stats are the counts a profile shows.
@@ -101,6 +102,9 @@ type Repository interface {
 	InviteFor(ctx context.Context, userID uuid.UUID) (*Invite, error)
 	SaveInvite(ctx context.Context, inv Invite) error
 	InviteByCode(ctx context.Context, code string) (*Invite, error)
+	// SetInvitedBy records who invited an account. It writes once: an account
+	// that already has an inviter keeps it.
+	SetInvitedBy(ctx context.Context, invitee, inviter uuid.UUID) (bool, error)
 
 	// MatchHashes maps each hash that names a verified, active user's phone
 	// or email to that user.
@@ -487,6 +491,16 @@ func (r *repository) InviteByCode(ctx context.Context, code string) (*Invite, er
 		return nil, err
 	}
 	return &inv, nil
+}
+
+func (r *repository) SetInvitedBy(ctx context.Context, invitee, inviter uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE users SET invited_by_user_id = $2
+		WHERE id = $1 AND invited_by_user_id IS NULL AND id <> $2`, invitee, inviter)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 func (r *repository) MatchHashes(ctx context.Context, hashes []string) (map[string]uuid.UUID, error) {

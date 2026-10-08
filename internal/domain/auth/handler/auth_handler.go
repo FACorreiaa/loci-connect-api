@@ -27,6 +27,16 @@ type AuthHandler struct {
 	// mfa is nil when MFA is not configured; the MFA RPCs then report
 	// Unimplemented instead of panicking on a nil dependency.
 	mfa MFAService
+
+	// signups runs after Register creates an account; nil runs nothing.
+	signups service.SignupHook
+}
+
+// WithSignupHook runs hook after each new account, with the invite code the
+// signup carried.
+func (h *AuthHandler) WithSignupHook(hook service.SignupHook) *AuthHandler {
+	h.signups = hook
+	return h
 }
 
 // NewAuthHandler constructs a new handler.
@@ -55,6 +65,9 @@ func (h *AuthHandler) Register(
 	})
 	if err != nil {
 		return nil, h.toConnectError(err)
+	}
+	if result.User != nil {
+		service.RunSignupHook(ctx, h.signups, result.User.ID, req.Msg.GetInviteCode())
 	}
 
 	return connect.NewResponse(presenter.RegisterResponse(result)), nil

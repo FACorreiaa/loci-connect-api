@@ -27,6 +27,14 @@ type CustomAuthHandler struct {
 	phoneService    *service.PhoneService
 	authService     *authservice.AuthService
 	links           *service.AccountLinks
+	signups         authservice.SignupHook
+}
+
+// WithSignupHook runs hook after a sign-in creates an account, with the
+// invite code the request carried.
+func (h *CustomAuthHandler) WithSignupHook(hook authservice.SignupHook) *CustomAuthHandler {
+	h.signups = hook
+	return h
 }
 
 // WithAccountLinks turns on AttachVerifiedPhone and LinkFacebook.
@@ -175,6 +183,9 @@ func (h *CustomAuthHandler) OAuthCallback(
 	if err != nil {
 		return nil, h.toConnectError(err)
 	}
+	if isNew {
+		authservice.RunSignupHook(ctx, h.signups, result.User.ID, req.Msg.GetInviteCode())
+	}
 
 	return connect.NewResponse(&customauth.OAuthCallbackResponse{
 		AccessToken:  result.Tokens.AccessToken,
@@ -241,6 +252,9 @@ func (h *CustomAuthHandler) SignInWithIDToken(
 	result, isNew, err := h.authService.LoginOrRegisterOAuth(ctx, provider, gothUser, meta)
 	if err != nil {
 		return nil, h.toConnectError(err)
+	}
+	if isNew {
+		authservice.RunSignupHook(ctx, h.signups, result.User.ID, req.Msg.GetInviteCode())
 	}
 
 	return connect.NewResponse(&customauth.OAuthCallbackResponse{
