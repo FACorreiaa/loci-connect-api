@@ -31,6 +31,14 @@ import (
 // the honest shape of a free tier rather than a defect. AI_FALLBACK_OPENROUTER_API_KEY
 // exists so that bucket can be a different account from the operator's paid
 // credit.
+//
+// The one paid exception is the Anthropic trial link, put at the head when
+// ANTHROPIC_SCOPE is "all" (the default). That is the operator choosing to
+// pay for free-tier traffic for the length of the trial, on a key with its
+// own spend cap; once the cap is hit the link benches itself and the free
+// models answer as before. It only joins a floor that exists: with no free
+// models configured, free callers already reach the paid chain, which has
+// the link too.
 func NewFreeChatClient(
 	ctx context.Context,
 	cfg config.AIConfig,
@@ -51,6 +59,13 @@ func NewFreeChatClient(
 		entries []*entry
 		errs    []error
 	)
+	if cfg.Anthropic.ServesFreeTier() {
+		if e, err := newAnthropicEntry(cfg, logger); err != nil {
+			errs = append(errs, err)
+		} else if e != nil {
+			entries = append(entries, e)
+		}
+	}
 	for _, spec := range cfg.Fallbacks {
 		client, err := newProviderClient(ctx, spec.Provider, spec.APIKey, spec.Model, cfg, logger)
 		if err != nil {
