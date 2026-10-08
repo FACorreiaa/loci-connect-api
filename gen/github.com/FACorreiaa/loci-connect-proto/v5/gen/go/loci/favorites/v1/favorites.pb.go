@@ -491,6 +491,131 @@ func (x *RemoveFromFavoritesRequest) GetContentType() ContentType {
 	return ContentType_CONTENT_TYPE_UNSPECIFIED
 }
 
+// UpdateFavoriteNote. The caller comes from the session.
+type UpdateFavoriteNoteRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	ItemId      string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	ContentType ContentType            `protobuf:"varint,2,opt,name=content_type,json=contentType,proto3,enum=loci.favorites.v1.ContentType" json:"content_type,omitempty"`
+	// Empty clears the note.
+	Notes         string `protobuf:"bytes,3,opt,name=notes,proto3" json:"notes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFavoriteNoteRequest) Reset() {
+	*x = UpdateFavoriteNoteRequest{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFavoriteNoteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFavoriteNoteRequest) ProtoMessage() {}
+
+func (x *UpdateFavoriteNoteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFavoriteNoteRequest.ProtoReflect.Descriptor instead.
+func (*UpdateFavoriteNoteRequest) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UpdateFavoriteNoteRequest) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *UpdateFavoriteNoteRequest) GetContentType() ContentType {
+	if x != nil {
+		return x.ContentType
+	}
+	return ContentType_CONTENT_TYPE_UNSPECIFIED
+}
+
+func (x *UpdateFavoriteNoteRequest) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
+}
+
+type UpdateFavoriteNoteResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Favorite *FavoriteItem          `protobuf:"bytes,1,opt,name=favorite,proto3" json:"favorite,omitempty"`
+	// Field points this call awarded.
+	PointsAwarded int32 `protobuf:"varint,2,opt,name=points_awarded,json=pointsAwarded,proto3" json:"points_awarded,omitempty"`
+	// True when the note counts as the caller's own words. False for short
+	// notes and ones that repeat the place's description.
+	NoteCounts    bool `protobuf:"varint,3,opt,name=note_counts,json=noteCounts,proto3" json:"note_counts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFavoriteNoteResponse) Reset() {
+	*x = UpdateFavoriteNoteResponse{}
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFavoriteNoteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFavoriteNoteResponse) ProtoMessage() {}
+
+func (x *UpdateFavoriteNoteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFavoriteNoteResponse.ProtoReflect.Descriptor instead.
+func (*UpdateFavoriteNoteResponse) Descriptor() ([]byte, []int) {
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UpdateFavoriteNoteResponse) GetFavorite() *FavoriteItem {
+	if x != nil {
+		return x.Favorite
+	}
+	return nil
+}
+
+func (x *UpdateFavoriteNoteResponse) GetPointsAwarded() int32 {
+	if x != nil {
+		return x.PointsAwarded
+	}
+	return 0
+}
+
+func (x *UpdateFavoriteNoteResponse) GetNoteCounts() bool {
+	if x != nil {
+		return x.NoteCounts
+	}
+	return false
+}
+
 type RemoveFromFavoritesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -501,7 +626,7 @@ type RemoveFromFavoritesResponse struct {
 
 func (x *RemoveFromFavoritesResponse) Reset() {
 	*x = RemoveFromFavoritesResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[4]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +638,7 @@ func (x *RemoveFromFavoritesResponse) String() string {
 func (*RemoveFromFavoritesResponse) ProtoMessage() {}
 
 func (x *RemoveFromFavoritesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[4]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +651,7 @@ func (x *RemoveFromFavoritesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveFromFavoritesResponse.ProtoReflect.Descriptor instead.
 func (*RemoveFromFavoritesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{4}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RemoveFromFavoritesResponse) GetSuccess() bool {
@@ -556,7 +681,7 @@ type GetFavoritesRequest struct {
 
 func (x *GetFavoritesRequest) Reset() {
 	*x = GetFavoritesRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[5]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -568,7 +693,7 @@ func (x *GetFavoritesRequest) String() string {
 func (*GetFavoritesRequest) ProtoMessage() {}
 
 func (x *GetFavoritesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[5]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -581,7 +706,7 @@ func (x *GetFavoritesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesRequest.ProtoReflect.Descriptor instead.
 func (*GetFavoritesRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{5}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetFavoritesRequest) GetUserId() string {
@@ -622,7 +747,7 @@ type GetFavoritesResponse struct {
 
 func (x *GetFavoritesResponse) Reset() {
 	*x = GetFavoritesResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[6]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +759,7 @@ func (x *GetFavoritesResponse) String() string {
 func (*GetFavoritesResponse) ProtoMessage() {}
 
 func (x *GetFavoritesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[6]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +772,7 @@ func (x *GetFavoritesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesResponse.ProtoReflect.Descriptor instead.
 func (*GetFavoritesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{6}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetFavoritesResponse) GetFavorites() []*FavoriteItem {
@@ -676,7 +801,7 @@ type IsFavoritedRequest struct {
 
 func (x *IsFavoritedRequest) Reset() {
 	*x = IsFavoritedRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[7]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -688,7 +813,7 @@ func (x *IsFavoritedRequest) String() string {
 func (*IsFavoritedRequest) ProtoMessage() {}
 
 func (x *IsFavoritedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[7]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -701,7 +826,7 @@ func (x *IsFavoritedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsFavoritedRequest.ProtoReflect.Descriptor instead.
 func (*IsFavoritedRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{7}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *IsFavoritedRequest) GetUserId() string {
@@ -734,7 +859,7 @@ type IsFavoritedResponse struct {
 
 func (x *IsFavoritedResponse) Reset() {
 	*x = IsFavoritedResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[8]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -746,7 +871,7 @@ func (x *IsFavoritedResponse) String() string {
 func (*IsFavoritedResponse) ProtoMessage() {}
 
 func (x *IsFavoritedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[8]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -759,7 +884,7 @@ func (x *IsFavoritedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsFavoritedResponse.ProtoReflect.Descriptor instead.
 func (*IsFavoritedResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{8}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *IsFavoritedResponse) GetIsFavorited() bool {
@@ -780,7 +905,7 @@ type GetFavoritesCountRequest struct {
 
 func (x *GetFavoritesCountRequest) Reset() {
 	*x = GetFavoritesCountRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[9]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -792,7 +917,7 @@ func (x *GetFavoritesCountRequest) String() string {
 func (*GetFavoritesCountRequest) ProtoMessage() {}
 
 func (x *GetFavoritesCountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[9]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -805,7 +930,7 @@ func (x *GetFavoritesCountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesCountRequest.ProtoReflect.Descriptor instead.
 func (*GetFavoritesCountRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{9}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetFavoritesCountRequest) GetUserId() string {
@@ -831,7 +956,7 @@ type GetFavoritesCountResponse struct {
 
 func (x *GetFavoritesCountResponse) Reset() {
 	*x = GetFavoritesCountResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[10]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -843,7 +968,7 @@ func (x *GetFavoritesCountResponse) String() string {
 func (*GetFavoritesCountResponse) ProtoMessage() {}
 
 func (x *GetFavoritesCountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[10]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -856,7 +981,7 @@ func (x *GetFavoritesCountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFavoritesCountResponse.ProtoReflect.Descriptor instead.
 func (*GetFavoritesCountResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{10}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetFavoritesCountResponse) GetCount() int32 {
@@ -900,7 +1025,7 @@ type HotelDetails struct {
 
 func (x *HotelDetails) Reset() {
 	*x = HotelDetails{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1037,7 @@ func (x *HotelDetails) String() string {
 func (*HotelDetails) ProtoMessage() {}
 
 func (x *HotelDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[11]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1050,7 @@ func (x *HotelDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelDetails.ProtoReflect.Descriptor instead.
 func (*HotelDetails) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{11}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *HotelDetails) GetId() string {
@@ -1117,7 +1242,7 @@ type HotelRoom struct {
 
 func (x *HotelRoom) Reset() {
 	*x = HotelRoom{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1129,7 +1254,7 @@ func (x *HotelRoom) String() string {
 func (*HotelRoom) ProtoMessage() {}
 
 func (x *HotelRoom) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[12]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1142,7 +1267,7 @@ func (x *HotelRoom) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelRoom.ProtoReflect.Descriptor instead.
 func (*HotelRoom) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{12}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *HotelRoom) GetType() string {
@@ -1198,7 +1323,7 @@ type NearbyAttraction struct {
 
 func (x *NearbyAttraction) Reset() {
 	*x = NearbyAttraction{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1210,7 +1335,7 @@ func (x *NearbyAttraction) String() string {
 func (*NearbyAttraction) ProtoMessage() {}
 
 func (x *NearbyAttraction) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[13]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1223,7 +1348,7 @@ func (x *NearbyAttraction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NearbyAttraction.ProtoReflect.Descriptor instead.
 func (*NearbyAttraction) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{13}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *NearbyAttraction) GetName() string {
@@ -1258,7 +1383,7 @@ type HotelContact struct {
 
 func (x *HotelContact) Reset() {
 	*x = HotelContact{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1270,7 +1395,7 @@ func (x *HotelContact) String() string {
 func (*HotelContact) ProtoMessage() {}
 
 func (x *HotelContact) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[14]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1283,7 +1408,7 @@ func (x *HotelContact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelContact.ProtoReflect.Descriptor instead.
 func (*HotelContact) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{14}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *HotelContact) GetPhone() string {
@@ -1316,7 +1441,7 @@ type GetHotelDetailsRequest struct {
 
 func (x *GetHotelDetailsRequest) Reset() {
 	*x = GetHotelDetailsRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1453,7 @@ func (x *GetHotelDetailsRequest) String() string {
 func (*GetHotelDetailsRequest) ProtoMessage() {}
 
 func (x *GetHotelDetailsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[15]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1466,7 @@ func (x *GetHotelDetailsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHotelDetailsRequest.ProtoReflect.Descriptor instead.
 func (*GetHotelDetailsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{15}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetHotelDetailsRequest) GetHotelId() string {
@@ -1362,7 +1487,7 @@ type GetHotelDetailsResponse struct {
 
 func (x *GetHotelDetailsResponse) Reset() {
 	*x = GetHotelDetailsResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1374,7 +1499,7 @@ func (x *GetHotelDetailsResponse) String() string {
 func (*GetHotelDetailsResponse) ProtoMessage() {}
 
 func (x *GetHotelDetailsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[16]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1387,7 +1512,7 @@ func (x *GetHotelDetailsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHotelDetailsResponse.ProtoReflect.Descriptor instead.
 func (*GetHotelDetailsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{16}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetHotelDetailsResponse) GetSuccess() bool {
@@ -1423,7 +1548,7 @@ type GetNearbyHotelsRequest struct {
 
 func (x *GetNearbyHotelsRequest) Reset() {
 	*x = GetNearbyHotelsRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1560,7 @@ func (x *GetNearbyHotelsRequest) String() string {
 func (*GetNearbyHotelsRequest) ProtoMessage() {}
 
 func (x *GetNearbyHotelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[17]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1573,7 @@ func (x *GetNearbyHotelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNearbyHotelsRequest.ProtoReflect.Descriptor instead.
 func (*GetNearbyHotelsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{17}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetNearbyHotelsRequest) GetLatitude() float64 {
@@ -1489,7 +1614,7 @@ type GetNearbyHotelsResponse struct {
 
 func (x *GetNearbyHotelsResponse) Reset() {
 	*x = GetNearbyHotelsResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1501,7 +1626,7 @@ func (x *GetNearbyHotelsResponse) String() string {
 func (*GetNearbyHotelsResponse) ProtoMessage() {}
 
 func (x *GetNearbyHotelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[18]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1514,7 +1639,7 @@ func (x *GetNearbyHotelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNearbyHotelsResponse.ProtoReflect.Descriptor instead.
 func (*GetNearbyHotelsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{18}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *GetNearbyHotelsResponse) GetHotels() []*HotelDetails {
@@ -1568,7 +1693,7 @@ type RestaurantDetails struct {
 
 func (x *RestaurantDetails) Reset() {
 	*x = RestaurantDetails{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1580,7 +1705,7 @@ func (x *RestaurantDetails) String() string {
 func (*RestaurantDetails) ProtoMessage() {}
 
 func (x *RestaurantDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[19]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1593,7 +1718,7 @@ func (x *RestaurantDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantDetails.ProtoReflect.Descriptor instead.
 func (*RestaurantDetails) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{19}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RestaurantDetails) GetId() string {
@@ -1803,7 +1928,7 @@ type MenuItem struct {
 
 func (x *MenuItem) Reset() {
 	*x = MenuItem{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1815,7 +1940,7 @@ func (x *MenuItem) String() string {
 func (*MenuItem) ProtoMessage() {}
 
 func (x *MenuItem) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[20]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1828,7 +1953,7 @@ func (x *MenuItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MenuItem.ProtoReflect.Descriptor instead.
 func (*MenuItem) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{20}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *MenuItem) GetName() string {
@@ -1863,7 +1988,7 @@ type RestaurantMenu struct {
 
 func (x *RestaurantMenu) Reset() {
 	*x = RestaurantMenu{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1875,7 +2000,7 @@ func (x *RestaurantMenu) String() string {
 func (*RestaurantMenu) ProtoMessage() {}
 
 func (x *RestaurantMenu) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[21]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1888,7 +2013,7 @@ func (x *RestaurantMenu) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantMenu.ProtoReflect.Descriptor instead.
 func (*RestaurantMenu) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{21}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *RestaurantMenu) GetStarters() []*MenuItem {
@@ -1923,7 +2048,7 @@ type RestaurantContact struct {
 
 func (x *RestaurantContact) Reset() {
 	*x = RestaurantContact{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1935,7 +2060,7 @@ func (x *RestaurantContact) String() string {
 func (*RestaurantContact) ProtoMessage() {}
 
 func (x *RestaurantContact) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[22]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1948,7 +2073,7 @@ func (x *RestaurantContact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantContact.ProtoReflect.Descriptor instead.
 func (*RestaurantContact) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{22}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RestaurantContact) GetPhone() string {
@@ -1981,7 +2106,7 @@ type GetRestaurantDetailsRequest struct {
 
 func (x *GetRestaurantDetailsRequest) Reset() {
 	*x = GetRestaurantDetailsRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1993,7 +2118,7 @@ func (x *GetRestaurantDetailsRequest) String() string {
 func (*GetRestaurantDetailsRequest) ProtoMessage() {}
 
 func (x *GetRestaurantDetailsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[23]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2006,7 +2131,7 @@ func (x *GetRestaurantDetailsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRestaurantDetailsRequest.ProtoReflect.Descriptor instead.
 func (*GetRestaurantDetailsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{23}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetRestaurantDetailsRequest) GetRestaurantId() string {
@@ -2027,7 +2152,7 @@ type GetRestaurantDetailsResponse struct {
 
 func (x *GetRestaurantDetailsResponse) Reset() {
 	*x = GetRestaurantDetailsResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2039,7 +2164,7 @@ func (x *GetRestaurantDetailsResponse) String() string {
 func (*GetRestaurantDetailsResponse) ProtoMessage() {}
 
 func (x *GetRestaurantDetailsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[24]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2052,7 +2177,7 @@ func (x *GetRestaurantDetailsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRestaurantDetailsResponse.ProtoReflect.Descriptor instead.
 func (*GetRestaurantDetailsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{24}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetRestaurantDetailsResponse) GetSuccess() bool {
@@ -2088,7 +2213,7 @@ type GetNearbyRestaurantsRequest struct {
 
 func (x *GetNearbyRestaurantsRequest) Reset() {
 	*x = GetNearbyRestaurantsRequest{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2100,7 +2225,7 @@ func (x *GetNearbyRestaurantsRequest) String() string {
 func (*GetNearbyRestaurantsRequest) ProtoMessage() {}
 
 func (x *GetNearbyRestaurantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[25]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2113,7 +2238,7 @@ func (x *GetNearbyRestaurantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNearbyRestaurantsRequest.ProtoReflect.Descriptor instead.
 func (*GetNearbyRestaurantsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{25}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetNearbyRestaurantsRequest) GetLatitude() float64 {
@@ -2154,7 +2279,7 @@ type GetNearbyRestaurantsResponse struct {
 
 func (x *GetNearbyRestaurantsResponse) Reset() {
 	*x = GetNearbyRestaurantsResponse{}
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2166,7 +2291,7 @@ func (x *GetNearbyRestaurantsResponse) String() string {
 func (*GetNearbyRestaurantsResponse) ProtoMessage() {}
 
 func (x *GetNearbyRestaurantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[26]
+	mi := &file_loci_favorites_v1_favorites_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2179,7 +2304,7 @@ func (x *GetNearbyRestaurantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNearbyRestaurantsResponse.ProtoReflect.Descriptor instead.
 func (*GetNearbyRestaurantsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{26}
+	return file_loci_favorites_v1_favorites_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetNearbyRestaurantsResponse) GetRestaurants() []*RestaurantDetails {
@@ -2241,7 +2366,18 @@ const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\x1aRemoveFromFavoritesRequest\x12 \n" +
 	"\auser_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\x12 \n" +
 	"\aitem_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06itemId\x12A\n" +
-	"\fcontent_type\x18\x03 \x01(\x0e2\x1e.loci.favorites.v1.ContentTypeR\vcontentType\"Q\n" +
+	"\fcontent_type\x18\x03 \x01(\x0e2\x1e.loci.favorites.v1.ContentTypeR\vcontentType\"\xaf\x01\n" +
+	"\x19UpdateFavoriteNoteRequest\x12#\n" +
+	"\aitem_id\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\x06itemId\x12M\n" +
+	"\fcontent_type\x18\x02 \x01(\x0e2\x1e.loci.favorites.v1.ContentTypeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\vcontentType\x12\x1e\n" +
+	"\x05notes\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xd0\x0fR\x05notes\"\xaa\x01\n" +
+	"\x1aUpdateFavoriteNoteResponse\x12;\n" +
+	"\bfavorite\x18\x01 \x01(\v2\x1f.loci.favorites.v1.FavoriteItemR\bfavorite\x12.\n" +
+	"\x0epoints_awarded\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\rpointsAwarded\x12\x1f\n" +
+	"\vnote_counts\x18\x03 \x01(\bR\n" +
+	"noteCounts\"Q\n" +
 	"\x1bRemoveFromFavoritesResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\xa8\x01\n" +
@@ -2395,7 +2531,7 @@ const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\x10CONTENT_TYPE_POI\x10\x01\x12\x16\n" +
 	"\x12CONTENT_TYPE_HOTEL\x10\x02\x12\x1b\n" +
 	"\x17CONTENT_TYPE_RESTAURANT\x10\x03\x12\x1a\n" +
-	"\x16CONTENT_TYPE_ITINERARY\x10\x042\xe4\a\n" +
+	"\x16CONTENT_TYPE_ITINERARY\x10\x042\xd7\b\n" +
 	"\x10FavoritesService\x12e\n" +
 	"\x0eAddToFavorites\x12(.loci.favorites.v1.AddToFavoritesRequest\x1a).loci.favorites.v1.AddToFavoritesResponse\x12t\n" +
 	"\x13RemoveFromFavorites\x12-.loci.favorites.v1.RemoveFromFavoritesRequest\x1a..loci.favorites.v1.RemoveFromFavoritesResponse\x12_\n" +
@@ -2405,7 +2541,8 @@ const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\x0fGetHotelDetails\x12).loci.favorites.v1.GetHotelDetailsRequest\x1a*.loci.favorites.v1.GetHotelDetailsResponse\x12w\n" +
 	"\x14GetRestaurantDetails\x12..loci.favorites.v1.GetRestaurantDetailsRequest\x1a/.loci.favorites.v1.GetRestaurantDetailsResponse\x12h\n" +
 	"\x0fGetNearbyHotels\x12).loci.favorites.v1.GetNearbyHotelsRequest\x1a*.loci.favorites.v1.GetNearbyHotelsResponse\x12w\n" +
-	"\x14GetNearbyRestaurants\x12..loci.favorites.v1.GetNearbyRestaurantsRequest\x1a/.loci.favorites.v1.GetNearbyRestaurantsResponseBRZPgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1;favoritesv1b\x06proto3"
+	"\x14GetNearbyRestaurants\x12..loci.favorites.v1.GetNearbyRestaurantsRequest\x1a/.loci.favorites.v1.GetNearbyRestaurantsResponse\x12q\n" +
+	"\x12UpdateFavoriteNote\x12,.loci.favorites.v1.UpdateFavoriteNoteRequest\x1a-.loci.favorites.v1.UpdateFavoriteNoteResponseBRZPgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1;favoritesv1b\x06proto3"
 
 var (
 	file_loci_favorites_v1_favorites_proto_rawDescOnce sync.Once
@@ -2420,90 +2557,96 @@ func file_loci_favorites_v1_favorites_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_favorites_v1_favorites_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_favorites_v1_favorites_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_loci_favorites_v1_favorites_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_loci_favorites_v1_favorites_proto_goTypes = []any{
 	(ContentType)(0),                           // 0: loci.favorites.v1.ContentType
 	(*FavoriteItem)(nil),                       // 1: loci.favorites.v1.FavoriteItem
 	(*AddToFavoritesRequest)(nil),              // 2: loci.favorites.v1.AddToFavoritesRequest
 	(*AddToFavoritesResponse)(nil),             // 3: loci.favorites.v1.AddToFavoritesResponse
 	(*RemoveFromFavoritesRequest)(nil),         // 4: loci.favorites.v1.RemoveFromFavoritesRequest
-	(*RemoveFromFavoritesResponse)(nil),        // 5: loci.favorites.v1.RemoveFromFavoritesResponse
-	(*GetFavoritesRequest)(nil),                // 6: loci.favorites.v1.GetFavoritesRequest
-	(*GetFavoritesResponse)(nil),               // 7: loci.favorites.v1.GetFavoritesResponse
-	(*IsFavoritedRequest)(nil),                 // 8: loci.favorites.v1.IsFavoritedRequest
-	(*IsFavoritedResponse)(nil),                // 9: loci.favorites.v1.IsFavoritedResponse
-	(*GetFavoritesCountRequest)(nil),           // 10: loci.favorites.v1.GetFavoritesCountRequest
-	(*GetFavoritesCountResponse)(nil),          // 11: loci.favorites.v1.GetFavoritesCountResponse
-	(*HotelDetails)(nil),                       // 12: loci.favorites.v1.HotelDetails
-	(*HotelRoom)(nil),                          // 13: loci.favorites.v1.HotelRoom
-	(*NearbyAttraction)(nil),                   // 14: loci.favorites.v1.NearbyAttraction
-	(*HotelContact)(nil),                       // 15: loci.favorites.v1.HotelContact
-	(*GetHotelDetailsRequest)(nil),             // 16: loci.favorites.v1.GetHotelDetailsRequest
-	(*GetHotelDetailsResponse)(nil),            // 17: loci.favorites.v1.GetHotelDetailsResponse
-	(*GetNearbyHotelsRequest)(nil),             // 18: loci.favorites.v1.GetNearbyHotelsRequest
-	(*GetNearbyHotelsResponse)(nil),            // 19: loci.favorites.v1.GetNearbyHotelsResponse
-	(*RestaurantDetails)(nil),                  // 20: loci.favorites.v1.RestaurantDetails
-	(*MenuItem)(nil),                           // 21: loci.favorites.v1.MenuItem
-	(*RestaurantMenu)(nil),                     // 22: loci.favorites.v1.RestaurantMenu
-	(*RestaurantContact)(nil),                  // 23: loci.favorites.v1.RestaurantContact
-	(*GetRestaurantDetailsRequest)(nil),        // 24: loci.favorites.v1.GetRestaurantDetailsRequest
-	(*GetRestaurantDetailsResponse)(nil),       // 25: loci.favorites.v1.GetRestaurantDetailsResponse
-	(*GetNearbyRestaurantsRequest)(nil),        // 26: loci.favorites.v1.GetNearbyRestaurantsRequest
-	(*GetNearbyRestaurantsResponse)(nil),       // 27: loci.favorites.v1.GetNearbyRestaurantsResponse
-	nil,                                        // 28: loci.favorites.v1.RestaurantDetails.HoursEntry
-	(*timestamppb.Timestamp)(nil),              // 29: google.protobuf.Timestamp
-	(*recommendation.RecommendationTrace)(nil), // 30: loci.recommendation.RecommendationTrace
+	(*UpdateFavoriteNoteRequest)(nil),          // 5: loci.favorites.v1.UpdateFavoriteNoteRequest
+	(*UpdateFavoriteNoteResponse)(nil),         // 6: loci.favorites.v1.UpdateFavoriteNoteResponse
+	(*RemoveFromFavoritesResponse)(nil),        // 7: loci.favorites.v1.RemoveFromFavoritesResponse
+	(*GetFavoritesRequest)(nil),                // 8: loci.favorites.v1.GetFavoritesRequest
+	(*GetFavoritesResponse)(nil),               // 9: loci.favorites.v1.GetFavoritesResponse
+	(*IsFavoritedRequest)(nil),                 // 10: loci.favorites.v1.IsFavoritedRequest
+	(*IsFavoritedResponse)(nil),                // 11: loci.favorites.v1.IsFavoritedResponse
+	(*GetFavoritesCountRequest)(nil),           // 12: loci.favorites.v1.GetFavoritesCountRequest
+	(*GetFavoritesCountResponse)(nil),          // 13: loci.favorites.v1.GetFavoritesCountResponse
+	(*HotelDetails)(nil),                       // 14: loci.favorites.v1.HotelDetails
+	(*HotelRoom)(nil),                          // 15: loci.favorites.v1.HotelRoom
+	(*NearbyAttraction)(nil),                   // 16: loci.favorites.v1.NearbyAttraction
+	(*HotelContact)(nil),                       // 17: loci.favorites.v1.HotelContact
+	(*GetHotelDetailsRequest)(nil),             // 18: loci.favorites.v1.GetHotelDetailsRequest
+	(*GetHotelDetailsResponse)(nil),            // 19: loci.favorites.v1.GetHotelDetailsResponse
+	(*GetNearbyHotelsRequest)(nil),             // 20: loci.favorites.v1.GetNearbyHotelsRequest
+	(*GetNearbyHotelsResponse)(nil),            // 21: loci.favorites.v1.GetNearbyHotelsResponse
+	(*RestaurantDetails)(nil),                  // 22: loci.favorites.v1.RestaurantDetails
+	(*MenuItem)(nil),                           // 23: loci.favorites.v1.MenuItem
+	(*RestaurantMenu)(nil),                     // 24: loci.favorites.v1.RestaurantMenu
+	(*RestaurantContact)(nil),                  // 25: loci.favorites.v1.RestaurantContact
+	(*GetRestaurantDetailsRequest)(nil),        // 26: loci.favorites.v1.GetRestaurantDetailsRequest
+	(*GetRestaurantDetailsResponse)(nil),       // 27: loci.favorites.v1.GetRestaurantDetailsResponse
+	(*GetNearbyRestaurantsRequest)(nil),        // 28: loci.favorites.v1.GetNearbyRestaurantsRequest
+	(*GetNearbyRestaurantsResponse)(nil),       // 29: loci.favorites.v1.GetNearbyRestaurantsResponse
+	nil,                                        // 30: loci.favorites.v1.RestaurantDetails.HoursEntry
+	(*timestamppb.Timestamp)(nil),              // 31: google.protobuf.Timestamp
+	(*recommendation.RecommendationTrace)(nil), // 32: loci.recommendation.RecommendationTrace
 }
 var file_loci_favorites_v1_favorites_proto_depIdxs = []int32{
 	0,  // 0: loci.favorites.v1.FavoriteItem.content_type:type_name -> loci.favorites.v1.ContentType
-	29, // 1: loci.favorites.v1.FavoriteItem.added_at:type_name -> google.protobuf.Timestamp
-	30, // 2: loci.favorites.v1.FavoriteItem.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	31, // 1: loci.favorites.v1.FavoriteItem.added_at:type_name -> google.protobuf.Timestamp
+	32, // 2: loci.favorites.v1.FavoriteItem.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
 	0,  // 3: loci.favorites.v1.AddToFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	30, // 4: loci.favorites.v1.AddToFavoritesRequest.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	32, // 4: loci.favorites.v1.AddToFavoritesRequest.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
 	1,  // 5: loci.favorites.v1.AddToFavoritesResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
 	0,  // 6: loci.favorites.v1.RemoveFromFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	0,  // 7: loci.favorites.v1.GetFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	1,  // 8: loci.favorites.v1.GetFavoritesResponse.favorites:type_name -> loci.favorites.v1.FavoriteItem
-	0,  // 9: loci.favorites.v1.IsFavoritedRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	0,  // 10: loci.favorites.v1.GetFavoritesCountRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	29, // 11: loci.favorites.v1.HotelDetails.created_at:type_name -> google.protobuf.Timestamp
-	13, // 12: loci.favorites.v1.HotelDetails.rooms:type_name -> loci.favorites.v1.HotelRoom
-	14, // 13: loci.favorites.v1.HotelDetails.nearby_attractions:type_name -> loci.favorites.v1.NearbyAttraction
-	15, // 14: loci.favorites.v1.HotelDetails.contact:type_name -> loci.favorites.v1.HotelContact
-	12, // 15: loci.favorites.v1.GetHotelDetailsResponse.hotel:type_name -> loci.favorites.v1.HotelDetails
-	12, // 16: loci.favorites.v1.GetNearbyHotelsResponse.hotels:type_name -> loci.favorites.v1.HotelDetails
-	29, // 17: loci.favorites.v1.RestaurantDetails.created_at:type_name -> google.protobuf.Timestamp
-	22, // 18: loci.favorites.v1.RestaurantDetails.menu:type_name -> loci.favorites.v1.RestaurantMenu
-	28, // 19: loci.favorites.v1.RestaurantDetails.hours:type_name -> loci.favorites.v1.RestaurantDetails.HoursEntry
-	23, // 20: loci.favorites.v1.RestaurantDetails.contact:type_name -> loci.favorites.v1.RestaurantContact
-	21, // 21: loci.favorites.v1.RestaurantMenu.starters:type_name -> loci.favorites.v1.MenuItem
-	21, // 22: loci.favorites.v1.RestaurantMenu.mains:type_name -> loci.favorites.v1.MenuItem
-	21, // 23: loci.favorites.v1.RestaurantMenu.desserts:type_name -> loci.favorites.v1.MenuItem
-	20, // 24: loci.favorites.v1.GetRestaurantDetailsResponse.restaurant:type_name -> loci.favorites.v1.RestaurantDetails
-	20, // 25: loci.favorites.v1.GetNearbyRestaurantsResponse.restaurants:type_name -> loci.favorites.v1.RestaurantDetails
-	2,  // 26: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
-	4,  // 27: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
-	6,  // 28: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
-	8,  // 29: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
-	10, // 30: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
-	16, // 31: loci.favorites.v1.FavoritesService.GetHotelDetails:input_type -> loci.favorites.v1.GetHotelDetailsRequest
-	24, // 32: loci.favorites.v1.FavoritesService.GetRestaurantDetails:input_type -> loci.favorites.v1.GetRestaurantDetailsRequest
-	18, // 33: loci.favorites.v1.FavoritesService.GetNearbyHotels:input_type -> loci.favorites.v1.GetNearbyHotelsRequest
-	26, // 34: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:input_type -> loci.favorites.v1.GetNearbyRestaurantsRequest
-	3,  // 35: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
-	5,  // 36: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
-	7,  // 37: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
-	9,  // 38: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
-	11, // 39: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
-	17, // 40: loci.favorites.v1.FavoritesService.GetHotelDetails:output_type -> loci.favorites.v1.GetHotelDetailsResponse
-	25, // 41: loci.favorites.v1.FavoritesService.GetRestaurantDetails:output_type -> loci.favorites.v1.GetRestaurantDetailsResponse
-	19, // 42: loci.favorites.v1.FavoritesService.GetNearbyHotels:output_type -> loci.favorites.v1.GetNearbyHotelsResponse
-	27, // 43: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:output_type -> loci.favorites.v1.GetNearbyRestaurantsResponse
-	35, // [35:44] is the sub-list for method output_type
-	26, // [26:35] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	0,  // 7: loci.favorites.v1.UpdateFavoriteNoteRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	1,  // 8: loci.favorites.v1.UpdateFavoriteNoteResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
+	0,  // 9: loci.favorites.v1.GetFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	1,  // 10: loci.favorites.v1.GetFavoritesResponse.favorites:type_name -> loci.favorites.v1.FavoriteItem
+	0,  // 11: loci.favorites.v1.IsFavoritedRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	0,  // 12: loci.favorites.v1.GetFavoritesCountRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	31, // 13: loci.favorites.v1.HotelDetails.created_at:type_name -> google.protobuf.Timestamp
+	15, // 14: loci.favorites.v1.HotelDetails.rooms:type_name -> loci.favorites.v1.HotelRoom
+	16, // 15: loci.favorites.v1.HotelDetails.nearby_attractions:type_name -> loci.favorites.v1.NearbyAttraction
+	17, // 16: loci.favorites.v1.HotelDetails.contact:type_name -> loci.favorites.v1.HotelContact
+	14, // 17: loci.favorites.v1.GetHotelDetailsResponse.hotel:type_name -> loci.favorites.v1.HotelDetails
+	14, // 18: loci.favorites.v1.GetNearbyHotelsResponse.hotels:type_name -> loci.favorites.v1.HotelDetails
+	31, // 19: loci.favorites.v1.RestaurantDetails.created_at:type_name -> google.protobuf.Timestamp
+	24, // 20: loci.favorites.v1.RestaurantDetails.menu:type_name -> loci.favorites.v1.RestaurantMenu
+	30, // 21: loci.favorites.v1.RestaurantDetails.hours:type_name -> loci.favorites.v1.RestaurantDetails.HoursEntry
+	25, // 22: loci.favorites.v1.RestaurantDetails.contact:type_name -> loci.favorites.v1.RestaurantContact
+	23, // 23: loci.favorites.v1.RestaurantMenu.starters:type_name -> loci.favorites.v1.MenuItem
+	23, // 24: loci.favorites.v1.RestaurantMenu.mains:type_name -> loci.favorites.v1.MenuItem
+	23, // 25: loci.favorites.v1.RestaurantMenu.desserts:type_name -> loci.favorites.v1.MenuItem
+	22, // 26: loci.favorites.v1.GetRestaurantDetailsResponse.restaurant:type_name -> loci.favorites.v1.RestaurantDetails
+	22, // 27: loci.favorites.v1.GetNearbyRestaurantsResponse.restaurants:type_name -> loci.favorites.v1.RestaurantDetails
+	2,  // 28: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
+	4,  // 29: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
+	8,  // 30: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
+	10, // 31: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
+	12, // 32: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
+	18, // 33: loci.favorites.v1.FavoritesService.GetHotelDetails:input_type -> loci.favorites.v1.GetHotelDetailsRequest
+	26, // 34: loci.favorites.v1.FavoritesService.GetRestaurantDetails:input_type -> loci.favorites.v1.GetRestaurantDetailsRequest
+	20, // 35: loci.favorites.v1.FavoritesService.GetNearbyHotels:input_type -> loci.favorites.v1.GetNearbyHotelsRequest
+	28, // 36: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:input_type -> loci.favorites.v1.GetNearbyRestaurantsRequest
+	5,  // 37: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:input_type -> loci.favorites.v1.UpdateFavoriteNoteRequest
+	3,  // 38: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
+	7,  // 39: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
+	9,  // 40: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
+	11, // 41: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
+	13, // 42: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
+	19, // 43: loci.favorites.v1.FavoritesService.GetHotelDetails:output_type -> loci.favorites.v1.GetHotelDetailsResponse
+	27, // 44: loci.favorites.v1.FavoritesService.GetRestaurantDetails:output_type -> loci.favorites.v1.GetRestaurantDetailsResponse
+	21, // 45: loci.favorites.v1.FavoritesService.GetNearbyHotels:output_type -> loci.favorites.v1.GetNearbyHotelsResponse
+	29, // 46: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:output_type -> loci.favorites.v1.GetNearbyRestaurantsResponse
+	6,  // 47: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:output_type -> loci.favorites.v1.UpdateFavoriteNoteResponse
+	38, // [38:48] is the sub-list for method output_type
+	28, // [28:38] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_loci_favorites_v1_favorites_proto_init() }
@@ -2519,7 +2662,7 @@ func file_loci_favorites_v1_favorites_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_favorites_v1_favorites_proto_rawDesc), len(file_loci_favorites_v1_favorites_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   28,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

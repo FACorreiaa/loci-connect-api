@@ -3,6 +3,7 @@ package gamification
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -13,32 +14,43 @@ import (
 )
 
 // fakeRepo keeps the ledger in memory with the same semantics as the
-// Postgres repository: unique (user, kind, ref), daily caps, streaks.
+// Postgres repository: unique (user, kind, ref), daily caps, weekly scores
+// per city and overall, scoped boards.
 type fakeRepo struct {
-	mu      sync.Mutex
-	events  []Event
-	totals  map[uuid.UUID]Totals
-	badges  map[uuid.UUID]map[string]time.Time
-	hidden  map[uuid.UUID]bool
-	days    map[string]*fakeDay // dayID → day
-	pois    map[string][2]float64
-	pushLog map[string]bool
+	mu          sync.Mutex
+	events      []Event
+	totals      map[uuid.UUID]Totals
+	badges      map[uuid.UUID]map[string]time.Time
+	hidden      map[uuid.UUID]bool // leaderboard_visible off
+	cityHidden  map[uuid.UUID]bool // city_board_visible off
+	trips       map[uuid.UUID]*fakeTrip
+	places      map[string]Place
+	cities      map[string]uuid.UUID
+	defaultCity map[uuid.UUID]uuid.UUID
+	notes       map[string][]string // content:item → sources
+	saved       []Keep
+	closed      map[int]bool
+	pushLog     map[string]bool
 }
 
-type fakeDay struct {
-	owner  uuid.UUID
-	tripID string
-	done   bool
+type fakeTrip struct {
+	owner uuid.UUID
+	state TripState
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		totals:  map[uuid.UUID]Totals{},
-		badges:  map[uuid.UUID]map[string]time.Time{},
-		hidden:  map[uuid.UUID]bool{},
-		days:    map[string]*fakeDay{},
-		pois:    map[string][2]float64{},
-		pushLog: map[string]bool{},
+		totals:      map[uuid.UUID]Totals{},
+		badges:      map[uuid.UUID]map[string]time.Time{},
+		hidden:      map[uuid.UUID]bool{},
+		cityHidden:  map[uuid.UUID]bool{},
+		trips:       map[uuid.UUID]*fakeTrip{},
+		places:      map[string]Place{},
+		cities:      map[string]uuid.UUID{},
+		defaultCity: map[uuid.UUID]uuid.UUID{},
+		notes:       map[string][]string{},
+		closed:      map[int]bool{},
+		pushLog:     map[string]bool{},
 	}
 }
 
@@ -61,7 +73,7 @@ func (r *fakeRepo) SetTimezone(_ context.Context, id uuid.UUID, tz string) error
 	return nil
 }
 
-func (r *fakeRepo) Insert(_ context.Context, e Event, dailyCap int, bump bool) (bool, Totals, error) {
+func (r *fakeRepo) Insert(_ context.Context, e Event, dailyCap int) (bool, Totals, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	t, ok := r.totals[e.UserID]
@@ -87,15 +99,7 @@ func (r *fakeRepo) Insert(_ context.Context, e Event, dailyCap int, bump bool) (
 	e.ID = uuid.New()
 	e.CreatedAt = time.Now()
 	r.events = append(r.events, e)
-	t.TotalPoints += int64(e.Points)
-	if bump {
-		t.CurrentStreak = NextStreak(t.CurrentStreak, t.LastActiveDate, e.LocalDate)
-		if t.CurrentStreak > t.LongestStreak {
-			t.LongestStreak = t.CurrentStreak
-		}
-		d := e.LocalDate
-		t.LastActiveDate = &d
-	}
+	t.TotalPoints += int64(e.FieldPoints)
 	r.totals[e.UserID] = t
 	return true, t, nil
 }
@@ -183,7 +187,7 @@ func (r *fakeRepo) Scores(_ context.Context, ids []uuid.UUID, m Metric, p Period
 		}
 		switch m {
 		case MetricPoints:
-			out[e.UserID] += int64(e.Points)
+			out[e.UserID] += int64(e.FieldPoints)
 		case MetricCities:
 			if e.Kind == KindNewCity {
 				out[e.UserID]++
@@ -209,37 +213,29 @@ func (r *fakeRepo) Progresses(_ context.Context, ids []uuid.UUID) (map[uuid.UUID
 	return out, nil
 }
 
-func (r *fakeRepo) History(_ context.Context, id uuid.UUID, limit int, _ time.Time) ([]Event, error) {
+func (r *fakeRepo) History(_ context.Context, id uuid.UUID, limit int, _ time.Time, fieldOnly bool) ([]Event, error) {
 	var out []Event
 	for i := len(r.events) - 1; i >= 0 && len(out) < limit; i-- {
-		if r.events[i].UserID == id {
+		if r.events[i].UserID == id && (!fieldOnly || r.events[i].FieldPoints > 0) {
 			out = append(out, r.events[i])
 		}
 	}
 	return out, nil
 }
 
-func (r *fakeRepo) CompleteDay(_ context.Context, id uuid.UUID, tripID, dayID string) (bool, bool, string, error) {
+func (r *fakeRepo) Place(_ context.Context, id string) (Place, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	d, ok := r.days[dayID]
-	if !ok || d.owner != id || d.tripID != tripID {
-		return false, false, "", ErrNotFound
-	}
-	newly := !d.done
-	d.done = true
-	all := true
-	for _, x := range r.days {
-		if x.tripID == tripID && !x.done {
-			all = false
-		}
-	}
-	return newly, all, "Rome, day 1", nil
+	return r.places[id], nil
 }
 
-func (r *fakeRepo) POI(_ context.Context, id string) (float64, float64, string, bool, error) {
-	p, ok := r.pois[id]
-	return p[0], p[1], "Pantheon", ok, nil
+func (r *fakeRepo) SetNeighborhood(_ context.Context, id, name string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	p := r.places[id]
+	p.Neighborhood, p.NeighborhoodChecked = name, true
+	r.places[id] = p
+	return nil
 }
 
 func (r *fakeRepo) ClaimPushSlot(_ context.Context, id uuid.UUID, kind string, d time.Time) (bool, error) {
@@ -251,6 +247,285 @@ func (r *fakeRepo) ClaimPushSlot(_ context.Context, id uuid.UUID, kind string, d
 	}
 	r.pushLog[k] = true
 	return true, nil
+}
+
+func (r *fakeRepo) Trip(_ context.Context, userID, tripID uuid.UUID) (*TripState, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.trips[tripID]
+	if !ok || t.owner != userID {
+		return nil, ErrNotFound
+	}
+	out := t.state
+	out.Days = make([]DayState, len(t.state.Days))
+	for i, d := range t.state.Days {
+		d.Stops = append([]StopState(nil), d.Stops...)
+		out.Days[i] = d
+	}
+	return &out, nil
+}
+
+func (r *fakeRepo) SetMark(_ context.Context, tripID, stopID uuid.UUID, status StopStatus) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for di := range r.trips[tripID].state.Days {
+		for si := range r.trips[tripID].state.Days[di].Stops {
+			if s := &r.trips[tripID].state.Days[di].Stops[si]; s.ID == stopID {
+				s.Status = status
+			}
+		}
+	}
+	return nil
+}
+
+func (r *fakeRepo) CompleteDay(_ context.Context, dayID uuid.UUID) (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, t := range r.trips {
+		for di := range t.state.Days {
+			if d := &t.state.Days[di]; d.ID == dayID {
+				if d.CompletedAt != nil {
+					return false, nil
+				}
+				now := time.Now()
+				d.CompletedAt = &now
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func (r *fakeRepo) CityByName(_ context.Context, name string) (*uuid.UUID, error) {
+	if id, ok := r.cities[strings.ToLower(name)]; ok {
+		return &id, nil
+	}
+	return nil, nil
+}
+
+func (r *fakeRepo) CityName(_ context.Context, id uuid.UUID) (string, error) {
+	for n, c := range r.cities {
+		if c == id {
+			return n, nil
+		}
+	}
+	return "", nil
+}
+
+func (r *fakeRepo) DefaultCity(_ context.Context, userID uuid.UUID, _ time.Time) (*uuid.UUID, string, error) {
+	if id, ok := r.defaultCity[userID]; ok {
+		name, _ := r.CityName(context.Background(), id)
+		return &id, name, nil
+	}
+	return nil, "", nil
+}
+
+func (r *fakeRepo) CityBoardVisible(_ context.Context, userID uuid.UUID) (bool, error) {
+	return !r.cityHidden[userID], nil
+}
+
+// season sums one user's events in a season and city (uuid.Nil: overall).
+func (r *fakeRepo) season(userID, cityID uuid.UUID, season int) SeasonScore {
+	var s SeasonScore
+	for _, e := range r.events {
+		if e.UserID != userID || e.SeasonID != season {
+			continue
+		}
+		if cityID != uuid.Nil && (e.CityID == nil || *e.CityID != cityID) {
+			continue
+		}
+		s.Score += int64(e.FieldPoints)
+		switch e.Kind {
+		case KindPlaceKept:
+			s.PlacesKept++
+		case KindTripDayCompleted:
+			s.DaysFinished++
+		}
+	}
+	return s
+}
+
+func (r *fakeRepo) Board(_ context.Context, q BoardQuery) (BoardPage, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	users := map[uuid.UUID]bool{}
+	for _, e := range r.events {
+		users[e.UserID] = true
+	}
+	among := map[uuid.UUID]bool{}
+	for _, id := range q.Among {
+		among[id] = true
+	}
+	type row struct {
+		id uuid.UUID
+		v  int64
+	}
+	var rows []row
+	for u := range users {
+		if q.Among != nil && !among[u] {
+			continue
+		}
+		if q.Among == nil && u != q.Viewer && r.cityHidden[u] {
+			continue
+		}
+		s := r.season(u, q.CityID, q.SeasonID)
+		v := s.Score
+		switch q.Metric {
+		case FieldPlacesKept:
+			v = int64(s.PlacesKept)
+		case FieldDaysFinished:
+			v = int64(s.DaysFinished)
+		}
+		if v > 0 {
+			rows = append(rows, row{u, v})
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].v != rows[j].v {
+			return rows[i].v > rows[j].v
+		}
+		return rows[i].id.String() < rows[j].id.String()
+	})
+	page := BoardPage{Scored: len(rows)}
+	meIdx := -1
+	for i, x := range rows {
+		if x.id == q.Viewer {
+			meIdx = i
+		}
+	}
+	pos := func(i int) BoardRow {
+		p := 1
+		for _, x := range rows {
+			if x.v > rows[i].v {
+				p++
+			}
+		}
+		return BoardRow{UserID: rows[i].id, Value: rows[i].v, Position: p}
+	}
+	for i := range rows {
+		switch {
+		case i < 10:
+			page.Top = append(page.Top, pos(i))
+		case i == meIdx:
+			me := pos(i)
+			page.Me = &me
+		case i == meIdx-1:
+			above := pos(i)
+			page.Above = &above
+		}
+	}
+	return page, nil
+}
+
+func (r *fakeRepo) LifetimeScores(_ context.Context, cityID uuid.UUID, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := map[uuid.UUID]int64{}
+	for _, e := range r.events {
+		if cityID == uuid.Nil || (e.CityID != nil && *e.CityID == cityID) {
+			out[e.UserID] += int64(e.FieldPoints)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) CityTotals(_ context.Context, userID uuid.UUID) ([]CityTotal, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	by := map[uuid.UUID]int64{}
+	for _, e := range r.events {
+		if e.UserID == userID && e.CityID != nil {
+			by[*e.CityID] += int64(e.FieldPoints)
+		}
+	}
+	var out []CityTotal
+	for c, v := range by {
+		out = append(out, CityTotal{CityID: c, Score: v})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	return out, nil
+}
+
+func (r *fakeRepo) SeasonScores(_ context.Context, userID, cityID uuid.UUID, seasons []int) (map[int]SeasonScore, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := map[int]SeasonScore{}
+	for _, id := range seasons {
+		out[id] = r.season(userID, cityID, id)
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) Lifetime(_ context.Context, userID uuid.UUID) (SeasonScore, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var s SeasonScore
+	for _, e := range r.events {
+		if e.UserID == userID {
+			s.Score += int64(e.FieldPoints)
+			if e.Kind == KindPlaceKept {
+				s.PlacesKept++
+			}
+			if e.Kind == KindTripDayCompleted {
+				s.DaysFinished++
+			}
+		}
+	}
+	return s, nil
+}
+
+func (r *fakeRepo) SeasonClosed(_ context.Context, id int) (bool, error) { return r.closed[id], nil }
+
+func (r *fakeRepo) OpenSeasons(_ context.Context, before int) ([]int, error) {
+	seen := map[int]bool{}
+	var out []int
+	for _, e := range r.events {
+		if e.SeasonID < before && !r.closed[e.SeasonID] && !seen[e.SeasonID] {
+			seen[e.SeasonID] = true
+			out = append(out, e.SeasonID)
+		}
+	}
+	sort.Ints(out)
+	return out, nil
+}
+
+func (r *fakeRepo) CloseSeason(_ context.Context, id int) error {
+	r.closed[id] = true
+	return nil
+}
+
+func (r *fakeRepo) DueKeeps(_ context.Context, limit int) ([]Keep, error) {
+	var out []Keep
+	for _, k := range r.saved {
+		paid := false
+		for _, e := range r.events {
+			if e.UserID == k.UserID && e.Kind == KindPlaceKept && e.RefKey == "kept:"+k.ContentType+":"+k.ItemID {
+				paid = true
+			}
+		}
+		if !paid && len(out) < limit {
+			out = append(out, k)
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) PlacesWithoutNeighborhood(_ context.Context, limit int) ([]PlaceRef, error) {
+	var out []PlaceRef
+	for id, p := range r.places {
+		if !p.NeighborhoodChecked && p.HasLocation && len(out) < limit {
+			out = append(out, PlaceRef{ID: id, Lat: p.Lat, Lon: p.Lon})
+		}
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) NoteSources(_ context.Context, _ uuid.UUID, contentType, itemID string) ([]string, error) {
+	src, ok := r.notes[contentType+":"+itemID]
+	if !ok {
+		return nil, ErrNotFound
+	}
+	return src, nil
 }
 
 type fakeGraph struct {
@@ -376,24 +651,32 @@ func TestRankSharesTies(t *testing.T) {
 	}
 }
 
-func TestCheckInIsIdempotentAndBuildsAStreak(t *testing.T) {
+func TestCheckInAwardsNothingButKeepsTheZone(t *testing.T) {
 	repo := newFakeRepo()
 	s := newTestService(repo, nil, nil)
 	u := uuid.New()
 	ctx := context.Background()
 
-	first, err := s.CheckIn(ctx, u, "Europe/Lisbon")
-	if err != nil || first.Points != Rules[KindDailyCheckIn].Points {
-		t.Fatalf("first check-in = %+v, %v", first, err)
+	res, err := s.CheckIn(ctx, u, "Europe/Lisbon")
+	if err != nil || res.Points != 0 || len(repo.events) != 0 {
+		t.Fatalf("check-in = %+v, %v, %d events; opening the app earns nothing", res, err, len(repo.events))
 	}
-	again, err := s.CheckIn(ctx, u, "Europe/Lisbon")
-	if err != nil || again.Points != 0 {
-		t.Fatalf("second check-in the same day must award nothing, got %+v, %v", again, err)
+	if tot, _ := repo.Totals(ctx, u); tot.Timezone != "Europe/Lisbon" {
+		t.Fatalf("timezone = %q", tot.Timezone)
 	}
-	s.now = func() time.Time { return noon.AddDate(0, 0, 1) }
-	next, err := s.CheckIn(ctx, u, "Europe/Lisbon")
-	if err != nil || next.Totals.CurrentStreak != 2 {
-		t.Fatalf("next day streak = %+v, %v", next.Totals, err)
+}
+
+func TestRetiredKindsAwardNothing(t *testing.T) {
+	repo := newFakeRepo()
+	s := newTestService(repo, nil, nil)
+	for _, k := range []Kind{KindDailyCheckIn, KindDailySearch} {
+		res, err := s.Award(context.Background(), Award{UserID: uuid.New(), Kind: k, RefKey: "x"})
+		if err != nil || res.Points != 0 {
+			t.Fatalf("kind %d = %+v, %v", k, res, err)
+		}
+	}
+	if len(repo.events) != 0 {
+		t.Fatalf("retired kinds wrote %d rows", len(repo.events))
 	}
 }
 
@@ -424,7 +707,8 @@ func TestPlaceVisitsAreCappedPerDay(t *testing.T) {
 
 func TestScoreVisitNeedsAFreshFixNearThePlace(t *testing.T) {
 	repo := newFakeRepo()
-	repo.pois["pantheon"] = [2]float64{41.8986, 12.4769}
+	rome := uuid.New()
+	repo.places["pantheon"] = Place{Found: true, Name: "Pantheon", HasLocation: true, Lat: 41.8986, Lon: 12.4769, CityID: &rome}
 	s := newTestService(repo, nil, nil)
 	u := uuid.New()
 	ctx := context.Background()
@@ -444,32 +728,49 @@ func TestScoreVisitNeedsAFreshFixNearThePlace(t *testing.T) {
 	if got := s.ScoreVisit(ctx, Visit{UserID: u, POIID: "pantheon", Fix: near}); got != 0 {
 		t.Errorf("the same place twice in a day scored %d, want 0", got)
 	}
-	city := s.ScoreVisit(ctx, Visit{UserID: u, NewCityKey: "rome-row", CityName: "Rome", CityLat: 41.9028, CityLon: 12.4964, Fix: near})
+	city := s.ScoreVisit(ctx, Visit{UserID: u, NewCityKey: rome.String(), NewCityID: &rome, CityName: "Rome", CityLat: 41.9028, CityLon: 12.4964, Fix: near})
 	if city != Rules[KindNewCity].Points {
 		t.Errorf("new city scored %d", city)
 	}
+	if v := repo.season(u, rome, SeasonID(noon)).Score; v != int64(Rules[KindPlaceVisited].Points+Rules[KindNewCity].Points) {
+		t.Errorf("Rome's week = %d; visits count on the city's board", v)
+	}
+}
+
+// newTrip gives u a trip in city with one day per stop count.
+func newTrip(repo *fakeRepo, u uuid.UUID, city *uuid.UUID, stopsPerDay ...int) *TripState {
+	t := TripState{ID: uuid.New(), Title: "Rome", CityID: city, CityName: "Rome"}
+	for i, n := range stopsPerDay {
+		d := DayState{ID: uuid.New(), Number: i + 1}
+		for j := 0; j < n; j++ {
+			d.Stops = append(d.Stops, StopState{ID: uuid.New(), Name: "Stop", Status: StopOpen})
+		}
+		t.Days = append(t.Days, d)
+	}
+	repo.trips[t.ID] = &fakeTrip{owner: u, state: t}
+	return &t
 }
 
 func TestCompleteTripDayScoresTheDayAndTheTrip(t *testing.T) {
 	repo := newFakeRepo()
 	s := newTestService(repo, nil, nil)
 	u := uuid.New()
-	trip := uuid.NewString()
-	repo.days["d1"] = &fakeDay{owner: u, tripID: trip}
-	repo.days["d2"] = &fakeDay{owner: u, tripID: trip}
+	trip := newTrip(repo, u, nil, 2, 2, 0)
+	d1, d2 := trip.Days[0].ID.String(), trip.Days[1].ID.String()
 	ctx := context.Background()
 
-	if _, err := s.CompleteTripDay(ctx, u, trip, "d1", 0, "UTC"); !errors.Is(err, ErrInvalid) {
+	if _, err := s.CompleteTripDay(ctx, u, trip.ID.String(), d1, 0, "UTC"); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("no stops: err = %v", err)
 	}
-	if _, err := s.CompleteTripDay(ctx, uuid.New(), trip, "d1", 3, "UTC"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.CompleteTripDay(ctx, uuid.New(), trip.ID.String(), d1, 3, "UTC"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("someone else's day: err = %v", err)
 	}
-	one, err := s.CompleteTripDay(ctx, u, trip, "d1", 3, "UTC")
+	one, err := s.CompleteTripDay(ctx, u, trip.ID.String(), d1, 3, "UTC")
 	if err != nil || one.TripCompleted || one.Points != Rules[KindTripDayCompleted].Points {
 		t.Fatalf("day one = %+v, %v", one, err)
 	}
-	two, err := s.CompleteTripDay(ctx, u, trip, "d2", 2, "UTC")
+	// The third day has no stops (a travel day) and is not asked to be walked.
+	two, err := s.CompleteTripDay(ctx, u, trip.ID.String(), d2, 2, "UTC")
 	want := Rules[KindTripDayCompleted].Points + Rules[KindTripCompleted].Points
 	if err != nil || !two.TripCompleted || two.Points != want {
 		t.Fatalf("last day = %+v, %v; want %d points and a finished trip", two, err, want)
@@ -481,7 +782,7 @@ func TestCompleteTripDayScoresTheDayAndTheTrip(t *testing.T) {
 	if !found {
 		t.Fatalf("finishing a trip earns trip-finisher, got %+v", two.NewBadges)
 	}
-	again, _ := s.CompleteTripDay(ctx, u, trip, "d2", 2, "UTC")
+	again, _ := s.CompleteTripDay(ctx, u, trip.ID.String(), d2, 2, "UTC")
 	if again.Points != 0 {
 		t.Fatalf("completing a day twice scored %d", again.Points)
 	}
@@ -530,7 +831,7 @@ func TestOvertakingAFriendNotifiesThemOnceADay(t *testing.T) {
 	if _, err := s.Award(ctx, Award{UserID: friend, Kind: KindTripDayCompleted, RefKey: "tripday:x"}); err != nil {
 		t.Fatal(err)
 	}
-	// 20 points to beat: a 50-point city overtakes.
+	// 15 points to beat: a 20-point city overtakes.
 	if _, err := s.Award(ctx, Award{UserID: me, Kind: KindNewCity, RefKey: "city:a"}); err != nil {
 		t.Fatal(err)
 	}

@@ -146,6 +146,14 @@ func main() {
 		}
 	})
 
+	// Close finished field-score weeks, pay places kept a week, and look up
+	// neighborhoods. Returns immediately when switched off.
+	concurrency.Run(logger, func() {
+		if err := deps.RunField(backgroundCtx); err != nil {
+			logger.Error("field runner stopped", "error", err)
+		}
+	})
+
 	// Start HTTP server
 	if err := runServer(cfg, logger, handler); err != nil {
 		logger.Error("server error", "error", err)

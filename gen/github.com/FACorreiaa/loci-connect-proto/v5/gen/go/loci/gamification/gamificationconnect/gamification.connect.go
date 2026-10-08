@@ -48,6 +48,15 @@ const (
 	// GamificationServiceCompleteTripDayProcedure is the fully-qualified name of the
 	// GamificationService's CompleteTripDay RPC.
 	GamificationServiceCompleteTripDayProcedure = "/loci.gamification.GamificationService/CompleteTripDay"
+	// GamificationServiceGetFieldProfileProcedure is the fully-qualified name of the
+	// GamificationService's GetFieldProfile RPC.
+	GamificationServiceGetFieldProfileProcedure = "/loci.gamification.GamificationService/GetFieldProfile"
+	// GamificationServiceGetFieldBoardProcedure is the fully-qualified name of the
+	// GamificationService's GetFieldBoard RPC.
+	GamificationServiceGetFieldBoardProcedure = "/loci.gamification.GamificationService/GetFieldBoard"
+	// GamificationServiceMarkStopProcedure is the fully-qualified name of the GamificationService's
+	// MarkStop RPC.
+	GamificationServiceMarkStopProcedure = "/loci.gamification.GamificationService/MarkStop"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -58,16 +67,18 @@ var (
 	gamificationServiceGetLeaderboardMethodDescriptor    = gamificationServiceServiceDescriptor.Methods().ByName("GetLeaderboard")
 	gamificationServiceListPointsHistoryMethodDescriptor = gamificationServiceServiceDescriptor.Methods().ByName("ListPointsHistory")
 	gamificationServiceCompleteTripDayMethodDescriptor   = gamificationServiceServiceDescriptor.Methods().ByName("CompleteTripDay")
+	gamificationServiceGetFieldProfileMethodDescriptor   = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldProfile")
+	gamificationServiceGetFieldBoardMethodDescriptor     = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldBoard")
+	gamificationServiceMarkStopMethodDescriptor          = gamificationServiceServiceDescriptor.Methods().ByName("MarkStop")
 )
 
 // GamificationServiceClient is a client for the loci.gamification.GamificationService service.
 type GamificationServiceClient interface {
-	// GetMyProgress is the caller's total, level, streak, badges and today's
-	// checklist.
+	// GetMyProgress is the caller's lifetime field score with the older level,
+	// streak and badge fields kept for clients that still render them.
 	GetMyProgress(context.Context, *connect.Request[gamification.GetMyProgressRequest]) (*connect.Response[gamification.GetMyProgressResponse], error)
-	// DailyCheckIn marks the caller active on their local date. It is idempotent
-	// per local date: the first call of the day awards points and extends the
-	// streak, later calls only return progress.
+	// DailyCheckIn records the device timezone. It no longer awards points or
+	// extends a streak; points_awarded is always 0.
 	DailyCheckIn(context.Context, *connect.Request[gamification.DailyCheckInRequest]) (*connect.Response[gamification.DailyCheckInResponse], error)
 	// GetLeaderboard ranks the caller and their friends. Friends who turned off
 	// leaderboard visibility, and blocked users, are left out. The caller's own
@@ -76,8 +87,21 @@ type GamificationServiceClient interface {
 	// ListPointsHistory is the caller's ledger, newest first.
 	ListPointsHistory(context.Context, *connect.Request[gamification.ListPointsHistoryRequest]) (*connect.Response[gamification.ListPointsHistoryResponse], error)
 	// CompleteTripDay records that the caller walked a day of their own trip.
-	// Completing every day of a trip also completes the trip.
+	// Completing every day of a trip also completes the trip. When any stop of
+	// the day has been marked with MarkStop, the day is judged from those marks
+	// and stops_done is ignored.
 	CompleteTripDay(context.Context, *connect.Request[gamification.CompleteTripDayRequest]) (*connect.Response[gamification.CompleteTripDayResponse], error)
+	// GetFieldProfile is the caller's lifetime field score, rank overall and per
+	// city, and this week against last week.
+	GetFieldProfile(context.Context, *connect.Request[gamification.GetFieldProfileRequest]) (*connect.Response[gamification.GetFieldProfileResponse], error)
+	// GetFieldBoard is one weekly board: the top ten, the caller's own row and
+	// the row just above it. Never a rank among everyone.
+	GetFieldBoard(context.Context, *connect.Request[gamification.GetFieldBoardRequest]) (*connect.Response[gamification.GetFieldBoardResponse], error)
+	// MarkStop marks a stop of the caller's own trip done, skipped, or open
+	// again. A day is finished when every stop is done or skipped and at least
+	// one is done; finishing every day finishes the trip. Reopening a stop never
+	// takes back points already awarded, and marking it again never repays them.
+	MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error)
 }
 
 // NewGamificationServiceClient constructs a client for the loci.gamification.GamificationService
@@ -120,6 +144,24 @@ func NewGamificationServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(gamificationServiceCompleteTripDayMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getFieldProfile: connect.NewClient[gamification.GetFieldProfileRequest, gamification.GetFieldProfileResponse](
+			httpClient,
+			baseURL+GamificationServiceGetFieldProfileProcedure,
+			connect.WithSchema(gamificationServiceGetFieldProfileMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getFieldBoard: connect.NewClient[gamification.GetFieldBoardRequest, gamification.GetFieldBoardResponse](
+			httpClient,
+			baseURL+GamificationServiceGetFieldBoardProcedure,
+			connect.WithSchema(gamificationServiceGetFieldBoardMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		markStop: connect.NewClient[gamification.MarkStopRequest, gamification.MarkStopResponse](
+			httpClient,
+			baseURL+GamificationServiceMarkStopProcedure,
+			connect.WithSchema(gamificationServiceMarkStopMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -130,6 +172,9 @@ type gamificationServiceClient struct {
 	getLeaderboard    *connect.Client[gamification.GetLeaderboardRequest, gamification.GetLeaderboardResponse]
 	listPointsHistory *connect.Client[gamification.ListPointsHistoryRequest, gamification.ListPointsHistoryResponse]
 	completeTripDay   *connect.Client[gamification.CompleteTripDayRequest, gamification.CompleteTripDayResponse]
+	getFieldProfile   *connect.Client[gamification.GetFieldProfileRequest, gamification.GetFieldProfileResponse]
+	getFieldBoard     *connect.Client[gamification.GetFieldBoardRequest, gamification.GetFieldBoardResponse]
+	markStop          *connect.Client[gamification.MarkStopRequest, gamification.MarkStopResponse]
 }
 
 // GetMyProgress calls loci.gamification.GamificationService.GetMyProgress.
@@ -157,15 +202,29 @@ func (c *gamificationServiceClient) CompleteTripDay(ctx context.Context, req *co
 	return c.completeTripDay.CallUnary(ctx, req)
 }
 
+// GetFieldProfile calls loci.gamification.GamificationService.GetFieldProfile.
+func (c *gamificationServiceClient) GetFieldProfile(ctx context.Context, req *connect.Request[gamification.GetFieldProfileRequest]) (*connect.Response[gamification.GetFieldProfileResponse], error) {
+	return c.getFieldProfile.CallUnary(ctx, req)
+}
+
+// GetFieldBoard calls loci.gamification.GamificationService.GetFieldBoard.
+func (c *gamificationServiceClient) GetFieldBoard(ctx context.Context, req *connect.Request[gamification.GetFieldBoardRequest]) (*connect.Response[gamification.GetFieldBoardResponse], error) {
+	return c.getFieldBoard.CallUnary(ctx, req)
+}
+
+// MarkStop calls loci.gamification.GamificationService.MarkStop.
+func (c *gamificationServiceClient) MarkStop(ctx context.Context, req *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error) {
+	return c.markStop.CallUnary(ctx, req)
+}
+
 // GamificationServiceHandler is an implementation of the loci.gamification.GamificationService
 // service.
 type GamificationServiceHandler interface {
-	// GetMyProgress is the caller's total, level, streak, badges and today's
-	// checklist.
+	// GetMyProgress is the caller's lifetime field score with the older level,
+	// streak and badge fields kept for clients that still render them.
 	GetMyProgress(context.Context, *connect.Request[gamification.GetMyProgressRequest]) (*connect.Response[gamification.GetMyProgressResponse], error)
-	// DailyCheckIn marks the caller active on their local date. It is idempotent
-	// per local date: the first call of the day awards points and extends the
-	// streak, later calls only return progress.
+	// DailyCheckIn records the device timezone. It no longer awards points or
+	// extends a streak; points_awarded is always 0.
 	DailyCheckIn(context.Context, *connect.Request[gamification.DailyCheckInRequest]) (*connect.Response[gamification.DailyCheckInResponse], error)
 	// GetLeaderboard ranks the caller and their friends. Friends who turned off
 	// leaderboard visibility, and blocked users, are left out. The caller's own
@@ -174,8 +233,21 @@ type GamificationServiceHandler interface {
 	// ListPointsHistory is the caller's ledger, newest first.
 	ListPointsHistory(context.Context, *connect.Request[gamification.ListPointsHistoryRequest]) (*connect.Response[gamification.ListPointsHistoryResponse], error)
 	// CompleteTripDay records that the caller walked a day of their own trip.
-	// Completing every day of a trip also completes the trip.
+	// Completing every day of a trip also completes the trip. When any stop of
+	// the day has been marked with MarkStop, the day is judged from those marks
+	// and stops_done is ignored.
 	CompleteTripDay(context.Context, *connect.Request[gamification.CompleteTripDayRequest]) (*connect.Response[gamification.CompleteTripDayResponse], error)
+	// GetFieldProfile is the caller's lifetime field score, rank overall and per
+	// city, and this week against last week.
+	GetFieldProfile(context.Context, *connect.Request[gamification.GetFieldProfileRequest]) (*connect.Response[gamification.GetFieldProfileResponse], error)
+	// GetFieldBoard is one weekly board: the top ten, the caller's own row and
+	// the row just above it. Never a rank among everyone.
+	GetFieldBoard(context.Context, *connect.Request[gamification.GetFieldBoardRequest]) (*connect.Response[gamification.GetFieldBoardResponse], error)
+	// MarkStop marks a stop of the caller's own trip done, skipped, or open
+	// again. A day is finished when every stop is done or skipped and at least
+	// one is done; finishing every day finishes the trip. Reopening a stop never
+	// takes back points already awarded, and marking it again never repays them.
+	MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error)
 }
 
 // NewGamificationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -214,6 +286,24 @@ func NewGamificationServiceHandler(svc GamificationServiceHandler, opts ...conne
 		connect.WithSchema(gamificationServiceCompleteTripDayMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	gamificationServiceGetFieldProfileHandler := connect.NewUnaryHandler(
+		GamificationServiceGetFieldProfileProcedure,
+		svc.GetFieldProfile,
+		connect.WithSchema(gamificationServiceGetFieldProfileMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	gamificationServiceGetFieldBoardHandler := connect.NewUnaryHandler(
+		GamificationServiceGetFieldBoardProcedure,
+		svc.GetFieldBoard,
+		connect.WithSchema(gamificationServiceGetFieldBoardMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	gamificationServiceMarkStopHandler := connect.NewUnaryHandler(
+		GamificationServiceMarkStopProcedure,
+		svc.MarkStop,
+		connect.WithSchema(gamificationServiceMarkStopMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.gamification.GamificationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GamificationServiceGetMyProgressProcedure:
@@ -226,6 +316,12 @@ func NewGamificationServiceHandler(svc GamificationServiceHandler, opts ...conne
 			gamificationServiceListPointsHistoryHandler.ServeHTTP(w, r)
 		case GamificationServiceCompleteTripDayProcedure:
 			gamificationServiceCompleteTripDayHandler.ServeHTTP(w, r)
+		case GamificationServiceGetFieldProfileProcedure:
+			gamificationServiceGetFieldProfileHandler.ServeHTTP(w, r)
+		case GamificationServiceGetFieldBoardProcedure:
+			gamificationServiceGetFieldBoardHandler.ServeHTTP(w, r)
+		case GamificationServiceMarkStopProcedure:
+			gamificationServiceMarkStopHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -253,4 +349,16 @@ func (UnimplementedGamificationServiceHandler) ListPointsHistory(context.Context
 
 func (UnimplementedGamificationServiceHandler) CompleteTripDay(context.Context, *connect.Request[gamification.CompleteTripDayRequest]) (*connect.Response[gamification.CompleteTripDayResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.CompleteTripDay is not implemented"))
+}
+
+func (UnimplementedGamificationServiceHandler) GetFieldProfile(context.Context, *connect.Request[gamification.GetFieldProfileRequest]) (*connect.Response[gamification.GetFieldProfileResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.GetFieldProfile is not implemented"))
+}
+
+func (UnimplementedGamificationServiceHandler) GetFieldBoard(context.Context, *connect.Request[gamification.GetFieldBoardRequest]) (*connect.Response[gamification.GetFieldBoardResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.GetFieldBoard is not implemented"))
+}
+
+func (UnimplementedGamificationServiceHandler) MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.MarkStop is not implemented"))
 }

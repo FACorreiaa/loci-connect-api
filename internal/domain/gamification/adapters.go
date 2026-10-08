@@ -21,7 +21,13 @@ func (s *Service) ScoreOnTheSpot(ctx context.Context, userID uuid.UUID, v travel
 		}
 	}
 	if c := v.NewCity; c != nil {
+		// Keyed by the shared city row when the globe knows it, so a city
+		// first reached by a walked stop is not paid again on a visit.
 		visit.NewCityKey = c.ID.String()
+		if c.CityID != nil {
+			visit.NewCityKey = c.CityID.String()
+			visit.NewCityID = c.CityID
+		}
 		visit.CityName = c.CityName
 		visit.CityLat = c.Latitude
 		visit.CityLon = c.Longitude
@@ -47,4 +53,14 @@ func (s *Service) PlaceConfirmed(ctx context.Context, users []uuid.UUID, submiss
 	for _, u := range users {
 		s.AwardQuietly(ctx, Award{UserID: u, Kind: KindPlaceSubmission, RefKey: "submission:" + submissionID.String(), Label: label})
 	}
+}
+
+// FavoriteSaved scores a saved place (favorites.FieldScorer).
+func (s *Service) FavoriteSaved(ctx context.Context, userID uuid.UUID, itemID, contentType, name, cityName string) int {
+	return s.PlaceSaved(ctx, userID, SavedItem{ItemID: itemID, ContentType: contentType, Name: name, CityName: cityName})
+}
+
+// FavoriteNoted scores a note on a saved place (favorites.FieldScorer).
+func (s *Service) FavoriteNoted(ctx context.Context, userID uuid.UUID, itemID, contentType, name, cityName, note string) (int, bool) {
+	return s.NoteWritten(ctx, userID, SavedItem{ItemID: itemID, ContentType: contentType, Name: name, CityName: cityName}, note)
 }

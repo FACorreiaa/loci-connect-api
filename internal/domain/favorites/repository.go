@@ -22,6 +22,9 @@ type Repository interface {
 	// GetFavoriteByItem returns the saved snapshot of one item, or nil when
 	// the user has not saved it.
 	GetFavoriteByItem(ctx context.Context, userID uuid.UUID, itemID, contentType string) (*locitypes.FavoriteItem, error)
+	// UpdateNote sets the note on one saved item without touching when it
+	// was saved; nil when the user has not saved it.
+	UpdateNote(ctx context.Context, userID uuid.UUID, itemID, contentType, notes string) (*locitypes.FavoriteItem, error)
 }
 
 // RepositoryImpl implements Repository
@@ -58,8 +61,7 @@ func (r *RepositoryImpl) AddFavorite(ctx context.Context, fav *locitypes.Favorit
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (user_id, item_id, content_type) DO UPDATE
 		SET notes = EXCLUDED.notes,
-		    description = EXCLUDED.description,
-		    added_at = EXCLUDED.added_at
+		    description = EXCLUDED.description
 		RETURNING id, added_at
 	`
 
@@ -271,4 +273,20 @@ func (r *RepositoryImpl) GetFavoriteByItem(ctx context.Context, userID uuid.UUID
 		return nil, err
 	}
 	return &fav, nil
+}
+
+// UpdateNote sets the note on one saved item. added_at is left alone: the
+// field score counts a place as kept from when it was saved.
+func (r *RepositoryImpl) UpdateNote(ctx context.Context, userID uuid.UUID, itemID, contentType, notes string) (*locitypes.FavoriteItem, error) {
+	ct, err := r.db.Exec(ctx, `
+		UPDATE user_favorites SET notes = $4
+		WHERE user_id = $1 AND item_id = $2 AND content_type = $3`, userID, itemID, contentType, notes)
+	if err != nil {
+		r.logger.ErrorContext(ctx, "failed to update favorite note", slog.Any("error", err))
+		return nil, err
+	}
+	if ct.RowsAffected() == 0 {
+		return nil, nil
+	}
+	return r.GetFavoriteByItem(ctx, userID, itemID, contentType)
 }

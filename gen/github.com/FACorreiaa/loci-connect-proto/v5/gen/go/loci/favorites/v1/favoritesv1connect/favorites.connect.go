@@ -60,6 +60,9 @@ const (
 	// FavoritesServiceGetNearbyRestaurantsProcedure is the fully-qualified name of the
 	// FavoritesService's GetNearbyRestaurants RPC.
 	FavoritesServiceGetNearbyRestaurantsProcedure = "/loci.favorites.v1.FavoritesService/GetNearbyRestaurants"
+	// FavoritesServiceUpdateFavoriteNoteProcedure is the fully-qualified name of the FavoritesService's
+	// UpdateFavoriteNote RPC.
+	FavoritesServiceUpdateFavoriteNoteProcedure = "/loci.favorites.v1.FavoritesService/UpdateFavoriteNote"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -74,6 +77,7 @@ var (
 	favoritesServiceGetRestaurantDetailsMethodDescriptor = favoritesServiceServiceDescriptor.Methods().ByName("GetRestaurantDetails")
 	favoritesServiceGetNearbyHotelsMethodDescriptor      = favoritesServiceServiceDescriptor.Methods().ByName("GetNearbyHotels")
 	favoritesServiceGetNearbyRestaurantsMethodDescriptor = favoritesServiceServiceDescriptor.Methods().ByName("GetNearbyRestaurants")
+	favoritesServiceUpdateFavoriteNoteMethodDescriptor   = favoritesServiceServiceDescriptor.Methods().ByName("UpdateFavoriteNote")
 )
 
 // FavoritesServiceClient is a client for the loci.favorites.v1.FavoritesService service.
@@ -96,6 +100,10 @@ type FavoritesServiceClient interface {
 	GetNearbyHotels(context.Context, *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error)
 	// Get nearby restaurants
 	GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error)
+	// UpdateFavoriteNote sets the caller's note on one of their saved items
+	// without changing when it was saved. A note of 40 or more characters in the
+	// caller's own words counts once toward their field score.
+	UpdateFavoriteNote(context.Context, *connect.Request[v1.UpdateFavoriteNoteRequest]) (*connect.Response[v1.UpdateFavoriteNoteResponse], error)
 }
 
 // NewFavoritesServiceClient constructs a client for the loci.favorites.v1.FavoritesService service.
@@ -162,6 +170,12 @@ func NewFavoritesServiceClient(httpClient connect.HTTPClient, baseURL string, op
 			connect.WithSchema(favoritesServiceGetNearbyRestaurantsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		updateFavoriteNote: connect.NewClient[v1.UpdateFavoriteNoteRequest, v1.UpdateFavoriteNoteResponse](
+			httpClient,
+			baseURL+FavoritesServiceUpdateFavoriteNoteProcedure,
+			connect.WithSchema(favoritesServiceUpdateFavoriteNoteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -176,6 +190,7 @@ type favoritesServiceClient struct {
 	getRestaurantDetails *connect.Client[v1.GetRestaurantDetailsRequest, v1.GetRestaurantDetailsResponse]
 	getNearbyHotels      *connect.Client[v1.GetNearbyHotelsRequest, v1.GetNearbyHotelsResponse]
 	getNearbyRestaurants *connect.Client[v1.GetNearbyRestaurantsRequest, v1.GetNearbyRestaurantsResponse]
+	updateFavoriteNote   *connect.Client[v1.UpdateFavoriteNoteRequest, v1.UpdateFavoriteNoteResponse]
 }
 
 // AddToFavorites calls loci.favorites.v1.FavoritesService.AddToFavorites.
@@ -223,6 +238,11 @@ func (c *favoritesServiceClient) GetNearbyRestaurants(ctx context.Context, req *
 	return c.getNearbyRestaurants.CallUnary(ctx, req)
 }
 
+// UpdateFavoriteNote calls loci.favorites.v1.FavoritesService.UpdateFavoriteNote.
+func (c *favoritesServiceClient) UpdateFavoriteNote(ctx context.Context, req *connect.Request[v1.UpdateFavoriteNoteRequest]) (*connect.Response[v1.UpdateFavoriteNoteResponse], error) {
+	return c.updateFavoriteNote.CallUnary(ctx, req)
+}
+
 // FavoritesServiceHandler is an implementation of the loci.favorites.v1.FavoritesService service.
 type FavoritesServiceHandler interface {
 	// Add an item to favorites
@@ -243,6 +263,10 @@ type FavoritesServiceHandler interface {
 	GetNearbyHotels(context.Context, *connect.Request[v1.GetNearbyHotelsRequest]) (*connect.Response[v1.GetNearbyHotelsResponse], error)
 	// Get nearby restaurants
 	GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error)
+	// UpdateFavoriteNote sets the caller's note on one of their saved items
+	// without changing when it was saved. A note of 40 or more characters in the
+	// caller's own words counts once toward their field score.
+	UpdateFavoriteNote(context.Context, *connect.Request[v1.UpdateFavoriteNoteRequest]) (*connect.Response[v1.UpdateFavoriteNoteResponse], error)
 }
 
 // NewFavoritesServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -305,6 +329,12 @@ func NewFavoritesServiceHandler(svc FavoritesServiceHandler, opts ...connect.Han
 		connect.WithSchema(favoritesServiceGetNearbyRestaurantsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	favoritesServiceUpdateFavoriteNoteHandler := connect.NewUnaryHandler(
+		FavoritesServiceUpdateFavoriteNoteProcedure,
+		svc.UpdateFavoriteNote,
+		connect.WithSchema(favoritesServiceUpdateFavoriteNoteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.favorites.v1.FavoritesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case FavoritesServiceAddToFavoritesProcedure:
@@ -325,6 +355,8 @@ func NewFavoritesServiceHandler(svc FavoritesServiceHandler, opts ...connect.Han
 			favoritesServiceGetNearbyHotelsHandler.ServeHTTP(w, r)
 		case FavoritesServiceGetNearbyRestaurantsProcedure:
 			favoritesServiceGetNearbyRestaurantsHandler.ServeHTTP(w, r)
+		case FavoritesServiceUpdateFavoriteNoteProcedure:
+			favoritesServiceUpdateFavoriteNoteHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -368,4 +400,8 @@ func (UnimplementedFavoritesServiceHandler) GetNearbyHotels(context.Context, *co
 
 func (UnimplementedFavoritesServiceHandler) GetNearbyRestaurants(context.Context, *connect.Request[v1.GetNearbyRestaurantsRequest]) (*connect.Response[v1.GetNearbyRestaurantsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.GetNearbyRestaurants is not implemented"))
+}
+
+func (UnimplementedFavoritesServiceHandler) UpdateFavoriteNote(context.Context, *connect.Request[v1.UpdateFavoriteNoteRequest]) (*connect.Response[v1.UpdateFavoriteNoteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.favorites.v1.FavoritesService.UpdateFavoriteNote is not implemented"))
 }

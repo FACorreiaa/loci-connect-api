@@ -56,6 +56,11 @@ type TripStop struct {
 	Notes               string
 	BookingURL          *string
 	RecommendationTrace *RecommendationTrace
+
+	// Read side only: how the traveller marked the stop (gamification
+	// MarkStop). Zero is open; SaveTrip never writes it.
+	Status   int16
+	StatusAt *time.Time
 }
 
 // TripDay is one day of a trip.
@@ -72,6 +77,10 @@ type TripDay struct {
 	CityLat   *float64
 	CityLon   *float64
 	TravelDay bool
+
+	// Read side only: when the traveller finished the day. SaveTrip carries
+	// it across its replace-all for days that survive the edit.
+	CompletedAt *time.Time
 }
 
 // TripLeg is travel between two consecutive cities in a multi-city trip.
@@ -352,10 +361,17 @@ func writeTrip(ctx context.Context, tx pgx.Tx, t *Trip, baseVersion int64) error
 	if err != nil {
 		return err
 	}
+	finished, err := finishedDays(ctx, tx, t.ID)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1`, t.ID); err != nil {
 		return fmt.Errorf("clear days: %w", err)
 	}
 	if err := insertDays(ctx, tx, t, owned); err != nil {
+		return err
+	}
+	if err := keepFieldState(ctx, tx, t, finished); err != nil {
 		return err
 	}
 	if existing {
@@ -506,6 +522,57 @@ func ownedIDs(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) (map[uuid.UUID]b
 		owned[id] = true
 	}
 	return owned, rows.Err()
+}
+
+// finishedDays is when each finished day of a trip was finished, read before
+// SaveTrip replaces the days.
+func finishedDays(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) (map[uuid.UUID]time.Time, error) {
+	out := map[uuid.UUID]time.Time{}
+	if tripID == uuid.Nil {
+		return out, nil
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT id, completed_at FROM trip_days WHERE trip_id = $1 AND completed_at IS NOT NULL`, tripID)
+	if err != nil {
+		return nil, fmt.Errorf("finished days: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			id uuid.UUID
+			at time.Time
+		)
+		if err := rows.Scan(&id, &at); err != nil {
+			return nil, fmt.Errorf("finished days: %w", err)
+		}
+		out[id] = at
+	}
+	return out, rows.Err()
+}
+
+// keepFieldState puts back what the field score recorded on a trip that the
+// replace-all just dropped: when each surviving day was finished. Stop marks
+// live in their own table keyed by stop id, so they survive as long as the
+// stop does; marks on stops this save removed are dropped.
+func keepFieldState(ctx context.Context, tx pgx.Tx, t *Trip, finished map[uuid.UUID]time.Time) error {
+	for i := range t.Days {
+		at, ok := finished[t.Days[i].ID]
+		if !ok {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `UPDATE trip_days SET completed_at = $2 WHERE id = $1`, t.Days[i].ID, at); err != nil {
+			return fmt.Errorf("keep finished day: %w", err)
+		}
+		t.Days[i].CompletedAt = &at
+	}
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM trip_stop_marks m
+		WHERE m.trip_id = $1 AND NOT EXISTS (
+			SELECT 1 FROM trip_stops s JOIN trip_days d ON d.id = s.day_id
+			WHERE d.trip_id = $1 AND s.id = m.stop_id)`, t.ID); err != nil {
+		return fmt.Errorf("prune stop marks: %w", err)
+	}
+	return nil
 }
 
 // keepID is the id to insert a day or stop under: the one the client sent
@@ -693,7 +760,7 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 		return err
 	}
 	dayRows, err := r.db.Query(ctx, `
-		SELECT id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day
+		SELECT id, day_number, date, city_id, city_name, city_lat, city_lon, travel_day, completed_at
 		FROM trip_days WHERE trip_id = $1 ORDER BY day_number`, t.ID)
 	if err != nil {
 		return fmt.Errorf("load days: %w", err)
@@ -705,7 +772,7 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 	for dayRows.Next() {
 		var d TripDay
 		if err := dayRows.Scan(&d.ID, &d.DayNumber, &d.Date,
-			&d.CityID, &d.CityName, &d.CityLat, &d.CityLon, &d.TravelDay); err != nil {
+			&d.CityID, &d.CityName, &d.CityLat, &d.CityLon, &d.TravelDay, &d.CompletedAt); err != nil {
 			return fmt.Errorf("scan day: %w", err)
 		}
 		t.Days = append(t.Days, d)
@@ -722,9 +789,11 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 
 	stopRows, err := r.db.Query(ctx, `
 		SELECT s.id, s.day_id, s.poi_id, s.order_index, s.name, s.start_minute,
-		       s.duration_minutes, s.notes, s.booking_url, s.recommendation_trace
+		       s.duration_minutes, s.notes, s.booking_url, s.recommendation_trace,
+		       COALESCE(m.status, 0::smallint), m.marked_at
 		FROM trip_stops s
 		JOIN trip_days d ON d.id = s.day_id
+		LEFT JOIN trip_stop_marks m ON m.stop_id = s.id
 		WHERE d.trip_id = $1
 		ORDER BY d.day_number, s.order_index`, t.ID)
 	if err != nil {
@@ -739,7 +808,8 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 			traceJSON []byte
 		)
 		if err := stopRows.Scan(&s.ID, &dayID, &s.POIID, &s.OrderIndex, &s.Name,
-			&s.StartMinute, &s.DurationMinutes, &s.Notes, &s.BookingURL, &traceJSON); err != nil {
+			&s.StartMinute, &s.DurationMinutes, &s.Notes, &s.BookingURL, &traceJSON,
+			&s.Status, &s.StatusAt); err != nil {
 			return fmt.Errorf("scan stop: %w", err)
 		}
 		if len(traceJSON) > 0 && string(traceJSON) != "null" {

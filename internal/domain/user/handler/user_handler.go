@@ -422,6 +422,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 		LeaderboardVisible: req.Msg.LeaderboardVisible,
 		StreakReminders:    req.Msg.StreakReminders,
 		ProgressUpdates:    req.Msg.ProgressUpdates,
+		CityBoardVisible:   req.Msg.CityBoardVisible,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -443,6 +444,7 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		LeaderboardVisible: s.LeaderboardVisible,
 		StreakReminders:    s.StreakReminders,
 		ProgressUpdates:    s.ProgressUpdates,
+		CityBoardVisible:   s.CityBoardVisible,
 	}
 }
 

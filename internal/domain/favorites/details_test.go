@@ -38,6 +38,10 @@ func (f *fakeRepo) IsFavorited(context.Context, uuid.UUID, string, string) (bool
 
 func (f *fakeRepo) GetFavoritesCount(context.Context, uuid.UUID, string) (int, error) { return 0, nil }
 
+func (f *fakeRepo) UpdateNote(context.Context, uuid.UUID, string, string, string) (*locitypes.FavoriteItem, error) {
+	return nil, nil
+}
+
 func (f *fakeRepo) GetFavoriteByItem(_ context.Context, _ uuid.UUID, itemID, contentType string) (*locitypes.FavoriteItem, error) {
 	return f.saved[itemID+"|"+contentType], nil
 }

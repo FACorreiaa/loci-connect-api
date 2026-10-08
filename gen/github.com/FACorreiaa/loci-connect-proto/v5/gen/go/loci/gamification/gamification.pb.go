@@ -9,6 +9,7 @@ package gamification
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	social "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
+	trip "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -27,9 +28,15 @@ const (
 type PointsKind int32
 
 const (
-	PointsKind_POINTS_KIND_UNSPECIFIED    PointsKind = 0
+	PointsKind_POINTS_KIND_UNSPECIFIED PointsKind = 0
+	// Retired: no longer awarded. Older rows keep their history but count 0
+	// toward the field score.
+	//
+	// Deprecated: Marked as deprecated in loci/gamification/gamification.proto.
 	PointsKind_POINTS_KIND_DAILY_CHECK_IN PointsKind = 1
-	// The first search or chat turn of a local day.
+	// Retired, as POINTS_KIND_DAILY_CHECK_IN.
+	//
+	// Deprecated: Marked as deprecated in loci/gamification/gamification.proto.
 	PointsKind_POINTS_KIND_DAILY_SEARCH PointsKind = 2
 	// A place visited while the device was there (server checks the distance).
 	PointsKind_POINTS_KIND_PLACE_VISITED PointsKind = 3
@@ -41,20 +48,35 @@ const (
 	PointsKind_POINTS_KIND_PLACE_SUBMISSION   PointsKind = 6
 	PointsKind_POINTS_KIND_TRIP_DAY_COMPLETED PointsKind = 7
 	PointsKind_POINTS_KIND_TRIP_COMPLETED     PointsKind = 8
+	// A place saved for the first time. Saving it again never pays again.
+	PointsKind_POINTS_KIND_PLACE_SAVED PointsKind = 9
+	// A saved place still kept seven days later.
+	PointsKind_POINTS_KIND_PLACE_KEPT PointsKind = 10
+	// A stop of the caller's trip marked done.
+	PointsKind_POINTS_KIND_STOP_DONE PointsKind = 11
+	// The first place in a neighborhood of a city.
+	PointsKind_POINTS_KIND_FIRST_NEIGHBORHOOD PointsKind = 12
+	// A note of the caller's own words on a saved place.
+	PointsKind_POINTS_KIND_PLACE_NOTE PointsKind = 13
 )
 
 // Enum value maps for PointsKind.
 var (
 	PointsKind_name = map[int32]string{
-		0: "POINTS_KIND_UNSPECIFIED",
-		1: "POINTS_KIND_DAILY_CHECK_IN",
-		2: "POINTS_KIND_DAILY_SEARCH",
-		3: "POINTS_KIND_PLACE_VISITED",
-		4: "POINTS_KIND_NEW_CITY",
-		5: "POINTS_KIND_SCOUT_CLAIM",
-		6: "POINTS_KIND_PLACE_SUBMISSION",
-		7: "POINTS_KIND_TRIP_DAY_COMPLETED",
-		8: "POINTS_KIND_TRIP_COMPLETED",
+		0:  "POINTS_KIND_UNSPECIFIED",
+		1:  "POINTS_KIND_DAILY_CHECK_IN",
+		2:  "POINTS_KIND_DAILY_SEARCH",
+		3:  "POINTS_KIND_PLACE_VISITED",
+		4:  "POINTS_KIND_NEW_CITY",
+		5:  "POINTS_KIND_SCOUT_CLAIM",
+		6:  "POINTS_KIND_PLACE_SUBMISSION",
+		7:  "POINTS_KIND_TRIP_DAY_COMPLETED",
+		8:  "POINTS_KIND_TRIP_COMPLETED",
+		9:  "POINTS_KIND_PLACE_SAVED",
+		10: "POINTS_KIND_PLACE_KEPT",
+		11: "POINTS_KIND_STOP_DONE",
+		12: "POINTS_KIND_FIRST_NEIGHBORHOOD",
+		13: "POINTS_KIND_PLACE_NOTE",
 	}
 	PointsKind_value = map[string]int32{
 		"POINTS_KIND_UNSPECIFIED":        0,
@@ -66,6 +88,11 @@ var (
 		"POINTS_KIND_PLACE_SUBMISSION":   6,
 		"POINTS_KIND_TRIP_DAY_COMPLETED": 7,
 		"POINTS_KIND_TRIP_COMPLETED":     8,
+		"POINTS_KIND_PLACE_SAVED":        9,
+		"POINTS_KIND_PLACE_KEPT":         10,
+		"POINTS_KIND_STOP_DONE":          11,
+		"POINTS_KIND_FIRST_NEIGHBORHOOD": 12,
+		"POINTS_KIND_PLACE_NOTE":         13,
 	}
 )
 
@@ -203,6 +230,173 @@ func (LeaderboardMetric) EnumDescriptor() ([]byte, []int) {
 	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{2}
 }
 
+// FieldRank is permanent: it follows the lifetime score and is never lost.
+// Thresholds live in server configuration.
+type FieldRank int32
+
+const (
+	FieldRank_FIELD_RANK_UNSPECIFIED FieldRank = 0
+	FieldRank_FIELD_RANK_SCOUT       FieldRank = 1
+	FieldRank_FIELD_RANK_WALKER      FieldRank = 2
+	FieldRank_FIELD_RANK_GUIDE       FieldRank = 3
+	FieldRank_FIELD_RANK_LOCAL       FieldRank = 4
+	FieldRank_FIELD_RANK_KEEPER      FieldRank = 5
+)
+
+// Enum value maps for FieldRank.
+var (
+	FieldRank_name = map[int32]string{
+		0: "FIELD_RANK_UNSPECIFIED",
+		1: "FIELD_RANK_SCOUT",
+		2: "FIELD_RANK_WALKER",
+		3: "FIELD_RANK_GUIDE",
+		4: "FIELD_RANK_LOCAL",
+		5: "FIELD_RANK_KEEPER",
+	}
+	FieldRank_value = map[string]int32{
+		"FIELD_RANK_UNSPECIFIED": 0,
+		"FIELD_RANK_SCOUT":       1,
+		"FIELD_RANK_WALKER":      2,
+		"FIELD_RANK_GUIDE":       3,
+		"FIELD_RANK_LOCAL":       4,
+		"FIELD_RANK_KEEPER":      5,
+	}
+)
+
+func (x FieldRank) Enum() *FieldRank {
+	p := new(FieldRank)
+	*p = x
+	return p
+}
+
+func (x FieldRank) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FieldRank) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_gamification_gamification_proto_enumTypes[3].Descriptor()
+}
+
+func (FieldRank) Type() protoreflect.EnumType {
+	return &file_loci_gamification_gamification_proto_enumTypes[3]
+}
+
+func (x FieldRank) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FieldRank.Descriptor instead.
+func (FieldRank) EnumDescriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{3}
+}
+
+type FieldBoardScope int32
+
+const (
+	FieldBoardScope_FIELD_BOARD_SCOPE_UNSPECIFIED FieldBoardScope = 0
+	// Everyone scored in one city this week who has not opted out.
+	FieldBoardScope_FIELD_BOARD_SCOPE_CITY_WEEK FieldBoardScope = 1
+	// The caller and their friends, across all cities, this week.
+	FieldBoardScope_FIELD_BOARD_SCOPE_FRIENDS_WEEK FieldBoardScope = 2
+	// The caller alone: this week against last week.
+	FieldBoardScope_FIELD_BOARD_SCOPE_PERSONAL FieldBoardScope = 3
+)
+
+// Enum value maps for FieldBoardScope.
+var (
+	FieldBoardScope_name = map[int32]string{
+		0: "FIELD_BOARD_SCOPE_UNSPECIFIED",
+		1: "FIELD_BOARD_SCOPE_CITY_WEEK",
+		2: "FIELD_BOARD_SCOPE_FRIENDS_WEEK",
+		3: "FIELD_BOARD_SCOPE_PERSONAL",
+	}
+	FieldBoardScope_value = map[string]int32{
+		"FIELD_BOARD_SCOPE_UNSPECIFIED":  0,
+		"FIELD_BOARD_SCOPE_CITY_WEEK":    1,
+		"FIELD_BOARD_SCOPE_FRIENDS_WEEK": 2,
+		"FIELD_BOARD_SCOPE_PERSONAL":     3,
+	}
+)
+
+func (x FieldBoardScope) Enum() *FieldBoardScope {
+	p := new(FieldBoardScope)
+	*p = x
+	return p
+}
+
+func (x FieldBoardScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FieldBoardScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_gamification_gamification_proto_enumTypes[4].Descriptor()
+}
+
+func (FieldBoardScope) Type() protoreflect.EnumType {
+	return &file_loci_gamification_gamification_proto_enumTypes[4]
+}
+
+func (x FieldBoardScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FieldBoardScope.Descriptor instead.
+func (FieldBoardScope) EnumDescriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{4}
+}
+
+type FieldBoardMetric int32
+
+const (
+	FieldBoardMetric_FIELD_BOARD_METRIC_UNSPECIFIED   FieldBoardMetric = 0
+	FieldBoardMetric_FIELD_BOARD_METRIC_OVERALL       FieldBoardMetric = 1
+	FieldBoardMetric_FIELD_BOARD_METRIC_PLACES_KEPT   FieldBoardMetric = 2
+	FieldBoardMetric_FIELD_BOARD_METRIC_DAYS_FINISHED FieldBoardMetric = 3
+)
+
+// Enum value maps for FieldBoardMetric.
+var (
+	FieldBoardMetric_name = map[int32]string{
+		0: "FIELD_BOARD_METRIC_UNSPECIFIED",
+		1: "FIELD_BOARD_METRIC_OVERALL",
+		2: "FIELD_BOARD_METRIC_PLACES_KEPT",
+		3: "FIELD_BOARD_METRIC_DAYS_FINISHED",
+	}
+	FieldBoardMetric_value = map[string]int32{
+		"FIELD_BOARD_METRIC_UNSPECIFIED":   0,
+		"FIELD_BOARD_METRIC_OVERALL":       1,
+		"FIELD_BOARD_METRIC_PLACES_KEPT":   2,
+		"FIELD_BOARD_METRIC_DAYS_FINISHED": 3,
+	}
+)
+
+func (x FieldBoardMetric) Enum() *FieldBoardMetric {
+	p := new(FieldBoardMetric)
+	*p = x
+	return p
+}
+
+func (x FieldBoardMetric) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FieldBoardMetric) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_gamification_gamification_proto_enumTypes[5].Descriptor()
+}
+
+func (FieldBoardMetric) Type() protoreflect.EnumType {
+	return &file_loci_gamification_gamification_proto_enumTypes[5]
+}
+
+func (x FieldBoardMetric) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FieldBoardMetric.Descriptor instead.
+func (FieldBoardMetric) EnumDescriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{5}
+}
+
 type Badge struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	Id          string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -333,10 +527,15 @@ func (x *TodayChecklist) GetPlacesVisited() int32 {
 	return 0
 }
 
+// Progress predates the field score. total_points is now the lifetime field
+// score; level, points_to_next_level, the streaks, badges and today are no
+// longer advanced and are kept only for clients that still render them. Use
+// GetFieldProfile instead.
 type Progress struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	TotalPoints int64                  `protobuf:"varint,1,opt,name=total_points,json=totalPoints,proto3" json:"total_points,omitempty"`
-	Level       int32                  `protobuf:"varint,2,opt,name=level,proto3" json:"level,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Lifetime field score.
+	TotalPoints int64 `protobuf:"varint,1,opt,name=total_points,json=totalPoints,proto3" json:"total_points,omitempty"`
+	Level       int32 `protobuf:"varint,2,opt,name=level,proto3" json:"level,omitempty"`
 	// Points needed to reach the next level from the current total.
 	PointsToNextLevel int64 `protobuf:"varint,3,opt,name=points_to_next_level,json=pointsToNextLevel,proto3" json:"points_to_next_level,omitempty"`
 	CurrentStreak     int32 `protobuf:"varint,4,opt,name=current_streak,json=currentStreak,proto3" json:"current_streak,omitempty"`
@@ -818,8 +1017,16 @@ type PointsEvent struct {
 	Kind   PointsKind             `protobuf:"varint,2,opt,name=kind,proto3,enum=loci.gamification.PointsKind" json:"kind,omitempty"`
 	Points int32                  `protobuf:"varint,3,opt,name=points,proto3" json:"points,omitempty"`
 	// What it was for, ready to show: "Visited Pantheon", "New city: Rome".
-	Label         string                 `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Label     string                 `protobuf:"bytes,4,opt,name=label,proto3" json:"label,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// The city the event happened in; empty when it has none.
+	CityId   string `protobuf:"bytes,6,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	CityName string `protobuf:"bytes,7,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	// What the event counts toward the field score. points keeps the value it
+	// was awarded with; retired kinds have 0 here.
+	FieldPoints int32 `protobuf:"varint,8,opt,name=field_points,json=fieldPoints,proto3" json:"field_points,omitempty"`
+	// ISO week of the caller's local date as year*100+week (202641).
+	SeasonId      int32 `protobuf:"varint,9,opt,name=season_id,json=seasonId,proto3" json:"season_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -889,10 +1096,40 @@ func (x *PointsEvent) GetCreatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *PointsEvent) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *PointsEvent) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *PointsEvent) GetFieldPoints() int32 {
+	if x != nil {
+		return x.FieldPoints
+	}
+	return 0
+}
+
+func (x *PointsEvent) GetSeasonId() int32 {
+	if x != nil {
+		return x.SeasonId
+	}
+	return 0
+}
+
 type ListPointsHistoryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PageSize  int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Leave out events that count nothing toward the field score.
+	FieldOnly     bool `protobuf:"varint,3,opt,name=field_only,json=fieldOnly,proto3" json:"field_only,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -939,6 +1176,13 @@ func (x *ListPointsHistoryRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *ListPointsHistoryRequest) GetFieldOnly() bool {
+	if x != nil {
+		return x.FieldOnly
+	}
+	return false
 }
 
 type ListPointsHistoryResponse struct {
@@ -1131,11 +1375,849 @@ func (x *CompleteTripDayResponse) GetNewBadges() []*Badge {
 	return nil
 }
 
+type CityRank struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	CityId   string                 `protobuf:"bytes,1,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	CityName string                 `protobuf:"bytes,2,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Rank     FieldRank              `protobuf:"varint,3,opt,name=rank,proto3,enum=loci.gamification.FieldRank" json:"rank,omitempty"`
+	// Lifetime field score in this city.
+	Score int64 `protobuf:"varint,4,opt,name=score,proto3" json:"score,omitempty"`
+	// Lifetime score that reaches the next rank; 0 at the top rank.
+	NextThreshold int64 `protobuf:"varint,5,opt,name=next_threshold,json=nextThreshold,proto3" json:"next_threshold,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CityRank) Reset() {
+	*x = CityRank{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CityRank) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CityRank) ProtoMessage() {}
+
+func (x *CityRank) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CityRank.ProtoReflect.Descriptor instead.
+func (*CityRank) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *CityRank) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *CityRank) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *CityRank) GetRank() FieldRank {
+	if x != nil {
+		return x.Rank
+	}
+	return FieldRank_FIELD_RANK_UNSPECIFIED
+}
+
+func (x *CityRank) GetScore() int64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *CityRank) GetNextThreshold() int64 {
+	if x != nil {
+		return x.NextThreshold
+	}
+	return 0
+}
+
+type FieldProfile struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	LifetimeScore int64                  `protobuf:"varint,1,opt,name=lifetime_score,json=lifetimeScore,proto3" json:"lifetime_score,omitempty"`
+	OverallRank   FieldRank              `protobuf:"varint,2,opt,name=overall_rank,json=overallRank,proto3,enum=loci.gamification.FieldRank" json:"overall_rank,omitempty"`
+	// Lifetime score that reaches the next overall rank; 0 at the top rank.
+	OverallNextThreshold int64 `protobuf:"varint,3,opt,name=overall_next_threshold,json=overallNextThreshold,proto3" json:"overall_next_threshold,omitempty"`
+	WeekScore            int64 `protobuf:"varint,4,opt,name=week_score,json=weekScore,proto3" json:"week_score,omitempty"`
+	LastWeekScore        int64 `protobuf:"varint,5,opt,name=last_week_score,json=lastWeekScore,proto3" json:"last_week_score,omitempty"`
+	// Cities the caller has scored in, highest score first.
+	Cities []*CityRank `protobuf:"bytes,6,rep,name=cities,proto3" json:"cities,omitempty"`
+	// The current season, as PointsEvent.season_id.
+	SeasonId int32 `protobuf:"varint,7,opt,name=season_id,json=seasonId,proto3" json:"season_id,omitempty"`
+	// Lifetime counts.
+	PlacesKept    int32 `protobuf:"varint,8,opt,name=places_kept,json=placesKept,proto3" json:"places_kept,omitempty"`
+	DaysFinished  int32 `protobuf:"varint,9,opt,name=days_finished,json=daysFinished,proto3" json:"days_finished,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FieldProfile) Reset() {
+	*x = FieldProfile{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FieldProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FieldProfile) ProtoMessage() {}
+
+func (x *FieldProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FieldProfile.ProtoReflect.Descriptor instead.
+func (*FieldProfile) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *FieldProfile) GetLifetimeScore() int64 {
+	if x != nil {
+		return x.LifetimeScore
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetOverallRank() FieldRank {
+	if x != nil {
+		return x.OverallRank
+	}
+	return FieldRank_FIELD_RANK_UNSPECIFIED
+}
+
+func (x *FieldProfile) GetOverallNextThreshold() int64 {
+	if x != nil {
+		return x.OverallNextThreshold
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetWeekScore() int64 {
+	if x != nil {
+		return x.WeekScore
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetLastWeekScore() int64 {
+	if x != nil {
+		return x.LastWeekScore
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetCities() []*CityRank {
+	if x != nil {
+		return x.Cities
+	}
+	return nil
+}
+
+func (x *FieldProfile) GetSeasonId() int32 {
+	if x != nil {
+		return x.SeasonId
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetPlacesKept() int32 {
+	if x != nil {
+		return x.PlacesKept
+	}
+	return 0
+}
+
+func (x *FieldProfile) GetDaysFinished() int32 {
+	if x != nil {
+		return x.DaysFinished
+	}
+	return 0
+}
+
+type GetFieldProfileRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFieldProfileRequest) Reset() {
+	*x = GetFieldProfileRequest{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFieldProfileRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFieldProfileRequest) ProtoMessage() {}
+
+func (x *GetFieldProfileRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFieldProfileRequest.ProtoReflect.Descriptor instead.
+func (*GetFieldProfileRequest) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{17}
+}
+
+type GetFieldProfileResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profile       *FieldProfile          `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFieldProfileResponse) Reset() {
+	*x = GetFieldProfileResponse{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFieldProfileResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFieldProfileResponse) ProtoMessage() {}
+
+func (x *GetFieldProfileResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFieldProfileResponse.ProtoReflect.Descriptor instead.
+func (*GetFieldProfileResponse) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *GetFieldProfileResponse) GetProfile() *FieldProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+type GetFieldBoardRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Unspecified means FIELD_BOARD_SCOPE_CITY_WEEK.
+	Scope FieldBoardScope `protobuf:"varint,1,opt,name=scope,proto3,enum=loci.gamification.FieldBoardScope" json:"scope,omitempty"`
+	// City for FIELD_BOARD_SCOPE_CITY_WEEK. Empty means the city of the
+	// caller's current trip, else of their latest trip or search.
+	CityId string `protobuf:"bytes,2,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	// Unspecified means FIELD_BOARD_METRIC_OVERALL.
+	Metric FieldBoardMetric `protobuf:"varint,3,opt,name=metric,proto3,enum=loci.gamification.FieldBoardMetric" json:"metric,omitempty"`
+	// 0 is this week, -1 last week and so on. Past weeks may need a plan.
+	SeasonOffset  int32 `protobuf:"varint,4,opt,name=season_offset,json=seasonOffset,proto3" json:"season_offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFieldBoardRequest) Reset() {
+	*x = GetFieldBoardRequest{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFieldBoardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFieldBoardRequest) ProtoMessage() {}
+
+func (x *GetFieldBoardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFieldBoardRequest.ProtoReflect.Descriptor instead.
+func (*GetFieldBoardRequest) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetFieldBoardRequest) GetScope() FieldBoardScope {
+	if x != nil {
+		return x.Scope
+	}
+	return FieldBoardScope_FIELD_BOARD_SCOPE_UNSPECIFIED
+}
+
+func (x *GetFieldBoardRequest) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *GetFieldBoardRequest) GetMetric() FieldBoardMetric {
+	if x != nil {
+		return x.Metric
+	}
+	return FieldBoardMetric_FIELD_BOARD_METRIC_UNSPECIFIED
+}
+
+func (x *GetFieldBoardRequest) GetSeasonOffset() int32 {
+	if x != nil {
+		return x.SeasonOffset
+	}
+	return 0
+}
+
+type FieldBoardRow struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1-based place on the board; equal values share it.
+	Position int32 `protobuf:"varint,1,opt,name=position,proto3" json:"position,omitempty"`
+	// Always set. For people who are not the caller's friends this is all that
+	// is shown.
+	DisplayName string `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	// Set only for the caller and their friends.
+	User  *social.PublicUser `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	Value int64              `protobuf:"varint,4,opt,name=value,proto3" json:"value,omitempty"`
+	IsMe  bool               `protobuf:"varint,5,opt,name=is_me,json=isMe,proto3" json:"is_me,omitempty"`
+	// Lifetime rank in the board's city (overall rank on other boards).
+	Rank          FieldRank `protobuf:"varint,6,opt,name=rank,proto3,enum=loci.gamification.FieldRank" json:"rank,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FieldBoardRow) Reset() {
+	*x = FieldBoardRow{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FieldBoardRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FieldBoardRow) ProtoMessage() {}
+
+func (x *FieldBoardRow) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FieldBoardRow.ProtoReflect.Descriptor instead.
+func (*FieldBoardRow) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *FieldBoardRow) GetPosition() int32 {
+	if x != nil {
+		return x.Position
+	}
+	return 0
+}
+
+func (x *FieldBoardRow) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *FieldBoardRow) GetUser() *social.PublicUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *FieldBoardRow) GetValue() int64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *FieldBoardRow) GetIsMe() bool {
+	if x != nil {
+		return x.IsMe
+	}
+	return false
+}
+
+func (x *FieldBoardRow) GetRank() FieldRank {
+	if x != nil {
+		return x.Rank
+	}
+	return FieldRank_FIELD_RANK_UNSPECIFIED
+}
+
+type PersonalWeek struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ThisWeek             int64                  `protobuf:"varint,1,opt,name=this_week,json=thisWeek,proto3" json:"this_week,omitempty"`
+	LastWeek             int64                  `protobuf:"varint,2,opt,name=last_week,json=lastWeek,proto3" json:"last_week,omitempty"`
+	PlacesKept           int32                  `protobuf:"varint,3,opt,name=places_kept,json=placesKept,proto3" json:"places_kept,omitempty"`
+	PlacesKeptLastWeek   int32                  `protobuf:"varint,4,opt,name=places_kept_last_week,json=placesKeptLastWeek,proto3" json:"places_kept_last_week,omitempty"`
+	DaysFinished         int32                  `protobuf:"varint,5,opt,name=days_finished,json=daysFinished,proto3" json:"days_finished,omitempty"`
+	DaysFinishedLastWeek int32                  `protobuf:"varint,6,opt,name=days_finished_last_week,json=daysFinishedLastWeek,proto3" json:"days_finished_last_week,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *PersonalWeek) Reset() {
+	*x = PersonalWeek{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PersonalWeek) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PersonalWeek) ProtoMessage() {}
+
+func (x *PersonalWeek) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PersonalWeek.ProtoReflect.Descriptor instead.
+func (*PersonalWeek) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *PersonalWeek) GetThisWeek() int64 {
+	if x != nil {
+		return x.ThisWeek
+	}
+	return 0
+}
+
+func (x *PersonalWeek) GetLastWeek() int64 {
+	if x != nil {
+		return x.LastWeek
+	}
+	return 0
+}
+
+func (x *PersonalWeek) GetPlacesKept() int32 {
+	if x != nil {
+		return x.PlacesKept
+	}
+	return 0
+}
+
+func (x *PersonalWeek) GetPlacesKeptLastWeek() int32 {
+	if x != nil {
+		return x.PlacesKeptLastWeek
+	}
+	return 0
+}
+
+func (x *PersonalWeek) GetDaysFinished() int32 {
+	if x != nil {
+		return x.DaysFinished
+	}
+	return 0
+}
+
+func (x *PersonalWeek) GetDaysFinishedLastWeek() int32 {
+	if x != nil {
+		return x.DaysFinishedLastWeek
+	}
+	return 0
+}
+
+type GetFieldBoardResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Scope       FieldBoardScope        `protobuf:"varint,1,opt,name=scope,proto3,enum=loci.gamification.FieldBoardScope" json:"scope,omitempty"`
+	CityId      string                 `protobuf:"bytes,2,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	CityName    string                 `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	SeasonId    int32                  `protobuf:"varint,4,opt,name=season_id,json=seasonId,proto3" json:"season_id,omitempty"`
+	SeasonStart *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=season_start,json=seasonStart,proto3" json:"season_start,omitempty"`
+	SeasonEnd   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=season_end,json=seasonEnd,proto3" json:"season_end,omitempty"`
+	// At most ten rows, best first.
+	Top []*FieldBoardRow `protobuf:"bytes,7,rep,name=top,proto3" json:"top,omitempty"`
+	// The caller, when they have scored and are not already in top.
+	Me *FieldBoardRow `protobuf:"bytes,8,opt,name=me,proto3" json:"me,omitempty"`
+	// The row just above the caller, when it is not already in top.
+	Above *FieldBoardRow `protobuf:"bytes,9,opt,name=above,proto3" json:"above,omitempty"`
+	// People scored on this board.
+	ScoredUsers int32 `protobuf:"varint,10,opt,name=scored_users,json=scoredUsers,proto3" json:"scored_users,omitempty"`
+	// True when fewer than eight people are on the board.
+	TooFew bool `protobuf:"varint,11,opt,name=too_few,json=tooFew,proto3" json:"too_few,omitempty"`
+	// False when the caller has no friends yet; hide the friends board then.
+	FriendsAvailable bool `protobuf:"varint,12,opt,name=friends_available,json=friendsAvailable,proto3" json:"friends_available,omitempty"`
+	// Set for FIELD_BOARD_SCOPE_PERSONAL.
+	Personal *PersonalWeek `protobuf:"bytes,13,opt,name=personal,proto3" json:"personal,omitempty"`
+	// True when a past week was asked for and the caller's plan does not
+	// include it; the rows are empty then.
+	HistoryLocked bool `protobuf:"varint,14,opt,name=history_locked,json=historyLocked,proto3" json:"history_locked,omitempty"`
+	// True when the caller opted out of city boards, so others do not see them.
+	MeHidden      bool `protobuf:"varint,15,opt,name=me_hidden,json=meHidden,proto3" json:"me_hidden,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetFieldBoardResponse) Reset() {
+	*x = GetFieldBoardResponse{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetFieldBoardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetFieldBoardResponse) ProtoMessage() {}
+
+func (x *GetFieldBoardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetFieldBoardResponse.ProtoReflect.Descriptor instead.
+func (*GetFieldBoardResponse) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetFieldBoardResponse) GetScope() FieldBoardScope {
+	if x != nil {
+		return x.Scope
+	}
+	return FieldBoardScope_FIELD_BOARD_SCOPE_UNSPECIFIED
+}
+
+func (x *GetFieldBoardResponse) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *GetFieldBoardResponse) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *GetFieldBoardResponse) GetSeasonId() int32 {
+	if x != nil {
+		return x.SeasonId
+	}
+	return 0
+}
+
+func (x *GetFieldBoardResponse) GetSeasonStart() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SeasonStart
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetSeasonEnd() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SeasonEnd
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetTop() []*FieldBoardRow {
+	if x != nil {
+		return x.Top
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetMe() *FieldBoardRow {
+	if x != nil {
+		return x.Me
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetAbove() *FieldBoardRow {
+	if x != nil {
+		return x.Above
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetScoredUsers() int32 {
+	if x != nil {
+		return x.ScoredUsers
+	}
+	return 0
+}
+
+func (x *GetFieldBoardResponse) GetTooFew() bool {
+	if x != nil {
+		return x.TooFew
+	}
+	return false
+}
+
+func (x *GetFieldBoardResponse) GetFriendsAvailable() bool {
+	if x != nil {
+		return x.FriendsAvailable
+	}
+	return false
+}
+
+func (x *GetFieldBoardResponse) GetPersonal() *PersonalWeek {
+	if x != nil {
+		return x.Personal
+	}
+	return nil
+}
+
+func (x *GetFieldBoardResponse) GetHistoryLocked() bool {
+	if x != nil {
+		return x.HistoryLocked
+	}
+	return false
+}
+
+func (x *GetFieldBoardResponse) GetMeHidden() bool {
+	if x != nil {
+		return x.MeHidden
+	}
+	return false
+}
+
+type MarkStopRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	TripId string                 `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	DayId  string                 `protobuf:"bytes,2,opt,name=day_id,json=dayId,proto3" json:"day_id,omitempty"`
+	StopId string                 `protobuf:"bytes,3,opt,name=stop_id,json=stopId,proto3" json:"stop_id,omitempty"`
+	Status trip.TripStopStatus    `protobuf:"varint,4,opt,name=status,proto3,enum=loci.trip.TripStopStatus" json:"status,omitempty"`
+	// IANA zone of the device, as in DailyCheckInRequest.
+	Timezone      string `protobuf:"bytes,5,opt,name=timezone,proto3" json:"timezone,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkStopRequest) Reset() {
+	*x = MarkStopRequest{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkStopRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkStopRequest) ProtoMessage() {}
+
+func (x *MarkStopRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkStopRequest.ProtoReflect.Descriptor instead.
+func (*MarkStopRequest) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *MarkStopRequest) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *MarkStopRequest) GetDayId() string {
+	if x != nil {
+		return x.DayId
+	}
+	return ""
+}
+
+func (x *MarkStopRequest) GetStopId() string {
+	if x != nil {
+		return x.StopId
+	}
+	return ""
+}
+
+func (x *MarkStopRequest) GetStatus() trip.TripStopStatus {
+	if x != nil {
+		return x.Status
+	}
+	return trip.TripStopStatus(0)
+}
+
+func (x *MarkStopRequest) GetTimezone() string {
+	if x != nil {
+		return x.Timezone
+	}
+	return ""
+}
+
+type MarkStopResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        trip.TripStopStatus    `protobuf:"varint,1,opt,name=status,proto3,enum=loci.trip.TripStopStatus" json:"status,omitempty"`
+	PointsAwarded int32                  `protobuf:"varint,2,opt,name=points_awarded,json=pointsAwarded,proto3" json:"points_awarded,omitempty"`
+	// True when this call finished the stop's day.
+	DayFinished bool `protobuf:"varint,3,opt,name=day_finished,json=dayFinished,proto3" json:"day_finished,omitempty"`
+	// True when this call finished the whole trip.
+	TripFinished bool `protobuf:"varint,4,opt,name=trip_finished,json=tripFinished,proto3" json:"trip_finished,omitempty"`
+	// The caller's field score this week after the call.
+	WeekScore     int64 `protobuf:"varint,5,opt,name=week_score,json=weekScore,proto3" json:"week_score,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkStopResponse) Reset() {
+	*x = MarkStopResponse{}
+	mi := &file_loci_gamification_gamification_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkStopResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkStopResponse) ProtoMessage() {}
+
+func (x *MarkStopResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_gamification_gamification_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkStopResponse.ProtoReflect.Descriptor instead.
+func (*MarkStopResponse) Descriptor() ([]byte, []int) {
+	return file_loci_gamification_gamification_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *MarkStopResponse) GetStatus() trip.TripStopStatus {
+	if x != nil {
+		return x.Status
+	}
+	return trip.TripStopStatus(0)
+}
+
+func (x *MarkStopResponse) GetPointsAwarded() int32 {
+	if x != nil {
+		return x.PointsAwarded
+	}
+	return 0
+}
+
+func (x *MarkStopResponse) GetDayFinished() bool {
+	if x != nil {
+		return x.DayFinished
+	}
+	return false
+}
+
+func (x *MarkStopResponse) GetTripFinished() bool {
+	if x != nil {
+		return x.TripFinished
+	}
+	return false
+}
+
+func (x *MarkStopResponse) GetWeekScore() int64 {
+	if x != nil {
+		return x.WeekScore
+	}
+	return 0
+}
+
 var File_loci_gamification_gamification_proto protoreflect.FileDescriptor
 
 const file_loci_gamification_gamification_proto_rawDesc = "" +
 	"\n" +
-	"$loci/gamification/gamification.proto\x12\x11loci.gamification\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/social/social.proto\"\xa6\x01\n" +
+	"$loci/gamification/gamification.proto\x12\x11loci.gamification\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/social/social.proto\x1a\x14loci/trip/trip.proto\"\xa6\x01\n" +
 	"\x05Badge\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x182R\x02id\x12\x1d\n" +
 	"\x05title\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05title\x12*\n" +
@@ -1181,18 +2263,24 @@ const file_loci_gamification_gamification_proto_rawDesc = "" +
 	"\aentries\x18\x01 \x03(\v2#.loci.gamification.LeaderboardEntryR\aentries\x12=\n" +
 	"\fperiod_start\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vperiodStart\x129\n" +
 	"\n" +
-	"period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tperiodEnd\"\xd5\x01\n" +
+	"period_end\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tperiodEnd\"\xf0\x02\n" +
 	"\vPointsEvent\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x121\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1d.loci.gamification.PointsKindR\x04kind\x12\x1f\n" +
 	"\x06points\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06points\x12\x1e\n" +
 	"\x05label\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\x05label\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"k\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12 \n" +
+	"\acity_id\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12%\n" +
+	"\tcity_name\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x12*\n" +
+	"\ffield_points\x18\b \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vfieldPoints\x12$\n" +
+	"\tseason_id\x18\t \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\bseasonId\"\x8a\x01\n" +
 	"\x18ListPointsHistoryRequest\x12&\n" +
 	"\tpage_size\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x00R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tpageToken\"{\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tpageToken\x12\x1d\n" +
+	"\n" +
+	"field_only\x18\x03 \x01(\bR\tfieldOnly\"{\n" +
 	"\x19ListPointsHistoryResponse\x126\n" +
 	"\x06events\x18\x01 \x03(\v2\x1e.loci.gamification.PointsEventR\x06events\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb0\x01\n" +
@@ -1208,18 +2296,97 @@ const file_loci_gamification_gamification_proto_rawDesc = "" +
 	"\x0epoints_awarded\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\rpointsAwarded\x12%\n" +
 	"\x0etrip_completed\x18\x03 \x01(\bR\rtripCompleted\x127\n" +
 	"\n" +
-	"new_badges\x18\x04 \x03(\v2\x18.loci.gamification.BadgeR\tnewBadges*\xa3\x02\n" +
+	"new_badges\x18\x04 \x03(\v2\x18.loci.gamification.BadgeR\tnewBadges\"\xd4\x01\n" +
+	"\bCityRank\x12 \n" +
+	"\acity_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12%\n" +
+	"\tcity_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x120\n" +
+	"\x04rank\x18\x03 \x01(\x0e2\x1c.loci.gamification.FieldRankR\x04rank\x12\x1d\n" +
+	"\x05score\x18\x04 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x05score\x12.\n" +
+	"\x0enext_threshold\x18\x05 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\rnextThreshold\"\xca\x03\n" +
+	"\fFieldProfile\x12.\n" +
+	"\x0elifetime_score\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\rlifetimeScore\x12?\n" +
+	"\foverall_rank\x18\x02 \x01(\x0e2\x1c.loci.gamification.FieldRankR\voverallRank\x12=\n" +
+	"\x16overall_next_threshold\x18\x03 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x14overallNextThreshold\x12&\n" +
+	"\n" +
+	"week_score\x18\x04 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\tweekScore\x12/\n" +
+	"\x0flast_week_score\x18\x05 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\rlastWeekScore\x123\n" +
+	"\x06cities\x18\x06 \x03(\v2\x1b.loci.gamification.CityRankR\x06cities\x12$\n" +
+	"\tseason_id\x18\a \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\bseasonId\x12(\n" +
+	"\vplaces_kept\x18\b \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\n" +
+	"placesKept\x12,\n" +
+	"\rdays_finished\x18\t \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fdaysFinished\"\x18\n" +
+	"\x16GetFieldProfileRequest\"T\n" +
+	"\x17GetFieldProfileResponse\x129\n" +
+	"\aprofile\x18\x01 \x01(\v2\x1f.loci.gamification.FieldProfileR\aprofile\"\xfc\x01\n" +
+	"\x14GetFieldBoardRequest\x12B\n" +
+	"\x05scope\x18\x01 \x01(\x0e2\".loci.gamification.FieldBoardScopeB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05scope\x12 \n" +
+	"\acity_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12E\n" +
+	"\x06metric\x18\x03 \x01(\x0e2#.loci.gamification.FieldBoardMetricB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06metric\x127\n" +
+	"\rseason_offset\x18\x04 \x01(\x05B\x12\xbaH\x0f\x1a\r\x18\x00(\xcc\xff\xff\xff\xff\xff\xff\xff\xff\x01R\fseasonOffset\"\xf4\x01\n" +
+	"\rFieldBoardRow\x12#\n" +
+	"\bposition\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x01R\bposition\x12+\n" +
+	"\fdisplay_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\vdisplayName\x12+\n" +
+	"\x04user\x18\x03 \x01(\v2\x17.loci.social.PublicUserR\x04user\x12\x1d\n" +
+	"\x05value\x18\x04 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\x05value\x12\x13\n" +
+	"\x05is_me\x18\x05 \x01(\bR\x04isMe\x120\n" +
+	"\x04rank\x18\x06 \x01(\x0e2\x1c.loci.gamification.FieldRankR\x04rank\"\xae\x02\n" +
+	"\fPersonalWeek\x12$\n" +
+	"\tthis_week\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\bthisWeek\x12$\n" +
+	"\tlast_week\x18\x02 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\blastWeek\x12(\n" +
+	"\vplaces_kept\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\n" +
+	"placesKept\x12:\n" +
+	"\x15places_kept_last_week\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x12placesKeptLastWeek\x12,\n" +
+	"\rdays_finished\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fdaysFinished\x12>\n" +
+	"\x17days_finished_last_week\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x14daysFinishedLastWeek\"\xcb\x05\n" +
+	"\x15GetFieldBoardResponse\x128\n" +
+	"\x05scope\x18\x01 \x01(\x0e2\".loci.gamification.FieldBoardScopeR\x05scope\x12 \n" +
+	"\acity_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12%\n" +
+	"\tcity_name\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x12$\n" +
+	"\tseason_id\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\bseasonId\x12=\n" +
+	"\fseason_start\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\vseasonStart\x129\n" +
+	"\n" +
+	"season_end\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tseasonEnd\x122\n" +
+	"\x03top\x18\a \x03(\v2 .loci.gamification.FieldBoardRowR\x03top\x120\n" +
+	"\x02me\x18\b \x01(\v2 .loci.gamification.FieldBoardRowR\x02me\x126\n" +
+	"\x05above\x18\t \x01(\v2 .loci.gamification.FieldBoardRowR\x05above\x12*\n" +
+	"\fscored_users\x18\n" +
+	" \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\vscoredUsers\x12\x17\n" +
+	"\atoo_few\x18\v \x01(\bR\x06tooFew\x12+\n" +
+	"\x11friends_available\x18\f \x01(\bR\x10friendsAvailable\x12;\n" +
+	"\bpersonal\x18\r \x01(\v2\x1f.loci.gamification.PersonalWeekR\bpersonal\x12%\n" +
+	"\x0ehistory_locked\x18\x0e \x01(\bR\rhistoryLocked\x12\x1b\n" +
+	"\tme_hidden\x18\x0f \x01(\bR\bmeHidden\"\xe1\x01\n" +
+	"\x0fMarkStopRequest\x12\"\n" +
+	"\atrip_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06tripId\x12 \n" +
+	"\x06day_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x05dayId\x12\"\n" +
+	"\astop_id\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06stopId\x12=\n" +
+	"\x06status\x18\x04 \x01(\x0e2\x19.loci.trip.TripStopStatusB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12%\n" +
+	"\btimezone\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18@R\btimezone\"\xe5\x01\n" +
+	"\x10MarkStopResponse\x121\n" +
+	"\x06status\x18\x01 \x01(\x0e2\x19.loci.trip.TripStopStatusR\x06status\x12.\n" +
+	"\x0epoints_awarded\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\rpointsAwarded\x12!\n" +
+	"\fday_finished\x18\x03 \x01(\bR\vdayFinished\x12#\n" +
+	"\rtrip_finished\x18\x04 \x01(\bR\ftripFinished\x12&\n" +
+	"\n" +
+	"week_score\x18\x05 \x01(\x03B\a\xbaH\x04\"\x02(\x00R\tweekScore*\xbf\x03\n" +
 	"\n" +
 	"PointsKind\x12\x1b\n" +
-	"\x17POINTS_KIND_UNSPECIFIED\x10\x00\x12\x1e\n" +
-	"\x1aPOINTS_KIND_DAILY_CHECK_IN\x10\x01\x12\x1c\n" +
-	"\x18POINTS_KIND_DAILY_SEARCH\x10\x02\x12\x1d\n" +
+	"\x17POINTS_KIND_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1aPOINTS_KIND_DAILY_CHECK_IN\x10\x01\x1a\x02\b\x01\x12 \n" +
+	"\x18POINTS_KIND_DAILY_SEARCH\x10\x02\x1a\x02\b\x01\x12\x1d\n" +
 	"\x19POINTS_KIND_PLACE_VISITED\x10\x03\x12\x18\n" +
 	"\x14POINTS_KIND_NEW_CITY\x10\x04\x12\x1b\n" +
 	"\x17POINTS_KIND_SCOUT_CLAIM\x10\x05\x12 \n" +
 	"\x1cPOINTS_KIND_PLACE_SUBMISSION\x10\x06\x12\"\n" +
 	"\x1ePOINTS_KIND_TRIP_DAY_COMPLETED\x10\a\x12\x1e\n" +
-	"\x1aPOINTS_KIND_TRIP_COMPLETED\x10\b*\x93\x01\n" +
+	"\x1aPOINTS_KIND_TRIP_COMPLETED\x10\b\x12\x1b\n" +
+	"\x17POINTS_KIND_PLACE_SAVED\x10\t\x12\x1a\n" +
+	"\x16POINTS_KIND_PLACE_KEPT\x10\n" +
+	"\x12\x19\n" +
+	"\x15POINTS_KIND_STOP_DONE\x10\v\x12\"\n" +
+	"\x1ePOINTS_KIND_FIRST_NEIGHBORHOOD\x10\f\x12\x1a\n" +
+	"\x16POINTS_KIND_PLACE_NOTE\x10\r*\x93\x01\n" +
 	"\x11LeaderboardPeriod\x12\"\n" +
 	"\x1eLEADERBOARD_PERIOD_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17LEADERBOARD_PERIOD_WEEK\x10\x01\x12\x1c\n" +
@@ -1229,13 +2396,33 @@ const file_loci_gamification_gamification_proto_rawDesc = "" +
 	"\x1eLEADERBOARD_METRIC_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19LEADERBOARD_METRIC_POINTS\x10\x01\x12\x1d\n" +
 	"\x19LEADERBOARD_METRIC_CITIES\x10\x02\x12\x1d\n" +
-	"\x19LEADERBOARD_METRIC_PLACES\x10\x032\x9b\x04\n" +
+	"\x19LEADERBOARD_METRIC_PLACES\x10\x03*\x97\x01\n" +
+	"\tFieldRank\x12\x1a\n" +
+	"\x16FIELD_RANK_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10FIELD_RANK_SCOUT\x10\x01\x12\x15\n" +
+	"\x11FIELD_RANK_WALKER\x10\x02\x12\x14\n" +
+	"\x10FIELD_RANK_GUIDE\x10\x03\x12\x14\n" +
+	"\x10FIELD_RANK_LOCAL\x10\x04\x12\x15\n" +
+	"\x11FIELD_RANK_KEEPER\x10\x05*\x99\x01\n" +
+	"\x0fFieldBoardScope\x12!\n" +
+	"\x1dFIELD_BOARD_SCOPE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bFIELD_BOARD_SCOPE_CITY_WEEK\x10\x01\x12\"\n" +
+	"\x1eFIELD_BOARD_SCOPE_FRIENDS_WEEK\x10\x02\x12\x1e\n" +
+	"\x1aFIELD_BOARD_SCOPE_PERSONAL\x10\x03*\xa0\x01\n" +
+	"\x10FieldBoardMetric\x12\"\n" +
+	"\x1eFIELD_BOARD_METRIC_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aFIELD_BOARD_METRIC_OVERALL\x10\x01\x12\"\n" +
+	"\x1eFIELD_BOARD_METRIC_PLACES_KEPT\x10\x02\x12$\n" +
+	" FIELD_BOARD_METRIC_DAYS_FINISHED\x10\x032\xbe\x06\n" +
 	"\x13GamificationService\x12b\n" +
 	"\rGetMyProgress\x12'.loci.gamification.GetMyProgressRequest\x1a(.loci.gamification.GetMyProgressResponse\x12_\n" +
 	"\fDailyCheckIn\x12&.loci.gamification.DailyCheckInRequest\x1a'.loci.gamification.DailyCheckInResponse\x12e\n" +
 	"\x0eGetLeaderboard\x12(.loci.gamification.GetLeaderboardRequest\x1a).loci.gamification.GetLeaderboardResponse\x12n\n" +
 	"\x11ListPointsHistory\x12+.loci.gamification.ListPointsHistoryRequest\x1a,.loci.gamification.ListPointsHistoryResponse\x12h\n" +
-	"\x0fCompleteTripDay\x12).loci.gamification.CompleteTripDayRequest\x1a*.loci.gamification.CompleteTripDayResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification;gamificationb\x06proto3"
+	"\x0fCompleteTripDay\x12).loci.gamification.CompleteTripDayRequest\x1a*.loci.gamification.CompleteTripDayResponse\x12h\n" +
+	"\x0fGetFieldProfile\x12).loci.gamification.GetFieldProfileRequest\x1a*.loci.gamification.GetFieldProfileResponse\x12b\n" +
+	"\rGetFieldBoard\x12'.loci.gamification.GetFieldBoardRequest\x1a(.loci.gamification.GetFieldBoardResponse\x12S\n" +
+	"\bMarkStop\x12\".loci.gamification.MarkStopRequest\x1a#.loci.gamification.MarkStopResponseBSZQgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification;gamificationb\x06proto3"
 
 var (
 	file_loci_gamification_gamification_proto_rawDescOnce sync.Once
@@ -1249,63 +2436,100 @@ func file_loci_gamification_gamification_proto_rawDescGZIP() []byte {
 	return file_loci_gamification_gamification_proto_rawDescData
 }
 
-var file_loci_gamification_gamification_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_loci_gamification_gamification_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_loci_gamification_gamification_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_loci_gamification_gamification_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_loci_gamification_gamification_proto_goTypes = []any{
 	(PointsKind)(0),                   // 0: loci.gamification.PointsKind
 	(LeaderboardPeriod)(0),            // 1: loci.gamification.LeaderboardPeriod
 	(LeaderboardMetric)(0),            // 2: loci.gamification.LeaderboardMetric
-	(*Badge)(nil),                     // 3: loci.gamification.Badge
-	(*TodayChecklist)(nil),            // 4: loci.gamification.TodayChecklist
-	(*Progress)(nil),                  // 5: loci.gamification.Progress
-	(*GetMyProgressRequest)(nil),      // 6: loci.gamification.GetMyProgressRequest
-	(*GetMyProgressResponse)(nil),     // 7: loci.gamification.GetMyProgressResponse
-	(*DailyCheckInRequest)(nil),       // 8: loci.gamification.DailyCheckInRequest
-	(*DailyCheckInResponse)(nil),      // 9: loci.gamification.DailyCheckInResponse
-	(*GetLeaderboardRequest)(nil),     // 10: loci.gamification.GetLeaderboardRequest
-	(*LeaderboardEntry)(nil),          // 11: loci.gamification.LeaderboardEntry
-	(*GetLeaderboardResponse)(nil),    // 12: loci.gamification.GetLeaderboardResponse
-	(*PointsEvent)(nil),               // 13: loci.gamification.PointsEvent
-	(*ListPointsHistoryRequest)(nil),  // 14: loci.gamification.ListPointsHistoryRequest
-	(*ListPointsHistoryResponse)(nil), // 15: loci.gamification.ListPointsHistoryResponse
-	(*CompleteTripDayRequest)(nil),    // 16: loci.gamification.CompleteTripDayRequest
-	(*CompleteTripDayResponse)(nil),   // 17: loci.gamification.CompleteTripDayResponse
-	(*timestamppb.Timestamp)(nil),     // 18: google.protobuf.Timestamp
-	(*social.PublicUser)(nil),         // 19: loci.social.PublicUser
+	(FieldRank)(0),                    // 3: loci.gamification.FieldRank
+	(FieldBoardScope)(0),              // 4: loci.gamification.FieldBoardScope
+	(FieldBoardMetric)(0),             // 5: loci.gamification.FieldBoardMetric
+	(*Badge)(nil),                     // 6: loci.gamification.Badge
+	(*TodayChecklist)(nil),            // 7: loci.gamification.TodayChecklist
+	(*Progress)(nil),                  // 8: loci.gamification.Progress
+	(*GetMyProgressRequest)(nil),      // 9: loci.gamification.GetMyProgressRequest
+	(*GetMyProgressResponse)(nil),     // 10: loci.gamification.GetMyProgressResponse
+	(*DailyCheckInRequest)(nil),       // 11: loci.gamification.DailyCheckInRequest
+	(*DailyCheckInResponse)(nil),      // 12: loci.gamification.DailyCheckInResponse
+	(*GetLeaderboardRequest)(nil),     // 13: loci.gamification.GetLeaderboardRequest
+	(*LeaderboardEntry)(nil),          // 14: loci.gamification.LeaderboardEntry
+	(*GetLeaderboardResponse)(nil),    // 15: loci.gamification.GetLeaderboardResponse
+	(*PointsEvent)(nil),               // 16: loci.gamification.PointsEvent
+	(*ListPointsHistoryRequest)(nil),  // 17: loci.gamification.ListPointsHistoryRequest
+	(*ListPointsHistoryResponse)(nil), // 18: loci.gamification.ListPointsHistoryResponse
+	(*CompleteTripDayRequest)(nil),    // 19: loci.gamification.CompleteTripDayRequest
+	(*CompleteTripDayResponse)(nil),   // 20: loci.gamification.CompleteTripDayResponse
+	(*CityRank)(nil),                  // 21: loci.gamification.CityRank
+	(*FieldProfile)(nil),              // 22: loci.gamification.FieldProfile
+	(*GetFieldProfileRequest)(nil),    // 23: loci.gamification.GetFieldProfileRequest
+	(*GetFieldProfileResponse)(nil),   // 24: loci.gamification.GetFieldProfileResponse
+	(*GetFieldBoardRequest)(nil),      // 25: loci.gamification.GetFieldBoardRequest
+	(*FieldBoardRow)(nil),             // 26: loci.gamification.FieldBoardRow
+	(*PersonalWeek)(nil),              // 27: loci.gamification.PersonalWeek
+	(*GetFieldBoardResponse)(nil),     // 28: loci.gamification.GetFieldBoardResponse
+	(*MarkStopRequest)(nil),           // 29: loci.gamification.MarkStopRequest
+	(*MarkStopResponse)(nil),          // 30: loci.gamification.MarkStopResponse
+	(*timestamppb.Timestamp)(nil),     // 31: google.protobuf.Timestamp
+	(*social.PublicUser)(nil),         // 32: loci.social.PublicUser
+	(trip.TripStopStatus)(0),          // 33: loci.trip.TripStopStatus
 }
 var file_loci_gamification_gamification_proto_depIdxs = []int32{
-	18, // 0: loci.gamification.Badge.awarded_at:type_name -> google.protobuf.Timestamp
-	3,  // 1: loci.gamification.Progress.badges:type_name -> loci.gamification.Badge
-	4,  // 2: loci.gamification.Progress.today:type_name -> loci.gamification.TodayChecklist
-	5,  // 3: loci.gamification.GetMyProgressResponse.progress:type_name -> loci.gamification.Progress
-	5,  // 4: loci.gamification.DailyCheckInResponse.progress:type_name -> loci.gamification.Progress
-	3,  // 5: loci.gamification.DailyCheckInResponse.new_badges:type_name -> loci.gamification.Badge
+	31, // 0: loci.gamification.Badge.awarded_at:type_name -> google.protobuf.Timestamp
+	6,  // 1: loci.gamification.Progress.badges:type_name -> loci.gamification.Badge
+	7,  // 2: loci.gamification.Progress.today:type_name -> loci.gamification.TodayChecklist
+	8,  // 3: loci.gamification.GetMyProgressResponse.progress:type_name -> loci.gamification.Progress
+	8,  // 4: loci.gamification.DailyCheckInResponse.progress:type_name -> loci.gamification.Progress
+	6,  // 5: loci.gamification.DailyCheckInResponse.new_badges:type_name -> loci.gamification.Badge
 	1,  // 6: loci.gamification.GetLeaderboardRequest.period:type_name -> loci.gamification.LeaderboardPeriod
 	2,  // 7: loci.gamification.GetLeaderboardRequest.metric:type_name -> loci.gamification.LeaderboardMetric
-	19, // 8: loci.gamification.LeaderboardEntry.user:type_name -> loci.social.PublicUser
-	11, // 9: loci.gamification.GetLeaderboardResponse.entries:type_name -> loci.gamification.LeaderboardEntry
-	18, // 10: loci.gamification.GetLeaderboardResponse.period_start:type_name -> google.protobuf.Timestamp
-	18, // 11: loci.gamification.GetLeaderboardResponse.period_end:type_name -> google.protobuf.Timestamp
+	32, // 8: loci.gamification.LeaderboardEntry.user:type_name -> loci.social.PublicUser
+	14, // 9: loci.gamification.GetLeaderboardResponse.entries:type_name -> loci.gamification.LeaderboardEntry
+	31, // 10: loci.gamification.GetLeaderboardResponse.period_start:type_name -> google.protobuf.Timestamp
+	31, // 11: loci.gamification.GetLeaderboardResponse.period_end:type_name -> google.protobuf.Timestamp
 	0,  // 12: loci.gamification.PointsEvent.kind:type_name -> loci.gamification.PointsKind
-	18, // 13: loci.gamification.PointsEvent.created_at:type_name -> google.protobuf.Timestamp
-	13, // 14: loci.gamification.ListPointsHistoryResponse.events:type_name -> loci.gamification.PointsEvent
-	5,  // 15: loci.gamification.CompleteTripDayResponse.progress:type_name -> loci.gamification.Progress
-	3,  // 16: loci.gamification.CompleteTripDayResponse.new_badges:type_name -> loci.gamification.Badge
-	6,  // 17: loci.gamification.GamificationService.GetMyProgress:input_type -> loci.gamification.GetMyProgressRequest
-	8,  // 18: loci.gamification.GamificationService.DailyCheckIn:input_type -> loci.gamification.DailyCheckInRequest
-	10, // 19: loci.gamification.GamificationService.GetLeaderboard:input_type -> loci.gamification.GetLeaderboardRequest
-	14, // 20: loci.gamification.GamificationService.ListPointsHistory:input_type -> loci.gamification.ListPointsHistoryRequest
-	16, // 21: loci.gamification.GamificationService.CompleteTripDay:input_type -> loci.gamification.CompleteTripDayRequest
-	7,  // 22: loci.gamification.GamificationService.GetMyProgress:output_type -> loci.gamification.GetMyProgressResponse
-	9,  // 23: loci.gamification.GamificationService.DailyCheckIn:output_type -> loci.gamification.DailyCheckInResponse
-	12, // 24: loci.gamification.GamificationService.GetLeaderboard:output_type -> loci.gamification.GetLeaderboardResponse
-	15, // 25: loci.gamification.GamificationService.ListPointsHistory:output_type -> loci.gamification.ListPointsHistoryResponse
-	17, // 26: loci.gamification.GamificationService.CompleteTripDay:output_type -> loci.gamification.CompleteTripDayResponse
-	22, // [22:27] is the sub-list for method output_type
-	17, // [17:22] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	31, // 13: loci.gamification.PointsEvent.created_at:type_name -> google.protobuf.Timestamp
+	16, // 14: loci.gamification.ListPointsHistoryResponse.events:type_name -> loci.gamification.PointsEvent
+	8,  // 15: loci.gamification.CompleteTripDayResponse.progress:type_name -> loci.gamification.Progress
+	6,  // 16: loci.gamification.CompleteTripDayResponse.new_badges:type_name -> loci.gamification.Badge
+	3,  // 17: loci.gamification.CityRank.rank:type_name -> loci.gamification.FieldRank
+	3,  // 18: loci.gamification.FieldProfile.overall_rank:type_name -> loci.gamification.FieldRank
+	21, // 19: loci.gamification.FieldProfile.cities:type_name -> loci.gamification.CityRank
+	22, // 20: loci.gamification.GetFieldProfileResponse.profile:type_name -> loci.gamification.FieldProfile
+	4,  // 21: loci.gamification.GetFieldBoardRequest.scope:type_name -> loci.gamification.FieldBoardScope
+	5,  // 22: loci.gamification.GetFieldBoardRequest.metric:type_name -> loci.gamification.FieldBoardMetric
+	32, // 23: loci.gamification.FieldBoardRow.user:type_name -> loci.social.PublicUser
+	3,  // 24: loci.gamification.FieldBoardRow.rank:type_name -> loci.gamification.FieldRank
+	4,  // 25: loci.gamification.GetFieldBoardResponse.scope:type_name -> loci.gamification.FieldBoardScope
+	31, // 26: loci.gamification.GetFieldBoardResponse.season_start:type_name -> google.protobuf.Timestamp
+	31, // 27: loci.gamification.GetFieldBoardResponse.season_end:type_name -> google.protobuf.Timestamp
+	26, // 28: loci.gamification.GetFieldBoardResponse.top:type_name -> loci.gamification.FieldBoardRow
+	26, // 29: loci.gamification.GetFieldBoardResponse.me:type_name -> loci.gamification.FieldBoardRow
+	26, // 30: loci.gamification.GetFieldBoardResponse.above:type_name -> loci.gamification.FieldBoardRow
+	27, // 31: loci.gamification.GetFieldBoardResponse.personal:type_name -> loci.gamification.PersonalWeek
+	33, // 32: loci.gamification.MarkStopRequest.status:type_name -> loci.trip.TripStopStatus
+	33, // 33: loci.gamification.MarkStopResponse.status:type_name -> loci.trip.TripStopStatus
+	9,  // 34: loci.gamification.GamificationService.GetMyProgress:input_type -> loci.gamification.GetMyProgressRequest
+	11, // 35: loci.gamification.GamificationService.DailyCheckIn:input_type -> loci.gamification.DailyCheckInRequest
+	13, // 36: loci.gamification.GamificationService.GetLeaderboard:input_type -> loci.gamification.GetLeaderboardRequest
+	17, // 37: loci.gamification.GamificationService.ListPointsHistory:input_type -> loci.gamification.ListPointsHistoryRequest
+	19, // 38: loci.gamification.GamificationService.CompleteTripDay:input_type -> loci.gamification.CompleteTripDayRequest
+	23, // 39: loci.gamification.GamificationService.GetFieldProfile:input_type -> loci.gamification.GetFieldProfileRequest
+	25, // 40: loci.gamification.GamificationService.GetFieldBoard:input_type -> loci.gamification.GetFieldBoardRequest
+	29, // 41: loci.gamification.GamificationService.MarkStop:input_type -> loci.gamification.MarkStopRequest
+	10, // 42: loci.gamification.GamificationService.GetMyProgress:output_type -> loci.gamification.GetMyProgressResponse
+	12, // 43: loci.gamification.GamificationService.DailyCheckIn:output_type -> loci.gamification.DailyCheckInResponse
+	15, // 44: loci.gamification.GamificationService.GetLeaderboard:output_type -> loci.gamification.GetLeaderboardResponse
+	18, // 45: loci.gamification.GamificationService.ListPointsHistory:output_type -> loci.gamification.ListPointsHistoryResponse
+	20, // 46: loci.gamification.GamificationService.CompleteTripDay:output_type -> loci.gamification.CompleteTripDayResponse
+	24, // 47: loci.gamification.GamificationService.GetFieldProfile:output_type -> loci.gamification.GetFieldProfileResponse
+	28, // 48: loci.gamification.GamificationService.GetFieldBoard:output_type -> loci.gamification.GetFieldBoardResponse
+	30, // 49: loci.gamification.GamificationService.MarkStop:output_type -> loci.gamification.MarkStopResponse
+	42, // [42:50] is the sub-list for method output_type
+	34, // [34:42] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_loci_gamification_gamification_proto_init() }
@@ -1318,8 +2542,8 @@ func file_loci_gamification_gamification_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_gamification_gamification_proto_rawDesc), len(file_loci_gamification_gamification_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   15,
+			NumEnums:      6,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

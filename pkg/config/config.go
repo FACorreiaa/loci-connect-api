@@ -41,6 +41,14 @@ type SocialConfig struct {
 	// FacebookAppID is the Meta app the iOS SDK signs Limited Login tokens
 	// for; empty turns LinkFacebook off.
 	FacebookAppID string
+	// FieldRanksOverall and FieldRanksCity are the lifetime field scores each
+	// rank starts at, Scout to Keeper ("0,60,200,500,1200"); empty keeps the
+	// defaults in the gamification package.
+	FieldRanksOverall string
+	FieldRanksCity    string
+	// FieldRunnerEnabled runs the field score's background work: closing
+	// finished weeks, paying places kept a week, neighborhood lookups.
+	FieldRunnerEnabled bool
 }
 
 type CacheConfig struct {
@@ -497,6 +505,9 @@ func Load() (*Config, error) {
 		Social: SocialConfig{
 			GamificationEnabled: getEnvAsBool("GAMIFICATION_ENABLED", true),
 			FacebookAppID:       getEnv("FACEBOOK_APP_ID", ""),
+			FieldRanksOverall:   getEnv("FIELD_RANK_THRESHOLDS_OVERALL", ""),
+			FieldRanksCity:      getEnv("FIELD_RANK_THRESHOLDS_CITY", ""),
+			FieldRunnerEnabled:  getEnvAsBool("FIELD_RUNNER_ENABLED", true),
 		},
 		Messaging: MessagingConfig{
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
