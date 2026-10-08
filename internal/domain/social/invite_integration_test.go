@@ -42,12 +42,12 @@ func invitedBy(t *testing.T, id uuid.UUID) *uuid.UUID {
 	return by
 }
 
-// Migration 0115 on rows that existed before it: an expiring code becomes
+// Migration 0117 on rows that existed before it: an expiring code becomes
 // permanent and keeps its value, and an account with no code gets one of the
 // same shape newCode() makes. The harness migrates an empty database, so the
 // Up section is run again here over seeded rows; it is written to be
 // re-runnable.
-func TestMigration0115Backfill(t *testing.T) {
+func TestMigration0117Backfill(t *testing.T) {
 	ctx := context.Background()
 	withCode, withoutCode := newSocialUser(t), newSocialUser(t)
 	_, err := testSocialDB.Exec(ctx,
@@ -55,7 +55,7 @@ func TestMigration0115Backfill(t *testing.T) {
 		withCode, "legacy-"+withCode.String()[:8], time.Now().Add(time.Hour))
 	require.NoError(t, err)
 
-	raw, err := os.ReadFile("../../../pkg/db/migrations/0115_invite_attribution.up.sql")
+	raw, err := os.ReadFile("../../../pkg/db/migrations/0117_invite_attribution.up.sql")
 	require.NoError(t, err)
 	up, _, ok := strings.Cut(string(raw), "-- +goose Down")
 	require.True(t, ok)
