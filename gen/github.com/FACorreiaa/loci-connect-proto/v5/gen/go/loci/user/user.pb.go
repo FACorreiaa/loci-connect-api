@@ -930,8 +930,11 @@ type NotificationSettings struct {
 	StreakReminders bool `protobuf:"varint,7,opt,name=streak_reminders,json=streakReminders,proto3" json:"streak_reminders,omitempty"`
 	// Badges earned and a friend passing the caller on the week's leaderboard.
 	ProgressUpdates bool `protobuf:"varint,8,opt,name=progress_updates,json=progressUpdates,proto3" json:"progress_updates,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Whether people who are not friends see the caller's display name and
+	// weekly field score on city boards. On unless turned off.
+	CityBoardVisible bool `protobuf:"varint,9,opt,name=city_board_visible,json=cityBoardVisible,proto3" json:"city_board_visible,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *NotificationSettings) Reset() {
@@ -1020,6 +1023,13 @@ func (x *NotificationSettings) GetProgressUpdates() bool {
 	return false
 }
 
+func (x *NotificationSettings) GetCityBoardVisible() bool {
+	if x != nil {
+		return x.CityBoardVisible
+	}
+	return false
+}
+
 type GetNotificationSettingsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -1066,6 +1076,7 @@ type UpdateNotificationSettingsRequest struct {
 	LeaderboardVisible *bool `protobuf:"varint,5,opt,name=leaderboard_visible,json=leaderboardVisible,proto3,oneof" json:"leaderboard_visible,omitempty"`
 	StreakReminders    *bool `protobuf:"varint,6,opt,name=streak_reminders,json=streakReminders,proto3,oneof" json:"streak_reminders,omitempty"`
 	ProgressUpdates    *bool `protobuf:"varint,7,opt,name=progress_updates,json=progressUpdates,proto3,oneof" json:"progress_updates,omitempty"`
+	CityBoardVisible   *bool `protobuf:"varint,8,opt,name=city_board_visible,json=cityBoardVisible,proto3,oneof" json:"city_board_visible,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -1145,6 +1156,13 @@ func (x *UpdateNotificationSettingsRequest) GetStreakReminders() bool {
 func (x *UpdateNotificationSettingsRequest) GetProgressUpdates() bool {
 	if x != nil && x.ProgressUpdates != nil {
 		return *x.ProgressUpdates
+	}
+	return false
+}
+
+func (x *UpdateNotificationSettingsRequest) GetCityBoardVisible() bool {
+	if x != nil && x.CityBoardVisible != nil {
+		return *x.CityBoardVisible
 	}
 	return false
 }
@@ -1514,7 +1532,7 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\bfilename\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\bfilename\"E\n" +
 	"\x14DeleteAccountRequest\x12-\n" +
-	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xfb\x02\n" +
+	"\fconfirmation\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18\x14R\fconfirmation\"\xa9\x03\n" +
 	"\x14NotificationSettings\x12(\n" +
 	"\x0frecommendations\x18\x01 \x01(\bR\x0frecommendations\x12%\n" +
 	"\x0etrip_reminders\x18\x02 \x01(\bR\rtripReminders\x129\n" +
@@ -1524,8 +1542,9 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x0ffriend_activity\x18\x05 \x01(\bR\x0efriendActivity\x12/\n" +
 	"\x13leaderboard_visible\x18\x06 \x01(\bR\x12leaderboardVisible\x12)\n" +
 	"\x10streak_reminders\x18\a \x01(\bR\x0fstreakReminders\x12)\n" +
-	"\x10progress_updates\x18\b \x01(\bR\x0fprogressUpdates\" \n" +
-	"\x1eGetNotificationSettingsRequest\"\x81\x04\n" +
+	"\x10progress_updates\x18\b \x01(\bR\x0fprogressUpdates\x12,\n" +
+	"\x12city_board_visible\x18\t \x01(\bR\x10cityBoardVisible\" \n" +
+	"\x1eGetNotificationSettingsRequest\"\xcb\x04\n" +
 	"!UpdateNotificationSettingsRequest\x12-\n" +
 	"\x0frecommendations\x18\x01 \x01(\bH\x00R\x0frecommendations\x88\x01\x01\x12*\n" +
 	"\x0etrip_reminders\x18\x02 \x01(\bH\x01R\rtripReminders\x88\x01\x01\x12,\n" +
@@ -1533,14 +1552,16 @@ const file_loci_user_user_proto_rawDesc = "" +
 	"\x0ffriend_activity\x18\x04 \x01(\bH\x03R\x0efriendActivity\x88\x01\x01\x124\n" +
 	"\x13leaderboard_visible\x18\x05 \x01(\bH\x04R\x12leaderboardVisible\x88\x01\x01\x12.\n" +
 	"\x10streak_reminders\x18\x06 \x01(\bH\x05R\x0fstreakReminders\x88\x01\x01\x12.\n" +
-	"\x10progress_updates\x18\a \x01(\bH\x06R\x0fprogressUpdates\x88\x01\x01B\x12\n" +
+	"\x10progress_updates\x18\a \x01(\bH\x06R\x0fprogressUpdates\x88\x01\x01\x121\n" +
+	"\x12city_board_visible\x18\b \x01(\bH\aR\x10cityBoardVisible\x88\x01\x01B\x12\n" +
 	"\x10_recommendationsB\x11\n" +
 	"\x0f_trip_remindersB\x12\n" +
 	"\x10_search_finishedB\x12\n" +
 	"\x10_friend_activityB\x16\n" +
 	"\x14_leaderboard_visibleB\x13\n" +
 	"\x11_streak_remindersB\x13\n" +
-	"\x11_progress_updates\"\xe1\x02\n" +
+	"\x11_progress_updatesB\x15\n" +
+	"\x13_city_board_visible\"\xe1\x02\n" +
 	"\x19RegisterPushDeviceRequest\x12?\n" +
 	"\bplatform\x18\x01 \x01(\x0e2\x17.loci.user.PushPlatformB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bplatform\x12&\n" +

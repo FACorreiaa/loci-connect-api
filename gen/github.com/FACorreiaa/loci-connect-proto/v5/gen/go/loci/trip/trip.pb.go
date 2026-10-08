@@ -141,6 +141,58 @@ func (TripPace) EnumDescriptor() ([]byte, []int) {
 	return file_loci_trip_trip_proto_rawDescGZIP(), []int{1}
 }
 
+type TripStopStatus int32
+
+const (
+	TripStopStatus_TRIP_STOP_STATUS_UNSPECIFIED TripStopStatus = 0
+	TripStopStatus_TRIP_STOP_STATUS_OPEN        TripStopStatus = 1
+	TripStopStatus_TRIP_STOP_STATUS_DONE        TripStopStatus = 2
+	TripStopStatus_TRIP_STOP_STATUS_SKIPPED     TripStopStatus = 3
+)
+
+// Enum value maps for TripStopStatus.
+var (
+	TripStopStatus_name = map[int32]string{
+		0: "TRIP_STOP_STATUS_UNSPECIFIED",
+		1: "TRIP_STOP_STATUS_OPEN",
+		2: "TRIP_STOP_STATUS_DONE",
+		3: "TRIP_STOP_STATUS_SKIPPED",
+	}
+	TripStopStatus_value = map[string]int32{
+		"TRIP_STOP_STATUS_UNSPECIFIED": 0,
+		"TRIP_STOP_STATUS_OPEN":        1,
+		"TRIP_STOP_STATUS_DONE":        2,
+		"TRIP_STOP_STATUS_SKIPPED":     3,
+	}
+)
+
+func (x TripStopStatus) Enum() *TripStopStatus {
+	p := new(TripStopStatus)
+	*p = x
+	return p
+}
+
+func (x TripStopStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TripStopStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_trip_trip_proto_enumTypes[2].Descriptor()
+}
+
+func (TripStopStatus) Type() protoreflect.EnumType {
+	return &file_loci_trip_trip_proto_enumTypes[2]
+}
+
+func (x TripStopStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TripStopStatus.Descriptor instead.
+func (TripStopStatus) EnumDescriptor() ([]byte, []int) {
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+}
+
 type FlightCabin int32
 
 const (
@@ -180,11 +232,11 @@ func (x FlightCabin) String() string {
 }
 
 func (FlightCabin) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[2].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[3].Descriptor()
 }
 
 func (FlightCabin) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[2]
+	return &file_loci_trip_trip_proto_enumTypes[3]
 }
 
 func (x FlightCabin) Number() protoreflect.EnumNumber {
@@ -193,7 +245,7 @@ func (x FlightCabin) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FlightCabin.Descriptor instead.
 func (FlightCabin) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
 }
 
 // PackingCategory groups suggestions so a long list stays scannable.
@@ -245,11 +297,11 @@ func (x PackingCategory) String() string {
 }
 
 func (PackingCategory) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[3].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[4].Descriptor()
 }
 
 func (PackingCategory) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[3]
+	return &file_loci_trip_trip_proto_enumTypes[4]
 }
 
 func (x PackingCategory) Number() protoreflect.EnumNumber {
@@ -258,7 +310,7 @@ func (x PackingCategory) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PackingCategory.Descriptor instead.
 func (PackingCategory) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
 }
 
 // ChecklistItemKind says which list an item belongs to.
@@ -295,11 +347,11 @@ func (x ChecklistItemKind) String() string {
 }
 
 func (ChecklistItemKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[4].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[5].Descriptor()
 }
 
 func (ChecklistItemKind) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[4]
+	return &file_loci_trip_trip_proto_enumTypes[5]
 }
 
 func (x ChecklistItemKind) Number() protoreflect.EnumNumber {
@@ -308,7 +360,7 @@ func (x ChecklistItemKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ChecklistItemKind.Descriptor instead.
 func (ChecklistItemKind) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
 }
 
 // ExportFormat selects the export artifact.
@@ -348,11 +400,11 @@ func (x ExportFormat) String() string {
 }
 
 func (ExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[5].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[6].Descriptor()
 }
 
 func (ExportFormat) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[5]
+	return &file_loci_trip_trip_proto_enumTypes[6]
 }
 
 func (x ExportFormat) Number() protoreflect.EnumNumber {
@@ -361,7 +413,7 @@ func (x ExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportFormat.Descriptor instead.
 func (ExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{6}
 }
 
 // TripConstraint holds the planning constraints for a trip. These override the
@@ -477,7 +529,12 @@ type TripStop struct {
 	// of the linked POI, so it is absent when the stop has no poi_id or that POI
 	// has no picture yet; render the usual placeholder then. Filled on City Pack
 	// stops (BundleDay.stops).
-	Image         *poi.POIImage `protobuf:"bytes,11,opt,name=image,proto3,oneof" json:"image,omitempty"`
+	Image *poi.POIImage `protobuf:"bytes,11,opt,name=image,proto3,oneof" json:"image,omitempty"`
+	// Whether the traveller walked or skipped the stop (read side only; set with
+	// GamificationService.MarkStop, ignored by SaveTrip).
+	Status TripStopStatus `protobuf:"varint,12,opt,name=status,proto3,enum=loci.trip.TripStopStatus" json:"status,omitempty"`
+	// When status last changed; absent while the stop is open.
+	StatusAt      *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=status_at,json=statusAt,proto3" json:"status_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -589,6 +646,20 @@ func (x *TripStop) GetImage() *poi.POIImage {
 	return nil
 }
 
+func (x *TripStop) GetStatus() TripStopStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TripStopStatus_TRIP_STOP_STATUS_UNSPECIFIED
+}
+
+func (x *TripStop) GetStatusAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StatusAt
+	}
+	return nil
+}
+
 // TripDay is one day of a trip.
 type TripDay struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -606,7 +677,10 @@ type TripDay struct {
 	CityLon  *float64 `protobuf:"fixed64,8,opt,name=city_lon,json=cityLon,proto3,oneof" json:"city_lon,omitempty"`
 	// True when the day includes a move between cities, so the UI can show that
 	// sightseeing time is reduced.
-	TravelDay     bool `protobuf:"varint,9,opt,name=travel_day,json=travelDay,proto3" json:"travel_day,omitempty"`
+	TravelDay bool `protobuf:"varint,9,opt,name=travel_day,json=travelDay,proto3" json:"travel_day,omitempty"`
+	// When the traveller finished the day (read side only; ignored by
+	// SaveTrip). Absent while unfinished.
+	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -702,6 +776,13 @@ func (x *TripDay) GetTravelDay() bool {
 		return x.TravelDay
 	}
 	return false
+}
+
+func (x *TripDay) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
 }
 
 // TripLeg is travel between two consecutive places in a multi-city trip.
@@ -3963,7 +4044,7 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\r_budget_levelB\v\n" +
 	"\t_mobilityB\x13\n" +
 	"\x11_day_start_minuteB\x11\n" +
-	"\x0f_day_end_minute\"\xf3\x04\n" +
+	"\x0f_day_end_minute\"\xdf\x05\n" +
 	"\bTripStop\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12\x1e\n" +
 	"\x06poi_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05poiId\x12(\n" +
@@ -3981,13 +4062,15 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\x03poi\x18\t \x01(\v2\x19.loci.poi.POIDetailedInfoH\x03R\x03poi\x88\x01\x01\x12`\n" +
 	"\x14recommendation_trace\x18\n" +
 	" \x01(\v2(.loci.recommendation.RecommendationTraceH\x04R\x13recommendationTrace\x88\x01\x01\x12-\n" +
-	"\x05image\x18\v \x01(\v2\x12.loci.poi.POIImageH\x05R\x05image\x88\x01\x01B\x0f\n" +
+	"\x05image\x18\v \x01(\v2\x12.loci.poi.POIImageH\x05R\x05image\x88\x01\x01\x121\n" +
+	"\x06status\x18\f \x01(\x0e2\x19.loci.trip.TripStopStatusR\x06status\x127\n" +
+	"\tstatus_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bstatusAtB\x0f\n" +
 	"\r_start_minuteB\x13\n" +
 	"\x11_duration_minutesB\x0e\n" +
 	"\f_booking_urlB\x06\n" +
 	"\x04_poiB\x17\n" +
 	"\x15_recommendation_traceB\b\n" +
-	"\x06_image\"\xba\x03\n" +
+	"\x06_image\"\xf9\x03\n" +
 	"\aTripDay\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12&\n" +
 	"\n" +
@@ -3999,7 +4082,9 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\bcity_lat\x18\a \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x02R\acityLat\x88\x01\x01\x127\n" +
 	"\bcity_lon\x18\b \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\x03R\acityLon\x88\x01\x01\x12\x1d\n" +
 	"\n" +
-	"travel_day\x18\t \x01(\bR\ttravelDayB\a\n" +
+	"travel_day\x18\t \x01(\bR\ttravelDay\x12=\n" +
+	"\fcompleted_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAtB\a\n" +
 	"\x05_dateB\n" +
 	"\n" +
 	"\b_city_idB\v\n" +
@@ -4327,7 +4412,12 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\x15TRIP_PACE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11TRIP_PACE_RELAXED\x10\x01\x12\x16\n" +
 	"\x12TRIP_PACE_MODERATE\x10\x02\x12\x14\n" +
-	"\x10TRIP_PACE_PACKED\x10\x03*\x9a\x01\n" +
+	"\x10TRIP_PACE_PACKED\x10\x03*\x86\x01\n" +
+	"\x0eTripStopStatus\x12 \n" +
+	"\x1cTRIP_STOP_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15TRIP_STOP_STATUS_OPEN\x10\x01\x12\x19\n" +
+	"\x15TRIP_STOP_STATUS_DONE\x10\x02\x12\x1c\n" +
+	"\x18TRIP_STOP_STATUS_SKIPPED\x10\x03*\x9a\x01\n" +
 	"\vFlightCabin\x12\x1c\n" +
 	"\x18FLIGHT_CABIN_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14FLIGHT_CABIN_ECONOMY\x10\x01\x12 \n" +
@@ -4398,185 +4488,189 @@ func file_loci_trip_trip_proto_rawDescGZIP() []byte {
 	return file_loci_trip_trip_proto_rawDescData
 }
 
-var file_loci_trip_trip_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_loci_trip_trip_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_loci_trip_trip_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_loci_trip_trip_proto_goTypes = []any{
 	(TripVisibility)(0),                        // 0: loci.trip.TripVisibility
 	(TripPace)(0),                              // 1: loci.trip.TripPace
-	(FlightCabin)(0),                           // 2: loci.trip.FlightCabin
-	(PackingCategory)(0),                       // 3: loci.trip.PackingCategory
-	(ChecklistItemKind)(0),                     // 4: loci.trip.ChecklistItemKind
-	(ExportFormat)(0),                          // 5: loci.trip.ExportFormat
-	(*TripConstraint)(nil),                     // 6: loci.trip.TripConstraint
-	(*TripStop)(nil),                           // 7: loci.trip.TripStop
-	(*TripDay)(nil),                            // 8: loci.trip.TripDay
-	(*TripLeg)(nil),                            // 9: loci.trip.TripLeg
-	(*TripCity)(nil),                           // 10: loci.trip.TripCity
-	(*TripStay)(nil),                           // 11: loci.trip.TripStay
-	(*FlightPlace)(nil),                        // 12: loci.trip.FlightPlace
-	(*FlightLink)(nil),                         // 13: loci.trip.FlightLink
-	(*TripFlight)(nil),                         // 14: loci.trip.TripFlight
-	(*TripDraft)(nil),                          // 15: loci.trip.TripDraft
-	(*TripSnapshot)(nil),                       // 16: loci.trip.TripSnapshot
-	(*PackingSuggestion)(nil),                  // 17: loci.trip.PackingSuggestion
-	(*SuggestPackingRequest)(nil),              // 18: loci.trip.SuggestPackingRequest
-	(*SuggestPackingResponse)(nil),             // 19: loci.trip.SuggestPackingResponse
-	(*ChecklistItem)(nil),                      // 20: loci.trip.ChecklistItem
-	(*GetTripChecklistRequest)(nil),            // 21: loci.trip.GetTripChecklistRequest
-	(*GetTripChecklistResponse)(nil),           // 22: loci.trip.GetTripChecklistResponse
-	(*UpsertChecklistItemRequest)(nil),         // 23: loci.trip.UpsertChecklistItemRequest
-	(*DeleteChecklistItemRequest)(nil),         // 24: loci.trip.DeleteChecklistItemRequest
-	(*DeleteChecklistItemResponse)(nil),        // 25: loci.trip.DeleteChecklistItemResponse
-	(*DismissPackingSuggestionRequest)(nil),    // 26: loci.trip.DismissPackingSuggestionRequest
-	(*DismissPackingSuggestionResponse)(nil),   // 27: loci.trip.DismissPackingSuggestionResponse
-	(*SaveTripRequest)(nil),                    // 28: loci.trip.SaveTripRequest
-	(*GetTripRequest)(nil),                     // 29: loci.trip.GetTripRequest
-	(*ListTripsRequest)(nil),                   // 30: loci.trip.ListTripsRequest
-	(*ListTripsResponse)(nil),                  // 31: loci.trip.ListTripsResponse
-	(*ShareTripRequest)(nil),                   // 32: loci.trip.ShareTripRequest
-	(*SetTripVisibilityRequest)(nil),           // 33: loci.trip.SetTripVisibilityRequest
-	(*SetTripVisibilityResponse)(nil),          // 34: loci.trip.SetTripVisibilityResponse
-	(*GetSharedTripRequest)(nil),               // 35: loci.trip.GetSharedTripRequest
-	(*GetFriendTripRequest)(nil),               // 36: loci.trip.GetFriendTripRequest
-	(*ListFriendTripsRequest)(nil),             // 37: loci.trip.ListFriendTripsRequest
-	(*ListUserTripsRequest)(nil),               // 38: loci.trip.ListUserTripsRequest
-	(*CopyTripRequest)(nil),                    // 39: loci.trip.CopyTripRequest
-	(*CopyTripResponse)(nil),                   // 40: loci.trip.CopyTripResponse
-	(*ShareTripResponse)(nil),                  // 41: loci.trip.ShareTripResponse
-	(*ReorderStopsRequest)(nil),                // 42: loci.trip.ReorderStopsRequest
-	(*RenameStopRequest)(nil),                  // 43: loci.trip.RenameStopRequest
-	(*EditStopDurationRequest)(nil),            // 44: loci.trip.EditStopDurationRequest
-	(*SetConstraintRequest)(nil),               // 45: loci.trip.SetConstraintRequest
-	(*SetTripDatesRequest)(nil),                // 46: loci.trip.SetTripDatesRequest
-	(*SetStayRequest)(nil),                     // 47: loci.trip.SetStayRequest
-	(*ClearStayRequest)(nil),                   // 48: loci.trip.ClearStayRequest
-	(*AddFlightRequest)(nil),                   // 49: loci.trip.AddFlightRequest
-	(*RemoveFlightRequest)(nil),                // 50: loci.trip.RemoveFlightRequest
-	(*BuildFlightLinksRequest)(nil),            // 51: loci.trip.BuildFlightLinksRequest
-	(*BuildFlightLinksResponse)(nil),           // 52: loci.trip.BuildFlightLinksResponse
-	(*AddStopRequest)(nil),                     // 53: loci.trip.AddStopRequest
-	(*RemoveStopRequest)(nil),                  // 54: loci.trip.RemoveStopRequest
-	(*ReplaceStopRequest)(nil),                 // 55: loci.trip.ReplaceStopRequest
-	(*ExportTripRequest)(nil),                  // 56: loci.trip.ExportTripRequest
-	(*ExportTripResponse)(nil),                 // 57: loci.trip.ExportTripResponse
-	(*poi.POIDetailedInfo)(nil),                // 58: loci.poi.POIDetailedInfo
-	(*recommendation.RecommendationTrace)(nil), // 59: loci.recommendation.RecommendationTrace
-	(*poi.POIImage)(nil),                       // 60: loci.poi.POIImage
-	(*timestamppb.Timestamp)(nil),              // 61: google.protobuf.Timestamp
-	(*social.PublicUser)(nil),                  // 62: loci.social.PublicUser
-	(*common.PaginationRequest)(nil),           // 63: loci.common.PaginationRequest
-	(*common.PaginationMetadata)(nil),          // 64: loci.common.PaginationMetadata
+	(TripStopStatus)(0),                        // 2: loci.trip.TripStopStatus
+	(FlightCabin)(0),                           // 3: loci.trip.FlightCabin
+	(PackingCategory)(0),                       // 4: loci.trip.PackingCategory
+	(ChecklistItemKind)(0),                     // 5: loci.trip.ChecklistItemKind
+	(ExportFormat)(0),                          // 6: loci.trip.ExportFormat
+	(*TripConstraint)(nil),                     // 7: loci.trip.TripConstraint
+	(*TripStop)(nil),                           // 8: loci.trip.TripStop
+	(*TripDay)(nil),                            // 9: loci.trip.TripDay
+	(*TripLeg)(nil),                            // 10: loci.trip.TripLeg
+	(*TripCity)(nil),                           // 11: loci.trip.TripCity
+	(*TripStay)(nil),                           // 12: loci.trip.TripStay
+	(*FlightPlace)(nil),                        // 13: loci.trip.FlightPlace
+	(*FlightLink)(nil),                         // 14: loci.trip.FlightLink
+	(*TripFlight)(nil),                         // 15: loci.trip.TripFlight
+	(*TripDraft)(nil),                          // 16: loci.trip.TripDraft
+	(*TripSnapshot)(nil),                       // 17: loci.trip.TripSnapshot
+	(*PackingSuggestion)(nil),                  // 18: loci.trip.PackingSuggestion
+	(*SuggestPackingRequest)(nil),              // 19: loci.trip.SuggestPackingRequest
+	(*SuggestPackingResponse)(nil),             // 20: loci.trip.SuggestPackingResponse
+	(*ChecklistItem)(nil),                      // 21: loci.trip.ChecklistItem
+	(*GetTripChecklistRequest)(nil),            // 22: loci.trip.GetTripChecklistRequest
+	(*GetTripChecklistResponse)(nil),           // 23: loci.trip.GetTripChecklistResponse
+	(*UpsertChecklistItemRequest)(nil),         // 24: loci.trip.UpsertChecklistItemRequest
+	(*DeleteChecklistItemRequest)(nil),         // 25: loci.trip.DeleteChecklistItemRequest
+	(*DeleteChecklistItemResponse)(nil),        // 26: loci.trip.DeleteChecklistItemResponse
+	(*DismissPackingSuggestionRequest)(nil),    // 27: loci.trip.DismissPackingSuggestionRequest
+	(*DismissPackingSuggestionResponse)(nil),   // 28: loci.trip.DismissPackingSuggestionResponse
+	(*SaveTripRequest)(nil),                    // 29: loci.trip.SaveTripRequest
+	(*GetTripRequest)(nil),                     // 30: loci.trip.GetTripRequest
+	(*ListTripsRequest)(nil),                   // 31: loci.trip.ListTripsRequest
+	(*ListTripsResponse)(nil),                  // 32: loci.trip.ListTripsResponse
+	(*ShareTripRequest)(nil),                   // 33: loci.trip.ShareTripRequest
+	(*SetTripVisibilityRequest)(nil),           // 34: loci.trip.SetTripVisibilityRequest
+	(*SetTripVisibilityResponse)(nil),          // 35: loci.trip.SetTripVisibilityResponse
+	(*GetSharedTripRequest)(nil),               // 36: loci.trip.GetSharedTripRequest
+	(*GetFriendTripRequest)(nil),               // 37: loci.trip.GetFriendTripRequest
+	(*ListFriendTripsRequest)(nil),             // 38: loci.trip.ListFriendTripsRequest
+	(*ListUserTripsRequest)(nil),               // 39: loci.trip.ListUserTripsRequest
+	(*CopyTripRequest)(nil),                    // 40: loci.trip.CopyTripRequest
+	(*CopyTripResponse)(nil),                   // 41: loci.trip.CopyTripResponse
+	(*ShareTripResponse)(nil),                  // 42: loci.trip.ShareTripResponse
+	(*ReorderStopsRequest)(nil),                // 43: loci.trip.ReorderStopsRequest
+	(*RenameStopRequest)(nil),                  // 44: loci.trip.RenameStopRequest
+	(*EditStopDurationRequest)(nil),            // 45: loci.trip.EditStopDurationRequest
+	(*SetConstraintRequest)(nil),               // 46: loci.trip.SetConstraintRequest
+	(*SetTripDatesRequest)(nil),                // 47: loci.trip.SetTripDatesRequest
+	(*SetStayRequest)(nil),                     // 48: loci.trip.SetStayRequest
+	(*ClearStayRequest)(nil),                   // 49: loci.trip.ClearStayRequest
+	(*AddFlightRequest)(nil),                   // 50: loci.trip.AddFlightRequest
+	(*RemoveFlightRequest)(nil),                // 51: loci.trip.RemoveFlightRequest
+	(*BuildFlightLinksRequest)(nil),            // 52: loci.trip.BuildFlightLinksRequest
+	(*BuildFlightLinksResponse)(nil),           // 53: loci.trip.BuildFlightLinksResponse
+	(*AddStopRequest)(nil),                     // 54: loci.trip.AddStopRequest
+	(*RemoveStopRequest)(nil),                  // 55: loci.trip.RemoveStopRequest
+	(*ReplaceStopRequest)(nil),                 // 56: loci.trip.ReplaceStopRequest
+	(*ExportTripRequest)(nil),                  // 57: loci.trip.ExportTripRequest
+	(*ExportTripResponse)(nil),                 // 58: loci.trip.ExportTripResponse
+	(*poi.POIDetailedInfo)(nil),                // 59: loci.poi.POIDetailedInfo
+	(*recommendation.RecommendationTrace)(nil), // 60: loci.recommendation.RecommendationTrace
+	(*poi.POIImage)(nil),                       // 61: loci.poi.POIImage
+	(*timestamppb.Timestamp)(nil),              // 62: google.protobuf.Timestamp
+	(*social.PublicUser)(nil),                  // 63: loci.social.PublicUser
+	(*common.PaginationRequest)(nil),           // 64: loci.common.PaginationRequest
+	(*common.PaginationMetadata)(nil),          // 65: loci.common.PaginationMetadata
 }
 var file_loci_trip_trip_proto_depIdxs = []int32{
 	1,  // 0: loci.trip.TripConstraint.pace:type_name -> loci.trip.TripPace
-	58, // 1: loci.trip.TripStop.poi:type_name -> loci.poi.POIDetailedInfo
-	59, // 2: loci.trip.TripStop.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	60, // 3: loci.trip.TripStop.image:type_name -> loci.poi.POIImage
-	61, // 4: loci.trip.TripDay.date:type_name -> google.protobuf.Timestamp
-	7,  // 5: loci.trip.TripDay.stops:type_name -> loci.trip.TripStop
-	12, // 6: loci.trip.TripFlight.origin:type_name -> loci.trip.FlightPlace
-	12, // 7: loci.trip.TripFlight.destination:type_name -> loci.trip.FlightPlace
-	2,  // 8: loci.trip.TripFlight.cabin:type_name -> loci.trip.FlightCabin
-	13, // 9: loci.trip.TripFlight.links:type_name -> loci.trip.FlightLink
-	6,  // 10: loci.trip.TripDraft.constraints:type_name -> loci.trip.TripConstraint
-	8,  // 11: loci.trip.TripDraft.days:type_name -> loci.trip.TripDay
-	9,  // 12: loci.trip.TripDraft.legs:type_name -> loci.trip.TripLeg
-	10, // 13: loci.trip.TripDraft.cities:type_name -> loci.trip.TripCity
-	61, // 14: loci.trip.TripDraft.created_at:type_name -> google.protobuf.Timestamp
-	61, // 15: loci.trip.TripDraft.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 16: loci.trip.TripDraft.visibility:type_name -> loci.trip.TripVisibility
-	62, // 17: loci.trip.TripDraft.owner:type_name -> loci.social.PublicUser
-	11, // 18: loci.trip.TripDraft.stays:type_name -> loci.trip.TripStay
-	14, // 19: loci.trip.TripDraft.flights:type_name -> loci.trip.TripFlight
-	15, // 20: loci.trip.TripSnapshot.trip:type_name -> loci.trip.TripDraft
-	61, // 21: loci.trip.TripSnapshot.created_at:type_name -> google.protobuf.Timestamp
-	3,  // 22: loci.trip.PackingSuggestion.category:type_name -> loci.trip.PackingCategory
-	17, // 23: loci.trip.SuggestPackingResponse.suggestions:type_name -> loci.trip.PackingSuggestion
-	4,  // 24: loci.trip.ChecklistItem.kind:type_name -> loci.trip.ChecklistItemKind
-	61, // 25: loci.trip.ChecklistItem.updated_at:type_name -> google.protobuf.Timestamp
-	20, // 26: loci.trip.GetTripChecklistResponse.items:type_name -> loci.trip.ChecklistItem
-	20, // 27: loci.trip.UpsertChecklistItemRequest.item:type_name -> loci.trip.ChecklistItem
-	15, // 28: loci.trip.SaveTripRequest.trip:type_name -> loci.trip.TripDraft
-	63, // 29: loci.trip.ListTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	15, // 30: loci.trip.ListTripsResponse.trips:type_name -> loci.trip.TripDraft
-	64, // 31: loci.trip.ListTripsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	0,  // 32: loci.trip.SetTripVisibilityRequest.visibility:type_name -> loci.trip.TripVisibility
-	0,  // 33: loci.trip.SetTripVisibilityResponse.visibility:type_name -> loci.trip.TripVisibility
-	63, // 34: loci.trip.ListFriendTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	63, // 35: loci.trip.ListUserTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	6,  // 36: loci.trip.SetConstraintRequest.constraints:type_name -> loci.trip.TripConstraint
-	11, // 37: loci.trip.SetStayRequest.stay:type_name -> loci.trip.TripStay
-	14, // 38: loci.trip.AddFlightRequest.flight:type_name -> loci.trip.TripFlight
-	12, // 39: loci.trip.BuildFlightLinksRequest.origin:type_name -> loci.trip.FlightPlace
-	12, // 40: loci.trip.BuildFlightLinksRequest.destination:type_name -> loci.trip.FlightPlace
-	2,  // 41: loci.trip.BuildFlightLinksRequest.cabin:type_name -> loci.trip.FlightCabin
-	13, // 42: loci.trip.BuildFlightLinksResponse.links:type_name -> loci.trip.FlightLink
-	7,  // 43: loci.trip.AddStopRequest.stop:type_name -> loci.trip.TripStop
-	7,  // 44: loci.trip.ReplaceStopRequest.replacement:type_name -> loci.trip.TripStop
-	5,  // 45: loci.trip.ExportTripRequest.format:type_name -> loci.trip.ExportFormat
-	28, // 46: loci.trip.TripService.SaveTrip:input_type -> loci.trip.SaveTripRequest
-	29, // 47: loci.trip.TripService.GetTrip:input_type -> loci.trip.GetTripRequest
-	30, // 48: loci.trip.TripService.ListTrips:input_type -> loci.trip.ListTripsRequest
-	32, // 49: loci.trip.TripService.ShareTrip:input_type -> loci.trip.ShareTripRequest
-	33, // 50: loci.trip.TripService.SetTripVisibility:input_type -> loci.trip.SetTripVisibilityRequest
-	35, // 51: loci.trip.TripService.GetSharedTrip:input_type -> loci.trip.GetSharedTripRequest
-	36, // 52: loci.trip.TripService.GetFriendTrip:input_type -> loci.trip.GetFriendTripRequest
-	37, // 53: loci.trip.TripService.ListFriendTrips:input_type -> loci.trip.ListFriendTripsRequest
-	38, // 54: loci.trip.TripService.ListUserTrips:input_type -> loci.trip.ListUserTripsRequest
-	39, // 55: loci.trip.TripService.CopyTrip:input_type -> loci.trip.CopyTripRequest
-	42, // 56: loci.trip.TripService.ReorderStops:input_type -> loci.trip.ReorderStopsRequest
-	43, // 57: loci.trip.TripService.RenameStop:input_type -> loci.trip.RenameStopRequest
-	44, // 58: loci.trip.TripService.EditStopDuration:input_type -> loci.trip.EditStopDurationRequest
-	45, // 59: loci.trip.TripService.SetConstraint:input_type -> loci.trip.SetConstraintRequest
-	53, // 60: loci.trip.TripService.AddStop:input_type -> loci.trip.AddStopRequest
-	54, // 61: loci.trip.TripService.RemoveStop:input_type -> loci.trip.RemoveStopRequest
-	55, // 62: loci.trip.TripService.ReplaceStop:input_type -> loci.trip.ReplaceStopRequest
-	46, // 63: loci.trip.TripService.SetTripDates:input_type -> loci.trip.SetTripDatesRequest
-	47, // 64: loci.trip.TripService.SetStay:input_type -> loci.trip.SetStayRequest
-	48, // 65: loci.trip.TripService.ClearStay:input_type -> loci.trip.ClearStayRequest
-	49, // 66: loci.trip.TripService.AddFlight:input_type -> loci.trip.AddFlightRequest
-	50, // 67: loci.trip.TripService.RemoveFlight:input_type -> loci.trip.RemoveFlightRequest
-	51, // 68: loci.trip.TripService.BuildFlightLinks:input_type -> loci.trip.BuildFlightLinksRequest
-	56, // 69: loci.trip.TripService.ExportTrip:input_type -> loci.trip.ExportTripRequest
-	18, // 70: loci.trip.TripService.SuggestPacking:input_type -> loci.trip.SuggestPackingRequest
-	21, // 71: loci.trip.TripService.GetTripChecklist:input_type -> loci.trip.GetTripChecklistRequest
-	23, // 72: loci.trip.TripService.UpsertChecklistItem:input_type -> loci.trip.UpsertChecklistItemRequest
-	24, // 73: loci.trip.TripService.DeleteChecklistItem:input_type -> loci.trip.DeleteChecklistItemRequest
-	26, // 74: loci.trip.TripService.DismissPackingSuggestion:input_type -> loci.trip.DismissPackingSuggestionRequest
-	15, // 75: loci.trip.TripService.SaveTrip:output_type -> loci.trip.TripDraft
-	15, // 76: loci.trip.TripService.GetTrip:output_type -> loci.trip.TripDraft
-	31, // 77: loci.trip.TripService.ListTrips:output_type -> loci.trip.ListTripsResponse
-	41, // 78: loci.trip.TripService.ShareTrip:output_type -> loci.trip.ShareTripResponse
-	34, // 79: loci.trip.TripService.SetTripVisibility:output_type -> loci.trip.SetTripVisibilityResponse
-	15, // 80: loci.trip.TripService.GetSharedTrip:output_type -> loci.trip.TripDraft
-	15, // 81: loci.trip.TripService.GetFriendTrip:output_type -> loci.trip.TripDraft
-	31, // 82: loci.trip.TripService.ListFriendTrips:output_type -> loci.trip.ListTripsResponse
-	31, // 83: loci.trip.TripService.ListUserTrips:output_type -> loci.trip.ListTripsResponse
-	40, // 84: loci.trip.TripService.CopyTrip:output_type -> loci.trip.CopyTripResponse
-	15, // 85: loci.trip.TripService.ReorderStops:output_type -> loci.trip.TripDraft
-	15, // 86: loci.trip.TripService.RenameStop:output_type -> loci.trip.TripDraft
-	15, // 87: loci.trip.TripService.EditStopDuration:output_type -> loci.trip.TripDraft
-	15, // 88: loci.trip.TripService.SetConstraint:output_type -> loci.trip.TripDraft
-	15, // 89: loci.trip.TripService.AddStop:output_type -> loci.trip.TripDraft
-	15, // 90: loci.trip.TripService.RemoveStop:output_type -> loci.trip.TripDraft
-	15, // 91: loci.trip.TripService.ReplaceStop:output_type -> loci.trip.TripDraft
-	15, // 92: loci.trip.TripService.SetTripDates:output_type -> loci.trip.TripDraft
-	15, // 93: loci.trip.TripService.SetStay:output_type -> loci.trip.TripDraft
-	15, // 94: loci.trip.TripService.ClearStay:output_type -> loci.trip.TripDraft
-	15, // 95: loci.trip.TripService.AddFlight:output_type -> loci.trip.TripDraft
-	15, // 96: loci.trip.TripService.RemoveFlight:output_type -> loci.trip.TripDraft
-	52, // 97: loci.trip.TripService.BuildFlightLinks:output_type -> loci.trip.BuildFlightLinksResponse
-	57, // 98: loci.trip.TripService.ExportTrip:output_type -> loci.trip.ExportTripResponse
-	19, // 99: loci.trip.TripService.SuggestPacking:output_type -> loci.trip.SuggestPackingResponse
-	22, // 100: loci.trip.TripService.GetTripChecklist:output_type -> loci.trip.GetTripChecklistResponse
-	20, // 101: loci.trip.TripService.UpsertChecklistItem:output_type -> loci.trip.ChecklistItem
-	25, // 102: loci.trip.TripService.DeleteChecklistItem:output_type -> loci.trip.DeleteChecklistItemResponse
-	27, // 103: loci.trip.TripService.DismissPackingSuggestion:output_type -> loci.trip.DismissPackingSuggestionResponse
-	75, // [75:104] is the sub-list for method output_type
-	46, // [46:75] is the sub-list for method input_type
-	46, // [46:46] is the sub-list for extension type_name
-	46, // [46:46] is the sub-list for extension extendee
-	0,  // [0:46] is the sub-list for field type_name
+	59, // 1: loci.trip.TripStop.poi:type_name -> loci.poi.POIDetailedInfo
+	60, // 2: loci.trip.TripStop.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	61, // 3: loci.trip.TripStop.image:type_name -> loci.poi.POIImage
+	2,  // 4: loci.trip.TripStop.status:type_name -> loci.trip.TripStopStatus
+	62, // 5: loci.trip.TripStop.status_at:type_name -> google.protobuf.Timestamp
+	62, // 6: loci.trip.TripDay.date:type_name -> google.protobuf.Timestamp
+	8,  // 7: loci.trip.TripDay.stops:type_name -> loci.trip.TripStop
+	62, // 8: loci.trip.TripDay.completed_at:type_name -> google.protobuf.Timestamp
+	13, // 9: loci.trip.TripFlight.origin:type_name -> loci.trip.FlightPlace
+	13, // 10: loci.trip.TripFlight.destination:type_name -> loci.trip.FlightPlace
+	3,  // 11: loci.trip.TripFlight.cabin:type_name -> loci.trip.FlightCabin
+	14, // 12: loci.trip.TripFlight.links:type_name -> loci.trip.FlightLink
+	7,  // 13: loci.trip.TripDraft.constraints:type_name -> loci.trip.TripConstraint
+	9,  // 14: loci.trip.TripDraft.days:type_name -> loci.trip.TripDay
+	10, // 15: loci.trip.TripDraft.legs:type_name -> loci.trip.TripLeg
+	11, // 16: loci.trip.TripDraft.cities:type_name -> loci.trip.TripCity
+	62, // 17: loci.trip.TripDraft.created_at:type_name -> google.protobuf.Timestamp
+	62, // 18: loci.trip.TripDraft.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 19: loci.trip.TripDraft.visibility:type_name -> loci.trip.TripVisibility
+	63, // 20: loci.trip.TripDraft.owner:type_name -> loci.social.PublicUser
+	12, // 21: loci.trip.TripDraft.stays:type_name -> loci.trip.TripStay
+	15, // 22: loci.trip.TripDraft.flights:type_name -> loci.trip.TripFlight
+	16, // 23: loci.trip.TripSnapshot.trip:type_name -> loci.trip.TripDraft
+	62, // 24: loci.trip.TripSnapshot.created_at:type_name -> google.protobuf.Timestamp
+	4,  // 25: loci.trip.PackingSuggestion.category:type_name -> loci.trip.PackingCategory
+	18, // 26: loci.trip.SuggestPackingResponse.suggestions:type_name -> loci.trip.PackingSuggestion
+	5,  // 27: loci.trip.ChecklistItem.kind:type_name -> loci.trip.ChecklistItemKind
+	62, // 28: loci.trip.ChecklistItem.updated_at:type_name -> google.protobuf.Timestamp
+	21, // 29: loci.trip.GetTripChecklistResponse.items:type_name -> loci.trip.ChecklistItem
+	21, // 30: loci.trip.UpsertChecklistItemRequest.item:type_name -> loci.trip.ChecklistItem
+	16, // 31: loci.trip.SaveTripRequest.trip:type_name -> loci.trip.TripDraft
+	64, // 32: loci.trip.ListTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	16, // 33: loci.trip.ListTripsResponse.trips:type_name -> loci.trip.TripDraft
+	65, // 34: loci.trip.ListTripsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	0,  // 35: loci.trip.SetTripVisibilityRequest.visibility:type_name -> loci.trip.TripVisibility
+	0,  // 36: loci.trip.SetTripVisibilityResponse.visibility:type_name -> loci.trip.TripVisibility
+	64, // 37: loci.trip.ListFriendTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	64, // 38: loci.trip.ListUserTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	7,  // 39: loci.trip.SetConstraintRequest.constraints:type_name -> loci.trip.TripConstraint
+	12, // 40: loci.trip.SetStayRequest.stay:type_name -> loci.trip.TripStay
+	15, // 41: loci.trip.AddFlightRequest.flight:type_name -> loci.trip.TripFlight
+	13, // 42: loci.trip.BuildFlightLinksRequest.origin:type_name -> loci.trip.FlightPlace
+	13, // 43: loci.trip.BuildFlightLinksRequest.destination:type_name -> loci.trip.FlightPlace
+	3,  // 44: loci.trip.BuildFlightLinksRequest.cabin:type_name -> loci.trip.FlightCabin
+	14, // 45: loci.trip.BuildFlightLinksResponse.links:type_name -> loci.trip.FlightLink
+	8,  // 46: loci.trip.AddStopRequest.stop:type_name -> loci.trip.TripStop
+	8,  // 47: loci.trip.ReplaceStopRequest.replacement:type_name -> loci.trip.TripStop
+	6,  // 48: loci.trip.ExportTripRequest.format:type_name -> loci.trip.ExportFormat
+	29, // 49: loci.trip.TripService.SaveTrip:input_type -> loci.trip.SaveTripRequest
+	30, // 50: loci.trip.TripService.GetTrip:input_type -> loci.trip.GetTripRequest
+	31, // 51: loci.trip.TripService.ListTrips:input_type -> loci.trip.ListTripsRequest
+	33, // 52: loci.trip.TripService.ShareTrip:input_type -> loci.trip.ShareTripRequest
+	34, // 53: loci.trip.TripService.SetTripVisibility:input_type -> loci.trip.SetTripVisibilityRequest
+	36, // 54: loci.trip.TripService.GetSharedTrip:input_type -> loci.trip.GetSharedTripRequest
+	37, // 55: loci.trip.TripService.GetFriendTrip:input_type -> loci.trip.GetFriendTripRequest
+	38, // 56: loci.trip.TripService.ListFriendTrips:input_type -> loci.trip.ListFriendTripsRequest
+	39, // 57: loci.trip.TripService.ListUserTrips:input_type -> loci.trip.ListUserTripsRequest
+	40, // 58: loci.trip.TripService.CopyTrip:input_type -> loci.trip.CopyTripRequest
+	43, // 59: loci.trip.TripService.ReorderStops:input_type -> loci.trip.ReorderStopsRequest
+	44, // 60: loci.trip.TripService.RenameStop:input_type -> loci.trip.RenameStopRequest
+	45, // 61: loci.trip.TripService.EditStopDuration:input_type -> loci.trip.EditStopDurationRequest
+	46, // 62: loci.trip.TripService.SetConstraint:input_type -> loci.trip.SetConstraintRequest
+	54, // 63: loci.trip.TripService.AddStop:input_type -> loci.trip.AddStopRequest
+	55, // 64: loci.trip.TripService.RemoveStop:input_type -> loci.trip.RemoveStopRequest
+	56, // 65: loci.trip.TripService.ReplaceStop:input_type -> loci.trip.ReplaceStopRequest
+	47, // 66: loci.trip.TripService.SetTripDates:input_type -> loci.trip.SetTripDatesRequest
+	48, // 67: loci.trip.TripService.SetStay:input_type -> loci.trip.SetStayRequest
+	49, // 68: loci.trip.TripService.ClearStay:input_type -> loci.trip.ClearStayRequest
+	50, // 69: loci.trip.TripService.AddFlight:input_type -> loci.trip.AddFlightRequest
+	51, // 70: loci.trip.TripService.RemoveFlight:input_type -> loci.trip.RemoveFlightRequest
+	52, // 71: loci.trip.TripService.BuildFlightLinks:input_type -> loci.trip.BuildFlightLinksRequest
+	57, // 72: loci.trip.TripService.ExportTrip:input_type -> loci.trip.ExportTripRequest
+	19, // 73: loci.trip.TripService.SuggestPacking:input_type -> loci.trip.SuggestPackingRequest
+	22, // 74: loci.trip.TripService.GetTripChecklist:input_type -> loci.trip.GetTripChecklistRequest
+	24, // 75: loci.trip.TripService.UpsertChecklistItem:input_type -> loci.trip.UpsertChecklistItemRequest
+	25, // 76: loci.trip.TripService.DeleteChecklistItem:input_type -> loci.trip.DeleteChecklistItemRequest
+	27, // 77: loci.trip.TripService.DismissPackingSuggestion:input_type -> loci.trip.DismissPackingSuggestionRequest
+	16, // 78: loci.trip.TripService.SaveTrip:output_type -> loci.trip.TripDraft
+	16, // 79: loci.trip.TripService.GetTrip:output_type -> loci.trip.TripDraft
+	32, // 80: loci.trip.TripService.ListTrips:output_type -> loci.trip.ListTripsResponse
+	42, // 81: loci.trip.TripService.ShareTrip:output_type -> loci.trip.ShareTripResponse
+	35, // 82: loci.trip.TripService.SetTripVisibility:output_type -> loci.trip.SetTripVisibilityResponse
+	16, // 83: loci.trip.TripService.GetSharedTrip:output_type -> loci.trip.TripDraft
+	16, // 84: loci.trip.TripService.GetFriendTrip:output_type -> loci.trip.TripDraft
+	32, // 85: loci.trip.TripService.ListFriendTrips:output_type -> loci.trip.ListTripsResponse
+	32, // 86: loci.trip.TripService.ListUserTrips:output_type -> loci.trip.ListTripsResponse
+	41, // 87: loci.trip.TripService.CopyTrip:output_type -> loci.trip.CopyTripResponse
+	16, // 88: loci.trip.TripService.ReorderStops:output_type -> loci.trip.TripDraft
+	16, // 89: loci.trip.TripService.RenameStop:output_type -> loci.trip.TripDraft
+	16, // 90: loci.trip.TripService.EditStopDuration:output_type -> loci.trip.TripDraft
+	16, // 91: loci.trip.TripService.SetConstraint:output_type -> loci.trip.TripDraft
+	16, // 92: loci.trip.TripService.AddStop:output_type -> loci.trip.TripDraft
+	16, // 93: loci.trip.TripService.RemoveStop:output_type -> loci.trip.TripDraft
+	16, // 94: loci.trip.TripService.ReplaceStop:output_type -> loci.trip.TripDraft
+	16, // 95: loci.trip.TripService.SetTripDates:output_type -> loci.trip.TripDraft
+	16, // 96: loci.trip.TripService.SetStay:output_type -> loci.trip.TripDraft
+	16, // 97: loci.trip.TripService.ClearStay:output_type -> loci.trip.TripDraft
+	16, // 98: loci.trip.TripService.AddFlight:output_type -> loci.trip.TripDraft
+	16, // 99: loci.trip.TripService.RemoveFlight:output_type -> loci.trip.TripDraft
+	53, // 100: loci.trip.TripService.BuildFlightLinks:output_type -> loci.trip.BuildFlightLinksResponse
+	58, // 101: loci.trip.TripService.ExportTrip:output_type -> loci.trip.ExportTripResponse
+	20, // 102: loci.trip.TripService.SuggestPacking:output_type -> loci.trip.SuggestPackingResponse
+	23, // 103: loci.trip.TripService.GetTripChecklist:output_type -> loci.trip.GetTripChecklistResponse
+	21, // 104: loci.trip.TripService.UpsertChecklistItem:output_type -> loci.trip.ChecklistItem
+	26, // 105: loci.trip.TripService.DeleteChecklistItem:output_type -> loci.trip.DeleteChecklistItemResponse
+	28, // 106: loci.trip.TripService.DismissPackingSuggestion:output_type -> loci.trip.DismissPackingSuggestionResponse
+	78, // [78:107] is the sub-list for method output_type
+	49, // [49:78] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_loci_trip_trip_proto_init() }
@@ -4603,7 +4697,7 @@ func file_loci_trip_trip_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_trip_trip_proto_rawDesc), len(file_loci_trip_trip_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      7,
 			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   1,
