@@ -605,9 +605,14 @@ func (r *pgRepository) ClaimPushSlot(ctx context.Context, userID uuid.UUID, kind
 
 func (r *pgRepository) Trip(ctx context.Context, userID, tripID uuid.UUID) (*TripState, error) {
 	t := &TripState{ID: tripID}
+	// Many trips carry only a city name (trips.city_id is optional and has no
+	// foreign key), so the city row is resolved by name when the id is
+	// missing or points nowhere; without it nothing walked there counts on
+	// the city's board.
 	err := r.db.QueryRow(ctx, `
-		SELECT t.title, t.city_id, COALESCE(NULLIF(c.name, ''), t.city_name)
-		FROM trips t LEFT JOIN cities c ON c.id = t.city_id
+		SELECT t.title, c.id, COALESCE(NULLIF(c.name, ''), t.city_name)
+		FROM trips t
+		LEFT JOIN LATERAL (`+cityRowFor("t.city_id", "t.city_name")+`) c ON TRUE
 		WHERE t.id = $1 AND t.user_id = $2`, tripID, userID).Scan(&t.Title, &t.CityID, &t.CityName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -616,9 +621,10 @@ func (r *pgRepository) Trip(ctx context.Context, userID, tripID uuid.UUID) (*Tri
 		return nil, fmt.Errorf("read trip: %w", err)
 	}
 	rows, err := r.db.Query(ctx, `
-		SELECT d.id, d.day_number, d.city_id, COALESCE(d.city_name, ''), d.completed_at,
+		SELECT d.id, d.day_number, dc.id, COALESCE(NULLIF(dc.name, ''), d.city_name, ''), d.completed_at,
 		       s.id, COALESCE(s.poi_id, ''), COALESCE(s.name, ''), COALESCE(m.status, 1::smallint)
 		FROM trip_days d
+		LEFT JOIN LATERAL (`+cityRowFor("d.city_id", "d.city_name")+`) dc ON TRUE
 		LEFT JOIN trip_stops s ON s.day_id = d.id
 		LEFT JOIN trip_stop_marks m ON m.stop_id = s.id
 		WHERE d.trip_id = $1
@@ -708,18 +714,18 @@ func (r *pgRepository) DefaultCity(ctx context.Context, userID uuid.UUID, today 
 		name string
 	)
 	err := r.db.QueryRow(ctx, `
-		SELECT c.id, COALESCE(c.name, '')
+		SELECT x.id, COALESCE(x.name, '')
 		FROM (
-			SELECT t.city_id, 1 AS pri, t.updated_at AS at FROM trips t
-			WHERE t.user_id = $1 AND t.city_id IS NOT NULL AND t.start_date <= $2 AND t.end_date >= $2
+			SELECT c.id, c.name, CASE WHEN t.start_date <= $2 AND t.end_date >= $2 THEN 1 ELSE 2 END AS pri,
+			       t.updated_at AS at
+			FROM trips t
+			JOIN LATERAL (`+cityRowFor("t.city_id", "t.city_name")+`) c ON TRUE
+			WHERE t.user_id = $1
 			UNION ALL
-			SELECT t.city_id, 2, t.updated_at FROM trips t
-			WHERE t.user_id = $1 AND t.city_id IS NOT NULL
-			UNION ALL
-			SELECT li.city_id, 3, li.created_at FROM llm_interactions li
-			WHERE li.user_id = $1 AND li.city_id IS NOT NULL
+			SELECT c.id, c.name, 3, li.created_at
+			FROM llm_interactions li JOIN cities c ON c.id = li.city_id
+			WHERE li.user_id = $1
 		) x
-		JOIN cities c ON c.id = x.city_id
 		ORDER BY x.pri, x.at DESC
 		LIMIT 1`, userID, today).Scan(&id, &name)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -729,6 +735,20 @@ func (r *pgRepository) DefaultCity(ctx context.Context, userID uuid.UUID, today 
 		return nil, "", fmt.Errorf("default city: %w", err)
 	}
 	return &id, name, nil
+}
+
+// cityRowFor is a subquery for the cities row a trip or day belongs to: the
+// row its id names when that row exists, else the oldest row with its name.
+// idCol and nameCol are column references from the caller's query, never
+// input.
+func cityRowFor(idCol, nameCol string) string {
+	return `
+		SELECT c.id, c.name FROM cities c
+		WHERE c.id = ` + idCol + `
+		   OR (NOT EXISTS (SELECT 1 FROM cities c0 WHERE c0.id = ` + idCol + `)
+		       AND lower(c.name) = lower(NULLIF(` + nameCol + `, '')))
+		ORDER BY (c.id = ` + idCol + `) DESC NULLS LAST, c.created_at
+		LIMIT 1`
 }
 
 func (r *pgRepository) CityBoardVisible(ctx context.Context, userID uuid.UUID) (bool, error) {
