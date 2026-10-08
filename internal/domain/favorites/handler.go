@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -26,7 +27,15 @@ type Handler struct {
 	listItems ListItemCounter
 	prefs     preference.Recorder
 	places    PlaceReader
+	field     FieldScorer
 	logger    *slog.Logger
+}
+
+// FieldScorer is the field score (gamification.Service): a first save and a
+// note in the traveller's own words each count once per place.
+type FieldScorer interface {
+	FavoriteSaved(ctx context.Context, userID uuid.UUID, itemID, contentType, name, cityName string) int
+	FavoriteNoted(ctx context.Context, userID uuid.UUID, itemID, contentType, name, cityName, note string) (int, bool)
 }
 
 // PlanChecker is the subset of subscription.Service needed for freemium gates.
@@ -61,6 +70,30 @@ func NewHandler(
 func (h *Handler) WithPlaces(places PlaceReader) *Handler {
 	h.places = places
 	return h
+}
+
+// WithScorer turns on field points for saves and notes.
+func (h *Handler) WithScorer(s FieldScorer) *Handler {
+	h.field = s
+	return h
+}
+
+func favoriteToProto(f *locitypes.FavoriteItem) *favoritesv1.FavoriteItem {
+	return &favoritesv1.FavoriteItem{
+		Id:          f.ID.String(),
+		UserId:      f.UserID.String(),
+		ItemId:      f.ItemID,
+		ItemName:    f.ItemName,
+		ContentType: stringToContentType(f.ContentType),
+		Notes:       f.Notes,
+		Description: f.Description,
+		CityName:    f.CityName,
+		Latitude:    f.Latitude,
+		Longitude:   f.Longitude,
+		Rating:      f.Rating,
+		Category:    f.Category,
+		AddedAt:     timestamppb.New(f.AddedAt),
+	}
 }
 
 // contentTypeToString converts proto enum to string
@@ -154,25 +187,47 @@ func (h *Handler) AddToFavorites(
 		slog.String("item_id", itemID),
 		slog.String("content_type", fav.ContentType))
 
+	if h.field != nil {
+		h.field.FavoriteSaved(ctx, userID, result.ItemID, result.ContentType, result.ItemName, result.CityName)
+		if result.Notes != "" {
+			h.field.FavoriteNoted(ctx, userID, result.ItemID, result.ContentType, result.ItemName, result.CityName, result.Notes)
+		}
+	}
+
 	return connect.NewResponse(&favoritesv1.AddToFavoritesResponse{
-		Success: true,
-		Message: "Added to favorites",
-		Favorite: &favoritesv1.FavoriteItem{
-			Id:          result.ID.String(),
-			UserId:      result.UserID.String(),
-			ItemId:      result.ItemID,
-			ItemName:    result.ItemName,
-			ContentType: stringToContentType(result.ContentType),
-			Notes:       result.Notes,
-			Description: result.Description,
-			CityName:    result.CityName,
-			Latitude:    result.Latitude,
-			Longitude:   result.Longitude,
-			Rating:      result.Rating,
-			Category:    result.Category,
-			AddedAt:     timestamppb.New(result.AddedAt),
-		},
+		Success:  true,
+		Message:  "Added to favorites",
+		Favorite: favoriteToProto(result),
 	}), nil
+}
+
+// UpdateFavoriteNote sets the caller's note on one of their saved items.
+func (h *Handler) UpdateFavoriteNote(
+	ctx context.Context,
+	req *connect.Request[favoritesv1.UpdateFavoriteNoteRequest],
+) (*connect.Response[favoritesv1.UpdateFavoriteNoteResponse], error) {
+	userIDStr, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
+	}
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid session"))
+	}
+	contentType := contentTypeToString(req.Msg.GetContentType())
+	fav, err := h.repo.UpdateNote(ctx, userID, req.Msg.GetItemId(), contentType, strings.TrimSpace(req.Msg.GetNotes()))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to save the note"))
+	}
+	if fav == nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("not in your saved places"))
+	}
+	out := &favoritesv1.UpdateFavoriteNoteResponse{Favorite: favoriteToProto(fav)}
+	if h.field != nil && fav.Notes != "" {
+		points, counts := h.field.FavoriteNoted(ctx, userID, fav.ItemID, fav.ContentType, fav.ItemName, fav.CityName, fav.Notes)
+		out.PointsAwarded, out.NoteCounts = int32(points), counts
+	}
+	return connect.NewResponse(out), nil
 }
 
 // RemoveFromFavorites removes an item from favorites

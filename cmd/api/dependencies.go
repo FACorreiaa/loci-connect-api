@@ -82,6 +82,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
 	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 	"github.com/FACorreiaa/loci-connect-api/pkg/geocode"
+	"github.com/FACorreiaa/loci-connect-api/pkg/pglock"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
@@ -232,6 +233,8 @@ type Dependencies struct {
 	// watchRunner runs due standing tasks; nil when no model could be built
 	// or WATCH_RUNNER_ENABLED=false. watchClient is the model it runs them on.
 	watchRunner *watch.Runner
+	// fieldRunner closes field seasons and pays kept places; nil when off.
+	fieldRunner *gamification.Runner
 	watchClient interface{ Close() error }
 
 	PreferenceRecorder preference.Recorder
@@ -687,6 +690,16 @@ func (d *Dependencies) RunWatches(ctx context.Context) error {
 	return d.watchRunner.Run(ctx)
 }
 
+// RunField runs the field score's background work until ctx is cancelled.
+// Returns nil immediately when it is switched off. Every replica runs the
+// loop; an advisory lock lets one of them work in any tick.
+func (d *Dependencies) RunField(ctx context.Context) error {
+	if d.fieldRunner == nil {
+		return nil
+	}
+	return d.fieldRunner.Run(ctx)
+}
+
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
@@ -921,13 +934,27 @@ func (d *Dependencies) initHandlers() error {
 		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
 		d.SocialHandler = socialdomain.NewHandler(socialSvc, d.Logger)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
-		// Points ride on the friends graph: leaderboards are friends only.
+		// The field score rides on the friends graph for its friends board, and
+		// on the reverse geocoder for neighborhoods.
+		overallRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksOverall, gamification.DefaultOverallThresholds)
+		if err != nil {
+			d.Logger.Warn("FIELD_RANK_THRESHOLDS_OVERALL ignored", slog.Any("error", err))
+		}
+		cityRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksCity, gamification.DefaultCityThresholds)
+		if err != nil {
+			d.Logger.Warn("FIELD_RANK_THRESHOLDS_CITY ignored", slog.Any("error", err))
+		}
 		d.gamification = gamification.NewService(
 			gamification.NewRepository(d.DB.Pool), socialSvc, progressNotifier, d.Logger,
 			d.Config.Social.GamificationEnabled,
-		)
+		).WithRanks(overallRanks, cityRanks).
+			WithNeighborhoods(localcontext.NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), localcontext.NewSignalsHTTPClient(), nil)).
+			WithPlans(d.SubscriptionService)
 		d.GamificationHandler = gamification.NewHandler(d.gamification, d.Logger)
-		d.ChatHandler = d.ChatHandler.WithSearchScorer(d.gamification)
+		if d.Config.Social.GamificationEnabled && d.Config.Social.FieldRunnerEnabled {
+			d.fieldRunner = gamification.NewRunner(d.gamification, pglock.New(d.DB.Pool, gamification.RunnerLockKey), d.Logger)
+		}
+		d.FavoritesHandler = d.FavoritesHandler.WithScorer(d.gamification)
 		// Dates, stays and flights. The service is kept for the chat agent,
 		// which edits a trip's plan through the same rules as the editor.
 		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), flights.DeepLinks{})

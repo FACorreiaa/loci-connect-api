@@ -2,7 +2,6 @@ package watch
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/db"
+	"github.com/FACorreiaa/loci-connect-api/pkg/pglock"
 )
 
 const watchColumns = `id, user_id, session_id, title, schedule_human, interval_minutes,
@@ -140,49 +140,16 @@ func (r *PostgresRepository) Disable(ctx context.Context, id uuid.UUID) error {
 }
 
 // ErrLockHeld means another replica is running the watch loop this minute.
-var ErrLockHeld = errors.New("watch: runner lock held elsewhere")
+var ErrLockHeld = pglock.ErrHeld
 
 // runnerLockKey is the pg advisory lock the runner takes. Any constant works
 // as long as nothing else in the database uses it; this one spells
 // "lociwtch" in ASCII.
 const runnerLockKey int64 = 0x6c6f636977746368
 
-// PgLocker takes a session-level advisory lock on one pooled connection and
-// holds that connection until unlocked, so the lock and its release happen
-// on the same backend.
-type PgLocker struct {
-	pool *pgxpool.Pool
-	key  int64
-}
+// PgLocker is the watch runner's advisory lock.
+type PgLocker = pglock.Locker
 
 func NewPgLocker(pool *pgxpool.Pool) *PgLocker {
-	return &PgLocker{pool: pool, key: runnerLockKey}
-}
-
-// TryLock returns ErrLockHeld without waiting when another session has it.
-func (l *PgLocker) TryLock(ctx context.Context) (func(), error) {
-	conn, err := l.pool.Acquire(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("acquire lock connection: %w", err)
-	}
-	var got bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock($1)`, l.key).Scan(&got); err != nil {
-		conn.Release()
-		return nil, fmt.Errorf("try advisory lock: %w", err)
-	}
-	if !got {
-		conn.Release()
-		return nil, ErrLockHeld
-	}
-	return func() {
-		// Unlock on a fresh context: the tick's may already be cancelled
-		// (shutdown), and a lock left on a pooled connection would outlive it.
-		unlockCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if _, err := conn.Exec(unlockCtx, `SELECT pg_advisory_unlock($1)`, l.key); err != nil {
-			// Closing the connection ends the session, which releases it.
-			_ = conn.Conn().Close(unlockCtx)
-		}
-		conn.Release()
-	}, nil
+	return pglock.New(pool, runnerLockKey)
 }

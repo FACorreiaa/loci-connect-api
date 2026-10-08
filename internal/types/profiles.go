@@ -379,8 +379,11 @@ type NotificationSettings struct {
 	// StreakReminders is read by the device, which sends the reminder itself.
 	StreakReminders bool `json:"streak_reminders"`
 	// ProgressUpdates gates pushes for badges earned and friends passing you.
-	ProgressUpdates bool      `json:"progress_updates"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ProgressUpdates bool `json:"progress_updates"`
+	// CityBoardVisible shows the account's display name and weekly field
+	// score on city boards, to people who are not friends.
+	CityBoardVisible bool      `json:"city_board_visible"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 // UpdateNotificationSettingsParams is a partial update: a nil field means the
@@ -394,4 +397,5 @@ type UpdateNotificationSettingsParams struct {
 	LeaderboardVisible *bool `json:"leaderboard_visible,omitempty"`
 	StreakReminders    *bool `json:"streak_reminders,omitempty"`
 	ProgressUpdates    *bool `json:"progress_updates,omitempty"`
+	CityBoardVisible   *bool `json:"city_board_visible,omitempty"`
 }

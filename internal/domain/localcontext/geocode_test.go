@@ -135,3 +135,26 @@ func TestGeocoder_PlaceFallsBackToLocality(t *testing.T) {
 		t.Errorf("place = %+v err=%v", p, err)
 	}
 }
+
+// Shapes taken from live responses (2026-10-08): the locality is the
+// neighborhood in Lisbon and Rome, where the finest admin area is too coarse
+// (Rome's level 10 is a whole municipio).
+func TestGeocoder_Neighborhood(t *testing.T) {
+	cases := map[string]struct{ body, want string }{
+		"lisbon parish": {`{"city":"Lisbon","locality":"Santa Maria Maior","localityInfo":{"administrative":[
+			{"name":"Portugal","adminLevel":2},{"name":"Lisbon","adminLevel":7},{"name":"Santa Maria Maior","adminLevel":8}]}}`, "Santa Maria Maior"},
+		"rome rione": {`{"city":"Rome","locality":"Pigna","localityInfo":{"administrative":[
+			{"name":"Rome","adminLevel":6},{"name":"Municipio Roma I","adminLevel":10}]}}`, "Pigna"},
+		"locality is the city": {`{"city":"Faro","locality":"Faro","localityInfo":{"administrative":[
+			{"name":"Faro","adminLevel":7},{"name":"Sé","adminLevel":8}]}}`, "Sé"},
+		"nothing finer": {`{"city":"Évora","locality":"Évora","localityInfo":{"administrative":[
+			{"name":"Évora","adminLevel":7}]}}`, ""},
+	}
+	for name, c := range cases {
+		g, _ := geocoder(t, c.body, http.StatusOK)
+		got, err := g.Neighborhood(context.Background(), 38.71, -9.13)
+		if err != nil || got != c.want {
+			t.Errorf("%s: got %q, %v; want %q", name, got, err, c.want)
+		}
+	}
+}

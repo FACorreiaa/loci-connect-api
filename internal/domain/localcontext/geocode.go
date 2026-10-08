@@ -3,6 +3,7 @@ package localcontext
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 
@@ -50,6 +51,14 @@ type bigDataCloudResponse struct {
 	City                 string `json:"city"`
 	Locality             string `json:"locality"`
 	PrincipalSubdivision string `json:"principalSubdivision"`
+	LocalityInfo         struct {
+		Administrative []bigDataCloudArea `json:"administrative"`
+	} `json:"localityInfo"`
+}
+
+type bigDataCloudArea struct {
+	Name       string `json:"name"`
+	AdminLevel int    `json:"adminLevel"`
 }
 
 // sourcePlace namespaces town-level cache entries apart from the country ones:
@@ -125,4 +134,40 @@ func (g *BigDataCloudGeocoder) CountryCode(ctx context.Context, lat, lon float64
 
 	cacheSet(g.cache, SourceGeocode, key, code, ttlGeocode)
 	return code, nil
+}
+
+// sourceNeighborhood namespaces neighborhood cache entries: same upstream,
+// finer key than Place.
+const sourceNeighborhood = SourceGeocode + "-neighborhood"
+
+// Neighborhood names the neighborhood a coordinate sits in, or "" when the
+// geocoder knows none. It is the locality when that is finer than the city
+// (Lisbon gives "Santa Maria Maior", Rome "Pigna"), else the most local
+// administrative area below the city (OSM admin_level 8 or finer). Keyed at
+// 0.002° (~200 m).
+func (g *BigDataCloudGeocoder) Neighborhood(ctx context.Context, lat, lon float64) (string, error) {
+	key := fmt.Sprintf("%.3f,%.3f", math.Round(lat*500)/500, math.Round(lon*500)/500)
+	if n, ok := cacheGet[string](g.cache, sourceNeighborhood, key); ok {
+		return n, nil
+	}
+	body, err := g.lookup(ctx, lat, lon)
+	if err != nil {
+		return "", err
+	}
+	city := strings.TrimSpace(body.City)
+	name := strings.TrimSpace(body.Locality)
+	if strings.EqualFold(name, city) {
+		name = ""
+	}
+	if name == "" {
+		level := 0
+		for _, a := range body.LocalityInfo.Administrative {
+			n := strings.TrimSpace(a.Name)
+			if a.AdminLevel >= 8 && a.AdminLevel > level && n != "" && !strings.EqualFold(n, city) {
+				name, level = n, a.AdminLevel
+			}
+		}
+	}
+	cacheSet(g.cache, sourceNeighborhood, key, name, ttlGeocode)
+	return name, nil
 }

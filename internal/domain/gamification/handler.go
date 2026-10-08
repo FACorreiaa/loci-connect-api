@@ -9,6 +9,7 @@ import (
 	"connectrpc.com/connect"
 	gamificationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification/gamificationconnect"
+	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -184,19 +185,26 @@ func (h *Handler) ListPointsHistory(ctx context.Context, req *connect.Request[ga
 		}
 	}
 	size := int(req.Msg.GetPageSize())
-	events, err := h.svc.History(ctx, uid, size, before)
+	events, err := h.svc.History(ctx, uid, size, before, req.Msg.GetFieldOnly())
 	if err != nil {
 		return nil, h.connectErr(err)
 	}
 	out := &gamificationv1.ListPointsHistoryResponse{}
 	for _, e := range events {
-		out.Events = append(out.Events, &gamificationv1.PointsEvent{
-			Id:        e.ID.String(),
-			Kind:      gamificationv1.PointsKind(e.Kind),
-			Points:    int32(e.Points),
-			Label:     e.Label,
-			CreatedAt: timestamppb.New(e.CreatedAt),
-		})
+		pe := &gamificationv1.PointsEvent{
+			Id:          e.ID.String(),
+			Kind:        gamificationv1.PointsKind(e.Kind),
+			Points:      int32(e.Points),
+			Label:       e.Label,
+			CreatedAt:   timestamppb.New(e.CreatedAt),
+			CityName:    e.CityName,
+			FieldPoints: int32(e.FieldPoints),
+			SeasonId:    int32(e.SeasonID),
+		}
+		if e.CityID != nil {
+			pe.CityId = e.CityID.String()
+		}
+		out.Events = append(out.Events, pe)
 	}
 	if size <= 0 || size > 100 {
 		size = 30
@@ -225,5 +233,117 @@ func (h *Handler) CompleteTripDay(ctx context.Context, req *connect.Request[gami
 		PointsAwarded: int32(res.Points),
 		TripCompleted: res.TripCompleted,
 		NewBadges:     badgesProto(res.NewBadges, h.svc.now()),
+	}), nil
+}
+
+func (h *Handler) GetFieldProfile(ctx context.Context, _ *connect.Request[gamificationv1.GetFieldProfileRequest]) (*connect.Response[gamificationv1.GetFieldProfileResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := h.svc.Profile(ctx, uid)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	out := &gamificationv1.FieldProfile{
+		LifetimeScore:        p.Lifetime,
+		OverallRank:          gamificationv1.FieldRank(p.Rank),
+		OverallNextThreshold: p.Next,
+		WeekScore:            p.Week,
+		LastWeekScore:        p.LastWeek,
+		SeasonId:             int32(p.SeasonID),
+		PlacesKept:           int32(p.PlacesKept),
+		DaysFinished:         int32(p.DaysFinished),
+	}
+	for _, c := range p.Cities {
+		out.Cities = append(out.Cities, &gamificationv1.CityRank{
+			CityId:        c.CityID.String(),
+			CityName:      c.Name,
+			Rank:          gamificationv1.FieldRank(c.Rank),
+			Score:         c.Score,
+			NextThreshold: c.Next,
+		})
+	}
+	return connect.NewResponse(&gamificationv1.GetFieldProfileResponse{Profile: out}), nil
+}
+
+func fieldRowProto(r *FieldRow) *gamificationv1.FieldBoardRow {
+	if r == nil {
+		return nil
+	}
+	return &gamificationv1.FieldBoardRow{
+		Position:    int32(r.Position),
+		DisplayName: r.DisplayName,
+		User:        r.User,
+		Value:       r.Value,
+		IsMe:        r.IsMe,
+		Rank:        gamificationv1.FieldRank(r.Rank),
+	}
+}
+
+func (h *Handler) GetFieldBoard(ctx context.Context, req *connect.Request[gamificationv1.GetFieldBoardRequest]) (*connect.Response[gamificationv1.GetFieldBoardResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b, err := h.svc.Board(ctx, uid, BoardRequest{
+		Scope:        Scope(req.Msg.GetScope()),
+		CityID:       req.Msg.GetCityId(),
+		Metric:       FieldMetric(req.Msg.GetMetric()),
+		SeasonOffset: int(req.Msg.GetSeasonOffset()),
+	})
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	start := SeasonStart(b.SeasonID)
+	out := &gamificationv1.GetFieldBoardResponse{
+		Scope:            gamificationv1.FieldBoardScope(b.Scope),
+		CityName:         b.CityName,
+		SeasonId:         int32(b.SeasonID),
+		SeasonStart:      timestamppb.New(start),
+		SeasonEnd:        timestamppb.New(start.AddDate(0, 0, 7)),
+		Me:               fieldRowProto(b.Me),
+		Above:            fieldRowProto(b.Above),
+		ScoredUsers:      int32(b.Scored),
+		TooFew:           b.TooFew,
+		FriendsAvailable: b.FriendsAvailable,
+		HistoryLocked:    b.HistoryLocked,
+		MeHidden:         b.MeHidden,
+	}
+	if b.CityID != nil {
+		out.CityId = b.CityID.String()
+	}
+	for i := range b.Top {
+		out.Top = append(out.Top, fieldRowProto(&b.Top[i]))
+	}
+	if p := b.Personal; p != nil {
+		out.Personal = &gamificationv1.PersonalWeek{
+			ThisWeek:             p.This.Score,
+			LastWeek:             p.Last.Score,
+			PlacesKept:           int32(p.This.PlacesKept),
+			PlacesKeptLastWeek:   int32(p.Last.PlacesKept),
+			DaysFinished:         int32(p.This.DaysFinished),
+			DaysFinishedLastWeek: int32(p.Last.DaysFinished),
+		}
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Handler) MarkStop(ctx context.Context, req *connect.Request[gamificationv1.MarkStopRequest]) (*connect.Response[gamificationv1.MarkStopResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	res, err := h.svc.MarkStop(ctx, uid, req.Msg.GetTripId(), req.Msg.GetStopId(),
+		StopStatus(req.Msg.GetStatus()), req.Msg.GetTimezone())
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&gamificationv1.MarkStopResponse{
+		Status:        tripv1.TripStopStatus(res.Status),
+		PointsAwarded: int32(res.Points),
+		DayFinished:   res.DayFinished,
+		TripFinished:  res.TripFinished,
+		WeekScore:     res.WeekScore,
 	}), nil
 }

@@ -186,6 +186,9 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 		if d.Date != nil {
 			pd.Date = timestamppb.New(*d.Date)
 		}
+		if d.CompletedAt != nil {
+			pd.CompletedAt = timestamppb.New(*d.CompletedAt)
+		}
 		for _, s := range d.Stops {
 			ps := &tripv1.TripStop{
 				Id:              s.ID.String(),
@@ -198,6 +201,13 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 				BookingUrl:      s.BookingURL,
 			}
 			ps.RecommendationTrace = traceToProto(s.RecommendationTrace)
+			ps.Status = tripv1.TripStopStatus_TRIP_STOP_STATUS_OPEN
+			if s.Status != 0 {
+				ps.Status = tripv1.TripStopStatus(s.Status)
+			}
+			if s.StatusAt != nil {
+				ps.StatusAt = timestamppb.New(*s.StatusAt)
+			}
 			pd.Stops = append(pd.Stops, ps)
 		}
 		p.Days = append(p.Days, pd)
