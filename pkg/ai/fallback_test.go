@@ -6,12 +6,16 @@ import (
 	"io"
 	"iter"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"google.golang.org/genai"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/pkg/anthropic"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
 
@@ -476,5 +480,91 @@ func TestChainStreamCallerCancelDuringHeadIsNotFailover(t *testing.T) {
 	}
 	if backup.calls != 0 {
 		t.Fatalf("backup was called %d times after the caller left", backup.calls)
+	}
+}
+
+// anthropicStub answers every Messages call with the same status and body,
+// and counts the calls, so a test can see the link being benched.
+func anthropicStub(t *testing.T, status int, contentType, body string) (*anthropic.ChatClient, *atomic.Int32) {
+	t.Helper()
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}))
+	t.Cleanup(srv.Close)
+
+	client, err := anthropic.New(anthropic.Options{
+		APIKey:     "sk-ant-test",
+		Model:      "claude-haiku-5-5",
+		BaseURL:    srv.URL,
+		HTTPClient: srv.Client(),
+	})
+	if err != nil {
+		t.Fatalf("anthropic client: %v", err)
+	}
+	return client, &calls
+}
+
+// The trial's spend cap: Anthropic answers a reached workspace limit with a
+// 400, and that must hand the request to OpenRouter and bench the link, so
+// hitting the cap needs no deploy.
+func TestChainAnthropicUsageLimitFailsOverToOpenRouter(t *testing.T) {
+	claude, calls := anthropicStub(t, http.StatusBadRequest, "application/json",
+		`{"type":"error","error":{"type":"invalid_request_error","message":"You have reached your specified workspace API usage limits. You will regain access on 2026-11-01 at 00:00 UTC."}}`)
+	openrouter := &fakeClient{model: "deepseek/deepseek-v4-flash", text: "from openrouter"}
+	chain := newChainClient([]*entry{
+		{client: claude, model: claude.Model()},
+		{client: openrouter, model: openrouter.model},
+	}, time.Minute, quietLogger())
+
+	for i := range 2 {
+		got, err := chain.GenerateText(t.Context(), "plan Lisbon", nil)
+		if err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+		if got != "from openrouter" {
+			t.Fatalf("call %d = %q, want the OpenRouter answer", i, got)
+		}
+	}
+	if n := calls.Load(); n != 1 {
+		t.Errorf("anthropic called %d times, want 1: a spent budget should bench the link", n)
+	}
+	if chain.Model() != "deepseek/deepseek-v4-flash" {
+		t.Errorf("Model() = %q, want the model that answered", chain.Model())
+	}
+}
+
+// A refusal is HTTP 200 and arrives inside the stream. Nothing has reached
+// the caller yet, so the chain moves on, and does not bench a link that is
+// otherwise fine.
+func TestChainAnthropicStreamRefusalFailsOverToOpenRouter(t *testing.T) {
+	refusal := "event: message_start\n" +
+		`data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-haiku-5-5","content":[],"stop_reason":null,"usage":{"input_tokens":10,"output_tokens":1}}}` + "\n\n" +
+		"event: message_delta\n" +
+		`data: {"type":"message_delta","delta":{"stop_reason":"refusal"},"usage":{"output_tokens":3}}` + "\n\n" +
+		"event: message_stop\n" +
+		`data: {"type":"message_stop"}` + "\n\n"
+	claude, calls := anthropicStub(t, http.StatusOK, "text/event-stream", refusal)
+	openrouter := &fakeClient{model: "deepseek/deepseek-v4-flash", streamChunks: []string{"Day 1"}}
+	chain := newChainClient([]*entry{
+		{client: claude, model: claude.Model()},
+		{client: openrouter, model: openrouter.model},
+	}, time.Minute, quietLogger())
+
+	for i := range 2 {
+		seq, err := chain.GenerateStream(t.Context(), "plan Lisbon", nil)
+		if err != nil {
+			t.Fatalf("call %d: %v", i, err)
+		}
+		got, err := collect(t, seq)
+		if err != nil || got != "Day 1" {
+			t.Fatalf("call %d = %q, %v; want the OpenRouter stream", i, got, err)
+		}
+	}
+	if n := calls.Load(); n != 2 {
+		t.Errorf("anthropic called %d times, want 2: a refusal is not a dead credential", n)
 	}
 }
