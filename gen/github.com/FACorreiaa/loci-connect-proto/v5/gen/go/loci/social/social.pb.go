@@ -335,11 +335,16 @@ func (x *FriendRequest) GetCreatedAt() *timestamppb.Timestamp {
 }
 
 type Invite struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
-	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	Inviter       *PublicUser            `protobuf:"bytes,4,opt,name=inviter,proto3" json:"inviter,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Code  string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Url   string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	// Unset: the code does not expire.
+	ExpiresAt *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Inviter   *PublicUser            `protobuf:"bytes,4,opt,name=inviter,proto3" json:"inviter,omitempty"`
+	// Message to send with the link, without the url. Share sheets take the url
+	// as its own item; append it only where a channel takes one string (SMS,
+	// a copied message).
+	ShareText     string `protobuf:"bytes,5,opt,name=share_text,json=shareText,proto3" json:"share_text,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -400,6 +405,13 @@ func (x *Invite) GetInviter() *PublicUser {
 		return x.Inviter
 	}
 	return nil
+}
+
+func (x *Invite) GetShareText() string {
+	if x != nil {
+		return x.ShareText
+	}
+	return ""
 }
 
 // ProfileStats are the counts a profile shows. Travel counts come from the
@@ -2046,13 +2058,15 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\x04from\x18\x02 \x01(\v2\x17.loci.social.PublicUserR\x04from\x12'\n" +
 	"\x02to\x18\x03 \x01(\v2\x17.loci.social.PublicUserR\x02to\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xaf\x01\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xd8\x01\n" +
 	"\x06Invite\x12\x1b\n" +
 	"\x04code\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x182R\x04code\x12\x1a\n" +
 	"\x03url\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\x03url\x129\n" +
 	"\n" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x121\n" +
-	"\ainviter\x18\x04 \x01(\v2\x17.loci.social.PublicUserR\ainviter\"\xa7\x01\n" +
+	"\ainviter\x18\x04 \x01(\v2\x17.loci.social.PublicUserR\ainviter\x12'\n" +
+	"\n" +
+	"share_text\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\tshareText\"\xa7\x01\n" +
 	"\fProfileStats\x12\x1f\n" +
 	"\x06cities\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06cities\x12%\n" +
 	"\tcountries\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tcountries\x12,\n" +
