@@ -127,6 +127,54 @@ type AIConfig struct {
 	// means the chain's default; negative disables the check.
 	StreamFirstChunkTimeout time.Duration
 	StreamIdleTimeout       time.Duration
+
+	// Anthropic is an optional link put ahead of the primary. It is not a
+	// value of Provider on purpose: Provider also picks the embedding client,
+	// and Anthropic has no embeddings API.
+	Anthropic AnthropicConfig
+}
+
+// Anthropic trial settings. ANTHROPIC_THINKING and ANTHROPIC_SCOPE values.
+const (
+	AnthropicThinkingAdaptive = "adaptive"
+	AnthropicThinkingDisabled = "disabled"
+
+	AnthropicScopeAll  = "all"
+	AnthropicScopePaid = "paid"
+)
+
+// DefaultAnthropicModel is what ANTHROPIC_MODEL falls back to.
+const DefaultAnthropicModel = "claude-haiku-5-5"
+
+// AnthropicConfig describes Claude over Anthropic's own Messages API, tried
+// before the primary while a trial is on.
+//
+// Two switches, so the trial is reversible without touching a secret: the
+// key (ANTHROPIC_API_KEY) makes the link possible, and First
+// (ANTHROPIC_FIRST) puts it in the chain. With either one unset nothing
+// is built and the chains are exactly what they were without it.
+type AnthropicConfig struct {
+	APIKey string
+	First  bool
+	Model  string
+	// Effort is sent as output_config.effort. Empty sends nothing and
+	// leaves the model's default.
+	Effort string
+	// Thinking is AnthropicThinkingAdaptive or AnthropicThinkingDisabled.
+	Thinking string
+	// Scope is AnthropicScopeAll, which also puts the link ahead of the free
+	// tier's chain, or AnthropicScopePaid, which keeps it to paying callers.
+	Scope string
+}
+
+// Enabled reports whether the link is built at all.
+func (a AnthropicConfig) Enabled() bool {
+	return a.APIKey != "" && a.First
+}
+
+// ServesFreeTier reports whether the free tier's chain gets the link too.
+func (a AnthropicConfig) ServesFreeTier() bool {
+	return a.Enabled() && a.Scope != AnthropicScopePaid
 }
 
 type ServerConfig struct {
@@ -677,6 +725,9 @@ func Load() (*Config, error) {
 	if cfg.AI.GenerateTimeout <= 0 || cfg.AI.StreamTimeout <= 0 {
 		return nil, errors.New("AI timeout values must be positive")
 	}
+	if err := validateAnthropic(cfg.AI.Anthropic); err != nil {
+		return nil, err
+	}
 
 	if cfg.Auth.JWTSecret == "" {
 		return nil, errors.New("JWT_SECRET is required")
@@ -747,8 +798,50 @@ func loadAIConfig() AIConfig {
 	if cfg.FallbackEnabled {
 		cfg.Fallbacks = loadFallbacks()
 	}
+	cfg.Anthropic = loadAnthropicConfig()
 
 	return cfg
+}
+
+func loadAnthropicConfig() AnthropicConfig {
+	return AnthropicConfig{
+		APIKey:   strings.TrimSpace(getEnv("ANTHROPIC_API_KEY", "")),
+		First:    getEnvAsBool("ANTHROPIC_FIRST", false),
+		Model:    strings.TrimSpace(getEnv("ANTHROPIC_MODEL", DefaultAnthropicModel)),
+		Effort:   strings.ToLower(strings.TrimSpace(getEnv("ANTHROPIC_EFFORT", ""))),
+		Thinking: strings.ToLower(strings.TrimSpace(getEnv("ANTHROPIC_THINKING", AnthropicThinkingAdaptive))),
+		Scope:    strings.ToLower(strings.TrimSpace(getEnv("ANTHROPIC_SCOPE", AnthropicScopeAll))),
+	}
+}
+
+// validateAnthropic rejects a value the trial would otherwise misread.
+//
+// Checked only once the link is on. A typo in a variable that changes
+// nothing must not stop a deployment that is not running the trial.
+func validateAnthropic(a AnthropicConfig) error {
+	if !a.Enabled() {
+		return nil
+	}
+	if a.Model == "" {
+		return errors.New("ANTHROPIC_MODEL must not be empty when ANTHROPIC_FIRST is on")
+	}
+	switch a.Effort {
+	case "", "low", "medium", "high", "xhigh", "max":
+	default:
+		return fmt.Errorf("ANTHROPIC_EFFORT %q is not one of low, medium, high, xhigh, max", a.Effort)
+	}
+	switch a.Thinking {
+	case AnthropicThinkingAdaptive, AnthropicThinkingDisabled:
+	default:
+		return fmt.Errorf("ANTHROPIC_THINKING %q is not %q or %q",
+			a.Thinking, AnthropicThinkingAdaptive, AnthropicThinkingDisabled)
+	}
+	switch a.Scope {
+	case AnthropicScopeAll, AnthropicScopePaid:
+	default:
+		return fmt.Errorf("ANTHROPIC_SCOPE %q is not %q or %q", a.Scope, AnthropicScopeAll, AnthropicScopePaid)
+	}
+	return nil
 }
 
 // loadFallbacks builds the ordered fallback chain. Every entry is an

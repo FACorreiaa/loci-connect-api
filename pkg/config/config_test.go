@@ -791,3 +791,120 @@ func TestAPNSKey_InlineOrPath(t *testing.T) {
 		})
 	}
 }
+
+// anthropicEnv clears every ANTHROPIC_* variable, so a developer's own shell
+// cannot switch the trial on under a test.
+func anthropicEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{
+		"ANTHROPIC_API_KEY", "ANTHROPIC_FIRST", "ANTHROPIC_MODEL",
+		"ANTHROPIC_EFFORT", "ANTHROPIC_THINKING", "ANTHROPIC_SCOPE",
+	} {
+		t.Setenv(k, "")
+	}
+}
+
+// With no key the trial is off and nothing else moves: the same provider,
+// the same model, the same embeddings.
+func TestLoad_AnthropicOffByDefault(t *testing.T) {
+	baseEnv(t)
+	anthropicEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	a := cfg.AI.Anthropic
+	if a.Enabled() || a.ServesFreeTier() {
+		t.Fatalf("anthropic enabled with no key: %+v", a)
+	}
+	if a.Model != DefaultAnthropicModel || a.Thinking != AnthropicThinkingAdaptive || a.Scope != AnthropicScopeAll {
+		t.Errorf("defaults = %+v", a)
+	}
+	if a.Effort != "" {
+		t.Errorf("effort = %q, want unset so the model's default applies", a.Effort)
+	}
+}
+
+// The key alone is not enough. ANTHROPIC_FIRST is the rollback switch, so a
+// sealed key with the switch off must change nothing.
+func TestLoad_AnthropicKeyWithoutFirstIsOff(t *testing.T) {
+	baseEnv(t)
+	anthropicEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.AI.Anthropic.Enabled() {
+		t.Fatal("anthropic enabled without ANTHROPIC_FIRST")
+	}
+}
+
+// On, Anthropic sits in front of the chat chain, and AI_PROVIDER still says
+// openrouter: that value picks the embedding client, and Anthropic has no
+// embeddings to offer.
+func TestLoad_AnthropicOnKeepsEmbeddingsOnOpenRouter(t *testing.T) {
+	baseEnv(t)
+	anthropicEnv(t)
+	t.Setenv("OPENROUTER_API_KEY", "primary-key")
+	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+	t.Setenv("ANTHROPIC_FIRST", "true")
+	t.Setenv("ANTHROPIC_EFFORT", "LOW")
+	t.Setenv("ANTHROPIC_SCOPE", "paid")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	a := cfg.AI.Anthropic
+	if !a.Enabled() {
+		t.Fatal("anthropic not enabled")
+	}
+	if a.ServesFreeTier() {
+		t.Error("ANTHROPIC_SCOPE=paid still serves the free tier")
+	}
+	if a.Effort != "low" {
+		t.Errorf("effort = %q, want normalised to low", a.Effort)
+	}
+	if cfg.AI.Provider != AIProviderOpenRouter {
+		t.Errorf("provider = %q, want openrouter", cfg.AI.Provider)
+	}
+	if cfg.AI.EmbeddingModel != "google/gemini-embedding-001" {
+		t.Errorf("embedding model = %q, want the OpenRouter one", cfg.AI.EmbeddingModel)
+	}
+	if cfg.AI.APIKey != "primary-key" {
+		t.Errorf("primary key = %q, want the OpenRouter key untouched", cfg.AI.APIKey)
+	}
+}
+
+func TestLoad_AnthropicRejectsUnknownValuesOnlyWhenOn(t *testing.T) {
+	cases := map[string]string{
+		"ANTHROPIC_EFFORT":   "extreme",
+		"ANTHROPIC_THINKING": "enabled",
+		"ANTHROPIC_SCOPE":    "free",
+	}
+	for key, value := range cases {
+		t.Run(key, func(t *testing.T) {
+			baseEnv(t)
+			anthropicEnv(t)
+			t.Setenv("OPENROUTER_API_KEY", "primary-key")
+			t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+			t.Setenv(key, value)
+
+			// Off: a typo in a variable that changes nothing must not stop a boot.
+			if _, err := Load(); err != nil {
+				t.Fatalf("Load with the trial off: %v", err)
+			}
+
+			t.Setenv("ANTHROPIC_FIRST", "true")
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), key) {
+				t.Fatalf("Load = %v, want an error naming %s", err, key)
+			}
+		})
+	}
+}
