@@ -553,3 +553,50 @@ func TestRepositoryPushSlotIsOncePerDay(t *testing.T) {
 		t.Fatalf("a new day gets a new slot")
 	}
 }
+
+// Trips often carry only a city name, or a city_id that names no row
+// (trips.city_id has no foreign key). The field score still has to know the
+// city, or nothing walked there counts on its board.
+func TestRepositoryResolvesTripCitiesByName(t *testing.T) {
+	pool, _ := testsupport.StartPostgres(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
+	u := seedUser(t, pool)
+	name := "Funchal " + uuid.NewString()[:6]
+	funchal := seedCity(t, pool, name)
+	other := seedCity(t, pool, "Other "+uuid.NewString()[:6])
+
+	var tripID, dayID uuid.UUID
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO trips (user_id, city_id, city_name, title, start_date, end_date)
+		VALUES ($1, $2, $3, 'Madeira', '2026-10-07', '2026-10-10') RETURNING id`,
+		u, uuid.New(), strings.ToLower(name)).Scan(&tripID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO trip_days (trip_id, day_number, city_name) VALUES ($1, 1, $2) RETURNING id`, tripID, name).Scan(&dayID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO trip_stops (day_id, name) VALUES ($1, 'Mercado')`, dayID); err != nil {
+		t.Fatal(err)
+	}
+	// A search in another city must not outrank the trip covering today.
+	if _, err := pool.Exec(ctx, `INSERT INTO llm_interactions (user_id, city_id, prompt, response) VALUES ($1, $2, 'x', 'y')`, u, other); err != nil {
+		t.Logf("seed search skipped: %v", err)
+	}
+
+	trip, err := repo.Trip(ctx, u, tripID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trip.CityID == nil || *trip.CityID != funchal || trip.CityName != name {
+		t.Fatalf("trip city = %v %q; want %s resolved by name over a dangling id", trip.CityID, trip.CityName, funchal)
+	}
+	if d := trip.Days[0]; d.CityID == nil || *d.CityID != funchal {
+		t.Fatalf("day city = %v", d.CityID)
+	}
+	id, got, err := repo.DefaultCity(ctx, u, day(8))
+	if err != nil || id == nil || *id != funchal || got != name {
+		t.Fatalf("default = %v %q, %v", id, got, err)
+	}
+}
