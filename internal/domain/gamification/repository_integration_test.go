@@ -456,7 +456,7 @@ func TestRepositoryDueKeeps(t *testing.T) {
 	}
 }
 
-// The 0115 rescore, run over rows the old economy wrote: retired kinds count
+// The 0116 rescore, run over rows the old economy wrote: retired kinds count
 // 0, re-valued kinds count their new value, and lifetime totals follow.
 func TestMigrationRescoresTheOldLedger(t *testing.T) {
 	pool, _ := testsupport.StartPostgres(t)
@@ -524,7 +524,7 @@ func TestMigrationRescoresTheOldLedger(t *testing.T) {
 
 func migrationHalves(t *testing.T) (up, down string) {
 	t.Helper()
-	raw, err := os.ReadFile("../../../pkg/db/migrations/0115_field_score.up.sql")
+	raw, err := os.ReadFile("../../../pkg/db/migrations/0116_field_score.up.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
