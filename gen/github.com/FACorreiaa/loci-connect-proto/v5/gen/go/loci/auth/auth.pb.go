@@ -797,11 +797,14 @@ func (x *GetMFAStatusResponse) GetRequiredByPolicy() bool {
 
 // RegisterRequest for user registration
 type RegisterRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
-	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
-	Role          *string                `protobuf:"bytes,4,opt,name=role,proto3,oneof" json:"role,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Username string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Email    string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	Password string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
+	Role     *string                `protobuf:"bytes,4,opt,name=role,proto3,oneof" json:"role,omitempty"`
+	// Invite code from the link that brought this person here. Unvalidated on
+	// purpose: a bad code is ignored and never fails the signup.
+	InviteCode    *string `protobuf:"bytes,5,opt,name=invite_code,json=inviteCode,proto3,oneof" json:"invite_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -860,6 +863,13 @@ func (x *RegisterRequest) GetPassword() string {
 func (x *RegisterRequest) GetRole() string {
 	if x != nil && x.Role != nil {
 		return *x.Role
+	}
+	return ""
+}
+
+func (x *RegisterRequest) GetInviteCode() string {
+	if x != nil && x.InviteCode != nil {
+		return *x.InviteCode
 	}
 	return ""
 }
@@ -1901,14 +1911,17 @@ const file_loci_auth_auth_proto_rawDesc = "" +
 	"\venrolled_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\n" +
 	"enrolledAt\x88\x01\x01\x12,\n" +
 	"\x12required_by_policy\x18\x04 \x01(\bR\x10requiredByPolicyB\x0e\n" +
-	"\f_enrolled_at\"\xbe\x01\n" +
+	"\f_enrolled_at\"\xf4\x01\n" +
 	"\x0fRegisterRequest\x127\n" +
 	"\busername\x18\x01 \x01(\tB\x1b\xbaH\x18r\x16\x10\x03\x18d2\x10^[a-zA-Z0-9_-]+$R\busername\x12\x1d\n" +
 	"\x05email\x18\x02 \x01(\tB\a\xbaH\x04r\x02`\x01R\x05email\x12&\n" +
 	"\bpassword\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\b\x18\xc8\x01R\bpassword\x12\"\n" +
-	"\x04role\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x04role\x88\x01\x01B\a\n" +
-	"\x05_role\"C\n" +
+	"\x04role\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x04role\x88\x01\x01\x12$\n" +
+	"\vinvite_code\x18\x05 \x01(\tH\x01R\n" +
+	"inviteCode\x88\x01\x01B\a\n" +
+	"\x05_roleB\x0e\n" +
+	"\f_invite_code\"C\n" +
 	"\x13RefreshTokenRequest\x12,\n" +
 	"\rrefresh_token\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x10R\frefreshToken\"i\n" +
 	"\rTokenResponse\x12*\n" +
