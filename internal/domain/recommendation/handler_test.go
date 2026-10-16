@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FACorreiaa/go-utils/pkg/util"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	recommendationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -14,35 +15,57 @@ import (
 
 func TestLearningEvent(t *testing.T) {
 	t.Parallel()
+	rated := func(r int32) *recommendationv1.RecommendationEvent {
+		return &recommendationv1.RecommendationEvent{
+			EventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED,
+			Rating:    util.Ptr(r),
+		}
+	}
+	ofType := func(et recommendationv1.RecommendationEventType) *recommendationv1.RecommendationEvent {
+		return &recommendationv1.RecommendationEvent{EventType: et}
+	}
 	tests := []struct {
-		name      string
-		eventType recommendationv1.RecommendationEventType
-		want      string
-		learns    bool
+		name   string
+		event  *recommendationv1.RecommendationEvent
+		want   string
+		learns bool
 	}{
-		{name: "exposure is measurement only", eventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_PRESENTED},
-		{name: "favorite is positive", eventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED, want: "favorited", learns: true},
-		{name: "dismissal is negative", eventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED, want: "skipped", learns: true},
-		{name: "confirmed visit is positive", eventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED, want: "visited", learns: true},
+		{name: "exposure is measurement only", event: ofType(recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_PRESENTED)},
+		{name: "favorite is positive", event: ofType(recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED), want: "favorited", learns: true},
+		{name: "dismissal is negative", event: ofType(recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED), want: "skipped", learns: true},
+		{name: "confirmed visit is positive", event: ofType(recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED), want: "visited", learns: true},
+		{name: "high rating is a visit", event: rated(5), want: "visited", learns: true},
+		{name: "low rating is skipped", event: rated(1), want: "skipped", learns: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, learns := learningEvent(tt.eventType)
+			got, learns := learningEvent(tt.event)
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.learns, learns)
 		})
 	}
 }
 
+// preference_feedback.weight is a magnitude; EventMultiplier supplies the
+// sign. Storing a negative weight for a skip flips it back to positive.
 func TestEventWeight(t *testing.T) {
 	t.Parallel()
-	assert.Equal(t, float32(-0.5), eventWeight(&recommendationv1.RecommendationEvent{
-		EventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP,
-	}))
-	assert.Equal(t, float32(0.8), eventWeight(&recommendationv1.RecommendationEvent{
+	for _, et := range []recommendationv1.RecommendationEventType{
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP,
+	} {
+		w := eventWeight(&recommendationv1.RecommendationEvent{EventType: et})
+		assert.Equal(t, float32(0.5), w, et.String())
+		assert.Less(t, preference.EventMultiplier(preference.EventSkipped)*w, float32(0), et.String())
+	}
+	assert.Equal(t, float32(0.7), eventWeight(&recommendationv1.RecommendationEvent{
 		EventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED,
 		Rating:    util.Ptr[int32](4),
+	}))
+	assert.Equal(t, float32(1.0), eventWeight(&recommendationv1.RecommendationEvent{
+		EventType: recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED,
+		Rating:    util.Ptr[int32](1),
 	}))
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -169,37 +170,44 @@ func enumValue(value, prefix string) string {
 	return strings.ToLower(strings.TrimPrefix(value, prefix))
 }
 
-func learningEvent(eventType recommendationv1.RecommendationEventType) (string, bool) {
-	switch eventType {
+func learningEvent(event *recommendationv1.RecommendationEvent) (string, bool) {
+	switch event.GetEventType() {
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED:
-		return "favorited", true
+		return preference.EventFavorited, true
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_ADDED_TO_LIST,
 		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_ADDED_TO_TRIP:
-		return "saved", true
+		return preference.EventSaved, true
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_KEPT_IN_TRIP:
-		return "reordered", true
+		return preference.EventReordered, true
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED,
 		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP:
-		return "skipped", true
+		return preference.EventSkipped, true
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_EXPORTED:
-		return "exported", true
-	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED,
-		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED:
-		return "visited", true
+		return preference.EventExported, true
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED:
+		return preference.EventVisited, true
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED:
+		name, _ := preference.RatingSignal(float64(event.GetRating()))
+		return name, true
 	default:
 		return "", false
 	}
 }
 
+// eventWeight is the magnitude stored in preference_feedback.weight. It is
+// never negative: preference.EventMultiplier applies the sign, so a negative
+// weight on a skip would flip it into a positive signal.
 func eventWeight(event *recommendationv1.RecommendationEvent) float32 {
-	if event.GetEventType() == recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED {
-		return float32(event.GetRating()) / 5
+	switch event.GetEventType() {
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED:
+		_, weight := preference.RatingSignal(float64(event.GetRating()))
+		return weight
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP:
+		return 0.5
+	default:
+		return 1
 	}
-	if event.GetEventType() == recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED ||
-		event.GetEventType() == recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP {
-		return -0.5
-	}
-	return 1
 }
 
 func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recommendationv1.RecordEventsRequest]) (*connect.Response[recommendationv1.RecordEventsResponse], error) {
@@ -311,7 +319,7 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 			})
 		}
 
-		preferenceEvent, learns := learningEvent(event.GetEventType())
+		preferenceEvent, learns := learningEvent(event)
 		if !learns {
 			continue
 		}
