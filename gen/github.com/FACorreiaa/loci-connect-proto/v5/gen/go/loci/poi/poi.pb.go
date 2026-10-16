@@ -83,6 +83,10 @@ type POIDetailedInfo struct {
 	// Absent for POIs that are not part of a plan (a search result, a nearby
 	// lookup), in which case clients fall back to chunking by index.
 	Day *int32 `protobuf:"varint,35,opt,name=day,proto3,oneof" json:"day,omitempty"`
+	// How well this place fits the signed-in traveller's learned taste. Set only
+	// when Loci has enough signal to say so honestly; absent for anonymous users,
+	// users with personalization off, and cold-start profiles.
+	TasteMatch *TasteMatch `protobuf:"bytes,36,opt,name=taste_match,json=tasteMatch,proto3,oneof" json:"taste_match,omitempty"`
 	// Pictures with the credit they cannot be shown without.
 	//
 	// Wikimedia Commons content is CC BY-SA and similar: displaying the image
@@ -362,9 +366,72 @@ func (x *POIDetailedInfo) GetDay() int32 {
 	return 0
 }
 
+func (x *POIDetailedInfo) GetTasteMatch() *TasteMatch {
+	if x != nil {
+		return x.TasteMatch
+	}
+	return nil
+}
+
 func (x *POIDetailedInfo) GetImageCredits() []*POIImage {
 	if x != nil {
 		return x.ImageCredits
+	}
+	return nil
+}
+
+// TasteMatch explains why a place fits the traveller, not whether it is good.
+type TasteMatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0..1 relative to the traveller's own range: 1 is among the best fits Loci
+	// has seen for them, 0 among the worst.
+	Score float32 `protobuf:"fixed32,1,opt,name=score,proto3" json:"score,omitempty"`
+	// Short, human reasons ("You like quiet cafés"), strongest first.
+	Reasons       []string `protobuf:"bytes,2,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TasteMatch) Reset() {
+	*x = TasteMatch{}
+	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TasteMatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TasteMatch) ProtoMessage() {}
+
+func (x *TasteMatch) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TasteMatch.ProtoReflect.Descriptor instead.
+func (*TasteMatch) Descriptor() ([]byte, []int) {
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TasteMatch) GetScore() float32 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *TasteMatch) GetReasons() []string {
+	if x != nil {
+		return x.Reasons
 	}
 	return nil
 }
@@ -387,7 +454,7 @@ type POIImage struct {
 
 func (x *POIImage) Reset() {
 	*x = POIImage{}
-	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	mi := &file_loci_poi_poi_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -399,7 +466,7 @@ func (x *POIImage) String() string {
 func (*POIImage) ProtoMessage() {}
 
 func (x *POIImage) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	mi := &file_loci_poi_poi_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -412,7 +479,7 @@ func (x *POIImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use POIImage.ProtoReflect.Descriptor instead.
 func (*POIImage) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{1}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *POIImage) GetUrl() string {
@@ -477,7 +544,7 @@ type HotelDetailedInfo struct {
 
 func (x *HotelDetailedInfo) Reset() {
 	*x = HotelDetailedInfo{}
-	mi := &file_loci_poi_poi_proto_msgTypes[2]
+	mi := &file_loci_poi_poi_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -489,7 +556,7 @@ func (x *HotelDetailedInfo) String() string {
 func (*HotelDetailedInfo) ProtoMessage() {}
 
 func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[2]
+	mi := &file_loci_poi_poi_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -502,7 +569,7 @@ func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelDetailedInfo.ProtoReflect.Descriptor instead.
 func (*HotelDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{2}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *HotelDetailedInfo) GetId() string {
@@ -660,7 +727,7 @@ type RestaurantDetailedInfo struct {
 
 func (x *RestaurantDetailedInfo) Reset() {
 	*x = RestaurantDetailedInfo{}
-	mi := &file_loci_poi_poi_proto_msgTypes[3]
+	mi := &file_loci_poi_poi_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -672,7 +739,7 @@ func (x *RestaurantDetailedInfo) String() string {
 func (*RestaurantDetailedInfo) ProtoMessage() {}
 
 func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[3]
+	mi := &file_loci_poi_poi_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -685,7 +752,7 @@ func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantDetailedInfo.ProtoReflect.Descriptor instead.
 func (*RestaurantDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{3}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *RestaurantDetailedInfo) GetId() string {
@@ -833,7 +900,7 @@ type POIFilters struct {
 
 func (x *POIFilters) Reset() {
 	*x = POIFilters{}
-	mi := &file_loci_poi_poi_proto_msgTypes[4]
+	mi := &file_loci_poi_poi_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -845,7 +912,7 @@ func (x *POIFilters) String() string {
 func (*POIFilters) ProtoMessage() {}
 
 func (x *POIFilters) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[4]
+	mi := &file_loci_poi_poi_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -858,7 +925,7 @@ func (x *POIFilters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use POIFilters.ProtoReflect.Descriptor instead.
 func (*POIFilters) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{4}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *POIFilters) GetCity() string {
@@ -911,7 +978,7 @@ type SearchPOIRequest struct {
 
 func (x *SearchPOIRequest) Reset() {
 	*x = SearchPOIRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[5]
+	mi := &file_loci_poi_poi_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -923,7 +990,7 @@ func (x *SearchPOIRequest) String() string {
 func (*SearchPOIRequest) ProtoMessage() {}
 
 func (x *SearchPOIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[5]
+	mi := &file_loci_poi_poi_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -936,7 +1003,7 @@ func (x *SearchPOIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPOIRequest.ProtoReflect.Descriptor instead.
 func (*SearchPOIRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{5}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SearchPOIRequest) GetQuery() string {
@@ -1041,7 +1108,7 @@ type SearchPOIResponse struct {
 
 func (x *SearchPOIResponse) Reset() {
 	*x = SearchPOIResponse{}
-	mi := &file_loci_poi_poi_proto_msgTypes[6]
+	mi := &file_loci_poi_poi_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1120,7 @@ func (x *SearchPOIResponse) String() string {
 func (*SearchPOIResponse) ProtoMessage() {}
 
 func (x *SearchPOIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[6]
+	mi := &file_loci_poi_poi_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1133,7 @@ func (x *SearchPOIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPOIResponse.ProtoReflect.Descriptor instead.
 func (*SearchPOIResponse) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{6}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchPOIResponse) GetPois() []*POIDetailedInfo {
@@ -1093,7 +1160,7 @@ type GetPOIRequest struct {
 
 func (x *GetPOIRequest) Reset() {
 	*x = GetPOIRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[7]
+	mi := &file_loci_poi_poi_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1105,7 +1172,7 @@ func (x *GetPOIRequest) String() string {
 func (*GetPOIRequest) ProtoMessage() {}
 
 func (x *GetPOIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[7]
+	mi := &file_loci_poi_poi_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1118,7 +1185,7 @@ func (x *GetPOIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPOIRequest.ProtoReflect.Descriptor instead.
 func (*GetPOIRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{7}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetPOIRequest) GetPoiId() string {
@@ -1138,7 +1205,7 @@ type GetPOIResponse struct {
 
 func (x *GetPOIResponse) Reset() {
 	*x = GetPOIResponse{}
-	mi := &file_loci_poi_poi_proto_msgTypes[8]
+	mi := &file_loci_poi_poi_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1150,7 +1217,7 @@ func (x *GetPOIResponse) String() string {
 func (*GetPOIResponse) ProtoMessage() {}
 
 func (x *GetPOIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[8]
+	mi := &file_loci_poi_poi_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1163,7 +1230,7 @@ func (x *GetPOIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPOIResponse.ProtoReflect.Descriptor instead.
 func (*GetPOIResponse) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{8}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetPOIResponse) GetPoi() *POIDetailedInfo {
@@ -1185,7 +1252,7 @@ type AddPoiRequest struct {
 
 func (x *AddPoiRequest) Reset() {
 	*x = AddPoiRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[9]
+	mi := &file_loci_poi_poi_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1197,7 +1264,7 @@ func (x *AddPoiRequest) String() string {
 func (*AddPoiRequest) ProtoMessage() {}
 
 func (x *AddPoiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[9]
+	mi := &file_loci_poi_poi_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1210,7 +1277,7 @@ func (x *AddPoiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddPoiRequest.ProtoReflect.Descriptor instead.
 func (*AddPoiRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{9}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AddPoiRequest) GetPoiId() string {
@@ -1238,7 +1305,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xb4\x10\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\x80\x11\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1291,7 +1358,9 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x0everified_facts\x18  \x01(\v2\x16.loci.place.PlaceFactsH\n" +
 	"R\rverifiedFacts\x88\x01\x01\x12\x1f\n" +
 	"\bgrounded\x18! \x01(\bH\vR\bgrounded\x88\x01\x01\x12 \n" +
-	"\x03day\x18# \x01(\x05B\t\xbaH\x06\x1a\x04\x18<(\x01H\fR\x03day\x88\x01\x01\x12A\n" +
+	"\x03day\x18# \x01(\x05B\t\xbaH\x06\x1a\x04\x18<(\x01H\fR\x03day\x88\x01\x01\x12:\n" +
+	"\vtaste_match\x18$ \x01(\v2\x14.loci.poi.TasteMatchH\rR\n" +
+	"tasteMatch\x88\x01\x01\x12A\n" +
 	"\rimage_credits\x18\" \x03(\v2\x12.loci.poi.POIImageB\b\xbaH\x05\x92\x01\x02\x10\x14R\fimageCredits\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -1309,7 +1378,15 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x15_recommendation_traceB\x11\n" +
 	"\x0f_verified_factsB\v\n" +
 	"\t_groundedB\x06\n" +
-	"\x04_day\"\xd2\x01\n" +
+	"\x04_dayB\x0e\n" +
+	"\f_taste_match\"_\n" +
+	"\n" +
+	"TasteMatch\x12%\n" +
+	"\x05score\x18\x01 \x01(\x02B\x0f\xbaH\f\n" +
+	"\n" +
+	"\x1d\x00\x00\x80?-\x00\x00\x00\x00R\x05score\x12*\n" +
+	"\areasons\x18\x02 \x03(\tB\x10\xbaH\r\x92\x01\n" +
+	"\x10\x03\"\x06r\x04\x10\x01\x18xR\areasons\"\xd2\x01\n" +
 	"\bPOIImage\x12\x1f\n" +
 	"\x03url\x18\x01 \x01(\tB\r\xbaH\n" +
 	"r\b\x10\x01\x18\x80\x10\x88\x01\x01R\x03url\x12\x1f\n" +
@@ -1476,45 +1553,47 @@ func file_loci_poi_poi_proto_rawDescGZIP() []byte {
 	return file_loci_poi_poi_proto_rawDescData
 }
 
-var file_loci_poi_poi_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_loci_poi_poi_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_loci_poi_poi_proto_goTypes = []any{
 	(*POIDetailedInfo)(nil),                    // 0: loci.poi.POIDetailedInfo
-	(*POIImage)(nil),                           // 1: loci.poi.POIImage
-	(*HotelDetailedInfo)(nil),                  // 2: loci.poi.HotelDetailedInfo
-	(*RestaurantDetailedInfo)(nil),             // 3: loci.poi.RestaurantDetailedInfo
-	(*POIFilters)(nil),                         // 4: loci.poi.POIFilters
-	(*SearchPOIRequest)(nil),                   // 5: loci.poi.SearchPOIRequest
-	(*SearchPOIResponse)(nil),                  // 6: loci.poi.SearchPOIResponse
-	(*GetPOIRequest)(nil),                      // 7: loci.poi.GetPOIRequest
-	(*GetPOIResponse)(nil),                     // 8: loci.poi.GetPOIResponse
-	(*AddPoiRequest)(nil),                      // 9: loci.poi.AddPoiRequest
-	nil,                                        // 10: loci.poi.POIDetailedInfo.OpeningHoursEntry
-	(*timestamppb.Timestamp)(nil),              // 11: google.protobuf.Timestamp
-	(*recommendation.RecommendationTrace)(nil), // 12: loci.recommendation.RecommendationTrace
-	(*place.PlaceFacts)(nil),                   // 13: loci.place.PlaceFacts
-	(*common.PaginationMetadata)(nil),          // 14: loci.common.PaginationMetadata
+	(*TasteMatch)(nil),                         // 1: loci.poi.TasteMatch
+	(*POIImage)(nil),                           // 2: loci.poi.POIImage
+	(*HotelDetailedInfo)(nil),                  // 3: loci.poi.HotelDetailedInfo
+	(*RestaurantDetailedInfo)(nil),             // 4: loci.poi.RestaurantDetailedInfo
+	(*POIFilters)(nil),                         // 5: loci.poi.POIFilters
+	(*SearchPOIRequest)(nil),                   // 6: loci.poi.SearchPOIRequest
+	(*SearchPOIResponse)(nil),                  // 7: loci.poi.SearchPOIResponse
+	(*GetPOIRequest)(nil),                      // 8: loci.poi.GetPOIRequest
+	(*GetPOIResponse)(nil),                     // 9: loci.poi.GetPOIResponse
+	(*AddPoiRequest)(nil),                      // 10: loci.poi.AddPoiRequest
+	nil,                                        // 11: loci.poi.POIDetailedInfo.OpeningHoursEntry
+	(*timestamppb.Timestamp)(nil),              // 12: google.protobuf.Timestamp
+	(*recommendation.RecommendationTrace)(nil), // 13: loci.recommendation.RecommendationTrace
+	(*place.PlaceFacts)(nil),                   // 14: loci.place.PlaceFacts
+	(*common.PaginationMetadata)(nil),          // 15: loci.common.PaginationMetadata
 }
 var file_loci_poi_poi_proto_depIdxs = []int32{
-	10, // 0: loci.poi.POIDetailedInfo.opening_hours:type_name -> loci.poi.POIDetailedInfo.OpeningHoursEntry
-	11, // 1: loci.poi.POIDetailedInfo.created_at:type_name -> google.protobuf.Timestamp
-	12, // 2: loci.poi.POIDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	13, // 3: loci.poi.POIDetailedInfo.verified_facts:type_name -> loci.place.PlaceFacts
-	1,  // 4: loci.poi.POIDetailedInfo.image_credits:type_name -> loci.poi.POIImage
-	12, // 5: loci.poi.HotelDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	12, // 6: loci.poi.RestaurantDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	0,  // 7: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
-	14, // 8: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
-	0,  // 9: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
-	0,  // 10: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
-	5,  // 11: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
-	7,  // 12: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
-	6,  // 13: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
-	8,  // 14: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
-	13, // [13:15] is the sub-list for method output_type
-	11, // [11:13] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	11, // 0: loci.poi.POIDetailedInfo.opening_hours:type_name -> loci.poi.POIDetailedInfo.OpeningHoursEntry
+	12, // 1: loci.poi.POIDetailedInfo.created_at:type_name -> google.protobuf.Timestamp
+	13, // 2: loci.poi.POIDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	14, // 3: loci.poi.POIDetailedInfo.verified_facts:type_name -> loci.place.PlaceFacts
+	1,  // 4: loci.poi.POIDetailedInfo.taste_match:type_name -> loci.poi.TasteMatch
+	2,  // 5: loci.poi.POIDetailedInfo.image_credits:type_name -> loci.poi.POIImage
+	13, // 6: loci.poi.HotelDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	13, // 7: loci.poi.RestaurantDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	0,  // 8: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
+	15, // 9: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
+	0,  // 10: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
+	0,  // 11: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
+	6,  // 12: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
+	8,  // 13: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
+	7,  // 14: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
+	9,  // 15: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
+	14, // [14:16] is the sub-list for method output_type
+	12, // [12:14] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_loci_poi_poi_proto_init() }
@@ -1523,18 +1602,18 @@ func file_loci_poi_poi_proto_init() {
 		return
 	}
 	file_loci_poi_poi_proto_msgTypes[0].OneofWrappers = []any{}
-	file_loci_poi_poi_proto_msgTypes[2].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[3].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[4].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[5].OneofWrappers = []any{}
-	file_loci_poi_poi_proto_msgTypes[9].OneofWrappers = []any{}
+	file_loci_poi_poi_proto_msgTypes[6].OneofWrappers = []any{}
+	file_loci_poi_poi_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_poi_poi_proto_rawDesc), len(file_loci_poi_poi_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

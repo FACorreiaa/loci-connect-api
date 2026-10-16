@@ -24,6 +24,9 @@ type Repository interface {
 	// the visit had no POI or replayed an existing one.
 	RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, *uuid.UUID, error)
 	DeleteVisit(ctx context.Context, userID, id uuid.UUID) error
+	// DeleteVisitedPOI removes one place visit (user_visited_pois.id) the user
+	// owns. It never touches the city row. False means no such visit for them.
+	DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (bool, error)
 	// EnsureBackfilled runs the one-time pass over pre-existing signals for this
 	// user, if it has not run already. Reports whether history is now populated.
 	EnsureBackfilled(ctx context.Context, userID uuid.UUID) (bool, error)
@@ -433,6 +436,15 @@ func countryFromCities(ctx context.Context, tx pgx.Tx, in VisitInput) (string, e
 		return "", fmt.Errorf("resolve visit country: %w", err)
 	}
 	return strings.TrimSpace(country), nil
+}
+
+func (r *repository) DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
+		`DELETE FROM user_visited_pois WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return false, fmt.Errorf("delete visited poi: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *repository) DeleteVisit(ctx context.Context, userID, id uuid.UUID) error {

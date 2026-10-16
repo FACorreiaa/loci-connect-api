@@ -230,6 +230,9 @@ func (h *Handler) RecordVisit(
 	}), nil
 }
 
+// visitKey is the preference_feedback metadata key a visit's signal is filed under.
+const visitKey = "visit_id"
+
 // learnFromVisit records a newly inserted place visit as a taste signal. The
 // visit id rides in the metadata so deleting the visit can remove the signal.
 func (h *Handler) learnFromVisit(ctx context.Context, uid uuid.UUID, in VisitInput, visitID *uuid.UUID) {
@@ -241,8 +244,8 @@ func (h *Handler) learnFromVisit(ctx context.Context, uid uuid.UUID, in VisitInp
 		TripID: in.TripID,
 		Weight: 1,
 		Metadata: map[string]any{
-			"visit_id": visitID.String(),
-			"source":   string(in.Source),
+			visitKey: visitID.String(),
+			"source": string(in.Source),
 		},
 	})
 	if h.kicker != nil {
@@ -266,6 +269,32 @@ func (h *Handler) DeleteVisit(
 		return nil, toConnectErr(err)
 	}
 	return connect.NewResponse(&travelhistoryv1.DeleteVisitResponse{Deleted: true}), nil
+}
+
+// DeleteVisitedPOI removes one place visit and the taste signal it produced.
+func (h *Handler) DeleteVisitedPOI(
+	ctx context.Context,
+	req *connect.Request[travelhistoryv1.DeleteVisitedPOIRequest],
+) (*connect.Response[travelhistoryv1.DeleteVisitedPOIResponse], error) {
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := uuid.Parse(req.Msg.GetId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid visit ID"))
+	}
+	deleted, err := h.repo.DeleteVisitedPOI(ctx, uid, id)
+	if err != nil {
+		return nil, toConnectErr(err)
+	}
+	if deleted && h.taste != nil {
+		h.taste.Forget(ctx, uid, visitKey, id.String())
+		if h.kicker != nil {
+			h.kicker.Kick(uid)
+		}
+	}
+	return connect.NewResponse(&travelhistoryv1.DeleteVisitedPOIResponse{Deleted: deleted}), nil
 }
 
 // GetGlobeData fills the whole globe dashboard in one call. Three separate RPCs

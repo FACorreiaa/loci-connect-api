@@ -173,6 +173,13 @@ func parseOptionalUUID(s string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
+func sourceFromProto(s travelhistoryv1.VisitSource) Source {
+	if s == travelhistoryv1.VisitSource_VISIT_SOURCE_VISIT_EVENT {
+		return SourceVisitEvent
+	}
+	return SourceManual
+}
+
 func visitInputFromProto(req *travelhistoryv1.RecordVisitRequest) (VisitInput, error) {
 	cityID, err := parseOptionalUUID(req.GetCityId())
 	if err != nil {
@@ -188,9 +195,10 @@ func visitInputFromProto(req *travelhistoryv1.RecordVisitRequest) (VisitInput, e
 		CityName:  req.GetCityName(),
 		Latitude:  req.GetLatitude(),
 		Longitude: req.GetLongitude(),
-		// A visit recorded through the public RPC is the traveller telling us
-		// directly; anything derived uses a different source.
-		Source:  SourceManual,
+		// The client says how it knew: an arrival on the spot, or the traveller
+		// marking it. Unset is MANUAL, as before the field existed; derived
+		// sources (trip, backfill) are rejected by the proto's validation.
+		Source:  sourceFromProto(req.GetSource()),
 		TripID:  tripID,
 		POIID:   req.GetPoiId(),
 		POIName: req.GetPoiName(),
