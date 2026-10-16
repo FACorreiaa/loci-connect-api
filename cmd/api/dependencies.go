@@ -54,6 +54,7 @@ import (
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/recap"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/retrieval"
@@ -230,6 +231,11 @@ type Dependencies struct {
 	CompareHandler           *compare.Handler
 	CityHandler              *cityhandler.CityHandler
 	TravelHistoryHandler     *travelhistory.Handler
+	// RecapHandler serves trip recaps; RecapImages draws their shared images.
+	RecapHandler *recap.Handler
+	RecapImages  *recap.ImageHandler
+	// recapRunner queues, builds and announces recaps; nil when off.
+	recapRunner *recap.Runner
 	// WatchHandler serves standing tasks. Always built: proposing, storing
 	// and listing work without a model; only running them needs one.
 	WatchHandler *watch.Handler
@@ -712,6 +718,15 @@ func (d *Dependencies) RunField(ctx context.Context) error {
 	return d.fieldRunner.Run(ctx)
 }
 
+// RunRecaps queues, builds and announces trip recaps until ctx is cancelled.
+// Returns nil immediately when switched off (RECAP_RUNNER_ENABLED).
+func (d *Dependencies) RunRecaps(ctx context.Context) error {
+	if d.recapRunner == nil {
+		return nil
+	}
+	return d.recapRunner.Run(ctx)
+}
+
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
@@ -1013,6 +1028,26 @@ func (d *Dependencies) initHandlers() error {
 		WithTaste(d.PreferenceRecorder, d.TasteRefresher)
 	if d.gamification != nil {
 		d.TravelHistoryHandler = d.TravelHistoryHandler.WithScorer(d.gamification)
+	}
+
+	// Trip recaps. Share links land on the web app, like trip shares. The
+	// push goes through the same notifier as badges, when push is on.
+	if d.DB != nil {
+		var recapNotifier recap.Notifier
+		if n, ok := progressNotifier.(recap.Notifier); ok {
+			recapNotifier = n
+		}
+		recapCityRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksCity, gamification.DefaultCityThresholds)
+		if err != nil {
+			recapCityRanks = gamification.DefaultCityThresholds
+		}
+		recapSvc := recap.NewService(recap.NewRepository(d.DB.Pool), shareOrigin(d.Config.Server.BaseURL), recapNotifier, d.Logger).
+			WithBuilder(&recap.Builder{CityRanks: recapCityRanks})
+		d.RecapHandler = recap.NewHandler(recapSvc, d.Logger)
+		d.RecapImages = recap.NewImageHandler(recapSvc, d.Logger)
+		if d.Config.Social.RecapRunnerEnabled {
+			d.recapRunner = recap.NewRunner(recapSvc, pglock.New(d.DB.Pool, recap.RunnerLockKey), d.Logger)
+		}
 	}
 
 	// City Packs. The catalog serves whether or not Stripe is configured; an

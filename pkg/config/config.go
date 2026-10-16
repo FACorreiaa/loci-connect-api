@@ -49,6 +49,9 @@ type SocialConfig struct {
 	// FieldRunnerEnabled runs the field score's background work: closing
 	// finished weeks, paying places kept a week, neighborhood lookups.
 	FieldRunnerEnabled bool
+	// RecapRunnerEnabled queues a recap when a trip ends, builds it and
+	// pushes it. Off by default: recaps still build when someone opens one.
+	RecapRunnerEnabled bool
 }
 
 type CacheConfig struct {
@@ -556,6 +559,7 @@ func Load() (*Config, error) {
 			FieldRanksOverall:   getEnv("FIELD_RANK_THRESHOLDS_OVERALL", ""),
 			FieldRanksCity:      getEnv("FIELD_RANK_THRESHOLDS_CITY", ""),
 			FieldRunnerEnabled:  getEnvAsBool("FIELD_RUNNER_ENABLED", true),
+			RecapRunnerEnabled:  getEnvAsBool("RECAP_RUNNER_ENABLED", false),
 		},
 		Messaging: MessagingConfig{
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
