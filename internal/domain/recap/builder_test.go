@@ -115,6 +115,10 @@ func TestBuildTripFull(t *testing.T) {
 	require.Len(t, hl, 3)
 	assert.Equal(t, "Tasca", hl[0].GetName(), "reviewed places first")
 	assert.Equal(t, recapv1.HighlightReason_HIGHLIGHT_REASON_FIRST_VISIT, hl[1].GetReason())
+	f2 := lisbon()
+	f2.Highlights = []HighlightFact{{POIID: "x", Name: "Bar", Category: "wine_bar"}}
+	rec2, _, _ := NewBuilder().BuildTrip(f2)
+	assert.Equal(t, "wine bar", card(rec2, CardHighlights).GetHighlights().GetHighlights()[0].GetCategory())
 
 	progress := card(rec, CardProgress).GetProgress()
 	assert.Equal(t, int64(120), progress.GetPoints())

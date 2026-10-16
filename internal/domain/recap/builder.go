@@ -521,7 +521,7 @@ func (b *Builder) highlights(f *TripFacts) *recapv1.RecapCard {
 		card.Highlights = append(card.Highlights, &recapv1.Highlight{
 			PoiId:    h.POIID,
 			Name:     h.Name,
-			Category: h.Category,
+			Category: humanCategory(h.Category),
 			Rating:   int32(h.Rating),
 			Reason:   recapv1.HighlightReason(h.Reason),
 		})
@@ -681,4 +681,9 @@ func lowerFirst(s string) string {
 		return s
 	}
 	return string(unicode.ToLower(r)) + s[n:]
+}
+
+// humanCategory turns a stored category key ("wine_bar") into words.
+func humanCategory(c string) string {
+	return strings.TrimSpace(strings.ReplaceAll(c, "_", " "))
 }

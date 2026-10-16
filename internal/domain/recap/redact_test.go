@@ -41,7 +41,10 @@ func TestPublicViewLeaksNothingPrivate(t *testing.T) {
 
 	places := card(pub, CardPlaces).GetPlaces()
 	assert.Equal(t, int32(4), places.GetPlacesCount(), "counts stay")
-	assert.Empty(t, places.GetGroups(), "neighbourhood stamps go")
+	require.Len(t, places.GetGroups(), 1, "neighbourhood stamps become one city stamp")
+	assert.Equal(t, "Lisbon", places.GetGroups()[0].GetLabel())
+	assert.Equal(t, int32(4), places.GetGroups()[0].GetPlacesCount())
+	assert.Equal(t, "Kept across three neighbourhoods of Lisbon.", places.GetHeadline())
 
 	route := card(pub, CardRoute).GetRoute()
 	assert.Positive(t, route.GetDistanceKm())

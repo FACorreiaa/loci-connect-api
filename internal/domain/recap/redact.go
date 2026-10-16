@@ -1,6 +1,7 @@
 package recap
 
 import (
+	"fmt"
 	"strings"
 
 	recapv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recap"
@@ -37,8 +38,14 @@ func PublicView(r *recapv1.Recap) *recapv1.Recap {
 		BuilderVersion: r.GetBuilderVersion(),
 	}
 	cities := cityNames(r)
+	primary := ""
 	for _, c := range r.GetCards() {
-		if pc := publicCard(c, cities); pc != nil {
+		if in := c.GetIntro(); in != nil {
+			primary = in.GetPrimaryCity()
+		}
+	}
+	for _, c := range r.GetCards() {
+		if pc := publicCard(c, cities, primary); pc != nil {
 			out.Cards = append(out.Cards, pc)
 		}
 	}
@@ -68,7 +75,7 @@ func cityNames(r *recapv1.Recap) map[string]bool {
 	return m
 }
 
-func publicCard(c *recapv1.RecapCard, cities map[string]bool) *recapv1.RecapCard {
+func publicCard(c *recapv1.RecapCard, cities map[string]bool, primary string) *recapv1.RecapCard {
 	id := c.GetId()
 	switch {
 	case c.GetIntro() != nil:
@@ -96,6 +103,14 @@ func publicCard(c *recapv1.RecapCard, cities map[string]bool) *recapv1.RecapCard
 		for _, g := range p.GetGroups() {
 			if cities[strings.ToLower(g.GetLabel())] {
 				card.Groups = append(card.Groups, &recapv1.PlaceGroup{Label: g.GetLabel(), PlacesCount: g.GetPlacesCount()})
+			}
+		}
+		// A one-city trip's stamps were all neighbourhoods: stamp the city
+		// instead, and say how many neighbourhoods without naming them.
+		if len(card.Groups) == 0 && card.GetPlacesCount() > 0 && primary != "" {
+			card.Groups = []*recapv1.PlaceGroup{{Label: primary, PlacesCount: card.GetPlacesCount()}}
+			if n := len(p.GetGroups()); n > 1 {
+				card.Headline = fmt.Sprintf("Kept across %s neighbourhoods of %s.", numberWord(n), primary)
 			}
 		}
 		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_Places{Places: card}}
