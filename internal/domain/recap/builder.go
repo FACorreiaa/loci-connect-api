@@ -100,7 +100,7 @@ func (b *Builder) BuildTrip(f *TripFacts) (rec *recapv1.Recap, reason string, ok
 	cards := make([]*recapv1.RecapCard, 0, len(stats)+2)
 	cards = append(cards, b.intro(f))
 	cards = append(cards, stats...)
-	cards = append(cards, outro(places, route, days))
+	cards = append(cards, outro(places, route, dayCount(f)))
 
 	return &recapv1.Recap{
 		Kind:           recapv1.RecapKind_RECAP_KIND_TRIP,
@@ -629,7 +629,9 @@ func (b *Builder) friends(f *TripFacts) *recapv1.RecapCard {
 	return &recapv1.RecapCard{Id: CardFriends, Card: &recapv1.RecapCard_Friends{Friends: card}}
 }
 
-func outro(places, route, days *recapv1.RecapCard) *recapv1.RecapCard {
+// outro counts the trip's days the way the intro and subtitle do (its
+// dates), not the itinerary's day rows, so the story agrees with itself.
+func outro(places, route *recapv1.RecapCard, days int) *recapv1.RecapCard {
 	var parts []string
 	if p := places.GetPlaces(); p != nil && p.GetPlacesCount() > 0 {
 		parts = append(parts, plural(int(p.GetPlacesCount()), "place", "places"))
@@ -637,9 +639,7 @@ func outro(places, route, days *recapv1.RecapCard) *recapv1.RecapCard {
 	if r := route.GetRoute(); r != nil {
 		parts = append(parts, fmt.Sprintf("%.0f km", r.GetDistanceKm()))
 	}
-	if d := days.GetDays(); d != nil {
-		parts = append(parts, plural(int(d.GetDaysTotal()), "day", "days"))
-	}
+	parts = append(parts, plural(days, "day", "days"))
 	return &recapv1.RecapCard{Id: CardOutro, Card: &recapv1.RecapCard_Outro{Outro: &recapv1.OutroCard{
 		Headline:    "Where to next?",
 		SummaryLine: strings.Join(parts, " · "),

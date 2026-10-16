@@ -130,7 +130,7 @@ func TestBuildTripFull(t *testing.T) {
 
 	outro := card(rec, CardOutro).GetOutro()
 	assert.Contains(t, outro.GetSummaryLine(), "4 places · ")
-	assert.Contains(t, outro.GetSummaryLine(), " km · 3 days")
+	assert.Contains(t, outro.GetSummaryLine(), " km · 5 days", "days as the subtitle counts them")
 }
 
 func TestBuildTripThinData(t *testing.T) {
