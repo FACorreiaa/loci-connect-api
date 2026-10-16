@@ -154,3 +154,28 @@ func TestHandler_SummariesSetHasPeriodCounts(t *testing.T) {
 	assert.True(t, summary.Msg.GetSummary().GetHasPeriodCounts())
 	assert.EqualValues(t, 0, summary.Msg.GetSummary().GetCitiesVisitedThisPeriod())
 }
+
+// RecordVisit hands back the new place visit's id, and nothing for a replay of
+// the same visit, so a replay cannot teach taste twice.
+func TestRecordVisit_ReturnsVisitIDOnlyWhenInserted(t *testing.T) {
+	ctx := context.Background()
+	pool := testsupport.MustPool()
+	user := uuid.New()
+	_, err := pool.Exec(ctx, "INSERT INTO users (id, email) VALUES ($1, $2)",
+		user, "visitid-"+uuid.NewString()+"@loci.test")
+	require.NoError(t, err)
+	repo := NewRepository(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	in := VisitInput{
+		CityName: "Lisbon", Latitude: 38.71, Longitude: -9.14,
+		POIID: uuid.NewString(), POIName: "Miradouro",
+		VisitedAt: time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC),
+	}
+	_, first, err := repo.RecordVisit(ctx, user, in)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	_, replay, err := repo.RecordVisit(ctx, user, in)
+	require.NoError(t, err)
+	require.Nil(t, replay)
+}

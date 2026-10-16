@@ -35,6 +35,16 @@ type Handler struct {
 	// best-effort: never nil after NewHandler, and never able to fail an event
 	// submission — see WithTravelHistory.
 	history travelhistory.Recorder
+
+	// kicker rebuilds the taste profile soon after an explicit verdict, so the
+	// next suggestion reflects it. Optional; nil waits for the rerank pass.
+	kicker preference.Kicker
+}
+
+// WithKicker refreshes the user's taste profile after explicit feedback.
+func (h *Handler) WithKicker(k preference.Kicker) *Handler {
+	h.kicker = k
+	return h
 }
 
 // WithTravelHistory attaches the travel-history recorder so a confirmed visit
@@ -230,6 +240,7 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 	// Visits derived from accepted events, written to travel history after the
 	// commit so they can never roll the events back.
 	var visited []visitCandidate
+	refresh := false
 	if len(req.Msg.GetEvents()) > 100 {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("too many recommendation events"))
 	}
@@ -323,6 +334,9 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 		if !learns {
 			continue
 		}
+		if explicitFeedback(event.GetEventType()) {
+			refresh = true
+		}
 		_, execErr = tx.Exec(ctx, `
 			INSERT INTO preference_feedback (user_id, poi_id, trip_id, event, weight, metadata)
 			SELECT $1, NULLIF($2, ''), $3, $4, $5, $6
@@ -339,6 +353,9 @@ func (h *Handler) RecordEvents(ctx context.Context, req *connect.Request[recomme
 	}
 
 	h.recordTravelHistory(ctx, userID, visited)
+	if refresh && h.kicker != nil {
+		h.kicker.Kick(userID)
+	}
 
 	return connect.NewResponse(&recommendationv1.RecordEventsResponse{Accepted: accepted, Duplicates: duplicates}), nil
 }
@@ -357,6 +374,20 @@ type visitCandidate struct {
 // the two identically (both produce the "visited" preference signal). Splitting
 // them here would make travel history disagree with the rest of the system about
 // what counts as having been somewhere.
+// explicitFeedback reports whether an event is a traveller's verdict on a
+// place, as opposed to exposure or a soft signal like a save.
+func explicitFeedback(t recommendationv1.RecommendationEventType) bool {
+	switch t {
+	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED:
+		return true
+	default:
+		return false
+	}
+}
+
 func visitConfirming(t recommendationv1.RecommendationEventType) bool {
 	switch t {
 	case recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED,

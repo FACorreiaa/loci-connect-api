@@ -62,13 +62,13 @@ func TestRepository_RecordVisitFillsCountryFromCities_Integration(t *testing.T) 
 	paris := seedCity(t, pool, "Globe Paris", "France", 48.86, 2.35)
 
 	t.Run("same name near its centre", func(t *testing.T) {
-		got, err := repo.RecordVisit(ctx, user, visitIn(lisbon, 38.71, -9.13))
+		got, _, err := repo.RecordVisit(ctx, user, visitIn(lisbon, 38.71, -9.13))
 		require.NoError(t, err)
 		require.Equal(t, "Portugal", got.Country)
 	})
 
 	t.Run("unknown name but within 50 km of a centre", func(t *testing.T) {
-		got, err := repo.RecordVisit(ctx, user, visitIn("Globe Cascais Bairro", 38.70, -9.42))
+		got, _, err := repo.RecordVisit(ctx, user, visitIn("Globe Cascais Bairro", 38.70, -9.42))
 		require.NoError(t, err)
 		require.Equal(t, "Portugal", got.Country)
 	})
@@ -76,7 +76,7 @@ func TestRepository_RecordVisitFillsCountryFromCities_Integration(t *testing.T) 
 	t.Run("same name but on another continent stays empty", func(t *testing.T) {
 		// Paris, Texas must not become France: a name match far from the
 		// stored centre is a different place, and we do not guess.
-		got, err := repo.RecordVisit(ctx, user, visitIn(paris, 33.66, -95.56))
+		got, _, err := repo.RecordVisit(ctx, user, visitIn(paris, 33.66, -95.56))
 		require.NoError(t, err)
 		require.Equal(t, "", got.Country)
 	})
@@ -85,7 +85,7 @@ func TestRepository_RecordVisitFillsCountryFromCities_Integration(t *testing.T) 
 		in := visitIn(lisbon, 38.71, -9.13)
 		in.Country = "Spain"
 		other := seedHistoryUser(t, pool)
-		got, err := repo.RecordVisit(ctx, other, in)
+		got, _, err := repo.RecordVisit(ctx, other, in)
 		require.NoError(t, err)
 		require.Equal(t, "Spain", got.Country)
 	})

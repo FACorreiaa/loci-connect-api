@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
@@ -242,6 +243,9 @@ type Dependencies struct {
 
 	PreferenceRecorder preference.Recorder
 	PreferenceVectors  preference.VectorStore
+	// TasteRefresher rebuilds a user's taste profile ~20s after an explicit
+	// verdict (rating, visit, dismissal) instead of waiting for the rerank pass.
+	TasteRefresher     *preference.Refresher
 	RetrievalAssembler *retrieval.Assembler
 }
 
@@ -333,6 +337,10 @@ func (d *Dependencies) initRepositories() error {
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
+	d.TasteRefresher = preference.NewRefresher(
+		preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser,
+		20*time.Second, d.Logger,
+	)
 	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
 	d.PushDevices = push.NewPostgresDeviceStore(d.DB.Pool)
 
@@ -523,7 +531,8 @@ func (d *Dependencies) initServices() error {
 		context.Background(), customauthservice.LoadIDTokenConfigFromEnv(),
 	)
 	d.PhoneService = customauthservice.NewPhoneService(customauthservice.LoadTwilioConfigFromEnv())
-	d.ReviewSvc = reviewdomain.NewService(d.ReviewRepo, d.Logger)
+	d.ReviewSvc = reviewdomain.NewService(d.ReviewRepo, d.Logger,
+		reviewdomain.WithTaste(d.PreferenceRecorder, d.TasteRefresher))
 
 	// Handlers
 	d.PaymentHandler = payment.NewPaymentServiceHandler(d.PaymentService, d.UserRepo, d.Logger)
@@ -841,7 +850,7 @@ func (d *Dependencies) initHandlers() error {
 	if d.MFAService != nil {
 		d.AuthHandler.WithMFA(d.MFAService)
 	}
-	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger)
+	d.RecommendationHandler = recommendation.NewHandler(d.DB.Pool, d.Logger).WithKicker(d.TasteRefresher)
 	// A finished run becomes a web push and an APNs push, each only when its
 	// keys are configured. With neither, runs, the cap and in-app toasts
 	// still work, and the log lines below are the only sign anything is
@@ -1000,7 +1009,8 @@ func (d *Dependencies) initHandlers() error {
 			d.Config.Server.BaseURL,
 		).WithOAuth(calendar.LoadOAuthConfigFromEnv()).WithSealer(d.sealer).WithPlans(d.SubscriptionService)
 	}
-	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger)
+	d.TravelHistoryHandler = travelhistory.NewHandler(d.TravelHistoryRepo, d.Logger).
+		WithTaste(d.PreferenceRecorder, d.TasteRefresher)
 	if d.gamification != nil {
 		d.TravelHistoryHandler = d.TravelHistoryHandler.WithScorer(d.gamification)
 	}
@@ -1144,6 +1154,8 @@ func (d *Dependencies) initHandlers() error {
 
 // Cleanup closes all resources
 func (d *Dependencies) Cleanup() {
+	// Before the pool closes: pending refreshes run now rather than being lost.
+	d.TasteRefresher.Close()
 	if d.watchClient != nil {
 		if err := d.watchClient.Close(); err != nil {
 			d.Logger.Warn("failed to close standing-task model client", slog.Any("error", err))
