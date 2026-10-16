@@ -30,6 +30,7 @@ const (
 	RecommendationChannel_RECOMMENDATION_CHANNEL_UNSPECIFIED RecommendationChannel = 0
 	RecommendationChannel_RECOMMENDATION_CHANNEL_WEB         RecommendationChannel = 1
 	RecommendationChannel_RECOMMENDATION_CHANNEL_MCP         RecommendationChannel = 2
+	RecommendationChannel_RECOMMENDATION_CHANNEL_IOS         RecommendationChannel = 3
 )
 
 // Enum value maps for RecommendationChannel.
@@ -38,11 +39,13 @@ var (
 		0: "RECOMMENDATION_CHANNEL_UNSPECIFIED",
 		1: "RECOMMENDATION_CHANNEL_WEB",
 		2: "RECOMMENDATION_CHANNEL_MCP",
+		3: "RECOMMENDATION_CHANNEL_IOS",
 	}
 	RecommendationChannel_value = map[string]int32{
 		"RECOMMENDATION_CHANNEL_UNSPECIFIED": 0,
 		"RECOMMENDATION_CHANNEL_WEB":         1,
 		"RECOMMENDATION_CHANNEL_MCP":         2,
+		"RECOMMENDATION_CHANNEL_IOS":         3,
 	}
 )
 
@@ -1018,11 +1021,12 @@ const file_loci_recommendation_recommendation_proto_rawDesc = "" +
 	"\fconfirmation\x18\x01 \x01(\tB\f\xbaH\tr\a\n" +
 	"\x05RESETR\fconfirmation\"5\n" +
 	"\x19ResetTasteProfileResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess*\x7f\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess*\x9f\x01\n" +
 	"\x15RecommendationChannel\x12&\n" +
 	"\"RECOMMENDATION_CHANNEL_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aRECOMMENDATION_CHANNEL_WEB\x10\x01\x12\x1e\n" +
-	"\x1aRECOMMENDATION_CHANNEL_MCP\x10\x02*\xeb\x01\n" +
+	"\x1aRECOMMENDATION_CHANNEL_MCP\x10\x02\x12\x1e\n" +
+	"\x1aRECOMMENDATION_CHANNEL_IOS\x10\x03*\xeb\x01\n" +
 	"\x15RecommendationSurface\x12&\n" +
 	"\"RECOMMENDATION_SURFACE_UNSPECIFIED\x10\x00\x12#\n" +
 	"\x1fRECOMMENDATION_SURFACE_DISCOVER\x10\x01\x12!\n" +
