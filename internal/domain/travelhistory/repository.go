@@ -294,6 +294,10 @@ func (r *repository) GlobeData(ctx context.Context, userID uuid.UUID, limit int)
 }
 
 func (r *repository) RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, *uuid.UUID, error) {
+	// No timestamp from the client means "I've been here", not an arrival
+	// observed at a moment. Marking a place twice is the same fact, so it must
+	// not add a visit, a taste signal, or a city count.
+	serverStamped := in.VisitedAt.IsZero()
 	in.Normalise(r.now())
 	if err := in.Validate(); err != nil {
 		return nil, nil, err
@@ -304,6 +308,18 @@ func (r *repository) RecordVisit(ctx context.Context, userID uuid.UUID, in Visit
 		return nil, nil, fmt.Errorf("begin record visit: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+
+	if serverStamped && in.POIID != "" {
+		var known bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM user_visited_pois WHERE user_id = $1 AND poi_id = $2)`,
+			userID, in.POIID).Scan(&known); err != nil {
+			return nil, nil, fmt.Errorf("check known visit: %w", err)
+		}
+		if known {
+			return nil, nil, nil
+		}
+	}
 
 	city, err := upsertVisitedCity(ctx, tx, userID, in)
 	if err != nil {

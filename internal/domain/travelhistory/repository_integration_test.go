@@ -179,3 +179,41 @@ func TestRecordVisit_ReturnsVisitIDOnlyWhenInserted(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, replay)
 }
+
+// "I've been here" sends no timestamp, so the server stamps now(). Pressing it
+// again (on another day, or after walking there) must not add a second visit,
+// a second taste signal, or bump the city's count.
+func TestRecordVisit_ServerStampedRepeatIsIdempotent(t *testing.T) {
+	ctx := context.Background()
+	pool := testsupport.MustPool()
+	user := uuid.New()
+	_, err := pool.Exec(ctx, "INSERT INTO users (id, email) VALUES ($1, $2)",
+		user, "idem-"+uuid.NewString()+"@loci.test")
+	require.NoError(t, err)
+	repo := NewRepository(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	poiID := uuid.NewString()
+	in := VisitInput{CityName: "Lisbon-" + uuid.NewString(), Latitude: 38.71, Longitude: -9.14, POIID: poiID, POIName: "Miradouro"}
+	_, first, err := repo.RecordVisit(ctx, user, in)
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	_, again, err := repo.RecordVisit(ctx, user, in)
+	require.NoError(t, err)
+	require.Nil(t, again, "a repeated manual mark must not insert a visit")
+
+	var visits, cityCount int
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM user_visited_pois WHERE user_id = $1 AND poi_id = $2`, user, poiID).Scan(&visits))
+	require.Equal(t, 1, visits)
+	require.NoError(t, pool.QueryRow(ctx,
+		`SELECT visit_count FROM user_visited_cities WHERE user_id = $1 AND city_name = $2`, user, in.CityName).Scan(&cityCount))
+	require.Equal(t, 1, cityCount)
+
+	// A timed arrival (walk, trip day) is a real return visit and still counts.
+	timed := in
+	timed.VisitedAt = time.Now().Add(48 * time.Hour)
+	_, returned, err := repo.RecordVisit(ctx, user, timed)
+	require.NoError(t, err)
+	require.NotNil(t, returned)
+}

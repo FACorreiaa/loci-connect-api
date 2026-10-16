@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -63,6 +64,17 @@ const insertFeedback = `
 		SELECT personalization_enabled FROM personalization_settings WHERE user_id = $1
 	), TRUE)`
 
+// recordTimeout bounds one best-effort write once it is detached from the
+// request.
+const recordTimeout = 5 * time.Second
+
+// detached runs a signal write independently of the request: signals are
+// recorded after the caller's main write commits, and a client that drops the
+// connection then must not lose the signal.
+func detached(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), recordTimeout)
+}
+
 func feedbackArgs(opts RecordOpts) (weight float32, raw []byte) {
 	weight = opts.Weight
 	if weight == 0 {
@@ -83,6 +95,8 @@ func (r *recorder) Record(ctx context.Context, userID uuid.UUID, event string, o
 	if userID == uuid.Nil || event == "" {
 		return
 	}
+	ctx, cancel := detached(ctx)
+	defer cancel()
 	weight, raw := feedbackArgs(opts)
 	_, err := r.db.Exec(ctx, insertFeedback, userID, opts.POIID, opts.TripID, event, weight, raw)
 	if err != nil && r.logger != nil {
@@ -94,6 +108,8 @@ func (r *recorder) Replace(ctx context.Context, userID uuid.UUID, key, value, ev
 	if userID == uuid.Nil || event == "" || key == "" || value == "" {
 		return
 	}
+	ctx, cancel := detached(ctx)
+	defer cancel()
 	weight, raw := feedbackArgs(opts)
 	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `
@@ -113,6 +129,8 @@ func (r *recorder) Forget(ctx context.Context, userID uuid.UUID, key, value stri
 	if userID == uuid.Nil || key == "" || value == "" {
 		return
 	}
+	ctx, cancel := detached(ctx)
+	defer cancel()
 	_, err := r.db.Exec(ctx, `
 		DELETE FROM preference_feedback WHERE user_id = $1 AND metadata->>$2 = $3`,
 		userID, key, value)

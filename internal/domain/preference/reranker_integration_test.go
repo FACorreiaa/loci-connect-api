@@ -143,3 +143,21 @@ func TestRecorder_RespectsPersonalizationOff(t *testing.T) {
 	rec.Replace(ctx, userID, "review_id", "r1", EventVisited, RecordOpts{POIID: uuid.NewString(), Metadata: map[string]any{"review_id": "r1"}})
 	require.Empty(t, feedbackRows(ctx, t, userID))
 }
+
+// A signal is recorded after the main write commits; a client that drops the
+// connection at that moment cancels the request context, and the signal must
+// still land.
+func TestRecorder_WritesAfterRequestCancelled(t *testing.T) {
+	ctx := context.Background()
+	userID := newTestUser(ctx, t, "cancelled")
+	rec := NewRecorder(testsupport.MustPool(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	rec.Record(cancelled, userID, EventVisited, RecordOpts{POIID: uuid.NewString()})
+	rec.Replace(cancelled, userID, "review_id", "r1", EventVisited, RecordOpts{POIID: uuid.NewString(), Metadata: map[string]any{"review_id": "r1"}})
+	require.Len(t, feedbackRows(ctx, t, userID), 2)
+
+	rec.Forget(cancelled, userID, "review_id", "r1")
+	require.Len(t, feedbackRows(ctx, t, userID), 1)
+}
