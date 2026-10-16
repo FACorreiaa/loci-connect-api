@@ -94,7 +94,11 @@ type ContextPacket struct {
 	CityName    string     `json:"city_name,omitempty"`
 	Evidence    []Evidence `json:"evidence"`
 	TraitLabels []string   `json:"trait_labels,omitempty"`
-	AssembledAt time.Time  `json:"assembled_at"`
+	// History is context about the traveller, not candidates. It is excluded
+	// from PacketID: the same places answer the same question whatever the
+	// account has saved since.
+	History     *UserHistory `json:"history,omitempty"`
+	AssembledAt time.Time    `json:"assembled_at"`
 }
 
 // RecordedEvidence is one persisted answer_evidence row, read back for display
@@ -310,7 +314,7 @@ func Render(p *ContextPacket) string {
 	if p.IsEmpty() {
 		return "**VERIFIED PLACES:** none found in Loci's database for this request. " +
 			"Say so plainly rather than inventing places, and keep any general " +
-			"suggestions clearly marked as unverified.\n"
+			"suggestions clearly marked as unverified.\n" + renderHistory(p.History)
 	}
 
 	var b strings.Builder
@@ -351,6 +355,7 @@ func Render(p *ContextPacket) string {
 	if len(p.TraitLabels) > 0 {
 		fmt.Fprintf(&b, "\n**Learned preferences:** %s\n", strings.Join(p.TraitLabels, ", "))
 	}
+	b.WriteString(renderHistory(p.History))
 
 	b.WriteString(`
 **CITATION RULES — these are not optional:**

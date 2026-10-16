@@ -20,7 +20,9 @@ type Repository interface {
 	ListVisitedPOIs(ctx context.Context, userID uuid.UUID, cityID *uuid.UUID, limit, offset int) ([]*VisitedPOI, int, error)
 	Summary(ctx context.Context, userID uuid.UUID, periodDays int32) (*Summary, error)
 	GlobeData(ctx context.Context, userID uuid.UUID, limit int) ([]*VisitedCity, []*GlobeArc, error)
-	RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, error)
+	// RecordVisit returns the place visit's id when one was inserted; nil when
+	// the visit had no POI or replayed an existing one.
+	RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, *uuid.UUID, error)
 	DeleteVisit(ctx context.Context, userID, id uuid.UUID) error
 	// EnsureBackfilled runs the one-time pass over pre-existing signals for this
 	// user, if it has not run already. Reports whether history is now populated.
@@ -291,44 +293,67 @@ func (r *repository) GlobeData(ctx context.Context, userID uuid.UUID, limit int)
 	return cities, arcs, nil
 }
 
-func (r *repository) RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, error) {
+func (r *repository) RecordVisit(ctx context.Context, userID uuid.UUID, in VisitInput) (*VisitedCity, *uuid.UUID, error) {
+	// No timestamp from the client means "I've been here", not an arrival
+	// observed at a moment. Marking a place twice is the same fact, so it must
+	// not add a visit, a taste signal, or a city count.
+	serverStamped := in.VisitedAt.IsZero()
 	in.Normalise(r.now())
 	if err := in.Validate(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("begin record visit: %w", err)
+		return nil, nil, fmt.Errorf("begin record visit: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	city, err := upsertVisitedCity(ctx, tx, userID, in)
-	if err != nil {
-		return nil, err
+	if serverStamped && in.POIID != "" {
+		var known bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM user_visited_pois WHERE user_id = $1 AND poi_id = $2)`,
+			userID, in.POIID).Scan(&known); err != nil {
+			return nil, nil, fmt.Errorf("check known visit: %w", err)
+		}
+		if known {
+			return nil, nil, nil
+		}
 	}
 
+	city, err := upsertVisitedCity(ctx, tx, userID, in)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var visitID *uuid.UUID
 	if in.POIID != "" {
 		// ON CONFLICT DO NOTHING: replaying the same event (same instant, same
 		// POI) must not inflate the count. A genuine second visit has a
-		// different timestamp.
-		if _, err := tx.Exec(ctx, `
+		// different timestamp. A replay returns no row, so visitID stays nil.
+		var id uuid.UUID
+		err := tx.QueryRow(ctx, `
 			INSERT INTO user_visited_pois (
 				user_id, poi_id, poi_name, city_name, latitude, longitude,
 				trip_id, source, visited_at
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-			ON CONFLICT (user_id, poi_id, visited_at) DO NOTHING`,
+			ON CONFLICT (user_id, poi_id, visited_at) DO NOTHING
+			RETURNING id`,
 			userID, in.POIID, in.POIName, in.CityName,
 			in.Latitude, in.Longitude, in.TripID, string(in.Source), in.VisitedAt,
-		); err != nil {
-			return nil, fmt.Errorf("record visited poi: %w", err)
+		).Scan(&id)
+		switch {
+		case err == nil:
+			visitID = &id
+		case !errors.Is(err, pgx.ErrNoRows):
+			return nil, nil, fmt.Errorf("record visited poi: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit record visit: %w", err)
+		return nil, nil, fmt.Errorf("commit record visit: %w", err)
 	}
-	return city, nil
+	return city, visitID, nil
 }
 
 // upsertVisitedCity merges a visit into the existing row for that city, widening

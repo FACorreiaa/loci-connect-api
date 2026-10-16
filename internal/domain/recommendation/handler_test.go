@@ -121,3 +121,25 @@ func TestEventFingerprint_DeduplicatesLogicalRetries(t *testing.T) {
 	second.EventType = recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED
 	assert.NotEqual(t, eventFingerprint(userID, first, metadata, nil), eventFingerprint(userID, second, metadata, nil))
 }
+
+// Explicit verdicts refresh the taste profile at once; exposure and soft
+// signals wait for the rerank pass.
+func TestExplicitFeedback(t *testing.T) {
+	t.Parallel()
+	explicit := []recommendationv1.RecommendationEventType{
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_DISMISSED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_REMOVED_FROM_TRIP,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_VISIT_CONFIRMED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_RATED,
+	}
+	for _, et := range explicit {
+		assert.True(t, explicitFeedback(et), et.String())
+	}
+	for _, et := range []recommendationv1.RecommendationEventType{
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_PRESENTED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_OPENED,
+		recommendationv1.RecommendationEventType_RECOMMENDATION_EVENT_TYPE_FAVORITED,
+	} {
+		assert.False(t, explicitFeedback(et), et.String())
+	}
+}

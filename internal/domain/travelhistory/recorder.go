@@ -45,7 +45,7 @@ func (r *repoRecorder) RecordVisit(ctx context.Context, userID uuid.UUID, in Vis
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.timeout)
 	defer cancel()
 
-	if _, err := r.repo.RecordVisit(ctx, userID, in); err != nil {
+	if _, _, err := r.repo.RecordVisit(ctx, userID, in); err != nil {
 		r.log.Warn("record visit failed",
 			slog.String("user_id", userID.String()),
 			slog.String("city", in.CityName),

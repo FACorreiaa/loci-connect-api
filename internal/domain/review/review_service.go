@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 )
 
 // ErrInvalidReview signals a validation failure on review input.
@@ -68,11 +70,54 @@ type Service interface {
 type service struct {
 	repo   Repository
 	logger *slog.Logger
+	taste  preference.Recorder
+	kicker preference.Kicker
 }
 
-func NewService(repo Repository, logger *slog.Logger) Service {
-	return &service{repo: repo, logger: logger.With(slog.String("component", "review-service"))}
+// Option configures optional collaborators of the review service.
+type Option func(*service)
+
+// WithTaste makes a review's rating teach the author's taste profile. Each
+// review keeps exactly one signal, keyed by its id: an edit replaces it and a
+// delete forgets it.
+func WithTaste(r preference.Recorder, k preference.Kicker) Option {
+	return func(s *service) {
+		s.taste = r
+		s.kicker = k
+	}
 }
+
+func NewService(repo Repository, logger *slog.Logger, opts ...Option) Service {
+	s := &service{repo: repo, logger: logger.With(slog.String("component", "review-service"))}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// learnFromRating swaps in the review's current rating as its taste signal.
+func (s *service) learnFromRating(ctx context.Context, userID, reviewID, poiID uuid.UUID, rating int) {
+	if s.taste == nil {
+		return
+	}
+	event, weight := preference.RatingSignal(float64(rating))
+	id := reviewID.String()
+	s.taste.Replace(ctx, userID, reviewKey, id, event, preference.RecordOpts{
+		POIID:    poiID.String(),
+		Weight:   weight,
+		Metadata: map[string]any{reviewKey: id},
+	})
+	s.kick(userID)
+}
+
+func (s *service) kick(userID uuid.UUID) {
+	if s.kicker != nil {
+		s.kicker.Kick(userID)
+	}
+}
+
+// reviewKey is the preference_feedback metadata key a review's signal is filed under.
+const reviewKey = "review_id"
 
 func validateReviewBody(rating int, content string) error {
 	if rating < 1 || rating > 5 {
@@ -100,6 +145,7 @@ func (s *service) CreateReview(ctx context.Context, in CreateReviewInput) (*Revi
 	if err := s.repo.Create(ctx, r); err != nil {
 		return nil, err
 	}
+	s.learnFromRating(ctx, r.UserID, r.ID, r.POIID, r.Rating)
 	// Re-fetch so the returned review carries the joined reviewer/POI display info.
 	return s.repo.GetByID(ctx, r.ID)
 }
@@ -145,7 +191,14 @@ func (s *service) ResolveReport(ctx context.Context, reviewID, moderatorID uuid.
 }
 
 func (s *service) DeleteReview(ctx context.Context, reviewID, userID uuid.UUID) error {
-	return s.repo.Delete(ctx, reviewID, userID)
+	if err := s.repo.Delete(ctx, reviewID, userID); err != nil {
+		return err
+	}
+	if s.taste != nil {
+		s.taste.Forget(ctx, userID, reviewKey, reviewID.String())
+		s.kick(userID)
+	}
+	return nil
 }
 
 // LikeReview records a helpful vote. Authors cannot vote on their own
@@ -175,7 +228,12 @@ func (s *service) UpdateReview(ctx context.Context, in UpdateReviewInput) (*Revi
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetByID(ctx, in.ReviewID)
+	updated, err := s.repo.GetByID(ctx, in.ReviewID)
+	if err != nil {
+		return nil, err
+	}
+	s.learnFromRating(ctx, in.UserID, in.ReviewID, updated.POIID, in.Rating)
+	return updated, nil
 }
 
 func (s *service) GetStatistics(ctx context.Context, poiID uuid.UUID) (*Statistics, error) {

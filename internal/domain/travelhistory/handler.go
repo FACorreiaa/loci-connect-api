@@ -11,6 +11,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory/travelhistoryconnect"
 	"github.com/google/uuid"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -20,6 +21,8 @@ type Handler struct {
 	repo   Repository
 	log    *slog.Logger
 	scorer VisitScorer
+	taste  preference.Recorder
+	kicker preference.Kicker
 }
 
 // VisitScorer awards points for a visit made on the spot. It returns the
@@ -46,6 +49,15 @@ type DeviceFix struct {
 // WithScorer turns on points for visits recorded on the spot.
 func (h *Handler) WithScorer(s VisitScorer) *Handler {
 	h.scorer = s
+	return h
+}
+
+// WithTaste makes recorded place visits teach the traveller's taste profile.
+// Derived visits (trip backfill, recommendation events) do not pass through
+// this handler, so they are never counted twice.
+func (h *Handler) WithTaste(r preference.Recorder, k preference.Kicker) *Handler {
+	h.taste = r
+	h.kicker = k
 	return h
 }
 
@@ -190,10 +202,11 @@ func (h *Handler) RecordVisit(
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	city, err := h.repo.RecordVisit(ctx, uid, in)
+	city, visitID, err := h.repo.RecordVisit(ctx, uid, in)
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
+	h.learnFromVisit(ctx, uid, in, visitID)
 	var points int
 	if h.scorer != nil && req.Msg.DeviceLocation != nil {
 		fix := req.Msg.GetDeviceLocation()
@@ -215,6 +228,26 @@ func (h *Handler) RecordVisit(
 		City:          visitedCityToProto(city),
 		PointsAwarded: int32(points),
 	}), nil
+}
+
+// learnFromVisit records a newly inserted place visit as a taste signal. The
+// visit id rides in the metadata so deleting the visit can remove the signal.
+func (h *Handler) learnFromVisit(ctx context.Context, uid uuid.UUID, in VisitInput, visitID *uuid.UUID) {
+	if h.taste == nil || visitID == nil || in.POIID == "" {
+		return
+	}
+	h.taste.Record(ctx, uid, preference.EventVisited, preference.RecordOpts{
+		POIID:  in.POIID,
+		TripID: in.TripID,
+		Weight: 1,
+		Metadata: map[string]any{
+			"visit_id": visitID.String(),
+			"source":   string(in.Source),
+		},
+	})
+	if h.kicker != nil {
+		h.kicker.Kick(uid)
+	}
 }
 
 func (h *Handler) DeleteVisit(
