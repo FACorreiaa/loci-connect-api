@@ -32,6 +32,13 @@ const (
 	// MaxQueryChars rejects pathologically long queries before they reach the
 	// database or an embedding provider.
 	MaxQueryChars = 512
+	// MaxHistoryChars caps the rendered "your history" block, heading included.
+	MaxHistoryChars = 600
+	// MaxHistoryTrips, MaxHistorySaved and MaxHistoryLists bound each section
+	// of a traveller's history before rendering.
+	MaxHistoryTrips = 5
+	MaxHistorySaved = 8
+	MaxHistoryLists = 5
 )
 
 // DefaultEvidence is the packet size used when a caller does not ask for one.

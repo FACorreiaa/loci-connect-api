@@ -125,6 +125,7 @@ func (a *Assembler) Assemble(ctx context.Context, req Request) (*ContextPacket, 
 		a.markVisited(ctx, packet, req.UserID, ids)
 	}
 	packet.TraitLabels = a.traitLabels(ctx, req.UserID)
+	packet.History = a.userHistory(ctx, req.UserID, req.CityName)
 
 	sortEvidence(packet.Evidence)
 	for i := range packet.Evidence {
