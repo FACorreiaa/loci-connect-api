@@ -41,6 +41,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile/profileconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recap/recapconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recents/recentsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation/recommendationconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/review/reviewv1connect"
@@ -61,6 +62,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment" // Add import
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/recap"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
@@ -115,6 +117,8 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		// packs: a present token is still validated, and the handlers widen
 		// what they show to a signed-in friend.
 		tripconnect.TripServiceGetSharedTripProcedure,
+		// A shared recap, the same way: the public view, by share code.
+		recapconnect.RecapServiceGetSharedRecapProcedure,
 		tripconnect.TripServiceListUserTripsProcedure,
 		socialconnect.SocialServiceGetInviteProcedure,
 		socialconnect.SocialServiceGetPublicProfileProcedure,
@@ -470,6 +474,14 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		mux.Handle(calPath, calHandler)
 		mux.Handle("/calendar/feed/", deps.CalendarHandler.FeedHandler())
 		deps.Logger.Info("registered Connect RPC service", "path", calPath)
+	}
+
+	if deps.RecapHandler != nil {
+		recapPath, recapHandler := recapconnect.NewRecapServiceHandler(deps.RecapHandler, opts)
+		mux.Handle(recapPath, recapHandler)
+		// Shared recap images: link previews and story cards, public.
+		mux.Handle(recap.ImagePath, deps.RecapImages)
+		deps.Logger.Info("registered Connect RPC service", "path", recapPath)
 	}
 
 	if deps.TravelHistoryHandler != nil {

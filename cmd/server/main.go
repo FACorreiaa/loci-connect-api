@@ -154,6 +154,13 @@ func main() {
 		}
 	})
 
+	// Queue, build and announce trip recaps. Returns immediately when off.
+	concurrency.Run(logger, func() {
+		if err := deps.RunRecaps(backgroundCtx); err != nil {
+			logger.Error("recap runner stopped", "error", err)
+		}
+	})
+
 	// Start HTTP server
 	if err := runServer(cfg, logger, handler); err != nil {
 		logger.Error("server error", "error", err)
