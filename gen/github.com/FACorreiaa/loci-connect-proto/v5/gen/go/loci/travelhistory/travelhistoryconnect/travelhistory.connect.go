@@ -48,6 +48,9 @@ const (
 	// TravelHistoryServiceDeleteVisitProcedure is the fully-qualified name of the
 	// TravelHistoryService's DeleteVisit RPC.
 	TravelHistoryServiceDeleteVisitProcedure = "/loci.travelhistory.TravelHistoryService/DeleteVisit"
+	// TravelHistoryServiceDeleteVisitedPOIProcedure is the fully-qualified name of the
+	// TravelHistoryService's DeleteVisitedPOI RPC.
+	TravelHistoryServiceDeleteVisitedPOIProcedure = "/loci.travelhistory.TravelHistoryService/DeleteVisitedPOI"
 	// TravelHistoryServiceGetGlobeDataProcedure is the fully-qualified name of the
 	// TravelHistoryService's GetGlobeData RPC.
 	TravelHistoryServiceGetGlobeDataProcedure = "/loci.travelhistory.TravelHistoryService/GetGlobeData"
@@ -61,6 +64,7 @@ var (
 	travelHistoryServiceGetTravelSummaryMethodDescriptor  = travelHistoryServiceServiceDescriptor.Methods().ByName("GetTravelSummary")
 	travelHistoryServiceRecordVisitMethodDescriptor       = travelHistoryServiceServiceDescriptor.Methods().ByName("RecordVisit")
 	travelHistoryServiceDeleteVisitMethodDescriptor       = travelHistoryServiceServiceDescriptor.Methods().ByName("DeleteVisit")
+	travelHistoryServiceDeleteVisitedPOIMethodDescriptor  = travelHistoryServiceServiceDescriptor.Methods().ByName("DeleteVisitedPOI")
 	travelHistoryServiceGetGlobeDataMethodDescriptor      = travelHistoryServiceServiceDescriptor.Methods().ByName("GetGlobeData")
 )
 
@@ -71,6 +75,7 @@ type TravelHistoryServiceClient interface {
 	GetTravelSummary(context.Context, *connect.Request[travelhistory.GetTravelSummaryRequest]) (*connect.Response[travelhistory.GetTravelSummaryResponse], error)
 	RecordVisit(context.Context, *connect.Request[travelhistory.RecordVisitRequest]) (*connect.Response[travelhistory.RecordVisitResponse], error)
 	DeleteVisit(context.Context, *connect.Request[travelhistory.DeleteVisitRequest]) (*connect.Response[travelhistory.DeleteVisitResponse], error)
+	DeleteVisitedPOI(context.Context, *connect.Request[travelhistory.DeleteVisitedPOIRequest]) (*connect.Response[travelhistory.DeleteVisitedPOIResponse], error)
 	// GetGlobeData fills the entire globe dashboard in one call.
 	GetGlobeData(context.Context, *connect.Request[travelhistory.GetGlobeDataRequest]) (*connect.Response[travelhistory.GetGlobeDataResponse], error)
 }
@@ -115,6 +120,12 @@ func NewTravelHistoryServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(travelHistoryServiceDeleteVisitMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		deleteVisitedPOI: connect.NewClient[travelhistory.DeleteVisitedPOIRequest, travelhistory.DeleteVisitedPOIResponse](
+			httpClient,
+			baseURL+TravelHistoryServiceDeleteVisitedPOIProcedure,
+			connect.WithSchema(travelHistoryServiceDeleteVisitedPOIMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		getGlobeData: connect.NewClient[travelhistory.GetGlobeDataRequest, travelhistory.GetGlobeDataResponse](
 			httpClient,
 			baseURL+TravelHistoryServiceGetGlobeDataProcedure,
@@ -131,6 +142,7 @@ type travelHistoryServiceClient struct {
 	getTravelSummary  *connect.Client[travelhistory.GetTravelSummaryRequest, travelhistory.GetTravelSummaryResponse]
 	recordVisit       *connect.Client[travelhistory.RecordVisitRequest, travelhistory.RecordVisitResponse]
 	deleteVisit       *connect.Client[travelhistory.DeleteVisitRequest, travelhistory.DeleteVisitResponse]
+	deleteVisitedPOI  *connect.Client[travelhistory.DeleteVisitedPOIRequest, travelhistory.DeleteVisitedPOIResponse]
 	getGlobeData      *connect.Client[travelhistory.GetGlobeDataRequest, travelhistory.GetGlobeDataResponse]
 }
 
@@ -159,6 +171,11 @@ func (c *travelHistoryServiceClient) DeleteVisit(ctx context.Context, req *conne
 	return c.deleteVisit.CallUnary(ctx, req)
 }
 
+// DeleteVisitedPOI calls loci.travelhistory.TravelHistoryService.DeleteVisitedPOI.
+func (c *travelHistoryServiceClient) DeleteVisitedPOI(ctx context.Context, req *connect.Request[travelhistory.DeleteVisitedPOIRequest]) (*connect.Response[travelhistory.DeleteVisitedPOIResponse], error) {
+	return c.deleteVisitedPOI.CallUnary(ctx, req)
+}
+
 // GetGlobeData calls loci.travelhistory.TravelHistoryService.GetGlobeData.
 func (c *travelHistoryServiceClient) GetGlobeData(ctx context.Context, req *connect.Request[travelhistory.GetGlobeDataRequest]) (*connect.Response[travelhistory.GetGlobeDataResponse], error) {
 	return c.getGlobeData.CallUnary(ctx, req)
@@ -172,6 +189,7 @@ type TravelHistoryServiceHandler interface {
 	GetTravelSummary(context.Context, *connect.Request[travelhistory.GetTravelSummaryRequest]) (*connect.Response[travelhistory.GetTravelSummaryResponse], error)
 	RecordVisit(context.Context, *connect.Request[travelhistory.RecordVisitRequest]) (*connect.Response[travelhistory.RecordVisitResponse], error)
 	DeleteVisit(context.Context, *connect.Request[travelhistory.DeleteVisitRequest]) (*connect.Response[travelhistory.DeleteVisitResponse], error)
+	DeleteVisitedPOI(context.Context, *connect.Request[travelhistory.DeleteVisitedPOIRequest]) (*connect.Response[travelhistory.DeleteVisitedPOIResponse], error)
 	// GetGlobeData fills the entire globe dashboard in one call.
 	GetGlobeData(context.Context, *connect.Request[travelhistory.GetGlobeDataRequest]) (*connect.Response[travelhistory.GetGlobeDataResponse], error)
 }
@@ -212,6 +230,12 @@ func NewTravelHistoryServiceHandler(svc TravelHistoryServiceHandler, opts ...con
 		connect.WithSchema(travelHistoryServiceDeleteVisitMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	travelHistoryServiceDeleteVisitedPOIHandler := connect.NewUnaryHandler(
+		TravelHistoryServiceDeleteVisitedPOIProcedure,
+		svc.DeleteVisitedPOI,
+		connect.WithSchema(travelHistoryServiceDeleteVisitedPOIMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	travelHistoryServiceGetGlobeDataHandler := connect.NewUnaryHandler(
 		TravelHistoryServiceGetGlobeDataProcedure,
 		svc.GetGlobeData,
@@ -230,6 +254,8 @@ func NewTravelHistoryServiceHandler(svc TravelHistoryServiceHandler, opts ...con
 			travelHistoryServiceRecordVisitHandler.ServeHTTP(w, r)
 		case TravelHistoryServiceDeleteVisitProcedure:
 			travelHistoryServiceDeleteVisitHandler.ServeHTTP(w, r)
+		case TravelHistoryServiceDeleteVisitedPOIProcedure:
+			travelHistoryServiceDeleteVisitedPOIHandler.ServeHTTP(w, r)
 		case TravelHistoryServiceGetGlobeDataProcedure:
 			travelHistoryServiceGetGlobeDataHandler.ServeHTTP(w, r)
 		default:
@@ -259,6 +285,10 @@ func (UnimplementedTravelHistoryServiceHandler) RecordVisit(context.Context, *co
 
 func (UnimplementedTravelHistoryServiceHandler) DeleteVisit(context.Context, *connect.Request[travelhistory.DeleteVisitRequest]) (*connect.Response[travelhistory.DeleteVisitResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.travelhistory.TravelHistoryService.DeleteVisit is not implemented"))
+}
+
+func (UnimplementedTravelHistoryServiceHandler) DeleteVisitedPOI(context.Context, *connect.Request[travelhistory.DeleteVisitedPOIRequest]) (*connect.Response[travelhistory.DeleteVisitedPOIResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.travelhistory.TravelHistoryService.DeleteVisitedPOI is not implemented"))
 }
 
 func (UnimplementedTravelHistoryServiceHandler) GetGlobeData(context.Context, *connect.Request[travelhistory.GetGlobeDataRequest]) (*connect.Response[travelhistory.GetGlobeDataResponse], error) {

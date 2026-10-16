@@ -113,3 +113,67 @@ func TestRecordVisit_ReplayedVisit_NoSecondSignal(t *testing.T) {
 		t.Fatalf("signals = %d, want 0", len(taste.signals))
 	}
 }
+
+func (f *fakeVisitRepo) DeleteVisitedPOI(_ context.Context, _, id uuid.UUID) (bool, error) {
+	return f.visitID != nil && *f.visitID == id, nil
+}
+
+type forgettingTaste struct {
+	fakeTaste
+	forgot []string
+}
+
+func (f *forgettingTaste) Forget(_ context.Context, _ uuid.UUID, key, value string) {
+	f.forgot = append(f.forgot, key+"="+value)
+}
+
+// Deleting a place visit also removes the taste signal it produced, keyed by
+// the visit id learnFromVisit stored.
+func TestDeleteVisitedPOI_ForgetsItsSignal(t *testing.T) {
+	visitID := uuid.New()
+	taste := &forgettingTaste{}
+	h := NewHandler(&fakeVisitRepo{visitID: &visitID}, nil).WithTaste(taste, taste)
+	user := uuid.New()
+
+	resp, err := h.DeleteVisitedPOI(authed(user), connect.NewRequest(&travelhistoryv1.DeleteVisitedPOIRequest{Id: visitID.String()}))
+	if err != nil {
+		t.Fatalf("DeleteVisitedPOI: %v", err)
+	}
+	if !resp.Msg.GetDeleted() {
+		t.Fatal("deleted = false, want true")
+	}
+	if len(taste.forgot) != 1 || taste.forgot[0] != "visit_id="+visitID.String() {
+		t.Fatalf("forgot = %v", taste.forgot)
+	}
+	if len(taste.kicks) != 1 {
+		t.Fatalf("kicks = %d, want 1", len(taste.kicks))
+	}
+}
+
+func TestDeleteVisitedPOI_UnknownIDForgetsNothing(t *testing.T) {
+	taste := &forgettingTaste{}
+	h := NewHandler(&fakeVisitRepo{}, nil).WithTaste(taste, taste)
+	resp, err := h.DeleteVisitedPOI(authed(uuid.New()), connect.NewRequest(&travelhistoryv1.DeleteVisitedPOIRequest{Id: uuid.NewString()}))
+	if err != nil {
+		t.Fatalf("DeleteVisitedPOI: %v", err)
+	}
+	if resp.Msg.GetDeleted() || len(taste.forgot) != 0 || len(taste.kicks) != 0 {
+		t.Fatalf("deleted=%v forgot=%v kicks=%d, want nothing", resp.Msg.GetDeleted(), taste.forgot, len(taste.kicks))
+	}
+}
+
+func TestVisitInputFromProto_Source(t *testing.T) {
+	base := func() *travelhistoryv1.RecordVisitRequest {
+		return &travelhistoryv1.RecordVisitRequest{CityName: "Lisbon", Latitude: 38.7, Longitude: -9.1}
+	}
+	unset, err := visitInputFromProto(base())
+	if err != nil || unset.Source != SourceManual {
+		t.Fatalf("unset source = %q, %v; want manual", unset.Source, err)
+	}
+	walked := base()
+	walked.Source = travelhistoryv1.VisitSource_VISIT_SOURCE_VISIT_EVENT.Enum()
+	got, err := visitInputFromProto(walked)
+	if err != nil || got.Source != SourceVisitEvent {
+		t.Fatalf("visit-event source = %q, %v; want visit_event", got.Source, err)
+	}
+}

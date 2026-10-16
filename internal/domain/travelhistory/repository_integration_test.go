@@ -217,3 +217,58 @@ func TestRecordVisit_ServerStampedRepeatIsIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, returned)
 }
+
+func TestDeleteVisitedPOI_RemovesOnlyThatVisit(t *testing.T) {
+	ctx := context.Background()
+	pool := testsupport.MustPool()
+	user, other := uuid.New(), uuid.New()
+	for _, id := range []uuid.UUID{user, other} {
+		_, err := pool.Exec(ctx, "INSERT INTO users (id, email) VALUES ($1, $2)", id, "del-"+uuid.NewString()+"@loci.test")
+		require.NoError(t, err)
+	}
+	repo := NewRepository(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	city := "Porto-" + uuid.NewString()
+	visit := func(u uuid.UUID, poi string) uuid.UUID {
+		_, id, err := repo.RecordVisit(ctx, u, VisitInput{CityName: city, Latitude: 41.15, Longitude: -8.61, POIID: poi, POIName: poi})
+		require.NoError(t, err)
+		require.NotNil(t, id)
+		return *id
+	}
+	first := visit(user, "Ribeira")
+	visit(user, "Livraria Lello")
+	theirs := visit(other, "Ribeira")
+
+	// Another user's id is not found and is left untouched.
+	deleted, err := repo.DeleteVisitedPOI(ctx, user, theirs)
+	require.NoError(t, err)
+	require.False(t, deleted)
+
+	deleted, err = repo.DeleteVisitedPOI(ctx, user, first)
+	require.NoError(t, err)
+	require.True(t, deleted)
+
+	var pois, cities int
+	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_visited_pois WHERE user_id = $1`, user).Scan(&pois))
+	require.Equal(t, 1, pois, "only the deleted visit goes")
+	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_visited_cities WHERE user_id = $1`, user).Scan(&cities))
+	require.Equal(t, 1, cities, "the city row survives")
+	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_visited_pois WHERE user_id = $1`, other).Scan(&pois))
+	require.Equal(t, 1, pois)
+}
+
+func TestRecordVisit_SourceVisitEventPersisted(t *testing.T) {
+	ctx := context.Background()
+	pool := testsupport.MustPool()
+	user := uuid.New()
+	_, err := pool.Exec(ctx, "INSERT INTO users (id, email) VALUES ($1, $2)", user, "src-"+uuid.NewString()+"@loci.test")
+	require.NoError(t, err)
+	repo := NewRepository(pool, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	_, id, err := repo.RecordVisit(ctx, user, VisitInput{
+		CityName: "Braga", Latitude: 41.55, Longitude: -8.42, POIID: uuid.NewString(), POIName: "Sé",
+		Source: SourceVisitEvent, VisitedAt: time.Now(),
+	})
+	require.NoError(t, err)
+	var source string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT source FROM user_visited_pois WHERE id = $1`, *id).Scan(&source))
+	require.Equal(t, string(SourceVisitEvent), source)
+}

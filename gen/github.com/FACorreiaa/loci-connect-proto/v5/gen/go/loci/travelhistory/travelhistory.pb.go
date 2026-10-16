@@ -980,8 +980,13 @@ type RecordVisitRequest struct {
 	// the spot). A visit earns points only when this fix is recent and close to
 	// the place's own coordinates; without it the visit is recorded, unscored.
 	DeviceLocation *DeviceFix `protobuf:"bytes,9,opt,name=device_location,json=deviceLocation,proto3,oneof" json:"device_location,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// How the client knew about this visit. Unset means MANUAL, which is what
+	// every caller sent before this field existed. Walk and trip-day arrivals send
+	// VISIT_EVENT; a traveller's "I've been here" sends MANUAL. TRIP and BACKFILL
+	// are server-derived and rejected here.
+	Source        *VisitSource `protobuf:"varint,10,opt,name=source,proto3,enum=loci.travelhistory.VisitSource,oneof" json:"source,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RecordVisitRequest) Reset() {
@@ -1075,6 +1080,13 @@ func (x *RecordVisitRequest) GetDeviceLocation() *DeviceFix {
 		return x.DeviceLocation
 	}
 	return nil
+}
+
+func (x *RecordVisitRequest) GetSource() VisitSource {
+	if x != nil && x.Source != nil {
+		return *x.Source
+	}
+	return VisitSource_VISIT_SOURCE_UNSPECIFIED
 }
 
 type DeviceFix struct {
@@ -1287,6 +1299,97 @@ func (x *DeleteVisitResponse) GetDeleted() bool {
 	return false
 }
 
+// DeleteVisitedPOIRequest removes one place visit (VisitedPOI.id) and the taste
+// signal it produced. Unlike DeleteVisit it never touches the city row.
+type DeleteVisitedPOIRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteVisitedPOIRequest) Reset() {
+	*x = DeleteVisitedPOIRequest{}
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteVisitedPOIRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteVisitedPOIRequest) ProtoMessage() {}
+
+func (x *DeleteVisitedPOIRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteVisitedPOIRequest.ProtoReflect.Descriptor instead.
+func (*DeleteVisitedPOIRequest) Descriptor() ([]byte, []int) {
+	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *DeleteVisitedPOIRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteVisitedPOIResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// False when the id does not exist or belongs to another user.
+	Deleted       bool `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteVisitedPOIResponse) Reset() {
+	*x = DeleteVisitedPOIResponse{}
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteVisitedPOIResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteVisitedPOIResponse) ProtoMessage() {}
+
+func (x *DeleteVisitedPOIResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteVisitedPOIResponse.ProtoReflect.Descriptor instead.
+func (*DeleteVisitedPOIResponse) Descriptor() ([]byte, []int) {
+	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *DeleteVisitedPOIResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
 // GetGlobeDataRequest asks for everything the globe dashboard renders in ONE
 // round trip. Splitting this across three calls makes a single screen wait on
 // three sequential auth + query cycles.
@@ -1302,7 +1405,7 @@ type GetGlobeDataRequest struct {
 
 func (x *GetGlobeDataRequest) Reset() {
 	*x = GetGlobeDataRequest{}
-	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[15]
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1314,7 +1417,7 @@ func (x *GetGlobeDataRequest) String() string {
 func (*GetGlobeDataRequest) ProtoMessage() {}
 
 func (x *GetGlobeDataRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[15]
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1327,7 +1430,7 @@ func (x *GetGlobeDataRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGlobeDataRequest.ProtoReflect.Descriptor instead.
 func (*GetGlobeDataRequest) Descriptor() ([]byte, []int) {
-	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{15}
+	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *GetGlobeDataRequest) GetLimit() int32 {
@@ -1358,7 +1461,7 @@ type GetGlobeDataResponse struct {
 
 func (x *GetGlobeDataResponse) Reset() {
 	*x = GetGlobeDataResponse{}
-	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[16]
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1370,7 +1473,7 @@ func (x *GetGlobeDataResponse) String() string {
 func (*GetGlobeDataResponse) ProtoMessage() {}
 
 func (x *GetGlobeDataResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[16]
+	mi := &file_loci_travelhistory_travelhistory_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1383,7 +1486,7 @@ func (x *GetGlobeDataResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetGlobeDataResponse.ProtoReflect.Descriptor instead.
 func (*GetGlobeDataResponse) Descriptor() ([]byte, []int) {
-	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{16}
+	return file_loci_travelhistory_travelhistory_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetGlobeDataResponse) GetCities() []*VisitedCity {
@@ -1506,7 +1609,7 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\xbaH\a\x1a\x05\x18\xc2\x1c(\x00R\n" +
 	"periodDays\"W\n" +
 	"\x18GetTravelSummaryResponse\x12;\n" +
-	"\asummary\x18\x01 \x01(\v2!.loci.travelhistory.TravelSummaryR\asummary\"\xf3\x03\n" +
+	"\asummary\x18\x01 \x01(\v2!.loci.travelhistory.TravelSummaryR\asummary\"\xc8\x04\n" +
 	"\x12RecordVisitRequest\x12\x17\n" +
 	"\acity_id\x18\x01 \x01(\tR\x06cityId\x12'\n" +
 	"\tcity_name\x18\x02 \x01(\tB\n" +
@@ -1518,11 +1621,15 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\bpoi_name\x18\a \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02H\x01R\apoiName\x88\x01\x01\x12>\n" +
 	"\n" +
 	"visited_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampH\x02R\tvisitedAt\x88\x01\x01\x12K\n" +
-	"\x0fdevice_location\x18\t \x01(\v2\x1d.loci.travelhistory.DeviceFixH\x03R\x0edeviceLocation\x88\x01\x01B\t\n" +
+	"\x0fdevice_location\x18\t \x01(\v2\x1d.loci.travelhistory.DeviceFixH\x03R\x0edeviceLocation\x88\x01\x01\x12H\n" +
+	"\x06source\x18\n" +
+	" \x01(\x0e2\x1f.loci.travelhistory.VisitSourceB\n" +
+	"\xbaH\a\x82\x01\x04\x18\x02\x18\x03H\x04R\x06source\x88\x01\x01B\t\n" +
 	"\a_poi_idB\v\n" +
 	"\t_poi_nameB\r\n" +
 	"\v_visited_atB\x12\n" +
-	"\x10_device_location\"\xec\x01\n" +
+	"\x10_device_locationB\t\n" +
+	"\a_source\"\xec\x01\n" +
 	"\tDeviceFix\x123\n" +
 	"\blatitude\x18\x01 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0R\blatitude\x125\n" +
 	"\tlongitude\x18\x02 \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0R\tlongitude\x126\n" +
@@ -1536,6 +1643,10 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\x12DeleteVisitRequest\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18$R\x02id\"/\n" +
 	"\x13DeleteVisitResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"3\n" +
+	"\x17DeleteVisitedPOIRequest\x12\x18\n" +
+	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\"4\n" +
+	"\x18DeleteVisitedPOIResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\"d\n" +
 	"\x13GetGlobeDataRequest\x12 \n" +
 	"\x05limit\x18\x01 \x01(\x05B\n" +
@@ -1555,13 +1666,14 @@ const file_loci_travelhistory_travelhistory_proto_rawDesc = "" +
 	"\x11VISIT_SOURCE_TRIP\x10\x01\x12\x1c\n" +
 	"\x18VISIT_SOURCE_VISIT_EVENT\x10\x02\x12\x17\n" +
 	"\x13VISIT_SOURCE_MANUAL\x10\x03\x12\x19\n" +
-	"\x15VISIT_SOURCE_BACKFILL\x10\x042\x86\x05\n" +
+	"\x15VISIT_SOURCE_BACKFILL\x10\x042\xf5\x05\n" +
 	"\x14TravelHistoryService\x12p\n" +
 	"\x11ListVisitedCities\x12,.loci.travelhistory.ListVisitedCitiesRequest\x1a-.loci.travelhistory.ListVisitedCitiesResponse\x12j\n" +
 	"\x0fListVisitedPOIs\x12*.loci.travelhistory.ListVisitedPOIsRequest\x1a+.loci.travelhistory.ListVisitedPOIsResponse\x12m\n" +
 	"\x10GetTravelSummary\x12+.loci.travelhistory.GetTravelSummaryRequest\x1a,.loci.travelhistory.GetTravelSummaryResponse\x12^\n" +
 	"\vRecordVisit\x12&.loci.travelhistory.RecordVisitRequest\x1a'.loci.travelhistory.RecordVisitResponse\x12^\n" +
-	"\vDeleteVisit\x12&.loci.travelhistory.DeleteVisitRequest\x1a'.loci.travelhistory.DeleteVisitResponse\x12a\n" +
+	"\vDeleteVisit\x12&.loci.travelhistory.DeleteVisitRequest\x1a'.loci.travelhistory.DeleteVisitResponse\x12m\n" +
+	"\x10DeleteVisitedPOI\x12+.loci.travelhistory.DeleteVisitedPOIRequest\x1a,.loci.travelhistory.DeleteVisitedPOIResponse\x12a\n" +
 	"\fGetGlobeData\x12'.loci.travelhistory.GetGlobeDataRequest\x1a(.loci.travelhistory.GetGlobeDataResponseBUZSgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/travelhistory;travelhistoryb\x06proto3"
 
 var (
@@ -1577,7 +1689,7 @@ func file_loci_travelhistory_travelhistory_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_travelhistory_travelhistory_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_travelhistory_travelhistory_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_loci_travelhistory_travelhistory_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_loci_travelhistory_travelhistory_proto_goTypes = []any{
 	(VisitSource)(0),                  // 0: loci.travelhistory.VisitSource
 	(*VisitedCity)(nil),               // 1: loci.travelhistory.VisitedCity
@@ -1595,46 +1707,51 @@ var file_loci_travelhistory_travelhistory_proto_goTypes = []any{
 	(*RecordVisitResponse)(nil),       // 13: loci.travelhistory.RecordVisitResponse
 	(*DeleteVisitRequest)(nil),        // 14: loci.travelhistory.DeleteVisitRequest
 	(*DeleteVisitResponse)(nil),       // 15: loci.travelhistory.DeleteVisitResponse
-	(*GetGlobeDataRequest)(nil),       // 16: loci.travelhistory.GetGlobeDataRequest
-	(*GetGlobeDataResponse)(nil),      // 17: loci.travelhistory.GetGlobeDataResponse
-	(*timestamppb.Timestamp)(nil),     // 18: google.protobuf.Timestamp
+	(*DeleteVisitedPOIRequest)(nil),   // 16: loci.travelhistory.DeleteVisitedPOIRequest
+	(*DeleteVisitedPOIResponse)(nil),  // 17: loci.travelhistory.DeleteVisitedPOIResponse
+	(*GetGlobeDataRequest)(nil),       // 18: loci.travelhistory.GetGlobeDataRequest
+	(*GetGlobeDataResponse)(nil),      // 19: loci.travelhistory.GetGlobeDataResponse
+	(*timestamppb.Timestamp)(nil),     // 20: google.protobuf.Timestamp
 }
 var file_loci_travelhistory_travelhistory_proto_depIdxs = []int32{
 	0,  // 0: loci.travelhistory.VisitedCity.source:type_name -> loci.travelhistory.VisitSource
-	18, // 1: loci.travelhistory.VisitedCity.first_visit_at:type_name -> google.protobuf.Timestamp
-	18, // 2: loci.travelhistory.VisitedCity.last_visit_at:type_name -> google.protobuf.Timestamp
+	20, // 1: loci.travelhistory.VisitedCity.first_visit_at:type_name -> google.protobuf.Timestamp
+	20, // 2: loci.travelhistory.VisitedCity.last_visit_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: loci.travelhistory.VisitedPOI.source:type_name -> loci.travelhistory.VisitSource
-	18, // 4: loci.travelhistory.VisitedPOI.visited_at:type_name -> google.protobuf.Timestamp
-	18, // 5: loci.travelhistory.TravelSummary.first_visit_at:type_name -> google.protobuf.Timestamp
-	18, // 6: loci.travelhistory.TravelSummary.last_visit_at:type_name -> google.protobuf.Timestamp
-	18, // 7: loci.travelhistory.GlobeArc.occurred_at:type_name -> google.protobuf.Timestamp
+	20, // 4: loci.travelhistory.VisitedPOI.visited_at:type_name -> google.protobuf.Timestamp
+	20, // 5: loci.travelhistory.TravelSummary.first_visit_at:type_name -> google.protobuf.Timestamp
+	20, // 6: loci.travelhistory.TravelSummary.last_visit_at:type_name -> google.protobuf.Timestamp
+	20, // 7: loci.travelhistory.GlobeArc.occurred_at:type_name -> google.protobuf.Timestamp
 	1,  // 8: loci.travelhistory.ListVisitedCitiesResponse.cities:type_name -> loci.travelhistory.VisitedCity
 	2,  // 9: loci.travelhistory.ListVisitedPOIsResponse.pois:type_name -> loci.travelhistory.VisitedPOI
 	3,  // 10: loci.travelhistory.GetTravelSummaryResponse.summary:type_name -> loci.travelhistory.TravelSummary
-	18, // 11: loci.travelhistory.RecordVisitRequest.visited_at:type_name -> google.protobuf.Timestamp
+	20, // 11: loci.travelhistory.RecordVisitRequest.visited_at:type_name -> google.protobuf.Timestamp
 	12, // 12: loci.travelhistory.RecordVisitRequest.device_location:type_name -> loci.travelhistory.DeviceFix
-	18, // 13: loci.travelhistory.DeviceFix.observed_at:type_name -> google.protobuf.Timestamp
-	1,  // 14: loci.travelhistory.RecordVisitResponse.city:type_name -> loci.travelhistory.VisitedCity
-	1,  // 15: loci.travelhistory.GetGlobeDataResponse.cities:type_name -> loci.travelhistory.VisitedCity
-	4,  // 16: loci.travelhistory.GetGlobeDataResponse.arcs:type_name -> loci.travelhistory.GlobeArc
-	3,  // 17: loci.travelhistory.GetGlobeDataResponse.summary:type_name -> loci.travelhistory.TravelSummary
-	5,  // 18: loci.travelhistory.TravelHistoryService.ListVisitedCities:input_type -> loci.travelhistory.ListVisitedCitiesRequest
-	7,  // 19: loci.travelhistory.TravelHistoryService.ListVisitedPOIs:input_type -> loci.travelhistory.ListVisitedPOIsRequest
-	9,  // 20: loci.travelhistory.TravelHistoryService.GetTravelSummary:input_type -> loci.travelhistory.GetTravelSummaryRequest
-	11, // 21: loci.travelhistory.TravelHistoryService.RecordVisit:input_type -> loci.travelhistory.RecordVisitRequest
-	14, // 22: loci.travelhistory.TravelHistoryService.DeleteVisit:input_type -> loci.travelhistory.DeleteVisitRequest
-	16, // 23: loci.travelhistory.TravelHistoryService.GetGlobeData:input_type -> loci.travelhistory.GetGlobeDataRequest
-	6,  // 24: loci.travelhistory.TravelHistoryService.ListVisitedCities:output_type -> loci.travelhistory.ListVisitedCitiesResponse
-	8,  // 25: loci.travelhistory.TravelHistoryService.ListVisitedPOIs:output_type -> loci.travelhistory.ListVisitedPOIsResponse
-	10, // 26: loci.travelhistory.TravelHistoryService.GetTravelSummary:output_type -> loci.travelhistory.GetTravelSummaryResponse
-	13, // 27: loci.travelhistory.TravelHistoryService.RecordVisit:output_type -> loci.travelhistory.RecordVisitResponse
-	15, // 28: loci.travelhistory.TravelHistoryService.DeleteVisit:output_type -> loci.travelhistory.DeleteVisitResponse
-	17, // 29: loci.travelhistory.TravelHistoryService.GetGlobeData:output_type -> loci.travelhistory.GetGlobeDataResponse
-	24, // [24:30] is the sub-list for method output_type
-	18, // [18:24] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	0,  // 13: loci.travelhistory.RecordVisitRequest.source:type_name -> loci.travelhistory.VisitSource
+	20, // 14: loci.travelhistory.DeviceFix.observed_at:type_name -> google.protobuf.Timestamp
+	1,  // 15: loci.travelhistory.RecordVisitResponse.city:type_name -> loci.travelhistory.VisitedCity
+	1,  // 16: loci.travelhistory.GetGlobeDataResponse.cities:type_name -> loci.travelhistory.VisitedCity
+	4,  // 17: loci.travelhistory.GetGlobeDataResponse.arcs:type_name -> loci.travelhistory.GlobeArc
+	3,  // 18: loci.travelhistory.GetGlobeDataResponse.summary:type_name -> loci.travelhistory.TravelSummary
+	5,  // 19: loci.travelhistory.TravelHistoryService.ListVisitedCities:input_type -> loci.travelhistory.ListVisitedCitiesRequest
+	7,  // 20: loci.travelhistory.TravelHistoryService.ListVisitedPOIs:input_type -> loci.travelhistory.ListVisitedPOIsRequest
+	9,  // 21: loci.travelhistory.TravelHistoryService.GetTravelSummary:input_type -> loci.travelhistory.GetTravelSummaryRequest
+	11, // 22: loci.travelhistory.TravelHistoryService.RecordVisit:input_type -> loci.travelhistory.RecordVisitRequest
+	14, // 23: loci.travelhistory.TravelHistoryService.DeleteVisit:input_type -> loci.travelhistory.DeleteVisitRequest
+	16, // 24: loci.travelhistory.TravelHistoryService.DeleteVisitedPOI:input_type -> loci.travelhistory.DeleteVisitedPOIRequest
+	18, // 25: loci.travelhistory.TravelHistoryService.GetGlobeData:input_type -> loci.travelhistory.GetGlobeDataRequest
+	6,  // 26: loci.travelhistory.TravelHistoryService.ListVisitedCities:output_type -> loci.travelhistory.ListVisitedCitiesResponse
+	8,  // 27: loci.travelhistory.TravelHistoryService.ListVisitedPOIs:output_type -> loci.travelhistory.ListVisitedPOIsResponse
+	10, // 28: loci.travelhistory.TravelHistoryService.GetTravelSummary:output_type -> loci.travelhistory.GetTravelSummaryResponse
+	13, // 29: loci.travelhistory.TravelHistoryService.RecordVisit:output_type -> loci.travelhistory.RecordVisitResponse
+	15, // 30: loci.travelhistory.TravelHistoryService.DeleteVisit:output_type -> loci.travelhistory.DeleteVisitResponse
+	17, // 31: loci.travelhistory.TravelHistoryService.DeleteVisitedPOI:output_type -> loci.travelhistory.DeleteVisitedPOIResponse
+	19, // 32: loci.travelhistory.TravelHistoryService.GetGlobeData:output_type -> loci.travelhistory.GetGlobeDataResponse
+	26, // [26:33] is the sub-list for method output_type
+	19, // [19:26] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_loci_travelhistory_travelhistory_proto_init() }
@@ -1650,7 +1767,7 @@ func file_loci_travelhistory_travelhistory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_travelhistory_travelhistory_proto_rawDesc), len(file_loci_travelhistory_travelhistory_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
