@@ -245,6 +245,8 @@ type Dependencies struct {
 	watchRunner *watch.Runner
 	// fieldRunner closes field seasons and pays kept places; nil when off.
 	fieldRunner *gamification.Runner
+	// dailyRunner publishes one seasonal editorial post per UTC day.
+	dailyRunner *boardsdomain.DailyRunner
 	watchClient interface{ Close() error }
 
 	PreferenceRecorder preference.Recorder
@@ -727,6 +729,15 @@ func (d *Dependencies) RunRecaps(ctx context.Context) error {
 	return d.recapRunner.Run(ctx)
 }
 
+// RunDailyPosts publishes the daily seasonal editorial post. Every replica
+// runs the loop; a Postgres advisory lock elects one worker per tick.
+func (d *Dependencies) RunDailyPosts(ctx context.Context) error {
+	if d.dailyRunner == nil {
+		return nil
+	}
+	return d.dailyRunner.Run(ctx)
+}
+
 // RunTelegram receives and answers Telegram messages until ctx is cancelled.
 //
 // Returns nil immediately when no bot is configured, so the caller can start it
@@ -994,6 +1005,15 @@ func (d *Dependencies) initHandlers() error {
 		boardAdmins := append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)
 		boardsSvc := boardsdomain.NewService(boardsdomain.NewRepository(d.DB.Pool), boardAdmins, boardsdomain.DefaultLimits)
 		d.BoardsHandler = boardsdomain.NewHandler(boardsSvc, socialSvc, d.Logger)
+		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
+			d.dailyRunner = boardsdomain.NewDailyRunner(
+				boardsdomain.NewRepository(d.DB.Pool),
+				pglock.New(d.DB.Pool, boardsdomain.DailyRunnerLockKey),
+				chatImpl.ActionLLM(),
+				boardsdomain.NewDailyPopularity(d.DB.Pool),
+				d.Logger,
+			)
+		}
 		// The chat agent's write path: trip-bound turns propose changes, and
 		// ApplyTripAction makes the one the traveller confirms.
 		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {

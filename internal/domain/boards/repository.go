@@ -76,8 +76,10 @@ type Post struct {
 	Score        int
 	CommentCount int
 	// MyVote is per viewer, not stored on the row.
-	MyVote    int
-	CreatedAt time.Time
+	MyVote          int
+	CreatedAt       time.Time
+	IsAIGenerated   bool
+	PublicationDate *time.Time
 }
 
 type Comment struct {
@@ -146,6 +148,7 @@ type Repository interface {
 	DeleteBoard(ctx context.Context, slug string, by uuid.UUID) error
 
 	CreatePost(ctx context.Context, p *Post) error
+	CreateAIPost(ctx context.Context, p *Post, publicationDate time.Time) error
 	GetPost(ctx context.Context, id, viewer uuid.UUID, includeBanned bool) (*Post, error)
 	ListPosts(ctx context.Context, q PostQuery) ([]*Post, error)
 	DeletePost(ctx context.Context, id, by uuid.UUID) error
@@ -290,13 +293,44 @@ func (r *repository) CreatePost(ctx context.Context, p *Post) error {
 	return nil
 }
 
+func (r *repository) CreateAIPost(ctx context.Context, p *Post, publicationDate time.Time) error {
+	var kind, ref *string
+	var snap []byte
+	if p.Attachment != nil {
+		kind, ref = &p.Attachment.Kind, &p.Attachment.Ref
+		var err error
+		if snap, err = json.Marshal(p.Attachment.Snapshot); err != nil {
+			return fmt.Errorf("encode ai snapshot: %w", err)
+		}
+	}
+	err := r.db.QueryRow(ctx, `
+		INSERT INTO board_posts
+			(board_id, author_id, title, url, body, attachment_kind, attachment_ref,
+			 attachment_snapshot, is_ai_generated, publication_date)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9)
+		ON CONFLICT (publication_date) WHERE is_ai_generated AND deleted_at IS NULL DO NOTHING
+		RETURNING id, created_at`,
+		p.BoardID, p.AuthorID, p.Title, p.URL, p.Body, kind, ref, snap,
+		publicationDate.UTC().Format("2006-01-02")).Scan(&p.ID, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("insert ai post: %w", err)
+	}
+	p.IsAIGenerated = true
+	date := publicationDate.UTC()
+	p.PublicationDate = &date
+	return nil
+}
+
 // postColumns reads a post for viewer $1.
 const postColumns = `
 	p.id, p.board_id, b.slug::text, b.name, p.author_id, p.title, p.url, p.body,
 	p.attachment_kind, p.attachment_ref, p.attachment_snapshot,
 	p.score, p.comment_count,
 	COALESCE((SELECT v.value FROM board_post_votes v WHERE v.post_id = p.id AND v.user_id = $1), 0),
-	p.created_at`
+	p.created_at, p.is_ai_generated, p.publication_date`
 
 func scanPost(row pgx.Row) (*Post, error) {
 	var (
@@ -306,7 +340,8 @@ func scanPost(row pgx.Row) (*Post, error) {
 		myVote    int16
 	)
 	err := row.Scan(&p.ID, &p.BoardID, &p.BoardSlug, &p.BoardName, &p.AuthorID, &p.Title, &p.URL, &p.Body,
-		&kind, &ref, &snap, &p.Score, &p.CommentCount, &myVote, &p.CreatedAt)
+		&kind, &ref, &snap, &p.Score, &p.CommentCount, &myVote, &p.CreatedAt,
+		&p.IsAIGenerated, &p.PublicationDate)
 	if err != nil {
 		return nil, err
 	}

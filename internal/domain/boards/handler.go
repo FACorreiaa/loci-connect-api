@@ -125,17 +125,18 @@ var kindFromProto = map[boardsv1.AttachmentKind]string{
 
 func postProto(p *Post, cards map[uuid.UUID]*socialv1.PublicUser) *boardsv1.Post {
 	out := &boardsv1.Post{
-		Id:           p.ID.String(),
-		Board:        &boardsv1.BoardRef{Slug: p.BoardSlug, Name: p.BoardName},
-		Author:       cards[p.AuthorID],
-		Title:        p.Title,
-		Url:          p.URL,
-		Domain:       Domain(p.URL),
-		Body:         p.Body,
-		Score:        int32(p.Score),
-		CommentCount: int32(p.CommentCount),
-		MyVote:       int32(p.MyVote),
-		CreatedAt:    ts(p.CreatedAt),
+		Id:            p.ID.String(),
+		Board:         &boardsv1.BoardRef{Slug: p.BoardSlug, Name: p.BoardName},
+		Author:        cards[p.AuthorID],
+		Title:         p.Title,
+		Url:           p.URL,
+		Domain:        Domain(p.URL),
+		Body:          p.Body,
+		Score:         int32(p.Score),
+		CommentCount:  int32(p.CommentCount),
+		MyVote:        int32(p.MyVote),
+		CreatedAt:     ts(p.CreatedAt),
+		IsAiGenerated: p.IsAIGenerated,
 	}
 	if a := p.Attachment; a != nil {
 		out.Attachment = &boardsv1.Attachment{

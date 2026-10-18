@@ -161,6 +161,13 @@ func main() {
 		}
 	})
 
+	// Publish one seasonal editorial destination per UTC calendar day.
+	concurrency.Run(logger, func() {
+		if err := deps.RunDailyPosts(backgroundCtx); err != nil {
+			logger.Error("daily editorial runner stopped", "error", err)
+		}
+	})
+
 	// Start HTTP server
 	if err := runServer(cfg, logger, handler); err != nil {
 		logger.Error("server error", "error", err)
