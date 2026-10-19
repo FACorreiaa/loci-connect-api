@@ -10,6 +10,7 @@ import (
 	chatv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
@@ -64,5 +65,7 @@ func (h *ChatHandler) GetSessionPOIs(
 		return nil, h.toConnectError(err)
 	}
 
-	return connect.NewResponse(presenter.ToGetSessionPOIsResponse(page)), nil
+	resp := presenter.ToGetSessionPOIsResponse(page)
+	preference.AnnotatePOIs(ctx, h.taste, userID, resp.GetPointsOfInterest())
+	return connect.NewResponse(resp), nil
 }

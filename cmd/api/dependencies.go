@@ -253,7 +253,10 @@ type Dependencies struct {
 	PreferenceVectors  preference.VectorStore
 	// TasteRefresher rebuilds a user's taste profile ~20s after an explicit
 	// verdict (rating, visit, dismissal) instead of waiting for the rerank pass.
-	TasteRefresher     *preference.Refresher
+	TasteRefresher *preference.Refresher
+	// TasteMatch scores places against a traveller's taste for the "NN% match"
+	// shown on every place.
+	TasteMatch         *preference.MatchScorer
 	RetrievalAssembler *retrieval.Assembler
 }
 
@@ -349,6 +352,7 @@ func (d *Dependencies) initRepositories() error {
 		preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser,
 		20*time.Second, d.Logger,
 	)
+	d.TasteMatch = preference.NewMatchScorer(d.DB.Pool, d.Logger)
 	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
 	d.PushDevices = push.NewPostgresDeviceStore(d.DB.Pool)
 
@@ -915,7 +919,9 @@ func (d *Dependencies) initHandlers() error {
 			watchPusher = notifier
 		}
 	}
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).
+		WithRuns(d.RunStore, onRunFinish).
+		WithTasteScorer(d.TasteMatch)
 	d.initWatches(watchPusher)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
@@ -1108,7 +1114,7 @@ func (d *Dependencies) initHandlers() error {
 	}
 	// SuggestPacking is wired below, once the weather adapter exists — a packing
 	// list is only worth generating if it knows the forecast.
-	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
+	d.POIHandler = poihandler.NewPOIHandler(d.POISvc).WithTasteScorer(d.TasteMatch)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService).
 		WithSignupHook(d.signups)
 	if d.DB != nil {

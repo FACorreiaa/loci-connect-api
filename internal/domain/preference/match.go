@@ -61,8 +61,13 @@ func NewMatchScorer(db *pgxpool.Pool, logger *slog.Logger) *MatchScorer {
 // off, a vector built from fewer than MinMatchSignals signals, or a vector not
 // yet calibrated. Places without an embedding, and ids that are not UUIDs, are
 // left out.
-func (s *MatchScorer) ScorePOIs(ctx context.Context, userID uuid.UUID, poiIDs []string) (map[string]Match, error) {
+func (s *MatchScorer) ScorePOIs(ctx context.Context, userID uuid.UUID, poiIDs []string) (_ map[string]Match, err error) {
 	out := map[string]Match{}
+	defer func() {
+		if err != nil {
+			s.logger.WarnContext(ctx, "taste match skipped", slog.Any("error", err))
+		}
+	}()
 	if s == nil || s.db == nil || userID == uuid.Nil || ExperimentVariant(userID) == "control" {
 		return out, nil
 	}
@@ -80,7 +85,7 @@ func (s *MatchScorer) ScorePOIs(ctx context.Context, userID uuid.UUID, poiIDs []
 		count    int
 		p10, p90 *float64
 	)
-	err := s.db.QueryRow(ctx, `
+	err = s.db.QueryRow(ctx, `
 		SELECT v.feedback_count, v.match_p10, v.match_p90
 		FROM user_preference_vectors v
 		LEFT JOIN personalization_settings settings ON settings.user_id = v.user_id

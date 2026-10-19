@@ -12,17 +12,40 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/poi/presenter"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
+	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
 type POIHandler struct {
 	poiconnect.UnimplementedPOIServiceHandler
 	service poi.Service
+	taste   preference.POIScorer
 }
 
 func NewPOIHandler(svc poi.Service) *POIHandler {
 	return &POIHandler{service: svc}
+}
+
+// WithTasteScorer attaches a taste match to every place this handler returns
+// to a signed-in caller.
+func (h *POIHandler) WithTasteScorer(s preference.POIScorer) *POIHandler {
+	h.taste = s
+	return h
+}
+
+// withTaste scores the places for the caller, if there is one.
+func (h *POIHandler) withTaste(ctx context.Context, pois ...*poiv1.POIDetailedInfo) {
+	raw, ok := interceptors.GetUserIDFromContext(ctx)
+	if !ok {
+		return
+	}
+	userID, err := uuid.Parse(raw)
+	if err != nil {
+		return
+	}
+	preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 }
 
 // searchMode is how SearchPOI answers a request.
@@ -102,9 +125,9 @@ func (h *POIHandler) SearchPOI(ctx context.Context, req *connect.Request[poiv1.S
 		return nil, apierr.ToConnect(err)
 	}
 
-	return connect.NewResponse(&poiv1.SearchPOIResponse{
-		Pois: presenter.ToPOIProtos(pois),
-	}), nil
+	out := presenter.ToPOIProtos(pois)
+	h.withTaste(ctx, out...)
+	return connect.NewResponse(&poiv1.SearchPOIResponse{Pois: out}), nil
 }
 
 // nearbyListLimit caps a query-less nearby listing; a nearby card shows a
@@ -138,9 +161,9 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 	if err != nil {
 		return nil, apierr.ToConnect(err)
 	}
-	return connect.NewResponse(&poiv1.SearchPOIResponse{
-		Pois: presenter.ToPOIProtos(pois),
-	}), nil
+	out := presenter.ToPOIProtos(pois)
+	h.withTaste(ctx, out...)
+	return connect.NewResponse(&poiv1.SearchPOIResponse{Pois: out}), nil
 }
 
 func (h *POIHandler) GetPOI(ctx context.Context, req *connect.Request[poiv1.GetPOIRequest]) (*connect.Response[poiv1.GetPOIResponse], error) {
@@ -157,7 +180,7 @@ func (h *POIHandler) GetPOI(ctx context.Context, req *connect.Request[poiv1.GetP
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("POI not found"))
 	}
 
-	return connect.NewResponse(&poiv1.GetPOIResponse{
-		Poi: presenter.ToPOIProto(poi),
-	}), nil
+	out := presenter.ToPOIProto(poi)
+	h.withTaste(ctx, out)
+	return connect.NewResponse(&poiv1.GetPOIResponse{Poi: out}), nil
 }
