@@ -154,7 +154,35 @@ func (r *Reranker) recomputeUser(ctx context.Context, userID uuid.UUID) (signals
 	if err := r.updateTasteTraits(ctx, userID); err != nil {
 		return len(vectors), false, err
 	}
+	if err := r.calibrate(ctx, userID); err != nil {
+		return len(vectors), false, err
+	}
 	return len(vectors), true, nil
+}
+
+// calibrate records where this traveller's vector puts the 10th and 90th
+// percentile of places, which MatchScorer rescales similarities against. The
+// sample is the first 2000 embedded places by id: UUID order is effectively
+// random, and a fixed sample keeps a traveller's scale steady between runs.
+func (r *Reranker) calibrate(ctx context.Context, userID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE user_preference_vectors v
+		SET match_p10 = q.p[1], match_p90 = q.p[2]
+		FROM (
+			SELECT percentile_cont(ARRAY[0.1, 0.9]) WITHIN GROUP (ORDER BY 1 - (sample.embedding <=> u.embedding)) AS p
+			FROM (
+				SELECT embedding FROM points_of_interest
+				WHERE embedding IS NOT NULL
+				ORDER BY id
+				LIMIT 2000
+			) sample
+			CROSS JOIN (SELECT embedding FROM user_preference_vectors WHERE user_id = $1) u
+		) q
+		WHERE v.user_id = $1`, userID)
+	if err != nil {
+		return fmt.Errorf("calibrate taste match: %w", err)
+	}
+	return nil
 }
 
 func (r *Reranker) updateTasteTraits(ctx context.Context, userID uuid.UUID) error {
