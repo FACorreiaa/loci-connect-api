@@ -482,8 +482,11 @@ type Post struct {
 	Score        int32       `protobuf:"varint,9,opt,name=score,proto3" json:"score,omitempty"`
 	CommentCount int32       `protobuf:"varint,10,opt,name=comment_count,json=commentCount,proto3" json:"comment_count,omitempty"`
 	// The caller's vote: -1, 0 or 1. Always 0 for anonymous callers.
-	MyVote        int32                  `protobuf:"varint,11,opt,name=my_vote,json=myVote,proto3" json:"my_vote,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	MyVote    int32                  `protobuf:"varint,11,opt,name=my_vote,json=myVote,proto3" json:"my_vote,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// True when this is a server-published editorial post rather than a user
+	// contribution.
+	IsAiGenerated bool `protobuf:"varint,13,opt,name=is_ai_generated,json=isAiGenerated,proto3" json:"is_ai_generated,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -600,6 +603,13 @@ func (x *Post) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *Post) GetIsAiGenerated() bool {
+	if x != nil {
+		return x.IsAiGenerated
+	}
+	return false
 }
 
 type Comment struct {
@@ -2342,7 +2352,7 @@ const file_loci_boards_v1_boards_proto_rawDesc = "" +
 	"\x05title\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\x05title\x12$\n" +
 	"\bsubtitle\x18\x04 \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\bsubtitle\x12%\n" +
 	"\timage_url\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\bimageUrl\x12\x1c\n" +
-	"\x04city\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x04city\"\xf8\x03\n" +
+	"\x04city\x18\x06 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\x04city\"\xa0\x04\n" +
 	"\x04Post\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12.\n" +
 	"\x05board\x18\x02 \x01(\v2\x18.loci.boards.v1.BoardRefR\x05board\x12/\n" +
@@ -2359,7 +2369,8 @@ const file_loci_boards_v1_boards_proto_rawDesc = "" +
 	" \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fcommentCount\x12+\n" +
 	"\amy_vote\x18\v \x01(\x05B\x12\xbaH\x0f\x1a\r\x18\x01(\xff\xff\xff\xff\xff\xff\xff\xff\xff\x01R\x06myVote\x129\n" +
 	"\n" +
-	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtB\r\n" +
+	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12&\n" +
+	"\x0fis_ai_generated\x18\r \x01(\bR\risAiGeneratedB\r\n" +
 	"\v_attachment\"\x8e\x02\n" +
 	"\aComment\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12 \n" +

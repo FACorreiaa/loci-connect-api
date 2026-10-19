@@ -91,6 +91,15 @@ func (r *DailyRunner) Tick(ctx context.Context) bool {
 }
 
 func (r *DailyRunner) publish(ctx context.Context, now time.Time) error {
+	// Every tick after the first of the day would otherwise pay for a model
+	// call whose insert is then discarded by the unique index.
+	done, err := r.repo.HasAIPost(ctx, now)
+	if err != nil {
+		return err
+	}
+	if done {
+		return nil
+	}
 	cities := seasonalCities(now.Month())
 	if len(cities) == 0 {
 		return fmt.Errorf("no seasonal cities for month %d", now.Month())
@@ -120,8 +129,14 @@ Do not claim live prices, opening hours, or events unless they are timeless. Do 
 	if err != nil {
 		return fmt.Errorf("generate post: %w", err)
 	}
+	// Read the first JSON object, fenced or not: not every model in the
+	// chain honours "JSON only".
+	start, end := strings.Index(raw, "{"), strings.LastIndex(raw, "}")
+	if start < 0 || end < start {
+		return errors.New("decode generated post: no JSON object in the reply")
+	}
 	var out dailyOutput
-	if err := json.Unmarshal([]byte(raw), &out); err != nil {
+	if err := json.Unmarshal([]byte(raw[start:end+1]), &out); err != nil {
 		return fmt.Errorf("decode generated post: %w", err)
 	}
 	out.Title, out.Body = strings.TrimSpace(out.Title), strings.TrimSpace(out.Body)

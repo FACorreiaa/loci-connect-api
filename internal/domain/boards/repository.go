@@ -149,6 +149,7 @@ type Repository interface {
 
 	CreatePost(ctx context.Context, p *Post) error
 	CreateAIPost(ctx context.Context, p *Post, publicationDate time.Time) error
+	HasAIPost(ctx context.Context, publicationDate time.Time) (bool, error)
 	GetPost(ctx context.Context, id, viewer uuid.UUID, includeBanned bool) (*Post, error)
 	ListPosts(ctx context.Context, q PostQuery) ([]*Post, error)
 	DeletePost(ctx context.Context, id, by uuid.UUID) error
@@ -322,6 +323,22 @@ func (r *repository) CreateAIPost(ctx context.Context, p *Post, publicationDate 
 	date := publicationDate.UTC()
 	p.PublicationDate = &date
 	return nil
+}
+
+// HasAIPost reports whether publicationDate's UTC day already has an
+// editorial post, so the runner can skip the model call. A deleted one
+// counts: a moderator's removal holds for the rest of that day.
+func (r *repository) HasAIPost(ctx context.Context, publicationDate time.Time) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM board_posts
+			WHERE is_ai_generated AND publication_date = $1
+		)`, publicationDate.UTC().Format("2006-01-02")).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check ai post: %w", err)
+	}
+	return exists, nil
 }
 
 // postColumns reads a post for viewer $1.
