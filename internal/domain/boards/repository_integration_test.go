@@ -269,3 +269,40 @@ func TestSnapshotOwnership_Integration(t *testing.T) {
 	require.NotNil(t, got.Attachment)
 	assert.Equal(t, s, got.Attachment.Snapshot)
 }
+
+func TestOneAIPostPerDay_Integration(t *testing.T) {
+	repo, pool := newRepo(t)
+	ctx := context.Background()
+	editor := seedUser(t, pool)
+	board := seedBoard(t, repo, editor, "daily-test")
+	day := time.Date(2026, 10, 19, 6, 0, 0, 0, time.UTC)
+
+	has, err := repo.HasAIPost(ctx, day)
+	require.NoError(t, err)
+	assert.False(t, has)
+
+	first := &Post{BoardID: board.ID, AuthorID: editor, Title: "Autumn in Alsace"}
+	require.NoError(t, repo.CreateAIPost(ctx, first, day))
+	require.NotEqual(t, uuid.Nil, first.ID)
+
+	// A second insert for the same UTC day is dropped, not an error.
+	again := &Post{BoardID: board.ID, AuthorID: editor, Title: "Rome again"}
+	require.NoError(t, repo.CreateAIPost(ctx, again, day.Add(15*time.Minute)))
+	assert.Equal(t, uuid.Nil, again.ID)
+
+	got, err := repo.GetPost(ctx, first.ID, editor, false)
+	require.NoError(t, err)
+	assert.True(t, got.IsAIGenerated)
+	require.NotNil(t, got.PublicationDate)
+	assert.Equal(t, "2026-10-19", got.PublicationDate.Format("2006-01-02"))
+
+	// A moderator's removal holds for the rest of the day.
+	require.NoError(t, repo.DeletePost(ctx, first.ID, editor))
+	has, err = repo.HasAIPost(ctx, day)
+	require.NoError(t, err)
+	assert.True(t, has)
+
+	has, err = repo.HasAIPost(ctx, day.Add(24*time.Hour))
+	require.NoError(t, err)
+	assert.False(t, has)
+}
