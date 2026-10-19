@@ -150,6 +150,8 @@ type Repository interface {
 	CreatePost(ctx context.Context, p *Post) error
 	CreateAIPost(ctx context.Context, p *Post, publicationDate time.Time) error
 	HasAIPost(ctx context.Context, publicationDate time.Time) (bool, error)
+	RecentAIPosts(ctx context.Context, since time.Time) ([]*Post, error)
+	CityIDByName(ctx context.Context, name, country string) (uuid.UUID, bool, error)
 	GetPost(ctx context.Context, id, viewer uuid.UUID, includeBanned bool) (*Post, error)
 	ListPosts(ctx context.Context, q PostQuery) ([]*Post, error)
 	DeletePost(ctx context.Context, id, by uuid.UUID) error
@@ -339,6 +341,57 @@ func (r *repository) HasAIPost(ctx context.Context, publicationDate time.Time) (
 		return false, fmt.Errorf("check ai post: %w", err)
 	}
 	return exists, nil
+}
+
+// RecentAIPosts reads the editorial posts published since, deleted ones
+// included, so the runner does not write about the same city twice in a row.
+// Only the title, body and attachment snapshot are filled in.
+func (r *repository) RecentAIPosts(ctx context.Context, since time.Time) ([]*Post, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT title, body, attachment_kind, attachment_ref, attachment_snapshot
+		FROM board_posts
+		WHERE is_ai_generated AND created_at >= $1`, since)
+	if err != nil {
+		return nil, fmt.Errorf("list recent ai posts: %w", err)
+	}
+	defer rows.Close()
+	var out []*Post
+	for rows.Next() {
+		var (
+			p         Post
+			kind, ref *string
+			snap      []byte
+		)
+		if err := rows.Scan(&p.Title, &p.Body, &kind, &ref, &snap); err != nil {
+			return nil, fmt.Errorf("scan recent ai post: %w", err)
+		}
+		if kind != nil && ref != nil {
+			p.Attachment = &Attachment{Kind: *kind, Ref: *ref}
+			if err := json.Unmarshal(snap, &p.Attachment.Snapshot); err != nil {
+				return nil, fmt.Errorf("decode recent ai snapshot: %w", err)
+			}
+		}
+		out = append(out, &p)
+	}
+	return out, rows.Err()
+}
+
+// CityIDByName finds the city a daily post is about, preferring the one in
+// country when the name is shared.
+func (r *repository) CityIDByName(ctx context.Context, name, country string) (uuid.UUID, bool, error) {
+	var id uuid.UUID
+	err := r.db.QueryRow(ctx, `
+		SELECT id FROM cities
+		WHERE name ILIKE $1
+		ORDER BY (country ILIKE $2) DESC, id
+		LIMIT 1`, name, country).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	if err != nil {
+		return uuid.Nil, false, fmt.Errorf("find city %q: %w", name, err)
+	}
+	return id, true, nil
 }
 
 // postColumns reads a post for viewer $1.

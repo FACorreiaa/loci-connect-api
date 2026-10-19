@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -26,7 +27,9 @@ type DailyTextGenerator interface {
 
 type SeasonalCity struct {
 	Name string
-	Hook string
+	// Country tells two cities of one name apart when looking up its page.
+	Country string
+	Hook    string
 }
 
 type DailyPopularity func(context.Context, []SeasonalCity) ([]string, error)
@@ -104,6 +107,14 @@ func (r *DailyRunner) publish(ctx context.Context, now time.Time) error {
 	if len(cities) == 0 {
 		return fmt.Errorf("no seasonal cities for month %d", now.Month())
 	}
+	recent, err := r.repo.RecentAIPosts(ctx, now.Add(-dailyNoRepeat))
+	if err != nil {
+		return fmt.Errorf("load recent daily posts: %w", err)
+	}
+	// Once a month's list is used up, repeating beats posting nothing.
+	if unused := unusedCities(cities, recent); len(unused) > 0 {
+		cities = unused
+	}
 	if r.popularity != nil {
 		popular, err := r.popularity(ctx, cities)
 		if err != nil {
@@ -117,14 +128,60 @@ func (r *DailyRunner) publish(ctx context.Context, now time.Time) error {
 			}
 		}
 	}
-	selected := cities[now.YearDay()%len(cities)]
-	return r.publishWithCity(ctx, now, selected)
+	// Seeded by the date, so a retried tick picks the same city.
+	pick := rand.New(rand.NewPCG(uint64(now.Year()), uint64(now.YearDay()))).IntN(len(cities))
+	return r.publishWithCity(ctx, now, cities[pick])
+}
+
+// dailyNoRepeat is how long a city rests after its post.
+const dailyNoRepeat = 30 * 24 * time.Hour
+
+// unusedCities drops the cities a recent post was about. The attached city
+// is the record when there is one; regions like Alsace have no cities row,
+// so their name in the post's text stands in.
+func unusedCities(cities []SeasonalCity, recent []*Post) []SeasonalCity {
+	var out []SeasonalCity
+	for _, city := range cities {
+		used := false
+		for _, p := range recent {
+			if p.Attachment != nil && strings.EqualFold(p.Attachment.Snapshot.City, city.Name) {
+				used = true
+				break
+			}
+			text := strings.ToLower(p.Title + " " + p.Body)
+			if strings.Contains(text, strings.ToLower(city.Name)) {
+				used = true
+				break
+			}
+		}
+		if !used {
+			out = append(out, city)
+		}
+	}
+	return out
+}
+
+// cityAttachment links the post to the city's page when Loci knows the city.
+func (r *DailyRunner) cityAttachment(ctx context.Context, city SeasonalCity) (*Attachment, error) {
+	id, ok, err := r.repo.CityIDByName(ctx, city.Name, city.Country)
+	if err != nil || !ok {
+		return nil, err
+	}
+	snap, err := r.repo.Snapshot(ctx, KindCity, id, uuid.Nil)
+	if errors.Is(err, ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &Attachment{Kind: KindCity, Ref: id.String(), Snapshot: snap}, nil
 }
 
 func (r *DailyRunner) publishWithCity(ctx context.Context, now time.Time, selected SeasonalCity) error {
-	prompt := fmt.Sprintf(`Write today's Loci editorial travel post about %s, which is especially appealing for %s.
+	prompt := fmt.Sprintf(`Write today's Loci editorial travel post about %s, %s, which is especially appealing in %s for %s.
 Return JSON only with exactly two string fields: "title" (short and inviting) and "body" (80-140 words).
-Do not claim live prices, opening hours, or events unless they are timeless. Do not mention that you are an AI.`, selected.Name, selected.Hook)
+Do not claim live prices, opening hours, or events unless they are timeless. Do not mention that you are an AI.`,
+		selected.Name, selected.Country, now.Month(), selected.Hook)
 	raw, err := r.generator.GenerateText(ctx, prompt)
 	if err != nil {
 		return fmt.Errorf("generate post: %w", err)
@@ -147,27 +204,141 @@ Do not claim live prices, opening hours, or events unless they are timeless. Do 
 	if err != nil {
 		return fmt.Errorf("load daily board: %w", err)
 	}
+	attachment, err := r.cityAttachment(ctx, selected)
+	if err != nil {
+		return fmt.Errorf("attach %s: %w", selected.Name, err)
+	}
 	authorID, _ := uuid.Parse(EditorialUserID)
 	return r.repo.CreateAIPost(ctx, &Post{
 		BoardID: board.ID, BoardSlug: board.Slug, BoardName: board.Name,
-		AuthorID: authorID, Title: out.Title, Body: out.Body,
+		AuthorID: authorID, Title: out.Title, Body: out.Body, Attachment: attachment,
 	}, now)
 }
 
+// seasonalCities is the month's shortlist: places at their best that month,
+// from both hemispheres, so the board is not a year of Europe.
 func seasonalCities(month time.Month) []SeasonalCity {
 	all := map[time.Month][]SeasonalCity{
-		1:  {{"Tromsø", "the northern lights"}, {"Madeira", "a mild winter escape"}, {"Seville", "the orange harvest"}},
-		2:  {{"Venice", "carnival"}, {"Valencia", "Las Fallas"}, {"Marrakech", "the mild season"}},
-		3:  {{"Kyoto", "early blossom"}, {"Lisbon", "the first spring light"}, {"Rome", "shoulder season"}},
-		4:  {{"Amsterdam", "tulip season"}, {"Paris", "spring in the parks"}, {"Istanbul", "the tulip festival"}},
-		5:  {{"Lisbon", "the jacarandas"}, {"Porto", "São João"}, {"Amalfi", "the coast before the crowds"}},
-		6:  {{"Reykjavik", "the midnight sun"}, {"Stockholm", "Midsummer"}, {"Sintra", "cool hills above Lisbon"}},
-		7:  {{"Dubrovnik", "the summer festival"}, {"Bergen", "long fjord days"}, {"Azores", "hydrangeas and whales"}},
-		8:  {{"Edinburgh", "the Fringe"}, {"Salzburg", "the summer festival"}, {"San Sebastián", "Semana Grande and pintxos"}},
-		9:  {{"Porto", "the harvest season"}, {"Munich", "Oktoberfest"}, {"Barcelona", "La Mercè"}},
-		10: {{"Boston", "New England foliage"}, {"Alsace", "wine villages in autumn"}, {"Rome", "shoulder season"}},
-		11: {{"Madrid", "the museum season"}, {"Bruges", "misty canals"}, {"Malta", "late sun"}},
-		12: {{"Vienna", "the Christmas markets"}, {"Strasbourg", "the Christmas market"}, {"Copenhagen", "hygge season"}},
+		1: {
+			{"Tromsø", "Norway", "the northern lights"},
+			{"Funchal", "Portugal", "a mild winter escape"},
+			{"Seville", "Spain", "the orange harvest"},
+			{"Cape Town", "South Africa", "high summer"},
+			{"Buenos Aires", "Argentina", "long summer evenings"},
+			{"Queenstown", "New Zealand", "alpine summer"},
+			{"Hanoi", "Vietnam", "the cool dry season"},
+			{"Bangkok", "Thailand", "the cool season"},
+		},
+		2: {
+			{"Venice", "Italy", "carnival"},
+			{"Rio de Janeiro", "Brazil", "carnival"},
+			{"Marrakech", "Morocco", "the mild season"},
+			{"Sapporo", "Japan", "the snow festival"},
+			{"Chiang Mai", "Thailand", "the cool dry season"},
+			{"Melbourne", "Australia", "late summer"},
+			{"Oaxaca", "Mexico", "the dry season"},
+			{"Lisbon", "Portugal", "almond blossom and quiet streets"},
+		},
+		3: {
+			{"Valencia", "Spain", "Las Fallas"},
+			{"Kyoto", "Japan", "early blossom"},
+			{"Rome", "Italy", "shoulder season"},
+			{"Dublin", "Ireland", "St Patrick's Day"},
+			{"Washington", "United States", "the cherry blossoms"},
+			{"Mexico City", "Mexico", "the jacarandas"},
+			{"Jaipur", "India", "the weeks before the heat"},
+			{"Porto", "Portugal", "the first spring light"},
+		},
+		4: {
+			{"Amsterdam", "Netherlands", "tulip season"},
+			{"Paris", "France", "spring in the parks"},
+			{"Istanbul", "Turkey", "the tulip festival"},
+			{"Seoul", "South Korea", "cherry blossoms"},
+			{"Seville", "Spain", "the April fair"},
+			{"Tokyo", "Japan", "late blossom"},
+			{"Granada", "Spain", "spring before the heat"},
+			{"Budapest", "Hungary", "the thermal baths in spring"},
+		},
+		5: {
+			{"Lisbon", "Portugal", "the jacarandas"},
+			{"Amalfi", "Italy", "the coast before the crowds"},
+			{"Prague", "Czechia", "spring evenings"},
+			{"Kraków", "Poland", "the old town in bloom"},
+			{"Florence", "Italy", "the galleries before summer"},
+			{"Athens", "Greece", "the ruins before the heat"},
+			{"Vancouver", "Canada", "mountains and sea in spring"},
+			{"Palma", "Spain", "the island before summer"},
+		},
+		6: {
+			{"Reykjavik", "Iceland", "the midnight sun"},
+			{"Stockholm", "Sweden", "Midsummer"},
+			{"Porto", "Portugal", "São João"},
+			{"Cusco", "Peru", "Inti Raymi"},
+			{"Sintra", "Portugal", "cool hills above Lisbon"},
+			{"Montreal", "Canada", "the jazz festival"},
+			{"Tallinn", "Estonia", "white nights"},
+			{"Helsinki", "Finland", "white nights"},
+		},
+		7: {
+			{"Dubrovnik", "Croatia", "the summer festival"},
+			{"Bergen", "Norway", "long fjord days"},
+			{"Azores", "Portugal", "hydrangeas and whales"},
+			{"Avignon", "France", "the theatre festival"},
+			{"Quebec City", "Canada", "the summer festival"},
+			{"Pamplona", "Spain", "San Fermín"},
+			{"Ljubljana", "Slovenia", "summer by the river"},
+			{"Queenstown", "New Zealand", "the ski season"},
+		},
+		8: {
+			{"Edinburgh", "United Kingdom", "the Fringe"},
+			{"Salzburg", "Austria", "the summer festival"},
+			{"San Sebastián", "Spain", "Semana Grande and pintxos"},
+			{"Split", "Croatia", "late summer by the sea"},
+			{"Galway", "Ireland", "the races and long evenings"},
+			{"Nairobi", "Kenya", "the great migration"},
+			{"Bordeaux", "France", "the vineyards before harvest"},
+			{"Copenhagen", "Denmark", "summer swims in the harbour"},
+		},
+		9: {
+			{"Porto", "Portugal", "the Douro harvest"},
+			{"Munich", "Germany", "Oktoberfest"},
+			{"Barcelona", "Spain", "La Mercè"},
+			{"Berlin", "Germany", "late-summer nights"},
+			{"Lyon", "France", "the start of the food season"},
+			{"New York", "United States", "early autumn"},
+			{"Florence", "Italy", "the Chianti harvest"},
+			{"Tbilisi", "Georgia", "the wine harvest"},
+		},
+		10: {
+			{"Boston", "United States", "New England foliage"},
+			{"Alsace", "France", "wine villages in autumn"},
+			{"Rome", "Italy", "shoulder season"},
+			{"Seoul", "South Korea", "autumn colours"},
+			{"Cape Town", "South Africa", "spring"},
+			{"Lisbon", "Portugal", "a warm autumn"},
+			{"Albuquerque", "United States", "the balloon fiesta"},
+			{"Istanbul", "Turkey", "mild autumn days"},
+		},
+		11: {
+			{"Madrid", "Spain", "the museum season"},
+			{"Bruges", "Belgium", "misty canals"},
+			{"Valletta", "Malta", "late sun"},
+			{"Kyoto", "Japan", "autumn colours"},
+			{"Buenos Aires", "Argentina", "the jacarandas"},
+			{"Mexico City", "Mexico", "Día de Muertos"},
+			{"Marrakech", "Morocco", "the mild season"},
+			{"Sydney", "Australia", "late spring"},
+		},
+		12: {
+			{"Vienna", "Austria", "the Christmas markets"},
+			{"Strasbourg", "France", "the Christmas market"},
+			{"Copenhagen", "Denmark", "hygge season"},
+			{"Nuremberg", "Germany", "the Christkindlesmarkt"},
+			{"Prague", "Czechia", "the Christmas markets"},
+			{"Cape Town", "South Africa", "early summer"},
+			{"Sydney", "Australia", "summer by the harbour"},
+			{"Rovaniemi", "Finland", "the polar night"},
+		},
 	}
 	return all[month]
 }
