@@ -398,6 +398,62 @@ func (HighlightReason) EnumDescriptor() ([]byte, []int) {
 	return file_loci_recap_recap_proto_rawDescGZIP(), []int{6}
 }
 
+// PercentileMetric is what a PercentileCard ranks the traveller on.
+type PercentileMetric int32
+
+const (
+	PercentileMetric_PERCENTILE_METRIC_UNSPECIFIED   PercentileMetric = 0
+	PercentileMetric_PERCENTILE_METRIC_PLACES        PercentileMetric = 1
+	PercentileMetric_PERCENTILE_METRIC_CITIES        PercentileMetric = 2
+	PercentileMetric_PERCENTILE_METRIC_DAYS_WALKED   PercentileMetric = 3
+	PercentileMetric_PERCENTILE_METRIC_CONTRIBUTIONS PercentileMetric = 4
+)
+
+// Enum value maps for PercentileMetric.
+var (
+	PercentileMetric_name = map[int32]string{
+		0: "PERCENTILE_METRIC_UNSPECIFIED",
+		1: "PERCENTILE_METRIC_PLACES",
+		2: "PERCENTILE_METRIC_CITIES",
+		3: "PERCENTILE_METRIC_DAYS_WALKED",
+		4: "PERCENTILE_METRIC_CONTRIBUTIONS",
+	}
+	PercentileMetric_value = map[string]int32{
+		"PERCENTILE_METRIC_UNSPECIFIED":   0,
+		"PERCENTILE_METRIC_PLACES":        1,
+		"PERCENTILE_METRIC_CITIES":        2,
+		"PERCENTILE_METRIC_DAYS_WALKED":   3,
+		"PERCENTILE_METRIC_CONTRIBUTIONS": 4,
+	}
+)
+
+func (x PercentileMetric) Enum() *PercentileMetric {
+	p := new(PercentileMetric)
+	*p = x
+	return p
+}
+
+func (x PercentileMetric) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PercentileMetric) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_recap_recap_proto_enumTypes[7].Descriptor()
+}
+
+func (PercentileMetric) Type() protoreflect.EnumType {
+	return &file_loci_recap_recap_proto_enumTypes[7]
+}
+
+func (x PercentileMetric) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PercentileMetric.Descriptor instead.
+func (PercentileMetric) EnumDescriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{7}
+}
+
 // Recap is one built recap: a title and an ordered list of cards.
 type Recap struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
@@ -741,6 +797,13 @@ type RecapCard struct {
 	//	*RecapCard_Field
 	//	*RecapCard_Friends
 	//	*RecapCard_Outro
+	//	*RecapCard_YearMap
+	//	*RecapCard_TripsTimeline
+	//	*RecapCard_TopCity
+	//	*RecapCard_TasteShift
+	//	*RecapCard_Streak
+	//	*RecapCard_Contributions
+	//	*RecapCard_Percentile
 	Card          isRecapCard_Card `protobuf_oneof:"card"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -880,6 +943,69 @@ func (x *RecapCard) GetOutro() *OutroCard {
 	return nil
 }
 
+func (x *RecapCard) GetYearMap() *YearMapCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_YearMap); ok {
+			return x.YearMap
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetTripsTimeline() *TripsTimelineCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_TripsTimeline); ok {
+			return x.TripsTimeline
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetTopCity() *TopCityCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_TopCity); ok {
+			return x.TopCity
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetTasteShift() *TasteShiftCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_TasteShift); ok {
+			return x.TasteShift
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetStreak() *StreakCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_Streak); ok {
+			return x.Streak
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetContributions() *ContributionsCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_Contributions); ok {
+			return x.Contributions
+		}
+	}
+	return nil
+}
+
+func (x *RecapCard) GetPercentile() *PercentileCard {
+	if x != nil {
+		if x, ok := x.Card.(*RecapCard_Percentile); ok {
+			return x.Percentile
+		}
+	}
+	return nil
+}
+
 type isRecapCard_Card interface {
 	isRecapCard_Card()
 }
@@ -921,7 +1047,36 @@ type RecapCard_Friends struct {
 }
 
 type RecapCard_Outro struct {
-	Outro *OutroCard `protobuf:"bytes,19,opt,name=outro,proto3,oneof"` // 30 and up are kept for year-in-review cards.
+	Outro *OutroCard `protobuf:"bytes,19,opt,name=outro,proto3,oneof"`
+}
+
+type RecapCard_YearMap struct {
+	// Year in review only.
+	YearMap *YearMapCard `protobuf:"bytes,30,opt,name=year_map,json=yearMap,proto3,oneof"`
+}
+
+type RecapCard_TripsTimeline struct {
+	TripsTimeline *TripsTimelineCard `protobuf:"bytes,31,opt,name=trips_timeline,json=tripsTimeline,proto3,oneof"`
+}
+
+type RecapCard_TopCity struct {
+	TopCity *TopCityCard `protobuf:"bytes,32,opt,name=top_city,json=topCity,proto3,oneof"`
+}
+
+type RecapCard_TasteShift struct {
+	TasteShift *TasteShiftCard `protobuf:"bytes,33,opt,name=taste_shift,json=tasteShift,proto3,oneof"`
+}
+
+type RecapCard_Streak struct {
+	Streak *StreakCard `protobuf:"bytes,34,opt,name=streak,proto3,oneof"`
+}
+
+type RecapCard_Contributions struct {
+	Contributions *ContributionsCard `protobuf:"bytes,35,opt,name=contributions,proto3,oneof"`
+}
+
+type RecapCard_Percentile struct {
+	Percentile *PercentileCard `protobuf:"bytes,36,opt,name=percentile,proto3,oneof"`
 }
 
 func (*RecapCard_Intro) isRecapCard_Card() {}
@@ -943,6 +1098,20 @@ func (*RecapCard_Field) isRecapCard_Card() {}
 func (*RecapCard_Friends) isRecapCard_Card() {}
 
 func (*RecapCard_Outro) isRecapCard_Card() {}
+
+func (*RecapCard_YearMap) isRecapCard_Card() {}
+
+func (*RecapCard_TripsTimeline) isRecapCard_Card() {}
+
+func (*RecapCard_TopCity) isRecapCard_Card() {}
+
+func (*RecapCard_TasteShift) isRecapCard_Card() {}
+
+func (*RecapCard_Streak) isRecapCard_Card() {}
+
+func (*RecapCard_Contributions) isRecapCard_Card() {}
+
+func (*RecapCard_Percentile) isRecapCard_Card() {}
 
 // IntroCard opens the story (the luggage tag).
 type IntroCard struct {
@@ -2167,6 +2336,830 @@ func (x *OutroCard) GetSummaryLine() string {
 	return ""
 }
 
+// YearMapCard shows where the year went: countries and cities, with the
+// countries visited for the first time called out.
+type YearMapCard struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CountriesCount int32                  `protobuf:"varint,1,opt,name=countries_count,json=countriesCount,proto3" json:"countries_count,omitempty"`
+	CitiesCount    int32                  `protobuf:"varint,2,opt,name=cities_count,json=citiesCount,proto3" json:"cities_count,omitempty"`
+	// Countries the traveller had never been to before this year.
+	NewCountriesCount int32 `protobuf:"varint,3,opt,name=new_countries_count,json=newCountriesCount,proto3" json:"new_countries_count,omitempty"`
+	// Most days first, at most 12.
+	Countries []*YearCountry `protobuf:"bytes,4,rep,name=countries,proto3" json:"countries,omitempty"`
+	// City centroids, for dots on the map. Cities only, so kept publicly.
+	Cities        []*RoutePoint `protobuf:"bytes,5,rep,name=cities,proto3" json:"cities,omitempty"`
+	Headline      string        `protobuf:"bytes,6,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *YearMapCard) Reset() {
+	*x = YearMapCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *YearMapCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*YearMapCard) ProtoMessage() {}
+
+func (x *YearMapCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use YearMapCard.ProtoReflect.Descriptor instead.
+func (*YearMapCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *YearMapCard) GetCountriesCount() int32 {
+	if x != nil {
+		return x.CountriesCount
+	}
+	return 0
+}
+
+func (x *YearMapCard) GetCitiesCount() int32 {
+	if x != nil {
+		return x.CitiesCount
+	}
+	return 0
+}
+
+func (x *YearMapCard) GetNewCountriesCount() int32 {
+	if x != nil {
+		return x.NewCountriesCount
+	}
+	return 0
+}
+
+func (x *YearMapCard) GetCountries() []*YearCountry {
+	if x != nil {
+		return x.Countries
+	}
+	return nil
+}
+
+func (x *YearMapCard) GetCities() []*RoutePoint {
+	if x != nil {
+		return x.Cities
+	}
+	return nil
+}
+
+func (x *YearMapCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+type YearCountry struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Country     string                 `protobuf:"bytes,1,opt,name=country,proto3" json:"country,omitempty"`
+	CountryCode string                 `protobuf:"bytes,2,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
+	CitiesCount int32                  `protobuf:"varint,3,opt,name=cities_count,json=citiesCount,proto3" json:"cities_count,omitempty"`
+	Days        int32                  `protobuf:"varint,4,opt,name=days,proto3" json:"days,omitempty"`
+	// True when this year was the traveller's first time in the country.
+	FirstTime     bool `protobuf:"varint,5,opt,name=first_time,json=firstTime,proto3" json:"first_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *YearCountry) Reset() {
+	*x = YearCountry{}
+	mi := &file_loci_recap_recap_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *YearCountry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*YearCountry) ProtoMessage() {}
+
+func (x *YearCountry) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use YearCountry.ProtoReflect.Descriptor instead.
+func (*YearCountry) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *YearCountry) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+func (x *YearCountry) GetCountryCode() string {
+	if x != nil {
+		return x.CountryCode
+	}
+	return ""
+}
+
+func (x *YearCountry) GetCitiesCount() int32 {
+	if x != nil {
+		return x.CitiesCount
+	}
+	return 0
+}
+
+func (x *YearCountry) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+func (x *YearCountry) GetFirstTime() bool {
+	if x != nil {
+		return x.FirstTime
+	}
+	return false
+}
+
+// TripsTimelineCard lays the year's trips out by month.
+type TripsTimelineCard struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	TripsCount int32                  `protobuf:"varint,1,opt,name=trips_count,json=tripsCount,proto3" json:"trips_count,omitempty"`
+	// Days spent on trips across the year.
+	DaysAway int32 `protobuf:"varint,2,opt,name=days_away,json=daysAway,proto3" json:"days_away,omitempty"`
+	// Always 12 entries, January first.
+	Months []*TimelineMonth `protobuf:"bytes,3,rep,name=months,proto3" json:"months,omitempty"`
+	// In date order, at most 12.
+	Trips []*TimelineTrip `protobuf:"bytes,4,rep,name=trips,proto3" json:"trips,omitempty"`
+	// 1..12, the month with the most days away; 0 when none.
+	BusiestMonth  int32  `protobuf:"varint,5,opt,name=busiest_month,json=busiestMonth,proto3" json:"busiest_month,omitempty"`
+	Headline      string `protobuf:"bytes,6,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TripsTimelineCard) Reset() {
+	*x = TripsTimelineCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TripsTimelineCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TripsTimelineCard) ProtoMessage() {}
+
+func (x *TripsTimelineCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TripsTimelineCard.ProtoReflect.Descriptor instead.
+func (*TripsTimelineCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *TripsTimelineCard) GetTripsCount() int32 {
+	if x != nil {
+		return x.TripsCount
+	}
+	return 0
+}
+
+func (x *TripsTimelineCard) GetDaysAway() int32 {
+	if x != nil {
+		return x.DaysAway
+	}
+	return 0
+}
+
+func (x *TripsTimelineCard) GetMonths() []*TimelineMonth {
+	if x != nil {
+		return x.Months
+	}
+	return nil
+}
+
+func (x *TripsTimelineCard) GetTrips() []*TimelineTrip {
+	if x != nil {
+		return x.Trips
+	}
+	return nil
+}
+
+func (x *TripsTimelineCard) GetBusiestMonth() int32 {
+	if x != nil {
+		return x.BusiestMonth
+	}
+	return 0
+}
+
+func (x *TripsTimelineCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+type TimelineMonth struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1..12.
+	Month         int32 `protobuf:"varint,1,opt,name=month,proto3" json:"month,omitempty"`
+	TripsCount    int32 `protobuf:"varint,2,opt,name=trips_count,json=tripsCount,proto3" json:"trips_count,omitempty"`
+	Days          int32 `protobuf:"varint,3,opt,name=days,proto3" json:"days,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimelineMonth) Reset() {
+	*x = TimelineMonth{}
+	mi := &file_loci_recap_recap_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimelineMonth) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimelineMonth) ProtoMessage() {}
+
+func (x *TimelineMonth) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimelineMonth.ProtoReflect.Descriptor instead.
+func (*TimelineMonth) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *TimelineMonth) GetMonth() int32 {
+	if x != nil {
+		return x.Month
+	}
+	return 0
+}
+
+func (x *TimelineMonth) GetTripsCount() int32 {
+	if x != nil {
+		return x.TripsCount
+	}
+	return 0
+}
+
+func (x *TimelineMonth) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+type TimelineTrip struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty in the public view.
+	TripId string `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	// 1..12, the month the trip started.
+	Month         int32  `protobuf:"varint,2,opt,name=month,proto3" json:"month,omitempty"`
+	CityName      string `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	CountryCode   string `protobuf:"bytes,4,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
+	DayCount      int32  `protobuf:"varint,5,opt,name=day_count,json=dayCount,proto3" json:"day_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimelineTrip) Reset() {
+	*x = TimelineTrip{}
+	mi := &file_loci_recap_recap_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimelineTrip) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimelineTrip) ProtoMessage() {}
+
+func (x *TimelineTrip) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimelineTrip.ProtoReflect.Descriptor instead.
+func (*TimelineTrip) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *TimelineTrip) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *TimelineTrip) GetMonth() int32 {
+	if x != nil {
+		return x.Month
+	}
+	return 0
+}
+
+func (x *TimelineTrip) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *TimelineTrip) GetCountryCode() string {
+	if x != nil {
+		return x.CountryCode
+	}
+	return ""
+}
+
+func (x *TimelineTrip) GetDayCount() int32 {
+	if x != nil {
+		return x.DayCount
+	}
+	return 0
+}
+
+// TopCityCard names the city the traveller spent the most of the year in.
+type TopCityCard struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	CityId      string                 `protobuf:"bytes,1,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	CityName    string                 `protobuf:"bytes,2,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Country     string                 `protobuf:"bytes,3,opt,name=country,proto3" json:"country,omitempty"`
+	CountryCode string                 `protobuf:"bytes,4,opt,name=country_code,json=countryCode,proto3" json:"country_code,omitempty"`
+	Days        int32                  `protobuf:"varint,5,opt,name=days,proto3" json:"days,omitempty"`
+	PlacesCount int32                  `protobuf:"varint,6,opt,name=places_count,json=placesCount,proto3" json:"places_count,omitempty"`
+	// Trips that included the city.
+	TripsCount    int32  `protobuf:"varint,7,opt,name=trips_count,json=tripsCount,proto3" json:"trips_count,omitempty"`
+	ImageUrl      string `protobuf:"bytes,8,opt,name=image_url,json=imageUrl,proto3" json:"image_url,omitempty"`
+	Headline      string `protobuf:"bytes,9,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TopCityCard) Reset() {
+	*x = TopCityCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TopCityCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TopCityCard) ProtoMessage() {}
+
+func (x *TopCityCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TopCityCard.ProtoReflect.Descriptor instead.
+func (*TopCityCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *TopCityCard) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *TopCityCard) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *TopCityCard) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+func (x *TopCityCard) GetCountryCode() string {
+	if x != nil {
+		return x.CountryCode
+	}
+	return ""
+}
+
+func (x *TopCityCard) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+func (x *TopCityCard) GetPlacesCount() int32 {
+	if x != nil {
+		return x.PlacesCount
+	}
+	return 0
+}
+
+func (x *TopCityCard) GetTripsCount() int32 {
+	if x != nil {
+		return x.TripsCount
+	}
+	return 0
+}
+
+func (x *TopCityCard) GetImageUrl() string {
+	if x != nil {
+		return x.ImageUrl
+	}
+	return ""
+}
+
+func (x *TopCityCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+// TasteShiftCard shows the taste trait that grew most over the year.
+type TasteShiftCard struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Headline string                 `protobuf:"bytes,1,opt,name=headline,proto3" json:"headline,omitempty"`
+	// The trait that gained most between the start and the end of the year.
+	Trait *TasteTrait `protobuf:"bytes,2,opt,name=trait,proto3" json:"trait,omitempty"`
+	// 0..1, the trait's strength at the start and at the end of the year.
+	StrengthStart float64 `protobuf:"fixed64,3,opt,name=strength_start,json=strengthStart,proto3" json:"strength_start,omitempty"`
+	StrengthEnd   float64 `protobuf:"fixed64,4,opt,name=strength_end,json=strengthEnd,proto3" json:"strength_end,omitempty"`
+	// Next biggest gainers, at most 2.
+	RunnersUp     []*TasteTrait `protobuf:"bytes,5,rep,name=runners_up,json=runnersUp,proto3" json:"runners_up,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TasteShiftCard) Reset() {
+	*x = TasteShiftCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TasteShiftCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TasteShiftCard) ProtoMessage() {}
+
+func (x *TasteShiftCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TasteShiftCard.ProtoReflect.Descriptor instead.
+func (*TasteShiftCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *TasteShiftCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+func (x *TasteShiftCard) GetTrait() *TasteTrait {
+	if x != nil {
+		return x.Trait
+	}
+	return nil
+}
+
+func (x *TasteShiftCard) GetStrengthStart() float64 {
+	if x != nil {
+		return x.StrengthStart
+	}
+	return 0
+}
+
+func (x *TasteShiftCard) GetStrengthEnd() float64 {
+	if x != nil {
+		return x.StrengthEnd
+	}
+	return 0
+}
+
+func (x *TasteShiftCard) GetRunnersUp() []*TasteTrait {
+	if x != nil {
+		return x.RunnersUp
+	}
+	return nil
+}
+
+// StreakCard shows the longest run of active days and how many days counted.
+type StreakCard struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	LongestStreakDays int32                  `protobuf:"varint,1,opt,name=longest_streak_days,json=longestStreakDays,proto3" json:"longest_streak_days,omitempty"`
+	// YYYY-MM-DD. Empty in the public view.
+	LongestStreakStart string `protobuf:"bytes,2,opt,name=longest_streak_start,json=longestStreakStart,proto3" json:"longest_streak_start,omitempty"`
+	LongestStreakEnd   string `protobuf:"bytes,3,opt,name=longest_streak_end,json=longestStreakEnd,proto3" json:"longest_streak_end,omitempty"`
+	// Days with any activity across the year.
+	ActiveDays int32 `protobuf:"varint,4,opt,name=active_days,json=activeDays,proto3" json:"active_days,omitempty"`
+	// 1..12, the month with the most active days; 0 when none.
+	BestMonth     int32  `protobuf:"varint,5,opt,name=best_month,json=bestMonth,proto3" json:"best_month,omitempty"`
+	Headline      string `protobuf:"bytes,6,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreakCard) Reset() {
+	*x = StreakCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreakCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreakCard) ProtoMessage() {}
+
+func (x *StreakCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreakCard.ProtoReflect.Descriptor instead.
+func (*StreakCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *StreakCard) GetLongestStreakDays() int32 {
+	if x != nil {
+		return x.LongestStreakDays
+	}
+	return 0
+}
+
+func (x *StreakCard) GetLongestStreakStart() string {
+	if x != nil {
+		return x.LongestStreakStart
+	}
+	return ""
+}
+
+func (x *StreakCard) GetLongestStreakEnd() string {
+	if x != nil {
+		return x.LongestStreakEnd
+	}
+	return ""
+}
+
+func (x *StreakCard) GetActiveDays() int32 {
+	if x != nil {
+		return x.ActiveDays
+	}
+	return 0
+}
+
+func (x *StreakCard) GetBestMonth() int32 {
+	if x != nil {
+		return x.BestMonth
+	}
+	return 0
+}
+
+func (x *StreakCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+// ContributionsCard counts what the traveller gave back to other travellers.
+type ContributionsCard struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ReviewsCount int32                  `protobuf:"varint,1,opt,name=reviews_count,json=reviewsCount,proto3" json:"reviews_count,omitempty"`
+	// Public lists created.
+	ListsCount int32 `protobuf:"varint,2,opt,name=lists_count,json=listsCount,proto3" json:"lists_count,omitempty"`
+	// Community board posts.
+	PostsCount int32 `protobuf:"varint,3,opt,name=posts_count,json=postsCount,proto3" json:"posts_count,omitempty"`
+	// Places submitted and facts confirmed.
+	SubmissionsCount int32  `protobuf:"varint,4,opt,name=submissions_count,json=submissionsCount,proto3" json:"submissions_count,omitempty"`
+	Headline         string `protobuf:"bytes,5,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ContributionsCard) Reset() {
+	*x = ContributionsCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ContributionsCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ContributionsCard) ProtoMessage() {}
+
+func (x *ContributionsCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ContributionsCard.ProtoReflect.Descriptor instead.
+func (*ContributionsCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ContributionsCard) GetReviewsCount() int32 {
+	if x != nil {
+		return x.ReviewsCount
+	}
+	return 0
+}
+
+func (x *ContributionsCard) GetListsCount() int32 {
+	if x != nil {
+		return x.ListsCount
+	}
+	return 0
+}
+
+func (x *ContributionsCard) GetPostsCount() int32 {
+	if x != nil {
+		return x.PostsCount
+	}
+	return 0
+}
+
+func (x *ContributionsCard) GetSubmissionsCount() int32 {
+	if x != nil {
+		return x.SubmissionsCount
+	}
+	return 0
+}
+
+func (x *ContributionsCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
+// PercentileCard ranks the traveller against everyone active that year. Only
+// built when enough travellers were active for the number to mean something.
+type PercentileCard struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 1..100: "top 5%" is 5.
+	TopPercent int32            `protobuf:"varint,1,opt,name=top_percent,json=topPercent,proto3" json:"top_percent,omitempty"`
+	Metric     PercentileMetric `protobuf:"varint,2,opt,name=metric,proto3,enum=loci.recap.PercentileMetric" json:"metric,omitempty"`
+	// The traveller's own value for the metric.
+	Value         int32  `protobuf:"varint,3,opt,name=value,proto3" json:"value,omitempty"`
+	Headline      string `protobuf:"bytes,4,opt,name=headline,proto3" json:"headline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PercentileCard) Reset() {
+	*x = PercentileCard{}
+	mi := &file_loci_recap_recap_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PercentileCard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PercentileCard) ProtoMessage() {}
+
+func (x *PercentileCard) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_recap_recap_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PercentileCard.ProtoReflect.Descriptor instead.
+func (*PercentileCard) Descriptor() ([]byte, []int) {
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *PercentileCard) GetTopPercent() int32 {
+	if x != nil {
+		return x.TopPercent
+	}
+	return 0
+}
+
+func (x *PercentileCard) GetMetric() PercentileMetric {
+	if x != nil {
+		return x.Metric
+	}
+	return PercentileMetric_PERCENTILE_METRIC_UNSPECIFIED
+}
+
+func (x *PercentileCard) GetValue() int32 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *PercentileCard) GetHeadline() string {
+	if x != nil {
+		return x.Headline
+	}
+	return ""
+}
+
 // RecapSummary is a list row.
 type RecapSummary struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2186,7 +3179,7 @@ type RecapSummary struct {
 
 func (x *RecapSummary) Reset() {
 	*x = RecapSummary{}
-	mi := &file_loci_recap_recap_proto_msgTypes[21]
+	mi := &file_loci_recap_recap_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2198,7 +3191,7 @@ func (x *RecapSummary) String() string {
 func (*RecapSummary) ProtoMessage() {}
 
 func (x *RecapSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[21]
+	mi := &file_loci_recap_recap_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2211,7 +3204,7 @@ func (x *RecapSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecapSummary.ProtoReflect.Descriptor instead.
 func (*RecapSummary) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{21}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RecapSummary) GetId() string {
@@ -2295,7 +3288,7 @@ type GetTripRecapRequest struct {
 
 func (x *GetTripRecapRequest) Reset() {
 	*x = GetTripRecapRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[22]
+	mi := &file_loci_recap_recap_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2307,7 +3300,7 @@ func (x *GetTripRecapRequest) String() string {
 func (*GetTripRecapRequest) ProtoMessage() {}
 
 func (x *GetTripRecapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[22]
+	mi := &file_loci_recap_recap_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2320,7 +3313,7 @@ func (x *GetTripRecapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTripRecapRequest.ProtoReflect.Descriptor instead.
 func (*GetTripRecapRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{22}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetTripRecapRequest) GetTripId() string {
@@ -2346,7 +3339,7 @@ type GetYearInReviewRequest struct {
 
 func (x *GetYearInReviewRequest) Reset() {
 	*x = GetYearInReviewRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[23]
+	mi := &file_loci_recap_recap_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2358,7 +3351,7 @@ func (x *GetYearInReviewRequest) String() string {
 func (*GetYearInReviewRequest) ProtoMessage() {}
 
 func (x *GetYearInReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[23]
+	mi := &file_loci_recap_recap_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2371,7 +3364,7 @@ func (x *GetYearInReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetYearInReviewRequest.ProtoReflect.Descriptor instead.
 func (*GetYearInReviewRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{23}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetYearInReviewRequest) GetYear() int32 {
@@ -2390,7 +3383,7 @@ type GetRecapRequest struct {
 
 func (x *GetRecapRequest) Reset() {
 	*x = GetRecapRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[24]
+	mi := &file_loci_recap_recap_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2402,7 +3395,7 @@ func (x *GetRecapRequest) String() string {
 func (*GetRecapRequest) ProtoMessage() {}
 
 func (x *GetRecapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[24]
+	mi := &file_loci_recap_recap_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2415,7 +3408,7 @@ func (x *GetRecapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecapRequest.ProtoReflect.Descriptor instead.
 func (*GetRecapRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{24}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetRecapRequest) GetRecapId() string {
@@ -2434,7 +3427,7 @@ type GetRecapResponse struct {
 
 func (x *GetRecapResponse) Reset() {
 	*x = GetRecapResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[25]
+	mi := &file_loci_recap_recap_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2446,7 +3439,7 @@ func (x *GetRecapResponse) String() string {
 func (*GetRecapResponse) ProtoMessage() {}
 
 func (x *GetRecapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[25]
+	mi := &file_loci_recap_recap_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2459,7 +3452,7 @@ func (x *GetRecapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRecapResponse.ProtoReflect.Descriptor instead.
 func (*GetRecapResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{25}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetRecapResponse) GetRecap() *Recap {
@@ -2480,7 +3473,7 @@ type ListRecapsRequest struct {
 
 func (x *ListRecapsRequest) Reset() {
 	*x = ListRecapsRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[26]
+	mi := &file_loci_recap_recap_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2492,7 +3485,7 @@ func (x *ListRecapsRequest) String() string {
 func (*ListRecapsRequest) ProtoMessage() {}
 
 func (x *ListRecapsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[26]
+	mi := &file_loci_recap_recap_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2505,7 +3498,7 @@ func (x *ListRecapsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRecapsRequest.ProtoReflect.Descriptor instead.
 func (*ListRecapsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{26}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListRecapsRequest) GetPageSize() int32 {
@@ -2532,7 +3525,7 @@ type ListRecapsResponse struct {
 
 func (x *ListRecapsResponse) Reset() {
 	*x = ListRecapsResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[27]
+	mi := &file_loci_recap_recap_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2544,7 +3537,7 @@ func (x *ListRecapsResponse) String() string {
 func (*ListRecapsResponse) ProtoMessage() {}
 
 func (x *ListRecapsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[27]
+	mi := &file_loci_recap_recap_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2557,7 +3550,7 @@ func (x *ListRecapsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRecapsResponse.ProtoReflect.Descriptor instead.
 func (*ListRecapsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{27}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListRecapsResponse) GetRecaps() []*RecapSummary {
@@ -2583,7 +3576,7 @@ type ShareRecapRequest struct {
 
 func (x *ShareRecapRequest) Reset() {
 	*x = ShareRecapRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[28]
+	mi := &file_loci_recap_recap_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2595,7 +3588,7 @@ func (x *ShareRecapRequest) String() string {
 func (*ShareRecapRequest) ProtoMessage() {}
 
 func (x *ShareRecapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[28]
+	mi := &file_loci_recap_recap_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2608,7 +3601,7 @@ func (x *ShareRecapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShareRecapRequest.ProtoReflect.Descriptor instead.
 func (*ShareRecapRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{28}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ShareRecapRequest) GetRecapId() string {
@@ -2629,7 +3622,7 @@ type ShareRecapResponse struct {
 
 func (x *ShareRecapResponse) Reset() {
 	*x = ShareRecapResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[29]
+	mi := &file_loci_recap_recap_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2641,7 +3634,7 @@ func (x *ShareRecapResponse) String() string {
 func (*ShareRecapResponse) ProtoMessage() {}
 
 func (x *ShareRecapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[29]
+	mi := &file_loci_recap_recap_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2654,7 +3647,7 @@ func (x *ShareRecapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShareRecapResponse.ProtoReflect.Descriptor instead.
 func (*ShareRecapResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{29}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ShareRecapResponse) GetShareCode() string {
@@ -2680,7 +3673,7 @@ type UnshareRecapRequest struct {
 
 func (x *UnshareRecapRequest) Reset() {
 	*x = UnshareRecapRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[30]
+	mi := &file_loci_recap_recap_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2692,7 +3685,7 @@ func (x *UnshareRecapRequest) String() string {
 func (*UnshareRecapRequest) ProtoMessage() {}
 
 func (x *UnshareRecapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[30]
+	mi := &file_loci_recap_recap_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2705,7 +3698,7 @@ func (x *UnshareRecapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnshareRecapRequest.ProtoReflect.Descriptor instead.
 func (*UnshareRecapRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{30}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *UnshareRecapRequest) GetRecapId() string {
@@ -2723,7 +3716,7 @@ type UnshareRecapResponse struct {
 
 func (x *UnshareRecapResponse) Reset() {
 	*x = UnshareRecapResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[31]
+	mi := &file_loci_recap_recap_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2735,7 +3728,7 @@ func (x *UnshareRecapResponse) String() string {
 func (*UnshareRecapResponse) ProtoMessage() {}
 
 func (x *UnshareRecapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[31]
+	mi := &file_loci_recap_recap_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2748,7 +3741,7 @@ func (x *UnshareRecapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnshareRecapResponse.ProtoReflect.Descriptor instead.
 func (*UnshareRecapResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{31}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{41}
 }
 
 type MarkRecapViewedRequest struct {
@@ -2760,7 +3753,7 @@ type MarkRecapViewedRequest struct {
 
 func (x *MarkRecapViewedRequest) Reset() {
 	*x = MarkRecapViewedRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[32]
+	mi := &file_loci_recap_recap_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2772,7 +3765,7 @@ func (x *MarkRecapViewedRequest) String() string {
 func (*MarkRecapViewedRequest) ProtoMessage() {}
 
 func (x *MarkRecapViewedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[32]
+	mi := &file_loci_recap_recap_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2785,7 +3778,7 @@ func (x *MarkRecapViewedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkRecapViewedRequest.ProtoReflect.Descriptor instead.
 func (*MarkRecapViewedRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{32}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *MarkRecapViewedRequest) GetRecapId() string {
@@ -2803,7 +3796,7 @@ type MarkRecapViewedResponse struct {
 
 func (x *MarkRecapViewedResponse) Reset() {
 	*x = MarkRecapViewedResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[33]
+	mi := &file_loci_recap_recap_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2815,7 +3808,7 @@ func (x *MarkRecapViewedResponse) String() string {
 func (*MarkRecapViewedResponse) ProtoMessage() {}
 
 func (x *MarkRecapViewedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[33]
+	mi := &file_loci_recap_recap_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2828,7 +3821,7 @@ func (x *MarkRecapViewedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkRecapViewedResponse.ProtoReflect.Descriptor instead.
 func (*MarkRecapViewedResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{33}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{43}
 }
 
 type RenderRecapCardImageRequest struct {
@@ -2842,7 +3835,7 @@ type RenderRecapCardImageRequest struct {
 
 func (x *RenderRecapCardImageRequest) Reset() {
 	*x = RenderRecapCardImageRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[34]
+	mi := &file_loci_recap_recap_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2854,7 +3847,7 @@ func (x *RenderRecapCardImageRequest) String() string {
 func (*RenderRecapCardImageRequest) ProtoMessage() {}
 
 func (x *RenderRecapCardImageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[34]
+	mi := &file_loci_recap_recap_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2867,7 +3860,7 @@ func (x *RenderRecapCardImageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenderRecapCardImageRequest.ProtoReflect.Descriptor instead.
 func (*RenderRecapCardImageRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{34}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *RenderRecapCardImageRequest) GetRecapId() string {
@@ -2902,7 +3895,7 @@ type RenderRecapCardImageResponse struct {
 
 func (x *RenderRecapCardImageResponse) Reset() {
 	*x = RenderRecapCardImageResponse{}
-	mi := &file_loci_recap_recap_proto_msgTypes[35]
+	mi := &file_loci_recap_recap_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2914,7 +3907,7 @@ func (x *RenderRecapCardImageResponse) String() string {
 func (*RenderRecapCardImageResponse) ProtoMessage() {}
 
 func (x *RenderRecapCardImageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[35]
+	mi := &file_loci_recap_recap_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2927,7 +3920,7 @@ func (x *RenderRecapCardImageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenderRecapCardImageResponse.ProtoReflect.Descriptor instead.
 func (*RenderRecapCardImageResponse) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{35}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *RenderRecapCardImageResponse) GetPng() []byte {
@@ -2960,7 +3953,7 @@ type GetSharedRecapRequest struct {
 
 func (x *GetSharedRecapRequest) Reset() {
 	*x = GetSharedRecapRequest{}
-	mi := &file_loci_recap_recap_proto_msgTypes[36]
+	mi := &file_loci_recap_recap_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2972,7 +3965,7 @@ func (x *GetSharedRecapRequest) String() string {
 func (*GetSharedRecapRequest) ProtoMessage() {}
 
 func (x *GetSharedRecapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_recap_recap_proto_msgTypes[36]
+	mi := &file_loci_recap_recap_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2985,7 +3978,7 @@ func (x *GetSharedRecapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSharedRecapRequest.ProtoReflect.Descriptor instead.
 func (*GetSharedRecapRequest) Descriptor() ([]byte, []int) {
-	return file_loci_recap_recap_proto_rawDescGZIP(), []int{36}
+	return file_loci_recap_recap_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *GetSharedRecapRequest) GetShareCode() string {
@@ -3034,7 +4027,7 @@ const file_loci_recap_recap_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
-	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\"\x97\x04\n" +
+	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\"\xc1\a\n" +
 	"\tRecapCard\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
 	"\x05intro\x18\n" +
@@ -3049,7 +4042,17 @@ const file_loci_recap_recap_proto_rawDesc = "" +
 	"\bprogress\x18\x10 \x01(\v2\x18.loci.recap.ProgressCardH\x00R\bprogress\x12-\n" +
 	"\x05field\x18\x11 \x01(\v2\x15.loci.recap.FieldCardH\x00R\x05field\x123\n" +
 	"\afriends\x18\x12 \x01(\v2\x17.loci.recap.FriendsCardH\x00R\afriends\x12-\n" +
-	"\x05outro\x18\x13 \x01(\v2\x15.loci.recap.OutroCardH\x00R\x05outroB\x06\n" +
+	"\x05outro\x18\x13 \x01(\v2\x15.loci.recap.OutroCardH\x00R\x05outro\x124\n" +
+	"\byear_map\x18\x1e \x01(\v2\x17.loci.recap.YearMapCardH\x00R\ayearMap\x12F\n" +
+	"\x0etrips_timeline\x18\x1f \x01(\v2\x1d.loci.recap.TripsTimelineCardH\x00R\rtripsTimeline\x124\n" +
+	"\btop_city\x18  \x01(\v2\x17.loci.recap.TopCityCardH\x00R\atopCity\x12=\n" +
+	"\vtaste_shift\x18! \x01(\v2\x1a.loci.recap.TasteShiftCardH\x00R\n" +
+	"tasteShift\x120\n" +
+	"\x06streak\x18\" \x01(\v2\x16.loci.recap.StreakCardH\x00R\x06streak\x12E\n" +
+	"\rcontributions\x18# \x01(\v2\x1d.loci.recap.ContributionsCardH\x00R\rcontributions\x12<\n" +
+	"\n" +
+	"percentile\x18$ \x01(\v2\x1a.loci.recap.PercentileCardH\x00R\n" +
+	"percentileB\x06\n" +
 	"\x04card\"\xda\x01\n" +
 	"\tIntroCard\x12\x12\n" +
 	"\x04lede\x18\x01 \x01(\tR\x04lede\x12\x1d\n" +
@@ -3159,7 +4162,82 @@ const file_loci_recap_recap_proto_rawDesc = "" +
 	"avatar_url\x18\x03 \x01(\tR\tavatarUrl\"J\n" +
 	"\tOutroCard\x12\x1a\n" +
 	"\bheadline\x18\x01 \x01(\tR\bheadline\x12!\n" +
-	"\fsummary_line\x18\x02 \x01(\tR\vsummaryLine\"\xb2\x02\n" +
+	"\fsummary_line\x18\x02 \x01(\tR\vsummaryLine\"\x8c\x02\n" +
+	"\vYearMapCard\x12'\n" +
+	"\x0fcountries_count\x18\x01 \x01(\x05R\x0ecountriesCount\x12!\n" +
+	"\fcities_count\x18\x02 \x01(\x05R\vcitiesCount\x12.\n" +
+	"\x13new_countries_count\x18\x03 \x01(\x05R\x11newCountriesCount\x125\n" +
+	"\tcountries\x18\x04 \x03(\v2\x17.loci.recap.YearCountryR\tcountries\x12.\n" +
+	"\x06cities\x18\x05 \x03(\v2\x16.loci.recap.RoutePointR\x06cities\x12\x1a\n" +
+	"\bheadline\x18\x06 \x01(\tR\bheadline\"\xa0\x01\n" +
+	"\vYearCountry\x12\x18\n" +
+	"\acountry\x18\x01 \x01(\tR\acountry\x12!\n" +
+	"\fcountry_code\x18\x02 \x01(\tR\vcountryCode\x12!\n" +
+	"\fcities_count\x18\x03 \x01(\x05R\vcitiesCount\x12\x12\n" +
+	"\x04days\x18\x04 \x01(\x05R\x04days\x12\x1d\n" +
+	"\n" +
+	"first_time\x18\x05 \x01(\bR\tfirstTime\"\xf5\x01\n" +
+	"\x11TripsTimelineCard\x12\x1f\n" +
+	"\vtrips_count\x18\x01 \x01(\x05R\n" +
+	"tripsCount\x12\x1b\n" +
+	"\tdays_away\x18\x02 \x01(\x05R\bdaysAway\x121\n" +
+	"\x06months\x18\x03 \x03(\v2\x19.loci.recap.TimelineMonthR\x06months\x12.\n" +
+	"\x05trips\x18\x04 \x03(\v2\x18.loci.recap.TimelineTripR\x05trips\x12#\n" +
+	"\rbusiest_month\x18\x05 \x01(\x05R\fbusiestMonth\x12\x1a\n" +
+	"\bheadline\x18\x06 \x01(\tR\bheadline\"Z\n" +
+	"\rTimelineMonth\x12\x14\n" +
+	"\x05month\x18\x01 \x01(\x05R\x05month\x12\x1f\n" +
+	"\vtrips_count\x18\x02 \x01(\x05R\n" +
+	"tripsCount\x12\x12\n" +
+	"\x04days\x18\x03 \x01(\x05R\x04days\"\x9a\x01\n" +
+	"\fTimelineTrip\x12\x17\n" +
+	"\atrip_id\x18\x01 \x01(\tR\x06tripId\x12\x14\n" +
+	"\x05month\x18\x02 \x01(\x05R\x05month\x12\x1b\n" +
+	"\tcity_name\x18\x03 \x01(\tR\bcityName\x12!\n" +
+	"\fcountry_code\x18\x04 \x01(\tR\vcountryCode\x12\x1b\n" +
+	"\tday_count\x18\x05 \x01(\x05R\bdayCount\"\x91\x02\n" +
+	"\vTopCityCard\x12\x17\n" +
+	"\acity_id\x18\x01 \x01(\tR\x06cityId\x12\x1b\n" +
+	"\tcity_name\x18\x02 \x01(\tR\bcityName\x12\x18\n" +
+	"\acountry\x18\x03 \x01(\tR\acountry\x12!\n" +
+	"\fcountry_code\x18\x04 \x01(\tR\vcountryCode\x12\x12\n" +
+	"\x04days\x18\x05 \x01(\x05R\x04days\x12!\n" +
+	"\fplaces_count\x18\x06 \x01(\x05R\vplacesCount\x12\x1f\n" +
+	"\vtrips_count\x18\a \x01(\x05R\n" +
+	"tripsCount\x12\x1b\n" +
+	"\timage_url\x18\b \x01(\tR\bimageUrl\x12\x1a\n" +
+	"\bheadline\x18\t \x01(\tR\bheadline\"\xdb\x01\n" +
+	"\x0eTasteShiftCard\x12\x1a\n" +
+	"\bheadline\x18\x01 \x01(\tR\bheadline\x12,\n" +
+	"\x05trait\x18\x02 \x01(\v2\x16.loci.recap.TasteTraitR\x05trait\x12%\n" +
+	"\x0estrength_start\x18\x03 \x01(\x01R\rstrengthStart\x12!\n" +
+	"\fstrength_end\x18\x04 \x01(\x01R\vstrengthEnd\x125\n" +
+	"\n" +
+	"runners_up\x18\x05 \x03(\v2\x16.loci.recap.TasteTraitR\trunnersUp\"\xf8\x01\n" +
+	"\n" +
+	"StreakCard\x12.\n" +
+	"\x13longest_streak_days\x18\x01 \x01(\x05R\x11longestStreakDays\x120\n" +
+	"\x14longest_streak_start\x18\x02 \x01(\tR\x12longestStreakStart\x12,\n" +
+	"\x12longest_streak_end\x18\x03 \x01(\tR\x10longestStreakEnd\x12\x1f\n" +
+	"\vactive_days\x18\x04 \x01(\x05R\n" +
+	"activeDays\x12\x1d\n" +
+	"\n" +
+	"best_month\x18\x05 \x01(\x05R\tbestMonth\x12\x1a\n" +
+	"\bheadline\x18\x06 \x01(\tR\bheadline\"\xc3\x01\n" +
+	"\x11ContributionsCard\x12#\n" +
+	"\rreviews_count\x18\x01 \x01(\x05R\freviewsCount\x12\x1f\n" +
+	"\vlists_count\x18\x02 \x01(\x05R\n" +
+	"listsCount\x12\x1f\n" +
+	"\vposts_count\x18\x03 \x01(\x05R\n" +
+	"postsCount\x12+\n" +
+	"\x11submissions_count\x18\x04 \x01(\x05R\x10submissionsCount\x12\x1a\n" +
+	"\bheadline\x18\x05 \x01(\tR\bheadline\"\x99\x01\n" +
+	"\x0ePercentileCard\x12\x1f\n" +
+	"\vtop_percent\x18\x01 \x01(\x05R\n" +
+	"topPercent\x124\n" +
+	"\x06metric\x18\x02 \x01(\x0e2\x1c.loci.recap.PercentileMetricR\x06metric\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\x05R\x05value\x12\x1a\n" +
+	"\bheadline\x18\x04 \x01(\tR\bheadline\"\xb2\x02\n" +
 	"\fRecapSummary\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x15.loci.recap.RecapKindR\x04kind\x12\x17\n" +
@@ -3248,7 +4326,13 @@ const file_loci_recap_recap_proto_rawDesc = "" +
 	"\x1cHIGHLIGHT_REASON_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aHIGHLIGHT_REASON_FAVORITED\x10\x01\x12\x1d\n" +
 	"\x19HIGHLIGHT_REASON_REVIEWED\x10\x02\x12 \n" +
-	"\x1cHIGHLIGHT_REASON_FIRST_VISIT\x10\x032\x80\x06\n" +
+	"\x1cHIGHLIGHT_REASON_FIRST_VISIT\x10\x03*\xb9\x01\n" +
+	"\x10PercentileMetric\x12!\n" +
+	"\x1dPERCENTILE_METRIC_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18PERCENTILE_METRIC_PLACES\x10\x01\x12\x1c\n" +
+	"\x18PERCENTILE_METRIC_CITIES\x10\x02\x12!\n" +
+	"\x1dPERCENTILE_METRIC_DAYS_WALKED\x10\x03\x12#\n" +
+	"\x1fPERCENTILE_METRIC_CONTRIBUTIONS\x10\x042\x80\x06\n" +
 	"\fRecapService\x12M\n" +
 	"\fGetTripRecap\x12\x1f.loci.recap.GetTripRecapRequest\x1a\x1c.loci.recap.GetRecapResponse\x12S\n" +
 	"\x0fGetYearInReview\x12\".loci.recap.GetYearInReviewRequest\x1a\x1c.loci.recap.GetRecapResponse\x12E\n" +
@@ -3274,8 +4358,8 @@ func file_loci_recap_recap_proto_rawDescGZIP() []byte {
 	return file_loci_recap_recap_proto_rawDescData
 }
 
-var file_loci_recap_recap_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_loci_recap_recap_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_loci_recap_recap_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_loci_recap_recap_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
 var file_loci_recap_recap_proto_goTypes = []any{
 	(RecapKind)(0),                       // 0: loci.recap.RecapKind
 	(RecapStatus)(0),                     // 1: loci.recap.RecapStatus
@@ -3284,102 +4368,127 @@ var file_loci_recap_recap_proto_goTypes = []any{
 	(TasteEvidenceKind)(0),               // 4: loci.recap.TasteEvidenceKind
 	(TasteTrend)(0),                      // 5: loci.recap.TasteTrend
 	(HighlightReason)(0),                 // 6: loci.recap.HighlightReason
-	(*Recap)(nil),                        // 7: loci.recap.Recap
-	(*RecapTheme)(nil),                   // 8: loci.recap.RecapTheme
-	(*RecapOwner)(nil),                   // 9: loci.recap.RecapOwner
-	(*RecapCard)(nil),                    // 10: loci.recap.RecapCard
-	(*IntroCard)(nil),                    // 11: loci.recap.IntroCard
-	(*PlacesCard)(nil),                   // 12: loci.recap.PlacesCard
-	(*PlaceGroup)(nil),                   // 13: loci.recap.PlaceGroup
-	(*RouteCard)(nil),                    // 14: loci.recap.RouteCard
-	(*RoutePoint)(nil),                   // 15: loci.recap.RoutePoint
-	(*DaysCard)(nil),                     // 16: loci.recap.DaysCard
-	(*DayStub)(nil),                      // 17: loci.recap.DayStub
-	(*TasteCard)(nil),                    // 18: loci.recap.TasteCard
-	(*TasteTrait)(nil),                   // 19: loci.recap.TasteTrait
-	(*HighlightsCard)(nil),               // 20: loci.recap.HighlightsCard
-	(*Highlight)(nil),                    // 21: loci.recap.Highlight
-	(*ProgressCard)(nil),                 // 22: loci.recap.ProgressCard
-	(*EarnedBadge)(nil),                  // 23: loci.recap.EarnedBadge
-	(*FieldCard)(nil),                    // 24: loci.recap.FieldCard
-	(*FriendsCard)(nil),                  // 25: loci.recap.FriendsCard
-	(*FriendRef)(nil),                    // 26: loci.recap.FriendRef
-	(*OutroCard)(nil),                    // 27: loci.recap.OutroCard
-	(*RecapSummary)(nil),                 // 28: loci.recap.RecapSummary
-	(*GetTripRecapRequest)(nil),          // 29: loci.recap.GetTripRecapRequest
-	(*GetYearInReviewRequest)(nil),       // 30: loci.recap.GetYearInReviewRequest
-	(*GetRecapRequest)(nil),              // 31: loci.recap.GetRecapRequest
-	(*GetRecapResponse)(nil),             // 32: loci.recap.GetRecapResponse
-	(*ListRecapsRequest)(nil),            // 33: loci.recap.ListRecapsRequest
-	(*ListRecapsResponse)(nil),           // 34: loci.recap.ListRecapsResponse
-	(*ShareRecapRequest)(nil),            // 35: loci.recap.ShareRecapRequest
-	(*ShareRecapResponse)(nil),           // 36: loci.recap.ShareRecapResponse
-	(*UnshareRecapRequest)(nil),          // 37: loci.recap.UnshareRecapRequest
-	(*UnshareRecapResponse)(nil),         // 38: loci.recap.UnshareRecapResponse
-	(*MarkRecapViewedRequest)(nil),       // 39: loci.recap.MarkRecapViewedRequest
-	(*MarkRecapViewedResponse)(nil),      // 40: loci.recap.MarkRecapViewedResponse
-	(*RenderRecapCardImageRequest)(nil),  // 41: loci.recap.RenderRecapCardImageRequest
-	(*RenderRecapCardImageResponse)(nil), // 42: loci.recap.RenderRecapCardImageResponse
-	(*GetSharedRecapRequest)(nil),        // 43: loci.recap.GetSharedRecapRequest
-	(*timestamppb.Timestamp)(nil),        // 44: google.protobuf.Timestamp
+	(PercentileMetric)(0),                // 7: loci.recap.PercentileMetric
+	(*Recap)(nil),                        // 8: loci.recap.Recap
+	(*RecapTheme)(nil),                   // 9: loci.recap.RecapTheme
+	(*RecapOwner)(nil),                   // 10: loci.recap.RecapOwner
+	(*RecapCard)(nil),                    // 11: loci.recap.RecapCard
+	(*IntroCard)(nil),                    // 12: loci.recap.IntroCard
+	(*PlacesCard)(nil),                   // 13: loci.recap.PlacesCard
+	(*PlaceGroup)(nil),                   // 14: loci.recap.PlaceGroup
+	(*RouteCard)(nil),                    // 15: loci.recap.RouteCard
+	(*RoutePoint)(nil),                   // 16: loci.recap.RoutePoint
+	(*DaysCard)(nil),                     // 17: loci.recap.DaysCard
+	(*DayStub)(nil),                      // 18: loci.recap.DayStub
+	(*TasteCard)(nil),                    // 19: loci.recap.TasteCard
+	(*TasteTrait)(nil),                   // 20: loci.recap.TasteTrait
+	(*HighlightsCard)(nil),               // 21: loci.recap.HighlightsCard
+	(*Highlight)(nil),                    // 22: loci.recap.Highlight
+	(*ProgressCard)(nil),                 // 23: loci.recap.ProgressCard
+	(*EarnedBadge)(nil),                  // 24: loci.recap.EarnedBadge
+	(*FieldCard)(nil),                    // 25: loci.recap.FieldCard
+	(*FriendsCard)(nil),                  // 26: loci.recap.FriendsCard
+	(*FriendRef)(nil),                    // 27: loci.recap.FriendRef
+	(*OutroCard)(nil),                    // 28: loci.recap.OutroCard
+	(*YearMapCard)(nil),                  // 29: loci.recap.YearMapCard
+	(*YearCountry)(nil),                  // 30: loci.recap.YearCountry
+	(*TripsTimelineCard)(nil),            // 31: loci.recap.TripsTimelineCard
+	(*TimelineMonth)(nil),                // 32: loci.recap.TimelineMonth
+	(*TimelineTrip)(nil),                 // 33: loci.recap.TimelineTrip
+	(*TopCityCard)(nil),                  // 34: loci.recap.TopCityCard
+	(*TasteShiftCard)(nil),               // 35: loci.recap.TasteShiftCard
+	(*StreakCard)(nil),                   // 36: loci.recap.StreakCard
+	(*ContributionsCard)(nil),            // 37: loci.recap.ContributionsCard
+	(*PercentileCard)(nil),               // 38: loci.recap.PercentileCard
+	(*RecapSummary)(nil),                 // 39: loci.recap.RecapSummary
+	(*GetTripRecapRequest)(nil),          // 40: loci.recap.GetTripRecapRequest
+	(*GetYearInReviewRequest)(nil),       // 41: loci.recap.GetYearInReviewRequest
+	(*GetRecapRequest)(nil),              // 42: loci.recap.GetRecapRequest
+	(*GetRecapResponse)(nil),             // 43: loci.recap.GetRecapResponse
+	(*ListRecapsRequest)(nil),            // 44: loci.recap.ListRecapsRequest
+	(*ListRecapsResponse)(nil),           // 45: loci.recap.ListRecapsResponse
+	(*ShareRecapRequest)(nil),            // 46: loci.recap.ShareRecapRequest
+	(*ShareRecapResponse)(nil),           // 47: loci.recap.ShareRecapResponse
+	(*UnshareRecapRequest)(nil),          // 48: loci.recap.UnshareRecapRequest
+	(*UnshareRecapResponse)(nil),         // 49: loci.recap.UnshareRecapResponse
+	(*MarkRecapViewedRequest)(nil),       // 50: loci.recap.MarkRecapViewedRequest
+	(*MarkRecapViewedResponse)(nil),      // 51: loci.recap.MarkRecapViewedResponse
+	(*RenderRecapCardImageRequest)(nil),  // 52: loci.recap.RenderRecapCardImageRequest
+	(*RenderRecapCardImageResponse)(nil), // 53: loci.recap.RenderRecapCardImageResponse
+	(*GetSharedRecapRequest)(nil),        // 54: loci.recap.GetSharedRecapRequest
+	(*timestamppb.Timestamp)(nil),        // 55: google.protobuf.Timestamp
 }
 var file_loci_recap_recap_proto_depIdxs = []int32{
 	0,  // 0: loci.recap.Recap.kind:type_name -> loci.recap.RecapKind
 	1,  // 1: loci.recap.Recap.status:type_name -> loci.recap.RecapStatus
-	10, // 2: loci.recap.Recap.cards:type_name -> loci.recap.RecapCard
-	8,  // 3: loci.recap.Recap.theme:type_name -> loci.recap.RecapTheme
-	9,  // 4: loci.recap.Recap.owner:type_name -> loci.recap.RecapOwner
-	44, // 5: loci.recap.Recap.ready_at:type_name -> google.protobuf.Timestamp
-	44, // 6: loci.recap.Recap.viewed_at:type_name -> google.protobuf.Timestamp
-	11, // 7: loci.recap.RecapCard.intro:type_name -> loci.recap.IntroCard
-	12, // 8: loci.recap.RecapCard.places:type_name -> loci.recap.PlacesCard
-	14, // 9: loci.recap.RecapCard.route:type_name -> loci.recap.RouteCard
-	16, // 10: loci.recap.RecapCard.days:type_name -> loci.recap.DaysCard
-	18, // 11: loci.recap.RecapCard.taste:type_name -> loci.recap.TasteCard
-	20, // 12: loci.recap.RecapCard.highlights:type_name -> loci.recap.HighlightsCard
-	22, // 13: loci.recap.RecapCard.progress:type_name -> loci.recap.ProgressCard
-	24, // 14: loci.recap.RecapCard.field:type_name -> loci.recap.FieldCard
-	25, // 15: loci.recap.RecapCard.friends:type_name -> loci.recap.FriendsCard
-	27, // 16: loci.recap.RecapCard.outro:type_name -> loci.recap.OutroCard
-	13, // 17: loci.recap.PlacesCard.groups:type_name -> loci.recap.PlaceGroup
-	3,  // 18: loci.recap.RouteCard.basis:type_name -> loci.recap.RouteBasis
-	15, // 19: loci.recap.RouteCard.points:type_name -> loci.recap.RoutePoint
-	17, // 20: loci.recap.DaysCard.days:type_name -> loci.recap.DayStub
-	19, // 21: loci.recap.TasteCard.traits:type_name -> loci.recap.TasteTrait
-	4,  // 22: loci.recap.TasteTrait.evidence_kind:type_name -> loci.recap.TasteEvidenceKind
-	5,  // 23: loci.recap.TasteTrait.trend:type_name -> loci.recap.TasteTrend
-	21, // 24: loci.recap.HighlightsCard.highlights:type_name -> loci.recap.Highlight
-	6,  // 25: loci.recap.Highlight.reason:type_name -> loci.recap.HighlightReason
-	23, // 26: loci.recap.ProgressCard.badges:type_name -> loci.recap.EarnedBadge
-	26, // 27: loci.recap.FriendsCard.friends:type_name -> loci.recap.FriendRef
-	0,  // 28: loci.recap.RecapSummary.kind:type_name -> loci.recap.RecapKind
-	44, // 29: loci.recap.RecapSummary.ready_at:type_name -> google.protobuf.Timestamp
-	7,  // 30: loci.recap.GetRecapResponse.recap:type_name -> loci.recap.Recap
-	28, // 31: loci.recap.ListRecapsResponse.recaps:type_name -> loci.recap.RecapSummary
-	2,  // 32: loci.recap.RenderRecapCardImageRequest.format:type_name -> loci.recap.RecapImageFormat
-	29, // 33: loci.recap.RecapService.GetTripRecap:input_type -> loci.recap.GetTripRecapRequest
-	30, // 34: loci.recap.RecapService.GetYearInReview:input_type -> loci.recap.GetYearInReviewRequest
-	31, // 35: loci.recap.RecapService.GetRecap:input_type -> loci.recap.GetRecapRequest
-	33, // 36: loci.recap.RecapService.ListRecaps:input_type -> loci.recap.ListRecapsRequest
-	35, // 37: loci.recap.RecapService.ShareRecap:input_type -> loci.recap.ShareRecapRequest
-	37, // 38: loci.recap.RecapService.UnshareRecap:input_type -> loci.recap.UnshareRecapRequest
-	39, // 39: loci.recap.RecapService.MarkRecapViewed:input_type -> loci.recap.MarkRecapViewedRequest
-	41, // 40: loci.recap.RecapService.RenderRecapCardImage:input_type -> loci.recap.RenderRecapCardImageRequest
-	43, // 41: loci.recap.RecapService.GetSharedRecap:input_type -> loci.recap.GetSharedRecapRequest
-	32, // 42: loci.recap.RecapService.GetTripRecap:output_type -> loci.recap.GetRecapResponse
-	32, // 43: loci.recap.RecapService.GetYearInReview:output_type -> loci.recap.GetRecapResponse
-	32, // 44: loci.recap.RecapService.GetRecap:output_type -> loci.recap.GetRecapResponse
-	34, // 45: loci.recap.RecapService.ListRecaps:output_type -> loci.recap.ListRecapsResponse
-	36, // 46: loci.recap.RecapService.ShareRecap:output_type -> loci.recap.ShareRecapResponse
-	38, // 47: loci.recap.RecapService.UnshareRecap:output_type -> loci.recap.UnshareRecapResponse
-	40, // 48: loci.recap.RecapService.MarkRecapViewed:output_type -> loci.recap.MarkRecapViewedResponse
-	42, // 49: loci.recap.RecapService.RenderRecapCardImage:output_type -> loci.recap.RenderRecapCardImageResponse
-	32, // 50: loci.recap.RecapService.GetSharedRecap:output_type -> loci.recap.GetRecapResponse
-	42, // [42:51] is the sub-list for method output_type
-	33, // [33:42] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	11, // 2: loci.recap.Recap.cards:type_name -> loci.recap.RecapCard
+	9,  // 3: loci.recap.Recap.theme:type_name -> loci.recap.RecapTheme
+	10, // 4: loci.recap.Recap.owner:type_name -> loci.recap.RecapOwner
+	55, // 5: loci.recap.Recap.ready_at:type_name -> google.protobuf.Timestamp
+	55, // 6: loci.recap.Recap.viewed_at:type_name -> google.protobuf.Timestamp
+	12, // 7: loci.recap.RecapCard.intro:type_name -> loci.recap.IntroCard
+	13, // 8: loci.recap.RecapCard.places:type_name -> loci.recap.PlacesCard
+	15, // 9: loci.recap.RecapCard.route:type_name -> loci.recap.RouteCard
+	17, // 10: loci.recap.RecapCard.days:type_name -> loci.recap.DaysCard
+	19, // 11: loci.recap.RecapCard.taste:type_name -> loci.recap.TasteCard
+	21, // 12: loci.recap.RecapCard.highlights:type_name -> loci.recap.HighlightsCard
+	23, // 13: loci.recap.RecapCard.progress:type_name -> loci.recap.ProgressCard
+	25, // 14: loci.recap.RecapCard.field:type_name -> loci.recap.FieldCard
+	26, // 15: loci.recap.RecapCard.friends:type_name -> loci.recap.FriendsCard
+	28, // 16: loci.recap.RecapCard.outro:type_name -> loci.recap.OutroCard
+	29, // 17: loci.recap.RecapCard.year_map:type_name -> loci.recap.YearMapCard
+	31, // 18: loci.recap.RecapCard.trips_timeline:type_name -> loci.recap.TripsTimelineCard
+	34, // 19: loci.recap.RecapCard.top_city:type_name -> loci.recap.TopCityCard
+	35, // 20: loci.recap.RecapCard.taste_shift:type_name -> loci.recap.TasteShiftCard
+	36, // 21: loci.recap.RecapCard.streak:type_name -> loci.recap.StreakCard
+	37, // 22: loci.recap.RecapCard.contributions:type_name -> loci.recap.ContributionsCard
+	38, // 23: loci.recap.RecapCard.percentile:type_name -> loci.recap.PercentileCard
+	14, // 24: loci.recap.PlacesCard.groups:type_name -> loci.recap.PlaceGroup
+	3,  // 25: loci.recap.RouteCard.basis:type_name -> loci.recap.RouteBasis
+	16, // 26: loci.recap.RouteCard.points:type_name -> loci.recap.RoutePoint
+	18, // 27: loci.recap.DaysCard.days:type_name -> loci.recap.DayStub
+	20, // 28: loci.recap.TasteCard.traits:type_name -> loci.recap.TasteTrait
+	4,  // 29: loci.recap.TasteTrait.evidence_kind:type_name -> loci.recap.TasteEvidenceKind
+	5,  // 30: loci.recap.TasteTrait.trend:type_name -> loci.recap.TasteTrend
+	22, // 31: loci.recap.HighlightsCard.highlights:type_name -> loci.recap.Highlight
+	6,  // 32: loci.recap.Highlight.reason:type_name -> loci.recap.HighlightReason
+	24, // 33: loci.recap.ProgressCard.badges:type_name -> loci.recap.EarnedBadge
+	27, // 34: loci.recap.FriendsCard.friends:type_name -> loci.recap.FriendRef
+	30, // 35: loci.recap.YearMapCard.countries:type_name -> loci.recap.YearCountry
+	16, // 36: loci.recap.YearMapCard.cities:type_name -> loci.recap.RoutePoint
+	32, // 37: loci.recap.TripsTimelineCard.months:type_name -> loci.recap.TimelineMonth
+	33, // 38: loci.recap.TripsTimelineCard.trips:type_name -> loci.recap.TimelineTrip
+	20, // 39: loci.recap.TasteShiftCard.trait:type_name -> loci.recap.TasteTrait
+	20, // 40: loci.recap.TasteShiftCard.runners_up:type_name -> loci.recap.TasteTrait
+	7,  // 41: loci.recap.PercentileCard.metric:type_name -> loci.recap.PercentileMetric
+	0,  // 42: loci.recap.RecapSummary.kind:type_name -> loci.recap.RecapKind
+	55, // 43: loci.recap.RecapSummary.ready_at:type_name -> google.protobuf.Timestamp
+	8,  // 44: loci.recap.GetRecapResponse.recap:type_name -> loci.recap.Recap
+	39, // 45: loci.recap.ListRecapsResponse.recaps:type_name -> loci.recap.RecapSummary
+	2,  // 46: loci.recap.RenderRecapCardImageRequest.format:type_name -> loci.recap.RecapImageFormat
+	40, // 47: loci.recap.RecapService.GetTripRecap:input_type -> loci.recap.GetTripRecapRequest
+	41, // 48: loci.recap.RecapService.GetYearInReview:input_type -> loci.recap.GetYearInReviewRequest
+	42, // 49: loci.recap.RecapService.GetRecap:input_type -> loci.recap.GetRecapRequest
+	44, // 50: loci.recap.RecapService.ListRecaps:input_type -> loci.recap.ListRecapsRequest
+	46, // 51: loci.recap.RecapService.ShareRecap:input_type -> loci.recap.ShareRecapRequest
+	48, // 52: loci.recap.RecapService.UnshareRecap:input_type -> loci.recap.UnshareRecapRequest
+	50, // 53: loci.recap.RecapService.MarkRecapViewed:input_type -> loci.recap.MarkRecapViewedRequest
+	52, // 54: loci.recap.RecapService.RenderRecapCardImage:input_type -> loci.recap.RenderRecapCardImageRequest
+	54, // 55: loci.recap.RecapService.GetSharedRecap:input_type -> loci.recap.GetSharedRecapRequest
+	43, // 56: loci.recap.RecapService.GetTripRecap:output_type -> loci.recap.GetRecapResponse
+	43, // 57: loci.recap.RecapService.GetYearInReview:output_type -> loci.recap.GetRecapResponse
+	43, // 58: loci.recap.RecapService.GetRecap:output_type -> loci.recap.GetRecapResponse
+	45, // 59: loci.recap.RecapService.ListRecaps:output_type -> loci.recap.ListRecapsResponse
+	47, // 60: loci.recap.RecapService.ShareRecap:output_type -> loci.recap.ShareRecapResponse
+	49, // 61: loci.recap.RecapService.UnshareRecap:output_type -> loci.recap.UnshareRecapResponse
+	51, // 62: loci.recap.RecapService.MarkRecapViewed:output_type -> loci.recap.MarkRecapViewedResponse
+	53, // 63: loci.recap.RecapService.RenderRecapCardImage:output_type -> loci.recap.RenderRecapCardImageResponse
+	43, // 64: loci.recap.RecapService.GetSharedRecap:output_type -> loci.recap.GetRecapResponse
+	56, // [56:65] is the sub-list for method output_type
+	47, // [47:56] is the sub-list for method input_type
+	47, // [47:47] is the sub-list for extension type_name
+	47, // [47:47] is the sub-list for extension extendee
+	0,  // [0:47] is the sub-list for field type_name
 }
 
 func init() { file_loci_recap_recap_proto_init() }
@@ -3398,14 +4507,21 @@ func file_loci_recap_recap_proto_init() {
 		(*RecapCard_Field)(nil),
 		(*RecapCard_Friends)(nil),
 		(*RecapCard_Outro)(nil),
+		(*RecapCard_YearMap)(nil),
+		(*RecapCard_TripsTimeline)(nil),
+		(*RecapCard_TopCity)(nil),
+		(*RecapCard_TasteShift)(nil),
+		(*RecapCard_Streak)(nil),
+		(*RecapCard_Contributions)(nil),
+		(*RecapCard_Percentile)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_recap_recap_proto_rawDesc), len(file_loci_recap_recap_proto_rawDesc)),
-			NumEnums:      7,
-			NumMessages:   37,
+			NumEnums:      8,
+			NumMessages:   47,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
