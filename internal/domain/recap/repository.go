@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Repository is the recaps table plus the reads a trip recap is built from.
+// Repository is the recaps table plus the reads a recap is built from.
 type Repository interface {
 	// Candidates are trips with no recap yet whose end (or last walked day)
 	// falls on or after since. The caller decides which are due.
@@ -52,13 +52,29 @@ type Repository interface {
 	MarkViewed(ctx context.Context, userID, id uuid.UUID) error
 	// LoadTripFacts reads everything a trip recap is built from.
 	LoadTripFacts(ctx context.Context, userID, tripID uuid.UUID, start, end time.Time) (*TripFacts, error)
+
+	// YearCandidates are travellers active in year with no year recap yet;
+	// only, when not nil, limits them to those ids.
+	YearCandidates(ctx context.Context, year int, only []uuid.UUID, limit int) ([]YearCandidate, error)
+	// QueueYear adds a pending year recap; false when the year has one.
+	QueueYear(ctx context.Context, userID uuid.UUID, year int) (bool, error)
+	// UpsertYear stores a year recap built on request, like UpsertTrip.
+	UpsertYear(ctx context.Context, userID uuid.UUID, year int, status Status, payload []byte, reason string) (Row, error)
+	ByYear(ctx context.Context, userID uuid.UUID, year int) (Row, error)
+	// Timezone is the traveller's zone; UTC when unknown.
+	Timezone(ctx context.Context, userID uuid.UUID) (string, error)
+	// LoadYearFacts reads everything a year in review is built from, up to
+	// now.
+	LoadYearFacts(ctx context.Context, userID uuid.UUID, year int, now time.Time) (*YearFacts, error)
 }
 
 // Notice is a ready recap waiting for its push.
 type Notice struct {
 	RecapID  uuid.UUID
 	UserID   uuid.UUID
+	Kind     Kind
 	TripID   uuid.UUID
+	Year     int
 	Timezone string
 	Viewed   bool
 	Payload  []byte
@@ -288,7 +304,7 @@ func (p *pgRepository) List(ctx context.Context, userID uuid.UUID, limit int, be
 
 func (p *pgRepository) Unnotified(ctx context.Context, limit int) ([]Notice, error) {
 	rows, err := p.pool.Query(ctx, `
-		SELECT r.id, r.user_id, COALESCE(r.trip_id, '00000000-0000-0000-0000-000000000000'::uuid),
+		SELECT r.id, r.user_id, r.kind, COALESCE(r.trip_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(r.year, 0),
 		       COALESCE(up.timezone, 'UTC'), r.viewed_at IS NOT NULL, r.payload
 		FROM recaps r
 		LEFT JOIN user_progress up ON up.user_id = r.user_id
@@ -301,9 +317,11 @@ func (p *pgRepository) Unnotified(ctx context.Context, limit int) ([]Notice, err
 	var out []Notice
 	for rows.Next() {
 		var n Notice
-		if err := rows.Scan(&n.RecapID, &n.UserID, &n.TripID, &n.Timezone, &n.Viewed, &n.Payload); err != nil {
+		var year int16
+		if err := rows.Scan(&n.RecapID, &n.UserID, &n.Kind, &n.TripID, &year, &n.Timezone, &n.Viewed, &n.Payload); err != nil {
 			return nil, err
 		}
+		n.Year = int(year)
 		out = append(out, n)
 	}
 	return out, rows.Err()
@@ -557,29 +575,39 @@ func (p *pgRepository) loadPlaces(ctx context.Context, f *TripFacts) error {
 		if lat != nil && lon != nil {
 			pl.Lat, pl.Lon, pl.HasCoords = *lat, *lon, true
 		}
-		key := pl.POIID
-		if key == "" {
-			key = "name:" + strings.ToLower(strings.TrimSpace(pl.Name))
-		}
-		if i, ok := index[key]; ok {
-			// One place visited twice, or visited and marked: keep the first
-			// time, and fill in what the other row knew.
-			cur := &f.Places[i]
-			if pl.At.Before(cur.At) {
-				cur.At = pl.At
-			}
-			if !cur.HasCoords && pl.HasCoords {
-				cur.Lat, cur.Lon, cur.HasCoords = pl.Lat, pl.Lon, true
-			}
-			if cur.Neighborhood == "" {
-				cur.Neighborhood = pl.Neighborhood
-			}
-			continue
-		}
-		index[key] = len(f.Places)
-		f.Places = append(f.Places, pl)
+		mergePlace(&f.Places, index, placeKey(pl), pl)
 	}
 	return rows.Err()
+}
+
+// placeKey identifies a place across visits and stop marks.
+func placeKey(pl Place) string {
+	if pl.POIID != "" {
+		return pl.POIID
+	}
+	return "name:" + strings.ToLower(strings.TrimSpace(pl.Name))
+}
+
+// mergePlace adds pl, or folds it into the place already under key: one
+// place visited twice, or visited and marked, keeps the first time and fills
+// in what the other row knew.
+func mergePlace(places *[]Place, index map[string]int, key string, pl Place) {
+	i, ok := index[key]
+	if !ok {
+		index[key] = len(*places)
+		*places = append(*places, pl)
+		return
+	}
+	cur := &(*places)[i]
+	if pl.At.Before(cur.At) {
+		cur.At = pl.At
+	}
+	if !cur.HasCoords && pl.HasCoords {
+		cur.Lat, cur.Lon, cur.HasCoords = pl.Lat, pl.Lon, true
+	}
+	if cur.Neighborhood == "" {
+		cur.Neighborhood = pl.Neighborhood
+	}
 }
 
 func (p *pgRepository) loadTaste(ctx context.Context, f *TripFacts) error {

@@ -1,11 +1,11 @@
 // Package recap builds story-style recaps of what a traveller did: one per
-// finished trip, and (later) one per calendar year.
+// finished trip, and one per calendar year (the year in review).
 //
 // A recap is built once from what the other domains already store (visits,
 // trip days, stop marks, taste evidence, points, field scores, friends) and
 // kept as a frozen snapshot in the recaps table. The builder is pure: the
-// repository loads a TripFacts, Build turns it into cards, and nothing in
-// between touches the database.
+// repository loads a TripFacts or YearFacts, BuildTrip or BuildYear turns it
+// into cards, and nothing in between touches the database.
 package recap
 
 import (

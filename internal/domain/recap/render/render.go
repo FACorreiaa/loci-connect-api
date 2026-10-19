@@ -1,4 +1,4 @@
-// Package render draws Loci trip-recap cards as PNG images, server-side and in
+// Package render draws Loci recap cards (trips and years) as PNG images, server-side and in
 // pure Go (no cgo), so it runs in the distroless image.
 //
 // Two shapes are produced: a 1080x1920 story image per card (Card) and a
@@ -185,6 +185,20 @@ func Card(r *recapv1.Recap, card *recapv1.RecapCard) ([]byte, error) {
 		drawFriends(c, r, k.Friends)
 	case *recapv1.RecapCard_Outro:
 		drawOutro(c, r, k.Outro)
+	case *recapv1.RecapCard_YearMap:
+		drawYearMap(c, r, k.YearMap)
+	case *recapv1.RecapCard_TripsTimeline:
+		drawTripsTimeline(c, r, k.TripsTimeline)
+	case *recapv1.RecapCard_TopCity:
+		drawTopCity(c, r, k.TopCity)
+	case *recapv1.RecapCard_TasteShift:
+		drawTasteShift(c, r, k.TasteShift)
+	case *recapv1.RecapCard_Streak:
+		drawStreak(c, r, k.Streak)
+	case *recapv1.RecapCard_Contributions:
+		drawContributions(c, r, k.Contributions)
+	case *recapv1.RecapCard_Percentile:
+		drawPercentile(c, r, k.Percentile)
 	default:
 		return nil, ErrUnsupportedCard
 	}
