@@ -12,6 +12,8 @@ import (
 
 	// Load environment variables from .env files when present.
 	_ "github.com/joho/godotenv"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/storage"
 )
 
 // Config holds all application configuration
@@ -30,6 +32,8 @@ type Config struct {
 	Voice         VoiceConfig
 	Push          PushConfig
 	Social        SocialConfig
+	// Storage is the bucket for trip journal photos; unset turns photos off.
+	Storage storage.Config
 }
 
 // SocialConfig switches the friends-and-points layer's moving parts.
@@ -560,6 +564,14 @@ func Load() (*Config, error) {
 			FieldRanksCity:      getEnv("FIELD_RANK_THRESHOLDS_CITY", ""),
 			FieldRunnerEnabled:  getEnvAsBool("FIELD_RUNNER_ENABLED", true),
 			RecapRunnerEnabled:  getEnvAsBool("RECAP_RUNNER_ENABLED", false),
+		},
+		Storage: storage.Config{
+			Endpoint:     strings.TrimSpace(getEnv("STORAGE_ENDPOINT", "")),
+			Region:       getEnv("STORAGE_REGION", "us-east-1"),
+			Bucket:       getEnv("STORAGE_BUCKET", ""),
+			AccessKey:    strings.TrimSpace(getEnv("STORAGE_ACCESS_KEY", "")),
+			SecretKey:    strings.TrimSpace(getEnv("STORAGE_SECRET_KEY", "")),
+			UsePathStyle: getEnvAsBool("STORAGE_USE_PATH_STYLE", true),
 		},
 		Messaging: MessagingConfig{
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),

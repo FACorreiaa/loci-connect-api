@@ -37,6 +37,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/integrations"
 	interestrepo "github.com/FACorreiaa/loci-connect-api/internal/domain/interests"
 	interesthandler "github.com/FACorreiaa/loci-connect-api/internal/domain/interests/handler"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/journal"
 	itinerarylist "github.com/FACorreiaa/loci-connect-api/internal/domain/list"
 	itineraryhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/list/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
@@ -89,6 +90,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/pglock"
 	"github.com/FACorreiaa/loci-connect-api/pkg/secret"
 	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
+	"github.com/FACorreiaa/loci-connect-api/pkg/storage"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/google/uuid"
 )
@@ -240,6 +242,11 @@ type Dependencies struct {
 	RankingHandler *ranking.Handler
 	// recapRunner queues, builds and announces recaps; nil when off.
 	recapRunner *recap.Runner
+
+	// JournalHandler serves the trip journal (notes and photos).
+	JournalHandler *journal.Handler
+	// journalSweeper drops unconfirmed uploads and deleted photos' objects.
+	journalSweeper *journal.Sweeper
 	// WatchHandler serves standing tasks. Always built: proposing, storing
 	// and listing work without a model; only running them needs one.
 	WatchHandler *watch.Handler
@@ -742,6 +749,15 @@ func (d *Dependencies) RunField(ctx context.Context) error {
 	return d.fieldRunner.Run(ctx)
 }
 
+// RunJournalSweeper cleans up journal photos until ctx is cancelled.
+// Returns immediately when there is no database.
+func (d *Dependencies) RunJournalSweeper(ctx context.Context) error {
+	if d.journalSweeper == nil {
+		return nil
+	}
+	return d.journalSweeper.Run(ctx)
+}
+
 // RunRecaps queues, builds and announces trip recaps until ctx is cancelled.
 // Returns nil immediately when switched off (RECAP_RUNNER_ENABLED).
 func (d *Dependencies) RunRecaps(ctx context.Context) error {
@@ -1097,6 +1113,24 @@ func (d *Dependencies) initHandlers() error {
 		if d.Config.Social.RecapRunnerEnabled {
 			d.recapRunner = recap.NewRunner(recapSvc, pglock.New(d.DB.Pool, recap.RunnerLockKey), d.Logger)
 		}
+	}
+
+	// Trip journal. Photos need object storage (STORAGE_*); without it the
+	// journal still serves notes and visits and says photos are off. The
+	// signer goes in as an untyped nil when off: a nil *storage.S3 inside the
+	// interface would read as "on".
+	if d.DB != nil {
+		var signer storage.Signer
+		s3, err := storage.NewS3(d.Config.Storage)
+		switch {
+		case err != nil:
+			d.Logger.Error("journal photo storage unavailable", slog.Any("error", err))
+		case s3 != nil:
+			signer = s3
+		}
+		journalRepo := journal.NewRepository(d.DB.Pool)
+		d.JournalHandler = journal.NewHandler(journal.NewService(journalRepo, signer, d.Logger), d.Logger)
+		d.journalSweeper = journal.NewSweeper(journalRepo, signer, pglock.New(d.DB.Pool, journal.SweeperLockKey), d.Logger)
 	}
 
 	// City Packs. The catalog serves whether or not Stripe is configured; an

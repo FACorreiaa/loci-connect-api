@@ -33,6 +33,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/integrations/integrationsv1connect"
 	interestconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/interest/interestconnect"
 	itineraryconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/itinerary/itineraryconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/journal/journalconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/list/listv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/localcontext/localcontextconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/memory/memoryv1connect"
@@ -483,6 +484,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		// Shared recap images: link previews and story cards, public.
 		mux.Handle(recap.ImagePath, deps.RecapImages)
 		deps.Logger.Info("registered Connect RPC service", "path", recapPath)
+	}
+
+	if deps.JournalHandler != nil {
+		journalPath, journalHandler := journalconnect.NewJournalServiceHandler(deps.JournalHandler, opts)
+		mux.Handle(journalPath, journalHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", journalPath)
 	}
 
 	if deps.RankingHandler != nil {
