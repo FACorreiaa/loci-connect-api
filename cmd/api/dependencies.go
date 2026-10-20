@@ -54,6 +54,7 @@ import (
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/ranking"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recap"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
@@ -234,6 +235,8 @@ type Dependencies struct {
 	// RecapHandler serves trip recaps; RecapImages draws their shared images.
 	RecapHandler *recap.Handler
 	RecapImages  *recap.ImageHandler
+	// RankingHandler serves travellers' per-city place rankings.
+	RankingHandler *ranking.Handler
 	// recapRunner queues, builds and announces recaps; nil when off.
 	recapRunner *recap.Runner
 	// WatchHandler serves standing tasks. Always built: proposing, storing
@@ -982,6 +985,9 @@ func (d *Dependencies) initHandlers() error {
 		d.signups = socialSvc
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
+		// Rankings are friends-only, checked against the same graph.
+		rankingSvc := ranking.NewService(ranking.NewRepository(d.DB.Pool), socialSvc, d.PreferenceRecorder, d.TasteRefresher, d.Logger)
+		d.RankingHandler = ranking.NewHandler(rankingSvc, d.Logger)
 		// The field score rides on the friends graph for its friends board, and
 		// on the reverse geocoder for neighborhoods.
 		overallRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksOverall, gamification.DefaultOverallThresholds)

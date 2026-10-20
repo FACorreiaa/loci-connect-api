@@ -41,6 +41,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile/profileconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/ranking/rankingconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recap/recapconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recents/recentsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation/recommendationconnect"
@@ -482,6 +483,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		// Shared recap images: link previews and story cards, public.
 		mux.Handle(recap.ImagePath, deps.RecapImages)
 		deps.Logger.Info("registered Connect RPC service", "path", recapPath)
+	}
+
+	if deps.RankingHandler != nil {
+		rankingPath, rankingHandler := rankingconnect.NewRankingServiceHandler(deps.RankingHandler, opts)
+		mux.Handle(rankingPath, rankingHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", rankingPath)
 	}
 
 	if deps.TravelHistoryHandler != nil {
