@@ -372,11 +372,12 @@ const (
 
 // TickResult counts what one runner tick did, for the log line.
 type TickResult struct {
-	Queued, Built, Ineligible, Failed, Notified int
+	Queued, Requeued, Built, Ineligible, Failed, Notified int
 }
 
 // Tick does one round of the runner's work: queue trips that just ended,
-// build what is pending, push what is ready.
+// requeue ineligible ones that have since seen activity, build what is
+// pending, push what is ready.
 func (s *Service) Tick(ctx context.Context) (TickResult, error) {
 	var res TickResult
 	now := s.now()
@@ -400,6 +401,13 @@ func (s *Service) Tick(ctx context.Context) (TickResult, error) {
 		if ok {
 			res.Queued++
 		}
+	}
+
+	// A trip that ended before any stop was marked builds ineligible; marking
+	// stops afterwards must still earn its push.
+	res.Requeued, err = s.repo.Requeue(ctx, since, buildBatch)
+	if err != nil {
+		return res, err
 	}
 
 	queued, err := s.queueYears(ctx, now)

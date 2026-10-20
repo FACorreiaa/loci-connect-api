@@ -70,7 +70,7 @@ func (r *Runner) Tick(ctx context.Context) bool {
 	}
 	if res != (TickResult{}) {
 		r.log.InfoContext(ctx, "recap tick",
-			slog.Int("queued", res.Queued), slog.Int("built", res.Built),
+			slog.Int("queued", res.Queued), slog.Int("requeued", res.Requeued), slog.Int("built", res.Built),
 			slog.Int("ineligible", res.Ineligible), slog.Int("failed", res.Failed),
 			slog.Int("notified", res.Notified))
 	}
