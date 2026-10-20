@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/google/uuid"
 	"golang.org/x/text/unicode/norm"
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -15,25 +16,55 @@ import (
 // link pinned it and still be the same place.
 const pinRadiusMeters = 1000
 
-// POIResolver resolves a candidate through POI search, which finds the place
-// in the database or has the model produce and store it. Search is
-// poi.Service.SearchPOIsByQueryAndCity.
+// POIResolver matches a candidate to a place already in Loci: the city by
+// name (never created), then the city's places by name (trigram), then by
+// meaning. It never generates or stores a place: a stranger's page must not
+// add rows to the shared catalogue, and generation per place would make one
+// import cost ten model calls. A place Loci does not have yet is a miss.
 type POIResolver struct {
-	Search func(ctx context.Context, query, city string) ([]locitypes.POIDetailedInfo, error)
+	// FindCity is the existing city with this name; false when there is none.
+	FindCity func(ctx context.Context, name string) (uuid.UUID, bool, error)
+	// ByName is the city's places whose name is like this one.
+	ByName func(ctx context.Context, cityID uuid.UUID, name string) ([]locitypes.POIDetailedInfo, error)
+	// Semantic is poi.Service.SearchPOIsSemanticByCity; nil skips it.
+	Semantic func(ctx context.Context, query string, cityID uuid.UUID, limit int) ([]locitypes.POIDetailedInfo, error)
 }
 
-// Resolve returns the first search result whose name is the candidate's and,
-// when the link pinned the place, that sits near the pin. Search ranks by
-// meaning, so its first result is often a similar place, not the named one.
+// Resolve returns the place the candidate names, or nil.
 func (r POIResolver) Resolve(ctx context.Context, c Candidate) (*Place, error) {
-	if c.City == "" {
+	city, _, _ := strings.Cut(c.City, ",")
+	city = strings.TrimSpace(city)
+	if city == "" {
 		return nil, nil
 	}
-	found, err := r.Search(ctx, c.Name, c.City)
+	cityID, ok, err := r.FindCity(ctx, city)
+	if err != nil || !ok {
+		return nil, err
+	}
+	found, err := r.ByName(ctx, cityID, c.Name)
 	if err != nil {
 		return nil, err
 	}
-	for _, p := range found {
+	if p := bestMatch(c, found); p != nil {
+		return p, nil
+	}
+	if r.Semantic == nil {
+		return nil, nil
+	}
+	found, err = r.Semantic(ctx, c.Name, cityID, 10)
+	if err != nil {
+		return nil, err
+	}
+	return bestMatch(c, found), nil
+}
+
+// bestMatch is the result named exactly as the candidate, else the one that
+// names it with the fewest extra words; never one away from the link's pin.
+// Search order is by meaning, so the first match is often the wrong one.
+func bestMatch(c Candidate, found []locitypes.POIDetailedInfo) *Place {
+	want := normalize(c.Name)
+	best, bestExtra := -1, 0
+	for i, p := range found {
 		if !nameMatch(c.Name, p.Name) {
 			continue
 		}
@@ -41,12 +72,22 @@ func (r POIResolver) Resolve(ctx context.Context, c Candidate) (*Place, error) {
 			distanceMeters(*c.Lat, *c.Lon, p.Latitude, p.Longitude) > pinRadiusMeters {
 			continue
 		}
-		return &Place{
-			ID: p.ID.String(), Name: p.Name, Address: p.Address, Category: p.Category,
-			Latitude: p.Latitude, Longitude: p.Longitude,
-		}, nil
+		extra := len(tokens(p.Name)) - len(tokens(c.Name))
+		if normalize(p.Name) == want {
+			extra = -1
+		}
+		if best < 0 || extra < bestExtra {
+			best, bestExtra = i, extra
+		}
 	}
-	return nil, nil
+	if best < 0 {
+		return nil
+	}
+	p := found[best]
+	return &Place{
+		ID: p.ID.String(), Name: p.Name, Address: p.Address, Category: p.Category,
+		Latitude: p.Latitude, Longitude: p.Longitude,
+	}
 }
 
 // stopwords are left out when names are compared.
@@ -81,31 +122,48 @@ func tokens(s string) map[string]bool {
 	return out
 }
 
-// nameMatch says two names are the same place: every word of the shorter is
-// in the longer ("Manteigaria" in "Manteigaria - Fábrica de Pastéis de
-// Nata"), or they share at least half their words. Whole words only, so
-// "Bar" is not "Barbearia".
-func nameMatch(a, b string) bool {
-	ta, tb := tokens(a), tokens(b)
-	if len(ta) == 0 || len(tb) == 0 {
+// generic words say what kind of place it is, not which one. A name needs
+// at least one other word to match anything but itself.
+var generic = map[string]bool{
+	"museum": true, "museu": true, "museo": true, "musee": true, "gallery": true, "galeria": true,
+	"garden": true, "gardens": true, "jardim": true, "jardin": true, "park": true, "parque": true, "parco": true,
+	"church": true, "igreja": true, "iglesia": true, "chiesa": true, "cathedral": true, "se": true, "basilica": true,
+	"national": true, "nacional": true, "nazionale": true, "botanical": true, "botanico": true,
+	"cafe": true, "caffe": true, "coffee": true, "bar": true, "pub": true, "restaurant": true, "restaurante": true,
+	"ristorante": true, "bistro": true, "hotel": true, "hostel": true, "market": true, "mercado": true, "mercato": true,
+	"street": true, "rua": true, "calle": true, "via": true, "avenida": true, "square": true, "praca": true,
+	"plaza": true, "piazza": true, "tower": true, "torre": true, "palace": true, "palacio": true, "palazzo": true,
+	"beach": true, "praia": true, "playa": true, "bakery": true, "pastelaria": true, "padaria": true,
+	"monastery": true, "mosteiro": true, "castle": true, "castelo": true, "castillo": true, "viewpoint": true,
+	"miradouro": true, "mirador": true, "sao": true, "santa": true, "santo": true, "san": true, "saint": true, "st": true,
+}
+
+// nameMatch says the place named placeName is the one the link calls
+// linkName: every word of the link's name is in the place's name, whole
+// words only and accents and case aside ("Manteigaria" is "Manteigaria -
+// Fábrica de Pastéis de Nata"; "Bar" is not "Barbearia"). Sharing the kind of
+// place is not enough: "Museu Nacional do Azulejo" is not "Museu Nacional de
+// Arqueologia", and "Bairro Alto Hotel" is not "Bairro Alto". A name of only
+// generic words matches only itself.
+func nameMatch(linkName, placeName string) bool {
+	want, have := tokens(linkName), tokens(placeName)
+	if len(want) == 0 || len(have) == 0 {
 		return false
 	}
-	small, big := ta, tb
-	if len(small) > len(big) {
-		small, big = big, small
-	}
-	shared, letters := 0, 0
-	for t := range small {
-		if big[t] {
-			shared++
-			letters += len(t)
+	distinctive, letters := false, 0
+	for t := range want {
+		if !have[t] {
+			return false
+		}
+		letters += len(t)
+		if !generic[t] {
+			distinctive = true
 		}
 	}
-	if shared == len(small) && letters >= 4 {
-		return true
+	if !distinctive {
+		return normalize(linkName) == normalize(placeName)
 	}
-	union := len(ta) + len(tb) - shared
-	return float64(shared)/float64(union) >= 0.5
+	return letters >= 4
 }
 
 func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {

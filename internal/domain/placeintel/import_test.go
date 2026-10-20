@@ -57,10 +57,12 @@ func TestImportPlaces_MapsTheResult(t *testing.T) {
 	require.Equal(t, "Manteigaria", first.GetName())
 	require.Equal(t, "best nata", first.GetNote())
 	require.Equal(t, "11111111-1111-1111-1111-111111111111", first.GetPoiId())
+	require.Equal(t, "Manteigaria Chiado", first.GetPoiName(), "the place that will be saved, shown when it differs")
 	require.Equal(t, "R. do Loreto 2", first.GetAddress())
 	require.InDelta(t, 38.71, first.GetLatitude(), 1e-9)
 	second := m.GetPlaces()[1]
 	require.Nil(t, second.PoiId)
+	require.Nil(t, second.PoiName)
 	require.Nil(t, second.Latitude)
 }
 

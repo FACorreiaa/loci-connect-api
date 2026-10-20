@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -108,4 +109,55 @@ func TestGet_RefusesNonTextAndErrors(t *testing.T) {
 	require.ErrorIs(t, err, ErrUnsupported)
 	_, err = testFetcher(0).Get(context.Background(), srv.URL+"/gone")
 	require.ErrorIs(t, err, ErrStatus)
+}
+
+// The dialer, not the URL check, stops a name that resolves to a private
+// address: "localhost" passes a name check that lets everything through and
+// is refused at connect.
+func TestGet_DialerRefusesANameThatResolvesPrivate(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("hi")) }))
+	defer srv.Close()
+	f := New(Options{})
+	f.portOK = func(string) bool { return true }
+	f.nameOK = func(string) bool { return true }
+	f.client = f.newClient()
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	_, err = f.Get(context.Background(), "http://localhost:"+u.Port()+"/")
+	require.ErrorIs(t, err, ErrBlocked)
+}
+
+// GetUntil stops following redirects at the first hop the caller wants, and
+// never downloads what is behind it.
+func TestGetUntil_StopsAtTheWantedHop(t *testing.T) {
+	var hitPage bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/short", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/place/x", http.StatusFound) })
+	mux.HandleFunc("/place/x", func(w http.ResponseWriter, _ *http.Request) {
+		hitPage = true
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	page, err := testFetcher(0).GetUntil(context.Background(), srv.URL+"/short", func(u *url.URL) bool {
+		return strings.HasPrefix(u.Path, "/place/")
+	})
+	require.NoError(t, err)
+	require.False(t, hitPage)
+	require.Equal(t, srv.URL+"/place/x", page.FinalURL)
+	require.Equal(t, []string{srv.URL + "/short", srv.URL + "/place/x"}, page.Hops)
+}
+
+// A refused page still reports where the redirects went.
+func TestGet_ErrorKeepsTheHops(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/a", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/b", http.StatusFound) })
+	mux.HandleFunc("/b", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTooManyRequests) })
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	page, err := testFetcher(0).Get(context.Background(), srv.URL+"/a")
+	require.ErrorIs(t, err, ErrStatus)
+	require.Equal(t, []string{srv.URL + "/a", srv.URL + "/b"}, page.Hops)
 }

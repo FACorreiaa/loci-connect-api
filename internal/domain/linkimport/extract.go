@@ -102,9 +102,15 @@ func buildPrompt(doc Doc, cityHint string) string {
 		hint = "none"
 	}
 	return fmt.Sprintf(extractPrompt, pageOpen, pageClose, hint,
-		clip(doc.Title, maxTitleInput), clip(doc.Description, maxTitleInput*2),
-		pageOpen, clip(doc.Text, maxPageRunes), pageClose)
+		unfenced(clip(doc.Title, maxTitleInput)), unfenced(clip(doc.Description, maxTitleInput*2)),
+		pageOpen, unfenced(clip(doc.Text, maxPageRunes)), pageClose)
 }
+
+// unfenced removes the fence markers from page text, so a page cannot close
+// the fence early and write instructions after it.
+var fenceMarkers = strings.NewReplacer(pageOpen, " ", pageClose, " ")
+
+func unfenced(s string) string { return fenceMarkers.Replace(s) }
 
 // parseExtraction takes the outermost JSON object in a reply, so a fenced or
 // lightly wrapped answer still parses.

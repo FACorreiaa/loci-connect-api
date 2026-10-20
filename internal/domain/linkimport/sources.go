@@ -45,17 +45,21 @@ func mapsPlace(u *url.URL) (name string, lat, lon *float64, ok bool) {
 	segs := strings.Split(u.Path, "/")
 	for i, s := range segs {
 		if s == "place" && i+1 < len(segs) && segs[i+1] != "" && !strings.HasPrefix(segs[i+1], "@") {
-			name = strings.TrimSpace(strings.ReplaceAll(segs[i+1], "+", " "))
+			name = strings.ReplaceAll(segs[i+1], "+", " ")
 			break
 		}
 	}
 	if name == "" {
 		q := u.Query()
-		name = strings.TrimSpace(firstNonEmpty(q.Get("q"), q.Get("query")))
+		name = firstNonEmpty(q.Get("q"), q.Get("query"))
 		if coordsOnly.MatchString(name) {
 			name = ""
 		}
 	}
+	// A searched address ("Manteigaria, R. do Loreto 2, Lisboa"): the place is
+	// what comes before the street.
+	name, _, _ = strings.Cut(name, ",")
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", nil, nil, false
 	}
@@ -84,12 +88,17 @@ func (s *Service) readMaps(ctx context.Context, u *url.URL) (*Candidate, error) 
 	urls := []string{u.String()}
 	host := strings.ToLower(u.Hostname())
 	if host == "maps.app.goo.gl" || strings.HasSuffix(host, "goo.gl") {
-		page, err := s.fetch.Get(ctx, u.String())
-		if err != nil {
-			return nil, fetchErr(err)
-		}
+		// Stop at the first hop that names a place: the Maps page behind it
+		// is large, and Google often refuses it from a datacenter.
+		page, err := s.fetch.GetUntil(ctx, u.String(), func(hop *url.URL) bool {
+			_, _, _, ok := mapsPlace(hop)
+			return detectSource(hop) == SourceGoogleMaps && ok
+		})
 		urls = append(urls, page.Hops...)
 		urls = append(urls, page.FinalURL)
+		if err != nil && len(page.Hops) <= 1 {
+			return nil, fetchErr(err)
+		}
 	}
 	for _, raw := range urls {
 		hop, err := url.Parse(raw)

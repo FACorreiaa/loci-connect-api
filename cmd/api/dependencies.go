@@ -1192,12 +1192,17 @@ func (d *Dependencies) initHandlers() error {
 		d.PlaceIntelligenceHandler = d.PlaceIntelligenceHandler.WithScorer(d.gamification)
 	}
 	// Places from a shared link: fetched through safefetch (never into the
-	// cluster), extracted by chat's model chain, looked up like search.
+	// cluster), extracted by chat's model chain, matched only to places Loci
+	// already has (never generated: a stranger's page must not add rows).
 	if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
 		d.PlaceIntelligenceHandler = d.PlaceIntelligenceHandler.WithLinkImport(linkimport.NewService(
 			safefetch.New(safefetch.Options{}),
 			chatImpl.ActionLLM(),
-			linkimport.POIResolver{Search: d.POISvc.SearchPOIsByQueryAndCity},
+			linkimport.POIResolver{
+				FindCity: linkimport.FindCity(d.DB.Pool),
+				ByName:   linkimport.ByName(d.DB.Pool),
+				Semantic: d.POISvc.SearchPOIsSemanticByCity,
+			},
 			d.Logger,
 		))
 	}

@@ -32,6 +32,13 @@ var (
 	ErrModel = errors.New("couldn't read the places right now")
 )
 
+// Deadlines: extraction holds a chat model slot, so a model that hangs must
+// not hold it (or the traveller) past these. Vars so tests can shorten them.
+var (
+	importTimeout  = 45 * time.Second
+	extractTimeout = 20 * time.Second
+)
+
 const (
 	resolveBudget      = 25 * time.Second
 	resolveConcurrency = 3
@@ -52,6 +59,7 @@ const (
 // Fetcher is safefetch.Fetcher.
 type Fetcher interface {
 	Get(ctx context.Context, rawURL string) (safefetch.Page, error)
+	GetUntil(ctx context.Context, rawURL string, stop func(*url.URL) bool) (safefetch.Page, error)
 }
 
 // Generator is one text completion (chat's ActionLLM).
@@ -122,6 +130,8 @@ func (s *Service) Import(ctx context.Context, rawURL, cityHint string) (*Result,
 	if err != nil {
 		return nil, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, importTimeout)
+	defer cancel()
 	cityHint = clip(cityHint, maxCityRunes)
 	source := detectSource(u)
 
@@ -152,7 +162,9 @@ func (s *Service) Import(ctx context.Context, rawURL, cityHint string) (*Result,
 		pinned.City = cityHint
 		cands = []Candidate{*pinned}
 	default:
-		city, found, err := Extract(ctx, s.gen, doc, cityHint)
+		ectx, ecancel := context.WithTimeout(ctx, extractTimeout)
+		city, found, err := Extract(ectx, s.gen, doc, cityHint)
+		ecancel()
 		if err != nil {
 			s.log.WarnContext(ctx, "link import: extraction failed", slog.Any("error", err))
 			return nil, ErrModel

@@ -109,13 +109,27 @@ func (f *Fetcher) newClient() *http.Client {
 	}
 }
 
-// Get fetches rawURL, following up to five redirects, each one checked.
+// Get fetches rawURL, following up to five redirects, each one checked. On
+// an error after the first request, the Page still carries the hops.
 func (f *Fetcher) Get(ctx context.Context, rawURL string) (Page, error) {
+	return f.get(ctx, rawURL, nil)
+}
+
+// GetUntil is Get that stops at the first redirect hop stop accepts: that
+// hop is not requested, and Page.FinalURL is it. It is for links whose
+// answer is the redirect itself (a Maps short link), where the page behind
+// it is large or refused.
+func (f *Fetcher) GetUntil(ctx context.Context, rawURL string, stop func(*url.URL) bool) (Page, error) {
+	return f.get(ctx, rawURL, stop)
+}
+
+func (f *Fetcher) get(ctx context.Context, rawURL string, stop func(*url.URL) bool) (Page, error) {
 	u, err := f.checkURL(rawURL)
 	if err != nil {
 		return Page{}, err
 	}
 	hops := []string{u.String()}
+	stopped := false
 	client := *f.client
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= maxRedirects {
@@ -125,6 +139,10 @@ func (f *Fetcher) Get(ctx context.Context, rawURL string) (Page, error) {
 			return err
 		}
 		hops = append(hops, req.URL.String())
+		if stop != nil && stop(req.URL) {
+			stopped = true
+			return http.ErrUseLastResponse
+		}
 		return nil
 	}
 
@@ -137,31 +155,35 @@ func (f *Fetcher) Get(ctx context.Context, rawURL string) (Page, error) {
 	req.Header.Set("Accept-Language", "en;q=0.9,*;q=0.5")
 
 	resp, err := client.Do(req)
+	trail := Page{FinalURL: hops[len(hops)-1], Hops: hops}
 	if err != nil {
-		return Page{}, err
+		return trail, err
 	}
 	defer resp.Body.Close()
+	if stopped {
+		return trail, nil
+	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return Page{}, fmt.Errorf("%w: %d", ErrStatus, resp.StatusCode)
+		return trail, fmt.Errorf("%w: %d", ErrStatus, resp.StatusCode)
 	}
 	ct := ""
 	if raw := resp.Header.Get("Content-Type"); raw != "" {
 		mt, _, err := mime.ParseMediaType(raw)
 		if err != nil {
-			return Page{}, ErrUnsupported
+			return trail, ErrUnsupported
 		}
 		ct = mt
 	}
 	switch ct {
 	case "", "text/html", "application/xhtml+xml", "application/json", "text/plain":
 	default:
-		return Page{}, fmt.Errorf("%w: %s", ErrUnsupported, ct)
+		return trail, fmt.Errorf("%w: %s", ErrUnsupported, ct)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, f.opts.MaxBytes))
 	if err != nil {
-		return Page{}, fmt.Errorf("read page: %w", err)
+		return trail, fmt.Errorf("read page: %w", err)
 	}
 	return Page{FinalURL: resp.Request.URL.String(), ContentType: ct, Body: body, Hops: hops}, nil
 }

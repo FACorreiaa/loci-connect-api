@@ -45,6 +45,7 @@ func (h *Handler) ImportPlaces(ctx context.Context, req *connect.Request[placev1
 		ip := &placev1.ImportedPlace{Name: p.Name, CityName: p.City, Note: p.Note}
 		if p.Place != nil {
 			ip.PoiId = &p.Place.ID
+			ip.PoiName = &p.Place.Name
 			ip.Latitude = &p.Place.Latitude
 			ip.Longitude = &p.Place.Longitude
 			if p.Place.Address != "" {
