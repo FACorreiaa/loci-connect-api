@@ -128,21 +128,43 @@ key the server signs with rather than a secret you paste.
 1. **Team ID** — <https://developer.apple.com/account> → Membership. Ten
    characters, e.g. `A1B2C3D4E5`. → `APPLE_TEAM_ID`
 2. **App ID** — Certificates, Identifiers & Profiles → Identifiers → **+** →
-   **App IDs** → App. Give it a bundle ID (`fyi.lociai.app`) and enable the
+   **App IDs** → App. Give it a bundle ID (`com.lociai.app`) and enable the
    **Sign In with Apple** capability. This is the iOS app's identity; the web
    flow needs it to exist so the Services ID can be grouped under it.
-3. **Services ID** — Identifiers → **+** → **Services IDs**. Description
-   `Loci Web`, identifier `fyi.lociai.web`. **This identifier — not the App
-   ID — is `APPLE_CLIENT_ID`.** Getting these two the wrong way round produces
+
+   It does NOT need a shipped app behind it — no build, no App Store listing,
+   no provisioning profile. But the string is permanent: it becomes the iOS
+   bundle ID, and changing it later means a new listing and new Apple user
+   identifiers for everyone.
+3. **Services ID** — Identifiers → **+** → **Services IDs**. Its identifier is
+   `fyi.lociai.app`. **That identifier — not the App ID — is
+   `APPLE_CLIENT_ID`.** Getting the two the wrong way round produces
    `invalid_client`, which says nothing about which one is wrong.
+
+   > **App IDs and Services IDs share one identifier namespace.** Registering
+   > an App ID fails with "An App ID with Identifier '...' is not available" if
+   > a *Services* ID already holds that string — and the Identifiers list is
+   > filtered to App IDs by default, so the thing blocking you is invisible.
+   > Switch the filter to Services IDs before concluding somebody else owns
+   > the name. This is why Loci's two identifiers do not share a prefix.
 
    Then **Configure** the Services ID:
    - Primary App ID: the App ID from step 2
-   - **Domains and Subdomains**: `lociai.fyi`
+   - **Domains and Subdomains**: `lociai.fyi` — bare host, no scheme, no path
    - **Return URLs**: `https://lociai.fyi/auth/oauth/apple/callback`
 
    Apple rejects `http://` and rejects `localhost` here. See
    [Local development](#4-local-development) for what to do instead.
+
+   > The Configure dialog is a **picker**, not a form: domains and return URLs
+   > are registered at the team level, and this attaches them to *this*
+   > Services ID. Tick them in the list, then **Done → Continue → Save** — all
+   > three. Save on its own silently keeps nothing, which reads exactly like a
+   > page that is not working.
+   >
+   > `apple-developer-domain-association.txt` downloads from the **+**
+   > (register Website URLs) flow, not from the picker. A domain already
+   > verified by another project in the same team needs no file at all.
 
 4. **Domain verification.** Apple's Configure dialog offers a
    `apple-developer-domain-association.txt` download and then verifies it at
@@ -225,33 +247,54 @@ openssl rand -base64 32
 Following `platform/infra/secrets/README.md`. `loci-env` already exists, so
 this reseals the whole set — a SealedSecret cannot be added to a key at a time.
 
+One key per file, in a directory — **not** `--from-env-file`. An env file
+cannot carry `APPLE_PRIVATE_KEY`: the `.p8` is multi-line PEM, and
+`--from-env-file` stops at the first newline, so the key would seal truncated
+and Apple sign-in would fail with a signing error that says nothing about
+truncation. `--from-file` takes each filename as the key and the whole file as
+the value, so newlines, `=` and quotes all survive untouched.
+
+This also starts from the live Secret rather than from anything typed out, so
+the existing keys cannot be dropped by being forgotten, and no secret is ever
+echoed to a terminal.
+
 ```sh
 cd ~/Work/production/platform/infra
+umask 077 && mkdir -p /tmp/loci-env.d && cd /tmp/loci-env.d
 
-# 1. Reconstruct the full plaintext env file for the secret. Every key
-#    currently in secrets/loci/loci-env.yaml has to be present, or resealing
-#    drops it: DB_USER, DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET,
-#    OPENROUTER_*, ENCRYPTION_KEY, MFA_SECRET_KEY, TELEGRAM_BOT_TOKEN, STRIPE_*
-$EDITOR /tmp/loci-env            # NOT in the repo, and delete it after
+# 1. Dump every key the live Secret already holds, one file per key.
+for k in $(kubectl -n horus get secret loci-env -o go-template='{{range $k,$v := .data}}{{$k}} {{end}}'); do
+  kubectl -n horus get secret loci-env -o go-template="{{index .data \"$k\"}}" | base64 -d > "$k"
+done
 
-# 2. Seal
+# 2. Add or replace the ones you are setting. printf, not echo: no trailing
+#    newline, which would otherwise end up inside the value.
+printf %s 'YOUR_ID.apps.googleusercontent.com' > GOOGLE_CLIENT_ID
+printf %s 'GOCSPX-...'                         > GOOGLE_CLIENT_SECRET
+openssl rand -base64 32 | tr -d '\n'           > SESSION_SECRET
+printf %s 'fyi.lociai.app'                     > APPLE_CLIENT_ID
+printf %s 'ABCDE12345'                         > APPLE_TEAM_ID
+printf %s 'KEY1234567'                         > APPLE_KEY_ID
+cp ~/Downloads/AuthKey_KEY1234567.p8            APPLE_PRIVATE_KEY
+
+# 3. Seal. --from-file=. keys on the filenames above.
+cd ~/Work/production/platform/infra
 kubectl create secret generic loci-env -n horus \
-  --from-env-file=/tmp/loci-env --dry-run=client -o yaml \
+  --from-file=/tmp/loci-env.d --dry-run=client -o yaml \
   | kubeseal --controller-name sealed-secrets-controller \
              --controller-namespace kube-system -o yaml \
   > secrets/loci/loci-env.yaml
 
-# 3. Check no plaintext escaped into the committed file
+# 4. Check nothing plaintext escaped into the committed file, and that the key
+#    count matches what you started with.
 grep -c encryptedData secrets/loci/loci-env.yaml
-grep -i "BEGIN PRIVATE KEY" secrets/loci/loci-env.yaml && echo "STOP: plaintext key" || echo "clean"
+grep -qi "BEGIN PRIVATE KEY" secrets/loci/loci-env.yaml && echo "STOP: plaintext key" || echo "clean"
 
-shred -u /tmp/loci-env 2>/dev/null || rm -f /tmp/loci-env
+find /tmp/loci-env.d -type f -exec shred -u {} + 2>/dev/null; rm -rf /tmp/loci-env.d
 ```
 
 Commit `secrets/loci/loci-env.yaml`, ArgoCD applies it, and the controller
-materializes the real `Secret`. Multi-line values survive `--from-env-file`
-only if quoted, so keep the `APPLE_PRIVATE_KEY="..."` quotes in the plaintext
-file.
+materializes the real `Secret`.
 
 Then restart the API so it re-reads the secret — env vars are read at boot:
 
