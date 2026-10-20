@@ -239,13 +239,24 @@ func TestDeleteVisitedPOI_RemovesOnlyThatVisit(t *testing.T) {
 	theirs := visit(other, "Ribeira")
 
 	// Another user's id is not found and is left untouched.
-	deleted, err := repo.DeleteVisitedPOI(ctx, user, theirs)
+	gone, err := repo.DeleteVisitedPOI(ctx, user, theirs)
 	require.NoError(t, err)
-	require.False(t, deleted)
+	require.False(t, gone.Deleted)
 
-	deleted, err = repo.DeleteVisitedPOI(ctx, user, first)
+	// A genuine second visit has its own timestamp.
+	_, againID, err := repo.RecordVisit(ctx, user, VisitInput{CityName: city, Latitude: 41.15, Longitude: -8.61, POIID: "Ribeira", POIName: "Ribeira", VisitedAt: time.Now().Add(-time.Hour)})
 	require.NoError(t, err)
-	require.True(t, deleted)
+	require.NotNil(t, againID)
+	again := *againID
+	gone, err = repo.DeleteVisitedPOI(ctx, user, first)
+	require.NoError(t, err)
+	require.True(t, gone.Deleted)
+	require.Equal(t, "Ribeira", gone.POIID)
+	require.False(t, gone.LastOfPOI, "a second Ribeira visit remains")
+
+	gone, err = repo.DeleteVisitedPOI(ctx, user, again)
+	require.NoError(t, err)
+	require.True(t, gone.LastOfPOI)
 
 	var pois, cities int
 	require.NoError(t, pool.QueryRow(ctx, `SELECT COUNT(*) FROM user_visited_pois WHERE user_id = $1`, user).Scan(&pois))

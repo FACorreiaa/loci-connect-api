@@ -46,6 +46,7 @@ type ChatHandler struct {
 	runs        runs.Store
 	onRunFinish runs.FinishListener
 	tripActions TripActions
+	taste       preference.POIScorer
 }
 
 // AttributionIssuer persists the exact traces emitted to an authenticated user.
@@ -61,6 +62,12 @@ func NewChatHandler(llmInteractionService service.LlmInteractiontService, logger
 		logger:    logger,
 		issuer:    issuer,
 	}
+}
+
+// WithTasteScorer attaches a taste match to every place streamed to the caller.
+func (h *ChatHandler) WithTasteScorer(s preference.POIScorer) *ChatHandler {
+	h.taste = s
+	return h
 }
 
 // WithRuns records each generation and announces its end to onFinish.
@@ -632,6 +639,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		}
 		cityResponse := presenter.ToAiCityResponse(&cr)
 		attributeCityResponse(cityResponse, event, userID)
+		preference.AnnotatePOIs(ctx, h.taste, userID, cityResponsePOIs(cityResponse)...)
 		resp.Payload = &chatv1.StreamEvent_Itinerary{Itinerary: &chatv1.ItineraryPayload{CityResponse: cityResponse}}
 
 	case locitypes.EventTypeCityData:
@@ -644,6 +652,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 	case locitypes.EventTypeHotels:
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
+		preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 		resp.Payload = &chatv1.StreamEvent_Hotels{Hotels: &chatv1.HotelsPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
@@ -651,6 +660,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 	case locitypes.EventTypeRestaurants:
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
+		preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 		resp.Payload = &chatv1.StreamEvent_Restaurants{Restaurants: &chatv1.RestaurantsPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
@@ -677,6 +687,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 	case "activities":
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
+		preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 		resp.Payload = &chatv1.StreamEvent_Activities{Activities: &chatv1.ActivitiesPayload{
 			Activities: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
@@ -684,6 +695,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 	case "nearby", locitypes.EventTypeGeneralPOI, locitypes.EventTypePersonalizedPOI:
 		pois, gcd, sid := decodeDomainList(event.Data)
 		attributePOIs(pois, event, userID)
+		preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 		resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
@@ -693,6 +705,7 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 		if decodeData(event.Data, &poi) {
 			pois := presenter.ToPOIDetailedInfoSlice([]locitypes.POIDetailedInfo{poi})
 			attributePOIs(pois, event, userID)
+			preference.AnnotatePOIs(ctx, h.taste, userID, pois)
 			resp.Payload = &chatv1.StreamEvent_GeneralPois{GeneralPois: &chatv1.GeneralPoisPayload{
 				Pois: pois,
 			}}
@@ -765,6 +778,19 @@ func recommendationTraces(event *chatv1.StreamEvent) []*recommendationv1.Recomme
 		}
 	}
 	return traces
+}
+
+// cityResponsePOIs lists every place group in a city response, for one
+// batched taste scoring call.
+func cityResponsePOIs(response *chatv1.AiCityResponse) [][]*poiv1.POIDetailedInfo {
+	if response == nil {
+		return nil
+	}
+	groups := [][]*poiv1.POIDetailedInfo{response.GetPointsOfInterest()}
+	if itinerary := response.GetItineraryResponse(); itinerary != nil {
+		groups = append(groups, itinerary.GetPointsOfInterest(), itinerary.GetRestaurants(), itinerary.GetBars())
+	}
+	return groups
 }
 
 func attributeCityResponse(response *chatv1.AiCityResponse, event locitypes.StreamEvent, userID uuid.UUID) {

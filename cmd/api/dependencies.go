@@ -54,6 +54,7 @@ import (
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/ranking"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recap"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recents"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recommendation"
@@ -234,6 +235,10 @@ type Dependencies struct {
 	// RecapHandler serves trip recaps; RecapImages draws their shared images.
 	RecapHandler *recap.Handler
 	RecapImages  *recap.ImageHandler
+	// RankingHandler serves travellers' per-city place rankings; rankings is
+	// its service, which also drops a ranking with the place's last visit.
+	RankingHandler *ranking.Handler
+	rankings       *ranking.Service
 	// recapRunner queues, builds and announces recaps; nil when off.
 	recapRunner *recap.Runner
 	// WatchHandler serves standing tasks. Always built: proposing, storing
@@ -253,7 +258,10 @@ type Dependencies struct {
 	PreferenceVectors  preference.VectorStore
 	// TasteRefresher rebuilds a user's taste profile ~20s after an explicit
 	// verdict (rating, visit, dismissal) instead of waiting for the rerank pass.
-	TasteRefresher     *preference.Refresher
+	TasteRefresher *preference.Refresher
+	// TasteMatch scores places against a traveller's taste for the "NN% match"
+	// shown on every place.
+	TasteMatch         *preference.MatchScorer
 	RetrievalAssembler *retrieval.Assembler
 }
 
@@ -349,6 +357,7 @@ func (d *Dependencies) initRepositories() error {
 		preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser,
 		20*time.Second, d.Logger,
 	)
+	d.TasteMatch = preference.NewMatchScorer(d.DB.Pool, d.Logger)
 	d.RunStore = runs.NewPostgresStore(d.DB.Pool)
 	d.PushDevices = push.NewPostgresDeviceStore(d.DB.Pool)
 
@@ -919,7 +928,9 @@ func (d *Dependencies) initHandlers() error {
 			watchPusher = notifier
 		}
 	}
-	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).WithRuns(d.RunStore, onRunFinish)
+	d.ChatHandler = chathandler.NewChatHandler(d.ChatService, d.Logger, d.RecommendationHandler).
+		WithRuns(d.RunStore, onRunFinish).
+		WithTasteScorer(d.TasteMatch)
 	d.initWatches(watchPusher)
 	d.ProfileHandler = profilehandler.NewProfileHandler(d.ProfileSvc)
 	d.DiscoverHandler = discoverdomain.NewHandler(d.DiscoverSvc, d.Logger)
@@ -980,6 +991,9 @@ func (d *Dependencies) initHandlers() error {
 		d.signups = socialSvc
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
+		// Rankings are friends-only, checked against the same graph.
+		d.rankings = ranking.NewService(ranking.NewRepository(d.DB.Pool), socialSvc, d.PreferenceRecorder, d.TasteRefresher, d.Logger)
+		d.RankingHandler = ranking.NewHandler(d.rankings, d.Logger)
 		// The field score rides on the friends graph for its friends board, and
 		// on the reverse geocoder for neighborhoods.
 		overallRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksOverall, gamification.DefaultOverallThresholds)
@@ -1053,6 +1067,9 @@ func (d *Dependencies) initHandlers() error {
 	if d.gamification != nil {
 		d.TravelHistoryHandler = d.TravelHistoryHandler.WithScorer(d.gamification)
 	}
+	if d.rankings != nil {
+		d.TravelHistoryHandler = d.TravelHistoryHandler.WithRankings(d.rankings)
+	}
 
 	// Trip recaps. Share links land on the web app, like trip shares. The
 	// push goes through the same notifier as badges, when push is on.
@@ -1120,7 +1137,7 @@ func (d *Dependencies) initHandlers() error {
 	}
 	// SuggestPacking is wired below, once the weather adapter exists — a packing
 	// list is only worth generating if it knows the forecast.
-	d.POIHandler = poihandler.NewPOIHandler(d.POISvc)
+	d.POIHandler = poihandler.NewPOIHandler(d.POISvc).WithTasteScorer(d.TasteMatch)
 	d.CustomAuthHandler = customauthhandler.NewCustomAuthHandler(d.OAuthService, d.IDTokenVerifier, d.PhoneService, d.AuthService).
 		WithSignupHook(d.signups)
 	if d.DB != nil {
