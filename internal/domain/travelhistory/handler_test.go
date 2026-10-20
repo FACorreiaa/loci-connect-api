@@ -14,7 +14,8 @@ import (
 
 type fakeVisitRepo struct {
 	Repository
-	visitID *uuid.UUID
+	visitID    *uuid.UUID
+	moreVisits bool
 }
 
 func (f *fakeVisitRepo) RecordVisit(_ context.Context, _ uuid.UUID, in VisitInput) (*VisitedCity, *uuid.UUID, error) {
@@ -114,8 +115,45 @@ func TestRecordVisit_ReplayedVisit_NoSecondSignal(t *testing.T) {
 	}
 }
 
-func (f *fakeVisitRepo) DeleteVisitedPOI(_ context.Context, _, id uuid.UUID) (bool, error) {
-	return f.visitID != nil && *f.visitID == id, nil
+func (f *fakeVisitRepo) DeleteVisitedPOI(_ context.Context, _, id uuid.UUID) (DeletedVisit, error) {
+	if f.visitID == nil || *f.visitID != id {
+		return DeletedVisit{}, nil
+	}
+	return DeletedVisit{Deleted: true, POIID: "poi-1", LastOfPOI: !f.moreVisits}, nil
+}
+
+type fakeRankings struct{ deleted []string }
+
+func (f *fakeRankings) Delete(_ context.Context, _ uuid.UUID, poiID string) (bool, error) {
+	f.deleted = append(f.deleted, poiID)
+	return true, nil
+}
+
+// Removing the only visit to a place also removes its ranking, so it leaves
+// the friends-visible top list and stops teaching taste.
+func TestDeleteVisitedPOI_LastVisitDropsRanking(t *testing.T) {
+	visitID := uuid.New()
+	rankings := &fakeRankings{}
+	h := NewHandler(&fakeVisitRepo{visitID: &visitID}, nil).WithRankings(rankings)
+	if _, err := h.DeleteVisitedPOI(authed(uuid.New()), connect.NewRequest(&travelhistoryv1.DeleteVisitedPOIRequest{Id: visitID.String()})); err != nil {
+		t.Fatalf("DeleteVisitedPOI: %v", err)
+	}
+	if len(rankings.deleted) != 1 || rankings.deleted[0] != "poi-1" {
+		t.Fatalf("rankings deleted = %v, want [poi-1]", rankings.deleted)
+	}
+}
+
+// Another visit to the same place still stands behind the ranking.
+func TestDeleteVisitedPOI_OtherVisitKeepsRanking(t *testing.T) {
+	visitID := uuid.New()
+	rankings := &fakeRankings{}
+	h := NewHandler(&fakeVisitRepo{visitID: &visitID, moreVisits: true}, nil).WithRankings(rankings)
+	if _, err := h.DeleteVisitedPOI(authed(uuid.New()), connect.NewRequest(&travelhistoryv1.DeleteVisitedPOIRequest{Id: visitID.String()})); err != nil {
+		t.Fatalf("DeleteVisitedPOI: %v", err)
+	}
+	if len(rankings.deleted) != 0 {
+		t.Fatalf("rankings deleted = %v, want none", rankings.deleted)
+	}
 }
 
 type forgettingTaste struct {

@@ -138,12 +138,54 @@ func removeFromBucket(ctx context.Context, tx pgx.Tx, userID uuid.UUID, poiID st
 	return renumber(ctx, tx, userID, rowIDs(rest))
 }
 
+// settle puts poiID at index lo among the placed rows, ahead of the places
+// still being ranked, and ends its comparisons.
+func settle(ctx context.Context, tx pgx.Tx, userID uuid.UUID, poiID string, placed []bucketRow, pending []string, lo int) error {
+	order := make([]string, 0, len(placed)+len(pending)+1)
+	order = append(order, rowIDs(placed[:lo])...)
+	order = append(order, poiID)
+	order = append(order, rowIDs(placed[lo:])...)
+	order = append(order, pending...)
+	if _, err := tx.Exec(ctx, `
+		UPDATE user_poi_rankings SET search_lo = NULL, search_hi = NULL, updated_at = NOW()
+		WHERE user_id = $1 AND poi_id = $2`, userID, poiID); err != nil {
+		return fmt.Errorf("place ranking: %w", err)
+	}
+	return renumber(ctx, tx, userID, order)
+}
+
+// resume answers a repeated verdict: nothing to ask when the place is already
+// placed, else the next comparison of its unfinished search (settling it when
+// the bucket has shrunk so that nothing is left to ask).
+func resume(ctx context.Context, tx pgx.Tx, userID uuid.UUID, poiID string, c *current) (*Comparison, error) {
+	if c.lo == nil || c.hi == nil {
+		return nil, nil
+	}
+	bucket, err := loadBucket(ctx, tx, userID, c.cityKey, c.verdict)
+	if err != nil {
+		return nil, err
+	}
+	placed, pending := placedExcept(bucket, poiID)
+	lo, hi := clampRange(*c.lo, *c.hi, len(placed))
+	if mid, done := nextProbe(lo, hi); !done {
+		return &Comparison{POIID: placed[mid].poiID, Name: placed[mid].name}, nil
+	}
+	return nil, settle(ctx, tx, userID, poiID, placed, pending, lo)
+}
+
 func (r *repository) Rate(ctx context.Context, userID uuid.UUID, in RateInput) (Place, *Comparison, error) {
 	key := cityKey(in.CityName)
 	var next *Comparison
 	err := r.inTx(ctx, userID, func(tx pgx.Tx) error {
 		old, err := getCurrent(ctx, tx, userID, in.POIID)
 		if err != nil {
+			return err
+		}
+		if old != nil && old.cityKey == key && old.verdict == in.Verdict {
+			// The same answer again (a re-arrival, or a notification answered
+			// after the in-app card): keep its place, or pick up the
+			// comparisons where they stopped.
+			next, err = resume(ctx, tx, userID, in.POIID, old)
 			return err
 		}
 		if old != nil {
@@ -225,17 +267,7 @@ func (r *repository) Compare(ctx context.Context, userID uuid.UUID, poiID, other
 			return nil
 		}
 
-		order := make([]string, 0, len(bucket))
-		order = append(order, rowIDs(placed[:lo])...)
-		order = append(order, poiID)
-		order = append(order, rowIDs(placed[lo:])...)
-		order = append(order, pending...)
-		if _, err := tx.Exec(ctx, `
-			UPDATE user_poi_rankings SET search_lo = NULL, search_hi = NULL, updated_at = NOW()
-			WHERE user_id = $1 AND poi_id = $2`, userID, poiID); err != nil {
-			return fmt.Errorf("place ranking: %w", err)
-		}
-		return renumber(ctx, tx, userID, order)
+		return settle(ctx, tx, userID, poiID, placed, pending, lo)
 	})
 	if err != nil {
 		return Place{}, nil, err

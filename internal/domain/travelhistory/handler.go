@@ -23,6 +23,13 @@ type Handler struct {
 	scorer VisitScorer
 	taste  preference.Recorder
 	kicker preference.Kicker
+	// rankings, when set, loses a place's ranking with its last visit.
+	rankings RankingRemover
+}
+
+// RankingRemover deletes a traveller's ranking of one place (ranking.Service).
+type RankingRemover interface {
+	Delete(ctx context.Context, userID uuid.UUID, poiID string) (bool, error)
 }
 
 // VisitScorer awards points for a visit made on the spot. It returns the
@@ -58,6 +65,14 @@ func (h *Handler) WithScorer(s VisitScorer) *Handler {
 func (h *Handler) WithTaste(r preference.Recorder, k preference.Kicker) *Handler {
 	h.taste = r
 	h.kicker = k
+	return h
+}
+
+// WithRankings makes deleting the last visit to a place also delete its
+// ranking: a place the traveller says they never went to should not sit in
+// the top list their friends see.
+func (h *Handler) WithRankings(r RankingRemover) *Handler {
+	h.rankings = r
 	return h
 }
 
@@ -284,17 +299,23 @@ func (h *Handler) DeleteVisitedPOI(
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid visit ID"))
 	}
-	deleted, err := h.repo.DeleteVisitedPOI(ctx, uid, id)
+	gone, err := h.repo.DeleteVisitedPOI(ctx, uid, id)
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
-	if deleted && h.taste != nil {
+	if gone.Deleted && h.taste != nil {
 		h.taste.Forget(ctx, uid, visitKey, id.String())
 		if h.kicker != nil {
 			h.kicker.Kick(uid)
 		}
 	}
-	return connect.NewResponse(&travelhistoryv1.DeleteVisitedPOIResponse{Deleted: deleted}), nil
+	if gone.LastOfPOI && h.rankings != nil {
+		// Best-effort, like the taste signal: the visit is already gone.
+		if _, err := h.rankings.Delete(ctx, uid, gone.POIID); err != nil {
+			h.log.WarnContext(ctx, "delete ranking with last visit", slog.String("poi_id", gone.POIID), slog.Any("error", err))
+		}
+	}
+	return connect.NewResponse(&travelhistoryv1.DeleteVisitedPOIResponse{Deleted: gone.Deleted}), nil
 }
 
 // GetGlobeData fills the whole globe dashboard in one call. Three separate RPCs
