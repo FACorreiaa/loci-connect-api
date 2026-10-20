@@ -205,6 +205,111 @@ func publicCard(c *recapv1.RecapCard, cities map[string]bool, primary string) *r
 			Headline: o.GetHeadline(), SummaryLine: o.GetSummaryLine(),
 		}}}
 	}
-	// Highlights name places; unknown cards are not known to be safe.
+	// Highlights name places: never public.
+	return publicYearCard(c)
+}
+
+// publicYearCard redacts the year-only cards. Their points are city
+// centroids and their names are cities, so those stay; ids and exact dates go.
+func publicYearCard(c *recapv1.RecapCard) *recapv1.RecapCard {
+	id := c.GetId()
+	switch {
+	case c.GetYearMap() != nil:
+		m := c.GetYearMap()
+		card := &recapv1.YearMapCard{
+			CountriesCount:    m.GetCountriesCount(),
+			CitiesCount:       m.GetCitiesCount(),
+			NewCountriesCount: m.GetNewCountriesCount(),
+			Headline:          m.GetHeadline(),
+		}
+		for _, co := range m.GetCountries() {
+			card.Countries = append(card.Countries, &recapv1.YearCountry{
+				Country: co.GetCountry(), CountryCode: co.GetCountryCode(),
+				CitiesCount: co.GetCitiesCount(), Days: co.GetDays(), FirstTime: co.GetFirstTime(),
+			})
+		}
+		for _, pt := range m.GetCities() {
+			card.Cities = append(card.Cities, &recapv1.RoutePoint{
+				Latitude: pt.GetLatitude(), Longitude: pt.GetLongitude(), Label: pt.GetLabel(),
+			})
+		}
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_YearMap{YearMap: card}}
+
+	case c.GetTripsTimeline() != nil:
+		t := c.GetTripsTimeline()
+		card := &recapv1.TripsTimelineCard{
+			TripsCount:   t.GetTripsCount(),
+			DaysAway:     t.GetDaysAway(),
+			BusiestMonth: t.GetBusiestMonth(),
+			Headline:     t.GetHeadline(),
+		}
+		for _, m := range t.GetMonths() {
+			card.Months = append(card.Months, &recapv1.TimelineMonth{Month: m.GetMonth(), TripsCount: m.GetTripsCount(), Days: m.GetDays()})
+		}
+		for _, tr := range t.GetTrips() {
+			card.Trips = append(card.Trips, &recapv1.TimelineTrip{
+				Month: tr.GetMonth(), CityName: tr.GetCityName(), CountryCode: tr.GetCountryCode(), DayCount: tr.GetDayCount(),
+			})
+		}
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_TripsTimeline{TripsTimeline: card}}
+
+	case c.GetTopCity() != nil:
+		t := c.GetTopCity()
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_TopCity{TopCity: &recapv1.TopCityCard{
+			CityName:    t.GetCityName(),
+			Country:     t.GetCountry(),
+			CountryCode: t.GetCountryCode(),
+			Days:        t.GetDays(),
+			PlacesCount: t.GetPlacesCount(),
+			TripsCount:  t.GetTripsCount(),
+			ImageUrl:    t.GetImageUrl(),
+			Headline:    t.GetHeadline(),
+		}}}
+
+	case c.GetTasteShift() != nil:
+		t := c.GetTasteShift()
+		trait := func(tr *recapv1.TasteTrait) *recapv1.TasteTrait {
+			return &recapv1.TasteTrait{TraitKey: tr.GetTraitKey(), Label: tr.GetLabel(), Strength: tr.GetStrength(), Trend: tr.GetTrend()}
+		}
+		if t.GetTrait() == nil {
+			return nil
+		}
+		card := &recapv1.TasteShiftCard{
+			Headline:      t.GetHeadline(),
+			Trait:         trait(t.GetTrait()),
+			StrengthStart: t.GetStrengthStart(),
+			StrengthEnd:   t.GetStrengthEnd(),
+		}
+		for _, tr := range t.GetRunnersUp() {
+			card.RunnersUp = append(card.RunnersUp, trait(tr))
+		}
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_TasteShift{TasteShift: card}}
+
+	case c.GetStreak() != nil:
+		s := c.GetStreak()
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_Streak{Streak: &recapv1.StreakCard{
+			LongestStreakDays: s.GetLongestStreakDays(),
+			ActiveDays:        s.GetActiveDays(),
+			BestMonth:         s.GetBestMonth(),
+			Headline:          s.GetHeadline(),
+		}}}
+
+	case c.GetContributions() != nil:
+		k := c.GetContributions()
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_Contributions{Contributions: &recapv1.ContributionsCard{
+			ReviewsCount:     k.GetReviewsCount(),
+			ListsCount:       k.GetListsCount(),
+			PostsCount:       k.GetPostsCount(),
+			SubmissionsCount: k.GetSubmissionsCount(),
+			Headline:         k.GetHeadline(),
+		}}}
+
+	case c.GetPercentile() != nil:
+		p := c.GetPercentile()
+		return &recapv1.RecapCard{Id: id, Card: &recapv1.RecapCard_Percentile{Percentile: &recapv1.PercentileCard{
+			TopPercent: p.GetTopPercent(), Metric: p.GetMetric(), Value: p.GetValue(), Headline: p.GetHeadline(),
+		}}}
+	}
+	// Unknown cards are not known to be safe.
 	return nil
 }
