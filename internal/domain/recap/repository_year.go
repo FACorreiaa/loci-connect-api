@@ -178,15 +178,24 @@ type cityMeta struct {
 	firstCountryVisit bool
 }
 
+// A city can have more than one row on the globe (one per source), and not
+// every row knows its country. Rows are read most informative first and
+// merged, and a country's first visit only counts rows that name a country:
+// rows with none would otherwise share one partition and all look new.
 func (p *pgRepository) loadCityMeta(ctx context.Context, userID uuid.UUID, s yearScope) (map[string]cityMeta, error) {
 	rows, err := p.pool.Query(ctx, `
+		WITH v AS (
+			SELECT v.*, COALESCE(NULLIF(v.country_code, ''), NULLIF(lower(v.country), '')) AS country_key
+			FROM user_visited_cities v WHERE v.user_id = $1
+		)
 		SELECT lower(v.city_name), v.city_id, COALESCE(NULLIF(c.country, ''), v.country, ''),
 		       COALESCE(v.country_code, ''),
 		       COALESCE(ST_Y(c.center_location), v.latitude), COALESCE(ST_X(c.center_location), v.longitude),
-		       MIN(v.first_visit_at) OVER (PARTITION BY COALESCE(NULLIF(v.country_code, ''), lower(v.country)))
-		FROM user_visited_cities v
+		       CASE WHEN v.country_key IS NOT NULL
+		            THEN MIN(v.first_visit_at) OVER (PARTITION BY v.country_key) END
+		FROM v
 		LEFT JOIN cities c ON c.id = v.city_id
-		WHERE v.user_id = $1`, userID)
+		ORDER BY lower(v.city_name), (v.country_key IS NOT NULL) DESC, v.last_visit_at DESC`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("year recap city meta: %w", err)
 	}
@@ -210,9 +219,25 @@ func (p *pgRepository) loadCityMeta(ctx context.Context, userID uuid.UUID, s yea
 			m.lat, m.lon, m.hasCoords = *lat, *lon, true
 		}
 		m.firstCountryVisit = firstVisit != nil && !firstVisit.Before(s.from)
-		if _, dup := out[key]; !dup {
+		cur, dup := out[key]
+		if !dup {
 			out[key] = m
+			continue
 		}
+		// Fill what the better row did not know.
+		if cur.country == "" {
+			cur.country = m.country
+		}
+		if cur.code == "" {
+			cur.code, cur.firstCountryVisit = m.code, m.firstCountryVisit
+		}
+		if cur.id == uuid.Nil {
+			cur.id = m.id
+		}
+		if !cur.hasCoords && m.hasCoords {
+			cur.lat, cur.lon, cur.hasCoords = m.lat, m.lon, true
+		}
+		out[key] = cur
 	}
 	return out, rows.Err()
 }

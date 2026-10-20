@@ -38,6 +38,10 @@ func seedYear(t *testing.T) (seeded, string) {
 		VALUES ($1, $2, 'Portugal', 'PT', 38.72, -9.14, 'visit_event', '2026-10-11', '2026-10-15'),
 		       ($1, 'Faro', 'Portugal', 'PT', 37.02, -7.93, 'visit_event', '2024-07-01', '2024-07-03'),
 		       ($1, 'Porto', 'Portugal', 'PT', 41.15, -8.61, 'visit_event', '2026-03-02', '2026-03-03')`, s.user, lisbon)
+	// A second Lisbon row from another source, with no country, written
+	// later: it must not erase Lisbon's country or make Portugal look new.
+	exec(t, `INSERT INTO user_visited_cities (user_id, city_name, country, country_code, latitude, longitude, source, first_visit_at, last_visit_at)
+		VALUES ($1, $2, '', NULL, 38.72, -9.14, 'manual', '2026-10-12', '2026-10-20')`, s.user, lisbon)
 
 	oldFb := uuid.New()
 	exec(t, `INSERT INTO preference_feedback (id, user_id, poi_id, event) VALUES ($1, $2, 'x', 'saved')`, oldFb, s.user)
