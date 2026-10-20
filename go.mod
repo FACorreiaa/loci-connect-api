@@ -1,6 +1,6 @@
 module github.com/FACorreiaa/loci-connect-api
 
-go 1.27.0
+go 1.27.3
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260709200747-435963d16310.1

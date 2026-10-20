@@ -189,7 +189,7 @@ services:
 
   # pprof visualization tool
   pprof-web:
-    image: golang:1.21-alpine
+    image: golang:1.27.3-alpine
     command: >
       sh -c "
         go install github.com/google/pprof@latest &&
