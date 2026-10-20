@@ -3,8 +3,14 @@
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
+# The proto version go.mod pins. gen/ is generated from that git tag rather
+# than from BSR latest: BSR has no per-version labels, so generating from it
+# pulled in every proto release the moment it was pushed, failed the proto
+# job on every branch and skipped CD until someone bumped go.mod.
+PROTO_VERSION = $(shell go list -m -f '{{.Version}}' github.com/FACorreiaa/loci-connect-proto/v5)
+
 generate: ## Generate code from proto files and sync vendored protos
-	buf generate buf.build/loci/loci-proto
+	buf generate "https://github.com/FACorreiaa/loci-connect-proto.git#tag=$(PROTO_VERSION)"
 	go mod tidy
 	go mod vendor
 
@@ -46,8 +52,13 @@ deps: ## Download dependencies
 	go mod download
 	go mod tidy
 
+# CI's pin (see .github/workflows/golangci-lint.yml), run via `go run` so the
+# copy on PATH never decides the result.
+GOLANGCI_LINT_VERSION = $(shell sed -nE 's/^ *version: (v[0-9.]+).*/\1/p' .github/workflows/golangci-lint.yml)
+GOLANGCI_LINT = go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+
 lint: ## Run linters
-	golangci-lint run ./...
+	$(GOLANGCI_LINT) run ./...
 
 # Docker commands
 docker-build: ## Build Docker image
@@ -106,4 +117,4 @@ hooks: ## Install versioned git hooks (.githooks → core.hooksPath)
 	bash scripts/install-hooks.sh
 
 lint-go: ## Run golangci-lint (same command the pre-commit hook runs)
-	golangci-lint run
+	$(GOLANGCI_LINT) run

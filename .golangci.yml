@@ -75,7 +75,9 @@ linters:
 formatters:
   settings:
     gofumpt:
-      extra-rules: true
+      extra:
+        group-params: true
+        clothe-returns: true
       module-path: ...
   enable:
     - gofumpt

@@ -35,7 +35,7 @@ func insertUser(t *testing.T, pool *pgxpool.Pool) uuid.UUID {
 	return id
 }
 
-func newFavorite(userID uuid.UUID, itemID uuid.UUID, contentType, name string) *locitypes.FavoriteItem {
+func newFavorite(userID, itemID uuid.UUID, contentType, name string) *locitypes.FavoriteItem {
 	return &locitypes.FavoriteItem{
 		UserID:      userID,
 		ItemID:      itemID.String(),

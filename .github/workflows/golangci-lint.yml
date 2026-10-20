@@ -25,9 +25,12 @@ jobs:
           # v2.13.0 hangs. Its staticcheck loops on internal/domain/chat/handler
           # and internal/domain/chat/service and never returns: runs sat over an
           # hour and ignored cancellation, which made every PR look stuck on
-          # lint. v2.13.2 lints the same tree in about five seconds. Keep this
-          # in lockstep with .githooks/pre-commit, which runs the same binary.
-          version: v2.13.2
+          # lint. v2.13.2 and later lint the same tree in seconds.
+          #
+          # This line is the one place the version lives: .githooks/pre-commit
+          # and `make lint` read it from here and `go run` that exact release,
+          # so a different golangci-lint on PATH can't fail a commit CI passes.
+          version: v2.15.0
           install-mode: goinstall
           only-new-issues: true
       - name: Go Vet

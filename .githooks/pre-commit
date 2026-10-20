@@ -16,10 +16,12 @@ GOFUMPT_VERSION="v0.11.0"
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 
-# Fail closed if the linter is missing — a skipped lint is not a pass.
-if ! command -v golangci-lint >/dev/null 2>&1; then
-  echo "pre-commit: golangci-lint not on PATH. Install v2.13.2 to match CI:" >&2
-  echo "  https://golangci-lint.run/welcome/install/" >&2
+# golangci-lint is run the same way, at the version CI pins: whatever is on
+# PATH drifts (a local v2.15.0 against CI's v2.13.2 failed commits CI passed).
+# Fail closed if the pin can't be read — a skipped lint is not a pass.
+GOLANGCI_LINT_VERSION="$(sed -nE 's/^ *version: (v[0-9.]+).*/\1/p' .github/workflows/golangci-lint.yml)"
+if [[ -z "${GOLANGCI_LINT_VERSION}" ]]; then
+  echo "pre-commit: no golangci-lint version in .github/workflows/golangci-lint.yml" >&2
   exit 1
 fi
 
@@ -45,13 +47,13 @@ fi
 echo "pre-commit: check-migrations"
 "${ROOT}/scripts/check-migrations.sh"
 
-echo "pre-commit: golangci-lint run"
+echo "pre-commit: golangci-lint ${GOLANGCI_LINT_VERSION} run"
 # --allow-parallel-runners: golangci-lint takes a global lock, so a lint
 # running in another checkout — a second editor, another agent session,
 # a watch task — makes this one fail with "parallel golangci-lint is
 # running" and aborts the commit under set -e. The flag is golangci-lint's
 # own answer to that: same linters, same config, same cache, allowed to
 # run beside another invocation.
-golangci-lint run --allow-parallel-runners
+go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" run --allow-parallel-runners
 
 echo "pre-commit: ok"
