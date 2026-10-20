@@ -382,8 +382,11 @@ type NotificationSettings struct {
 	ProgressUpdates bool `json:"progress_updates"`
 	// CityBoardVisible shows the account's display name and weekly field
 	// score on city boards, to people who are not friends.
-	CityBoardVisible bool      `json:"city_board_visible"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CityBoardVisible bool `json:"city_board_visible"`
+	// NearbyFits is read by the device, which watches the saved places that
+	// fit the traveller during a trip and sends the nudge itself.
+	NearbyFits bool      `json:"nearby_fits"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // UpdateNotificationSettingsParams is a partial update: a nil field means the
@@ -398,4 +401,5 @@ type UpdateNotificationSettingsParams struct {
 	StreakReminders    *bool `json:"streak_reminders,omitempty"`
 	ProgressUpdates    *bool `json:"progress_updates,omitempty"`
 	CityBoardVisible   *bool `json:"city_board_visible,omitempty"`
+	NearbyFits         *bool `json:"nearby_fits,omitempty"`
 }

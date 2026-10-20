@@ -154,6 +154,13 @@ func main() {
 		}
 	})
 
+	// Trip-day briefs (morning brief, weather turn). Returns immediately when off.
+	concurrency.Run(logger, func() {
+		if err := deps.RunTripBriefs(backgroundCtx); err != nil {
+			logger.Error("tripbrief runner stopped", "error", err)
+		}
+	})
+
 	// Queue, build and announce trip recaps. Returns immediately when off.
 	concurrency.Run(logger, func() {
 		if err := deps.RunRecaps(backgroundCtx); err != nil {

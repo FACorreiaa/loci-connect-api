@@ -23,3 +23,7 @@ func redactErr(err error) string {
 	}
 	return msg
 }
+
+// RedactErr is redactErr for callers outside the package that log a weather
+// or signals error (the trip brief runner).
+func RedactErr(err error) string { return redactErr(err) }

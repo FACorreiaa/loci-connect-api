@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	favoritesv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/favorites/v1/favoritesv1connect"
+	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 )
 
 // Handler implements the FavoritesService
@@ -28,6 +29,7 @@ type Handler struct {
 	prefs     preference.Recorder
 	places    PlaceReader
 	field     FieldScorer
+	taste     preference.POIScorer
 	logger    *slog.Logger
 }
 
@@ -76,6 +78,36 @@ func (h *Handler) WithPlaces(places PlaceReader) *Handler {
 func (h *Handler) WithScorer(s FieldScorer) *Handler {
 	h.field = s
 	return h
+}
+
+// WithTaste attaches taste_match to saved places in GetFavorites.
+func (h *Handler) WithTaste(s preference.POIScorer) *Handler {
+	h.taste = s
+	return h
+}
+
+// attachTasteMatch scores the saved places (not itineraries) in one call.
+// Best effort: a place the scorer skips, or every place when scoring fails,
+// is returned without a match.
+func (h *Handler) attachTasteMatch(ctx context.Context, userID uuid.UUID, favs []*favoritesv1.FavoriteItem) {
+	if h.taste == nil {
+		return
+	}
+	var ids []string
+	for _, f := range favs {
+		if f.GetContentType() != favoritesv1.ContentType_CONTENT_TYPE_ITINERARY && f.GetItemId() != "" {
+			ids = append(ids, f.GetItemId())
+		}
+	}
+	matches := preference.MatchesFor(ctx, h.taste, userID, ids)
+	for _, f := range favs {
+		if f.GetContentType() == favoritesv1.ContentType_CONTENT_TYPE_ITINERARY {
+			continue
+		}
+		if m, ok := matches[f.GetItemId()]; ok {
+			f.TasteMatch = &poiv1.TasteMatch{Score: m.Score, Reasons: m.Reasons}
+		}
+	}
 }
 
 func favoriteToProto(f *locitypes.FavoriteItem) *favoritesv1.FavoriteItem {
@@ -321,6 +353,8 @@ func (h *Handler) GetFavorites(
 			AddedAt:     timestamppb.New(fav.AddedAt),
 		}
 	}
+
+	h.attachTasteMatch(ctx, userID, protoFavorites)
 
 	l.InfoContext(ctx, "retrieved favorites",
 		slog.String("user_id", userID.String()),

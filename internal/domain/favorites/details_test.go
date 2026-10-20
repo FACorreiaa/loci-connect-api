@@ -22,6 +22,7 @@ import (
 
 type fakeRepo struct {
 	saved map[string]*locitypes.FavoriteItem // key: itemID|contentType
+	list  []locitypes.FavoriteItem
 }
 
 func (f *fakeRepo) AddFavorite(_ context.Context, fav *locitypes.FavoriteItem) (*locitypes.FavoriteItem, error) {
@@ -29,7 +30,7 @@ func (f *fakeRepo) AddFavorite(_ context.Context, fav *locitypes.FavoriteItem) (
 }
 func (f *fakeRepo) RemoveFavorite(context.Context, uuid.UUID, string, string) error { return nil }
 func (f *fakeRepo) GetFavorites(context.Context, uuid.UUID, string, int, int) ([]locitypes.FavoriteItem, int, error) {
-	return nil, 0, nil
+	return f.list, len(f.list), nil
 }
 
 func (f *fakeRepo) IsFavorited(context.Context, uuid.UUID, string, string) (bool, error) {

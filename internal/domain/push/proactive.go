@@ -74,13 +74,12 @@ func FirstLine(text string, maxRunes int) string {
 	return strings.TrimSpace(string(runes[:maxRunes-1])) + "…"
 }
 
-// NotifyProactive announces m on every iPhone its owner registered. Like
-// OnRunFinished it returns at once and never fails the caller: the message
-// is already in the thread, and the push is only a pointer to it. Web push
-// is not sent: a browser with the thread open already shows the message.
+// NotifyProactive announces m on every phone and browser its owner
+// registered. Like OnRunFinished it returns at once and never fails the
+// caller: the message is already in the thread, and the push is only a
+// pointer to it.
 func (n *Notifier) NotifyProactive(_ context.Context, m ProactiveMessage) {
-	sender, ok := n.senders[PlatformAPNS]
-	if !ok || m.SessionID == uuid.Nil || m.UserID == uuid.Nil {
+	if len(n.senders) == 0 || m.SessionID == uuid.Nil || m.UserID == uuid.Nil {
 		return
 	}
 	n.wg.Add(1)
@@ -88,24 +87,30 @@ func (n *Notifier) NotifyProactive(_ context.Context, m ProactiveMessage) {
 		defer n.wg.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		n.deliverProactive(ctx, sender, m)
+		n.deliverProactive(ctx, m)
 	}()
 }
 
-func (n *Notifier) deliverProactive(ctx context.Context, sender Sender, m ProactiveMessage) {
-	devices, err := n.devices.ForUser(ctx, m.UserID, PlatformAPNS)
-	if err != nil {
-		n.logger.Warn("list push devices", "session_id", m.SessionID, "platform", PlatformAPNS, "error", err)
-		return
-	}
-	if len(devices) == 0 {
-		return
-	}
+func (n *Notifier) deliverProactive(ctx context.Context, m ProactiveMessage) {
 	body, err := json.Marshal(BuildProactivePayload(m))
 	if err != nil {
 		return
 	}
-	for _, d := range devices {
-		n.sendOne(ctx, PlatformAPNS, sender, d, body, "session_id", m.SessionID)
+	for _, platform := range platformOrder {
+		sender, ok := n.senders[platform]
+		if !ok {
+			continue
+		}
+		devices, err := n.devices.ForUser(ctx, m.UserID, platform)
+		if err != nil {
+			n.logger.Warn("list push devices", "session_id", m.SessionID, "platform", platform, "error", err)
+			continue
+		}
+		for _, d := range devices {
+			if platform == PlatformWebPush && !ValidWebPushEndpoint(d.Endpoint) {
+				continue
+			}
+			n.sendOne(ctx, platform, sender, d, body, "session_id", m.SessionID)
+		}
 	}
 }

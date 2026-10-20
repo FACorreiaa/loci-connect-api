@@ -199,4 +199,24 @@ func TestServiceUserImpl_NotificationSettings_Integration(t *testing.T) {
 		assert.True(t, updated.Recommendations, "recommendations must be unchanged by a search_finished-only update")
 		assert.True(t, updated.TripReminders, "trip_reminders must be unchanged by a search_finished-only update")
 	})
+
+	t.Run("nearby_fits defaults off and round-trips", func(t *testing.T) {
+		userID := createTestUserDirectly(t, "notif_nearby_"+suffix, "notif_nearby_"+suffix+"@example.com", "Notif", "Nearby")
+
+		fresh, err := testUserService.GetNotificationSettings(ctx, userID)
+		require.NoError(t, err)
+		assert.False(t, fresh.NearbyFits, "nearby_fits is opt-in")
+
+		on, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{NearbyFits: util.Ptr(true)})
+		require.NoError(t, err)
+		assert.True(t, on.NearbyFits)
+
+		other, err := testUserService.UpdateNotificationSettings(ctx, userID, locitypes.UpdateNotificationSettingsParams{SearchFinished: util.Ptr(false)})
+		require.NoError(t, err)
+		assert.True(t, other.NearbyFits, "an update that does not mention nearby_fits keeps it")
+
+		read, err := testUserService.GetNotificationSettings(ctx, userID)
+		require.NoError(t, err)
+		assert.True(t, read.NearbyFits)
+	})
 }
