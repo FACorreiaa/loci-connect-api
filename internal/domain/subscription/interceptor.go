@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
+
 	"connectrpc.com/connect"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
@@ -31,6 +33,8 @@ var meteredProcedures = map[string]struct{}{
 	// Metered on every call, cached or not: the quota is taken before the
 	// handler runs, so a hit cannot be told from a miss here.
 	gastronomyconnect.GastronomyServiceGetCityGastronomyProcedure: {},
+	// One extraction call, plus a generation per place search has to create.
+	placeconnect.PlaceIntelligenceServiceImportPlacesProcedure: {},
 }
 
 func isMeteredProcedure(proc string) bool {

@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/linkimport"
+	"github.com/FACorreiaa/loci-connect-api/pkg/safefetch"
+
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
@@ -1187,6 +1190,16 @@ func (d *Dependencies) initHandlers() error {
 		WithPOIUpserter(placePOIUpserterAdapter{repo: d.POIRepo})
 	if d.gamification != nil {
 		d.PlaceIntelligenceHandler = d.PlaceIntelligenceHandler.WithScorer(d.gamification)
+	}
+	// Places from a shared link: fetched through safefetch (never into the
+	// cluster), extracted by chat's model chain, looked up like search.
+	if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
+		d.PlaceIntelligenceHandler = d.PlaceIntelligenceHandler.WithLinkImport(linkimport.NewService(
+			safefetch.New(safefetch.Options{}),
+			chatImpl.ActionLLM(),
+			linkimport.POIResolver{Search: d.POISvc.SearchPOIsByQueryAndCity},
+			d.Logger,
+		))
 	}
 
 	// Local context (weather now; booking/transport stubbed). Open-Meteo is the
