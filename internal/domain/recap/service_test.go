@@ -21,10 +21,15 @@ type fakeRepo struct {
 	facts      map[uuid.UUID]*TripFacts
 	factsErr   error
 	tz         string
+
+	yearFacts  map[uuid.UUID]*YearFacts
+	yearCands  []YearCandidate
+	yearLoads  int
+	yearOnlyIn [][]uuid.UUID
 }
 
 func newFakeRepo() *fakeRepo {
-	return &fakeRepo{rows: map[uuid.UUID]*Row{}, facts: map[uuid.UUID]*TripFacts{}, tz: "UTC"}
+	return &fakeRepo{rows: map[uuid.UUID]*Row{}, facts: map[uuid.UUID]*TripFacts{}, yearFacts: map[uuid.UUID]*YearFacts{}, tz: "UTC"}
 }
 
 func (f *fakeRepo) byTrip(tripID uuid.UUID) *Row {
@@ -155,7 +160,7 @@ func (f *fakeRepo) Unnotified(_ context.Context, _ int) ([]Notice, error) {
 	var out []Notice
 	for _, r := range f.rows {
 		if r.Status == StatusReady && r.NotifiedAt == nil {
-			out = append(out, Notice{RecapID: r.ID, UserID: r.UserID, TripID: r.TripID, Timezone: f.tz, Viewed: r.ViewedAt != nil, Payload: r.Payload})
+			out = append(out, Notice{RecapID: r.ID, UserID: r.UserID, Kind: r.Kind, TripID: r.TripID, Year: r.Year, Timezone: f.tz, Viewed: r.ViewedAt != nil, Payload: r.Payload})
 		}
 	}
 	return out, nil
@@ -214,13 +219,18 @@ func (f *fakeRepo) LoadTripFacts(_ context.Context, _, tripID uuid.UUID, start, 
 
 type sent struct {
 	to, trip    uuid.UUID
+	year        int
 	title, body string
 }
 
 type fakeNotifier struct{ sent []sent }
 
+func (n *fakeNotifier) YearRecapReady(_ context.Context, to uuid.UUID, year int, title, body string) {
+	n.sent = append(n.sent, sent{to: to, year: year, title: title, body: body})
+}
+
 func (n *fakeNotifier) RecapReady(_ context.Context, to, tripID uuid.UUID, title, body string) {
-	n.sent = append(n.sent, sent{to, tripID, title, body})
+	n.sent = append(n.sent, sent{to: to, trip: tripID, title: title, body: body})
 }
 
 func setup(t *testing.T, now time.Time) (*Service, *fakeRepo, *fakeNotifier, *TripFacts) {

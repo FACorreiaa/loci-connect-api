@@ -27,17 +27,21 @@ const ReasonYearLocked = "Your year in review unlocks on 1 December."
 type Notifier interface {
 	// RecapReady tells to that the recap of tripID is ready.
 	RecapReady(ctx context.Context, to, tripID uuid.UUID, title, body string)
+	// YearRecapReady tells to that their year in review is ready.
+	YearRecapReady(ctx context.Context, to uuid.UUID, year int, title, body string)
 }
 
 type noopNotifier struct{}
 
 func (noopNotifier) RecapReady(context.Context, uuid.UUID, uuid.UUID, string, string) {}
+func (noopNotifier) YearRecapReady(context.Context, uuid.UUID, int, string, string)   {}
 
 // Service runs recaps: building on request, the runner's queue, sharing.
 type Service struct {
 	repo     Repository
 	builder  *Builder
 	notifier Notifier
+	access   YearAccess
 	origin   string
 	log      *slog.Logger
 	now      func() time.Time
@@ -65,6 +69,13 @@ func NewService(repo Repository, origin string, notifier Notifier, log *slog.Log
 // WithBuilder replaces the builder (city rank thresholds from config).
 func (s *Service) WithBuilder(b *Builder) *Service {
 	s.builder = b
+	return s
+}
+
+// WithYearAccess replaces the year in review unlock rule (production
+// testing).
+func (s *Service) WithYearAccess(a YearAccess) *Service {
+	s.access = a
 	return s
 }
 
@@ -133,15 +144,67 @@ func (s *Service) build(ctx context.Context, userID, tripID uuid.UUID, start, en
 	return StatusReady, payload, "", nil
 }
 
-// YearInReview is not built yet: it unlocks in December.
-func (s *Service) YearInReview(_ context.Context, _ uuid.UUID, year int) (*recapv1.Recap, error) {
-	return &recapv1.Recap{
-		Kind:             recapv1.RecapKind_RECAP_KIND_YEAR,
-		Status:           recapv1.RecapStatus_RECAP_STATUS_INELIGIBLE,
-		Year:             int32(year),
-		IneligibleReason: ReasonYearLocked,
-		IsOwner:          true,
-	}, nil
+// YearInReview returns userID's recap of year, building it when it is
+// missing or not ready. Before the year unlocks it is INELIGIBLE.
+func (s *Service) YearInReview(ctx context.Context, userID uuid.UUID, year int) (*recapv1.Recap, error) {
+	now := s.now()
+	row, err := s.repo.ByYear(ctx, userID, year)
+	switch {
+	case err == nil:
+		if row.Status == StatusReady || row.ShareCode != "" {
+			return s.view(row, now)
+		}
+	case !errors.Is(err, ErrNotFound):
+		return nil, err
+	}
+
+	tz, err := s.repo.Timezone(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !s.access.Unlocked(userID, year, LocalDate(now, Location(tz))) {
+		return &recapv1.Recap{
+			Kind:             recapv1.RecapKind_RECAP_KIND_YEAR,
+			Status:           recapv1.RecapStatus_RECAP_STATUS_INELIGIBLE,
+			Year:             int32(year),
+			IneligibleReason: ReasonYearLocked,
+			IsOwner:          true,
+		}, nil
+	}
+	status, payload, reason, err := s.buildYear(ctx, userID, year, now)
+	if err != nil {
+		return nil, err
+	}
+	row, err = s.repo.UpsertYear(ctx, userID, year, status, payload, reason)
+	if err != nil {
+		return nil, err
+	}
+	return s.view(row, now)
+}
+
+// buildYear loads a year's facts and builds; status is ready or ineligible.
+func (s *Service) buildYear(ctx context.Context, userID uuid.UUID, year int, now time.Time) (Status, []byte, string, error) {
+	facts, err := s.repo.LoadYearFacts(ctx, userID, year, now)
+	if err != nil {
+		return 0, nil, "", err
+	}
+	rec, reason, ok := s.builder.BuildYear(facts)
+	if !ok {
+		return StatusIneligible, nil, reason, nil
+	}
+	payload, err := proto.Marshal(rec)
+	if err != nil {
+		return 0, nil, "", fmt.Errorf("marshal year recap: %w", err)
+	}
+	return StatusReady, payload, "", nil
+}
+
+// buildRow builds a queued recap of either kind.
+func (s *Service) buildRow(ctx context.Context, row Row, now time.Time) (Status, []byte, string, error) {
+	if row.Kind == KindYear {
+		return s.buildYear(ctx, row.UserID, row.Year, now)
+	}
+	return s.build(ctx, row.UserID, row.TripID, row.PeriodStart, row.PeriodEnd)
 }
 
 // Get opens one of userID's recaps by id.
@@ -339,6 +402,12 @@ func (s *Service) Tick(ctx context.Context) (TickResult, error) {
 		}
 	}
 
+	queued, err := s.queueYears(ctx, now)
+	if err != nil {
+		return res, err
+	}
+	res.Queued += queued
+
 	pending, err := s.repo.Pending(ctx, now, buildBatch)
 	if err != nil {
 		return res, err
@@ -347,7 +416,7 @@ func (s *Service) Tick(ctx context.Context) (TickResult, error) {
 		if err := ctx.Err(); err != nil {
 			return res, err
 		}
-		status, payload, reason, err := s.build(ctx, row.UserID, row.TripID, row.PeriodStart, row.PeriodEnd)
+		status, payload, reason, err := s.buildRow(ctx, row, now)
 		if err != nil {
 			attempts := row.Attempts + 1
 			failed := attempts >= MaxAttempts
@@ -394,19 +463,70 @@ func (s *Service) Tick(ctx context.Context) (TickResult, error) {
 			continue
 		}
 		title, body := PushText(rec)
-		s.notifier.RecapReady(ctx, n.UserID, n.TripID, title, body)
+		if n.Kind == KindYear {
+			s.notifier.YearRecapReady(ctx, n.UserID, n.Year, title, body)
+		} else {
+			s.notifier.RecapReady(ctx, n.UserID, n.TripID, title, body)
+		}
 		res.Notified++
 	}
 	return res, nil
 }
 
-// PushText is the notification for a ready trip recap.
+// queueYears queues the year in review of travellers whose year has just
+// unlocked, in December and January.
+func (s *Service) queueYears(ctx context.Context, now time.Time) (int, error) {
+	year, ok := s.access.RunnerYear(LocalDate(now, time.UTC))
+	if !ok {
+		return 0, nil
+	}
+	cands, err := s.repo.YearCandidates(ctx, year, s.earlyOnly(year, now), candidateBatch)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, c := range cands {
+		if !s.access.Unlocked(c.UserID, year, LocalDate(now, Location(c.Timezone))) {
+			continue
+		}
+		ok, err := s.repo.QueueYear(ctx, c.UserID, year)
+		if err != nil {
+			return n, err
+		}
+		if ok {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// earlyOnly is who the runner may queue before 1 December: the allowlist
+// when an override is limited to one, nil (everyone) otherwise.
+func (s *Service) earlyOnly(year int, now time.Time) []uuid.UUID {
+	a := s.access
+	if a.UnlockOverride.IsZero() || a.UnlockOverride.Year() != year || len(a.Allow) == 0 {
+		return nil
+	}
+	if !LocalDate(now, time.UTC).Before(time.Date(year, YearUnlockMonth, YearUnlockDay, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)) {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(a.Allow))
+	for id := range a.Allow {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// PushText is the notification for a ready recap.
 func PushText(rec *recapv1.Recap) (title, body string) {
-	title = "Your " + rec.GetTitle() + " recap is ready"
-	body = "Tap to relive the trip."
+	title, tail := "Your "+rec.GetTitle()+" recap is ready", "Tap to relive the trip."
+	if rec.GetKind() == recapv1.RecapKind_RECAP_KIND_YEAR {
+		title, tail = fmt.Sprintf("Your %d in Loci is ready", rec.GetYear()), "Tap to look back on the year."
+	}
+	body = tail
 	for _, c := range rec.GetCards() {
 		if o := c.GetOutro(); o != nil && o.GetSummaryLine() != "" {
-			body = o.GetSummaryLine() + ". Tap to relive the trip."
+			body = o.GetSummaryLine() + ". " + tail
 		}
 	}
 	return title, body

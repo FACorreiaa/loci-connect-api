@@ -720,7 +720,11 @@ func (d *Dependencies) RunField(ctx context.Context) error {
 	return d.fieldRunner.Run(ctx)
 }
 
-// RunRecaps queues, builds and announces trip recaps until ctx is cancelled.
+// The recap service finds its notifier by a type assertion on the progress
+// notifier; a method missing here would turn every recap push off silently.
+var _ recap.Notifier = (*push.Notifier)(nil)
+
+// RunRecaps queues, builds and announces recaps until ctx is cancelled.
 // Returns nil immediately when switched off (RECAP_RUNNER_ENABLED).
 func (d *Dependencies) RunRecaps(ctx context.Context) error {
 	if d.recapRunner == nil {
@@ -1061,8 +1065,16 @@ func (d *Dependencies) initHandlers() error {
 		if err != nil {
 			recapCityRanks = gamification.DefaultCityThresholds
 		}
+		yearAccess, err := recap.ParseYearAccess(d.Config.Social.RecapYearUnlockDate, d.Config.Social.RecapYearAllowlist)
+		if err != nil {
+			// A typo in a testing override must not open the year to everyone
+			// early: fall back to 1 December.
+			d.Logger.Warn("ignoring year in review overrides", slog.Any("error", err))
+			yearAccess = recap.YearAccess{}
+		}
 		recapSvc := recap.NewService(recap.NewRepository(d.DB.Pool), shareOrigin(d.Config.Server.BaseURL), recapNotifier, d.Logger).
-			WithBuilder(&recap.Builder{CityRanks: recapCityRanks})
+			WithBuilder(&recap.Builder{CityRanks: recapCityRanks}).
+			WithYearAccess(yearAccess)
 		d.RecapHandler = recap.NewHandler(recapSvc, d.Logger)
 		d.RecapImages = recap.NewImageHandler(recapSvc, d.Logger)
 		if d.Config.Social.RecapRunnerEnabled {

@@ -52,6 +52,12 @@ type SocialConfig struct {
 	// RecapRunnerEnabled queues a recap when a trip ends, builds it and
 	// pushes it. Off by default: recaps still build when someone opens one.
 	RecapRunnerEnabled bool
+	// RecapYearUnlockDate (YYYY-MM-DD) opens that year's year in review on
+	// that date instead of 1 December, and RecapYearAllowlist (user ids)
+	// limits the early opening to those travellers. Both are for trying it
+	// in production; leave them empty otherwise.
+	RecapYearUnlockDate string
+	RecapYearAllowlist  []string
 }
 
 type CacheConfig struct {
@@ -560,6 +566,8 @@ func Load() (*Config, error) {
 			FieldRanksCity:      getEnv("FIELD_RANK_THRESHOLDS_CITY", ""),
 			FieldRunnerEnabled:  getEnvAsBool("FIELD_RUNNER_ENABLED", true),
 			RecapRunnerEnabled:  getEnvAsBool("RECAP_RUNNER_ENABLED", false),
+			RecapYearUnlockDate: getEnv("RECAP_YEAR_UNLOCK_DATE", ""),
+			RecapYearAllowlist:  getEnvAsSlice("RECAP_YEAR_ALLOWLIST", nil),
 		},
 		Messaging: MessagingConfig{
 			TelegramBotToken:      getEnv("TELEGRAM_BOT_TOKEN", ""),
