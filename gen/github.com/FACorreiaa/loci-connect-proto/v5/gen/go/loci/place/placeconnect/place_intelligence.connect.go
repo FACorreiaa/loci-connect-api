@@ -57,6 +57,9 @@ const (
 	// PlaceIntelligenceServiceListMyClaimsProcedure is the fully-qualified name of the
 	// PlaceIntelligenceService's ListMyClaims RPC.
 	PlaceIntelligenceServiceListMyClaimsProcedure = "/loci.place.PlaceIntelligenceService/ListMyClaims"
+	// PlaceIntelligenceServiceImportPlacesProcedure is the fully-qualified name of the
+	// PlaceIntelligenceService's ImportPlaces RPC.
+	PlaceIntelligenceServiceImportPlacesProcedure = "/loci.place.PlaceIntelligenceService/ImportPlaces"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -70,6 +73,7 @@ var (
 	placeIntelligenceServiceConfirmPlaceMethodDescriptor            = placeIntelligenceServiceServiceDescriptor.Methods().ByName("ConfirmPlace")
 	placeIntelligenceServiceListPendingPlacesMethodDescriptor       = placeIntelligenceServiceServiceDescriptor.Methods().ByName("ListPendingPlaces")
 	placeIntelligenceServiceListMyClaimsMethodDescriptor            = placeIntelligenceServiceServiceDescriptor.Methods().ByName("ListMyClaims")
+	placeIntelligenceServiceImportPlacesMethodDescriptor            = placeIntelligenceServiceServiceDescriptor.Methods().ByName("ImportPlaces")
 )
 
 // PlaceIntelligenceServiceClient is a client for the loci.place.PlaceIntelligenceService service.
@@ -83,6 +87,9 @@ type PlaceIntelligenceServiceClient interface {
 	ListPendingPlaces(context.Context, *connect.Request[place.ListPendingPlacesRequest]) (*connect.Response[place.ListPendingPlacesResponse], error)
 	// ListMyClaims lists the caller's own claims, newest first.
 	ListMyClaims(context.Context, *connect.Request[place.ListMyClaimsRequest]) (*connect.Response[place.ListMyClaimsResponse], error)
+	// ImportPlaces reads a shared link and returns the places it mentions,
+	// matched to Loci places where possible. Saving them is up to the client.
+	ImportPlaces(context.Context, *connect.Request[place.ImportPlacesRequest]) (*connect.Response[place.ImportPlacesResponse], error)
 }
 
 // NewPlaceIntelligenceServiceClient constructs a client for the loci.place.PlaceIntelligenceService
@@ -143,6 +150,12 @@ func NewPlaceIntelligenceServiceClient(httpClient connect.HTTPClient, baseURL st
 			connect.WithSchema(placeIntelligenceServiceListMyClaimsMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		importPlaces: connect.NewClient[place.ImportPlacesRequest, place.ImportPlacesResponse](
+			httpClient,
+			baseURL+PlaceIntelligenceServiceImportPlacesProcedure,
+			connect.WithSchema(placeIntelligenceServiceImportPlacesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -156,6 +169,7 @@ type placeIntelligenceServiceClient struct {
 	confirmPlace            *connect.Client[place.ConfirmPlaceRequest, place.ConfirmPlaceResponse]
 	listPendingPlaces       *connect.Client[place.ListPendingPlacesRequest, place.ListPendingPlacesResponse]
 	listMyClaims            *connect.Client[place.ListMyClaimsRequest, place.ListMyClaimsResponse]
+	importPlaces            *connect.Client[place.ImportPlacesRequest, place.ImportPlacesResponse]
 }
 
 // GetPlaceFacts calls loci.place.PlaceIntelligenceService.GetPlaceFacts.
@@ -198,6 +212,11 @@ func (c *placeIntelligenceServiceClient) ListMyClaims(ctx context.Context, req *
 	return c.listMyClaims.CallUnary(ctx, req)
 }
 
+// ImportPlaces calls loci.place.PlaceIntelligenceService.ImportPlaces.
+func (c *placeIntelligenceServiceClient) ImportPlaces(ctx context.Context, req *connect.Request[place.ImportPlacesRequest]) (*connect.Response[place.ImportPlacesResponse], error) {
+	return c.importPlaces.CallUnary(ctx, req)
+}
+
 // PlaceIntelligenceServiceHandler is an implementation of the loci.place.PlaceIntelligenceService
 // service.
 type PlaceIntelligenceServiceHandler interface {
@@ -210,6 +229,9 @@ type PlaceIntelligenceServiceHandler interface {
 	ListPendingPlaces(context.Context, *connect.Request[place.ListPendingPlacesRequest]) (*connect.Response[place.ListPendingPlacesResponse], error)
 	// ListMyClaims lists the caller's own claims, newest first.
 	ListMyClaims(context.Context, *connect.Request[place.ListMyClaimsRequest]) (*connect.Response[place.ListMyClaimsResponse], error)
+	// ImportPlaces reads a shared link and returns the places it mentions,
+	// matched to Loci places where possible. Saving them is up to the client.
+	ImportPlaces(context.Context, *connect.Request[place.ImportPlacesRequest]) (*connect.Response[place.ImportPlacesResponse], error)
 }
 
 // NewPlaceIntelligenceServiceHandler builds an HTTP handler from the service implementation. It
@@ -266,6 +288,12 @@ func NewPlaceIntelligenceServiceHandler(svc PlaceIntelligenceServiceHandler, opt
 		connect.WithSchema(placeIntelligenceServiceListMyClaimsMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	placeIntelligenceServiceImportPlacesHandler := connect.NewUnaryHandler(
+		PlaceIntelligenceServiceImportPlacesProcedure,
+		svc.ImportPlaces,
+		connect.WithSchema(placeIntelligenceServiceImportPlacesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.place.PlaceIntelligenceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case PlaceIntelligenceServiceGetPlaceFactsProcedure:
@@ -284,6 +312,8 @@ func NewPlaceIntelligenceServiceHandler(svc PlaceIntelligenceServiceHandler, opt
 			placeIntelligenceServiceListPendingPlacesHandler.ServeHTTP(w, r)
 		case PlaceIntelligenceServiceListMyClaimsProcedure:
 			placeIntelligenceServiceListMyClaimsHandler.ServeHTTP(w, r)
+		case PlaceIntelligenceServiceImportPlacesProcedure:
+			placeIntelligenceServiceImportPlacesHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -323,4 +353,8 @@ func (UnimplementedPlaceIntelligenceServiceHandler) ListPendingPlaces(context.Co
 
 func (UnimplementedPlaceIntelligenceServiceHandler) ListMyClaims(context.Context, *connect.Request[place.ListMyClaimsRequest]) (*connect.Response[place.ListMyClaimsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.place.PlaceIntelligenceService.ListMyClaims is not implemented"))
+}
+
+func (UnimplementedPlaceIntelligenceServiceHandler) ImportPlaces(context.Context, *connect.Request[place.ImportPlacesRequest]) (*connect.Response[place.ImportPlacesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.place.PlaceIntelligenceService.ImportPlaces is not implemented"))
 }
