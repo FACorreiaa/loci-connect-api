@@ -70,6 +70,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripbrief"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/user"
 	userhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/user/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/userdata"
@@ -243,6 +244,10 @@ type Dependencies struct {
 	// and listing work without a model; only running them needs one.
 	WatchHandler *watch.Handler
 
+	// briefSender delivers trip-day briefs (the push notifier); nil with push off.
+	briefSender tripbrief.Sender
+	// tripBriefRunner sends trip-day briefs; nil unless TRIP_BRIEF_ENABLED.
+	tripBriefRunner *tripbrief.Runner
 	// watchRunner runs due standing tasks; nil when no model could be built
 	// or WATCH_RUNNER_ENABLED=false. watchClient is the model it runs them on.
 	watchRunner *watch.Runner
@@ -717,6 +722,16 @@ func (d *Dependencies) RunWatches(ctx context.Context) error {
 	return d.watchRunner.Run(ctx)
 }
 
+// RunTripBriefs sends trip-day briefs until ctx is cancelled. Returns nil
+// immediately when they are off. Every replica runs the loop; an advisory
+// lock lets one of them work in any tick.
+func (d *Dependencies) RunTripBriefs(ctx context.Context) error {
+	if d.tripBriefRunner == nil {
+		return nil
+	}
+	return d.tripBriefRunner.Run(ctx)
+}
+
 // RunField runs the field score's background work until ctx is cancelled.
 // Returns nil immediately when it is switched off. Every replica runs the
 // loop; an advisory lock lets one of them work in any tick.
@@ -917,6 +932,7 @@ func (d *Dependencies) initHandlers() error {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
 		socialNotifier = notifier
+		d.briefSender = notifier
 		progressNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
@@ -1175,6 +1191,18 @@ func (d *Dependencies) initHandlers() error {
 		newsVisitedAdapter{history: d.TravelHistoryRepo},
 		localcontext.NewPostgresNewsTickerPrefs(d.DB.Pool),
 	)
+
+	// Trip-day briefs: the morning brief and the weather turn, for travellers
+	// who turned trip reminders on. A stub forecast is left out rather than
+	// presented as the day's weather.
+	if envFlag("TRIP_BRIEF_ENABLED", false) && d.briefSender != nil {
+		briefWeather := weather
+		if weatherEst {
+			briefWeather = nil
+		}
+		d.tripBriefRunner = tripbrief.NewRunner(tripbrief.NewRepository(d.DB.Pool), briefWeather, signals, d.briefSender,
+			pglock.New(d.DB.Pool, tripbrief.RunnerLockKey), d.Logger)
+	}
 
 	d.LocalContextHandler = localcontext.
 		NewHandler(weather, weatherEst, d.Logger).
