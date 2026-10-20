@@ -196,3 +196,50 @@ func TestListMine_FiltersCityCaseInsensitive(t *testing.T) {
 	require.Equal(t, 1, all[0].Rank)
 	require.Equal(t, 1, all[1].Rank, "rank restarts in each city")
 }
+
+// A second "How was it?" with the same answer (a re-arrival, a notification
+// answered after the in-app card) must not throw away where the place sits.
+func TestRatePlace_SameVerdictKeepsPosition(t *testing.T) {
+	svc, user := newRankingService(t)
+	a, b, c := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	order := map[string]int{a: 0, b: 1, c: 2}
+	better := func(poi string) func(string) bool {
+		return func(other string) bool { return order[poi] < order[other] }
+	}
+	rate(t, svc, user, b, "Lisbon", Loved, better(b))
+	rate(t, svc, user, c, "Lisbon", Loved, better(c))
+	rate(t, svc, user, a, "Lisbon", Loved, better(a))
+
+	place, next, err := svc.RatePlace(context.Background(), user, RateInput{POIID: a, POIName: a, CityName: "Lisbon", Verdict: Loved})
+	require.NoError(t, err)
+	require.Nil(t, next, "an already-placed place needs no comparisons")
+	require.False(t, place.Pending)
+	require.Equal(t, 1, place.Rank)
+
+	list, err := svc.ListMine(context.Background(), user, "Lisbon", 0)
+	require.NoError(t, err)
+	require.Equal(t, []string{a, b, c}, ids(list))
+}
+
+// The same answer while comparisons are unfinished picks them up again.
+func TestRatePlace_SameVerdictResumesPending(t *testing.T) {
+	svc, user := newRankingService(t)
+	ctx := context.Background()
+	a, b := uuid.NewString(), uuid.NewString()
+	rate(t, svc, user, a, "Lisbon", Loved, nil)
+
+	_, first, err := svc.RatePlace(ctx, user, RateInput{POIID: b, POIName: b, CityName: "Lisbon", Verdict: Loved})
+	require.NoError(t, err)
+	require.NotNil(t, first)
+
+	place, again, err := svc.RatePlace(ctx, user, RateInput{POIID: b, POIName: b, CityName: "Lisbon", Verdict: Loved})
+	require.NoError(t, err)
+	require.True(t, place.Pending)
+	require.NotNil(t, again, "the unfinished comparison comes back")
+	require.Equal(t, first.POIID, again.POIID)
+
+	place, next, err := svc.ComparePlaces(ctx, user, b, again.POIID, true)
+	require.NoError(t, err)
+	require.Nil(t, next)
+	require.Equal(t, 1, place.Rank)
+}

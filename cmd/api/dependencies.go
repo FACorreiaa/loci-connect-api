@@ -236,8 +236,10 @@ type Dependencies struct {
 	// RecapHandler serves trip recaps; RecapImages draws their shared images.
 	RecapHandler *recap.Handler
 	RecapImages  *recap.ImageHandler
-	// RankingHandler serves travellers' per-city place rankings.
+	// RankingHandler serves travellers' per-city place rankings; rankings is
+	// its service, which also drops a ranking with the place's last visit.
 	RankingHandler *ranking.Handler
+	rankings       *ranking.Service
 	// recapRunner queues, builds and announces recaps; nil when off.
 	recapRunner *recap.Runner
 	// WatchHandler serves standing tasks. Always built: proposing, storing
@@ -1003,8 +1005,8 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
 		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
 		// Rankings are friends-only, checked against the same graph.
-		rankingSvc := ranking.NewService(ranking.NewRepository(d.DB.Pool), socialSvc, d.PreferenceRecorder, d.TasteRefresher, d.Logger)
-		d.RankingHandler = ranking.NewHandler(rankingSvc, d.Logger)
+		d.rankings = ranking.NewService(ranking.NewRepository(d.DB.Pool), socialSvc, d.PreferenceRecorder, d.TasteRefresher, d.Logger)
+		d.RankingHandler = ranking.NewHandler(d.rankings, d.Logger)
 		// The field score rides on the friends graph for its friends board, and
 		// on the reverse geocoder for neighborhoods.
 		overallRanks, err := gamification.ParseThresholds(d.Config.Social.FieldRanksOverall, gamification.DefaultOverallThresholds)
@@ -1077,6 +1079,9 @@ func (d *Dependencies) initHandlers() error {
 		WithTaste(d.PreferenceRecorder, d.TasteRefresher)
 	if d.gamification != nil {
 		d.TravelHistoryHandler = d.TravelHistoryHandler.WithScorer(d.gamification)
+	}
+	if d.rankings != nil {
+		d.TravelHistoryHandler = d.TravelHistoryHandler.WithRankings(d.rankings)
 	}
 
 	// Trip recaps. Share links land on the web app, like trip shares. The
