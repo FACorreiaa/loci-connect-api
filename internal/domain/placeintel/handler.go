@@ -66,6 +66,7 @@ type Handler struct {
 	cities cityResolver
 	pois   poiUpserter
 	scores ContributionScorer
+	links  linkImporter
 }
 
 // ContributionScorer awards points for scouting (gamification.Service).
