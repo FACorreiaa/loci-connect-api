@@ -423,6 +423,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 		StreakReminders:    req.Msg.StreakReminders,
 		ProgressUpdates:    req.Msg.ProgressUpdates,
 		CityBoardVisible:   req.Msg.CityBoardVisible,
+		NearbyFits:         req.Msg.NearbyFits,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -445,6 +446,7 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		StreakReminders:    s.StreakReminders,
 		ProgressUpdates:    s.ProgressUpdates,
 		CityBoardVisible:   s.CityBoardVisible,
+		NearbyFits:         s.NearbyFits,
 	}
 }
 

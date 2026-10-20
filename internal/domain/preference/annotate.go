@@ -30,14 +30,8 @@ func AnnotatePOIs(ctx context.Context, s POIScorer, userID uuid.UUID, groups ...
 			}
 		}
 	}
-	if len(ids) == 0 {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, annotateTimeout)
-	defer cancel()
-	matches, err := s.ScorePOIs(ctx, userID, ids)
-	if err != nil || len(matches) == 0 {
+	matches := MatchesFor(ctx, s, userID, ids)
+	if len(matches) == 0 {
 		return
 	}
 	for _, group := range groups {
@@ -47,4 +41,19 @@ func AnnotatePOIs(ctx context.Context, s POIScorer, userID uuid.UUID, groups ...
 			}
 		}
 	}
+}
+
+// MatchesFor scores ids within annotateTimeout. A failed or slow scoring call
+// gives no matches, never an error: callers show the places without one.
+func MatchesFor(ctx context.Context, s POIScorer, userID uuid.UUID, ids []string) map[string]Match {
+	if s == nil || userID == uuid.Nil || len(ids) == 0 {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, annotateTimeout)
+	defer cancel()
+	matches, err := s.ScorePOIs(ctx, userID, ids)
+	if err != nil {
+		return nil
+	}
+	return matches
 }

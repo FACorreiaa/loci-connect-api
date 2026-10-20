@@ -84,11 +84,14 @@ func TestFirstLine(t *testing.T) {
 	require.True(t, utf8.ValidString(got))
 }
 
-func TestNotifyProactiveSendsToAPNSDevicesOnly(t *testing.T) {
+// A browser gets the message too: the trip brief and standing tasks reach
+// people who never installed the app.
+func TestNotifyProactive_WebPushToo(t *testing.T) {
 	iphone := apnsDevice()
+	browser := Device{ID: uuid.New(), Platform: PlatformWebPush, Endpoint: "https://fcm.googleapis.com/x"}
 	devices := &fakeDeviceStore{byPlatform: map[string][]Device{
 		PlatformAPNS:    {iphone},
-		PlatformWebPush: {{ID: uuid.New(), Platform: PlatformWebPush, Endpoint: "https://fcm.googleapis.com/x"}},
+		PlatformWebPush: {browser, {ID: uuid.New(), Platform: PlatformWebPush, Endpoint: "https://evil.example/x"}},
 	}}
 	apns := newFakeSender()
 	n := newProactiveNotifier(devices, apns)
@@ -98,11 +101,12 @@ func TestNotifyProactiveSendsToAPNSDevicesOnly(t *testing.T) {
 	n.wait()
 
 	require.Equal(t, []Device{iphone}, apns.sentTo())
-	require.Empty(t, web.sentTo())
+	require.Equal(t, []Device{browser}, web.sentTo())
 	var p Payload
-	require.NoError(t, json.Unmarshal(apns.bodies[iphone.Endpoint], &p))
+	require.NoError(t, json.Unmarshal(web.bodyFor(browser.Endpoint), &p))
 	require.Equal(t, "proactive", p.Origin)
-	require.Equal(t, "loci_chat", p.Category)
+	require.Equal(t, "22222222-2222-2222-2222-222222222222", p.SessionID)
+	require.Equal(t, "https://lociai.fyi/itinerary?sessionId=22222222-2222-2222-2222-222222222222&cityName=Lisbon&domain=itinerary", p.URL)
 	require.Empty(t, devices.removedEndpoints())
 }
 
@@ -144,15 +148,16 @@ func TestNotifyProactivePrunesOnAPNSReasons(t *testing.T) {
 	}
 }
 
-func TestNotifyProactiveDisabledWithoutAPNS(t *testing.T) {
-	devices := &fakeDeviceStore{byPlatform: map[string][]Device{PlatformAPNS: {apnsDevice()}}}
+func TestNotifyProactiveWebOnlyWithoutAPNS(t *testing.T) {
+	browser := Device{ID: uuid.New(), Platform: PlatformWebPush, Endpoint: "https://fcm.googleapis.com/x"}
+	devices := &fakeDeviceStore{byPlatform: map[string][]Device{PlatformAPNS: {apnsDevice()}, PlatformWebPush: {browser}}}
 	web := newFakeSender()
 	n := NewNotifier(&fakeRunStore{}, &fakeSettingsReader{}, devices, web, nil)
 
 	n.NotifyProactive(context.Background(), testProactive())
 	n.wait()
 
-	require.Empty(t, web.sentTo())
+	require.Equal(t, []Device{browser}, web.sentTo())
 }
 
 func TestNotifyProactiveIgnoresMessageWithoutThread(t *testing.T) {

@@ -968,7 +968,8 @@ func (d *Dependencies) initHandlers() error {
 	d.InterestHandler = interesthandler.NewInterestHandler(d.InterestSvc)
 	d.TagsHandler = tagshandler.NewTagsHandler(d.TagsSvc)
 	d.FavoritesHandler = favorites.NewHandler(d.FavoritesRepo, d.Logger, d.SubscriptionService, d.PreferenceRecorder, d.ListRepo).
-		WithPlaces(d.POIRepo)
+		WithPlaces(d.POIRepo).
+		WithTaste(d.TasteMatch)
 	// The setup writer is handed the endpoint and tool names as data because
 	// internal/mcp imports apikey; this is the one place that can see both.
 	// The tool lists come from the table that decides scopes, so the prompt's
