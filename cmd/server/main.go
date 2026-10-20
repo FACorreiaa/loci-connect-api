@@ -161,6 +161,13 @@ func main() {
 		}
 	})
 
+	// Sweep abandoned journal uploads and deleted photos' objects.
+	concurrency.Run(logger, func() {
+		if err := deps.RunJournalSweeper(backgroundCtx); err != nil {
+			logger.Error("journal sweeper stopped", "error", err)
+		}
+	})
+
 	// Queue, build and announce trip recaps. Returns immediately when off.
 	concurrency.Run(logger, func() {
 		if err := deps.RunRecaps(backgroundCtx); err != nil {
