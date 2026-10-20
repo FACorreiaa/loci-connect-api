@@ -21,6 +21,8 @@ type fakeRepo struct {
 	facts      map[uuid.UUID]*TripFacts
 	factsErr   error
 	tz         string
+	// activity marks trips with stops done or visits since their last build.
+	activity map[uuid.UUID]bool
 
 	yearFacts  map[uuid.UUID]*YearFacts
 	yearCands  []YearCandidate
@@ -29,7 +31,10 @@ type fakeRepo struct {
 }
 
 func newFakeRepo() *fakeRepo {
-	return &fakeRepo{rows: map[uuid.UUID]*Row{}, facts: map[uuid.UUID]*TripFacts{}, yearFacts: map[uuid.UUID]*YearFacts{}, tz: "UTC"}
+	return &fakeRepo{
+		rows: map[uuid.UUID]*Row{}, facts: map[uuid.UUID]*TripFacts{}, yearFacts: map[uuid.UUID]*YearFacts{},
+		tz: "UTC", activity: map[uuid.UUID]bool{},
+	}
 }
 
 func (f *fakeRepo) byTrip(tripID uuid.UUID) *Row {
@@ -71,6 +76,20 @@ func (f *fakeRepo) Queue(_ context.Context, c Candidate, start, end time.Time) (
 	id := uuid.New()
 	f.rows[id] = &Row{ID: id, UserID: c.UserID, Kind: KindTrip, TripID: c.TripID, PeriodStart: start, PeriodEnd: end, Status: StatusPending}
 	return true, nil
+}
+
+func (f *fakeRepo) Requeue(_ context.Context, _ time.Time, _ int) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, r := range f.rows {
+		if r.Kind == KindTrip && r.Status == StatusIneligible && f.activity[r.TripID] {
+			r.Status, r.Attempts = StatusPending, 0
+			delete(f.activity, r.TripID)
+			n++
+		}
+	}
+	return n, nil
 }
 
 func (f *fakeRepo) Pending(_ context.Context, now time.Time, _ int) ([]Row, error) {
@@ -311,6 +330,32 @@ func TestTickIneligibleIsNotPushed(t *testing.T) {
 	assert.Equal(t, 1, res.Ineligible)
 	assert.Empty(t, n.sent)
 	assert.Equal(t, ReasonNoActivity, repo.byTrip(f.TripID).IneligibleReason)
+}
+
+func TestTickRequeuesIneligibleAfterActivity(t *testing.T) {
+	svc, repo, n, f := setup(t, noon)
+	repo.facts[f.TripID] = &TripFacts{TripID: f.TripID, Cities: []City{{Name: "Lisbon"}}}
+	ctx := context.Background()
+
+	res, err := svc.Tick(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 1, res.Ineligible)
+	assert.Empty(t, n.sent)
+
+	// No new activity: it stays put.
+	res, err = svc.Tick(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, TickResult{}, res)
+
+	// Stops marked after the trip ended.
+	repo.facts[f.TripID] = f
+	repo.activity[f.TripID] = true
+	res, err = svc.Tick(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, TickResult{Requeued: 1, Built: 1, Notified: 1}, res)
+	require.Len(t, n.sent, 1)
+	assert.Equal(t, f.TripID, n.sent[0].trip)
+	assert.Equal(t, StatusReady, repo.byTrip(f.TripID).Status)
 }
 
 func TestTickRetriesThenFails(t *testing.T) {

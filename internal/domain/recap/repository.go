@@ -21,6 +21,10 @@ type Repository interface {
 	TripCandidate(ctx context.Context, userID, tripID uuid.UUID) (Candidate, error)
 	// Queue adds a pending trip recap; false when the trip already has one.
 	Queue(ctx context.Context, c Candidate, start, end time.Time) (bool, error)
+	// Requeue puts back in the queue ineligible trip recaps whose trip ended
+	// on or after since and that gained a done stop, a visit or a finished
+	// day after they were built. Returns how many.
+	Requeue(ctx context.Context, since time.Time, limit int) (int, error)
 	// Pending is pending recaps whose build_after has passed, oldest first.
 	Pending(ctx context.Context, now time.Time, limit int) ([]Row, error)
 	// SaveBuilt stores a build. A ready recap keeps its first ready_at, so the
@@ -187,6 +191,28 @@ func (p *pgRepository) Queue(ctx context.Context, c Candidate, start, end time.T
 		return false, fmt.Errorf("queue recap: %w", err)
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+func (p *pgRepository) Requeue(ctx context.Context, since time.Time, limit int) (int, error) {
+	// updated_at is when the recap was last built, so anything newer is
+	// activity the build has not seen. Visits count from when they synced.
+	tag, err := p.pool.Exec(ctx, `
+		UPDATE recaps SET status = 1, build_after = NOW(), attempts = 0, last_error = '', updated_at = NOW()
+		WHERE status = 3 AND id IN (
+			SELECT r.id FROM recaps r
+			WHERE r.kind = 1 AND r.status = 3 AND r.share_code IS NULL AND r.period_end >= $1::date
+			  AND (EXISTS (SELECT 1 FROM trip_stop_marks m
+			               WHERE m.trip_id = r.trip_id AND m.status = 2 AND m.marked_at > r.updated_at)
+			    OR EXISTS (SELECT 1 FROM user_visited_pois v
+			               WHERE v.trip_id = r.trip_id AND v.user_id = r.user_id AND v.created_at > r.updated_at)
+			    OR EXISTS (SELECT 1 FROM trip_days d
+			               WHERE d.trip_id = r.trip_id AND d.completed_at > r.updated_at))
+			ORDER BY r.period_end DESC
+			LIMIT $2)`, since, limit)
+	if err != nil {
+		return 0, fmt.Errorf("requeue recaps: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }
 
 func (p *pgRepository) Pending(ctx context.Context, now time.Time, limit int) ([]Row, error) {

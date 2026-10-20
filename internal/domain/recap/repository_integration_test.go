@@ -220,6 +220,49 @@ func TestRepositoryTripRecapLifecycle(t *testing.T) {
 	assert.NotNil(t, re.NotifiedAt)
 }
 
+func TestRepositoryRequeueAfterActivity(t *testing.T) {
+	ctx := context.Background()
+	repo := NewRepository(testDB)
+	now := time.Now()
+	end := midnightUTC(now.AddDate(0, 0, -2))
+	s := seedTrip(t, end)
+	since := now.AddDate(0, 0, -(LookbackDays + 1))
+	start := end.AddDate(0, 0, -4)
+
+	row, err := repo.UpsertTrip(ctx, s.user, s.trip, start, end, StatusIneligible, nil, ReasonNoActivity)
+	require.NoError(t, err)
+	requeued := func() bool {
+		t.Helper()
+		_, err := repo.Requeue(ctx, since, 1000)
+		require.NoError(t, err)
+		got, err := repo.ByID(ctx, s.user, row.ID)
+		require.NoError(t, err)
+		return got.Status == StatusPending
+	}
+	assert.False(t, requeued(), "seeded activity predates the build")
+
+	// A stop marked done after the build.
+	var day uuid.UUID
+	require.NoError(t, testDB.QueryRow(ctx, `SELECT id FROM trip_days WHERE trip_id = $1 AND day_number = 2`, s.trip).Scan(&day))
+	stop := uuid.New()
+	exec(t, `INSERT INTO trip_stops (id, day_id, poi_id, name, order_index) VALUES ($1, $2, $3, 'Late', 1)`, stop, day, s.poiB.String())
+	exec(t, `INSERT INTO trip_stop_marks (stop_id, trip_id, status) VALUES ($1, $2, 2)`, stop, s.trip)
+	assert.True(t, requeued())
+
+	// Built again: the same mark does not requeue it twice.
+	require.NoError(t, repo.SaveBuilt(ctx, row.ID, StatusIneligible, nil, ReasonNoActivity))
+	assert.False(t, requeued())
+
+	// A finished day counts too, but not on a trip past the lookback.
+	exec(t, `UPDATE trip_days SET completed_at = NOW() WHERE id = $1`, day)
+	_, err = repo.Requeue(ctx, now.AddDate(0, 0, 1), 1000)
+	require.NoError(t, err)
+	got, err := repo.ByID(ctx, s.user, row.ID)
+	require.NoError(t, err)
+	assert.Equal(t, StatusIneligible, got.Status, "ended before since")
+	assert.True(t, requeued())
+}
+
 func TestRepositoryUndatedTripIsNotACandidate(t *testing.T) {
 	ctx := context.Background()
 	repo := NewRepository(testDB)
