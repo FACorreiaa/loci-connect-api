@@ -106,7 +106,7 @@ func (r *Runner) Tick(ctx context.Context) int {
 	defer unlock()
 
 	now := r.now()
-	forecasts := map[[2]float64]*localcontext.WeatherDay{}
+	forecasts := map[[2]float64][]localcontext.WeatherDay{}
 	sent := r.mornings(ctx, now, forecasts) + r.weatherTurns(ctx, now, forecasts)
 	if sent > 0 {
 		r.logger.InfoContext(ctx, "tripbrief sent", slog.Int("count", sent))
@@ -114,7 +114,7 @@ func (r *Runner) Tick(ctx context.Context) int {
 	return sent
 }
 
-func (r *Runner) mornings(ctx context.Context, now time.Time, forecasts map[[2]float64]*localcontext.WeatherDay) int {
+func (r *Runner) mornings(ctx context.Context, now time.Time, forecasts map[[2]float64][]localcontext.WeatherDay) int {
 	due, err := r.store.Due(ctx, now, KindMorning, morningFrom, morningTo, r.batch)
 	if err != nil {
 		r.logger.WarnContext(ctx, "tripbrief: due mornings", slog.Any("error", err))
@@ -150,7 +150,7 @@ func (r *Runner) mornings(ctx context.Context, now time.Time, forecasts map[[2]f
 	return sent
 }
 
-func (r *Runner) weatherTurns(ctx context.Context, now time.Time, forecasts map[[2]float64]*localcontext.WeatherDay) int {
+func (r *Runner) weatherTurns(ctx context.Context, now time.Time, forecasts map[[2]float64][]localcontext.WeatherDay) int {
 	due, err := r.store.Due(ctx, now, KindWeather, weatherFrom, weatherTo, r.batch)
 	if err != nil {
 		r.logger.WarnContext(ctx, "tripbrief: due weather checks", slog.Any("error", err))
@@ -191,22 +191,31 @@ func (r *Runner) claimAndSend(ctx context.Context, c Candidate, kind string, pre
 	return true
 }
 
-// forecast is today's forecast at c's city, fetched once per place per tick.
-func (r *Runner) forecast(ctx context.Context, c Candidate, cache map[[2]float64]*localcontext.WeatherDay) *localcontext.WeatherDay {
+// forecastDays covers the traveller's date wherever they are: Open-Meteo
+// buckets by UTC day, and a local date is at most one day off it.
+const forecastDays = 3
+
+// forecast is the forecast for c's own date at c's city. The days are
+// fetched once per place per tick; nil when no day matches.
+func (r *Runner) forecast(ctx context.Context, c Candidate, cache map[[2]float64][]localcontext.WeatherDay) *localcontext.WeatherDay {
 	if r.weather == nil || c.Lat == nil || c.Lon == nil {
 		return nil
 	}
 	key := [2]float64{math.Round(*c.Lat*100) / 100, math.Round(*c.Lon*100) / 100}
-	if wx, ok := cache[key]; ok {
-		return wx
+	days, ok := cache[key]
+	if !ok {
+		var err error
+		days, err = r.weather.Forecast(ctx, key[0], key[1], forecastDays)
+		if err != nil {
+			r.logger.WarnContext(ctx, "tripbrief: forecast", slog.String("error", localcontext.RedactErr(err)))
+		}
+		cache[key] = days
 	}
-	var wx *localcontext.WeatherDay
-	days, err := r.weather.Forecast(ctx, key[0], key[1], 1)
-	if err != nil {
-		r.logger.WarnContext(ctx, "tripbrief: forecast", slog.String("error", localcontext.RedactErr(err)))
-	} else if len(days) > 0 {
-		wx = &days[0]
+	want := c.LocalDate.Format(time.DateOnly)
+	for i := range days {
+		if days[i].Date.Format(time.DateOnly) == want {
+			return &days[i]
+		}
 	}
-	cache[key] = wx
-	return wx
+	return nil
 }
