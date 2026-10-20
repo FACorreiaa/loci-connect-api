@@ -16,6 +16,10 @@ const SweeperLockKey int64 = 0x6c6f63696a726e // "locijrn"
 const (
 	sweepEvery = 10 * time.Minute
 	sweepBatch = 200
+	// tombstoneGrace outlives every signed PUT URL: deleting a key while its
+	// URL is still valid would let a late upload recreate it with no row and
+	// no tombstone left to find it.
+	tombstoneGrace = putTTL + 5*time.Minute
 )
 
 // Locker is the advisory lock the sweeper runs under (pglock.Locker).
@@ -81,7 +85,7 @@ func (s *Sweeper) Sweep(ctx context.Context, now time.Time) error {
 	if s.signer == nil {
 		return nil
 	}
-	keys, err := s.repo.Tombstones(ctx, sweepBatch)
+	keys, err := s.repo.Tombstones(ctx, now.Add(-tombstoneGrace), sweepBatch)
 	if err != nil {
 		return err
 	}

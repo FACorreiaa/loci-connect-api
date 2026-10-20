@@ -139,7 +139,8 @@ func TestSweeper_RemovesStalePendingAndTombstonesObjects(t *testing.T) {
 
 	signer := &recordingSigner{}
 	sw := NewSweeper(repo, signer, nil, nil)
-	require.NoError(t, sw.Sweep(ctx, time.Now()))
+	// Run as if past the tombstone grace, so the swept row's object goes too.
+	require.NoError(t, sw.Sweep(ctx, time.Now().Add(tombstoneGrace+time.Minute)))
 
 	_, err = repo.Photo(ctx, f.user, stale.ID)
 	require.ErrorIs(t, err, ErrNotFound)
@@ -152,9 +153,13 @@ func TestSweeper_RemovesStalePendingAndTombstonesObjects(t *testing.T) {
 	// object and the next sweep removes it.
 	_, err = pool.Exec(ctx, `DELETE FROM trips WHERE id = $1`, f.trip)
 	require.NoError(t, err)
-	require.NoError(t, sw.Sweep(ctx, time.Now()))
+	// A tombstone younger than the upload URL is left for a later sweep.
+	keys, err := repo.Tombstones(ctx, time.Now().Add(-tombstoneGrace), 10000)
+	require.NoError(t, err)
+	require.NotContains(t, keys, fresh.Key)
+	require.NoError(t, sw.Sweep(ctx, time.Now().Add(tombstoneGrace+time.Minute)))
 	require.Contains(t, signer.deleted, fresh.Key)
-	keys, err := repo.Tombstones(ctx, 10000)
+	keys, err = repo.Tombstones(ctx, time.Now().Add(time.Hour), 10000)
 	require.NoError(t, err)
 	require.NotContains(t, keys, fresh.Key)
 	require.NotContains(t, keys, stale.Key)

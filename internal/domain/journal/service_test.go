@@ -310,3 +310,19 @@ func TestDayFor_UndatedAndOutOfRange(t *testing.T) {
 }
 
 var _ = errors.New
+
+// A visit is dated where it happened: 23:00 UTC in Tokyo is the next
+// morning there, whatever zone the account was set up in.
+func TestVisitLocalDate_UsesWhereTheVisitWas(t *testing.T) {
+	at := time.Date(2026, 10, 20, 23, 0, 0, 0, time.UTC)
+	home := time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC) // e.g. Lisbon, or no zone
+	tokyo, la := 139.7, -118.2
+
+	require.Equal(t, "2026-10-21", visitLocalDate(at, &tokyo, home).Format(time.DateOnly))
+	require.Equal(t, "2026-10-20", visitLocalDate(at, &la, home).Format(time.DateOnly))
+	// 01:00 UTC is still the previous evening in Los Angeles.
+	early := time.Date(2026, 10, 21, 1, 0, 0, 0, time.UTC)
+	require.Equal(t, "2026-10-20", visitLocalDate(early, &la, early).Format(time.DateOnly))
+	// No coordinates: the account's own zone is all there is.
+	require.Equal(t, "2026-10-20", visitLocalDate(at, nil, home).Format(time.DateOnly))
+}

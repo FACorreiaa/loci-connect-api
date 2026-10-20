@@ -75,13 +75,15 @@ type Stop struct {
 }
 
 // Visit is a logged visit on the trip. LocalDate is visited_at in the
-// traveller's own time zone, for placing it on a day.
+// account's own time zone (UTC when unset); Longitude, when the visit has
+// one, dates it where it happened instead (see visitLocalDate).
 type Visit struct {
 	POIID     string
 	Name      string
 	Source    string
 	VisitedAt time.Time
 	LocalDate time.Time
+	Longitude *float64
 	Verdict   int16
 }
 
@@ -121,6 +123,7 @@ type Repository interface {
 	DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) (bool, error)
 	// SweepPending removes pending photos created before cutoff.
 	SweepPending(ctx context.Context, cutoff time.Time) (int64, error)
-	Tombstones(ctx context.Context, limit int) ([]string, error)
+	// Tombstones are keys deleted before the given time, oldest first.
+	Tombstones(ctx context.Context, before time.Time, limit int) ([]string, error)
 	ClearTombstones(ctx context.Context, keys []string) error
 }

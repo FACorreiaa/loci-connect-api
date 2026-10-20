@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -100,7 +101,7 @@ func (s *Service) Journal(ctx context.Context, userID, tripID uuid.UUID) (*journ
 			continue
 		}
 		seen[v.POIID] = true
-		i := dayFor(days, v.LocalDate)
+		i := dayFor(days, visitLocalDate(v.VisitedAt, v.Longitude, v.LocalDate))
 		if i < 0 {
 			continue
 		}
@@ -134,6 +135,20 @@ func (s *Service) Journal(ctx context.Context, userID, tripID uuid.UUID) (*journ
 		}
 	}
 	return out, nil
+}
+
+// visitLocalDate is the calendar date a visit happened on, where it happened.
+// The account's zone is where the traveller lives, not where the trip is, so
+// a visit with a longitude is dated by its solar offset (15° an hour). That
+// can be an hour off a political zone, which only matters around midnight;
+// without a longitude the account's date (homeDate) is all there is.
+func visitLocalDate(at time.Time, longitude *float64, homeDate time.Time) time.Time {
+	if longitude == nil {
+		return homeDate
+	}
+	offset := time.Duration(math.Round(*longitude/15)) * time.Hour
+	local := at.UTC().Add(offset)
+	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 // dayFor is the index of the day a visit on local date belongs to: the day

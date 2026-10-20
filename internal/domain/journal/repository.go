@@ -95,13 +95,13 @@ func (r *pgRepository) Days(ctx context.Context, userID, tripID uuid.UUID) ([]Da
 	return days, rows.Err()
 }
 
-// Visits are the visits logged on the trip, with their local date in the
-// traveller's own zone (UTC when it is unset or unknown).
+// Visits are the visits logged on the trip, with their date in the account's
+// zone (UTC when it is unset or unknown) and their longitude.
 func (r *pgRepository) Visits(ctx context.Context, userID, tripID uuid.UUID) ([]Visit, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT v.poi_id, COALESCE(NULLIF(v.poi_name, ''), rk.poi_name, ''), v.source, v.visited_at,
 		       (v.visited_at AT TIME ZONE COALESCE(tz.name, 'UTC'))::date,
-		       COALESCE(rk.verdict, 0)
+		       v.longitude, COALESCE(rk.verdict, 0)
 		FROM user_visited_pois v
 		JOIN users u ON u.id = v.user_id
 		LEFT JOIN pg_timezone_names tz ON tz.name = u.timezone
@@ -113,7 +113,7 @@ func (r *pgRepository) Visits(ctx context.Context, userID, tripID uuid.UUID) ([]
 	}
 	out, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Visit, error) {
 		var v Visit
-		err := row.Scan(&v.POIID, &v.Name, &v.Source, &v.VisitedAt, &v.LocalDate, &v.Verdict)
+		err := row.Scan(&v.POIID, &v.Name, &v.Source, &v.VisitedAt, &v.LocalDate, &v.Longitude, &v.Verdict)
 		return v, err
 	})
 	if err != nil {
@@ -236,8 +236,11 @@ func (r *pgRepository) SweepPending(ctx context.Context, cutoff time.Time) (int6
 	return tag.RowsAffected(), nil
 }
 
-func (r *pgRepository) Tombstones(ctx context.Context, limit int) ([]string, error) {
-	rows, err := r.pool.Query(ctx, `SELECT object_key FROM trip_photo_tombstones ORDER BY deleted_at LIMIT $1`, limit)
+func (r *pgRepository) Tombstones(ctx context.Context, before time.Time, limit int) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT object_key FROM trip_photo_tombstones
+		WHERE deleted_at < $1
+		ORDER BY deleted_at LIMIT $2`, before, limit)
 	if err != nil {
 		return nil, fmt.Errorf("photo tombstones: %w", err)
 	}

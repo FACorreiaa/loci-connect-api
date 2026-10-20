@@ -43,6 +43,7 @@ func (r *recordingSigner) Delete(_ context.Context, key string) error {
 type tombRepo struct {
 	Repository
 	cutoff  time.Time
+	before  time.Time
 	keys    []string
 	cleared []string
 }
@@ -52,7 +53,10 @@ func (t *tombRepo) SweepPending(_ context.Context, cutoff time.Time) (int64, err
 	return 0, nil
 }
 
-func (t *tombRepo) Tombstones(context.Context, int) ([]string, error) { return t.keys, nil }
+func (t *tombRepo) Tombstones(_ context.Context, before time.Time, _ int) ([]string, error) {
+	t.before = before
+	return t.keys, nil
+}
 
 func (t *tombRepo) ClearTombstones(_ context.Context, keys []string) error {
 	t.cleared = append(t.cleared, keys...)
@@ -75,4 +79,14 @@ func TestSweep_WithoutStorageKeepsTombstones(t *testing.T) {
 	repo := &tombRepo{keys: []string{"a"}}
 	require.NoError(t, NewSweeper(repo, nil, nil, nil).Sweep(context.Background(), time.Now()))
 	require.Empty(t, repo.cleared)
+}
+
+// An object deleted while its upload URL is still valid can be written after
+// the sweep; its tombstone waits until no signed PUT can land any more.
+func TestSweep_TombstonesWaitOutTheUploadURL(t *testing.T) {
+	repo := &tombRepo{}
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, NewSweeper(repo, &recordingSigner{}, nil, nil).Sweep(context.Background(), now))
+	require.False(t, repo.before.IsZero())
+	require.True(t, repo.before.Before(now.Add(-putTTL)), "tombstones younger than the PUT TTL must not be drained")
 }
