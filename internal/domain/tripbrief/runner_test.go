@@ -42,8 +42,13 @@ func (f *fakeStore) MorningPrecip(_ context.Context, user uuid.UUID, _ time.Time
 
 func (f *fakeStore) Stops(context.Context, uuid.UUID) ([]Stop, error) { return f.stops, nil }
 
+// fixtureDate is the traveller's date in candidate().
+var fixtureDate = time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)
+
+// fakeWeather answers with days, or with day dated on fixtureDate.
 type fakeWeather struct {
 	day   *localcontext.WeatherDay
+	days  []localcontext.WeatherDay
 	err   error
 	calls int
 }
@@ -53,10 +58,15 @@ func (f *fakeWeather) Forecast(context.Context, float64, float64, int) ([]localc
 	if f.err != nil {
 		return nil, f.err
 	}
+	if f.days != nil {
+		return f.days, nil
+	}
 	if f.day == nil {
 		return nil, nil
 	}
-	return []localcontext.WeatherDay{*f.day}, nil
+	d := *f.day
+	d.Date = fixtureDate
+	return []localcontext.WeatherDay{d}, nil
 }
 
 type sent struct{ title, body string }
@@ -77,7 +87,7 @@ type openLock struct{}
 func (openLock) TryLock(context.Context) (func(), error) { return func() {}, nil }
 
 func candidate(withDay, withCoords bool) Candidate {
-	c := Candidate{UserID: uuid.New(), TripID: uuid.New(), City: "Lisbon", DayNumber: 1, LocalDate: time.Date(2026, 10, 20, 0, 0, 0, 0, time.UTC)}
+	c := Candidate{UserID: uuid.New(), TripID: uuid.New(), City: "Lisbon", DayNumber: 1, LocalDate: fixtureDate}
 	if withDay {
 		id := uuid.New()
 		c.DayID = &id
@@ -108,6 +118,28 @@ func TestRunner_MorningRecordsThePrecip(t *testing.T) {
 	require.Equal(t, "20°C, clear · 1 stop, first A", s.sent[0].body)
 	require.NotNil(t, store.precipIn[0])
 	require.InDelta(t, 0.2, *store.precipIn[0], 1e-6)
+}
+
+// The forecast is bucketed by UTC day. Far east of UTC the traveller's
+// morning is still yesterday in UTC, so the brief must pick its own date,
+// not the first day returned.
+func TestRunner_MorningUsesTheTravellersDate(t *testing.T) {
+	store := &fakeStore{due: map[string][]Candidate{KindMorning: {candidate(false, true)}}, claimOK: true}
+	s := &fakeSender{}
+	wx := &fakeWeather{days: []localcontext.WeatherDay{
+		{Date: fixtureDate.AddDate(0, 0, -1), HighC: 30, Condition: "Clear"},
+		{Date: fixtureDate, HighC: 12, Condition: "Rain"},
+	}}
+	newTestRunner(store, wx, s).Tick(context.Background())
+	require.Equal(t, []sent{{"Day 1 in Lisbon", "12°C, rain"}}, s.sent)
+
+	t.Run("no forecast for that date: no weather", func(t *testing.T) {
+		store := &fakeStore{due: map[string][]Candidate{KindMorning: {candidate(true, true)}}, stops: []Stop{{Name: "A"}}, claimOK: true}
+		s := &fakeSender{}
+		wx := &fakeWeather{days: []localcontext.WeatherDay{{Date: fixtureDate.AddDate(0, 0, -1), HighC: 30, Condition: "Clear"}}}
+		newTestRunner(store, wx, s).Tick(context.Background())
+		require.Equal(t, []sent{{"Day 1 in Lisbon", "1 stop, first A"}}, s.sent)
+	})
 }
 
 func TestBuild_PartialData(t *testing.T) {

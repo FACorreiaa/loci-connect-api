@@ -26,7 +26,7 @@ type Repository interface {
 	DeleteVisit(ctx context.Context, userID, id uuid.UUID) error
 	// DeleteVisitedPOI removes one place visit (user_visited_pois.id) the user
 	// owns. It never touches the city row. False means no such visit for them.
-	DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (bool, error)
+	DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (DeletedVisit, error)
 	// EnsureBackfilled runs the one-time pass over pre-existing signals for this
 	// user, if it has not run already. Reports whether history is now populated.
 	EnsureBackfilled(ctx context.Context, userID uuid.UUID) (bool, error)
@@ -438,13 +438,35 @@ func countryFromCities(ctx context.Context, tx pgx.Tx, in VisitInput) (string, e
 	return strings.TrimSpace(country), nil
 }
 
-func (r *repository) DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (bool, error) {
-	tag, err := r.db.Exec(ctx,
-		`DELETE FROM user_visited_pois WHERE id = $1 AND user_id = $2`, id, userID)
-	if err != nil {
-		return false, fmt.Errorf("delete visited poi: %w", err)
+// DeletedVisit is what removing one place visit did.
+type DeletedVisit struct {
+	Deleted bool
+	POIID   string
+	// LastOfPOI is set when no other visit to that place remains.
+	LastOfPOI bool
+}
+
+func (r *repository) DeleteVisitedPOI(ctx context.Context, userID, id uuid.UUID) (DeletedVisit, error) {
+	// The outer SELECT sees the rows as they were before the DELETE, hence
+	// the explicit v.id <> $1.
+	var out DeletedVisit
+	err := r.db.QueryRow(ctx, `
+		WITH d AS (
+			DELETE FROM user_visited_pois WHERE id = $1 AND user_id = $2 RETURNING poi_id
+		)
+		SELECT d.poi_id, NOT EXISTS (
+			SELECT 1 FROM user_visited_pois v
+			WHERE v.user_id = $2 AND v.poi_id = d.poi_id AND v.id <> $1
+		)
+		FROM d`, id, userID).Scan(&out.POIID, &out.LastOfPOI)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return DeletedVisit{}, nil
 	}
-	return tag.RowsAffected() > 0, nil
+	if err != nil {
+		return DeletedVisit{}, fmt.Errorf("delete visited poi: %w", err)
+	}
+	out.Deleted = true
+	return out, nil
 }
 
 func (r *repository) DeleteVisit(ctx context.Context, userID, id uuid.UUID) error {

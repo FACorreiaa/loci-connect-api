@@ -8,6 +8,7 @@ package favoritesv1
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	poi "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	recommendation "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recommendation"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -97,8 +98,11 @@ type FavoriteItem struct {
 	Category            string                              `protobuf:"bytes,12,opt,name=category,proto3" json:"category,omitempty"`
 	AddedAt             *timestamppb.Timestamp              `protobuf:"bytes,13,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
 	RecommendationTrace *recommendation.RecommendationTrace `protobuf:"bytes,14,opt,name=recommendation_trace,json=recommendationTrace,proto3,oneof" json:"recommendation_trace,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// How well the place fits the caller's taste, when the server could score
+	// it (same rules as POIDetailedInfo.taste_match). Unset otherwise.
+	TasteMatch    *poi.TasteMatch `protobuf:"bytes,15,opt,name=taste_match,json=tasteMatch,proto3,oneof" json:"taste_match,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FavoriteItem) Reset() {
@@ -225,6 +229,13 @@ func (x *FavoriteItem) GetAddedAt() *timestamppb.Timestamp {
 func (x *FavoriteItem) GetRecommendationTrace() *recommendation.RecommendationTrace {
 	if x != nil {
 		return x.RecommendationTrace
+	}
+	return nil
+}
+
+func (x *FavoriteItem) GetTasteMatch() *poi.TasteMatch {
+	if x != nil {
+		return x.TasteMatch
 	}
 	return nil
 }
@@ -2325,7 +2336,7 @@ var File_loci_favorites_v1_favorites_proto protoreflect.FileDescriptor
 
 const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\n" +
-	"!loci/favorites/v1/favorites.proto\x12\x11loci.favorites.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a(loci/recommendation/recommendation.proto\"\xa5\x04\n" +
+	"!loci/favorites/v1/favorites.proto\x12\x11loci.favorites.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x12loci/poi/poi.proto\x1a(loci/recommendation/recommendation.proto\"\xf1\x04\n" +
 	"\fFavoriteItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x17\n" +
@@ -2341,8 +2352,11 @@ const file_loci_favorites_v1_favorites_proto_rawDesc = "" +
 	"\x06rating\x18\v \x01(\x01R\x06rating\x12\x1a\n" +
 	"\bcategory\x18\f \x01(\tR\bcategory\x125\n" +
 	"\badded_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\aaddedAt\x12`\n" +
-	"\x14recommendation_trace\x18\x0e \x01(\v2(.loci.recommendation.RecommendationTraceH\x00R\x13recommendationTrace\x88\x01\x01B\x17\n" +
-	"\x15_recommendation_trace\"\xa7\x04\n" +
+	"\x14recommendation_trace\x18\x0e \x01(\v2(.loci.recommendation.RecommendationTraceH\x00R\x13recommendationTrace\x88\x01\x01\x12:\n" +
+	"\vtaste_match\x18\x0f \x01(\v2\x14.loci.poi.TasteMatchH\x01R\n" +
+	"tasteMatch\x88\x01\x01B\x17\n" +
+	"\x15_recommendation_traceB\x0e\n" +
+	"\f_taste_match\"\xa7\x04\n" +
 	"\x15AddToFavoritesRequest\x12 \n" +
 	"\auser_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\x12 \n" +
 	"\aitem_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06itemId\x12\x1b\n" +
@@ -2592,61 +2606,63 @@ var file_loci_favorites_v1_favorites_proto_goTypes = []any{
 	nil,                                        // 30: loci.favorites.v1.RestaurantDetails.HoursEntry
 	(*timestamppb.Timestamp)(nil),              // 31: google.protobuf.Timestamp
 	(*recommendation.RecommendationTrace)(nil), // 32: loci.recommendation.RecommendationTrace
+	(*poi.TasteMatch)(nil),                     // 33: loci.poi.TasteMatch
 }
 var file_loci_favorites_v1_favorites_proto_depIdxs = []int32{
 	0,  // 0: loci.favorites.v1.FavoriteItem.content_type:type_name -> loci.favorites.v1.ContentType
 	31, // 1: loci.favorites.v1.FavoriteItem.added_at:type_name -> google.protobuf.Timestamp
 	32, // 2: loci.favorites.v1.FavoriteItem.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	0,  // 3: loci.favorites.v1.AddToFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	32, // 4: loci.favorites.v1.AddToFavoritesRequest.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	1,  // 5: loci.favorites.v1.AddToFavoritesResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
-	0,  // 6: loci.favorites.v1.RemoveFromFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	0,  // 7: loci.favorites.v1.UpdateFavoriteNoteRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	1,  // 8: loci.favorites.v1.UpdateFavoriteNoteResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
-	0,  // 9: loci.favorites.v1.GetFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	1,  // 10: loci.favorites.v1.GetFavoritesResponse.favorites:type_name -> loci.favorites.v1.FavoriteItem
-	0,  // 11: loci.favorites.v1.IsFavoritedRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	0,  // 12: loci.favorites.v1.GetFavoritesCountRequest.content_type:type_name -> loci.favorites.v1.ContentType
-	31, // 13: loci.favorites.v1.HotelDetails.created_at:type_name -> google.protobuf.Timestamp
-	15, // 14: loci.favorites.v1.HotelDetails.rooms:type_name -> loci.favorites.v1.HotelRoom
-	16, // 15: loci.favorites.v1.HotelDetails.nearby_attractions:type_name -> loci.favorites.v1.NearbyAttraction
-	17, // 16: loci.favorites.v1.HotelDetails.contact:type_name -> loci.favorites.v1.HotelContact
-	14, // 17: loci.favorites.v1.GetHotelDetailsResponse.hotel:type_name -> loci.favorites.v1.HotelDetails
-	14, // 18: loci.favorites.v1.GetNearbyHotelsResponse.hotels:type_name -> loci.favorites.v1.HotelDetails
-	31, // 19: loci.favorites.v1.RestaurantDetails.created_at:type_name -> google.protobuf.Timestamp
-	24, // 20: loci.favorites.v1.RestaurantDetails.menu:type_name -> loci.favorites.v1.RestaurantMenu
-	30, // 21: loci.favorites.v1.RestaurantDetails.hours:type_name -> loci.favorites.v1.RestaurantDetails.HoursEntry
-	25, // 22: loci.favorites.v1.RestaurantDetails.contact:type_name -> loci.favorites.v1.RestaurantContact
-	23, // 23: loci.favorites.v1.RestaurantMenu.starters:type_name -> loci.favorites.v1.MenuItem
-	23, // 24: loci.favorites.v1.RestaurantMenu.mains:type_name -> loci.favorites.v1.MenuItem
-	23, // 25: loci.favorites.v1.RestaurantMenu.desserts:type_name -> loci.favorites.v1.MenuItem
-	22, // 26: loci.favorites.v1.GetRestaurantDetailsResponse.restaurant:type_name -> loci.favorites.v1.RestaurantDetails
-	22, // 27: loci.favorites.v1.GetNearbyRestaurantsResponse.restaurants:type_name -> loci.favorites.v1.RestaurantDetails
-	2,  // 28: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
-	4,  // 29: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
-	8,  // 30: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
-	10, // 31: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
-	12, // 32: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
-	18, // 33: loci.favorites.v1.FavoritesService.GetHotelDetails:input_type -> loci.favorites.v1.GetHotelDetailsRequest
-	26, // 34: loci.favorites.v1.FavoritesService.GetRestaurantDetails:input_type -> loci.favorites.v1.GetRestaurantDetailsRequest
-	20, // 35: loci.favorites.v1.FavoritesService.GetNearbyHotels:input_type -> loci.favorites.v1.GetNearbyHotelsRequest
-	28, // 36: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:input_type -> loci.favorites.v1.GetNearbyRestaurantsRequest
-	5,  // 37: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:input_type -> loci.favorites.v1.UpdateFavoriteNoteRequest
-	3,  // 38: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
-	7,  // 39: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
-	9,  // 40: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
-	11, // 41: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
-	13, // 42: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
-	19, // 43: loci.favorites.v1.FavoritesService.GetHotelDetails:output_type -> loci.favorites.v1.GetHotelDetailsResponse
-	27, // 44: loci.favorites.v1.FavoritesService.GetRestaurantDetails:output_type -> loci.favorites.v1.GetRestaurantDetailsResponse
-	21, // 45: loci.favorites.v1.FavoritesService.GetNearbyHotels:output_type -> loci.favorites.v1.GetNearbyHotelsResponse
-	29, // 46: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:output_type -> loci.favorites.v1.GetNearbyRestaurantsResponse
-	6,  // 47: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:output_type -> loci.favorites.v1.UpdateFavoriteNoteResponse
-	38, // [38:48] is the sub-list for method output_type
-	28, // [28:38] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	33, // 3: loci.favorites.v1.FavoriteItem.taste_match:type_name -> loci.poi.TasteMatch
+	0,  // 4: loci.favorites.v1.AddToFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	32, // 5: loci.favorites.v1.AddToFavoritesRequest.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	1,  // 6: loci.favorites.v1.AddToFavoritesResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
+	0,  // 7: loci.favorites.v1.RemoveFromFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	0,  // 8: loci.favorites.v1.UpdateFavoriteNoteRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	1,  // 9: loci.favorites.v1.UpdateFavoriteNoteResponse.favorite:type_name -> loci.favorites.v1.FavoriteItem
+	0,  // 10: loci.favorites.v1.GetFavoritesRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	1,  // 11: loci.favorites.v1.GetFavoritesResponse.favorites:type_name -> loci.favorites.v1.FavoriteItem
+	0,  // 12: loci.favorites.v1.IsFavoritedRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	0,  // 13: loci.favorites.v1.GetFavoritesCountRequest.content_type:type_name -> loci.favorites.v1.ContentType
+	31, // 14: loci.favorites.v1.HotelDetails.created_at:type_name -> google.protobuf.Timestamp
+	15, // 15: loci.favorites.v1.HotelDetails.rooms:type_name -> loci.favorites.v1.HotelRoom
+	16, // 16: loci.favorites.v1.HotelDetails.nearby_attractions:type_name -> loci.favorites.v1.NearbyAttraction
+	17, // 17: loci.favorites.v1.HotelDetails.contact:type_name -> loci.favorites.v1.HotelContact
+	14, // 18: loci.favorites.v1.GetHotelDetailsResponse.hotel:type_name -> loci.favorites.v1.HotelDetails
+	14, // 19: loci.favorites.v1.GetNearbyHotelsResponse.hotels:type_name -> loci.favorites.v1.HotelDetails
+	31, // 20: loci.favorites.v1.RestaurantDetails.created_at:type_name -> google.protobuf.Timestamp
+	24, // 21: loci.favorites.v1.RestaurantDetails.menu:type_name -> loci.favorites.v1.RestaurantMenu
+	30, // 22: loci.favorites.v1.RestaurantDetails.hours:type_name -> loci.favorites.v1.RestaurantDetails.HoursEntry
+	25, // 23: loci.favorites.v1.RestaurantDetails.contact:type_name -> loci.favorites.v1.RestaurantContact
+	23, // 24: loci.favorites.v1.RestaurantMenu.starters:type_name -> loci.favorites.v1.MenuItem
+	23, // 25: loci.favorites.v1.RestaurantMenu.mains:type_name -> loci.favorites.v1.MenuItem
+	23, // 26: loci.favorites.v1.RestaurantMenu.desserts:type_name -> loci.favorites.v1.MenuItem
+	22, // 27: loci.favorites.v1.GetRestaurantDetailsResponse.restaurant:type_name -> loci.favorites.v1.RestaurantDetails
+	22, // 28: loci.favorites.v1.GetNearbyRestaurantsResponse.restaurants:type_name -> loci.favorites.v1.RestaurantDetails
+	2,  // 29: loci.favorites.v1.FavoritesService.AddToFavorites:input_type -> loci.favorites.v1.AddToFavoritesRequest
+	4,  // 30: loci.favorites.v1.FavoritesService.RemoveFromFavorites:input_type -> loci.favorites.v1.RemoveFromFavoritesRequest
+	8,  // 31: loci.favorites.v1.FavoritesService.GetFavorites:input_type -> loci.favorites.v1.GetFavoritesRequest
+	10, // 32: loci.favorites.v1.FavoritesService.IsFavorited:input_type -> loci.favorites.v1.IsFavoritedRequest
+	12, // 33: loci.favorites.v1.FavoritesService.GetFavoritesCount:input_type -> loci.favorites.v1.GetFavoritesCountRequest
+	18, // 34: loci.favorites.v1.FavoritesService.GetHotelDetails:input_type -> loci.favorites.v1.GetHotelDetailsRequest
+	26, // 35: loci.favorites.v1.FavoritesService.GetRestaurantDetails:input_type -> loci.favorites.v1.GetRestaurantDetailsRequest
+	20, // 36: loci.favorites.v1.FavoritesService.GetNearbyHotels:input_type -> loci.favorites.v1.GetNearbyHotelsRequest
+	28, // 37: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:input_type -> loci.favorites.v1.GetNearbyRestaurantsRequest
+	5,  // 38: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:input_type -> loci.favorites.v1.UpdateFavoriteNoteRequest
+	3,  // 39: loci.favorites.v1.FavoritesService.AddToFavorites:output_type -> loci.favorites.v1.AddToFavoritesResponse
+	7,  // 40: loci.favorites.v1.FavoritesService.RemoveFromFavorites:output_type -> loci.favorites.v1.RemoveFromFavoritesResponse
+	9,  // 41: loci.favorites.v1.FavoritesService.GetFavorites:output_type -> loci.favorites.v1.GetFavoritesResponse
+	11, // 42: loci.favorites.v1.FavoritesService.IsFavorited:output_type -> loci.favorites.v1.IsFavoritedResponse
+	13, // 43: loci.favorites.v1.FavoritesService.GetFavoritesCount:output_type -> loci.favorites.v1.GetFavoritesCountResponse
+	19, // 44: loci.favorites.v1.FavoritesService.GetHotelDetails:output_type -> loci.favorites.v1.GetHotelDetailsResponse
+	27, // 45: loci.favorites.v1.FavoritesService.GetRestaurantDetails:output_type -> loci.favorites.v1.GetRestaurantDetailsResponse
+	21, // 46: loci.favorites.v1.FavoritesService.GetNearbyHotels:output_type -> loci.favorites.v1.GetNearbyHotelsResponse
+	29, // 47: loci.favorites.v1.FavoritesService.GetNearbyRestaurants:output_type -> loci.favorites.v1.GetNearbyRestaurantsResponse
+	6,  // 48: loci.favorites.v1.FavoritesService.UpdateFavoriteNote:output_type -> loci.favorites.v1.UpdateFavoriteNoteResponse
+	39, // [39:49] is the sub-list for method output_type
+	29, // [29:39] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_loci_favorites_v1_favorites_proto_init() }
