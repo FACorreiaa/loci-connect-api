@@ -306,3 +306,40 @@ func TestOneAIPostPerDay_Integration(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, has)
 }
+
+func TestDailyCityLookupAndRecentPosts_Integration(t *testing.T) {
+	repo, pool := newRepo(t)
+	ctx := context.Background()
+	editor := seedUser(t, pool)
+	board := seedBoard(t, repo, editor, "daily-cities")
+	evora := uuid.New()
+	_, err := pool.Exec(ctx, "INSERT INTO cities (id, name, country) VALUES ($1, 'Évora', 'Portugal')", evora)
+	require.NoError(t, err)
+
+	id, ok, err := repo.CityIDByName(ctx, "évora", "Portugal")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, evora, id)
+	_, ok, err = repo.CityIDByName(ctx, "Alsace", "France")
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	snap, err := repo.Snapshot(ctx, KindCity, evora, uuid.Nil)
+	require.NoError(t, err)
+	day := time.Date(2026, 10, 19, 6, 0, 0, 0, time.UTC)
+	require.NoError(t, repo.CreateAIPost(ctx, &Post{
+		BoardID: board.ID, AuthorID: editor, Title: "A warm autumn", Body: "Trams and tiles.",
+		Attachment: &Attachment{Kind: KindCity, Ref: evora.String(), Snapshot: snap},
+	}, day))
+
+	recent, err := repo.RecentAIPosts(ctx, time.Now().Add(-time.Hour))
+	require.NoError(t, err)
+	require.Len(t, recent, 1)
+	require.NotNil(t, recent[0].Attachment)
+	assert.Equal(t, "Évora", recent[0].Attachment.Snapshot.City)
+	assert.Equal(t, "A warm autumn", recent[0].Title)
+
+	recent, err = repo.RecentAIPosts(ctx, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	assert.Empty(t, recent)
+}

@@ -116,7 +116,10 @@ func TestMeteredStreamRecordsFinalCumulativeUsageOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateStream: %v", err)
 	}
-	for range seq {
+	for _, err := range seq {
+		if err != nil {
+			t.Fatalf("stream: %v", err)
+		}
 	}
 
 	if len(c.calls) != 1 {
@@ -147,7 +150,10 @@ func TestMeteredStreamRecordsWhenCallerStopsEarly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateStream: %v", err)
 	}
-	for range seq {
+	for _, err := range seq {
+		if err != nil {
+			t.Fatalf("stream: %v", err)
+		}
 		break
 	}
 
