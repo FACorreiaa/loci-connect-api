@@ -9,21 +9,26 @@ import (
 func TestBuildSocialPayload(t *testing.T) {
 	ana := &socialv1.PublicUser{Username: "ana", DisplayName: "Ana Sousa"}
 
-	req := BuildSocialPayload(socialRequest, ana)
-	if req.URL != WebOrigin+"/friends" || req.Body != "Ana Sousa wants to be friends on Loci." {
-		t.Errorf("request payload = %+v", req)
+	followed := BuildSocialPayload(socialFollowed, ana)
+	if followed.URL != WebOrigin+"/u/ana" || followed.Body != "Ana Sousa started following you on Loci." {
+		t.Errorf("new follower payload = %+v", followed)
 	}
-	if req.Category != SocialCategory || req.ThreadID != "friends" {
-		t.Errorf("request grouping = %q / %q", req.Category, req.ThreadID)
+	if followed.Category != SocialCategory || followed.ThreadID != "friends" {
+		t.Errorf("grouping = %q / %q", followed.Category, followed.ThreadID)
 	}
 
-	acc := BuildSocialPayload(socialAccepted, ana)
-	if acc.URL != WebOrigin+"/u/ana" || acc.Title != "New friend on Loci" {
-		t.Errorf("accepted payload = %+v", acc)
+	back := BuildSocialPayload(socialFollowedBack, ana)
+	if back.URL != WebOrigin+"/u/ana" || back.Title != "New friend on Loci" {
+		t.Errorf("followed back payload = %+v", back)
+	}
+
+	req := BuildSocialPayload(socialFollowRequest, ana)
+	if req.URL != WebOrigin+"/friends?tab=requests" || req.Body != "Ana Sousa asked to follow you on Loci." {
+		t.Errorf("follow request payload = %+v", req)
 	}
 
 	// No card (a deleted account between the event and the push) still reads.
-	if p := BuildSocialPayload(socialAccepted, nil); p.URL != WebOrigin+"/friends" || p.Body == "" {
+	if p := BuildSocialPayload(socialFollowApproved, nil); p.URL != WebOrigin+"/friends" || p.Body == "" {
 		t.Errorf("payload without a card = %+v", p)
 	}
 }

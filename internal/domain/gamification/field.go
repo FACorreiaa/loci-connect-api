@@ -358,7 +358,8 @@ func (s *Service) Board(ctx context.Context, userID uuid.UUID, req BoardRequest)
 
 	var friends []uuid.UUID
 	if s.graph != nil {
-		if friends, err = s.graph.FriendIDs(ctx, userID); err != nil {
+		// The "friends" board is the people the viewer follows.
+		if friends, err = s.graph.FollowingIDs(ctx, userID); err != nil {
 			return nil, err
 		}
 	}

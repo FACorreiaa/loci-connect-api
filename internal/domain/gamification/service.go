@@ -11,10 +11,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// Graph is what the leaderboard needs from the friends layer.
-// social.Service satisfies it.
+// Graph is what the boards need from the people layer. A board shows the
+// viewer and the people they follow. social.Service satisfies it.
 type Graph interface {
-	FriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	// FollowingIDs lists the people userID follows.
+	FollowingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	// FollowerIDs lists the people who follow userID: whose boards show them.
+	FollowerIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	PublicUsers(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*socialv1.PublicUser, error)
 }
 
@@ -197,13 +200,14 @@ func (s *Service) grantBadges(ctx context.Context, userID uuid.UUID, totals Tota
 	return earned, nil
 }
 
-// announcePass tells each friend whose weekly total userID just overtook.
-// Each friend hears at most once a day, never at night.
+// announcePass tells each follower whose weekly total userID just overtook:
+// the people whose boards show userID. Each hears at most once a day, never
+// at night.
 func (s *Service) announcePass(ctx context.Context, userID uuid.UUID, points int, today time.Time) {
 	if s.graph == nil || points <= 0 {
 		return
 	}
-	friends, err := s.graph.FriendIDs(ctx, userID)
+	friends, err := s.graph.FollowerIDs(ctx, userID)
 	if err != nil || len(friends) == 0 {
 		return
 	}
@@ -471,10 +475,10 @@ type Entry struct {
 	IsMe   bool
 }
 
-// Leaderboard ranks userID and their friends for metric over the period
-// containing today in the caller's zone. Friends who hid themselves are left
-// out; the caller is always in. Blocks end friendships, so blocked users are
-// never in the friend list.
+// Leaderboard ranks userID and the people they follow for metric over the
+// period containing today in the caller's zone. People who hid themselves are
+// left out; the caller is always in. Blocks end follows, so blocked users are
+// never in the list.
 func (s *Service) Leaderboard(ctx context.Context, userID uuid.UUID, kind PeriodKind, metric Metric) ([]Entry, Period, error) {
 	totals, err := s.repo.Totals(ctx, userID)
 	if err != nil {
@@ -483,7 +487,7 @@ func (s *Service) Leaderboard(ctx context.Context, userID uuid.UUID, kind Period
 	period := PeriodFor(kind, LocalDate(s.now(), totals.Timezone))
 	ids := []uuid.UUID{userID}
 	if s.graph != nil {
-		friends, err := s.graph.FriendIDs(ctx, userID)
+		friends, err := s.graph.FollowingIDs(ctx, userID)
 		if err != nil {
 			return nil, Period{}, err
 		}

@@ -82,7 +82,7 @@ func seedTrip(t *testing.T, end time.Time) seeded {
 	exec(t, `INSERT INTO user_badges (user_id, badge_id, awarded_at) VALUES ($1, 'first-city', $2)`, s.user, start.Add(12*time.Hour))
 	exec(t, `INSERT INTO field_city_totals (user_id, city_id, score) VALUES ($1, $2, 140)`, s.user, s.city)
 
-	exec(t, `INSERT INTO friendships (user_id, friend_id) VALUES ($1, $2), ($2, $1)`, s.user, s.friend)
+	exec(t, `INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2), ($2, $1)`, s.user, s.friend)
 	exec(t, `INSERT INTO trips (user_id, city_name, title, visibility) VALUES ($1, $2, 'Ana in Lisbon', 2)`, s.friend, cityName)
 
 	exec(t, `INSERT INTO user_favorites (user_id, item_id, item_name, content_type, city_name, category, added_at)

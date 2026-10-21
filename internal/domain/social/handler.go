@@ -56,6 +56,8 @@ func (h *Handler) connectErr(err error) error {
 	switch {
 	case errors.Is(err, ErrNotFound):
 		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, ErrPrivate):
+		return connect.NewError(connect.CodePermissionDenied, err)
 	case errors.Is(err, ErrSelf):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, ErrLimited):
@@ -143,14 +145,15 @@ func (h *Handler) GetInvite(ctx context.Context, req *connect.Request[socialv1.G
 	}
 	resp := &socialv1.GetInviteResponse{Invite: inviteProto(inv, inviter)}
 	if viewer := optionalCaller(ctx); viewer != uuid.Nil {
-		rel, blockedBy, err := h.svc.repo.RelationOf(ctx, viewer, inv.UserID)
+		e, err := h.svc.edge(ctx, viewer, inv.UserID)
 		if err != nil {
 			return nil, h.connectErr(err)
 		}
-		if blockedBy {
+		if e.BlockedBy {
 			return nil, h.connectErr(ErrNotFound)
 		}
-		resp.Relationship = socialv1.Relationship(rel)
+		resp.Relationship = socialv1.Relationship(e.Legacy())
+		resp.FollowState = socialv1.FollowState(e.State)
 	}
 	return connect.NewResponse(resp), nil
 }
@@ -236,7 +239,7 @@ func (h *Handler) CancelFriendRequest(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-	if err := h.svc.repo.CancelRequest(ctx, id, uid); err != nil {
+	if err := h.svc.Cancel(ctx, uid, id); err != nil {
 		return nil, h.connectErr(err)
 	}
 	return connect.NewResponse(&socialv1.CancelFriendRequestResponse{}), nil
@@ -252,7 +255,7 @@ func (h *Handler) ListFriendRequests(ctx context.Context, req *connect.Request[s
 		return nil, err
 	}
 	incoming := req.Msg.GetDirection() != socialv1.RequestDirection_REQUEST_DIRECTION_OUTGOING
-	list, err := h.svc.repo.ListRequests(ctx, uid, incoming)
+	list, err := h.svc.ListFriendRequests(ctx, uid, incoming)
 	if err != nil {
 		return nil, h.connectErr(err)
 	}
@@ -288,7 +291,7 @@ func (h *Handler) RemoveFriend(ctx context.Context, req *connect.Request[socialv
 	if err != nil {
 		return nil, err
 	}
-	if err := h.svc.repo.RemoveFriend(ctx, uid, other); err != nil {
+	if err := h.svc.RemoveFriend(ctx, uid, other); err != nil {
 		return nil, h.connectErr(err)
 	}
 	return connect.NewResponse(&socialv1.RemoveFriendResponse{}), nil
@@ -335,7 +338,10 @@ func (h *Handler) MatchContacts(ctx context.Context, req *connect.Request[social
 	}
 	out := make([]*socialv1.ContactMatch, 0, len(matches))
 	for _, m := range matches {
-		out = append(out, &socialv1.ContactMatch{Hash: m.Hash, User: m.User, Relationship: socialv1.Relationship(m.Relation)})
+		out = append(out, &socialv1.ContactMatch{
+			Hash: m.Hash, User: m.User, Relationship: socialv1.Relationship(m.Edge.Legacy()),
+			FollowState: socialv1.FollowState(m.Edge.State), FollowsYou: m.Edge.FollowsYou,
+		})
 	}
 	return connect.NewResponse(&socialv1.MatchContactsResponse{Matches: out}), nil
 }
@@ -353,11 +359,7 @@ func (h *Handler) SearchUsers(ctx context.Context, req *connect.Request[socialv1
 	if err != nil {
 		return nil, h.connectErr(err)
 	}
-	out := make([]*socialv1.UserResult, 0, len(results))
-	for _, r := range results {
-		out = append(out, &socialv1.UserResult{User: r.User, Relationship: socialv1.Relationship(r.Relation)})
-	}
-	return connect.NewResponse(&socialv1.SearchUsersResponse{Users: out}), nil
+	return connect.NewResponse(&socialv1.SearchUsersResponse{Users: userResults(results)}), nil
 }
 
 func (h *Handler) GetPublicProfile(ctx context.Context, req *connect.Request[socialv1.GetPublicProfileRequest]) (*connect.Response[socialv1.GetPublicProfileResponse], error) {
@@ -374,8 +376,15 @@ func (h *Handler) GetPublicProfile(ctx context.Context, req *connect.Request[soc
 		Stats: &socialv1.ProfileStats{
 			Cities: p.Stats.Cities, Countries: p.Stats.Countries,
 			VisibleTrips: p.Stats.VisibleTrips, Friends: p.Stats.Friends,
+			Followers: p.Stats.Followers, Following: p.Stats.Following,
 		},
-		Relationship: socialv1.Relationship(p.Relation),
+		IsPrivate: p.Edge.Private,
+		CanView:   p.CanView(),
+	}
+	if p.SignedIn {
+		resp.Relationship = socialv1.Relationship(p.Edge.Legacy())
+		resp.FollowState = socialv1.FollowState(p.Edge.State)
+		resp.FollowsYou = p.Edge.FollowsYou
 	}
 	if !p.MemberSince.IsZero() {
 		resp.MemberSince = timestamppb.New(p.MemberSince.Truncate(24 * time.Hour))
@@ -392,9 +401,182 @@ func (h *Handler) MatchFacebookFriends(ctx context.Context, _ *connect.Request[s
 	if err != nil {
 		return nil, h.connectErr(err)
 	}
+	return connect.NewResponse(&socialv1.MatchFacebookFriendsResponse{Matches: userResults(results)}), nil
+}
+
+func userResults(results []Result) []*socialv1.UserResult {
 	out := make([]*socialv1.UserResult, 0, len(results))
 	for _, r := range results {
-		out = append(out, &socialv1.UserResult{User: r.User, Relationship: socialv1.Relationship(r.Relation)})
+		out = append(out, &socialv1.UserResult{
+			User: r.User, Relationship: socialv1.Relationship(r.Edge.Legacy()),
+			FollowState: socialv1.FollowState(r.Edge.State), FollowsYou: r.Edge.FollowsYou,
+		})
 	}
-	return connect.NewResponse(&socialv1.MatchFacebookFriendsResponse{Matches: out}), nil
+	return out
+}
+
+func (h *Handler) Follow(ctx context.Context, req *connect.Request[socialv1.FollowUserRequest]) (*connect.Response[socialv1.FollowUserResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	to, err := h.target(ctx, req.Msg.GetUserId(), req.Msg.GetUsername())
+	if err != nil {
+		return nil, err
+	}
+	state, followsYou, _, err := h.svc.Follow(ctx, uid, to)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	user, err := h.card(ctx, to)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.FollowUserResponse{
+		FollowState: socialv1.FollowState(state), FollowsYou: followsYou, User: user,
+	}), nil
+}
+
+func (h *Handler) Unfollow(ctx context.Context, req *connect.Request[socialv1.UnfollowRequest]) (*connect.Response[socialv1.UnfollowResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	other, err := parseID(req.Msg.GetUserId(), "user ID")
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.Unfollow(ctx, uid, other); err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.UnfollowResponse{}), nil
+}
+
+func (h *Handler) RemoveFollower(ctx context.Context, req *connect.Request[socialv1.RemoveFollowerRequest]) (*connect.Response[socialv1.RemoveFollowerResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	other, err := parseID(req.Msg.GetUserId(), "user ID")
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.RemoveFollower(ctx, uid, other); err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.RemoveFollowerResponse{}), nil
+}
+
+func (h *Handler) listFollows(ctx context.Context, userID string, followers bool, pageSize int32, pageToken string) (*connect.Response[socialv1.ListFollowsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target := uuid.Nil
+	if userID != "" {
+		if target, err = parseID(userID, "user ID"); err != nil {
+			return nil, err
+		}
+	}
+	list, next, total, err := h.svc.ListFollows(ctx, uid, target, followers, int(pageSize), pageToken)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	out := make([]*socialv1.FollowEntry, 0, len(list))
+	for _, f := range list {
+		out = append(out, &socialv1.FollowEntry{
+			User: f.User, Since: timestamppb.New(f.Since),
+			FollowState: socialv1.FollowState(f.Edge.State), FollowsYou: f.Edge.FollowsYou,
+		})
+	}
+	return connect.NewResponse(&socialv1.ListFollowsResponse{
+		Entries: out, NextPageToken: next, Total: int32(total), //nolint:gosec // bounded by the follows table
+	}), nil
+}
+
+func (h *Handler) ListFollowers(ctx context.Context, req *connect.Request[socialv1.ListFollowersRequest]) (*connect.Response[socialv1.ListFollowsResponse], error) {
+	return h.listFollows(ctx, req.Msg.GetUserId(), true, req.Msg.GetPageSize(), req.Msg.GetPageToken())
+}
+
+func (h *Handler) ListFollowing(ctx context.Context, req *connect.Request[socialv1.ListFollowingRequest]) (*connect.Response[socialv1.ListFollowsResponse], error) {
+	return h.listFollows(ctx, req.Msg.GetUserId(), false, req.Msg.GetPageSize(), req.Msg.GetPageToken())
+}
+
+func (h *Handler) ListFollowRequests(ctx context.Context, req *connect.Request[socialv1.ListFollowRequestsRequest]) (*connect.Response[socialv1.ListFollowRequestsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	incoming := req.Msg.GetDirection() != socialv1.RequestDirection_REQUEST_DIRECTION_OUTGOING
+	list, err := h.svc.repo.ListRequests(ctx, uid, incoming)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	out := make([]*socialv1.FollowRequestEntry, 0, len(list))
+	for _, r := range list {
+		out = append(out, &socialv1.FollowRequestEntry{
+			Id: r.ID.String(), From: r.From, To: r.To, CreatedAt: timestamppb.New(r.CreatedAt),
+		})
+	}
+	return connect.NewResponse(&socialv1.ListFollowRequestsResponse{Requests: out}), nil
+}
+
+func (h *Handler) RespondFollowRequest(ctx context.Context, req *connect.Request[socialv1.RespondFollowRequestRequest]) (*connect.Response[socialv1.RespondFollowRequestResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := parseID(req.Msg.GetRequestId(), "request ID")
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.RespondFollow(ctx, uid, id, req.Msg.GetApprove()); err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.RespondFollowRequestResponse{}), nil
+}
+
+func (h *Handler) CancelFollowRequest(ctx context.Context, req *connect.Request[socialv1.CancelFollowRequestRequest]) (*connect.Response[socialv1.CancelFollowRequestResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := parseID(req.Msg.GetRequestId(), "request ID")
+	if err != nil {
+		return nil, err
+	}
+	if err := h.svc.repo.CancelRequest(ctx, id, uid); err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.CancelFollowRequestResponse{}), nil
+}
+
+func settingsProto(s Settings) *socialv1.GetSocialSettingsResponse {
+	return &socialv1.GetSocialSettingsResponse{Settings: &socialv1.SocialSettings{
+		IsPrivate: s.Private, PendingRequests: s.Pending,
+	}}
+}
+
+func (h *Handler) GetSocialSettings(ctx context.Context, _ *connect.Request[socialv1.GetSocialSettingsRequest]) (*connect.Response[socialv1.GetSocialSettingsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.svc.Settings(ctx, uid)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(settingsProto(s)), nil
+}
+
+func (h *Handler) SetAccountPrivacy(ctx context.Context, req *connect.Request[socialv1.SetAccountPrivacyRequest]) (*connect.Response[socialv1.GetSocialSettingsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s, err := h.svc.SetPrivate(ctx, uid, req.Msg.GetIsPrivate())
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(settingsProto(s)), nil
 }

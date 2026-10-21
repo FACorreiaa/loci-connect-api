@@ -528,11 +528,17 @@ func (r *fakeRepo) NoteSources(_ context.Context, _ uuid.UUID, contentType, item
 	return src, nil
 }
 
+// fakeGraph's friends follow each other, so the same list answers both
+// directions.
 type fakeGraph struct {
 	friends map[uuid.UUID][]uuid.UUID
 }
 
-func (g fakeGraph) FriendIDs(_ context.Context, id uuid.UUID) ([]uuid.UUID, error) {
+func (g fakeGraph) FollowingIDs(_ context.Context, id uuid.UUID) ([]uuid.UUID, error) {
+	return g.friends[id], nil
+}
+
+func (g fakeGraph) FollowerIDs(_ context.Context, id uuid.UUID) ([]uuid.UUID, error) {
 	return g.friends[id], nil
 }
 
