@@ -14,17 +14,16 @@ func domainNearbyPrompt(domainNoun, categoryHint string, lat, lon, distance floa
 	if radiusKm <= 0 {
 		radiusKm = 5.0
 	}
-	return fmt.Sprintf(`You are a travel assistant generating %s for a user at a SPECIFIC location.
+	return fmt.Sprintf(`You are a travel assistant generating %s for a user at a specific location.
 
-CRITICAL REQUIREMENTS:
-- User's EXACT location: latitude %.6f, longitude %.6f
-- Search radius: %.1f kilometers
-- ONLY include places WITHIN this radius from the user's coordinates
-- NEVER return null. If you truly cannot find anything, return {"points_of_interest": []} — but you should almost always find several near a populated area.
+Requirements:
+- User's location: latitude %.6f, longitude %.6f
+- Search radius: %.1f kilometers. Include only places within it; these are shown as places near the user.
+- Never return null. If nothing real is within the radius, return {"points_of_interest": []}; near a populated area there are usually several.
 
 Generate up to 10 diverse %s.
 
-Return STRICTLY as JSON:
+Return as JSON:
 {
   "points_of_interest": [
     {
@@ -61,23 +60,21 @@ func getGeneralPOIByDistancePrompt(lat, lon, distance float64, strict bool) stri
 
 	strictNote := ""
 	if strict {
-		strictNote = "\n\nRETRY INSTRUCTION: A previous attempt returned no results. You MUST return at least 5 real, well-known points of interest. Never return null or an empty array. If the exact coordinates fall on a rural or sparsely populated spot, include notable POIs from the nearest town(s) that still fall within the radius."
+		strictNote = "\n\nA previous attempt returned no results. Look harder: aim for at least 5 real, well-known places, and if the coordinates fall on a rural or sparsely populated spot, include notable places in the nearest town(s) inside the radius. Return an empty list only if no real place lies within the radius — never invent one to fill it."
 	}
 
-	return fmt.Sprintf(`You are a travel assistant generating points of interest for a user at a SPECIFIC location.
+	return fmt.Sprintf(`You are a travel assistant generating points of interest for a user at a specific location.
 
-CRITICAL REQUIREMENTS:
-- User's EXACT location: latitude %.6f, longitude %.6f
-- Search radius: %.1f kilometers (%.0f meters)
-- ONLY include POIs that are WITHIN this radius from the user's coordinates
-- Calculate the approximate distance from the user's coordinates before including each POI
-- NEVER return null. If you truly cannot find anything, return {"points_of_interest": []} — but you should almost always be able to find several real places near a populated area.
+Requirements:
+- User's location: latitude %.6f, longitude %.6f
+- Search radius: %.1f kilometers (%.0f meters). Include only places within it; these are shown as places near the user.
+- Never return null. If nothing real is within the radius, return {"points_of_interest": []}; near a populated area there are usually several.
 
 First, identify what town/city is at coordinates (%.4f, %.4f) and find POIs there and in immediate surroundings within %.1f km.
 
 Generate up to 10 diverse points of interest including: restaurants, bars, hotels, museums, parks, historical sites, and activities.
 
-Return STRICTLY as JSON:
+Return as JSON:
 {
   "points_of_interest": [
     {
@@ -90,9 +87,9 @@ Return STRICTLY as JSON:
   ]
 }
 
-IMPORTANT: Every POI latitude/longitude MUST be within %.1f km of (%.6f, %.6f). Do not include popular POIs from other cities.%s`,
+Do not include popular places from other cities.%s`,
 		lat, lon, radiusKm, distance,
 		lat, lon, radiusKm,
 		radiusKm, lat, radiusKm, lon,
-		radiusKm, lat, lon, strictNote)
+		strictNote)
 }
