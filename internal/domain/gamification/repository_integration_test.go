@@ -4,6 +4,7 @@ package gamification
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -598,5 +599,87 @@ func TestRepositoryResolvesTripCitiesByName(t *testing.T) {
 	id, got, err := repo.DefaultCity(ctx, u, day(8))
 	if err != nil || id == nil || *id != funchal || got != name {
 		t.Fatalf("default = %v %q, %v", id, got, err)
+	}
+}
+
+// The weekly streak moves inside the award: exploration extends it, saving a
+// place does not, and a gap restarts it.
+func TestInsertKeepsTheWeeklyStreak(t *testing.T) {
+	pool, _ := testsupport.StartPostgres(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
+	u := seedUser(t, pool)
+	insert := func(k Kind, ref string, d time.Time) Totals {
+		t.Helper()
+		_, totals, err := repo.Insert(ctx, ev(u, k, ref, 1, d, nil), 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return totals
+	}
+	monday := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+
+	insert(KindPlaceSaved, "save:a", day(5))
+	if got, _ := repo.Totals(ctx, u); got.WeekStreak != 0 || got.LastStreakWeek != nil {
+		t.Fatalf("saving started a streak: %+v", got)
+	}
+	insert(KindStopDone, "stop:a", day(5))
+	insert(KindStopDone, "stop:b", day(8))
+	got := insert(KindNewCity, "city:a", day(13))
+	if got.WeekStreak != 2 || got.LongestWeekStreak != 2 || !got.LastStreakWeek.Equal(monday(2026, 10, 12)) {
+		t.Fatalf("two weeks = %+v", got)
+	}
+	got = insert(KindPlaceVisited, "poi:a", day(28))
+	if got.WeekStreak != 1 || got.LongestWeekStreak != 2 {
+		t.Fatalf("after a gap = %+v", got)
+	}
+	if read, _ := repo.Totals(ctx, u); read.WeekStreak != 1 || read.LongestWeekStreak != 2 || !read.LastStreakWeek.Equal(monday(2026, 10, 26)) {
+		t.Fatalf("stored = %+v", read)
+	}
+}
+
+// Migration 0125 rebuilds weekly streaks from the ledger already written.
+func TestMigration0125BackfillsWeekStreaks(t *testing.T) {
+	pool, _ := testsupport.StartPostgres(t)
+	ctx := context.Background()
+	raw, err := os.ReadFile("../../../pkg/db/migrations/0125_achievements.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, down, ok := strings.Cut(string(raw), "-- +goose Down")
+	if !ok {
+		t.Fatal("no Down section")
+	}
+	if _, err := pool.Exec(ctx, down); err != nil {
+		t.Fatal(err)
+	}
+	u, saver := seedUser(t, pool), seedUser(t, pool)
+	// Weeks of 28 Sep, 5 Oct, 12 Oct (a run of 3), then 26 Oct (a run of 1).
+	for i, d := range []string{"2026-09-29", "2026-10-04", "2026-10-06", "2026-10-12", "2026-10-30"} {
+		if _, err := pool.Exec(ctx, `
+			INSERT INTO points_events (user_id, kind, ref_key, points, field_points, label, local_date, season_id)
+			VALUES ($1, 11, $2, 8, 8, 'stop', $3, 0)`, u, fmt.Sprintf("stop:%d", i), d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO points_events (user_id, kind, ref_key, points, field_points, label, local_date, season_id)
+		VALUES ($1, 9, 'save:x', 2, 2, 'save', '2026-10-12', 0)`, saver); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, up); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewRepository(pool)
+	got, err := repo.Totals(ctx, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.WeekStreak != 1 || got.LongestWeekStreak != 3 || got.LastStreakWeek == nil ||
+		got.LastStreakWeek.Format(time.DateOnly) != "2026-10-26" {
+		t.Fatalf("backfilled streak = %d longest %d last %v", got.WeekStreak, got.LongestWeekStreak, got.LastStreakWeek)
+	}
+	if s, _ := repo.Totals(ctx, saver); s.LongestWeekStreak != 0 {
+		t.Fatalf("saving alone made a streak: %+v", s)
 	}
 }

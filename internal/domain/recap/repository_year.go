@@ -523,22 +523,8 @@ func (p *pgRepository) loadYearProgress(ctx context.Context, f *YearFacts, s yea
 		return err
 	}
 
-	rows, err = p.pool.Query(ctx, `
-		SELECT badge_id FROM user_badges
-		WHERE user_id = $1 AND awarded_at >= $2 AND awarded_at < $3
-		ORDER BY awarded_at`, f.UserID, s.from, s.to)
-	if err != nil {
-		return fmt.Errorf("year recap badges: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return fmt.Errorf("scan year recap badge: %w", err)
-		}
-		f.Badges = append(f.Badges, id)
-	}
-	return rows.Err()
+	f.Badges, err = p.earnedBetween(ctx, f.UserID, s.from, s.to)
+	return err
 }
 
 func (p *pgRepository) loadContributions(ctx context.Context, f *YearFacts, s yearScope) error {

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	achievementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
 	"github.com/google/uuid"
 )
@@ -104,30 +105,6 @@ func (r *fakeRepo) Insert(_ context.Context, e Event, dailyCap int) (bool, Total
 	return true, t, nil
 }
 
-func (r *fakeRepo) Counts(_ context.Context, id uuid.UUID, longest int) (Counts, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	c := Counts{LongestStreak: longest}
-	places := map[string]bool{}
-	for _, e := range r.events {
-		if e.UserID != id {
-			continue
-		}
-		switch e.Kind {
-		case KindNewCity:
-			c.Cities++
-		case KindPlaceVisited:
-			places[strings.Split(e.RefKey, ":")[1]] = true
-		case KindScoutClaim:
-			c.ScoutClaims++
-		case KindTripCompleted:
-			c.TripsDone++
-		}
-	}
-	c.Places = len(places)
-	return c, nil
-}
-
 func (r *fakeRepo) Badges(_ context.Context, id uuid.UUID) (map[string]time.Time, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -136,19 +113,6 @@ func (r *fakeRepo) Badges(_ context.Context, id uuid.UUID) (map[string]time.Time
 		out[k] = v
 	}
 	return out, nil
-}
-
-func (r *fakeRepo) GrantBadge(_ context.Context, id uuid.UUID, badge string) (bool, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.badges[id] == nil {
-		r.badges[id] = map[string]time.Time{}
-	}
-	if _, ok := r.badges[id][badge]; ok {
-		return false, nil
-	}
-	r.badges[id][badge] = time.Now()
-	return true, nil
 }
 
 func (r *fakeRepo) Today(_ context.Context, id uuid.UUID, d time.Time) (map[Kind]int, error) {
@@ -552,14 +516,7 @@ func (g fakeGraph) PublicUsers(_ context.Context, ids []uuid.UUID) (map[uuid.UUI
 
 type recordingNotifier struct {
 	mu     sync.Mutex
-	badges []string
 	passed []uuid.UUID
-}
-
-func (n *recordingNotifier) BadgeEarned(_ context.Context, _ uuid.UUID, title, _ string) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	n.badges = append(n.badges, title)
 }
 
 func (n *recordingNotifier) PassedOnLeaderboard(_ context.Context, to uuid.UUID, _ *socialv1.PublicUser) {
@@ -781,13 +738,6 @@ func TestCompleteTripDayScoresTheDayAndTheTrip(t *testing.T) {
 	if err != nil || !two.TripCompleted || two.Points != want {
 		t.Fatalf("last day = %+v, %v; want %d points and a finished trip", two, err, want)
 	}
-	found := false
-	for _, b := range two.NewBadges {
-		found = found || b.ID == "trip-finisher"
-	}
-	if !found {
-		t.Fatalf("finishing a trip earns trip-finisher, got %+v", two.NewBadges)
-	}
 	again, _ := s.CompleteTripDay(ctx, u, trip.ID.String(), d2, 2, "UTC")
 	if again.Points != 0 {
 		t.Fatalf("completing a day twice scored %d", again.Points)
@@ -867,20 +817,16 @@ func TestOvertakingAFriendNotifiesThemOnceADay(t *testing.T) {
 	}
 }
 
-func TestNoProgressPushAtNight(t *testing.T) {
-	repo := newFakeRepo()
-	n := &recordingNotifier{}
-	s := newTestService(repo, nil, n)
-	s.now = func() time.Time { return time.Date(2026, 10, 1, 23, 0, 0, 0, time.UTC) }
-	u := uuid.New()
-	if _, err := s.Award(context.Background(), Award{UserID: u, Kind: KindNewCity, RefKey: "city:night"}); err != nil {
-		t.Fatal(err)
+func TestQuietHours(t *testing.T) {
+	at := func(h int) time.Time { return time.Date(2026, 10, 1, h, 0, 0, 0, time.UTC) }
+	for h, want := range map[int]bool{21: false, 22: true, 23: true, 3: true, 7: true, 8: false, 12: false} {
+		if got := Quiet(at(h), "UTC"); got != want {
+			t.Errorf("Quiet at %02d:00 = %v, want %v", h, got, want)
+		}
 	}
-	if len(n.badges) != 0 {
-		t.Fatalf("badge push at 23:00: %v", n.badges)
-	}
-	if b, _ := repo.Badges(context.Background(), u); b["first-city"].IsZero() {
-		t.Fatalf("the badge is still granted at night")
+	// 20:00 UTC is 05:00 the next day in Tokyo.
+	if !Quiet(at(20), "Asia/Tokyo") {
+		t.Error("quiet hours ignore the recipient's zone")
 	}
 }
 
@@ -890,5 +836,84 @@ func TestKillSwitchAwardsNothing(t *testing.T) {
 	res, err := s.CheckIn(context.Background(), uuid.New(), "UTC")
 	if err != nil || res.Points != 0 || len(repo.events) != 0 {
 		t.Fatalf("disabled check-in = %+v, %v, %d events", res, err, len(repo.events))
+	}
+}
+
+type fakeAchiever struct {
+	Achiever
+	calls int
+	tier  achievementv1.AchievementTier
+}
+
+func (a *fakeAchiever) Evaluate(context.Context, uuid.UUID) ([]*achievementv1.Achievement, error) {
+	a.calls++
+	a.tier++
+	return []*achievementv1.Achievement{{Id: "trailhead", Tier: a.tier}}, nil
+}
+
+// Each new award judges achievements once, and a request's collector keeps
+// one entry per achievement, the latest. A repeat award judges nothing.
+func TestAwardCollectsUnlocks(t *testing.T) {
+	repo := newFakeRepo()
+	ach := &fakeAchiever{}
+	s := newTestService(repo, nil, nil).WithAchievements(ach)
+	u := uuid.New()
+	ctx, got := collectUnlocks(context.Background())
+
+	res, err := s.Award(ctx, Award{UserID: u, Kind: KindStopDone, RefKey: "stop:a"})
+	if err != nil || len(res.Unlocked) != 1 {
+		t.Fatalf("award = %+v, %v", res, err)
+	}
+	if _, err := s.Award(ctx, Award{UserID: u, Kind: KindStopDone, RefKey: "stop:a"}); err != nil {
+		t.Fatal(err)
+	}
+	if ach.calls != 1 {
+		t.Fatalf("a repeated award judged achievements again (%d calls)", ach.calls)
+	}
+	s.AwardQuietly(ctx, Award{UserID: u, Kind: KindStopDone, RefKey: "stop:b"})
+	list := got.list()
+	if len(list) != 1 || list[0].GetTier() != achievementv1.AchievementTier_ACHIEVEMENT_TIER_SILVER {
+		t.Fatalf("collected %v, want trailhead once at its latest tier", list)
+	}
+}
+
+func TestLegacyBadgesNameTheTier(t *testing.T) {
+	got := legacyBadges([]*achievementv1.Achievement{
+		{Id: "cartographer", Title: "Cartographer", Tier: achievementv1.AchievementTier_ACHIEVEMENT_TIER_GOLD},
+		{Id: "first-pin", Title: "First Pin"},
+	})
+	if got[0].GetId() != "cartographer-gold" || got[0].GetTitle() != "Cartographer · Gold" {
+		t.Errorf("track badge = %v", got[0])
+	}
+	if got[1].GetId() != "first-pin" || got[1].GetTitle() != "First Pin" {
+		t.Errorf("moment badge = %v", got[1])
+	}
+}
+
+type fakeFeed struct{ posts []string }
+
+func (f *fakeFeed) PostNewCity(_ context.Context, _ uuid.UUID, key string, _ *uuid.UUID, name string) {
+	f.posts = append(f.posts, "city "+key+" "+name)
+}
+
+func (f *fakeFeed) PostTripFinished(_ context.Context, _, trip uuid.UUID) {
+	f.posts = append(f.posts, "trip "+trip.String())
+}
+
+// A new city and a finished trip reach the feed once; nothing else does.
+func TestFreshNewsReachesTheFeed(t *testing.T) {
+	repo := newFakeRepo()
+	feed := &fakeFeed{}
+	s := newTestService(repo, nil, nil).WithFeed(feed)
+	u, trip := uuid.New(), uuid.New()
+	ctx := context.Background()
+	for range 2 {
+		s.AwardQuietly(ctx, Award{UserID: u, Kind: KindNewCity, RefKey: "city:porto", Name: "Porto"})
+		s.AwardQuietly(ctx, Award{UserID: u, Kind: KindTripCompleted, RefKey: "trip:" + trip.String()})
+	}
+	s.AwardQuietly(ctx, Award{UserID: u, Kind: KindStopDone, RefKey: "stop:a"})
+	want := []string{"city porto Porto", "trip " + trip.String()}
+	if strings.Join(feed.posts, "|") != strings.Join(want, "|") {
+		t.Fatalf("posts = %v; want %v", feed.posts, want)
 	}
 }

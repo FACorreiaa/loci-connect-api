@@ -32,3 +32,13 @@ func TestBuildSocialPayload(t *testing.T) {
 		t.Errorf("payload without a card = %+v", p)
 	}
 }
+
+func TestBuildCheerPayload(t *testing.T) {
+	p := BuildCheerPayload(&socialv1.PublicUser{Username: "ana", DisplayName: "Ana Sousa"}, "Cartographer · Gold", "/achievements")
+	if p.Body != "Ana Sousa cheered your Cartographer · Gold." || p.URL != WebOrigin+"/achievements" {
+		t.Errorf("cheer payload = %+v", p)
+	}
+	if p.Origin != "cheered" || p.Category != SocialCategory {
+		t.Errorf("cheer grouping = %+v", p)
+	}
+}

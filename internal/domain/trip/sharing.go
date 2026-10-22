@@ -116,6 +116,18 @@ func (h *Handler) WithSharing(repo SharingRepository, graph SocialGraph) *Handle
 	return h
 }
 
+// SharingFeed tells the owner's followers about a trip opened to them. Best
+// effort; social.Feed satisfies it.
+type SharingFeed interface {
+	PostTripShared(ctx context.Context, actor, tripID uuid.UUID)
+}
+
+// WithFeed posts the first time a trip is opened to friends or to everyone.
+func (h *Handler) WithFeed(f SharingFeed) *Handler {
+	h.feed = f
+	return h
+}
+
 type sharingRepository struct {
 	db   *pgxpool.Pool
 	days *repository
@@ -263,6 +275,9 @@ func (h *Handler) SetTripVisibility(ctx context.Context, req *connect.Request[tr
 	t, err := h.sharing.SetVisibility(ctx, id, uid, vis, req.Msg.GetShareDetails(), newShareCode())
 	if err != nil {
 		return nil, toConnectErr(err)
+	}
+	if h.feed != nil && (t.Visibility == VisibilityFriends || t.Visibility == VisibilityPublic) {
+		h.feed.PostTripShared(ctx, uid, t.ID)
 	}
 	resp := &tripv1.SetTripVisibilityResponse{Visibility: tripv1.TripVisibility(t.Visibility)}
 	if t.Visibility != VisibilityPrivate && t.ShareCode != nil {

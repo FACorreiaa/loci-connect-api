@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	achievementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
 	gamificationv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/gamification/gamificationconnect"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
@@ -49,6 +51,8 @@ func (h *Handler) connectErr(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, ErrInvalid):
 		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, ErrPrivate):
+		return connect.NewError(connect.CodePermissionDenied, err)
 	default:
 		h.log.Error("gamification rpc failed", slog.Any("error", err))
 		return connect.NewError(connect.CodeInternal, errors.New("something went wrong, try again"))
@@ -63,10 +67,18 @@ func badgeProto(b Badge, at time.Time, earned bool) *gamificationv1.Badge {
 	return out
 }
 
-func badgesProto(bs []Badge, now time.Time) []*gamificationv1.Badge {
-	out := make([]*gamificationv1.Badge, 0, len(bs))
-	for _, b := range bs {
-		out = append(out, badgeProto(b, now, true))
+// legacyBadges shows achievements to apps that only know badges. Each
+// reached tier of a track reads as its own badge.
+func legacyBadges(as []*achievementv1.Achievement) []*gamificationv1.Badge {
+	out := make([]*gamificationv1.Badge, 0, len(as))
+	for _, a := range as {
+		b := &gamificationv1.Badge{Id: a.GetId(), Title: a.GetTitle(), Description: a.GetDescription(), AwardedAt: a.GetEarnedAt()}
+		if t := a.GetTier(); t != achievementv1.AchievementTier_ACHIEVEMENT_TIER_UNSPECIFIED {
+			name := strings.TrimPrefix(t.String(), "ACHIEVEMENT_TIER_")
+			b.Id += "-" + strings.ToLower(name)
+			b.Title += " · " + name[:1] + strings.ToLower(name[1:])
+		}
+		out = append(out, b)
 	}
 	return out
 }
@@ -88,6 +100,7 @@ func progressProto(p *Progress) *gamificationv1.Progress {
 		at, earned := p.Earned[b.ID]
 		out.Badges = append(out.Badges, badgeProto(b, at, earned))
 	}
+	out.Badges = append(out.Badges, legacyBadges(p.Achievements)...)
 	return out
 }
 
@@ -119,7 +132,6 @@ func (h *Handler) DailyCheckIn(ctx context.Context, req *connect.Request[gamific
 	return connect.NewResponse(&gamificationv1.DailyCheckInResponse{
 		Progress:      progressProto(p),
 		PointsAwarded: int32(res.Points),
-		NewBadges:     badgesProto(res.NewBadges, h.svc.now()),
 	}), nil
 }
 
@@ -220,6 +232,7 @@ func (h *Handler) CompleteTripDay(ctx context.Context, req *connect.Request[gami
 	if err != nil {
 		return nil, err
 	}
+	ctx, got := collectUnlocks(ctx)
 	res, err := h.svc.CompleteTripDay(ctx, uid, req.Msg.GetTripId(), req.Msg.GetDayId(), int(req.Msg.GetStopsDone()), req.Msg.GetTimezone())
 	if err != nil {
 		return nil, h.connectErr(err)
@@ -232,7 +245,8 @@ func (h *Handler) CompleteTripDay(ctx context.Context, req *connect.Request[gami
 		Progress:      progressProto(p),
 		PointsAwarded: int32(res.Points),
 		TripCompleted: res.TripCompleted,
-		NewBadges:     badgesProto(res.NewBadges, h.svc.now()),
+		NewBadges:     legacyBadges(got.list()),
+		Unlocked:      got.list(),
 	}), nil
 }
 
@@ -254,6 +268,12 @@ func (h *Handler) GetFieldProfile(ctx context.Context, _ *connect.Request[gamifi
 		SeasonId:             int32(p.SeasonID),
 		PlacesKept:           int32(p.PlacesKept),
 		DaysFinished:         int32(p.DaysFinished),
+		WeekStreak: &gamificationv1.WeekStreak{
+			Current:          int32(p.WeekStreak.Current),
+			Longest:          int32(p.WeekStreak.Longest),
+			ExploredThisWeek: p.WeekStreak.ExploredThisWeek,
+			WeekStart:        p.WeekStreak.WeekStart.Format(time.DateOnly),
+		},
 	}
 	for _, c := range p.Cities {
 		out.Cities = append(out.Cities, &gamificationv1.CityRank{
@@ -334,6 +354,7 @@ func (h *Handler) MarkStop(ctx context.Context, req *connect.Request[gamificatio
 	if err != nil {
 		return nil, err
 	}
+	ctx, got := collectUnlocks(ctx)
 	res, err := h.svc.MarkStop(ctx, uid, req.Msg.GetTripId(), req.Msg.GetStopId(),
 		StopStatus(req.Msg.GetStatus()), req.Msg.GetTimezone())
 	if err != nil {
@@ -345,5 +366,40 @@ func (h *Handler) MarkStop(ctx context.Context, req *connect.Request[gamificatio
 		DayFinished:   res.DayFinished,
 		TripFinished:  res.TripFinished,
 		WeekScore:     res.WeekScore,
+		Unlocked:      got.list(),
 	}), nil
+}
+
+func (h *Handler) ListAchievements(ctx context.Context, req *connect.Request[gamificationv1.ListAchievementsRequest]) (*connect.Response[gamificationv1.ListAchievementsResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	owner := uid
+	if id := req.Msg.GetUserId(); id != "" {
+		if owner, err = uuid.Parse(id); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		}
+	}
+	if h.svc.achiever == nil {
+		return connect.NewResponse(&gamificationv1.ListAchievementsResponse{}), nil
+	}
+	out, err := h.svc.achiever.List(ctx, uid, owner)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *Handler) MarkAchievementsSeen(ctx context.Context, req *connect.Request[gamificationv1.MarkAchievementsSeenRequest]) (*connect.Response[gamificationv1.MarkAchievementsSeenResponse], error) {
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if h.svc.achiever != nil {
+		if err := h.svc.achiever.MarkSeen(ctx, uid, req.Msg.GetIds()); err != nil {
+			return nil, h.connectErr(err)
+		}
+	}
+	return connect.NewResponse(&gamificationv1.MarkAchievementsSeenResponse{}), nil
 }
