@@ -107,6 +107,24 @@ const (
 	// TripServiceDismissPackingSuggestionProcedure is the fully-qualified name of the TripService's
 	// DismissPackingSuggestion RPC.
 	TripServiceDismissPackingSuggestionProcedure = "/loci.trip.TripService/DismissPackingSuggestion"
+	// TripServiceCreateTripInviteProcedure is the fully-qualified name of the TripService's
+	// CreateTripInvite RPC.
+	TripServiceCreateTripInviteProcedure = "/loci.trip.TripService/CreateTripInvite"
+	// TripServiceGetTripInviteProcedure is the fully-qualified name of the TripService's GetTripInvite
+	// RPC.
+	TripServiceGetTripInviteProcedure = "/loci.trip.TripService/GetTripInvite"
+	// TripServiceAcceptTripInviteProcedure is the fully-qualified name of the TripService's
+	// AcceptTripInvite RPC.
+	TripServiceAcceptTripInviteProcedure = "/loci.trip.TripService/AcceptTripInvite"
+	// TripServiceRevokeTripInviteProcedure is the fully-qualified name of the TripService's
+	// RevokeTripInvite RPC.
+	TripServiceRevokeTripInviteProcedure = "/loci.trip.TripService/RevokeTripInvite"
+	// TripServiceListTripMembersProcedure is the fully-qualified name of the TripService's
+	// ListTripMembers RPC.
+	TripServiceListTripMembersProcedure = "/loci.trip.TripService/ListTripMembers"
+	// TripServiceRemoveTripMemberProcedure is the fully-qualified name of the TripService's
+	// RemoveTripMember RPC.
+	TripServiceRemoveTripMemberProcedure = "/loci.trip.TripService/RemoveTripMember"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -141,11 +159,19 @@ var (
 	tripServiceUpsertChecklistItemMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("UpsertChecklistItem")
 	tripServiceDeleteChecklistItemMethodDescriptor      = tripServiceServiceDescriptor.Methods().ByName("DeleteChecklistItem")
 	tripServiceDismissPackingSuggestionMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("DismissPackingSuggestion")
+	tripServiceCreateTripInviteMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("CreateTripInvite")
+	tripServiceGetTripInviteMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("GetTripInvite")
+	tripServiceAcceptTripInviteMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("AcceptTripInvite")
+	tripServiceRevokeTripInviteMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RevokeTripInvite")
+	tripServiceListTripMembersMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("ListTripMembers")
+	tripServiceRemoveTripMemberMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RemoveTripMember")
 )
 
 // TripServiceClient is a client for the loci.trip.TripService service.
 type TripServiceClient interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetTrip opens one of the caller's trips, or a trip the caller is a
+	// member of (with viewer_role and members set). Anything else is NotFound.
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
 	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
@@ -201,6 +227,24 @@ type TripServiceClient interface {
 	DeleteChecklistItem(context.Context, *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error)
 	// DismissPackingSuggestion hides a suggestion from this trip's checklist.
 	DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error)
+	// Planning together. CreateTripInvite (owner only) returns the trip's live
+	// invite for that role, minting one when there is none.
+	CreateTripInvite(context.Context, *connect.Request[trip.CreateTripInviteRequest]) (*connect.Response[trip.TripInvite], error)
+	// GetTripInvite previews an invite. Accepts anonymous callers. An unknown
+	// code is NotFound; an expired, revoked or used-up one has joinable false.
+	GetTripInvite(context.Context, *connect.Request[trip.GetTripInviteRequest]) (*connect.Response[trip.TripInvitePreview], error)
+	// AcceptTripInvite joins the trip with the invite's role and makes the
+	// caller and the owner friends. Joining again is a no-op that keeps the
+	// existing role. A dead invite is FailedPrecondition; too many accepts in
+	// an hour is ResourceExhausted.
+	AcceptTripInvite(context.Context, *connect.Request[trip.AcceptTripInviteRequest]) (*connect.Response[trip.AcceptTripInviteResponse], error)
+	// RevokeTripInvite stops an invite from working (owner only).
+	RevokeTripInvite(context.Context, *connect.Request[trip.RevokeTripInviteRequest]) (*connect.Response[trip.RevokeTripInviteResponse], error)
+	// ListTripMembers lists the owner and members, for anyone on the trip.
+	ListTripMembers(context.Context, *connect.Request[trip.ListTripMembersRequest]) (*connect.Response[trip.ListTripMembersResponse], error)
+	// RemoveTripMember takes someone off the trip: the owner removes anyone,
+	// a member removes only themselves.
+	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
 }
 
 // NewTripServiceClient constructs a client for the loci.trip.TripService service. By default, it
@@ -387,6 +431,42 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceDismissPackingSuggestionMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		createTripInvite: connect.NewClient[trip.CreateTripInviteRequest, trip.TripInvite](
+			httpClient,
+			baseURL+TripServiceCreateTripInviteProcedure,
+			connect.WithSchema(tripServiceCreateTripInviteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getTripInvite: connect.NewClient[trip.GetTripInviteRequest, trip.TripInvitePreview](
+			httpClient,
+			baseURL+TripServiceGetTripInviteProcedure,
+			connect.WithSchema(tripServiceGetTripInviteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		acceptTripInvite: connect.NewClient[trip.AcceptTripInviteRequest, trip.AcceptTripInviteResponse](
+			httpClient,
+			baseURL+TripServiceAcceptTripInviteProcedure,
+			connect.WithSchema(tripServiceAcceptTripInviteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		revokeTripInvite: connect.NewClient[trip.RevokeTripInviteRequest, trip.RevokeTripInviteResponse](
+			httpClient,
+			baseURL+TripServiceRevokeTripInviteProcedure,
+			connect.WithSchema(tripServiceRevokeTripInviteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listTripMembers: connect.NewClient[trip.ListTripMembersRequest, trip.ListTripMembersResponse](
+			httpClient,
+			baseURL+TripServiceListTripMembersProcedure,
+			connect.WithSchema(tripServiceListTripMembersMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		removeTripMember: connect.NewClient[trip.RemoveTripMemberRequest, trip.RemoveTripMemberResponse](
+			httpClient,
+			baseURL+TripServiceRemoveTripMemberProcedure,
+			connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -421,6 +501,12 @@ type tripServiceClient struct {
 	upsertChecklistItem      *connect.Client[trip.UpsertChecklistItemRequest, trip.ChecklistItem]
 	deleteChecklistItem      *connect.Client[trip.DeleteChecklistItemRequest, trip.DeleteChecklistItemResponse]
 	dismissPackingSuggestion *connect.Client[trip.DismissPackingSuggestionRequest, trip.DismissPackingSuggestionResponse]
+	createTripInvite         *connect.Client[trip.CreateTripInviteRequest, trip.TripInvite]
+	getTripInvite            *connect.Client[trip.GetTripInviteRequest, trip.TripInvitePreview]
+	acceptTripInvite         *connect.Client[trip.AcceptTripInviteRequest, trip.AcceptTripInviteResponse]
+	revokeTripInvite         *connect.Client[trip.RevokeTripInviteRequest, trip.RevokeTripInviteResponse]
+	listTripMembers          *connect.Client[trip.ListTripMembersRequest, trip.ListTripMembersResponse]
+	removeTripMember         *connect.Client[trip.RemoveTripMemberRequest, trip.RemoveTripMemberResponse]
 }
 
 // SaveTrip calls loci.trip.TripService.SaveTrip.
@@ -570,9 +656,41 @@ func (c *tripServiceClient) DismissPackingSuggestion(ctx context.Context, req *c
 	return c.dismissPackingSuggestion.CallUnary(ctx, req)
 }
 
+// CreateTripInvite calls loci.trip.TripService.CreateTripInvite.
+func (c *tripServiceClient) CreateTripInvite(ctx context.Context, req *connect.Request[trip.CreateTripInviteRequest]) (*connect.Response[trip.TripInvite], error) {
+	return c.createTripInvite.CallUnary(ctx, req)
+}
+
+// GetTripInvite calls loci.trip.TripService.GetTripInvite.
+func (c *tripServiceClient) GetTripInvite(ctx context.Context, req *connect.Request[trip.GetTripInviteRequest]) (*connect.Response[trip.TripInvitePreview], error) {
+	return c.getTripInvite.CallUnary(ctx, req)
+}
+
+// AcceptTripInvite calls loci.trip.TripService.AcceptTripInvite.
+func (c *tripServiceClient) AcceptTripInvite(ctx context.Context, req *connect.Request[trip.AcceptTripInviteRequest]) (*connect.Response[trip.AcceptTripInviteResponse], error) {
+	return c.acceptTripInvite.CallUnary(ctx, req)
+}
+
+// RevokeTripInvite calls loci.trip.TripService.RevokeTripInvite.
+func (c *tripServiceClient) RevokeTripInvite(ctx context.Context, req *connect.Request[trip.RevokeTripInviteRequest]) (*connect.Response[trip.RevokeTripInviteResponse], error) {
+	return c.revokeTripInvite.CallUnary(ctx, req)
+}
+
+// ListTripMembers calls loci.trip.TripService.ListTripMembers.
+func (c *tripServiceClient) ListTripMembers(ctx context.Context, req *connect.Request[trip.ListTripMembersRequest]) (*connect.Response[trip.ListTripMembersResponse], error) {
+	return c.listTripMembers.CallUnary(ctx, req)
+}
+
+// RemoveTripMember calls loci.trip.TripService.RemoveTripMember.
+func (c *tripServiceClient) RemoveTripMember(ctx context.Context, req *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error) {
+	return c.removeTripMember.CallUnary(ctx, req)
+}
+
 // TripServiceHandler is an implementation of the loci.trip.TripService service.
 type TripServiceHandler interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetTrip opens one of the caller's trips, or a trip the caller is a
+	// member of (with viewer_role and members set). Anything else is NotFound.
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
 	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
@@ -628,6 +746,24 @@ type TripServiceHandler interface {
 	DeleteChecklistItem(context.Context, *connect.Request[trip.DeleteChecklistItemRequest]) (*connect.Response[trip.DeleteChecklistItemResponse], error)
 	// DismissPackingSuggestion hides a suggestion from this trip's checklist.
 	DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error)
+	// Planning together. CreateTripInvite (owner only) returns the trip's live
+	// invite for that role, minting one when there is none.
+	CreateTripInvite(context.Context, *connect.Request[trip.CreateTripInviteRequest]) (*connect.Response[trip.TripInvite], error)
+	// GetTripInvite previews an invite. Accepts anonymous callers. An unknown
+	// code is NotFound; an expired, revoked or used-up one has joinable false.
+	GetTripInvite(context.Context, *connect.Request[trip.GetTripInviteRequest]) (*connect.Response[trip.TripInvitePreview], error)
+	// AcceptTripInvite joins the trip with the invite's role and makes the
+	// caller and the owner friends. Joining again is a no-op that keeps the
+	// existing role. A dead invite is FailedPrecondition; too many accepts in
+	// an hour is ResourceExhausted.
+	AcceptTripInvite(context.Context, *connect.Request[trip.AcceptTripInviteRequest]) (*connect.Response[trip.AcceptTripInviteResponse], error)
+	// RevokeTripInvite stops an invite from working (owner only).
+	RevokeTripInvite(context.Context, *connect.Request[trip.RevokeTripInviteRequest]) (*connect.Response[trip.RevokeTripInviteResponse], error)
+	// ListTripMembers lists the owner and members, for anyone on the trip.
+	ListTripMembers(context.Context, *connect.Request[trip.ListTripMembersRequest]) (*connect.Response[trip.ListTripMembersResponse], error)
+	// RemoveTripMember takes someone off the trip: the owner removes anyone,
+	// a member removes only themselves.
+	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
 }
 
 // NewTripServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -810,6 +946,42 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceDismissPackingSuggestionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceCreateTripInviteHandler := connect.NewUnaryHandler(
+		TripServiceCreateTripInviteProcedure,
+		svc.CreateTripInvite,
+		connect.WithSchema(tripServiceCreateTripInviteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceGetTripInviteHandler := connect.NewUnaryHandler(
+		TripServiceGetTripInviteProcedure,
+		svc.GetTripInvite,
+		connect.WithSchema(tripServiceGetTripInviteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceAcceptTripInviteHandler := connect.NewUnaryHandler(
+		TripServiceAcceptTripInviteProcedure,
+		svc.AcceptTripInvite,
+		connect.WithSchema(tripServiceAcceptTripInviteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceRevokeTripInviteHandler := connect.NewUnaryHandler(
+		TripServiceRevokeTripInviteProcedure,
+		svc.RevokeTripInvite,
+		connect.WithSchema(tripServiceRevokeTripInviteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceListTripMembersHandler := connect.NewUnaryHandler(
+		TripServiceListTripMembersProcedure,
+		svc.ListTripMembers,
+		connect.WithSchema(tripServiceListTripMembersMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceRemoveTripMemberHandler := connect.NewUnaryHandler(
+		TripServiceRemoveTripMemberProcedure,
+		svc.RemoveTripMember,
+		connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.trip.TripService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TripServiceSaveTripProcedure:
@@ -870,6 +1042,18 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceDeleteChecklistItemHandler.ServeHTTP(w, r)
 		case TripServiceDismissPackingSuggestionProcedure:
 			tripServiceDismissPackingSuggestionHandler.ServeHTTP(w, r)
+		case TripServiceCreateTripInviteProcedure:
+			tripServiceCreateTripInviteHandler.ServeHTTP(w, r)
+		case TripServiceGetTripInviteProcedure:
+			tripServiceGetTripInviteHandler.ServeHTTP(w, r)
+		case TripServiceAcceptTripInviteProcedure:
+			tripServiceAcceptTripInviteHandler.ServeHTTP(w, r)
+		case TripServiceRevokeTripInviteProcedure:
+			tripServiceRevokeTripInviteHandler.ServeHTTP(w, r)
+		case TripServiceListTripMembersProcedure:
+			tripServiceListTripMembersHandler.ServeHTTP(w, r)
+		case TripServiceRemoveTripMemberProcedure:
+			tripServiceRemoveTripMemberHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -993,4 +1177,28 @@ func (UnimplementedTripServiceHandler) DeleteChecklistItem(context.Context, *con
 
 func (UnimplementedTripServiceHandler) DismissPackingSuggestion(context.Context, *connect.Request[trip.DismissPackingSuggestionRequest]) (*connect.Response[trip.DismissPackingSuggestionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.DismissPackingSuggestion is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) CreateTripInvite(context.Context, *connect.Request[trip.CreateTripInviteRequest]) (*connect.Response[trip.TripInvite], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.CreateTripInvite is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) GetTripInvite(context.Context, *connect.Request[trip.GetTripInviteRequest]) (*connect.Response[trip.TripInvitePreview], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetTripInvite is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) AcceptTripInvite(context.Context, *connect.Request[trip.AcceptTripInviteRequest]) (*connect.Response[trip.AcceptTripInviteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.AcceptTripInvite is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) RevokeTripInvite(context.Context, *connect.Request[trip.RevokeTripInviteRequest]) (*connect.Response[trip.RevokeTripInviteResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RevokeTripInvite is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ListTripMembers(context.Context, *connect.Request[trip.ListTripMembersRequest]) (*connect.Response[trip.ListTripMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListTripMembers is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveTripMember is not implemented"))
 }
