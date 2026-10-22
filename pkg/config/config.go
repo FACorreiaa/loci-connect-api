@@ -57,6 +57,10 @@ type SocialConfig struct {
 	// AchievementsEnabled grants and lists achievements. On by default, a
 	// kill switch like GamificationEnabled; achievements also need that on.
 	AchievementsEnabled bool
+	// FeedEnabled records and serves the following feed and its cheers. On
+	// by default; off, the feed RPCs answer Unimplemented and nothing is
+	// recorded.
+	FeedEnabled bool
 	// RecapRunnerEnabled queues a recap when a trip ends, builds it and
 	// pushes it. Off by default: recaps still build when someone opens one.
 	RecapRunnerEnabled bool
@@ -574,6 +578,7 @@ func Load() (*Config, error) {
 			FieldRanksCity:      getEnv("FIELD_RANK_THRESHOLDS_CITY", ""),
 			FieldRunnerEnabled:  getEnvAsBool("FIELD_RUNNER_ENABLED", true),
 			AchievementsEnabled: getEnvAsBool("ACHIEVEMENTS_ENABLED", true),
+			FeedEnabled:         getEnvAsBool("FEED_ENABLED", true),
 			RecapRunnerEnabled:  getEnvAsBool("RECAP_RUNNER_ENABLED", false),
 			RecapYearUnlockDate: getEnv("RECAP_YEAR_UNLOCK_DATE", ""),
 			RecapYearAllowlist:  getEnvAsSlice("RECAP_YEAR_ALLOWLIST", nil),

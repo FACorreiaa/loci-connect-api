@@ -889,3 +889,31 @@ func TestLegacyBadgesNameTheTier(t *testing.T) {
 		t.Errorf("moment badge = %v", got[1])
 	}
 }
+
+type fakeFeed struct{ posts []string }
+
+func (f *fakeFeed) PostNewCity(_ context.Context, _ uuid.UUID, key string, _ *uuid.UUID, name string) {
+	f.posts = append(f.posts, "city "+key+" "+name)
+}
+
+func (f *fakeFeed) PostTripFinished(_ context.Context, _, trip uuid.UUID) {
+	f.posts = append(f.posts, "trip "+trip.String())
+}
+
+// A new city and a finished trip reach the feed once; nothing else does.
+func TestFreshNewsReachesTheFeed(t *testing.T) {
+	repo := newFakeRepo()
+	feed := &fakeFeed{}
+	s := newTestService(repo, nil, nil).WithFeed(feed)
+	u, trip := uuid.New(), uuid.New()
+	ctx := context.Background()
+	for range 2 {
+		s.AwardQuietly(ctx, Award{UserID: u, Kind: KindNewCity, RefKey: "city:porto", Name: "Porto"})
+		s.AwardQuietly(ctx, Award{UserID: u, Kind: KindTripCompleted, RefKey: "trip:" + trip.String()})
+	}
+	s.AwardQuietly(ctx, Award{UserID: u, Kind: KindStopDone, RefKey: "stop:a"})
+	want := []string{"city porto Porto", "trip " + trip.String()}
+	if strings.Join(feed.posts, "|") != strings.Join(want, "|") {
+		t.Fatalf("posts = %v; want %v", feed.posts, want)
+	}
+}

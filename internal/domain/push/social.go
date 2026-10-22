@@ -23,6 +23,7 @@ const (
 	socialFollowedBack   socialKind = "followed_back"
 	socialFollowRequest  socialKind = "follow_request"
 	socialFollowApproved socialKind = "follow_approved"
+	socialCheered        socialKind = "cheered"
 )
 
 func displayName(u *socialv1.PublicUser, fallback string) string {
@@ -85,6 +86,23 @@ func (n *Notifier) FollowRequested(_ context.Context, to uuid.UUID, from *social
 // FollowApproved tells `to` their request to follow `by` was approved.
 func (n *Notifier) FollowApproved(_ context.Context, to uuid.UUID, by *socialv1.PublicUser) {
 	n.notifySocial(to, BuildSocialPayload(socialFollowApproved, by))
+}
+
+// BuildCheerPayload shapes a cheer: from cheered what ("your Cartographer ·
+// Gold"), opening path in the app.
+func BuildCheerPayload(from *socialv1.PublicUser, what, path string) Payload {
+	return Payload{
+		Category: SocialCategory, ThreadID: "friends", Origin: string(socialCheered),
+		Title: "Cheers!",
+		Body:  displayName(from, "Someone") + " cheered your " + what + ".",
+		URL:   WebOrigin + path,
+	}
+}
+
+// Cheered tells `to` that `from` cheered one of their feed items, unless they
+// switched cheers off.
+func (n *Notifier) Cheered(_ context.Context, to uuid.UUID, from *socialv1.PublicUser, what, path string) {
+	n.notifyGated(to, BuildCheerPayload(from, what, path), func(s *locitypes.NotificationSettings) bool { return s.Cheers })
 }
 
 // notifySocial sends p to every device `to` registered, on every platform,

@@ -54,6 +54,7 @@ type Handler struct {
 	// Unimplemented.
 	sharing SharingRepository
 	graph   SocialGraph
+	feed    SharingFeed
 
 	// Optional, attached via WithPlan. Nil makes the plan RPCs (dates, stays,
 	// flights) answer Unimplemented.

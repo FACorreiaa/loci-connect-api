@@ -424,6 +424,7 @@ func (h *UserHandler) UpdateNotificationSettings(
 		ProgressUpdates:    req.Msg.ProgressUpdates,
 		CityBoardVisible:   req.Msg.CityBoardVisible,
 		NearbyFits:         req.Msg.NearbyFits,
+		Cheers:             req.Msg.Cheers,
 	})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
@@ -447,6 +448,7 @@ func toProtoNotificationSettings(s *locitypes.NotificationSettings) *userpb.Noti
 		ProgressUpdates:    s.ProgressUpdates,
 		CityBoardVisible:   s.CityBoardVisible,
 		NearbyFits:         s.NearbyFits,
+		Cheers:             s.Cheers,
 	}
 }
 

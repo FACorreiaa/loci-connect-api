@@ -94,6 +94,9 @@ type Award struct {
 	Kind   Kind
 	RefKey string
 	Label  string
+	// Name is what the award is about, for the following feed: a new city's
+	// name.
+	Name   string
 	CityID *uuid.UUID
 }
 

@@ -1,8 +1,11 @@
 package achievements
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
+	"slices"
+	"strings"
 	"time"
 
 	achievementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
@@ -16,6 +19,12 @@ import (
 // Notifier announces an unlock on the user's devices. Best effort.
 type Notifier interface {
 	AchievementUnlocked(ctx context.Context, to uuid.UUID, title, description string)
+}
+
+// Feed records the day's best unlock for the user's followers. Best effort;
+// social.Feed satisfies it.
+type Feed interface {
+	PostAchievement(ctx context.Context, actor uuid.UUID, a *achievementv1.AchievementSummary, rank int, day time.Time)
 }
 
 // Viewer decides whether viewer may see owner's achievements.
@@ -36,6 +45,9 @@ const (
 	rarityEvery = time.Hour
 	// touchTimeout bounds an evaluation made off the request path.
 	touchTimeout = 5 * time.Second
+	// showcaseNewest is how many of a showcase are the latest earned; the
+	// rest are the rarest.
+	showcaseNewest = 4
 )
 
 // Service judges and lists achievements.
@@ -43,6 +55,7 @@ type Service struct {
 	repo    Repository
 	notify  Notifier
 	viewer  Viewer
+	feed    Feed
 	log     *slog.Logger
 	now     func() time.Time
 	enabled bool
@@ -70,6 +83,12 @@ func NewService(repo Repository, notify Notifier, viewer Viewer, log *slog.Logge
 // WithCityRanks takes the Keeper threshold from the city ranks in use.
 func (s *Service) WithCityRanks(t gamification.Thresholds) *Service {
 	s.keeperScore = t[gamification.RankKeeper-1]
+	return s
+}
+
+// WithFeed posts live unlocks to the user's followers.
+func (s *Service) WithFeed(f Feed) *Service {
+	s.feed = f
 	return s
 }
 
@@ -107,7 +126,8 @@ func index(earned []Earned) map[Unit]Earned {
 // Evaluate grants what userID has newly earned and returns it, one entry per
 // achievement at its highest tier. A user whose past was never evaluated is
 // backfilled instead: everything is granted silently and nothing returned.
-// A live unlock pushes at most once a day, never at night.
+// A live unlock reaches the followers' feed (the day's best one) and pushes at
+// most once a day, never at night.
 func (s *Service) Evaluate(ctx context.Context, userID uuid.UUID) ([]*achievementv1.Achievement, error) {
 	if s == nil || !s.enabled || userID == uuid.Nil {
 		return nil, nil
@@ -150,7 +170,21 @@ func (s *Service) Evaluate(ctx context.Context, userID uuid.UUID) ([]*achievemen
 			out = append(out, view(d, counts[d.Counter], held, Rarity{}, true))
 		}
 	}
-	s.announce(ctx, userID, granted)
+	best := granted[0]
+	for _, u := range granted[1:] {
+		if rank(u) > rank(best) {
+			best = u
+		}
+	}
+	tz, err := s.repo.Timezone(ctx, userID)
+	if err != nil {
+		s.log.WarnContext(ctx, "read timezone", slog.String("user_id", userID.String()), slog.Any("error", err))
+		return out, nil
+	}
+	if s.feed != nil {
+		s.feed.PostAchievement(ctx, userID, Summary(best, now), rank(best), gamification.LocalDate(now, tz))
+	}
+	s.announce(ctx, userID, best, tz)
 	return out, nil
 }
 
@@ -168,18 +202,8 @@ func rank(u Unit) int {
 	}
 }
 
-func (s *Service) announce(ctx context.Context, userID uuid.UUID, granted []Unit) {
+func (s *Service) announce(ctx context.Context, userID uuid.UUID, best Unit, tz string) {
 	if s.notify == nil {
-		return
-	}
-	best := granted[0]
-	for _, u := range granted[1:] {
-		if rank(u) > rank(best) {
-			best = u
-		}
-	}
-	tz, err := s.repo.Timezone(ctx, userID)
-	if err != nil {
 		return
 	}
 	now := s.now()
@@ -303,6 +327,75 @@ func (s *Service) RefreshRarity(ctx context.Context) error {
 	now := s.now()
 	_, err := s.repo.RefreshRarity(ctx, now.Add(-rarityWindow), now.Add(-rarityEvery))
 	return err
+}
+
+// Summary is u as others see it once earned: a track at that tier.
+func Summary(u Unit, at time.Time) *achievementv1.AchievementSummary {
+	d, _ := ByID(u.ID)
+	desc := d.Blurb
+	if d.Kind == KindTrack {
+		desc = d.Describe(d.Threshold(u.Tier))
+	}
+	return &achievementv1.AchievementSummary{
+		Id: d.ID, Title: d.Title, Description: desc, Icon: d.Icon,
+		Kind: achievementv1.AchievementKind(d.Kind), Tier: achievementv1.AchievementTier(u.Tier),
+		EarnedAt: ts(at),
+	}
+}
+
+// Showcase is what owner's profile shows off, at most limit: their latest
+// achievements, then their rarest, each at its highest tier. earned counts
+// every unit held, as List does. The caller decides who may see it.
+func (s *Service) Showcase(ctx context.Context, owner uuid.UUID, limit int) ([]*achievementv1.AchievementSummary, int32, error) {
+	if s == nil || !s.enabled {
+		return nil, 0, nil
+	}
+	earned, _, err := s.repo.Earned(ctx, owner)
+	if err != nil {
+		return nil, 0, err
+	}
+	var count int32
+	top := map[string]Earned{}
+	for _, e := range earned {
+		if _, ok := ByID(e.ID); !ok {
+			continue
+		}
+		count++
+		if b, ok := top[e.ID]; !ok || e.Tier > b.Tier {
+			top[e.ID] = e
+		}
+	}
+	if len(top) == 0 {
+		return nil, count, nil
+	}
+	rarity, err := s.repo.Rarity(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	list := make([]Earned, 0, len(top))
+	for _, e := range top {
+		list = append(list, e)
+	}
+	newer := func(a, b Earned) int {
+		if c := b.At.Compare(a.At); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ID, b.ID)
+	}
+	slices.SortFunc(list, newer)
+	n := min(showcaseNewest, len(list))
+	slices.SortFunc(list[n:], func(a, b Earned) int {
+		if c := cmp.Compare(rarity.Holders[a.Unit], rarity.Holders[b.Unit]); c != 0 {
+			return c
+		}
+		return newer(a, b)
+	})
+	list = list[:min(limit, len(list))]
+	out := make([]*achievementv1.AchievementSummary, len(list))
+	for i, e := range list {
+		out[i] = Summary(e.Unit, e.At)
+	}
+	return out, count, nil
 }
 
 func ts(t time.Time) *timestamppb.Timestamp {

@@ -2,12 +2,14 @@ package social
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	achievementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social/socialconnect"
 	"github.com/google/uuid"
@@ -16,11 +18,24 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
+// Showcaser is the achievements a profile shows off.
+// achievements.Service satisfies it.
+type Showcaser interface {
+	// Showcase is owner's best earned achievements, at most limit, and how many
+	// they earned in all.
+	Showcase(ctx context.Context, owner uuid.UUID, limit int) ([]*achievementv1.AchievementSummary, int32, error)
+}
+
+// showcaseSize is how many achievements a profile shows off.
+const showcaseSize = 12
+
 // Handler implements SocialService.
 type Handler struct {
 	socialconnect.UnimplementedSocialServiceHandler
-	svc *Service
-	log *slog.Logger
+	svc      *Service
+	feed     *Feed
+	showcase Showcaser
+	log      *slog.Logger
 }
 
 // NewHandler wires the handler.
@@ -29,6 +44,19 @@ func NewHandler(svc *Service, log *slog.Logger) *Handler {
 		log = slog.Default()
 	}
 	return &Handler{svc: svc, log: log}
+}
+
+// WithFeed serves the following feed and cheers. Without it they answer
+// Unimplemented.
+func (h *Handler) WithFeed(f *Feed) *Handler {
+	h.feed = f
+	return h
+}
+
+// WithShowcase fills profiles with their achievements.
+func (h *Handler) WithShowcase(s Showcaser) *Handler {
+	h.showcase = s
+	return h
 }
 
 func caller(ctx context.Context) (uuid.UUID, error) {
@@ -58,7 +86,7 @@ func (h *Handler) connectErr(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, ErrPrivate):
 		return connect.NewError(connect.CodePermissionDenied, err)
-	case errors.Is(err, ErrSelf):
+	case errors.Is(err, ErrSelf), errors.Is(err, ErrInvalid):
 		return connect.NewError(connect.CodeInvalidArgument, err)
 	case errors.Is(err, ErrLimited):
 		return connect.NewError(connect.CodeResourceExhausted, err)
@@ -389,6 +417,16 @@ func (h *Handler) GetPublicProfile(ctx context.Context, req *connect.Request[soc
 	if !p.MemberSince.IsZero() {
 		resp.MemberSince = timestamppb.New(p.MemberSince.Truncate(24 * time.Hour))
 	}
+	if h.showcase != nil && resp.CanView {
+		top, earned, err := h.showcase.Showcase(ctx, target, showcaseSize)
+		if err != nil {
+			// The card is still worth showing without its achievements.
+			h.log.WarnContext(ctx, "profile showcase failed", slog.String("user_id", target.String()), slog.Any("error", err))
+		} else {
+			resp.Showcase = top
+			resp.Stats.Achievements = earned
+		}
+	}
 	return connect.NewResponse(resp), nil
 }
 
@@ -579,4 +617,102 @@ func (h *Handler) SetAccountPrivacy(ctx context.Context, req *connect.Request[so
 		return nil, h.connectErr(err)
 	}
 	return connect.NewResponse(settingsProto(s)), nil
+}
+
+func (h *Handler) feedReady() error {
+	if h.feed == nil {
+		return connect.NewError(connect.CodeUnimplemented, errors.New("the feed is not enabled"))
+	}
+	return nil
+}
+
+func (h *Handler) ListFeed(ctx context.Context, req *connect.Request[socialv1.ListFeedRequest]) (*connect.Response[socialv1.ListFeedResponse], error) {
+	if err := h.feedReady(); err != nil {
+		return nil, err
+	}
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items, next, err := h.feed.List(ctx, uid, int(req.Msg.GetPageSize()), req.Msg.GetPageToken())
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	out := make([]*socialv1.FeedItem, 0, len(items))
+	for _, it := range items {
+		if p := feedItemProto(it); p != nil {
+			out = append(out, p)
+		}
+	}
+	return connect.NewResponse(&socialv1.ListFeedResponse{Items: out, NextPageToken: next}), nil
+}
+
+// feedItemProto is it on the wire, nil for an item it cannot render.
+func feedItemProto(it FeedItem) *socialv1.FeedItem {
+	out := &socialv1.FeedItem{
+		Id: it.ID.String(), Kind: socialv1.FeedItemKind(it.Kind), Actor: it.Actor,
+		CreatedAt: timestamppb.New(it.CreatedAt), CheerCount: it.Cheers, CheeredByMe: it.CheeredByMe,
+		RecentCheerers: it.Cheerers,
+	}
+	switch it.Kind {
+	case FeedAchievement:
+		var a achievementPayload
+		if err := json.Unmarshal(it.Payload, &a); err != nil || a.ID == "" {
+			return nil
+		}
+		out.Detail = &socialv1.FeedItem_Achievement{Achievement: &achievementv1.AchievementSummary{
+			Id: a.ID, Title: a.Title, Description: a.Description, Icon: a.Icon,
+			Kind: achievementv1.AchievementKind(a.Kind), Tier: achievementv1.AchievementTier(a.Tier),
+			EarnedAt: timestamppb.New(a.EarnedAt),
+		}}
+	case FeedNewCity:
+		var c cityPayload
+		_ = json.Unmarshal(it.Payload, &c)
+		city := &socialv1.FeedCity{CityName: it.CityName, Country: it.Country}
+		if c.CityID != nil {
+			city.CityId = c.CityID.String()
+		}
+		out.Detail = &socialv1.FeedItem_City{City: city}
+	case FeedTripFinished, FeedTripShared:
+		if it.TripID == nil {
+			return nil
+		}
+		out.Detail = &socialv1.FeedItem_Trip{Trip: &socialv1.FeedTrip{
+			TripId: it.TripID.String(), Title: it.Trip.Title, CityName: it.Trip.CityName, Days: it.Trip.Days,
+		}}
+	default:
+		return nil
+	}
+	return out
+}
+
+func (h *Handler) Cheer(ctx context.Context, req *connect.Request[socialv1.CheerRequest]) (*connect.Response[socialv1.CheerResponse], error) {
+	return h.cheer(ctx, req.Msg.GetItemId(), true)
+}
+
+func (h *Handler) Uncheer(ctx context.Context, req *connect.Request[socialv1.UncheerRequest]) (*connect.Response[socialv1.CheerResponse], error) {
+	return h.cheer(ctx, req.Msg.GetItemId(), false)
+}
+
+func (h *Handler) cheer(ctx context.Context, itemID string, on bool) (*connect.Response[socialv1.CheerResponse], error) {
+	if err := h.feedReady(); err != nil {
+		return nil, err
+	}
+	uid, err := caller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := parseID(itemID, "item ID")
+	if err != nil {
+		return nil, err
+	}
+	cheer := h.feed.Uncheer
+	if on {
+		cheer = h.feed.Cheer
+	}
+	n, mine, err := cheer(ctx, uid, id)
+	if err != nil {
+		return nil, h.connectErr(err)
+	}
+	return connect.NewResponse(&socialv1.CheerResponse{CheerCount: n, CheeredByMe: mine}), nil
 }
