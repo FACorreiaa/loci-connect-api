@@ -134,7 +134,7 @@ func (s *Service) firstCity(ctx context.Context, userID, cityID uuid.UUID, name 
 		label = "New city: " + name
 	}
 	return s.AwardQuietly(ctx, Award{
-		UserID: userID, Kind: KindNewCity, RefKey: "city:" + cityID.String(), Label: label, CityID: &cityID,
+		UserID: userID, Kind: KindNewCity, RefKey: "city:" + cityID.String(), Label: label, Name: name, CityID: &cityID,
 	})
 }
 

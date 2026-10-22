@@ -626,12 +626,12 @@ func (r *PostgresUserRepo) GetNotificationSettings(ctx context.Context, userID u
 		VALUES ($1)
 		ON CONFLICT (user_id) DO UPDATE SET user_id = EXCLUDED.user_id
 		RETURNING recommendations, trip_reminders, search_finished, friend_activity,
-			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, updated_at`
+			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, cheers, updated_at`
 
 	var out locitypes.NotificationSettings
 	if err := r.pgpool.QueryRow(ctx, query, userID).
 		Scan(&out.Recommendations, &out.TripReminders, &out.SearchFinished, &out.FriendActivity,
-			&out.LeaderboardVisible, &out.StreakReminders, &out.ProgressUpdates, &out.CityBoardVisible, &out.NearbyFits, &out.UpdatedAt); err != nil {
+			&out.LeaderboardVisible, &out.StreakReminders, &out.ProgressUpdates, &out.CityBoardVisible, &out.NearbyFits, &out.Cheers, &out.UpdatedAt); err != nil {
 		return nil, fmt.Errorf("read notification settings: %w", err)
 	}
 	return &out, nil
@@ -644,9 +644,9 @@ func (r *PostgresUserRepo) GetNotificationSettings(ctx context.Context, userID u
 func (r *PostgresUserRepo) UpdateNotificationSettings(ctx context.Context, userID uuid.UUID, params locitypes.UpdateNotificationSettingsParams) (*locitypes.NotificationSettings, error) {
 	query := `
 		INSERT INTO notification_settings (user_id, recommendations, trip_reminders, search_finished, friend_activity,
-			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, updated_at)
+			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, cheers, updated_at)
 		VALUES ($1, COALESCE($2, FALSE), COALESCE($3, FALSE), COALESCE($4, TRUE), COALESCE($5, TRUE),
-			COALESCE($6, TRUE), COALESCE($7, TRUE), COALESCE($8, TRUE), COALESCE($9, TRUE), COALESCE($10, FALSE), NOW())
+			COALESCE($6, TRUE), COALESCE($7, TRUE), COALESCE($8, TRUE), COALESCE($9, TRUE), COALESCE($10, FALSE), COALESCE($11, TRUE), NOW())
 		ON CONFLICT (user_id) DO UPDATE SET
 			recommendations = COALESCE($2, notification_settings.recommendations),
 			trip_reminders  = COALESCE($3, notification_settings.trip_reminders),
@@ -657,15 +657,16 @@ func (r *PostgresUserRepo) UpdateNotificationSettings(ctx context.Context, userI
 			progress_updates    = COALESCE($8, notification_settings.progress_updates),
 			city_board_visible  = COALESCE($9, notification_settings.city_board_visible),
 			nearby_fits         = COALESCE($10, notification_settings.nearby_fits),
+			cheers              = COALESCE($11, notification_settings.cheers),
 			updated_at      = NOW()
 		RETURNING recommendations, trip_reminders, search_finished, friend_activity,
-			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, updated_at`
+			leaderboard_visible, streak_reminders, progress_updates, city_board_visible, nearby_fits, cheers, updated_at`
 
 	var out locitypes.NotificationSettings
 	if err := r.pgpool.QueryRow(ctx, query, userID, params.Recommendations, params.TripReminders, params.SearchFinished, params.FriendActivity,
-		params.LeaderboardVisible, params.StreakReminders, params.ProgressUpdates, params.CityBoardVisible, params.NearbyFits).
+		params.LeaderboardVisible, params.StreakReminders, params.ProgressUpdates, params.CityBoardVisible, params.NearbyFits, params.Cheers).
 		Scan(&out.Recommendations, &out.TripReminders, &out.SearchFinished, &out.FriendActivity,
-			&out.LeaderboardVisible, &out.StreakReminders, &out.ProgressUpdates, &out.CityBoardVisible, &out.NearbyFits, &out.UpdatedAt); err != nil {
+			&out.LeaderboardVisible, &out.StreakReminders, &out.ProgressUpdates, &out.CityBoardVisible, &out.NearbyFits, &out.Cheers, &out.UpdatedAt); err != nil {
 		return nil, fmt.Errorf("update notification settings: %w", err)
 	}
 	return &out, nil

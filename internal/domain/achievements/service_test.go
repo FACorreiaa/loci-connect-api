@@ -3,6 +3,7 @@ package achievements
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -435,5 +436,88 @@ func TestBackfillBatch(t *testing.T) {
 	left, _ := repo.Unbackfilled(context.Background(), 10)
 	if len(left) != 1 {
 		t.Fatalf("left = %d, want 1", len(left))
+	}
+}
+
+type feedPosts struct {
+	mu    sync.Mutex
+	posts []string
+	days  []time.Time
+}
+
+func (f *feedPosts) PostAchievement(_ context.Context, _ uuid.UUID, a *achievementv1.AchievementSummary, rank int, day time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.posts = append(f.posts, fmt.Sprintf("%s/%d/%d", a.GetId(), a.GetTier(), rank))
+	f.days = append(f.days, day)
+}
+
+// The feed gets the best live unlock every time, night or day, and never a
+// backfilled one.
+func TestLiveUnlocksReachTheFeed(t *testing.T) {
+	repo := newFakeRepo()
+	f := &feedPosts{}
+	s := newTestService(repo, &pushes{}, nil).WithFeed(f)
+	ctx := context.Background()
+
+	old := repo.user(map[Counter]int64{CountCities: 40})
+	repo.backfilled[old] = false
+	_, _ = s.Evaluate(ctx, old)
+	if len(f.posts) != 0 {
+		t.Fatalf("backfill reached the feed: %v", f.posts)
+	}
+
+	repo.tz = "Pacific/Auckland" // 01:00 on Friday there: quiet, but still posted
+	u := repo.user(map[Counter]int64{CountStops: 80, CountDays: 1})
+	_, _ = s.Evaluate(ctx, u)
+	if len(f.posts) != 1 || f.posts[0] != "trailhead/2/3" {
+		t.Fatalf("posts = %v; want trailhead at silver, rank 3", f.posts)
+	}
+	if want := time.Date(2026, 10, 23, 0, 0, 0, 0, time.UTC); !f.days[0].Equal(want) {
+		t.Fatalf("day = %s; want the user's local %s", f.days[0], want)
+	}
+}
+
+func TestShowcaseIsNewestThenRarest(t *testing.T) {
+	repo := newFakeRepo()
+	s := newTestService(repo, nil, nil)
+	u := repo.user(nil)
+	at := func(h int) time.Time { return noon.Add(-time.Duration(h) * time.Hour) }
+	held := []Earned{
+		{Unit: Unit{ID: "cartographer", Tier: TierBronze}, At: at(10)},
+		{Unit: Unit{ID: "cartographer", Tier: TierSilver}, At: at(1)},
+		{Unit: Unit{ID: "first-pin"}, At: at(9)},
+		{Unit: Unit{ID: "night-owl"}, At: at(30)},
+		{Unit: Unit{ID: "day-one-done"}, At: at(20)},
+		{Unit: Unit{ID: "round-trip"}, At: at(21)},
+		{Unit: Unit{ID: "kindred"}, At: at(22)},
+		{Unit: Unit{ID: "first-light"}, At: at(23)},
+		{Unit: Unit{ID: "retired-badge"}, At: at(0)},
+	}
+	repo.earned[u] = map[Unit]Earned{}
+	for _, e := range held {
+		repo.earned[u][e.Unit] = e
+	}
+	repo.rarity = Rarity{Base: 100, Holders: map[Unit]int{
+		{ID: "night-owl"}: 2, {ID: "first-light"}: 5, {ID: "kindred"}: 40,
+	}}
+
+	top, earned, err := s.Showcase(context.Background(), u, 6)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if earned != 8 {
+		t.Errorf("earned = %d; want 8 units (the unknown id left out)", earned)
+	}
+	var got []string
+	for _, a := range top {
+		got = append(got, fmt.Sprintf("%s/%d", a.GetId(), a.GetTier()))
+	}
+	want := []string{"cartographer/2", "first-pin/0", "day-one-done/0", "round-trip/0", "night-owl/0", "first-light/0"}
+	if strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("showcase = %v; want %v", got, want)
+	}
+	if top[0].GetDescription() == "" || top[0].GetTitle() != "Cartographer" {
+		t.Errorf("summary = %+v", top[0])
 	}
 }

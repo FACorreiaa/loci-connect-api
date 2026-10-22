@@ -65,6 +65,7 @@ type Service struct {
 	hoods        Neighborhoods
 	plans        PlanChecker
 	achiever     Achiever
+	feed         Feed
 }
 
 // NewService builds the service. With enabled false every award is a no-op
@@ -152,6 +153,7 @@ func (s *Service) Award(ctx context.Context, a Award) (Result, error) {
 	if !inserted {
 		return Result{Totals: totals}, nil
 	}
+	s.toFeed(ctx, a)
 	res := Result{Points: rule.Points, Totals: totals, Unlocked: s.evaluate(ctx, a.UserID)}
 	s.announcePass(ctx, a.UserID, rule.Points, today)
 	return res, nil
@@ -350,7 +352,7 @@ func (s *Service) ScoreVisit(ctx context.Context, v Visit) int {
 		total += s.AwardQuietly(ctx, Award{
 			UserID: v.UserID, Kind: KindNewCity,
 			RefKey: "city:" + v.NewCityKey, Label: "New city: " + v.CityName,
-			CityID: v.NewCityID,
+			Name: v.CityName, CityID: v.NewCityID,
 		})
 	}
 	return total
