@@ -1034,7 +1034,8 @@ func (d *Dependencies) initHandlers() error {
 		// brought it here.
 		d.signups = socialSvc
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
-		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc)
+		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc).
+			WithMembers(trip.NewMembersRepository(d.DB.Pool, d.Logger), socialSvc)
 		// The following feed: new cities, finished and shared trips and the
 		// day's best achievement, read by the people who follow you.
 		var feed *socialdomain.Feed

@@ -45,6 +45,63 @@ func TestCanView(t *testing.T) {
 	}
 }
 
+// Members see the trip whatever its visibility; a block still wins.
+func TestCanSeeAsMember(t *testing.T) {
+	owner, member, stranger := uuid.New(), uuid.New(), uuid.New()
+	anon := uuid.Nil
+	type tc struct {
+		name    string
+		viewer  uuid.UUID
+		role    Role
+		vis     Visibility
+		access  Access
+		blocked bool
+		want    bool
+	}
+	cases := []tc{
+		{"owner sees private", owner, RoleOwner, VisibilityPrivate, AccessByID, false, true},
+		{"co-planner sees private", member, RoleCoPlanner, VisibilityPrivate, AccessByID, false, true},
+		{"viewer sees private", member, RoleViewer, VisibilityPrivate, AccessByID, false, true},
+		{"blocked co-planner sees nothing", member, RoleCoPlanner, VisibilityPrivate, AccessByID, true, false},
+		{"blocked viewer cannot see public either", member, RoleViewer, VisibilityPublic, AccessByID, true, false},
+		{"stranger cannot see private", stranger, RoleNone, VisibilityPrivate, AccessByID, false, false},
+		{"stranger falls back to CanView for a link trip", stranger, RoleNone, VisibilityLink, AccessByLink, false, true},
+		{"anonymous with a role is still anonymous", anon, RoleCoPlanner, VisibilityPrivate, AccessByID, false, false},
+	}
+	for _, c := range cases {
+		if got := CanSeeAsMember(c.viewer, owner, c.role, c.vis, c.access, false, c.blocked); got != c.want {
+			t.Errorf("%s: CanSeeAsMember = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// Only the owner and unblocked co-planners suggest changes.
+func TestCanEdit(t *testing.T) {
+	owner, member := uuid.New(), uuid.New()
+	type tc struct {
+		name    string
+		viewer  uuid.UUID
+		role    Role
+		blocked bool
+		want    bool
+	}
+	cases := []tc{
+		{"owner edits", owner, RoleOwner, false, true},
+		{"owner edits with no role passed", owner, RoleNone, false, true},
+		{"co-planner edits", member, RoleCoPlanner, false, true},
+		{"blocked co-planner cannot", member, RoleCoPlanner, true, false},
+		{"viewer cannot", member, RoleViewer, false, false},
+		{"stranger cannot", member, RoleNone, false, false},
+		{"a non-owner claiming owner cannot", member, RoleOwner, false, false},
+		{"anonymous cannot", uuid.Nil, RoleCoPlanner, false, false},
+	}
+	for _, c := range cases {
+		if got := CanEdit(c.viewer, owner, c.role, c.blocked); got != c.want {
+			t.Errorf("%s: CanEdit = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func sharedDraft() *tripv1.TripDraft {
 	url := "https://book.example/1"
 	sid := "session-1"

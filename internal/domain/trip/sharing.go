@@ -71,6 +71,44 @@ func CanView(viewer, owner uuid.UUID, vis Visibility, access Access, friends, bl
 	}
 }
 
+// Role is what a person may do on a trip. The order matters: each role may
+// do everything the ones below it may.
+type Role int
+
+const (
+	RoleNone Role = iota
+	RoleViewer
+	RoleCoPlanner
+	RoleOwner
+)
+
+// CanSeeAsMember is CanView for someone the owner let onto the trip: a member
+// sees it whatever its visibility, unless either side blocked the other.
+func CanSeeAsMember(viewer, owner uuid.UUID, role Role, vis Visibility, access Access, friends, blocked bool) bool {
+	if viewer != uuid.Nil && viewer == owner {
+		return true
+	}
+	if viewer != uuid.Nil && role >= RoleViewer && !blocked {
+		return true
+	}
+	return CanView(viewer, owner, vis, access, friends, blocked)
+}
+
+// CanEdit reports whether viewer may suggest changes to the trip: the owner,
+// or a co-planner neither side has blocked. Applying a change stays with the
+// owner.
+func CanEdit(viewer, owner uuid.UUID, role Role, blocked bool) bool {
+	if viewer == uuid.Nil {
+		return false
+	}
+	if viewer == owner {
+		return true
+	}
+	// RoleOwner for someone who is not the owner is a caller's mistake, not
+	// a reason to let them in.
+	return role == RoleCoPlanner && !blocked
+}
+
 // SocialGraph is what trip sharing needs from the people layer. Friends are
 // people who follow each other. The social package implements it; trip does
 // not import social.
