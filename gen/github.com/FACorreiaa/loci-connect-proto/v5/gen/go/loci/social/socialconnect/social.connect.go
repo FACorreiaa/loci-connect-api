@@ -44,6 +44,40 @@ const (
 	// SocialServiceAcceptInviteProcedure is the fully-qualified name of the SocialService's
 	// AcceptInvite RPC.
 	SocialServiceAcceptInviteProcedure = "/loci.social.SocialService/AcceptInvite"
+	// SocialServiceFollowProcedure is the fully-qualified name of the SocialService's Follow RPC.
+	SocialServiceFollowProcedure = "/loci.social.SocialService/Follow"
+	// SocialServiceUnfollowProcedure is the fully-qualified name of the SocialService's Unfollow RPC.
+	SocialServiceUnfollowProcedure = "/loci.social.SocialService/Unfollow"
+	// SocialServiceRemoveFollowerProcedure is the fully-qualified name of the SocialService's
+	// RemoveFollower RPC.
+	SocialServiceRemoveFollowerProcedure = "/loci.social.SocialService/RemoveFollower"
+	// SocialServiceListFollowersProcedure is the fully-qualified name of the SocialService's
+	// ListFollowers RPC.
+	SocialServiceListFollowersProcedure = "/loci.social.SocialService/ListFollowers"
+	// SocialServiceListFollowingProcedure is the fully-qualified name of the SocialService's
+	// ListFollowing RPC.
+	SocialServiceListFollowingProcedure = "/loci.social.SocialService/ListFollowing"
+	// SocialServiceListFollowRequestsProcedure is the fully-qualified name of the SocialService's
+	// ListFollowRequests RPC.
+	SocialServiceListFollowRequestsProcedure = "/loci.social.SocialService/ListFollowRequests"
+	// SocialServiceRespondFollowRequestProcedure is the fully-qualified name of the SocialService's
+	// RespondFollowRequest RPC.
+	SocialServiceRespondFollowRequestProcedure = "/loci.social.SocialService/RespondFollowRequest"
+	// SocialServiceCancelFollowRequestProcedure is the fully-qualified name of the SocialService's
+	// CancelFollowRequest RPC.
+	SocialServiceCancelFollowRequestProcedure = "/loci.social.SocialService/CancelFollowRequest"
+	// SocialServiceGetSocialSettingsProcedure is the fully-qualified name of the SocialService's
+	// GetSocialSettings RPC.
+	SocialServiceGetSocialSettingsProcedure = "/loci.social.SocialService/GetSocialSettings"
+	// SocialServiceSetAccountPrivacyProcedure is the fully-qualified name of the SocialService's
+	// SetAccountPrivacy RPC.
+	SocialServiceSetAccountPrivacyProcedure = "/loci.social.SocialService/SetAccountPrivacy"
+	// SocialServiceListFeedProcedure is the fully-qualified name of the SocialService's ListFeed RPC.
+	SocialServiceListFeedProcedure = "/loci.social.SocialService/ListFeed"
+	// SocialServiceCheerProcedure is the fully-qualified name of the SocialService's Cheer RPC.
+	SocialServiceCheerProcedure = "/loci.social.SocialService/Cheer"
+	// SocialServiceUncheerProcedure is the fully-qualified name of the SocialService's Uncheer RPC.
+	SocialServiceUncheerProcedure = "/loci.social.SocialService/Uncheer"
 	// SocialServiceSendFriendRequestProcedure is the fully-qualified name of the SocialService's
 	// SendFriendRequest RPC.
 	SocialServiceSendFriendRequestProcedure = "/loci.social.SocialService/SendFriendRequest"
@@ -88,6 +122,19 @@ var (
 	socialServiceRotateInviteMethodDescriptor         = socialServiceServiceDescriptor.Methods().ByName("RotateInvite")
 	socialServiceGetInviteMethodDescriptor            = socialServiceServiceDescriptor.Methods().ByName("GetInvite")
 	socialServiceAcceptInviteMethodDescriptor         = socialServiceServiceDescriptor.Methods().ByName("AcceptInvite")
+	socialServiceFollowMethodDescriptor               = socialServiceServiceDescriptor.Methods().ByName("Follow")
+	socialServiceUnfollowMethodDescriptor             = socialServiceServiceDescriptor.Methods().ByName("Unfollow")
+	socialServiceRemoveFollowerMethodDescriptor       = socialServiceServiceDescriptor.Methods().ByName("RemoveFollower")
+	socialServiceListFollowersMethodDescriptor        = socialServiceServiceDescriptor.Methods().ByName("ListFollowers")
+	socialServiceListFollowingMethodDescriptor        = socialServiceServiceDescriptor.Methods().ByName("ListFollowing")
+	socialServiceListFollowRequestsMethodDescriptor   = socialServiceServiceDescriptor.Methods().ByName("ListFollowRequests")
+	socialServiceRespondFollowRequestMethodDescriptor = socialServiceServiceDescriptor.Methods().ByName("RespondFollowRequest")
+	socialServiceCancelFollowRequestMethodDescriptor  = socialServiceServiceDescriptor.Methods().ByName("CancelFollowRequest")
+	socialServiceGetSocialSettingsMethodDescriptor    = socialServiceServiceDescriptor.Methods().ByName("GetSocialSettings")
+	socialServiceSetAccountPrivacyMethodDescriptor    = socialServiceServiceDescriptor.Methods().ByName("SetAccountPrivacy")
+	socialServiceListFeedMethodDescriptor             = socialServiceServiceDescriptor.Methods().ByName("ListFeed")
+	socialServiceCheerMethodDescriptor                = socialServiceServiceDescriptor.Methods().ByName("Cheer")
+	socialServiceUncheerMethodDescriptor              = socialServiceServiceDescriptor.Methods().ByName("Uncheer")
 	socialServiceSendFriendRequestMethodDescriptor    = socialServiceServiceDescriptor.Methods().ByName("SendFriendRequest")
 	socialServiceRespondFriendRequestMethodDescriptor = socialServiceServiceDescriptor.Methods().ByName("RespondFriendRequest")
 	socialServiceCancelFriendRequestMethodDescriptor  = socialServiceServiceDescriptor.Methods().ByName("CancelFriendRequest")
@@ -111,19 +158,54 @@ type SocialServiceClient interface {
 	// GetInvite describes an invite for its landing page. Expired or rotated
 	// codes are NotFound.
 	GetInvite(context.Context, *connect.Request[social.GetInviteRequest]) (*connect.Response[social.GetInviteResponse], error)
-	// AcceptInvite makes the caller and the inviter friends at once: opening a
-	// friend's link is the consent on both sides.
+	// AcceptInvite makes the caller and the inviter friends at once (each
+	// follows the other, whatever their privacy): opening a friend's link is
+	// the consent on both sides.
 	AcceptInvite(context.Context, *connect.Request[social.AcceptInviteRequest]) (*connect.Response[social.AcceptInviteResponse], error)
+	// Follow follows a user. Following a private account sends a follow request
+	// instead (state REQUESTED); following again is a no-op.
+	Follow(context.Context, *connect.Request[social.FollowUserRequest]) (*connect.Response[social.FollowUserResponse], error)
+	// Unfollow stops following a user, or withdraws a pending follow request.
+	Unfollow(context.Context, *connect.Request[social.UnfollowRequest]) (*connect.Response[social.UnfollowResponse], error)
+	// RemoveFollower makes a user stop following the caller.
+	RemoveFollower(context.Context, *connect.Request[social.RemoveFollowerRequest]) (*connect.Response[social.RemoveFollowerResponse], error)
+	// ListFollowers and ListFollowing list a user's followers and the people
+	// they follow, newest first. Empty user_id means the caller. A private
+	// account's lists are PermissionDenied to anyone it has not approved.
+	ListFollowers(context.Context, *connect.Request[social.ListFollowersRequest]) (*connect.Response[social.ListFollowsResponse], error)
+	ListFollowing(context.Context, *connect.Request[social.ListFollowingRequest]) (*connect.Response[social.ListFollowsResponse], error)
+	// ListFollowRequests lists pending follow requests to or from the caller.
+	ListFollowRequests(context.Context, *connect.Request[social.ListFollowRequestsRequest]) (*connect.Response[social.ListFollowRequestsResponse], error)
+	// RespondFollowRequest approves or declines a request to follow the caller.
+	RespondFollowRequest(context.Context, *connect.Request[social.RespondFollowRequestRequest]) (*connect.Response[social.RespondFollowRequestResponse], error)
+	// CancelFollowRequest withdraws a follow request the caller sent.
+	CancelFollowRequest(context.Context, *connect.Request[social.CancelFollowRequestRequest]) (*connect.Response[social.CancelFollowRequestResponse], error)
+	// GetSocialSettings and SetAccountPrivacy read and set whether the caller's
+	// account is private. Making it public approves every pending request.
+	GetSocialSettings(context.Context, *connect.Request[social.GetSocialSettingsRequest]) (*connect.Response[social.GetSocialSettingsResponse], error)
+	SetAccountPrivacy(context.Context, *connect.Request[social.SetAccountPrivacyRequest]) (*connect.Response[social.GetSocialSettingsResponse], error)
+	// ListFeed is what the people the caller follows did lately: achievements
+	// earned, new cities, trips finished and trips shared, newest first. Trips
+	// appear only while the caller may still see them.
+	ListFeed(context.Context, *connect.Request[social.ListFeedRequest]) (*connect.Response[social.ListFeedResponse], error)
+	// Cheer and Uncheer add and take back the caller's cheer on a feed item.
+	// Both are idempotent.
+	Cheer(context.Context, *connect.Request[social.CheerRequest]) (*connect.Response[social.CheerResponse], error)
+	Uncheer(context.Context, *connect.Request[social.UncheerRequest]) (*connect.Response[social.CheerResponse], error)
+	// SendFriendRequest follows the user (kept for older clients; use Follow).
 	SendFriendRequest(context.Context, *connect.Request[social.SendFriendRequestRequest]) (*connect.Response[social.SendFriendRequestResponse], error)
 	// RespondFriendRequest accepts or declines an incoming request.
 	RespondFriendRequest(context.Context, *connect.Request[social.RespondFriendRequestRequest]) (*connect.Response[social.RespondFriendRequestResponse], error)
 	// CancelFriendRequest withdraws a request the caller sent.
 	CancelFriendRequest(context.Context, *connect.Request[social.CancelFriendRequestRequest]) (*connect.Response[social.CancelFriendRequestResponse], error)
 	ListFriendRequests(context.Context, *connect.Request[social.ListFriendRequestsRequest]) (*connect.Response[social.ListFriendRequestsResponse], error)
+	// ListFriends lists mutual follows.
 	ListFriends(context.Context, *connect.Request[social.ListFriendsRequest]) (*connect.Response[social.ListFriendsResponse], error)
+	// RemoveFriend ends following in both directions.
 	RemoveFriend(context.Context, *connect.Request[social.RemoveFriendRequest]) (*connect.Response[social.RemoveFriendResponse], error)
-	// BlockUser ends any friendship and pending request between the two, and
-	// hides each side's content and profile from the other.
+	// BlockUser ends following in both directions and any pending request
+	// between the two, and hides each side's content and profile from the
+	// other.
 	BlockUser(context.Context, *connect.Request[social.BlockUserRequest]) (*connect.Response[social.BlockUserResponse], error)
 	UnblockUser(context.Context, *connect.Request[social.UnblockUserRequest]) (*connect.Response[social.UnblockUserResponse], error)
 	// MatchContacts finds Loci users among the caller's contacts. Clients send
@@ -139,7 +221,8 @@ type SocialServiceClient interface {
 	// SearchUsers finds users by username prefix.
 	SearchUsers(context.Context, *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error)
 	// GetPublicProfile is a user's profile as the caller may see it. A user who
-	// blocked the caller is NotFound.
+	// blocked the caller is NotFound. A private account the caller may not see
+	// still returns the card and counts, with can_view false.
 	GetPublicProfile(context.Context, *connect.Request[social.GetPublicProfileRequest]) (*connect.Response[social.GetPublicProfileResponse], error)
 }
 
@@ -175,6 +258,84 @@ func NewSocialServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			httpClient,
 			baseURL+SocialServiceAcceptInviteProcedure,
 			connect.WithSchema(socialServiceAcceptInviteMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		follow: connect.NewClient[social.FollowUserRequest, social.FollowUserResponse](
+			httpClient,
+			baseURL+SocialServiceFollowProcedure,
+			connect.WithSchema(socialServiceFollowMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		unfollow: connect.NewClient[social.UnfollowRequest, social.UnfollowResponse](
+			httpClient,
+			baseURL+SocialServiceUnfollowProcedure,
+			connect.WithSchema(socialServiceUnfollowMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		removeFollower: connect.NewClient[social.RemoveFollowerRequest, social.RemoveFollowerResponse](
+			httpClient,
+			baseURL+SocialServiceRemoveFollowerProcedure,
+			connect.WithSchema(socialServiceRemoveFollowerMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listFollowers: connect.NewClient[social.ListFollowersRequest, social.ListFollowsResponse](
+			httpClient,
+			baseURL+SocialServiceListFollowersProcedure,
+			connect.WithSchema(socialServiceListFollowersMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listFollowing: connect.NewClient[social.ListFollowingRequest, social.ListFollowsResponse](
+			httpClient,
+			baseURL+SocialServiceListFollowingProcedure,
+			connect.WithSchema(socialServiceListFollowingMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listFollowRequests: connect.NewClient[social.ListFollowRequestsRequest, social.ListFollowRequestsResponse](
+			httpClient,
+			baseURL+SocialServiceListFollowRequestsProcedure,
+			connect.WithSchema(socialServiceListFollowRequestsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		respondFollowRequest: connect.NewClient[social.RespondFollowRequestRequest, social.RespondFollowRequestResponse](
+			httpClient,
+			baseURL+SocialServiceRespondFollowRequestProcedure,
+			connect.WithSchema(socialServiceRespondFollowRequestMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		cancelFollowRequest: connect.NewClient[social.CancelFollowRequestRequest, social.CancelFollowRequestResponse](
+			httpClient,
+			baseURL+SocialServiceCancelFollowRequestProcedure,
+			connect.WithSchema(socialServiceCancelFollowRequestMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		getSocialSettings: connect.NewClient[social.GetSocialSettingsRequest, social.GetSocialSettingsResponse](
+			httpClient,
+			baseURL+SocialServiceGetSocialSettingsProcedure,
+			connect.WithSchema(socialServiceGetSocialSettingsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		setAccountPrivacy: connect.NewClient[social.SetAccountPrivacyRequest, social.GetSocialSettingsResponse](
+			httpClient,
+			baseURL+SocialServiceSetAccountPrivacyProcedure,
+			connect.WithSchema(socialServiceSetAccountPrivacyMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listFeed: connect.NewClient[social.ListFeedRequest, social.ListFeedResponse](
+			httpClient,
+			baseURL+SocialServiceListFeedProcedure,
+			connect.WithSchema(socialServiceListFeedMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		cheer: connect.NewClient[social.CheerRequest, social.CheerResponse](
+			httpClient,
+			baseURL+SocialServiceCheerProcedure,
+			connect.WithSchema(socialServiceCheerMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		uncheer: connect.NewClient[social.UncheerRequest, social.CheerResponse](
+			httpClient,
+			baseURL+SocialServiceUncheerProcedure,
+			connect.WithSchema(socialServiceUncheerMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		sendFriendRequest: connect.NewClient[social.SendFriendRequestRequest, social.SendFriendRequestResponse](
@@ -258,6 +419,19 @@ type socialServiceClient struct {
 	rotateInvite         *connect.Client[social.RotateInviteRequest, social.GetMyInviteResponse]
 	getInvite            *connect.Client[social.GetInviteRequest, social.GetInviteResponse]
 	acceptInvite         *connect.Client[social.AcceptInviteRequest, social.AcceptInviteResponse]
+	follow               *connect.Client[social.FollowUserRequest, social.FollowUserResponse]
+	unfollow             *connect.Client[social.UnfollowRequest, social.UnfollowResponse]
+	removeFollower       *connect.Client[social.RemoveFollowerRequest, social.RemoveFollowerResponse]
+	listFollowers        *connect.Client[social.ListFollowersRequest, social.ListFollowsResponse]
+	listFollowing        *connect.Client[social.ListFollowingRequest, social.ListFollowsResponse]
+	listFollowRequests   *connect.Client[social.ListFollowRequestsRequest, social.ListFollowRequestsResponse]
+	respondFollowRequest *connect.Client[social.RespondFollowRequestRequest, social.RespondFollowRequestResponse]
+	cancelFollowRequest  *connect.Client[social.CancelFollowRequestRequest, social.CancelFollowRequestResponse]
+	getSocialSettings    *connect.Client[social.GetSocialSettingsRequest, social.GetSocialSettingsResponse]
+	setAccountPrivacy    *connect.Client[social.SetAccountPrivacyRequest, social.GetSocialSettingsResponse]
+	listFeed             *connect.Client[social.ListFeedRequest, social.ListFeedResponse]
+	cheer                *connect.Client[social.CheerRequest, social.CheerResponse]
+	uncheer              *connect.Client[social.UncheerRequest, social.CheerResponse]
 	sendFriendRequest    *connect.Client[social.SendFriendRequestRequest, social.SendFriendRequestResponse]
 	respondFriendRequest *connect.Client[social.RespondFriendRequestRequest, social.RespondFriendRequestResponse]
 	cancelFriendRequest  *connect.Client[social.CancelFriendRequestRequest, social.CancelFriendRequestResponse]
@@ -290,6 +464,71 @@ func (c *socialServiceClient) GetInvite(ctx context.Context, req *connect.Reques
 // AcceptInvite calls loci.social.SocialService.AcceptInvite.
 func (c *socialServiceClient) AcceptInvite(ctx context.Context, req *connect.Request[social.AcceptInviteRequest]) (*connect.Response[social.AcceptInviteResponse], error) {
 	return c.acceptInvite.CallUnary(ctx, req)
+}
+
+// Follow calls loci.social.SocialService.Follow.
+func (c *socialServiceClient) Follow(ctx context.Context, req *connect.Request[social.FollowUserRequest]) (*connect.Response[social.FollowUserResponse], error) {
+	return c.follow.CallUnary(ctx, req)
+}
+
+// Unfollow calls loci.social.SocialService.Unfollow.
+func (c *socialServiceClient) Unfollow(ctx context.Context, req *connect.Request[social.UnfollowRequest]) (*connect.Response[social.UnfollowResponse], error) {
+	return c.unfollow.CallUnary(ctx, req)
+}
+
+// RemoveFollower calls loci.social.SocialService.RemoveFollower.
+func (c *socialServiceClient) RemoveFollower(ctx context.Context, req *connect.Request[social.RemoveFollowerRequest]) (*connect.Response[social.RemoveFollowerResponse], error) {
+	return c.removeFollower.CallUnary(ctx, req)
+}
+
+// ListFollowers calls loci.social.SocialService.ListFollowers.
+func (c *socialServiceClient) ListFollowers(ctx context.Context, req *connect.Request[social.ListFollowersRequest]) (*connect.Response[social.ListFollowsResponse], error) {
+	return c.listFollowers.CallUnary(ctx, req)
+}
+
+// ListFollowing calls loci.social.SocialService.ListFollowing.
+func (c *socialServiceClient) ListFollowing(ctx context.Context, req *connect.Request[social.ListFollowingRequest]) (*connect.Response[social.ListFollowsResponse], error) {
+	return c.listFollowing.CallUnary(ctx, req)
+}
+
+// ListFollowRequests calls loci.social.SocialService.ListFollowRequests.
+func (c *socialServiceClient) ListFollowRequests(ctx context.Context, req *connect.Request[social.ListFollowRequestsRequest]) (*connect.Response[social.ListFollowRequestsResponse], error) {
+	return c.listFollowRequests.CallUnary(ctx, req)
+}
+
+// RespondFollowRequest calls loci.social.SocialService.RespondFollowRequest.
+func (c *socialServiceClient) RespondFollowRequest(ctx context.Context, req *connect.Request[social.RespondFollowRequestRequest]) (*connect.Response[social.RespondFollowRequestResponse], error) {
+	return c.respondFollowRequest.CallUnary(ctx, req)
+}
+
+// CancelFollowRequest calls loci.social.SocialService.CancelFollowRequest.
+func (c *socialServiceClient) CancelFollowRequest(ctx context.Context, req *connect.Request[social.CancelFollowRequestRequest]) (*connect.Response[social.CancelFollowRequestResponse], error) {
+	return c.cancelFollowRequest.CallUnary(ctx, req)
+}
+
+// GetSocialSettings calls loci.social.SocialService.GetSocialSettings.
+func (c *socialServiceClient) GetSocialSettings(ctx context.Context, req *connect.Request[social.GetSocialSettingsRequest]) (*connect.Response[social.GetSocialSettingsResponse], error) {
+	return c.getSocialSettings.CallUnary(ctx, req)
+}
+
+// SetAccountPrivacy calls loci.social.SocialService.SetAccountPrivacy.
+func (c *socialServiceClient) SetAccountPrivacy(ctx context.Context, req *connect.Request[social.SetAccountPrivacyRequest]) (*connect.Response[social.GetSocialSettingsResponse], error) {
+	return c.setAccountPrivacy.CallUnary(ctx, req)
+}
+
+// ListFeed calls loci.social.SocialService.ListFeed.
+func (c *socialServiceClient) ListFeed(ctx context.Context, req *connect.Request[social.ListFeedRequest]) (*connect.Response[social.ListFeedResponse], error) {
+	return c.listFeed.CallUnary(ctx, req)
+}
+
+// Cheer calls loci.social.SocialService.Cheer.
+func (c *socialServiceClient) Cheer(ctx context.Context, req *connect.Request[social.CheerRequest]) (*connect.Response[social.CheerResponse], error) {
+	return c.cheer.CallUnary(ctx, req)
+}
+
+// Uncheer calls loci.social.SocialService.Uncheer.
+func (c *socialServiceClient) Uncheer(ctx context.Context, req *connect.Request[social.UncheerRequest]) (*connect.Response[social.CheerResponse], error) {
+	return c.uncheer.CallUnary(ctx, req)
 }
 
 // SendFriendRequest calls loci.social.SocialService.SendFriendRequest.
@@ -361,19 +600,54 @@ type SocialServiceHandler interface {
 	// GetInvite describes an invite for its landing page. Expired or rotated
 	// codes are NotFound.
 	GetInvite(context.Context, *connect.Request[social.GetInviteRequest]) (*connect.Response[social.GetInviteResponse], error)
-	// AcceptInvite makes the caller and the inviter friends at once: opening a
-	// friend's link is the consent on both sides.
+	// AcceptInvite makes the caller and the inviter friends at once (each
+	// follows the other, whatever their privacy): opening a friend's link is
+	// the consent on both sides.
 	AcceptInvite(context.Context, *connect.Request[social.AcceptInviteRequest]) (*connect.Response[social.AcceptInviteResponse], error)
+	// Follow follows a user. Following a private account sends a follow request
+	// instead (state REQUESTED); following again is a no-op.
+	Follow(context.Context, *connect.Request[social.FollowUserRequest]) (*connect.Response[social.FollowUserResponse], error)
+	// Unfollow stops following a user, or withdraws a pending follow request.
+	Unfollow(context.Context, *connect.Request[social.UnfollowRequest]) (*connect.Response[social.UnfollowResponse], error)
+	// RemoveFollower makes a user stop following the caller.
+	RemoveFollower(context.Context, *connect.Request[social.RemoveFollowerRequest]) (*connect.Response[social.RemoveFollowerResponse], error)
+	// ListFollowers and ListFollowing list a user's followers and the people
+	// they follow, newest first. Empty user_id means the caller. A private
+	// account's lists are PermissionDenied to anyone it has not approved.
+	ListFollowers(context.Context, *connect.Request[social.ListFollowersRequest]) (*connect.Response[social.ListFollowsResponse], error)
+	ListFollowing(context.Context, *connect.Request[social.ListFollowingRequest]) (*connect.Response[social.ListFollowsResponse], error)
+	// ListFollowRequests lists pending follow requests to or from the caller.
+	ListFollowRequests(context.Context, *connect.Request[social.ListFollowRequestsRequest]) (*connect.Response[social.ListFollowRequestsResponse], error)
+	// RespondFollowRequest approves or declines a request to follow the caller.
+	RespondFollowRequest(context.Context, *connect.Request[social.RespondFollowRequestRequest]) (*connect.Response[social.RespondFollowRequestResponse], error)
+	// CancelFollowRequest withdraws a follow request the caller sent.
+	CancelFollowRequest(context.Context, *connect.Request[social.CancelFollowRequestRequest]) (*connect.Response[social.CancelFollowRequestResponse], error)
+	// GetSocialSettings and SetAccountPrivacy read and set whether the caller's
+	// account is private. Making it public approves every pending request.
+	GetSocialSettings(context.Context, *connect.Request[social.GetSocialSettingsRequest]) (*connect.Response[social.GetSocialSettingsResponse], error)
+	SetAccountPrivacy(context.Context, *connect.Request[social.SetAccountPrivacyRequest]) (*connect.Response[social.GetSocialSettingsResponse], error)
+	// ListFeed is what the people the caller follows did lately: achievements
+	// earned, new cities, trips finished and trips shared, newest first. Trips
+	// appear only while the caller may still see them.
+	ListFeed(context.Context, *connect.Request[social.ListFeedRequest]) (*connect.Response[social.ListFeedResponse], error)
+	// Cheer and Uncheer add and take back the caller's cheer on a feed item.
+	// Both are idempotent.
+	Cheer(context.Context, *connect.Request[social.CheerRequest]) (*connect.Response[social.CheerResponse], error)
+	Uncheer(context.Context, *connect.Request[social.UncheerRequest]) (*connect.Response[social.CheerResponse], error)
+	// SendFriendRequest follows the user (kept for older clients; use Follow).
 	SendFriendRequest(context.Context, *connect.Request[social.SendFriendRequestRequest]) (*connect.Response[social.SendFriendRequestResponse], error)
 	// RespondFriendRequest accepts or declines an incoming request.
 	RespondFriendRequest(context.Context, *connect.Request[social.RespondFriendRequestRequest]) (*connect.Response[social.RespondFriendRequestResponse], error)
 	// CancelFriendRequest withdraws a request the caller sent.
 	CancelFriendRequest(context.Context, *connect.Request[social.CancelFriendRequestRequest]) (*connect.Response[social.CancelFriendRequestResponse], error)
 	ListFriendRequests(context.Context, *connect.Request[social.ListFriendRequestsRequest]) (*connect.Response[social.ListFriendRequestsResponse], error)
+	// ListFriends lists mutual follows.
 	ListFriends(context.Context, *connect.Request[social.ListFriendsRequest]) (*connect.Response[social.ListFriendsResponse], error)
+	// RemoveFriend ends following in both directions.
 	RemoveFriend(context.Context, *connect.Request[social.RemoveFriendRequest]) (*connect.Response[social.RemoveFriendResponse], error)
-	// BlockUser ends any friendship and pending request between the two, and
-	// hides each side's content and profile from the other.
+	// BlockUser ends following in both directions and any pending request
+	// between the two, and hides each side's content and profile from the
+	// other.
 	BlockUser(context.Context, *connect.Request[social.BlockUserRequest]) (*connect.Response[social.BlockUserResponse], error)
 	UnblockUser(context.Context, *connect.Request[social.UnblockUserRequest]) (*connect.Response[social.UnblockUserResponse], error)
 	// MatchContacts finds Loci users among the caller's contacts. Clients send
@@ -389,7 +663,8 @@ type SocialServiceHandler interface {
 	// SearchUsers finds users by username prefix.
 	SearchUsers(context.Context, *connect.Request[social.SearchUsersRequest]) (*connect.Response[social.SearchUsersResponse], error)
 	// GetPublicProfile is a user's profile as the caller may see it. A user who
-	// blocked the caller is NotFound.
+	// blocked the caller is NotFound. A private account the caller may not see
+	// still returns the card and counts, with can_view false.
 	GetPublicProfile(context.Context, *connect.Request[social.GetPublicProfileRequest]) (*connect.Response[social.GetPublicProfileResponse], error)
 }
 
@@ -421,6 +696,84 @@ func NewSocialServiceHandler(svc SocialServiceHandler, opts ...connect.HandlerOp
 		SocialServiceAcceptInviteProcedure,
 		svc.AcceptInvite,
 		connect.WithSchema(socialServiceAcceptInviteMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceFollowHandler := connect.NewUnaryHandler(
+		SocialServiceFollowProcedure,
+		svc.Follow,
+		connect.WithSchema(socialServiceFollowMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceUnfollowHandler := connect.NewUnaryHandler(
+		SocialServiceUnfollowProcedure,
+		svc.Unfollow,
+		connect.WithSchema(socialServiceUnfollowMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceRemoveFollowerHandler := connect.NewUnaryHandler(
+		SocialServiceRemoveFollowerProcedure,
+		svc.RemoveFollower,
+		connect.WithSchema(socialServiceRemoveFollowerMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceListFollowersHandler := connect.NewUnaryHandler(
+		SocialServiceListFollowersProcedure,
+		svc.ListFollowers,
+		connect.WithSchema(socialServiceListFollowersMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceListFollowingHandler := connect.NewUnaryHandler(
+		SocialServiceListFollowingProcedure,
+		svc.ListFollowing,
+		connect.WithSchema(socialServiceListFollowingMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceListFollowRequestsHandler := connect.NewUnaryHandler(
+		SocialServiceListFollowRequestsProcedure,
+		svc.ListFollowRequests,
+		connect.WithSchema(socialServiceListFollowRequestsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceRespondFollowRequestHandler := connect.NewUnaryHandler(
+		SocialServiceRespondFollowRequestProcedure,
+		svc.RespondFollowRequest,
+		connect.WithSchema(socialServiceRespondFollowRequestMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceCancelFollowRequestHandler := connect.NewUnaryHandler(
+		SocialServiceCancelFollowRequestProcedure,
+		svc.CancelFollowRequest,
+		connect.WithSchema(socialServiceCancelFollowRequestMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceGetSocialSettingsHandler := connect.NewUnaryHandler(
+		SocialServiceGetSocialSettingsProcedure,
+		svc.GetSocialSettings,
+		connect.WithSchema(socialServiceGetSocialSettingsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceSetAccountPrivacyHandler := connect.NewUnaryHandler(
+		SocialServiceSetAccountPrivacyProcedure,
+		svc.SetAccountPrivacy,
+		connect.WithSchema(socialServiceSetAccountPrivacyMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceListFeedHandler := connect.NewUnaryHandler(
+		SocialServiceListFeedProcedure,
+		svc.ListFeed,
+		connect.WithSchema(socialServiceListFeedMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceCheerHandler := connect.NewUnaryHandler(
+		SocialServiceCheerProcedure,
+		svc.Cheer,
+		connect.WithSchema(socialServiceCheerMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	socialServiceUncheerHandler := connect.NewUnaryHandler(
+		SocialServiceUncheerProcedure,
+		svc.Uncheer,
+		connect.WithSchema(socialServiceUncheerMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	socialServiceSendFriendRequestHandler := connect.NewUnaryHandler(
@@ -505,6 +858,32 @@ func NewSocialServiceHandler(svc SocialServiceHandler, opts ...connect.HandlerOp
 			socialServiceGetInviteHandler.ServeHTTP(w, r)
 		case SocialServiceAcceptInviteProcedure:
 			socialServiceAcceptInviteHandler.ServeHTTP(w, r)
+		case SocialServiceFollowProcedure:
+			socialServiceFollowHandler.ServeHTTP(w, r)
+		case SocialServiceUnfollowProcedure:
+			socialServiceUnfollowHandler.ServeHTTP(w, r)
+		case SocialServiceRemoveFollowerProcedure:
+			socialServiceRemoveFollowerHandler.ServeHTTP(w, r)
+		case SocialServiceListFollowersProcedure:
+			socialServiceListFollowersHandler.ServeHTTP(w, r)
+		case SocialServiceListFollowingProcedure:
+			socialServiceListFollowingHandler.ServeHTTP(w, r)
+		case SocialServiceListFollowRequestsProcedure:
+			socialServiceListFollowRequestsHandler.ServeHTTP(w, r)
+		case SocialServiceRespondFollowRequestProcedure:
+			socialServiceRespondFollowRequestHandler.ServeHTTP(w, r)
+		case SocialServiceCancelFollowRequestProcedure:
+			socialServiceCancelFollowRequestHandler.ServeHTTP(w, r)
+		case SocialServiceGetSocialSettingsProcedure:
+			socialServiceGetSocialSettingsHandler.ServeHTTP(w, r)
+		case SocialServiceSetAccountPrivacyProcedure:
+			socialServiceSetAccountPrivacyHandler.ServeHTTP(w, r)
+		case SocialServiceListFeedProcedure:
+			socialServiceListFeedHandler.ServeHTTP(w, r)
+		case SocialServiceCheerProcedure:
+			socialServiceCheerHandler.ServeHTTP(w, r)
+		case SocialServiceUncheerProcedure:
+			socialServiceUncheerHandler.ServeHTTP(w, r)
 		case SocialServiceSendFriendRequestProcedure:
 			socialServiceSendFriendRequestHandler.ServeHTTP(w, r)
 		case SocialServiceRespondFriendRequestProcedure:
@@ -552,6 +931,58 @@ func (UnimplementedSocialServiceHandler) GetInvite(context.Context, *connect.Req
 
 func (UnimplementedSocialServiceHandler) AcceptInvite(context.Context, *connect.Request[social.AcceptInviteRequest]) (*connect.Response[social.AcceptInviteResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.AcceptInvite is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) Follow(context.Context, *connect.Request[social.FollowUserRequest]) (*connect.Response[social.FollowUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.Follow is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) Unfollow(context.Context, *connect.Request[social.UnfollowRequest]) (*connect.Response[social.UnfollowResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.Unfollow is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) RemoveFollower(context.Context, *connect.Request[social.RemoveFollowerRequest]) (*connect.Response[social.RemoveFollowerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.RemoveFollower is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) ListFollowers(context.Context, *connect.Request[social.ListFollowersRequest]) (*connect.Response[social.ListFollowsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.ListFollowers is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) ListFollowing(context.Context, *connect.Request[social.ListFollowingRequest]) (*connect.Response[social.ListFollowsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.ListFollowing is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) ListFollowRequests(context.Context, *connect.Request[social.ListFollowRequestsRequest]) (*connect.Response[social.ListFollowRequestsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.ListFollowRequests is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) RespondFollowRequest(context.Context, *connect.Request[social.RespondFollowRequestRequest]) (*connect.Response[social.RespondFollowRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.RespondFollowRequest is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) CancelFollowRequest(context.Context, *connect.Request[social.CancelFollowRequestRequest]) (*connect.Response[social.CancelFollowRequestResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.CancelFollowRequest is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) GetSocialSettings(context.Context, *connect.Request[social.GetSocialSettingsRequest]) (*connect.Response[social.GetSocialSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.GetSocialSettings is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) SetAccountPrivacy(context.Context, *connect.Request[social.SetAccountPrivacyRequest]) (*connect.Response[social.GetSocialSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.SetAccountPrivacy is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) ListFeed(context.Context, *connect.Request[social.ListFeedRequest]) (*connect.Response[social.ListFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.ListFeed is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) Cheer(context.Context, *connect.Request[social.CheerRequest]) (*connect.Response[social.CheerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.Cheer is not implemented"))
+}
+
+func (UnimplementedSocialServiceHandler) Uncheer(context.Context, *connect.Request[social.UncheerRequest]) (*connect.Response[social.CheerResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.social.SocialService.Uncheer is not implemented"))
 }
 
 func (UnimplementedSocialServiceHandler) SendFriendRequest(context.Context, *connect.Request[social.SendFriendRequestRequest]) (*connect.Response[social.SendFriendRequestResponse], error) {

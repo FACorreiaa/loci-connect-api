@@ -1190,7 +1190,10 @@ func (x *PersonalizedRecommendations) GetRecommendationReason() string {
 	return ""
 }
 
-// Achievement badges
+// Achievement badges. Never served; achievements live in
+// GamificationService.ListAchievements.
+//
+// Deprecated: Marked as deprecated in loci/statistics/statistics.proto.
 type AchievementBadges struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	EarnedBadges    []*Badge               `protobuf:"bytes,1,rep,name=earned_badges,json=earnedBadges,proto3" json:"earned_badges,omitempty"`
@@ -3343,10 +3346,10 @@ const file_loci_statistics_statistics_proto_rawDesc = "" +
 	"\x10suggested_cities\x18\x01 \x03(\tR\x0fsuggestedCities\x121\n" +
 	"\x14suggested_categories\x18\x02 \x03(\tR\x13suggestedCategories\x12?\n" +
 	"\x15recommendation_reason\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\x14recommendationReason\"\x93\x01\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xf4\x03R\x14recommendationReason\"\x97\x01\n" +
 	"\x11AchievementBadges\x12;\n" +
 	"\rearned_badges\x18\x01 \x03(\v2\x16.loci.statistics.BadgeR\fearnedBadges\x12A\n" +
-	"\x10available_badges\x18\x02 \x03(\v2\x16.loci.statistics.BadgeR\x0favailableBadges\"\xa0\x02\n" +
+	"\x10available_badges\x18\x02 \x03(\v2\x16.loci.statistics.BadgeR\x0favailableBadges:\x02\x18\x01\"\xa0\x02\n" +
 	"\x05Badge\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
