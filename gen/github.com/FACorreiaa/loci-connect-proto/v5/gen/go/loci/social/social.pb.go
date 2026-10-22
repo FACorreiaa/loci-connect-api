@@ -8,6 +8,7 @@ package social
 
 import (
 	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	achievement "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -23,7 +24,10 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Relationship is the caller's relation to another user.
+// Relationship is the caller's relation to another user in the older friend
+// model, derived from the follow graph: FRIENDS when each follows the other,
+// REQUESTED when only the caller follows (or asked to), INCOMING when only the
+// other user does. New clients read FollowState and follows_you instead.
 type Relationship int32
 
 const (
@@ -88,6 +92,67 @@ func (Relationship) EnumDescriptor() ([]byte, []int) {
 	return file_loci_social_social_proto_rawDescGZIP(), []int{0}
 }
 
+// FollowState is whether the caller follows another user.
+type FollowState int32
+
+const (
+	FollowState_FOLLOW_STATE_UNSPECIFIED FollowState = 0
+	FollowState_FOLLOW_STATE_NONE        FollowState = 1
+	// The caller asked to follow a private account; not yet approved.
+	FollowState_FOLLOW_STATE_REQUESTED FollowState = 2
+	FollowState_FOLLOW_STATE_FOLLOWING FollowState = 3
+	// The caller blocked this user.
+	FollowState_FOLLOW_STATE_BLOCKED FollowState = 4
+	FollowState_FOLLOW_STATE_SELF    FollowState = 5
+)
+
+// Enum value maps for FollowState.
+var (
+	FollowState_name = map[int32]string{
+		0: "FOLLOW_STATE_UNSPECIFIED",
+		1: "FOLLOW_STATE_NONE",
+		2: "FOLLOW_STATE_REQUESTED",
+		3: "FOLLOW_STATE_FOLLOWING",
+		4: "FOLLOW_STATE_BLOCKED",
+		5: "FOLLOW_STATE_SELF",
+	}
+	FollowState_value = map[string]int32{
+		"FOLLOW_STATE_UNSPECIFIED": 0,
+		"FOLLOW_STATE_NONE":        1,
+		"FOLLOW_STATE_REQUESTED":   2,
+		"FOLLOW_STATE_FOLLOWING":   3,
+		"FOLLOW_STATE_BLOCKED":     4,
+		"FOLLOW_STATE_SELF":        5,
+	}
+)
+
+func (x FollowState) Enum() *FollowState {
+	p := new(FollowState)
+	*p = x
+	return p
+}
+
+func (x FollowState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FollowState) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_social_social_proto_enumTypes[1].Descriptor()
+}
+
+func (FollowState) Type() protoreflect.EnumType {
+	return &file_loci_social_social_proto_enumTypes[1]
+}
+
+func (x FollowState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FollowState.Descriptor instead.
+func (FollowState) EnumDescriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{1}
+}
+
 type RequestDirection int32
 
 const (
@@ -121,11 +186,11 @@ func (x RequestDirection) String() string {
 }
 
 func (RequestDirection) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_social_social_proto_enumTypes[1].Descriptor()
+	return file_loci_social_social_proto_enumTypes[2].Descriptor()
 }
 
 func (RequestDirection) Type() protoreflect.EnumType {
-	return &file_loci_social_social_proto_enumTypes[1]
+	return &file_loci_social_social_proto_enumTypes[2]
 }
 
 func (x RequestDirection) Number() protoreflect.EnumNumber {
@@ -134,7 +199,64 @@ func (x RequestDirection) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RequestDirection.Descriptor instead.
 func (RequestDirection) EnumDescriptor() ([]byte, []int) {
-	return file_loci_social_social_proto_rawDescGZIP(), []int{1}
+	return file_loci_social_social_proto_rawDescGZIP(), []int{2}
+}
+
+type FeedItemKind int32
+
+const (
+	FeedItemKind_FEED_ITEM_KIND_UNSPECIFIED          FeedItemKind = 0
+	FeedItemKind_FEED_ITEM_KIND_ACHIEVEMENT_UNLOCKED FeedItemKind = 1
+	// The first place visited in a city.
+	FeedItemKind_FEED_ITEM_KIND_NEW_CITY      FeedItemKind = 2
+	FeedItemKind_FEED_ITEM_KIND_TRIP_FINISHED FeedItemKind = 3
+	// A trip made visible to friends or to everyone.
+	FeedItemKind_FEED_ITEM_KIND_TRIP_SHARED FeedItemKind = 4
+)
+
+// Enum value maps for FeedItemKind.
+var (
+	FeedItemKind_name = map[int32]string{
+		0: "FEED_ITEM_KIND_UNSPECIFIED",
+		1: "FEED_ITEM_KIND_ACHIEVEMENT_UNLOCKED",
+		2: "FEED_ITEM_KIND_NEW_CITY",
+		3: "FEED_ITEM_KIND_TRIP_FINISHED",
+		4: "FEED_ITEM_KIND_TRIP_SHARED",
+	}
+	FeedItemKind_value = map[string]int32{
+		"FEED_ITEM_KIND_UNSPECIFIED":          0,
+		"FEED_ITEM_KIND_ACHIEVEMENT_UNLOCKED": 1,
+		"FEED_ITEM_KIND_NEW_CITY":             2,
+		"FEED_ITEM_KIND_TRIP_FINISHED":        3,
+		"FEED_ITEM_KIND_TRIP_SHARED":          4,
+	}
+)
+
+func (x FeedItemKind) Enum() *FeedItemKind {
+	p := new(FeedItemKind)
+	*p = x
+	return p
+}
+
+func (x FeedItemKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FeedItemKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_social_social_proto_enumTypes[3].Descriptor()
+}
+
+func (FeedItemKind) Type() protoreflect.EnumType {
+	return &file_loci_social_social_proto_enumTypes[3]
+}
+
+func (x FeedItemKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FeedItemKind.Descriptor instead.
+func (FeedItemKind) EnumDescriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{3}
 }
 
 // PublicUser is what anyone may see about a user: never email or phone.
@@ -421,8 +543,13 @@ type ProfileStats struct {
 	Cities    int32                  `protobuf:"varint,1,opt,name=cities,proto3" json:"cities,omitempty"`
 	Countries int32                  `protobuf:"varint,2,opt,name=countries,proto3" json:"countries,omitempty"`
 	// Trips the caller may see on this profile.
-	VisibleTrips  int32 `protobuf:"varint,3,opt,name=visible_trips,json=visibleTrips,proto3" json:"visible_trips,omitempty"`
-	Friends       int32 `protobuf:"varint,4,opt,name=friends,proto3" json:"friends,omitempty"`
+	VisibleTrips int32 `protobuf:"varint,3,opt,name=visible_trips,json=visibleTrips,proto3" json:"visible_trips,omitempty"`
+	// People who follow this user and whom this user follows back.
+	Friends   int32 `protobuf:"varint,4,opt,name=friends,proto3" json:"friends,omitempty"`
+	Followers int32 `protobuf:"varint,5,opt,name=followers,proto3" json:"followers,omitempty"`
+	Following int32 `protobuf:"varint,6,opt,name=following,proto3" json:"following,omitempty"`
+	// Achievements earned (each reached track tier counts once).
+	Achievements  int32 `protobuf:"varint,7,opt,name=achievements,proto3" json:"achievements,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -481,6 +608,27 @@ func (x *ProfileStats) GetVisibleTrips() int32 {
 func (x *ProfileStats) GetFriends() int32 {
 	if x != nil {
 		return x.Friends
+	}
+	return 0
+}
+
+func (x *ProfileStats) GetFollowers() int32 {
+	if x != nil {
+		return x.Followers
+	}
+	return 0
+}
+
+func (x *ProfileStats) GetFollowing() int32 {
+	if x != nil {
+		return x.Following
+	}
+	return 0
+}
+
+func (x *ProfileStats) GetAchievements() int32 {
+	if x != nil {
+		return x.Achievements
 	}
 	return 0
 }
@@ -649,7 +797,9 @@ type GetInviteResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Invite *Invite                `protobuf:"bytes,1,opt,name=invite,proto3" json:"invite,omitempty"`
 	// The caller's relation to the inviter; UNSPECIFIED when signed out.
-	Relationship  Relationship `protobuf:"varint,2,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
+	Relationship Relationship `protobuf:"varint,2,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
+	// UNSPECIFIED when signed out.
+	FollowState   FollowState `protobuf:"varint,3,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -696,6 +846,13 @@ func (x *GetInviteResponse) GetRelationship() Relationship {
 		return x.Relationship
 	}
 	return Relationship_RELATIONSHIP_UNSPECIFIED
+}
+
+func (x *GetInviteResponse) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
 }
 
 type AcceptInviteRequest struct {
@@ -1559,6 +1716,8 @@ type ContactMatch struct {
 	Hash          string       `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
 	User          *PublicUser  `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
 	Relationship  Relationship `protobuf:"varint,3,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
+	FollowState   FollowState  `protobuf:"varint,4,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
+	FollowsYou    bool         `protobuf:"varint,5,opt,name=follows_you,json=followsYou,proto3" json:"follows_you,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1612,6 +1771,20 @@ func (x *ContactMatch) GetRelationship() Relationship {
 		return x.Relationship
 	}
 	return Relationship_RELATIONSHIP_UNSPECIFIED
+}
+
+func (x *ContactMatch) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
+}
+
+func (x *ContactMatch) GetFollowsYou() bool {
+	if x != nil {
+		return x.FollowsYou
+	}
+	return false
 }
 
 type MatchContactsResponse struct {
@@ -1794,6 +1967,8 @@ type UserResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	User          *PublicUser            `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	Relationship  Relationship           `protobuf:"varint,2,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
+	FollowState   FollowState            `protobuf:"varint,3,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
+	FollowsYou    bool                   `protobuf:"varint,4,opt,name=follows_you,json=followsYou,proto3" json:"follows_you,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1840,6 +2015,20 @@ func (x *UserResult) GetRelationship() Relationship {
 		return x.Relationship
 	}
 	return Relationship_RELATIONSHIP_UNSPECIFIED
+}
+
+func (x *UserResult) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
+}
+
+func (x *UserResult) GetFollowsYou() bool {
+	if x != nil {
+		return x.FollowsYou
+	}
+	return false
 }
 
 type SearchUsersResponse struct {
@@ -1973,8 +2162,18 @@ type GetPublicProfileResponse struct {
 	User  *PublicUser            `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
 	Stats *ProfileStats          `protobuf:"bytes,2,opt,name=stats,proto3" json:"stats,omitempty"`
 	// UNSPECIFIED when signed out.
-	Relationship  Relationship           `protobuf:"varint,3,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
-	MemberSince   *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
+	Relationship Relationship           `protobuf:"varint,3,opt,name=relationship,proto3,enum=loci.social.Relationship" json:"relationship,omitempty"`
+	MemberSince  *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=member_since,json=memberSince,proto3" json:"member_since,omitempty"`
+	// UNSPECIFIED when signed out.
+	FollowState FollowState `protobuf:"varint,5,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
+	// Whether this user follows the caller.
+	FollowsYou bool `protobuf:"varint,6,opt,name=follows_you,json=followsYou,proto3" json:"follows_you,omitempty"`
+	IsPrivate  bool `protobuf:"varint,7,opt,name=is_private,json=isPrivate,proto3" json:"is_private,omitempty"`
+	// False when the account is private and the caller is not an approved
+	// follower: trips, achievements and follow lists are left out.
+	CanView bool `protobuf:"varint,8,opt,name=can_view,json=canView,proto3" json:"can_view,omitempty"`
+	// Achievements to show off: the newest and rarest earned, at most twelve.
+	Showcase      []*achievement.AchievementSummary `protobuf:"bytes,9,rep,name=showcase,proto3" json:"showcase,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2037,11 +2236,1639 @@ func (x *GetPublicProfileResponse) GetMemberSince() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *GetPublicProfileResponse) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
+}
+
+func (x *GetPublicProfileResponse) GetFollowsYou() bool {
+	if x != nil {
+		return x.FollowsYou
+	}
+	return false
+}
+
+func (x *GetPublicProfileResponse) GetIsPrivate() bool {
+	if x != nil {
+		return x.IsPrivate
+	}
+	return false
+}
+
+func (x *GetPublicProfileResponse) GetCanView() bool {
+	if x != nil {
+		return x.CanView
+	}
+	return false
+}
+
+func (x *GetPublicProfileResponse) GetShowcase() []*achievement.AchievementSummary {
+	if x != nil {
+		return x.Showcase
+	}
+	return nil
+}
+
+type FollowUserRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Target:
+	//
+	//	*FollowUserRequest_UserId
+	//	*FollowUserRequest_Username
+	Target        isFollowUserRequest_Target `protobuf_oneof:"target"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowUserRequest) Reset() {
+	*x = FollowUserRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowUserRequest) ProtoMessage() {}
+
+func (x *FollowUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowUserRequest.ProtoReflect.Descriptor instead.
+func (*FollowUserRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *FollowUserRequest) GetTarget() isFollowUserRequest_Target {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *FollowUserRequest) GetUserId() string {
+	if x != nil {
+		if x, ok := x.Target.(*FollowUserRequest_UserId); ok {
+			return x.UserId
+		}
+	}
+	return ""
+}
+
+func (x *FollowUserRequest) GetUsername() string {
+	if x != nil {
+		if x, ok := x.Target.(*FollowUserRequest_Username); ok {
+			return x.Username
+		}
+	}
+	return ""
+}
+
+type isFollowUserRequest_Target interface {
+	isFollowUserRequest_Target()
+}
+
+type FollowUserRequest_UserId struct {
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type FollowUserRequest_Username struct {
+	Username string `protobuf:"bytes,2,opt,name=username,proto3,oneof"`
+}
+
+func (*FollowUserRequest_UserId) isFollowUserRequest_Target() {}
+
+func (*FollowUserRequest_Username) isFollowUserRequest_Target() {}
+
+type FollowUserResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// FOLLOWING, or REQUESTED for a private account.
+	FollowState   FollowState `protobuf:"varint,1,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
+	FollowsYou    bool        `protobuf:"varint,2,opt,name=follows_you,json=followsYou,proto3" json:"follows_you,omitempty"`
+	User          *PublicUser `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowUserResponse) Reset() {
+	*x = FollowUserResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowUserResponse) ProtoMessage() {}
+
+func (x *FollowUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowUserResponse.ProtoReflect.Descriptor instead.
+func (*FollowUserResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *FollowUserResponse) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
+}
+
+func (x *FollowUserResponse) GetFollowsYou() bool {
+	if x != nil {
+		return x.FollowsYou
+	}
+	return false
+}
+
+func (x *FollowUserResponse) GetUser() *PublicUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+type UnfollowRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnfollowRequest) Reset() {
+	*x = UnfollowRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnfollowRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnfollowRequest) ProtoMessage() {}
+
+func (x *UnfollowRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnfollowRequest.ProtoReflect.Descriptor instead.
+func (*UnfollowRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *UnfollowRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type UnfollowResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnfollowResponse) Reset() {
+	*x = UnfollowResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnfollowResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnfollowResponse) ProtoMessage() {}
+
+func (x *UnfollowResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnfollowResponse.ProtoReflect.Descriptor instead.
+func (*UnfollowResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{41}
+}
+
+type RemoveFollowerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveFollowerRequest) Reset() {
+	*x = RemoveFollowerRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveFollowerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveFollowerRequest) ProtoMessage() {}
+
+func (x *RemoveFollowerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveFollowerRequest.ProtoReflect.Descriptor instead.
+func (*RemoveFollowerRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *RemoveFollowerRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type RemoveFollowerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveFollowerResponse) Reset() {
+	*x = RemoveFollowerResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveFollowerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveFollowerResponse) ProtoMessage() {}
+
+func (x *RemoveFollowerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveFollowerResponse.ProtoReflect.Descriptor instead.
+func (*RemoveFollowerResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{43}
+}
+
+type ListFollowersRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty means the caller.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PageSize      int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFollowersRequest) Reset() {
+	*x = ListFollowersRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFollowersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFollowersRequest) ProtoMessage() {}
+
+func (x *ListFollowersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFollowersRequest.ProtoReflect.Descriptor instead.
+func (*ListFollowersRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ListFollowersRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListFollowersRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListFollowersRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListFollowingRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Empty means the caller.
+	UserId        string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	PageSize      int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFollowingRequest) Reset() {
+	*x = ListFollowingRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFollowingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFollowingRequest) ProtoMessage() {}
+
+func (x *ListFollowingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFollowingRequest.ProtoReflect.Descriptor instead.
+func (*ListFollowingRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ListFollowingRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListFollowingRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListFollowingRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+// FollowEntry is one person in a followers or following list.
+type FollowEntry struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	User  *PublicUser            `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// When the follow began.
+	Since *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=since,proto3" json:"since,omitempty"`
+	// Whether the caller follows this person.
+	FollowState FollowState `protobuf:"varint,3,opt,name=follow_state,json=followState,proto3,enum=loci.social.FollowState" json:"follow_state,omitempty"`
+	// Whether this person follows the caller.
+	FollowsYou    bool `protobuf:"varint,4,opt,name=follows_you,json=followsYou,proto3" json:"follows_you,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowEntry) Reset() {
+	*x = FollowEntry{}
+	mi := &file_loci_social_social_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowEntry) ProtoMessage() {}
+
+func (x *FollowEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowEntry.ProtoReflect.Descriptor instead.
+func (*FollowEntry) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *FollowEntry) GetUser() *PublicUser {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
+func (x *FollowEntry) GetSince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Since
+	}
+	return nil
+}
+
+func (x *FollowEntry) GetFollowState() FollowState {
+	if x != nil {
+		return x.FollowState
+	}
+	return FollowState_FOLLOW_STATE_UNSPECIFIED
+}
+
+func (x *FollowEntry) GetFollowsYou() bool {
+	if x != nil {
+		return x.FollowsYou
+	}
+	return false
+}
+
+type ListFollowsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*FollowEntry         `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	Total         int32                  `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFollowsResponse) Reset() {
+	*x = ListFollowsResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFollowsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFollowsResponse) ProtoMessage() {}
+
+func (x *ListFollowsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFollowsResponse.ProtoReflect.Descriptor instead.
+func (*ListFollowsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ListFollowsResponse) GetEntries() []*FollowEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+func (x *ListFollowsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+func (x *ListFollowsResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+type FollowRequestEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	From          *PublicUser            `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
+	To            *PublicUser            `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FollowRequestEntry) Reset() {
+	*x = FollowRequestEntry{}
+	mi := &file_loci_social_social_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FollowRequestEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FollowRequestEntry) ProtoMessage() {}
+
+func (x *FollowRequestEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FollowRequestEntry.ProtoReflect.Descriptor instead.
+func (*FollowRequestEntry) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *FollowRequestEntry) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FollowRequestEntry) GetFrom() *PublicUser {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *FollowRequestEntry) GetTo() *PublicUser {
+	if x != nil {
+		return x.To
+	}
+	return nil
+}
+
+func (x *FollowRequestEntry) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type ListFollowRequestsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Direction     RequestDirection       `protobuf:"varint,1,opt,name=direction,proto3,enum=loci.social.RequestDirection" json:"direction,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFollowRequestsRequest) Reset() {
+	*x = ListFollowRequestsRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFollowRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFollowRequestsRequest) ProtoMessage() {}
+
+func (x *ListFollowRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFollowRequestsRequest.ProtoReflect.Descriptor instead.
+func (*ListFollowRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *ListFollowRequestsRequest) GetDirection() RequestDirection {
+	if x != nil {
+		return x.Direction
+	}
+	return RequestDirection_REQUEST_DIRECTION_UNSPECIFIED
+}
+
+type ListFollowRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*FollowRequestEntry  `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFollowRequestsResponse) Reset() {
+	*x = ListFollowRequestsResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFollowRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFollowRequestsResponse) ProtoMessage() {}
+
+func (x *ListFollowRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFollowRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListFollowRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ListFollowRequestsResponse) GetRequests() []*FollowRequestEntry {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+type RespondFollowRequestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Approve       bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RespondFollowRequestRequest) Reset() {
+	*x = RespondFollowRequestRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RespondFollowRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RespondFollowRequestRequest) ProtoMessage() {}
+
+func (x *RespondFollowRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RespondFollowRequestRequest.ProtoReflect.Descriptor instead.
+func (*RespondFollowRequestRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *RespondFollowRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RespondFollowRequestRequest) GetApprove() bool {
+	if x != nil {
+		return x.Approve
+	}
+	return false
+}
+
+type RespondFollowRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RespondFollowRequestResponse) Reset() {
+	*x = RespondFollowRequestResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RespondFollowRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RespondFollowRequestResponse) ProtoMessage() {}
+
+func (x *RespondFollowRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RespondFollowRequestResponse.ProtoReflect.Descriptor instead.
+func (*RespondFollowRequestResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{52}
+}
+
+type CancelFollowRequestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelFollowRequestRequest) Reset() {
+	*x = CancelFollowRequestRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelFollowRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelFollowRequestRequest) ProtoMessage() {}
+
+func (x *CancelFollowRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelFollowRequestRequest.ProtoReflect.Descriptor instead.
+func (*CancelFollowRequestRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *CancelFollowRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CancelFollowRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelFollowRequestResponse) Reset() {
+	*x = CancelFollowRequestResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelFollowRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelFollowRequestResponse) ProtoMessage() {}
+
+func (x *CancelFollowRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelFollowRequestResponse.ProtoReflect.Descriptor instead.
+func (*CancelFollowRequestResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{54}
+}
+
+type SocialSettings struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	IsPrivate bool                   `protobuf:"varint,1,opt,name=is_private,json=isPrivate,proto3" json:"is_private,omitempty"`
+	// Pending requests to follow the caller.
+	PendingRequests int32 `protobuf:"varint,2,opt,name=pending_requests,json=pendingRequests,proto3" json:"pending_requests,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SocialSettings) Reset() {
+	*x = SocialSettings{}
+	mi := &file_loci_social_social_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SocialSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SocialSettings) ProtoMessage() {}
+
+func (x *SocialSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SocialSettings.ProtoReflect.Descriptor instead.
+func (*SocialSettings) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *SocialSettings) GetIsPrivate() bool {
+	if x != nil {
+		return x.IsPrivate
+	}
+	return false
+}
+
+func (x *SocialSettings) GetPendingRequests() int32 {
+	if x != nil {
+		return x.PendingRequests
+	}
+	return 0
+}
+
+type GetSocialSettingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSocialSettingsRequest) Reset() {
+	*x = GetSocialSettingsRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSocialSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSocialSettingsRequest) ProtoMessage() {}
+
+func (x *GetSocialSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSocialSettingsRequest.ProtoReflect.Descriptor instead.
+func (*GetSocialSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{56}
+}
+
+type SetAccountPrivacyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IsPrivate     bool                   `protobuf:"varint,1,opt,name=is_private,json=isPrivate,proto3" json:"is_private,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetAccountPrivacyRequest) Reset() {
+	*x = SetAccountPrivacyRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetAccountPrivacyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetAccountPrivacyRequest) ProtoMessage() {}
+
+func (x *SetAccountPrivacyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetAccountPrivacyRequest.ProtoReflect.Descriptor instead.
+func (*SetAccountPrivacyRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *SetAccountPrivacyRequest) GetIsPrivate() bool {
+	if x != nil {
+		return x.IsPrivate
+	}
+	return false
+}
+
+type GetSocialSettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Settings      *SocialSettings        `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSocialSettingsResponse) Reset() {
+	*x = GetSocialSettingsResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSocialSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSocialSettingsResponse) ProtoMessage() {}
+
+func (x *GetSocialSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSocialSettingsResponse.ProtoReflect.Descriptor instead.
+func (*GetSocialSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *GetSocialSettingsResponse) GetSettings() *SocialSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type FeedCity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CityId        string                 `protobuf:"bytes,1,opt,name=city_id,json=cityId,proto3" json:"city_id,omitempty"`
+	CityName      string                 `protobuf:"bytes,2,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Country       string                 `protobuf:"bytes,3,opt,name=country,proto3" json:"country,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FeedCity) Reset() {
+	*x = FeedCity{}
+	mi := &file_loci_social_social_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeedCity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeedCity) ProtoMessage() {}
+
+func (x *FeedCity) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeedCity.ProtoReflect.Descriptor instead.
+func (*FeedCity) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *FeedCity) GetCityId() string {
+	if x != nil {
+		return x.CityId
+	}
+	return ""
+}
+
+func (x *FeedCity) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *FeedCity) GetCountry() string {
+	if x != nil {
+		return x.Country
+	}
+	return ""
+}
+
+type FeedTrip struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TripId        string                 `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	CityName      string                 `protobuf:"bytes,3,opt,name=city_name,json=cityName,proto3" json:"city_name,omitempty"`
+	Days          int32                  `protobuf:"varint,4,opt,name=days,proto3" json:"days,omitempty"`
+	CoverImageUrl string                 `protobuf:"bytes,5,opt,name=cover_image_url,json=coverImageUrl,proto3" json:"cover_image_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FeedTrip) Reset() {
+	*x = FeedTrip{}
+	mi := &file_loci_social_social_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeedTrip) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeedTrip) ProtoMessage() {}
+
+func (x *FeedTrip) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeedTrip.ProtoReflect.Descriptor instead.
+func (*FeedTrip) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *FeedTrip) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *FeedTrip) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *FeedTrip) GetCityName() string {
+	if x != nil {
+		return x.CityName
+	}
+	return ""
+}
+
+func (x *FeedTrip) GetDays() int32 {
+	if x != nil {
+		return x.Days
+	}
+	return 0
+}
+
+func (x *FeedTrip) GetCoverImageUrl() string {
+	if x != nil {
+		return x.CoverImageUrl
+	}
+	return ""
+}
+
+type FeedItem struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Kind      FeedItemKind           `protobuf:"varint,2,opt,name=kind,proto3,enum=loci.social.FeedItemKind" json:"kind,omitempty"`
+	Actor     *PublicUser            `protobuf:"bytes,3,opt,name=actor,proto3" json:"actor,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Types that are valid to be assigned to Detail:
+	//
+	//	*FeedItem_Achievement
+	//	*FeedItem_City
+	//	*FeedItem_Trip
+	Detail      isFeedItem_Detail `protobuf_oneof:"detail"`
+	CheerCount  int32             `protobuf:"varint,8,opt,name=cheer_count,json=cheerCount,proto3" json:"cheer_count,omitempty"`
+	CheeredByMe bool              `protobuf:"varint,9,opt,name=cheered_by_me,json=cheeredByMe,proto3" json:"cheered_by_me,omitempty"`
+	// Up to three of the latest people who cheered.
+	RecentCheerers []*PublicUser `protobuf:"bytes,10,rep,name=recent_cheerers,json=recentCheerers,proto3" json:"recent_cheerers,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *FeedItem) Reset() {
+	*x = FeedItem{}
+	mi := &file_loci_social_social_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FeedItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FeedItem) ProtoMessage() {}
+
+func (x *FeedItem) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FeedItem.ProtoReflect.Descriptor instead.
+func (*FeedItem) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *FeedItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FeedItem) GetKind() FeedItemKind {
+	if x != nil {
+		return x.Kind
+	}
+	return FeedItemKind_FEED_ITEM_KIND_UNSPECIFIED
+}
+
+func (x *FeedItem) GetActor() *PublicUser {
+	if x != nil {
+		return x.Actor
+	}
+	return nil
+}
+
+func (x *FeedItem) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *FeedItem) GetDetail() isFeedItem_Detail {
+	if x != nil {
+		return x.Detail
+	}
+	return nil
+}
+
+func (x *FeedItem) GetAchievement() *achievement.AchievementSummary {
+	if x != nil {
+		if x, ok := x.Detail.(*FeedItem_Achievement); ok {
+			return x.Achievement
+		}
+	}
+	return nil
+}
+
+func (x *FeedItem) GetCity() *FeedCity {
+	if x != nil {
+		if x, ok := x.Detail.(*FeedItem_City); ok {
+			return x.City
+		}
+	}
+	return nil
+}
+
+func (x *FeedItem) GetTrip() *FeedTrip {
+	if x != nil {
+		if x, ok := x.Detail.(*FeedItem_Trip); ok {
+			return x.Trip
+		}
+	}
+	return nil
+}
+
+func (x *FeedItem) GetCheerCount() int32 {
+	if x != nil {
+		return x.CheerCount
+	}
+	return 0
+}
+
+func (x *FeedItem) GetCheeredByMe() bool {
+	if x != nil {
+		return x.CheeredByMe
+	}
+	return false
+}
+
+func (x *FeedItem) GetRecentCheerers() []*PublicUser {
+	if x != nil {
+		return x.RecentCheerers
+	}
+	return nil
+}
+
+type isFeedItem_Detail interface {
+	isFeedItem_Detail()
+}
+
+type FeedItem_Achievement struct {
+	Achievement *achievement.AchievementSummary `protobuf:"bytes,5,opt,name=achievement,proto3,oneof"`
+}
+
+type FeedItem_City struct {
+	City *FeedCity `protobuf:"bytes,6,opt,name=city,proto3,oneof"`
+}
+
+type FeedItem_Trip struct {
+	Trip *FeedTrip `protobuf:"bytes,7,opt,name=trip,proto3,oneof"`
+}
+
+func (*FeedItem_Achievement) isFeedItem_Detail() {}
+
+func (*FeedItem_City) isFeedItem_Detail() {}
+
+func (*FeedItem_Trip) isFeedItem_Detail() {}
+
+type ListFeedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PageSize      int32                  `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFeedRequest) Reset() {
+	*x = ListFeedRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFeedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFeedRequest) ProtoMessage() {}
+
+func (x *ListFeedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFeedRequest.ProtoReflect.Descriptor instead.
+func (*ListFeedRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *ListFeedRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListFeedRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListFeedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*FeedItem            `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFeedResponse) Reset() {
+	*x = ListFeedResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFeedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFeedResponse) ProtoMessage() {}
+
+func (x *ListFeedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFeedResponse.ProtoReflect.Descriptor instead.
+func (*ListFeedResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *ListFeedResponse) GetItems() []*FeedItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListFeedResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type CheerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheerRequest) Reset() {
+	*x = CheerRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheerRequest) ProtoMessage() {}
+
+func (x *CheerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheerRequest.ProtoReflect.Descriptor instead.
+func (*CheerRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *CheerRequest) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+type UncheerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UncheerRequest) Reset() {
+	*x = UncheerRequest{}
+	mi := &file_loci_social_social_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UncheerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UncheerRequest) ProtoMessage() {}
+
+func (x *UncheerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UncheerRequest.ProtoReflect.Descriptor instead.
+func (*UncheerRequest) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *UncheerRequest) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+type CheerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CheerCount    int32                  `protobuf:"varint,1,opt,name=cheer_count,json=cheerCount,proto3" json:"cheer_count,omitempty"`
+	CheeredByMe   bool                   `protobuf:"varint,2,opt,name=cheered_by_me,json=cheeredByMe,proto3" json:"cheered_by_me,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheerResponse) Reset() {
+	*x = CheerResponse{}
+	mi := &file_loci_social_social_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheerResponse) ProtoMessage() {}
+
+func (x *CheerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_social_social_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheerResponse.ProtoReflect.Descriptor instead.
+func (*CheerResponse) Descriptor() ([]byte, []int) {
+	return file_loci_social_social_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *CheerResponse) GetCheerCount() int32 {
+	if x != nil {
+		return x.CheerCount
+	}
+	return 0
+}
+
+func (x *CheerResponse) GetCheeredByMe() bool {
+	if x != nil {
+		return x.CheeredByMe
+	}
+	return false
+}
+
 var File_loci_social_social_proto protoreflect.FileDescriptor
 
 const file_loci_social_social_proto_rawDesc = "" +
 	"\n" +
-	"\x18loci/social/social.proto\x12\vloci.social\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc7\x01\n" +
+	"\x18loci/social/social.proto\x12\vloci.social\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"loci/achievement/achievement.proto\"\xc7\x01\n" +
 	"\n" +
 	"PublicUser\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12#\n" +
@@ -2066,21 +3893,25 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x121\n" +
 	"\ainviter\x18\x04 \x01(\v2\x17.loci.social.PublicUserR\ainviter\x12'\n" +
 	"\n" +
-	"share_text\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\tshareText\"\xa7\x01\n" +
+	"share_text\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\tshareText\"\xa2\x02\n" +
 	"\fProfileStats\x12\x1f\n" +
 	"\x06cities\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x06cities\x12%\n" +
 	"\tcountries\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tcountries\x12,\n" +
 	"\rvisible_trips\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fvisibleTrips\x12!\n" +
-	"\afriends\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\afriends\"\x14\n" +
+	"\afriends\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\afriends\x12%\n" +
+	"\tfollowers\x18\x05 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tfollowers\x12%\n" +
+	"\tfollowing\x18\x06 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\tfollowing\x12+\n" +
+	"\fachievements\x18\a \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\fachievements\"\x14\n" +
 	"\x12GetMyInviteRequest\"J\n" +
 	"\x13GetMyInviteResponse\x123\n" +
 	"\x06invite\x18\x01 \x01(\v2\x13.loci.social.InviteB\x06\xbaH\x03\xc8\x01\x01R\x06invite\"\x15\n" +
 	"\x13RotateInviteRequest\"1\n" +
 	"\x10GetInviteRequest\x12\x1d\n" +
-	"\x04code\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\x04code\"\x87\x01\n" +
+	"\x04code\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\x04code\"\xc4\x01\n" +
 	"\x11GetInviteResponse\x123\n" +
 	"\x06invite\x18\x01 \x01(\v2\x13.loci.social.InviteB\x06\xbaH\x03\xc8\x01\x01R\x06invite\x12=\n" +
-	"\frelationship\x18\x02 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\"4\n" +
+	"\frelationship\x18\x02 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\x12;\n" +
+	"\ffollow_state\x18\x03 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\"4\n" +
 	"\x13AcceptInviteRequest\x12\x1d\n" +
 	"\x04code\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\x04code\"K\n" +
 	"\x14AcceptInviteResponse\x123\n" +
@@ -2120,11 +3951,14 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x15\n" +
 	"\x13UnblockUserResponse\"R\n" +
 	"\x14MatchContactsRequest\x12:\n" +
-	"\x06hashes\x18\x01 \x03(\tB\"\xbaH\x1f\x92\x01\x1c\b\x01\x10\xd0\x0f\"\x15r\x132\x0e^[0-9a-f]{64}$\x98\x01@R\x06hashes\"\x98\x01\n" +
+	"\x06hashes\x18\x01 \x03(\tB\"\xbaH\x1f\x92\x01\x1c\b\x01\x10\xd0\x0f\"\x15r\x132\x0e^[0-9a-f]{64}$\x98\x01@R\x06hashes\"\xf6\x01\n" +
 	"\fContactMatch\x12\x1c\n" +
 	"\x04hash\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x98\x01@R\x04hash\x12+\n" +
 	"\x04user\x18\x02 \x01(\v2\x17.loci.social.PublicUserR\x04user\x12=\n" +
-	"\frelationship\x18\x03 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\"L\n" +
+	"\frelationship\x18\x03 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\x12;\n" +
+	"\ffollow_state\x18\x04 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\x12\x1f\n" +
+	"\vfollows_you\x18\x05 \x01(\bR\n" +
+	"followsYou\"L\n" +
 	"\x15MatchContactsResponse\x123\n" +
 	"\amatches\x18\x01 \x03(\v2\x19.loci.social.ContactMatchR\amatches\"\x1d\n" +
 	"\x1bMatchFacebookFriendsRequest\"Q\n" +
@@ -2132,22 +3966,137 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\amatches\x18\x01 \x03(\v2\x17.loci.social.UserResultR\amatches\"V\n" +
 	"\x12SearchUsersRequest\x12\x1f\n" +
 	"\x05query\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x02\x18dR\x05query\x12\x1f\n" +
-	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x182(\x00R\x05limit\"x\n" +
+	"\x05limit\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x182(\x00R\x05limit\"\xd6\x01\n" +
 	"\n" +
 	"UserResult\x12+\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.loci.social.PublicUserR\x04user\x12=\n" +
-	"\frelationship\x18\x02 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\"D\n" +
+	"\frelationship\x18\x02 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\x12;\n" +
+	"\ffollow_state\x18\x03 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\x12\x1f\n" +
+	"\vfollows_you\x18\x04 \x01(\bR\n" +
+	"followsYou\"D\n" +
 	"\x13SearchUsersResponse\x12-\n" +
 	"\x05users\x18\x01 \x03(\v2\x17.loci.social.UserResultR\x05users\"x\n" +
 	"\x17GetPublicProfileRequest\x12#\n" +
 	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\x06userId\x12'\n" +
 	"\busername\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\busernameB\x0f\n" +
-	"\x06target\x12\x05\xbaH\x02\b\x01\"\xfe\x01\n" +
+	"\x06target\x12\x05\xbaH\x02\b\x01\"\xe2\x03\n" +
 	"\x18GetPublicProfileResponse\x123\n" +
 	"\x04user\x18\x01 \x01(\v2\x17.loci.social.PublicUserB\x06\xbaH\x03\xc8\x01\x01R\x04user\x12/\n" +
 	"\x05stats\x18\x02 \x01(\v2\x19.loci.social.ProfileStatsR\x05stats\x12=\n" +
 	"\frelationship\x18\x03 \x01(\x0e2\x19.loci.social.RelationshipR\frelationship\x12=\n" +
-	"\fmember_since\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vmemberSince*\xc5\x01\n" +
+	"\fmember_since\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\vmemberSince\x12;\n" +
+	"\ffollow_state\x18\x05 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\x12\x1f\n" +
+	"\vfollows_you\x18\x06 \x01(\bR\n" +
+	"followsYou\x12\x1d\n" +
+	"\n" +
+	"is_private\x18\a \x01(\bR\tisPrivate\x12\x19\n" +
+	"\bcan_view\x18\b \x01(\bR\acanView\x12J\n" +
+	"\bshowcase\x18\t \x03(\v2$.loci.achievement.AchievementSummaryB\b\xbaH\x05\x92\x01\x02\x10\fR\bshowcase\"r\n" +
+	"\x11FollowUserRequest\x12#\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\x06userId\x12'\n" +
+	"\busername\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\busernameB\x0f\n" +
+	"\x06target\x12\x05\xbaH\x02\b\x01\"\x9f\x01\n" +
+	"\x12FollowUserResponse\x12;\n" +
+	"\ffollow_state\x18\x01 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\x12\x1f\n" +
+	"\vfollows_you\x18\x02 \x01(\bR\n" +
+	"followsYou\x12+\n" +
+	"\x04user\x18\x03 \x01(\v2\x17.loci.social.PublicUserR\x04user\"4\n" +
+	"\x0fUnfollowRequest\x12!\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x12\n" +
+	"\x10UnfollowResponse\":\n" +
+	"\x15RemoveFollowerRequest\x12!\n" +
+	"\auser_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x18\n" +
+	"\x16RemoveFollowerResponse\"\x8d\x01\n" +
+	"\x14ListFollowersRequest\x12$\n" +
+	"\auser_id\x18\x01 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06userId\x12&\n" +
+	"\tpage_size\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x00R\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tpageToken\"\x8d\x01\n" +
+	"\x14ListFollowingRequest\x12$\n" +
+	"\auser_id\x18\x01 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06userId\x12&\n" +
+	"\tpage_size\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x00R\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tpageToken\"\xca\x01\n" +
+	"\vFollowEntry\x12+\n" +
+	"\x04user\x18\x01 \x01(\v2\x17.loci.social.PublicUserR\x04user\x120\n" +
+	"\x05since\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05since\x12;\n" +
+	"\ffollow_state\x18\x03 \x01(\x0e2\x18.loci.social.FollowStateR\vfollowState\x12\x1f\n" +
+	"\vfollows_you\x18\x04 \x01(\bR\n" +
+	"followsYou\"\x90\x01\n" +
+	"\x13ListFollowsResponse\x122\n" +
+	"\aentries\x18\x01 \x03(\v2\x18.loci.social.FollowEntryR\aentries\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12\x1d\n" +
+	"\x05total\x18\x03 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x05total\"\xbe\x01\n" +
+	"\x12FollowRequestEntry\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12+\n" +
+	"\x04from\x18\x02 \x01(\v2\x17.loci.social.PublicUserR\x04from\x12'\n" +
+	"\x02to\x18\x03 \x01(\v2\x17.loci.social.PublicUserR\x02to\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"d\n" +
+	"\x19ListFollowRequestsRequest\x12G\n" +
+	"\tdirection\x18\x01 \x01(\x0e2\x1d.loci.social.RequestDirectionB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\tdirection\"Y\n" +
+	"\x1aListFollowRequestsResponse\x12;\n" +
+	"\brequests\x18\x01 \x03(\v2\x1f.loci.social.FollowRequestEntryR\brequests\"`\n" +
+	"\x1bRespondFollowRequestRequest\x12'\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12\x18\n" +
+	"\aapprove\x18\x02 \x01(\bR\aapprove\"\x1e\n" +
+	"\x1cRespondFollowRequestResponse\"E\n" +
+	"\x1aCancelFollowRequestRequest\x12'\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\"\x1d\n" +
+	"\x1bCancelFollowRequestResponse\"c\n" +
+	"\x0eSocialSettings\x12\x1d\n" +
+	"\n" +
+	"is_private\x18\x01 \x01(\bR\tisPrivate\x122\n" +
+	"\x10pending_requests\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x0fpendingRequests\"\x1a\n" +
+	"\x18GetSocialSettingsRequest\"9\n" +
+	"\x18SetAccountPrivacyRequest\x12\x1d\n" +
+	"\n" +
+	"is_private\x18\x01 \x01(\bR\tisPrivate\"T\n" +
+	"\x19GetSocialSettingsResponse\x127\n" +
+	"\bsettings\x18\x01 \x01(\v2\x1b.loci.social.SocialSettingsR\bsettings\"w\n" +
+	"\bFeedCity\x12 \n" +
+	"\acity_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06cityId\x12%\n" +
+	"\tcity_name\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x12\"\n" +
+	"\acountry\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\acountry\"\xc2\x01\n" +
+	"\bFeedTrip\x12 \n" +
+	"\atrip_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06tripId\x12\x1e\n" +
+	"\x05title\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xac\x02R\x05title\x12%\n" +
+	"\tcity_name\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\bcityName\x12\x1b\n" +
+	"\x04days\x18\x04 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x04days\x120\n" +
+	"\x0fcover_image_url\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\rcoverImageUrl\"\x84\x04\n" +
+	"\bFeedItem\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12-\n" +
+	"\x04kind\x18\x02 \x01(\x0e2\x19.loci.social.FeedItemKindR\x04kind\x12-\n" +
+	"\x05actor\x18\x03 \x01(\v2\x17.loci.social.PublicUserR\x05actor\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12H\n" +
+	"\vachievement\x18\x05 \x01(\v2$.loci.achievement.AchievementSummaryH\x00R\vachievement\x12+\n" +
+	"\x04city\x18\x06 \x01(\v2\x15.loci.social.FeedCityH\x00R\x04city\x12+\n" +
+	"\x04trip\x18\a \x01(\v2\x15.loci.social.FeedTripH\x00R\x04trip\x12(\n" +
+	"\vcheer_count\x18\b \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\n" +
+	"cheerCount\x12\"\n" +
+	"\rcheered_by_me\x18\t \x01(\bR\vcheeredByMe\x12J\n" +
+	"\x0frecent_cheerers\x18\n" +
+	" \x03(\v2\x17.loci.social.PublicUserB\b\xbaH\x05\x92\x01\x02\x10\x03R\x0erecentCheerersB\b\n" +
+	"\x06detail\"b\n" +
+	"\x0fListFeedRequest\x12&\n" +
+	"\tpage_size\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x182(\x00R\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\tpageToken\"g\n" +
+	"\x10ListFeedResponse\x12+\n" +
+	"\x05items\x18\x01 \x03(\v2\x15.loci.social.FeedItemR\x05items\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"1\n" +
+	"\fCheerRequest\x12!\n" +
+	"\aitem_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06itemId\"3\n" +
+	"\x0eUncheerRequest\x12!\n" +
+	"\aitem_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06itemId\"]\n" +
+	"\rCheerResponse\x12(\n" +
+	"\vcheer_count\x18\x01 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\n" +
+	"cheerCount\x12\"\n" +
+	"\rcheered_by_me\x18\x02 \x01(\bR\vcheeredByMe*\xc5\x01\n" +
 	"\fRelationship\x12\x1c\n" +
 	"\x18RELATIONSHIP_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11RELATIONSHIP_NONE\x10\x01\x12\x1a\n" +
@@ -2155,16 +4104,42 @@ const file_loci_social_social_proto_rawDesc = "" +
 	"\x15RELATIONSHIP_INCOMING\x10\x03\x12\x18\n" +
 	"\x14RELATIONSHIP_FRIENDS\x10\x04\x12\x18\n" +
 	"\x14RELATIONSHIP_BLOCKED\x10\x05\x12\x15\n" +
-	"\x11RELATIONSHIP_SELF\x10\x06*u\n" +
+	"\x11RELATIONSHIP_SELF\x10\x06*\xab\x01\n" +
+	"\vFollowState\x12\x1c\n" +
+	"\x18FOLLOW_STATE_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11FOLLOW_STATE_NONE\x10\x01\x12\x1a\n" +
+	"\x16FOLLOW_STATE_REQUESTED\x10\x02\x12\x1a\n" +
+	"\x16FOLLOW_STATE_FOLLOWING\x10\x03\x12\x18\n" +
+	"\x14FOLLOW_STATE_BLOCKED\x10\x04\x12\x15\n" +
+	"\x11FOLLOW_STATE_SELF\x10\x05*u\n" +
 	"\x10RequestDirection\x12!\n" +
 	"\x1dREQUEST_DIRECTION_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aREQUEST_DIRECTION_INCOMING\x10\x01\x12\x1e\n" +
-	"\x1aREQUEST_DIRECTION_OUTGOING\x10\x022\xb5\v\n" +
+	"\x1aREQUEST_DIRECTION_OUTGOING\x10\x02*\xb6\x01\n" +
+	"\fFeedItemKind\x12\x1e\n" +
+	"\x1aFEED_ITEM_KIND_UNSPECIFIED\x10\x00\x12'\n" +
+	"#FEED_ITEM_KIND_ACHIEVEMENT_UNLOCKED\x10\x01\x12\x1b\n" +
+	"\x17FEED_ITEM_KIND_NEW_CITY\x10\x02\x12 \n" +
+	"\x1cFEED_ITEM_KIND_TRIP_FINISHED\x10\x03\x12\x1e\n" +
+	"\x1aFEED_ITEM_KIND_TRIP_SHARED\x10\x042\xa3\x14\n" +
 	"\rSocialService\x12P\n" +
 	"\vGetMyInvite\x12\x1f.loci.social.GetMyInviteRequest\x1a .loci.social.GetMyInviteResponse\x12R\n" +
 	"\fRotateInvite\x12 .loci.social.RotateInviteRequest\x1a .loci.social.GetMyInviteResponse\x12J\n" +
 	"\tGetInvite\x12\x1d.loci.social.GetInviteRequest\x1a\x1e.loci.social.GetInviteResponse\x12S\n" +
-	"\fAcceptInvite\x12 .loci.social.AcceptInviteRequest\x1a!.loci.social.AcceptInviteResponse\x12b\n" +
+	"\fAcceptInvite\x12 .loci.social.AcceptInviteRequest\x1a!.loci.social.AcceptInviteResponse\x12I\n" +
+	"\x06Follow\x12\x1e.loci.social.FollowUserRequest\x1a\x1f.loci.social.FollowUserResponse\x12G\n" +
+	"\bUnfollow\x12\x1c.loci.social.UnfollowRequest\x1a\x1d.loci.social.UnfollowResponse\x12Y\n" +
+	"\x0eRemoveFollower\x12\".loci.social.RemoveFollowerRequest\x1a#.loci.social.RemoveFollowerResponse\x12T\n" +
+	"\rListFollowers\x12!.loci.social.ListFollowersRequest\x1a .loci.social.ListFollowsResponse\x12T\n" +
+	"\rListFollowing\x12!.loci.social.ListFollowingRequest\x1a .loci.social.ListFollowsResponse\x12e\n" +
+	"\x12ListFollowRequests\x12&.loci.social.ListFollowRequestsRequest\x1a'.loci.social.ListFollowRequestsResponse\x12k\n" +
+	"\x14RespondFollowRequest\x12(.loci.social.RespondFollowRequestRequest\x1a).loci.social.RespondFollowRequestResponse\x12h\n" +
+	"\x13CancelFollowRequest\x12'.loci.social.CancelFollowRequestRequest\x1a(.loci.social.CancelFollowRequestResponse\x12b\n" +
+	"\x11GetSocialSettings\x12%.loci.social.GetSocialSettingsRequest\x1a&.loci.social.GetSocialSettingsResponse\x12b\n" +
+	"\x11SetAccountPrivacy\x12%.loci.social.SetAccountPrivacyRequest\x1a&.loci.social.GetSocialSettingsResponse\x12G\n" +
+	"\bListFeed\x12\x1c.loci.social.ListFeedRequest\x1a\x1d.loci.social.ListFeedResponse\x12>\n" +
+	"\x05Cheer\x12\x19.loci.social.CheerRequest\x1a\x1a.loci.social.CheerResponse\x12B\n" +
+	"\aUncheer\x12\x1b.loci.social.UncheerRequest\x1a\x1a.loci.social.CheerResponse\x12b\n" +
 	"\x11SendFriendRequest\x12%.loci.social.SendFriendRequestRequest\x1a&.loci.social.SendFriendRequestResponse\x12k\n" +
 	"\x14RespondFriendRequest\x12(.loci.social.RespondFriendRequestRequest\x1a).loci.social.RespondFriendRequestResponse\x12h\n" +
 	"\x13CancelFriendRequest\x12'.loci.social.CancelFriendRequestRequest\x1a(.loci.social.CancelFriendRequestResponse\x12e\n" +
@@ -2190,117 +4165,200 @@ func file_loci_social_social_proto_rawDescGZIP() []byte {
 	return file_loci_social_social_proto_rawDescData
 }
 
-var file_loci_social_social_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_loci_social_social_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_loci_social_social_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_loci_social_social_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_loci_social_social_proto_goTypes = []any{
-	(Relationship)(0),                    // 0: loci.social.Relationship
-	(RequestDirection)(0),                // 1: loci.social.RequestDirection
-	(*PublicUser)(nil),                   // 2: loci.social.PublicUser
-	(*Friend)(nil),                       // 3: loci.social.Friend
-	(*FriendRequest)(nil),                // 4: loci.social.FriendRequest
-	(*Invite)(nil),                       // 5: loci.social.Invite
-	(*ProfileStats)(nil),                 // 6: loci.social.ProfileStats
-	(*GetMyInviteRequest)(nil),           // 7: loci.social.GetMyInviteRequest
-	(*GetMyInviteResponse)(nil),          // 8: loci.social.GetMyInviteResponse
-	(*RotateInviteRequest)(nil),          // 9: loci.social.RotateInviteRequest
-	(*GetInviteRequest)(nil),             // 10: loci.social.GetInviteRequest
-	(*GetInviteResponse)(nil),            // 11: loci.social.GetInviteResponse
-	(*AcceptInviteRequest)(nil),          // 12: loci.social.AcceptInviteRequest
-	(*AcceptInviteResponse)(nil),         // 13: loci.social.AcceptInviteResponse
-	(*SendFriendRequestRequest)(nil),     // 14: loci.social.SendFriendRequestRequest
-	(*SendFriendRequestResponse)(nil),    // 15: loci.social.SendFriendRequestResponse
-	(*RespondFriendRequestRequest)(nil),  // 16: loci.social.RespondFriendRequestRequest
-	(*RespondFriendRequestResponse)(nil), // 17: loci.social.RespondFriendRequestResponse
-	(*CancelFriendRequestRequest)(nil),   // 18: loci.social.CancelFriendRequestRequest
-	(*CancelFriendRequestResponse)(nil),  // 19: loci.social.CancelFriendRequestResponse
-	(*ListFriendRequestsRequest)(nil),    // 20: loci.social.ListFriendRequestsRequest
-	(*ListFriendRequestsResponse)(nil),   // 21: loci.social.ListFriendRequestsResponse
-	(*ListFriendsRequest)(nil),           // 22: loci.social.ListFriendsRequest
-	(*ListFriendsResponse)(nil),          // 23: loci.social.ListFriendsResponse
-	(*RemoveFriendRequest)(nil),          // 24: loci.social.RemoveFriendRequest
-	(*RemoveFriendResponse)(nil),         // 25: loci.social.RemoveFriendResponse
-	(*BlockUserRequest)(nil),             // 26: loci.social.BlockUserRequest
-	(*BlockUserResponse)(nil),            // 27: loci.social.BlockUserResponse
-	(*UnblockUserRequest)(nil),           // 28: loci.social.UnblockUserRequest
-	(*UnblockUserResponse)(nil),          // 29: loci.social.UnblockUserResponse
-	(*MatchContactsRequest)(nil),         // 30: loci.social.MatchContactsRequest
-	(*ContactMatch)(nil),                 // 31: loci.social.ContactMatch
-	(*MatchContactsResponse)(nil),        // 32: loci.social.MatchContactsResponse
-	(*MatchFacebookFriendsRequest)(nil),  // 33: loci.social.MatchFacebookFriendsRequest
-	(*MatchFacebookFriendsResponse)(nil), // 34: loci.social.MatchFacebookFriendsResponse
-	(*SearchUsersRequest)(nil),           // 35: loci.social.SearchUsersRequest
-	(*UserResult)(nil),                   // 36: loci.social.UserResult
-	(*SearchUsersResponse)(nil),          // 37: loci.social.SearchUsersResponse
-	(*GetPublicProfileRequest)(nil),      // 38: loci.social.GetPublicProfileRequest
-	(*GetPublicProfileResponse)(nil),     // 39: loci.social.GetPublicProfileResponse
-	(*timestamppb.Timestamp)(nil),        // 40: google.protobuf.Timestamp
+	(Relationship)(0),                      // 0: loci.social.Relationship
+	(FollowState)(0),                       // 1: loci.social.FollowState
+	(RequestDirection)(0),                  // 2: loci.social.RequestDirection
+	(FeedItemKind)(0),                      // 3: loci.social.FeedItemKind
+	(*PublicUser)(nil),                     // 4: loci.social.PublicUser
+	(*Friend)(nil),                         // 5: loci.social.Friend
+	(*FriendRequest)(nil),                  // 6: loci.social.FriendRequest
+	(*Invite)(nil),                         // 7: loci.social.Invite
+	(*ProfileStats)(nil),                   // 8: loci.social.ProfileStats
+	(*GetMyInviteRequest)(nil),             // 9: loci.social.GetMyInviteRequest
+	(*GetMyInviteResponse)(nil),            // 10: loci.social.GetMyInviteResponse
+	(*RotateInviteRequest)(nil),            // 11: loci.social.RotateInviteRequest
+	(*GetInviteRequest)(nil),               // 12: loci.social.GetInviteRequest
+	(*GetInviteResponse)(nil),              // 13: loci.social.GetInviteResponse
+	(*AcceptInviteRequest)(nil),            // 14: loci.social.AcceptInviteRequest
+	(*AcceptInviteResponse)(nil),           // 15: loci.social.AcceptInviteResponse
+	(*SendFriendRequestRequest)(nil),       // 16: loci.social.SendFriendRequestRequest
+	(*SendFriendRequestResponse)(nil),      // 17: loci.social.SendFriendRequestResponse
+	(*RespondFriendRequestRequest)(nil),    // 18: loci.social.RespondFriendRequestRequest
+	(*RespondFriendRequestResponse)(nil),   // 19: loci.social.RespondFriendRequestResponse
+	(*CancelFriendRequestRequest)(nil),     // 20: loci.social.CancelFriendRequestRequest
+	(*CancelFriendRequestResponse)(nil),    // 21: loci.social.CancelFriendRequestResponse
+	(*ListFriendRequestsRequest)(nil),      // 22: loci.social.ListFriendRequestsRequest
+	(*ListFriendRequestsResponse)(nil),     // 23: loci.social.ListFriendRequestsResponse
+	(*ListFriendsRequest)(nil),             // 24: loci.social.ListFriendsRequest
+	(*ListFriendsResponse)(nil),            // 25: loci.social.ListFriendsResponse
+	(*RemoveFriendRequest)(nil),            // 26: loci.social.RemoveFriendRequest
+	(*RemoveFriendResponse)(nil),           // 27: loci.social.RemoveFriendResponse
+	(*BlockUserRequest)(nil),               // 28: loci.social.BlockUserRequest
+	(*BlockUserResponse)(nil),              // 29: loci.social.BlockUserResponse
+	(*UnblockUserRequest)(nil),             // 30: loci.social.UnblockUserRequest
+	(*UnblockUserResponse)(nil),            // 31: loci.social.UnblockUserResponse
+	(*MatchContactsRequest)(nil),           // 32: loci.social.MatchContactsRequest
+	(*ContactMatch)(nil),                   // 33: loci.social.ContactMatch
+	(*MatchContactsResponse)(nil),          // 34: loci.social.MatchContactsResponse
+	(*MatchFacebookFriendsRequest)(nil),    // 35: loci.social.MatchFacebookFriendsRequest
+	(*MatchFacebookFriendsResponse)(nil),   // 36: loci.social.MatchFacebookFriendsResponse
+	(*SearchUsersRequest)(nil),             // 37: loci.social.SearchUsersRequest
+	(*UserResult)(nil),                     // 38: loci.social.UserResult
+	(*SearchUsersResponse)(nil),            // 39: loci.social.SearchUsersResponse
+	(*GetPublicProfileRequest)(nil),        // 40: loci.social.GetPublicProfileRequest
+	(*GetPublicProfileResponse)(nil),       // 41: loci.social.GetPublicProfileResponse
+	(*FollowUserRequest)(nil),              // 42: loci.social.FollowUserRequest
+	(*FollowUserResponse)(nil),             // 43: loci.social.FollowUserResponse
+	(*UnfollowRequest)(nil),                // 44: loci.social.UnfollowRequest
+	(*UnfollowResponse)(nil),               // 45: loci.social.UnfollowResponse
+	(*RemoveFollowerRequest)(nil),          // 46: loci.social.RemoveFollowerRequest
+	(*RemoveFollowerResponse)(nil),         // 47: loci.social.RemoveFollowerResponse
+	(*ListFollowersRequest)(nil),           // 48: loci.social.ListFollowersRequest
+	(*ListFollowingRequest)(nil),           // 49: loci.social.ListFollowingRequest
+	(*FollowEntry)(nil),                    // 50: loci.social.FollowEntry
+	(*ListFollowsResponse)(nil),            // 51: loci.social.ListFollowsResponse
+	(*FollowRequestEntry)(nil),             // 52: loci.social.FollowRequestEntry
+	(*ListFollowRequestsRequest)(nil),      // 53: loci.social.ListFollowRequestsRequest
+	(*ListFollowRequestsResponse)(nil),     // 54: loci.social.ListFollowRequestsResponse
+	(*RespondFollowRequestRequest)(nil),    // 55: loci.social.RespondFollowRequestRequest
+	(*RespondFollowRequestResponse)(nil),   // 56: loci.social.RespondFollowRequestResponse
+	(*CancelFollowRequestRequest)(nil),     // 57: loci.social.CancelFollowRequestRequest
+	(*CancelFollowRequestResponse)(nil),    // 58: loci.social.CancelFollowRequestResponse
+	(*SocialSettings)(nil),                 // 59: loci.social.SocialSettings
+	(*GetSocialSettingsRequest)(nil),       // 60: loci.social.GetSocialSettingsRequest
+	(*SetAccountPrivacyRequest)(nil),       // 61: loci.social.SetAccountPrivacyRequest
+	(*GetSocialSettingsResponse)(nil),      // 62: loci.social.GetSocialSettingsResponse
+	(*FeedCity)(nil),                       // 63: loci.social.FeedCity
+	(*FeedTrip)(nil),                       // 64: loci.social.FeedTrip
+	(*FeedItem)(nil),                       // 65: loci.social.FeedItem
+	(*ListFeedRequest)(nil),                // 66: loci.social.ListFeedRequest
+	(*ListFeedResponse)(nil),               // 67: loci.social.ListFeedResponse
+	(*CheerRequest)(nil),                   // 68: loci.social.CheerRequest
+	(*UncheerRequest)(nil),                 // 69: loci.social.UncheerRequest
+	(*CheerResponse)(nil),                  // 70: loci.social.CheerResponse
+	(*timestamppb.Timestamp)(nil),          // 71: google.protobuf.Timestamp
+	(*achievement.AchievementSummary)(nil), // 72: loci.achievement.AchievementSummary
 }
 var file_loci_social_social_proto_depIdxs = []int32{
-	2,  // 0: loci.social.Friend.user:type_name -> loci.social.PublicUser
-	40, // 1: loci.social.Friend.since:type_name -> google.protobuf.Timestamp
-	2,  // 2: loci.social.FriendRequest.from:type_name -> loci.social.PublicUser
-	2,  // 3: loci.social.FriendRequest.to:type_name -> loci.social.PublicUser
-	40, // 4: loci.social.FriendRequest.created_at:type_name -> google.protobuf.Timestamp
-	40, // 5: loci.social.Invite.expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 6: loci.social.Invite.inviter:type_name -> loci.social.PublicUser
-	5,  // 7: loci.social.GetMyInviteResponse.invite:type_name -> loci.social.Invite
-	5,  // 8: loci.social.GetInviteResponse.invite:type_name -> loci.social.Invite
+	4,  // 0: loci.social.Friend.user:type_name -> loci.social.PublicUser
+	71, // 1: loci.social.Friend.since:type_name -> google.protobuf.Timestamp
+	4,  // 2: loci.social.FriendRequest.from:type_name -> loci.social.PublicUser
+	4,  // 3: loci.social.FriendRequest.to:type_name -> loci.social.PublicUser
+	71, // 4: loci.social.FriendRequest.created_at:type_name -> google.protobuf.Timestamp
+	71, // 5: loci.social.Invite.expires_at:type_name -> google.protobuf.Timestamp
+	4,  // 6: loci.social.Invite.inviter:type_name -> loci.social.PublicUser
+	7,  // 7: loci.social.GetMyInviteResponse.invite:type_name -> loci.social.Invite
+	7,  // 8: loci.social.GetInviteResponse.invite:type_name -> loci.social.Invite
 	0,  // 9: loci.social.GetInviteResponse.relationship:type_name -> loci.social.Relationship
-	3,  // 10: loci.social.AcceptInviteResponse.friend:type_name -> loci.social.Friend
-	0,  // 11: loci.social.SendFriendRequestResponse.relationship:type_name -> loci.social.Relationship
-	4,  // 12: loci.social.SendFriendRequestResponse.request:type_name -> loci.social.FriendRequest
-	3,  // 13: loci.social.RespondFriendRequestResponse.friend:type_name -> loci.social.Friend
-	1,  // 14: loci.social.ListFriendRequestsRequest.direction:type_name -> loci.social.RequestDirection
-	4,  // 15: loci.social.ListFriendRequestsResponse.requests:type_name -> loci.social.FriendRequest
-	3,  // 16: loci.social.ListFriendsResponse.friends:type_name -> loci.social.Friend
-	2,  // 17: loci.social.ContactMatch.user:type_name -> loci.social.PublicUser
-	0,  // 18: loci.social.ContactMatch.relationship:type_name -> loci.social.Relationship
-	31, // 19: loci.social.MatchContactsResponse.matches:type_name -> loci.social.ContactMatch
-	36, // 20: loci.social.MatchFacebookFriendsResponse.matches:type_name -> loci.social.UserResult
-	2,  // 21: loci.social.UserResult.user:type_name -> loci.social.PublicUser
-	0,  // 22: loci.social.UserResult.relationship:type_name -> loci.social.Relationship
-	36, // 23: loci.social.SearchUsersResponse.users:type_name -> loci.social.UserResult
-	2,  // 24: loci.social.GetPublicProfileResponse.user:type_name -> loci.social.PublicUser
-	6,  // 25: loci.social.GetPublicProfileResponse.stats:type_name -> loci.social.ProfileStats
-	0,  // 26: loci.social.GetPublicProfileResponse.relationship:type_name -> loci.social.Relationship
-	40, // 27: loci.social.GetPublicProfileResponse.member_since:type_name -> google.protobuf.Timestamp
-	7,  // 28: loci.social.SocialService.GetMyInvite:input_type -> loci.social.GetMyInviteRequest
-	9,  // 29: loci.social.SocialService.RotateInvite:input_type -> loci.social.RotateInviteRequest
-	10, // 30: loci.social.SocialService.GetInvite:input_type -> loci.social.GetInviteRequest
-	12, // 31: loci.social.SocialService.AcceptInvite:input_type -> loci.social.AcceptInviteRequest
-	14, // 32: loci.social.SocialService.SendFriendRequest:input_type -> loci.social.SendFriendRequestRequest
-	16, // 33: loci.social.SocialService.RespondFriendRequest:input_type -> loci.social.RespondFriendRequestRequest
-	18, // 34: loci.social.SocialService.CancelFriendRequest:input_type -> loci.social.CancelFriendRequestRequest
-	20, // 35: loci.social.SocialService.ListFriendRequests:input_type -> loci.social.ListFriendRequestsRequest
-	22, // 36: loci.social.SocialService.ListFriends:input_type -> loci.social.ListFriendsRequest
-	24, // 37: loci.social.SocialService.RemoveFriend:input_type -> loci.social.RemoveFriendRequest
-	26, // 38: loci.social.SocialService.BlockUser:input_type -> loci.social.BlockUserRequest
-	28, // 39: loci.social.SocialService.UnblockUser:input_type -> loci.social.UnblockUserRequest
-	30, // 40: loci.social.SocialService.MatchContacts:input_type -> loci.social.MatchContactsRequest
-	33, // 41: loci.social.SocialService.MatchFacebookFriends:input_type -> loci.social.MatchFacebookFriendsRequest
-	35, // 42: loci.social.SocialService.SearchUsers:input_type -> loci.social.SearchUsersRequest
-	38, // 43: loci.social.SocialService.GetPublicProfile:input_type -> loci.social.GetPublicProfileRequest
-	8,  // 44: loci.social.SocialService.GetMyInvite:output_type -> loci.social.GetMyInviteResponse
-	8,  // 45: loci.social.SocialService.RotateInvite:output_type -> loci.social.GetMyInviteResponse
-	11, // 46: loci.social.SocialService.GetInvite:output_type -> loci.social.GetInviteResponse
-	13, // 47: loci.social.SocialService.AcceptInvite:output_type -> loci.social.AcceptInviteResponse
-	15, // 48: loci.social.SocialService.SendFriendRequest:output_type -> loci.social.SendFriendRequestResponse
-	17, // 49: loci.social.SocialService.RespondFriendRequest:output_type -> loci.social.RespondFriendRequestResponse
-	19, // 50: loci.social.SocialService.CancelFriendRequest:output_type -> loci.social.CancelFriendRequestResponse
-	21, // 51: loci.social.SocialService.ListFriendRequests:output_type -> loci.social.ListFriendRequestsResponse
-	23, // 52: loci.social.SocialService.ListFriends:output_type -> loci.social.ListFriendsResponse
-	25, // 53: loci.social.SocialService.RemoveFriend:output_type -> loci.social.RemoveFriendResponse
-	27, // 54: loci.social.SocialService.BlockUser:output_type -> loci.social.BlockUserResponse
-	29, // 55: loci.social.SocialService.UnblockUser:output_type -> loci.social.UnblockUserResponse
-	32, // 56: loci.social.SocialService.MatchContacts:output_type -> loci.social.MatchContactsResponse
-	34, // 57: loci.social.SocialService.MatchFacebookFriends:output_type -> loci.social.MatchFacebookFriendsResponse
-	37, // 58: loci.social.SocialService.SearchUsers:output_type -> loci.social.SearchUsersResponse
-	39, // 59: loci.social.SocialService.GetPublicProfile:output_type -> loci.social.GetPublicProfileResponse
-	44, // [44:60] is the sub-list for method output_type
-	28, // [28:44] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	1,  // 10: loci.social.GetInviteResponse.follow_state:type_name -> loci.social.FollowState
+	5,  // 11: loci.social.AcceptInviteResponse.friend:type_name -> loci.social.Friend
+	0,  // 12: loci.social.SendFriendRequestResponse.relationship:type_name -> loci.social.Relationship
+	6,  // 13: loci.social.SendFriendRequestResponse.request:type_name -> loci.social.FriendRequest
+	5,  // 14: loci.social.RespondFriendRequestResponse.friend:type_name -> loci.social.Friend
+	2,  // 15: loci.social.ListFriendRequestsRequest.direction:type_name -> loci.social.RequestDirection
+	6,  // 16: loci.social.ListFriendRequestsResponse.requests:type_name -> loci.social.FriendRequest
+	5,  // 17: loci.social.ListFriendsResponse.friends:type_name -> loci.social.Friend
+	4,  // 18: loci.social.ContactMatch.user:type_name -> loci.social.PublicUser
+	0,  // 19: loci.social.ContactMatch.relationship:type_name -> loci.social.Relationship
+	1,  // 20: loci.social.ContactMatch.follow_state:type_name -> loci.social.FollowState
+	33, // 21: loci.social.MatchContactsResponse.matches:type_name -> loci.social.ContactMatch
+	38, // 22: loci.social.MatchFacebookFriendsResponse.matches:type_name -> loci.social.UserResult
+	4,  // 23: loci.social.UserResult.user:type_name -> loci.social.PublicUser
+	0,  // 24: loci.social.UserResult.relationship:type_name -> loci.social.Relationship
+	1,  // 25: loci.social.UserResult.follow_state:type_name -> loci.social.FollowState
+	38, // 26: loci.social.SearchUsersResponse.users:type_name -> loci.social.UserResult
+	4,  // 27: loci.social.GetPublicProfileResponse.user:type_name -> loci.social.PublicUser
+	8,  // 28: loci.social.GetPublicProfileResponse.stats:type_name -> loci.social.ProfileStats
+	0,  // 29: loci.social.GetPublicProfileResponse.relationship:type_name -> loci.social.Relationship
+	71, // 30: loci.social.GetPublicProfileResponse.member_since:type_name -> google.protobuf.Timestamp
+	1,  // 31: loci.social.GetPublicProfileResponse.follow_state:type_name -> loci.social.FollowState
+	72, // 32: loci.social.GetPublicProfileResponse.showcase:type_name -> loci.achievement.AchievementSummary
+	1,  // 33: loci.social.FollowUserResponse.follow_state:type_name -> loci.social.FollowState
+	4,  // 34: loci.social.FollowUserResponse.user:type_name -> loci.social.PublicUser
+	4,  // 35: loci.social.FollowEntry.user:type_name -> loci.social.PublicUser
+	71, // 36: loci.social.FollowEntry.since:type_name -> google.protobuf.Timestamp
+	1,  // 37: loci.social.FollowEntry.follow_state:type_name -> loci.social.FollowState
+	50, // 38: loci.social.ListFollowsResponse.entries:type_name -> loci.social.FollowEntry
+	4,  // 39: loci.social.FollowRequestEntry.from:type_name -> loci.social.PublicUser
+	4,  // 40: loci.social.FollowRequestEntry.to:type_name -> loci.social.PublicUser
+	71, // 41: loci.social.FollowRequestEntry.created_at:type_name -> google.protobuf.Timestamp
+	2,  // 42: loci.social.ListFollowRequestsRequest.direction:type_name -> loci.social.RequestDirection
+	52, // 43: loci.social.ListFollowRequestsResponse.requests:type_name -> loci.social.FollowRequestEntry
+	59, // 44: loci.social.GetSocialSettingsResponse.settings:type_name -> loci.social.SocialSettings
+	3,  // 45: loci.social.FeedItem.kind:type_name -> loci.social.FeedItemKind
+	4,  // 46: loci.social.FeedItem.actor:type_name -> loci.social.PublicUser
+	71, // 47: loci.social.FeedItem.created_at:type_name -> google.protobuf.Timestamp
+	72, // 48: loci.social.FeedItem.achievement:type_name -> loci.achievement.AchievementSummary
+	63, // 49: loci.social.FeedItem.city:type_name -> loci.social.FeedCity
+	64, // 50: loci.social.FeedItem.trip:type_name -> loci.social.FeedTrip
+	4,  // 51: loci.social.FeedItem.recent_cheerers:type_name -> loci.social.PublicUser
+	65, // 52: loci.social.ListFeedResponse.items:type_name -> loci.social.FeedItem
+	9,  // 53: loci.social.SocialService.GetMyInvite:input_type -> loci.social.GetMyInviteRequest
+	11, // 54: loci.social.SocialService.RotateInvite:input_type -> loci.social.RotateInviteRequest
+	12, // 55: loci.social.SocialService.GetInvite:input_type -> loci.social.GetInviteRequest
+	14, // 56: loci.social.SocialService.AcceptInvite:input_type -> loci.social.AcceptInviteRequest
+	42, // 57: loci.social.SocialService.Follow:input_type -> loci.social.FollowUserRequest
+	44, // 58: loci.social.SocialService.Unfollow:input_type -> loci.social.UnfollowRequest
+	46, // 59: loci.social.SocialService.RemoveFollower:input_type -> loci.social.RemoveFollowerRequest
+	48, // 60: loci.social.SocialService.ListFollowers:input_type -> loci.social.ListFollowersRequest
+	49, // 61: loci.social.SocialService.ListFollowing:input_type -> loci.social.ListFollowingRequest
+	53, // 62: loci.social.SocialService.ListFollowRequests:input_type -> loci.social.ListFollowRequestsRequest
+	55, // 63: loci.social.SocialService.RespondFollowRequest:input_type -> loci.social.RespondFollowRequestRequest
+	57, // 64: loci.social.SocialService.CancelFollowRequest:input_type -> loci.social.CancelFollowRequestRequest
+	60, // 65: loci.social.SocialService.GetSocialSettings:input_type -> loci.social.GetSocialSettingsRequest
+	61, // 66: loci.social.SocialService.SetAccountPrivacy:input_type -> loci.social.SetAccountPrivacyRequest
+	66, // 67: loci.social.SocialService.ListFeed:input_type -> loci.social.ListFeedRequest
+	68, // 68: loci.social.SocialService.Cheer:input_type -> loci.social.CheerRequest
+	69, // 69: loci.social.SocialService.Uncheer:input_type -> loci.social.UncheerRequest
+	16, // 70: loci.social.SocialService.SendFriendRequest:input_type -> loci.social.SendFriendRequestRequest
+	18, // 71: loci.social.SocialService.RespondFriendRequest:input_type -> loci.social.RespondFriendRequestRequest
+	20, // 72: loci.social.SocialService.CancelFriendRequest:input_type -> loci.social.CancelFriendRequestRequest
+	22, // 73: loci.social.SocialService.ListFriendRequests:input_type -> loci.social.ListFriendRequestsRequest
+	24, // 74: loci.social.SocialService.ListFriends:input_type -> loci.social.ListFriendsRequest
+	26, // 75: loci.social.SocialService.RemoveFriend:input_type -> loci.social.RemoveFriendRequest
+	28, // 76: loci.social.SocialService.BlockUser:input_type -> loci.social.BlockUserRequest
+	30, // 77: loci.social.SocialService.UnblockUser:input_type -> loci.social.UnblockUserRequest
+	32, // 78: loci.social.SocialService.MatchContacts:input_type -> loci.social.MatchContactsRequest
+	35, // 79: loci.social.SocialService.MatchFacebookFriends:input_type -> loci.social.MatchFacebookFriendsRequest
+	37, // 80: loci.social.SocialService.SearchUsers:input_type -> loci.social.SearchUsersRequest
+	40, // 81: loci.social.SocialService.GetPublicProfile:input_type -> loci.social.GetPublicProfileRequest
+	10, // 82: loci.social.SocialService.GetMyInvite:output_type -> loci.social.GetMyInviteResponse
+	10, // 83: loci.social.SocialService.RotateInvite:output_type -> loci.social.GetMyInviteResponse
+	13, // 84: loci.social.SocialService.GetInvite:output_type -> loci.social.GetInviteResponse
+	15, // 85: loci.social.SocialService.AcceptInvite:output_type -> loci.social.AcceptInviteResponse
+	43, // 86: loci.social.SocialService.Follow:output_type -> loci.social.FollowUserResponse
+	45, // 87: loci.social.SocialService.Unfollow:output_type -> loci.social.UnfollowResponse
+	47, // 88: loci.social.SocialService.RemoveFollower:output_type -> loci.social.RemoveFollowerResponse
+	51, // 89: loci.social.SocialService.ListFollowers:output_type -> loci.social.ListFollowsResponse
+	51, // 90: loci.social.SocialService.ListFollowing:output_type -> loci.social.ListFollowsResponse
+	54, // 91: loci.social.SocialService.ListFollowRequests:output_type -> loci.social.ListFollowRequestsResponse
+	56, // 92: loci.social.SocialService.RespondFollowRequest:output_type -> loci.social.RespondFollowRequestResponse
+	58, // 93: loci.social.SocialService.CancelFollowRequest:output_type -> loci.social.CancelFollowRequestResponse
+	62, // 94: loci.social.SocialService.GetSocialSettings:output_type -> loci.social.GetSocialSettingsResponse
+	62, // 95: loci.social.SocialService.SetAccountPrivacy:output_type -> loci.social.GetSocialSettingsResponse
+	67, // 96: loci.social.SocialService.ListFeed:output_type -> loci.social.ListFeedResponse
+	70, // 97: loci.social.SocialService.Cheer:output_type -> loci.social.CheerResponse
+	70, // 98: loci.social.SocialService.Uncheer:output_type -> loci.social.CheerResponse
+	17, // 99: loci.social.SocialService.SendFriendRequest:output_type -> loci.social.SendFriendRequestResponse
+	19, // 100: loci.social.SocialService.RespondFriendRequest:output_type -> loci.social.RespondFriendRequestResponse
+	21, // 101: loci.social.SocialService.CancelFriendRequest:output_type -> loci.social.CancelFriendRequestResponse
+	23, // 102: loci.social.SocialService.ListFriendRequests:output_type -> loci.social.ListFriendRequestsResponse
+	25, // 103: loci.social.SocialService.ListFriends:output_type -> loci.social.ListFriendsResponse
+	27, // 104: loci.social.SocialService.RemoveFriend:output_type -> loci.social.RemoveFriendResponse
+	29, // 105: loci.social.SocialService.BlockUser:output_type -> loci.social.BlockUserResponse
+	31, // 106: loci.social.SocialService.UnblockUser:output_type -> loci.social.UnblockUserResponse
+	34, // 107: loci.social.SocialService.MatchContacts:output_type -> loci.social.MatchContactsResponse
+	36, // 108: loci.social.SocialService.MatchFacebookFriends:output_type -> loci.social.MatchFacebookFriendsResponse
+	39, // 109: loci.social.SocialService.SearchUsers:output_type -> loci.social.SearchUsersResponse
+	41, // 110: loci.social.SocialService.GetPublicProfile:output_type -> loci.social.GetPublicProfileResponse
+	82, // [82:111] is the sub-list for method output_type
+	53, // [53:82] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_loci_social_social_proto_init() }
@@ -2316,13 +4374,22 @@ func file_loci_social_social_proto_init() {
 		(*GetPublicProfileRequest_UserId)(nil),
 		(*GetPublicProfileRequest_Username)(nil),
 	}
+	file_loci_social_social_proto_msgTypes[38].OneofWrappers = []any{
+		(*FollowUserRequest_UserId)(nil),
+		(*FollowUserRequest_Username)(nil),
+	}
+	file_loci_social_social_proto_msgTypes[61].OneofWrappers = []any{
+		(*FeedItem_Achievement)(nil),
+		(*FeedItem_City)(nil),
+		(*FeedItem_Trip)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_social_social_proto_rawDesc), len(file_loci_social_social_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   38,
+			NumEnums:      4,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
