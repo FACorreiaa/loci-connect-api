@@ -19,8 +19,8 @@ type Locker interface {
 }
 
 // Runner does the field score's background work every Interval: closes
-// finished seasons, pays places kept a week, and looks up neighborhoods the
-// request path missed. Every replica starts one; the advisory lock lets one
+// finished seasons, pays places kept a week, looks up neighborhoods the
+// request path missed, backfills achievements and recounts their rarity. Every replica starts one; the advisory lock lets one
 // of them work in any tick.
 type Runner struct {
 	svc      *Service
@@ -36,6 +36,7 @@ const RunnerTick = 5 * time.Minute
 // third-party API, one a second.
 const (
 	keepBatch          = 500
+	backfillBatch      = 500
 	neighborhoodBatch  = 50
 	neighborhoodPacing = time.Second
 )
@@ -85,6 +86,16 @@ func (r *Runner) Tick(ctx context.Context) bool {
 		r.log.WarnContext(ctx, "paying kept places failed", slog.Any("error", err))
 	} else if n > 0 {
 		r.log.InfoContext(ctx, "kept places paid", slog.Int("count", n))
+	}
+	if a := r.svc.achiever; a != nil {
+		if n, err := a.BackfillBatch(ctx, backfillBatch); err != nil {
+			r.log.WarnContext(ctx, "achievement backfill failed", slog.Any("error", err))
+		} else if n > 0 {
+			r.log.InfoContext(ctx, "achievements backfilled", slog.Int("users", n))
+		}
+		if err := a.RefreshRarity(ctx); err != nil {
+			r.log.WarnContext(ctx, "achievement rarity refresh failed", slog.Any("error", err))
+		}
 	}
 	if n, err := r.svc.BackfillNeighborhoods(ctx, neighborhoodBatch, neighborhoodPacing); err != nil {
 		r.log.WarnContext(ctx, "neighborhood backfill failed", slog.Any("error", err))

@@ -15,6 +15,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/safefetch"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
@@ -198,6 +199,9 @@ type Dependencies struct {
 	GamificationHandler *gamification.Handler
 	// gamification awards points from other domains' handlers.
 	gamification *gamification.Service
+	// achievements judges what users earn; its interceptor evaluates actions
+	// that earn no points. Nil without a database.
+	achievements *achievements.Service
 	// signups runs after an account is created: its invite code, and who
 	// invited it. Nil without a database.
 	signups service.SignupHook
@@ -953,12 +957,14 @@ func (d *Dependencies) initHandlers() error {
 	var socialNotifier socialdomain.Notifier
 	// Badges and leaderboard passes go the same way, gated by their own switch.
 	var progressNotifier gamification.Notifier
+	var achievementNotifier achievements.Notifier
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
 		socialNotifier = notifier
 		d.briefSender = notifier
 		progressNotifier = notifier
+		achievementNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
 		}
@@ -1046,6 +1052,13 @@ func (d *Dependencies) initHandlers() error {
 		).WithRanks(overallRanks, cityRanks).
 			WithNeighborhoods(localcontext.NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), localcontext.NewSignalsHTTPClient(), nil)).
 			WithPlans(d.SubscriptionService)
+		// Achievements are judged after every award and listed through the
+		// gamification service; a private account's are its followers' only.
+		d.achievements = achievements.NewService(
+			achievements.NewRepository(d.DB.Pool), achievementNotifier, socialSvc, d.Logger,
+			d.Config.Social.GamificationEnabled && d.Config.Social.AchievementsEnabled,
+		).WithCityRanks(cityRanks)
+		d.gamification = d.gamification.WithAchievements(d.achievements)
 		d.GamificationHandler = gamification.NewHandler(d.gamification, d.Logger)
 		if d.Config.Social.GamificationEnabled && d.Config.Social.FieldRunnerEnabled {
 			d.fieldRunner = gamification.NewRunner(d.gamification, pglock.New(d.DB.Pool, gamification.RunnerLockKey), d.Logger)

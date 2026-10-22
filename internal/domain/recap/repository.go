@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
 )
 
 // Repository is the recaps table plus the reads a recap is built from.
@@ -708,22 +710,37 @@ func (p *pgRepository) loadProgress(ctx context.Context, f *TripFacts, from, to 
 		return err
 	}
 
-	rows, err = p.pool.Query(ctx, `
-		SELECT badge_id FROM user_badges
+	f.Badges, err = p.earnedBetween(ctx, f.UserID, from, to)
+	return err
+}
+
+// earnedBetween lists what userID earned in [from, to): badges from before
+// achievements, then achievements (as achievements.Unit keys). Backfilled
+// achievements are left out: their date is the backfill's, not the deed's.
+func (p *pgRepository) earnedBetween(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]string, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT badge_id, 0::smallint, awarded_at FROM user_badges
 		WHERE user_id = $1 AND awarded_at >= $2 AND awarded_at < $3
-		ORDER BY awarded_at`, f.UserID, from, to)
+		UNION ALL
+		SELECT achievement_id, tier, earned_at FROM user_achievements
+		WHERE user_id = $1 AND source = 'live' AND earned_at >= $2 AND earned_at < $3
+		ORDER BY 3`, userID, from, to)
 	if err != nil {
-		return fmt.Errorf("recap badges: %w", err)
+		return nil, fmt.Errorf("recap badges: %w", err)
 	}
 	defer rows.Close()
+	var out []string
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return fmt.Errorf("scan recap badge: %w", err)
+		var (
+			u  achievements.Unit
+			at time.Time
+		)
+		if err := rows.Scan(&u.ID, &u.Tier, &at); err != nil {
+			return nil, fmt.Errorf("scan recap badge: %w", err)
 		}
-		f.Badges = append(f.Badges, id)
+		out = append(out, u.Key())
 	}
-	return rows.Err()
+	return out, rows.Err()
 }
 
 func (p *pgRepository) loadField(ctx context.Context, f *TripFacts, cityID uuid.UUID) error {

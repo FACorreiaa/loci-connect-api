@@ -24,12 +24,9 @@ type Repository interface {
 	// same award already existed or the kind's daily cap was reached; then
 	// nothing changes.
 	Insert(ctx context.Context, e Event, dailyCap int) (inserted bool, totals Totals, err error)
-	// Counts are what badges are judged on.
-	Counts(ctx context.Context, userID uuid.UUID, longestStreak int) (Counts, error)
-	// Badges is when each earned badge was awarded.
+	// Badges is when each badge was awarded, before achievements replaced
+	// them. Nothing writes badges any more.
 	Badges(ctx context.Context, userID uuid.UUID) (map[string]time.Time, error)
-	// GrantBadge records a badge; false when it was already earned.
-	GrantBadge(ctx context.Context, userID uuid.UUID, badgeID string) (bool, error)
 	// Today is how many awards of each kind the user has on localDate.
 	Today(ctx context.Context, userID uuid.UUID, localDate time.Time) (map[Kind]int, error)
 	// Visible keeps the ids whose leaderboard_visible switch is on (users
@@ -256,9 +253,11 @@ func NewRepository(db *pgxpool.Pool) Repository {
 func (r *pgRepository) Totals(ctx context.Context, userID uuid.UUID) (Totals, error) {
 	t := Totals{Timezone: "UTC"}
 	err := r.db.QueryRow(ctx, `
-		SELECT total_points, current_streak, longest_streak, last_active_date, timezone
+		SELECT total_points, current_streak, longest_streak, last_active_date, timezone,
+		       week_streak, longest_week_streak, last_streak_week
 		FROM user_progress WHERE user_id = $1`, userID).
-		Scan(&t.TotalPoints, &t.CurrentStreak, &t.LongestStreak, &t.LastActiveDate, &t.Timezone)
+		Scan(&t.TotalPoints, &t.CurrentStreak, &t.LongestStreak, &t.LastActiveDate, &t.Timezone,
+			&t.WeekStreak, &t.LongestWeekStreak, &t.LastStreakWeek)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, nil
 	}
@@ -292,9 +291,11 @@ func (r *pgRepository) Insert(ctx context.Context, e Event, dailyCap int) (bool,
 		return false, Totals{}, fmt.Errorf("ensure progress: %w", err)
 	}
 	if err := tx.QueryRow(ctx, `
-		SELECT total_points, current_streak, longest_streak, last_active_date, timezone
+		SELECT total_points, current_streak, longest_streak, last_active_date, timezone,
+		       week_streak, longest_week_streak, last_streak_week
 		FROM user_progress WHERE user_id = $1 FOR UPDATE`, e.UserID).
-		Scan(&t.TotalPoints, &t.CurrentStreak, &t.LongestStreak, &t.LastActiveDate, &t.Timezone); err != nil {
+		Scan(&t.TotalPoints, &t.CurrentStreak, &t.LongestStreak, &t.LastActiveDate, &t.Timezone,
+			&t.WeekStreak, &t.LongestWeekStreak, &t.LastStreakWeek); err != nil {
 		return false, Totals{}, fmt.Errorf("lock progress: %w", err)
 	}
 
@@ -356,31 +357,20 @@ func (r *pgRepository) Insert(ctx context.Context, e Event, dailyCap int) (bool,
 	}
 
 	t.TotalPoints += int64(e.FieldPoints)
+	if e.Kind.Explores() {
+		t, _ = NextWeekStreak(t, e.LocalDate)
+	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE user_progress SET total_points = $2, updated_at = NOW() WHERE user_id = $1`,
-		e.UserID, t.TotalPoints); err != nil {
+		UPDATE user_progress SET total_points = $2, week_streak = $3, longest_week_streak = $4,
+		       last_streak_week = $5, updated_at = NOW()
+		WHERE user_id = $1`,
+		e.UserID, t.TotalPoints, t.WeekStreak, t.LongestWeekStreak, t.LastStreakWeek); err != nil {
 		return false, Totals{}, fmt.Errorf("update progress: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return false, Totals{}, fmt.Errorf("commit award: %w", err)
 	}
 	return true, t, nil
-}
-
-func (r *pgRepository) Counts(ctx context.Context, userID uuid.UUID, longestStreak int) (Counts, error) {
-	c := Counts{LongestStreak: longestStreak}
-	err := r.db.QueryRow(ctx, `
-		SELECT
-			COUNT(*) FILTER (WHERE kind = 4),
-			COUNT(DISTINCT split_part(ref_key, ':', 2)) FILTER (WHERE kind = 3),
-			COUNT(*) FILTER (WHERE kind = 5),
-			COUNT(*) FILTER (WHERE kind = 8)
-		FROM points_events WHERE user_id = $1`, userID).
-		Scan(&c.Cities, &c.Places, &c.ScoutClaims, &c.TripsDone)
-	if err != nil {
-		return c, fmt.Errorf("count achievements: %w", err)
-	}
-	return c, nil
 }
 
 func (r *pgRepository) Badges(ctx context.Context, userID uuid.UUID) (map[string]time.Time, error) {
@@ -401,15 +391,6 @@ func (r *pgRepository) Badges(ctx context.Context, userID uuid.UUID) (map[string
 		out[id] = at
 	}
 	return out, rows.Err()
-}
-
-func (r *pgRepository) GrantBadge(ctx context.Context, userID uuid.UUID, badgeID string) (bool, error) {
-	ct, err := r.db.Exec(ctx, `
-		INSERT INTO user_badges (user_id, badge_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, userID, badgeID)
-	if err != nil {
-		return false, fmt.Errorf("grant badge: %w", err)
-	}
-	return ct.RowsAffected() == 1, nil
 }
 
 func (r *pgRepository) Today(ctx context.Context, userID uuid.UUID, localDate time.Time) (map[Kind]int, error) {

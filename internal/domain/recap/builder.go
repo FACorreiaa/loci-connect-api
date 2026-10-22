@@ -14,6 +14,7 @@ import (
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/gamification"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/travelhistory"
 )
@@ -544,6 +545,8 @@ func (b *Builder) progress(f *TripFacts) *recapv1.RecapCard {
 		label := id
 		if b, ok := gamification.BadgeByID(id); ok {
 			label = b.Title
+		} else if l, ok := achievements.Label(id); ok {
+			label = l
 		}
 		card.Badges = append(card.Badges, &recapv1.EarnedBadge{BadgeId: id, Label: label})
 	}

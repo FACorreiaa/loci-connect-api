@@ -11,9 +11,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// badgeCopy is the display copy for each badge slug the server awards. The
-// wording lives here so web and iOS show the same thing without each keeping
-// its own table. creditCorroborators awards "local-scout".
+// localScoutClaims is the accepted reports that show "local-scout".
+const localScoutClaims = 10
+
+// badgeCopy is the display copy for each contributor badge slug. The wording
+// lives here so web and iOS show the same thing without each keeping its own
+// table. Achievements replaced these badges; older clients still show them.
 var badgeCopy = map[string]struct{ name, description string }{
 	"local-scout": {
 		name:        "Local scout",

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	achievementv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/achievement"
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
 	"github.com/google/uuid"
 )
@@ -24,13 +25,11 @@ type Graph interface {
 // Notifier announces progress on a user's devices. Best effort; it never
 // fails the action that earned the points.
 type Notifier interface {
-	BadgeEarned(ctx context.Context, to uuid.UUID, title, description string)
 	PassedOnLeaderboard(ctx context.Context, to uuid.UUID, by *socialv1.PublicUser)
 }
 
 type noopNotifier struct{}
 
-func (noopNotifier) BadgeEarned(context.Context, uuid.UUID, string, string)               {}
 func (noopNotifier) PassedOnLeaderboard(context.Context, uuid.UUID, *socialv1.PublicUser) {}
 
 // Quiet hours: no progress push is sent from 22:00 to 08:00 in the
@@ -65,6 +64,7 @@ type Service struct {
 	cityRanks    Thresholds
 	hoods        Neighborhoods
 	plans        PlanChecker
+	achiever     Achiever
 }
 
 // NewService builds the service. With enabled false every award is a no-op
@@ -110,9 +110,9 @@ func (s *Service) WithPlans(p PlanChecker) *Service {
 
 // Result is what one award did.
 type Result struct {
-	Points    int
-	Totals    Totals
-	NewBadges []Badge
+	Points   int
+	Totals   Totals
+	Unlocked []*achievementv1.Achievement
 }
 
 // Award scores one action. It is safe to call from any code path that records
@@ -152,10 +152,7 @@ func (s *Service) Award(ctx context.Context, a Award) (Result, error) {
 	if !inserted {
 		return Result{Totals: totals}, nil
 	}
-	res := Result{Points: rule.Points, Totals: totals}
-	if res.NewBadges, err = s.grantBadges(ctx, a.UserID, totals); err != nil {
-		s.log.Warn("badge check failed", slog.String("user_id", a.UserID.String()), slog.Any("error", err))
-	}
+	res := Result{Points: rule.Points, Totals: totals, Unlocked: s.evaluate(ctx, a.UserID)}
 	s.announcePass(ctx, a.UserID, rule.Points, today)
 	return res, nil
 }
@@ -174,30 +171,6 @@ func (s *Service) AwardQuietly(ctx context.Context, a Award) int {
 		return 0
 	}
 	return res.Points
-}
-
-func (s *Service) grantBadges(ctx context.Context, userID uuid.UUID, totals Totals) ([]Badge, error) {
-	counts, err := s.repo.Counts(ctx, userID, totals.LongestStreak)
-	if err != nil {
-		return nil, err
-	}
-	var earned []Badge
-	for _, b := range Badges {
-		if !b.Earned(counts) {
-			continue
-		}
-		granted, err := s.repo.GrantBadge(ctx, userID, b.ID)
-		if err != nil {
-			return earned, err
-		}
-		if granted {
-			earned = append(earned, b)
-			s.notifyIfAwake(ctx, userID, totals.Timezone, func(ctx context.Context) {
-				s.notify.BadgeEarned(ctx, userID, b.Title, b.Description)
-			})
-		}
-	}
-	return earned, nil
 }
 
 // announcePass tells each follower whose weekly total userID just overtook:
@@ -254,8 +227,7 @@ func (s *Service) announcePass(ctx context.Context, userID uuid.UUID, points int
 }
 
 func (s *Service) notifyIfAwake(ctx context.Context, to uuid.UUID, tz string, send func(context.Context)) {
-	h := LocalHour(s.now(), tz)
-	if h >= quietFrom || h < quietTo {
+	if Quiet(s.now(), tz) {
 		return
 	}
 	send(ctx)
@@ -263,13 +235,17 @@ func (s *Service) notifyIfAwake(ctx context.Context, to uuid.UUID, tz string, se
 
 // Progress is a user's progress as the API returns it.
 type Progress struct {
-	Totals      Totals
-	Level       int
-	ToNext      int64
-	Earned      map[string]time.Time
-	CheckedIn   bool
-	Searched    bool
-	PlacesToday int
+	Totals Totals
+	Level  int
+	ToNext int64
+	// Earned are the badges earned before achievements replaced them, and
+	// Achievements what has been earned since; older apps list both as
+	// badges.
+	Earned       map[string]time.Time
+	Achievements []*achievementv1.Achievement
+	CheckedIn    bool
+	Searched     bool
+	PlacesToday  int
 }
 
 // MyProgress loads userID's progress.
@@ -285,6 +261,17 @@ func (s *Service) MyProgress(ctx context.Context, userID uuid.UUID) (*Progress, 
 	}
 	if p.Earned, err = s.repo.Badges(ctx, userID); err != nil {
 		return nil, err
+	}
+	if s.achiever != nil {
+		list, err := s.achiever.List(ctx, userID, userID)
+		if err != nil {
+			return nil, err
+		}
+		for _, a := range list.GetAchievements() {
+			if a.GetEarnedAt() != nil {
+				p.Achievements = append(p.Achievements, a)
+			}
+		}
 	}
 	today, err := s.repo.Today(ctx, userID, LocalDate(s.now(), totals.Timezone))
 	if err != nil {
@@ -451,7 +438,7 @@ func (s *Service) finishDay(ctx context.Context, userID uuid.UUID, trip *TripSta
 		if done.Points > 0 {
 			out.Totals = done.Totals
 		}
-		out.NewBadges = append(out.NewBadges, done.NewBadges...)
+		out.Unlocked = append(out.Unlocked, done.Unlocked...)
 	}
 	return out, nil
 }

@@ -378,7 +378,8 @@ type NotificationSettings struct {
 	LeaderboardVisible bool `json:"leaderboard_visible"`
 	// StreakReminders is read by the device, which sends the reminder itself.
 	StreakReminders bool `json:"streak_reminders"`
-	// ProgressUpdates gates pushes for badges earned and friends passing you.
+	// ProgressUpdates gates pushes for achievements unlocked and friends
+	// passing you.
 	ProgressUpdates bool `json:"progress_updates"`
 	// CityBoardVisible shows the account's display name and weekly field
 	// score on city boards, to people who are not friends.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -653,8 +654,6 @@ func creditCorroborators(ctx context.Context, tx pgx.Tx, poiID, field, value str
 		UPDATE contributor_profiles SET
 			accepted_claims = accepted_claims + 1,
 			reputation = LEAST(100, reputation + 3),
-			badges = CASE WHEN accepted_claims + 1 >= 10 AND NOT ('local-scout' = ANY(badges))
-				THEN array_append(badges, 'local-scout') ELSE badges END,
 			updated_at = NOW()
 		WHERE user_id = ANY($1)`, credited); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("reward contributors: %w", err))
@@ -778,6 +777,11 @@ func (h *Handler) GetMyContributorProfile(ctx context.Context, _ *connect.Reques
 	}
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get contributor profile: %w", err))
+	}
+	// Achievements replaced contributor badges: nothing writes the column now,
+	// and local-scout is read off the same count as the Scout track's silver.
+	if profile.AcceptedClaims >= localScoutClaims && !slices.Contains(profile.Badges, "local-scout") {
+		profile.Badges = append(profile.Badges, "local-scout")
 	}
 	profile.BadgeDetails = badgesFor(profile.Badges)
 	return connect.NewResponse(profile), nil
