@@ -245,25 +245,41 @@ func (s *Service) AcceptInvite(ctx context.Context, userID uuid.UUID, code strin
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	if inv.UserID == userID {
-		return nil, time.Time{}, ErrSelf
-	}
-	_, blocked, err := s.repo.Relation(ctx, userID, inv.UserID)
+	cards, err := s.befriend(ctx, userID, inv.UserID)
 	if err != nil {
 		return nil, time.Time{}, err
+	}
+	return cards[inv.UserID], s.now(), nil
+}
+
+// Befriend makes userID and other friends the way accepting other's invite
+// does: each follows the other, and other hears about it. Joining someone's
+// trip through its invite link uses it.
+func (s *Service) Befriend(ctx context.Context, userID, other uuid.UUID) error {
+	_, err := s.befriend(ctx, userID, other)
+	return err
+}
+
+func (s *Service) befriend(ctx context.Context, userID, other uuid.UUID) (map[uuid.UUID]*socialv1.PublicUser, error) {
+	if other == userID {
+		return nil, ErrSelf
+	}
+	_, blocked, err := s.repo.Relation(ctx, userID, other)
+	if err != nil {
+		return nil, err
 	}
 	if blocked {
-		return nil, time.Time{}, ErrNotFound
+		return nil, ErrNotFound
 	}
-	if err := s.repo.MakeFriends(ctx, userID, inv.UserID); err != nil {
-		return nil, time.Time{}, err
+	if err := s.repo.MakeFriends(ctx, userID, other); err != nil {
+		return nil, err
 	}
-	cards, err := s.repo.PublicUsers(ctx, []uuid.UUID{userID, inv.UserID})
+	cards, err := s.repo.PublicUsers(ctx, []uuid.UUID{userID, other})
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
-	s.announceFollower(ctx, userID, inv.UserID, cards[userID], true)
-	return cards[inv.UserID], s.now(), nil
+	s.announceFollower(ctx, userID, other, cards[userID], true)
+	return cards, nil
 }
 
 // Follow makes from follow to, or asks to when to is private. It returns the

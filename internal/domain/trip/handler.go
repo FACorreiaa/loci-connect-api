@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
@@ -59,6 +60,14 @@ type Handler struct {
 	// Optional, attached via WithPlan. Nil makes the plan RPCs (dates, stays,
 	// flights) answer Unimplemented.
 	plan *Service
+
+	// Optional, attached via WithMembers (which needs WithSharing). Nil
+	// makes the member RPCs answer Unimplemented and GetTrip owner-only.
+	members  MembersRepository
+	befriend Befriender
+
+	// now is the clock invites expire by. Nil is time.Now; tests set it.
+	now func() time.Time
 }
 
 // WithAnalytics attaches the product-event recorder so a re-opened trip reaches
@@ -131,12 +140,22 @@ func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTr
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid trip ID"))
 	}
 	t, err := h.repo.GetTrip(ctx, id, uid)
+	if errors.Is(err, ErrNotFound) && h.membersReady() == nil {
+		p, merr := h.getMemberTrip(ctx, uid, id)
+		if merr != nil {
+			return nil, merr
+		}
+		return connect.NewResponse(p), nil
+	}
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
 	h.recordReopen(ctx, t, uid)
 	h.recordReopenEvent(t, uid)
-	return connect.NewResponse(h.respond(ctx, t)), nil
+	p := h.respond(ctx, t)
+	p.ViewerRole = tripv1.TripRole_TRIP_ROLE_OWNER
+	h.withMembers(ctx, p, t)
+	return connect.NewResponse(p), nil
 }
 
 func (h *Handler) ListTrips(ctx context.Context, req *connect.Request[tripv1.ListTripsRequest]) (*connect.Response[tripv1.ListTripsResponse], error) {
@@ -152,12 +171,46 @@ func (h *Handler) ListTrips(ctx context.Context, req *connect.Request[tripv1.Lis
 	if limit <= 0 || limit > 100 {
 		limit = 25
 	}
+	if req.Msg.GetIncludeMember() && h.membersReady() == nil {
+		return h.listWithMember(ctx, uid, page, limit)
+	}
 	trips, total, err := h.repo.ListTrips(ctx, uid, limit, (page-1)*limit)
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
 	return connect.NewResponse(&tripv1.ListTripsResponse{
 		Trips:      h.respondAll(ctx, trips),
+		Pagination: paginationMeta(page, limit, total),
+	}), nil
+}
+
+// listWithMember is ListTrips with the trips the caller is a member of mixed
+// in, each marked with the caller's role and, when not theirs, its owner.
+func (h *Handler) listWithMember(ctx context.Context, uid uuid.UUID, page, limit int) (*connect.Response[tripv1.ListTripsResponse], error) {
+	trips, roles, total, err := h.members.ListWithMember(ctx, uid, limit, (page-1)*limit)
+	if err != nil {
+		return nil, toConnectErr(err)
+	}
+	var owners []uuid.UUID
+	for _, t := range trips {
+		if t.UserID != uid {
+			owners = append(owners, t.UserID)
+		}
+	}
+	cards := h.ownerCards(ctx, owners)
+	out := h.respondAll(ctx, trips)
+	for i, t := range trips {
+		if t.UserID == uid {
+			out[i].ViewerRole = tripv1.TripRole_TRIP_ROLE_OWNER
+			continue
+		}
+		out[i].ShareCode = ""
+		out[i].SourceSessionId = nil
+		out[i].Owner = cards[t.UserID]
+		out[i].ViewerRole = roleToProto(roles[t.ID])
+	}
+	return connect.NewResponse(&tripv1.ListTripsResponse{
+		Trips:      out,
 		Pagination: paginationMeta(page, limit, total),
 	}), nil
 }

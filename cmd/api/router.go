@@ -119,6 +119,8 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		// packs: a present token is still validated, and the handlers widen
 		// what they show to a signed-in friend.
 		tripconnect.TripServiceGetSharedTripProcedure,
+		// A trip invite previews the trip before the stranger has an account.
+		tripconnect.TripServiceGetTripInviteProcedure,
 		// A shared recap, the same way: the public view, by share code.
 		recapconnect.RecapServiceGetSharedRecapProcedure,
 		tripconnect.TripServiceListUserTripsProcedure,
