@@ -209,6 +209,8 @@ func SetupRouter(deps *Dependencies) http.Handler {
 		runCapInterceptor, // after auth (needs the user), before quota (a refusal costs nothing)
 		subscriptionInterceptor,
 		observability.NewMetricsInterceptor(),
+		// After auth: it evaluates the caller once their call has succeeded.
+		deps.achievements.Interceptor(),
 	)
 
 	// Register Connect RPC routes

@@ -467,3 +467,63 @@ func TestBackfillNeighborhoods(t *testing.T) {
 		t.Fatalf("places = %+v", repo.places)
 	}
 }
+
+func date(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+
+func TestNextWeekStreak(t *testing.T) {
+	var tot Totals
+	step := func(d time.Time, wantCur, wantLongest int, wantChanged bool) {
+		t.Helper()
+		next, changed := NextWeekStreak(tot, d)
+		if changed != wantChanged || next.WeekStreak != wantCur || next.LongestWeekStreak != wantLongest {
+			t.Fatalf("explore on %s: streak %d longest %d changed %v; want %d %d %v",
+				d.Format(time.DateOnly), next.WeekStreak, next.LongestWeekStreak, changed, wantCur, wantLongest, wantChanged)
+		}
+		tot = next
+	}
+	step(date(2026, 12, 23), 1, 1, true)  // Wednesday, ISO week 52
+	step(date(2026, 12, 27), 1, 1, false) // Sunday, same week
+	step(date(2026, 12, 28), 2, 2, true)  // Monday, week 53
+	step(date(2027, 1, 4), 3, 3, true)    // across the year: 2027 week 1
+	step(date(2026, 12, 30), 3, 3, false) // a late award for an earlier week
+	step(date(2027, 1, 25), 1, 3, true)   // two weeks skipped: a new run
+	if got := tot.LastStreakWeek.Format(time.DateOnly); got != "2027-01-25" {
+		t.Fatalf("last streak week = %s, want the Monday 2027-01-25", got)
+	}
+}
+
+func TestWeekStreakAt(t *testing.T) {
+	last := date(2026, 10, 12) // a Monday
+	tot := Totals{WeekStreak: 5, LongestWeekStreak: 8, LastStreakWeek: &last}
+	cases := []struct {
+		today    time.Time
+		current  int
+		explored bool
+	}{
+		{date(2026, 10, 18), 5, true},  // Sunday of that week
+		{date(2026, 10, 22), 5, false}, // next week: alive, not yet extended
+		{date(2026, 10, 26), 0, false}, // a whole week missed
+	}
+	for _, c := range cases {
+		ws := WeekStreakAt(tot, c.today)
+		if ws.Current != c.current || ws.ExploredThisWeek != c.explored || ws.Longest != 8 {
+			t.Errorf("%s: %+v; want current %d explored %v", c.today.Format(time.DateOnly), ws, c.current, c.explored)
+		}
+		if ws.WeekStart.Weekday() != time.Monday {
+			t.Errorf("%s: week starts %s", c.today.Format(time.DateOnly), ws.WeekStart.Weekday())
+		}
+	}
+	if ws := WeekStreakAt(Totals{}, date(2026, 10, 22)); ws.Current != 0 || ws.ExploredThisWeek {
+		t.Errorf("no streak yet = %+v", ws)
+	}
+}
+
+func TestOnlyExplorationKeepsTheStreak(t *testing.T) {
+	for k := range Rules {
+		want := k == KindPlaceVisited || k == KindNewCity || k == KindTripDayCompleted ||
+			k == KindTripCompleted || k == KindStopDone || k == KindNeighborhood
+		if k.Explores() != want {
+			t.Errorf("kind %d explores = %v", k, k.Explores())
+		}
+	}
+}

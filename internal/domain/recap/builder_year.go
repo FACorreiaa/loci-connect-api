@@ -10,6 +10,7 @@ import (
 
 	recapv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recap"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/gamification"
 )
 
@@ -469,6 +470,8 @@ func yearProgress(f *YearFacts) *recapv1.RecapCard {
 		label := id
 		if b, ok := gamification.BadgeByID(id); ok {
 			label = b.Title
+		} else if l, ok := achievements.Label(id); ok {
+			label = l
 		}
 		card.Badges = append(card.Badges, &recapv1.EarnedBadge{BadgeId: id, Label: label})
 	}

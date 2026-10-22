@@ -9,19 +9,20 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-// ProgressCategory is the notification category points events carry: a badge
-// earned, a friend passing you on the week's leaderboard.
+// ProgressCategory is the notification category points events carry: an
+// achievement unlocked, a friend passing you on the week's leaderboard.
 const ProgressCategory = "loci_progress"
 
-// BuildBadgePayload announces a badge; it opens the progress screen.
-func BuildBadgePayload(title, description string) Payload {
+// BuildAchievementPayload announces an unlock; it opens the achievements
+// screen.
+func BuildAchievementPayload(title, description string) Payload {
 	return Payload{
 		Category: ProgressCategory,
 		ThreadID: "progress",
-		Origin:   "badge_earned",
-		Title:    "Badge earned: " + title,
+		Origin:   "achievement_unlocked",
+		Title:    "Achievement unlocked: " + title,
 		Body:     description,
-		URL:      WebOrigin + "/friends?tab=progress",
+		URL:      WebOrigin + "/achievements",
 	}
 }
 
@@ -48,9 +49,10 @@ func BuildPassedPayload(by *socialv1.PublicUser) Payload {
 
 func progressAllowed(s *locitypes.NotificationSettings) bool { return s.ProgressUpdates }
 
-// BadgeEarned tells `to` they earned a badge, unless progress updates are off.
-func (n *Notifier) BadgeEarned(_ context.Context, to uuid.UUID, title, description string) {
-	n.notifyGated(to, BuildBadgePayload(title, description), progressAllowed)
+// AchievementUnlocked tells `to` they unlocked an achievement, unless progress
+// updates are off.
+func (n *Notifier) AchievementUnlocked(_ context.Context, to uuid.UUID, title, description string) {
+	n.notifyGated(to, BuildAchievementPayload(title, description), progressAllowed)
 }
 
 // PassedOnLeaderboard tells `to` that `by` overtook them, unless progress

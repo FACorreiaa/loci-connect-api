@@ -11,7 +11,7 @@ import (
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
-// SocialCategory is the notification category friend events carry; the app
+// SocialCategory is the notification category people events carry; the app
 // groups them under one thread.
 const SocialCategory = "loci_social"
 
@@ -19,50 +19,94 @@ const SocialCategory = "loci_social"
 type socialKind string
 
 const (
-	socialRequest  socialKind = "friend_request"
-	socialAccepted socialKind = "friend_accepted"
+	socialFollowed       socialKind = "new_follower"
+	socialFollowedBack   socialKind = "followed_back"
+	socialFollowRequest  socialKind = "follow_request"
+	socialFollowApproved socialKind = "follow_approved"
+	socialCheered        socialKind = "cheered"
 )
 
-// BuildSocialPayload shapes a friend event for web push and APNs. A request
-// opens /friends (to answer it); an acceptance opens the friend's profile.
+func displayName(u *socialv1.PublicUser, fallback string) string {
+	switch {
+	case u == nil:
+		return fallback
+	case u.GetDisplayName() != "":
+		return u.GetDisplayName()
+	case u.GetUsername() != "":
+		return u.GetUsername()
+	default:
+		return fallback
+	}
+}
+
+// BuildSocialPayload shapes a people event for web push and APNs. A follow
+// request opens the requests list (to answer it); everything else opens the
+// other person's profile.
 func BuildSocialPayload(kind socialKind, other *socialv1.PublicUser) Payload {
-	name := "Someone"
+	name := displayName(other, "Someone")
 	path := "/friends"
-	if other != nil {
-		if other.GetDisplayName() != "" {
-			name = other.GetDisplayName()
-		} else if other.GetUsername() != "" {
-			name = other.GetUsername()
-		}
+	if other != nil && other.GetUsername() != "" {
+		path = "/u/" + other.GetUsername()
 	}
 	p := Payload{Category: SocialCategory, ThreadID: "friends", Origin: string(kind)}
 	switch kind {
-	case socialAccepted:
+	case socialFollowedBack:
 		p.Title = "New friend on Loci"
-		p.Body = name + " is now your friend. See their trips."
-		if other != nil && other.GetUsername() != "" {
-			path = "/u/" + other.GetUsername()
-		}
+		p.Body = name + " followed you back. You're friends now: see their trips."
+	case socialFollowRequest:
+		p.Title = "Follow request"
+		p.Body = name + " asked to follow you on Loci."
+		path = "/friends?tab=requests"
+	case socialFollowApproved:
+		p.Title = "Request approved"
+		p.Body = name + " approved your follow request."
 	default:
-		p.Title = "Friend request"
-		p.Body = name + " wants to be friends on Loci."
+		p.Title = "New follower"
+		p.Body = name + " started following you on Loci."
 	}
 	p.URL = WebOrigin + path
 	return p
 }
 
-// FriendRequest announces a new request to its recipient.
-func (n *Notifier) FriendRequest(_ context.Context, to uuid.UUID, from *socialv1.PublicUser) {
-	n.notifySocial(to, BuildSocialPayload(socialRequest, from))
+// NewFollower tells `to` that `from` follows them; friends when `to` already
+// followed `from`.
+func (n *Notifier) NewFollower(_ context.Context, to uuid.UUID, from *socialv1.PublicUser, friends bool) {
+	kind := socialFollowed
+	if friends {
+		kind = socialFollowedBack
+	}
+	n.notifySocial(to, BuildSocialPayload(kind, from))
 }
 
-// FriendAccepted tells `to` they have a new friend.
-func (n *Notifier) FriendAccepted(_ context.Context, to uuid.UUID, by *socialv1.PublicUser) {
-	n.notifySocial(to, BuildSocialPayload(socialAccepted, by))
+// FollowRequested tells a private account's owner someone asked to follow.
+func (n *Notifier) FollowRequested(_ context.Context, to uuid.UUID, from *socialv1.PublicUser) {
+	n.notifySocial(to, BuildSocialPayload(socialFollowRequest, from))
+}
+
+// FollowApproved tells `to` their request to follow `by` was approved.
+func (n *Notifier) FollowApproved(_ context.Context, to uuid.UUID, by *socialv1.PublicUser) {
+	n.notifySocial(to, BuildSocialPayload(socialFollowApproved, by))
+}
+
+// BuildCheerPayload shapes a cheer: from cheered what ("your Cartographer ·
+// Gold"), opening path in the app.
+func BuildCheerPayload(from *socialv1.PublicUser, what, path string) Payload {
+	return Payload{
+		Category: SocialCategory, ThreadID: "friends", Origin: string(socialCheered),
+		Title: "Cheers!",
+		Body:  displayName(from, "Someone") + " cheered your " + what + ".",
+		URL:   WebOrigin + path,
+	}
+}
+
+// Cheered tells `to` that `from` cheered one of their feed items, unless they
+// switched cheers off.
+func (n *Notifier) Cheered(_ context.Context, to uuid.UUID, from *socialv1.PublicUser, what, path string) {
+	n.notifyGated(to, BuildCheerPayload(from, what, path), func(s *locitypes.NotificationSettings) bool { return s.Cheers })
 }
 
 // notifySocial sends p to every device `to` registered, on every platform,
-// unless they switched friend activity off. Like OnRunFinished it returns at
+// unless they switched people activity (friend_activity) off. Like OnRunFinished it returns at
 // once and never fails the caller.
 func (n *Notifier) notifySocial(to uuid.UUID, p Payload) {
 	n.notifyGated(to, p, func(s *locitypes.NotificationSettings) bool { return s.FriendActivity })

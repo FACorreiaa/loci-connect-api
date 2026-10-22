@@ -1,8 +1,10 @@
-// Package social is Loci's friends layer: mutual friendships, friend
-// requests, invite links, blocks, contact matching and public profiles.
+// Package social is Loci's people layer: following, follow requests to
+// private accounts, invite links, blocks, contact matching and public
+// profiles.
 //
-// Friendship is mutual on purpose. "Friends" trip visibility, and later
-// location sharing, are seen only by people both sides approved.
+// Following is one-way. Two people who follow each other are friends, and
+// "Friends" trip visibility is seen only by friends: both sides chose it. The
+// older friend RPCs are served from the same graph (see Edge.Legacy).
 package social
 
 import (
@@ -26,10 +28,13 @@ var (
 	// ErrConflict is a request that already exists or a state that no
 	// longer allows the action.
 	ErrConflict = errors.New("conflict")
+	// ErrPrivate is content of a private account the caller is not an
+	// approved follower of.
+	ErrPrivate = errors.New("this account is private")
 )
 
-// Relation is the caller's relation to another user (Relationship in
-// social.proto).
+// Relation is the caller's relation to another user in the older friend
+// model (Relationship in social.proto).
 type Relation int32
 
 const (
@@ -41,13 +46,77 @@ const (
 	RelationSelf      Relation = 6
 )
 
-// Friend is one friendship as seen by one side.
+// FollowState is whether the caller follows another user (FollowState in
+// social.proto).
+type FollowState int32
+
+const (
+	FollowNone      FollowState = 1
+	FollowRequested FollowState = 2
+	FollowFollowing FollowState = 3
+	FollowBlocked   FollowState = 4
+	FollowSelf      FollowState = 5
+)
+
+// Edge is how a viewer stands with another user.
+type Edge struct {
+	// State is the viewer's side: whether they follow the other user.
+	State FollowState
+	// FollowsYou: the other user follows the viewer.
+	FollowsYou bool
+	// Incoming: the other user asked to follow the viewer, still pending.
+	Incoming bool
+	// BlockedBy: the other user blocked the viewer. Callers turn it into
+	// NotFound.
+	BlockedBy bool
+	// Private: the other user's account is private.
+	Private bool
+}
+
+// Friends is a mutual follow.
+func (e Edge) Friends() bool { return e.State == FollowFollowing && e.FollowsYou }
+
+// CanView reports whether the viewer may see the other user's trips,
+// achievements and follow lists: their own, a public account's, or a private
+// account they are an approved follower of.
+func (e Edge) CanView() bool {
+	return e.State == FollowSelf || (e.State != FollowBlocked && (!e.Private || e.State == FollowFollowing))
+}
+
+// Legacy is the edge in the older friend model, for clients that still read
+// Relationship: friends when each follows the other, requested when only the
+// viewer follows (or asked to), incoming when only the other user does.
+func (e Edge) Legacy() Relation {
+	switch {
+	case e.State == FollowSelf:
+		return RelationSelf
+	case e.State == FollowBlocked:
+		return RelationBlocked
+	case e.Friends():
+		return RelationFriends
+	case e.State == FollowFollowing || e.State == FollowRequested:
+		return RelationRequested
+	case e.FollowsYou || e.Incoming:
+		return RelationIncoming
+	default:
+		return RelationNone
+	}
+}
+
+// Friend is one friendship (a mutual follow) as seen by one side.
 type Friend struct {
 	User  *socialv1.PublicUser
 	Since time.Time
 }
 
-// Request is a friend request with both sides' cards.
+// Follow is one person in a followers or following list.
+type Follow struct {
+	User  *socialv1.PublicUser
+	Since time.Time
+}
+
+// Request is a follow request (or, for older clients, a friend request) with
+// both sides' cards.
 type Request struct {
 	ID        uuid.UUID
 	From, To  *socialv1.PublicUser
@@ -65,6 +134,7 @@ type Invite struct {
 // Stats are the counts a profile shows.
 type Stats struct {
 	Cities, Countries, VisibleTrips, Friends int32
+	Followers, Following                     int32
 }
 
 // Repository is the social store.
@@ -73,28 +143,51 @@ type Repository interface {
 	UserIDByUsername(ctx context.Context, username string) (uuid.UUID, error)
 	MemberSince(ctx context.Context, id uuid.UUID) (time.Time, error)
 
-	// Relation reports friendship and a block in either direction.
+	// Relation reports a mutual follow and a block in either direction.
 	Relation(ctx context.Context, a, b uuid.UUID) (friends, blocked bool, err error)
-	// RelationOf is viewer's relation to other. blockedBy reports that other
-	// blocked viewer, which callers turn into NotFound.
-	RelationOf(ctx context.Context, viewer, other uuid.UUID) (rel Relation, blockedBy bool, err error)
+	// Edges is viewer's edge to each of others (viewer itself included).
+	Edges(ctx context.Context, viewer uuid.UUID, others []uuid.UUID) (map[uuid.UUID]Edge, error)
+	// FriendIDs lists a user's mutual follows; FollowingIDs whom they follow;
+	// FollowerIDs who follows them.
 	FriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	FollowingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	FollowerIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
 	ListFriends(ctx context.Context, userID uuid.UUID) ([]Friend, error)
-	RemoveFriend(ctx context.Context, a, b uuid.UUID) error
+	// ListFollows lists userID's followers (or the people they follow),
+	// newest first, with the total.
+	ListFollows(ctx context.Context, userID uuid.UUID, followers bool, limit, offset int) ([]Follow, int, error)
 
-	// SendRequest records a pending request, or, when to had already asked
-	// from, accepts that one instead (friends is then true).
-	SendRequest(ctx context.Context, from, to uuid.UUID) (id uuid.UUID, friends bool, err error)
+	// Follow makes from follow to, or, when to is private, records a pending
+	// request. It returns the resulting state and the id of the follow or the
+	// request. Following again changes nothing.
+	Follow(ctx context.Context, from, to uuid.UUID) (FollowState, uuid.UUID, error)
+	// Unfollow ends from's follow of to and withdraws any pending request.
+	Unfollow(ctx context.Context, from, to uuid.UUID) error
+	// FollowByID resolves a follow by its id.
+	FollowByID(ctx context.Context, id uuid.UUID) (follower, followee uuid.UUID, err error)
 	// RespondRequest answers a pending request addressed to `to`; it returns
-	// the sender.
-	RespondRequest(ctx context.Context, id, to uuid.UUID, accept bool) (from uuid.UUID, err error)
+	// the sender. Approving makes the sender a follower.
+	RespondRequest(ctx context.Context, id, to uuid.UUID, approve bool) (from uuid.UUID, err error)
 	CancelRequest(ctx context.Context, id, from uuid.UUID) error
 	ListRequests(ctx context.Context, userID uuid.UUID, incoming bool) ([]Request, error)
-	CountRequestsSince(ctx context.Context, from uuid.UUID, since time.Time) (int, error)
+	// ListOneWay lists follows that are not returned, as requests: incoming
+	// is people following userID whom userID does not follow back, outgoing
+	// the reverse. Request.ID is the follow's id.
+	ListOneWay(ctx context.Context, userID uuid.UUID, incoming bool, limit int) ([]Request, error)
+	// CountFollowsSince counts follows and follow requests from has started
+	// since then.
+	CountFollowsSince(ctx context.Context, from uuid.UUID, since time.Time) (int, error)
 
-	// MakeFriends makes a and b friends at once (an accepted invite),
-	// closing any pending request between them.
+	// MakeFriends makes a and b follow each other at once (an accepted
+	// invite), whatever their privacy, closing any pending request between
+	// them.
 	MakeFriends(ctx context.Context, a, b uuid.UUID) error
+
+	// Privacy reads whether userID is private and how many requests wait.
+	Privacy(ctx context.Context, userID uuid.UUID) (private bool, pending int32, err error)
+	// SetPrivate sets userID's privacy. Going public approves every pending
+	// request; it returns the senders it approved.
+	SetPrivate(ctx context.Context, userID uuid.UUID, private bool) (approved []uuid.UUID, err error)
 
 	Block(ctx context.Context, blocker, blocked uuid.UUID) error
 	Unblock(ctx context.Context, blocker, blocked uuid.UUID) error
@@ -115,6 +208,10 @@ type Repository interface {
 	FacebookFriends(ctx context.Context, userID uuid.UUID) (ids []uuid.UUID, linked bool, err error)
 	SearchUsernames(ctx context.Context, prefix string, limit int) ([]uuid.UUID, error)
 	Stats(ctx context.Context, owner uuid.UUID, tripVisibilities []int32) (Stats, error)
+
+	// ClaimPushSlot reserves today's (UTC) push of kind for userID; false
+	// when one was already sent.
+	ClaimPushSlot(ctx context.Context, userID uuid.UUID, kind string) (bool, error)
 }
 
 type repository struct {
@@ -175,75 +272,109 @@ func (r *repository) MemberSince(ctx context.Context, id uuid.UUID) (time.Time, 
 
 func (r *repository) Relation(ctx context.Context, a, b uuid.UUID) (friends, blocked bool, err error) {
 	err = r.db.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM friendships WHERE user_id = $1 AND friend_id = $2),
+		SELECT EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = $2)
+		       AND EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = $1),
 		       EXISTS (SELECT 1 FROM user_blocks
 		               WHERE (blocker_id = $1 AND blocked_id = $2) OR (blocker_id = $2 AND blocked_id = $1))`,
 		a, b).Scan(&friends, &blocked)
 	return friends, blocked, err
 }
 
-func (r *repository) RelationOf(ctx context.Context, viewer, other uuid.UUID) (Relation, bool, error) {
-	if viewer == other {
-		return RelationSelf, false, nil
+func (r *repository) Edges(ctx context.Context, viewer uuid.UUID, others []uuid.UUID) (map[uuid.UUID]Edge, error) {
+	out := make(map[uuid.UUID]Edge, len(others))
+	if len(others) == 0 {
+		return out, nil
 	}
-	var blocks, blockedBy, friends, outgoing, incoming bool
-	err := r.db.QueryRow(ctx, `
-		SELECT EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2),
-		       EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1),
-		       EXISTS (SELECT 1 FROM friendships WHERE user_id = $1 AND friend_id = $2),
-		       EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $1 AND to_user = $2 AND status = 'pending'),
-		       EXISTS (SELECT 1 FROM friend_requests WHERE from_user = $2 AND to_user = $1 AND status = 'pending')`,
-		viewer, other).Scan(&blocks, &blockedBy, &friends, &outgoing, &incoming)
+	rows, err := r.db.Query(ctx, `
+		SELECT o.id, u.is_private,
+		       EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = o.id),
+		       EXISTS (SELECT 1 FROM user_blocks WHERE blocker_id = o.id AND blocked_id = $1),
+		       EXISTS (SELECT 1 FROM follows WHERE follower_id = $1 AND followee_id = o.id),
+		       EXISTS (SELECT 1 FROM follows WHERE follower_id = o.id AND followee_id = $1),
+		       EXISTS (SELECT 1 FROM follow_requests
+		               WHERE from_user = $1 AND to_user = o.id AND status = 'pending'),
+		       EXISTS (SELECT 1 FROM follow_requests
+		               WHERE from_user = o.id AND to_user = $1 AND status = 'pending')
+		FROM unnest($2::uuid[]) AS o(id)
+		JOIN users u ON u.id = o.id`, viewer, others)
 	if err != nil {
-		return 0, false, err
+		return nil, fmt.Errorf("edges: %w", err)
 	}
-	switch {
-	case blocks:
-		return RelationBlocked, blockedBy, nil
-	case friends:
-		return RelationFriends, blockedBy, nil
-	case outgoing:
-		return RelationRequested, blockedBy, nil
-	case incoming:
-		return RelationIncoming, blockedBy, nil
-	default:
-		return RelationNone, blockedBy, nil
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			id                           uuid.UUID
+			e                            Edge
+			blocks, following, requested bool
+		)
+		if err := rows.Scan(&id, &e.Private, &blocks, &e.BlockedBy, &following, &e.FollowsYou,
+			&requested, &e.Incoming); err != nil {
+			return nil, err
+		}
+		switch {
+		case id == viewer:
+			e = Edge{State: FollowSelf, Private: e.Private}
+		case blocks:
+			e.State = FollowBlocked
+		case following:
+			e.State = FollowFollowing
+		case requested:
+			e.State = FollowRequested
+		default:
+			e.State = FollowNone
+		}
+		out[id] = e
 	}
+	return out, rows.Err()
 }
 
 func (r *repository) FriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := r.db.Query(ctx, `SELECT friend_id FROM friendships WHERE user_id = $1`, userID)
+	rows, err := r.db.Query(ctx, `
+		SELECT a.followee_id FROM follows a
+		JOIN follows b ON b.follower_id = a.followee_id AND b.followee_id = a.follower_id
+		WHERE a.follower_id = $1`, userID)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
-func (r *repository) ListFriends(ctx context.Context, userID uuid.UUID) ([]Friend, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT f.friend_id, f.created_at FROM friendships f
-		JOIN users u ON u.id = f.friend_id AND u.is_active
-		WHERE f.user_id = $1 ORDER BY f.created_at DESC`, userID)
+func (r *repository) FollowingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx, `SELECT followee_id FROM follows WHERE follower_id = $1`, userID)
 	if err != nil {
 		return nil, err
 	}
-	type row struct {
-		id    uuid.UUID
-		since time.Time
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
+func (r *repository) FollowerIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx, `SELECT follower_id FROM follows WHERE followee_id = $1`, userID)
+	if err != nil {
+		return nil, err
 	}
-	var list []row
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
+// idSince is a user id and when the link to them began.
+type idSince struct {
+	id    uuid.UUID
+	since time.Time
+}
+
+func collectIDSince(rows pgx.Rows) ([]idSince, error) {
+	defer rows.Close()
+	var list []idSince
 	for rows.Next() {
-		var x row
+		var x idSince
 		if err := rows.Scan(&x.id, &x.since); err != nil {
-			rows.Close()
 			return nil, err
 		}
 		list = append(list, x)
 	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
+	return list, rows.Err()
+}
+
+func (r *repository) cardsFor(ctx context.Context, list []idSince) ([]Follow, error) {
 	ids := make([]uuid.UUID, len(list))
 	for i, x := range list {
 		ids[i] = x.id
@@ -252,72 +383,152 @@ func (r *repository) ListFriends(ctx context.Context, userID uuid.UUID) ([]Frien
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Friend, 0, len(list))
+	out := make([]Follow, 0, len(list))
 	for _, x := range list {
 		if c := cards[x.id]; c != nil {
-			out = append(out, Friend{User: c, Since: x.since})
+			out = append(out, Follow{User: c, Since: x.since})
 		}
 	}
 	return out, nil
 }
 
-func (r *repository) RemoveFriend(ctx context.Context, a, b uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `
-		DELETE FROM friendships WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)`, a, b)
-	return err
-}
-
-// befriend inserts both directions and closes any pending request between
-// the two, inside tx.
-func befriend(ctx context.Context, tx pgx.Tx, a, b uuid.UUID) error {
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO friendships (user_id, friend_id) VALUES ($1, $2), ($2, $1)
-		ON CONFLICT DO NOTHING`, a, b); err != nil {
-		return fmt.Errorf("insert friendship: %w", err)
+func (r *repository) ListFriends(ctx context.Context, userID uuid.UUID) ([]Friend, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT a.followee_id, GREATEST(a.created_at, b.created_at) AS since FROM follows a
+		JOIN follows b ON b.follower_id = a.followee_id AND b.followee_id = a.follower_id
+		WHERE a.follower_id = $1 ORDER BY since DESC`, userID)
+	if err != nil {
+		return nil, err
 	}
-	_, err := tx.Exec(ctx, `
-		UPDATE friend_requests SET status = 'accepted', responded_at = NOW()
-		WHERE status = 'pending'
-		  AND ((from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1))`, a, b)
-	return err
+	list, err := collectIDSince(rows)
+	if err != nil {
+		return nil, err
+	}
+	follows, err := r.cardsFor(ctx, list)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Friend, len(follows))
+	for i, f := range follows {
+		out[i] = Friend(f)
+	}
+	return out, nil
 }
 
-func (r *repository) SendRequest(ctx context.Context, from, to uuid.UUID) (uuid.UUID, bool, error) {
+func (r *repository) ListFollows(ctx context.Context, userID uuid.UUID, followers bool, limit, offset int) ([]Follow, int, error) {
+	// followers: rows where userID is followed; the listed person is the
+	// follower. Otherwise the listed person is whom userID follows.
+	mine, other := "follower_id", "followee_id"
+	if followers {
+		mine, other = "followee_id", "follower_id"
+	}
+	var total int
+	if err := r.db.QueryRow(ctx, `
+		SELECT COUNT(*) FROM follows f JOIN users u ON u.id = f.`+other+` AND u.is_active
+		WHERE f.`+mine+` = $1`, userID).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count follows: %w", err)
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT f.`+other+`, f.created_at FROM follows f
+		JOIN users u ON u.id = f.`+other+` AND u.is_active
+		WHERE f.`+mine+` = $1
+		ORDER BY f.created_at DESC, f.`+other+`
+		LIMIT $2 OFFSET $3`, userID, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list follows: %w", err)
+	}
+	list, err := collectIDSince(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+	out, err := r.cardsFor(ctx, list)
+	return out, total, err
+}
+
+func (r *repository) Follow(ctx context.Context, from, to uuid.UUID) (FollowState, uuid.UUID, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return uuid.Nil, false, err
+		return 0, uuid.Nil, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
 
-	// The other side already asked: the two requests meet.
-	var reverse uuid.UUID
-	err = tx.QueryRow(ctx, `
-		SELECT id FROM friend_requests WHERE from_user = $1 AND to_user = $2 AND status = 'pending'
-		FOR UPDATE`, to, from).Scan(&reverse)
-	switch {
-	case err == nil:
-		if err := befriend(ctx, tx, from, to); err != nil {
-			return uuid.Nil, false, err
-		}
-		return reverse, true, tx.Commit(ctx)
-	case !errors.Is(err, pgx.ErrNoRows):
-		return uuid.Nil, false, err
+	// Lock the followee's row so a privacy switch cannot race the decision
+	// between following and asking.
+	var private bool
+	err = tx.QueryRow(ctx, `SELECT is_private FROM users WHERE id = $1 AND is_active FOR SHARE`, to).Scan(&private)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, uuid.Nil, ErrNotFound
+	}
+	if err != nil {
+		return 0, uuid.Nil, err
 	}
 
 	var id uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT id FROM follows WHERE follower_id = $1 AND followee_id = $2`, from, to).Scan(&id)
+	switch {
+	case err == nil:
+		return FollowFollowing, id, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return 0, uuid.Nil, err
+	}
+
+	if !private {
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) RETURNING id`, from, to).Scan(&id); err != nil {
+			return 0, uuid.Nil, fmt.Errorf("insert follow: %w", err)
+		}
+		return FollowFollowing, id, tx.Commit(ctx)
+	}
+
 	err = tx.QueryRow(ctx, `
-		INSERT INTO friend_requests (from_user, to_user) VALUES ($1, $2) RETURNING id`, from, to).Scan(&id)
+		SELECT id FROM follow_requests WHERE from_user = $1 AND to_user = $2 AND status = 'pending'`,
+		from, to).Scan(&id)
+	switch {
+	case err == nil:
+		return FollowRequested, id, nil
+	case !errors.Is(err, pgx.ErrNoRows):
+		return 0, uuid.Nil, err
+	}
+	err = tx.QueryRow(ctx, `
+		INSERT INTO follow_requests (from_user, to_user) VALUES ($1, $2) RETURNING id`, from, to).Scan(&id)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return uuid.Nil, false, ErrConflict
+			return FollowRequested, uuid.Nil, nil
 		}
-		return uuid.Nil, false, fmt.Errorf("insert request: %w", err)
+		return 0, uuid.Nil, fmt.Errorf("insert follow request: %w", err)
 	}
-	return id, false, tx.Commit(ctx)
+	return FollowRequested, id, tx.Commit(ctx)
 }
 
-func (r *repository) RespondRequest(ctx context.Context, id, to uuid.UUID, accept bool) (uuid.UUID, error) {
+func (r *repository) Unfollow(ctx context.Context, from, to uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+	if _, err := tx.Exec(ctx, `DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`, from, to); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE follow_requests SET status = 'cancelled', responded_at = NOW()
+		WHERE from_user = $1 AND to_user = $2 AND status = 'pending'`, from, to); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *repository) FollowByID(ctx context.Context, id uuid.UUID) (uuid.UUID, uuid.UUID, error) {
+	var follower, followee uuid.UUID
+	err := r.db.QueryRow(ctx, `SELECT follower_id, followee_id FROM follows WHERE id = $1`, id).
+		Scan(&follower, &followee)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, uuid.Nil, ErrNotFound
+	}
+	return follower, followee, err
+}
+
+func (r *repository) RespondRequest(ctx context.Context, id, to uuid.UUID, approve bool) (uuid.UUID, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return uuid.Nil, err
@@ -326,7 +537,7 @@ func (r *repository) RespondRequest(ctx context.Context, id, to uuid.UUID, accep
 
 	var from uuid.UUID
 	err = tx.QueryRow(ctx, `
-		SELECT from_user FROM friend_requests
+		SELECT from_user FROM follow_requests
 		WHERE id = $1 AND to_user = $2 AND status = 'pending' FOR UPDATE`, id, to).Scan(&from)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, ErrNotFound
@@ -334,12 +545,17 @@ func (r *repository) RespondRequest(ctx context.Context, id, to uuid.UUID, accep
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if accept {
-		if err := befriend(ctx, tx, from, to); err != nil {
-			return uuid.Nil, err
+	status := "declined"
+	if approve {
+		status = "approved"
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			from, to); err != nil {
+			return uuid.Nil, fmt.Errorf("insert follow: %w", err)
 		}
-	} else if _, err := tx.Exec(ctx, `
-		UPDATE friend_requests SET status = 'declined', responded_at = NOW() WHERE id = $1`, id); err != nil {
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE follow_requests SET status = $2, responded_at = NOW() WHERE id = $1`, id, status); err != nil {
 		return uuid.Nil, err
 	}
 	return from, tx.Commit(ctx)
@@ -347,7 +563,7 @@ func (r *repository) RespondRequest(ctx context.Context, id, to uuid.UUID, accep
 
 func (r *repository) CancelRequest(ctx context.Context, id, from uuid.UUID) error {
 	ct, err := r.db.Exec(ctx, `
-		UPDATE friend_requests SET status = 'cancelled', responded_at = NOW()
+		UPDATE follow_requests SET status = 'cancelled', responded_at = NOW()
 		WHERE id = $1 AND from_user = $2 AND status = 'pending'`, id, from)
 	if err != nil {
 		return err
@@ -358,33 +574,24 @@ func (r *repository) CancelRequest(ctx context.Context, id, from uuid.UUID) erro
 	return nil
 }
 
-func (r *repository) ListRequests(ctx context.Context, userID uuid.UUID, incoming bool) ([]Request, error) {
-	col := "from_user"
-	if incoming {
-		col = "to_user"
-	}
-	rows, err := r.db.Query(ctx, `
-		SELECT id, from_user, to_user, created_at FROM friend_requests
-		WHERE `+col+` = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 200`, userID)
-	if err != nil {
-		return nil, err
-	}
-	type row struct {
-		id, from, to uuid.UUID
-		at           time.Time
-	}
-	var list []row
+// requestRow is a request before the cards are loaded.
+type requestRow struct {
+	id, from, to uuid.UUID
+	at           time.Time
+}
+
+func (r *repository) requestsWithCards(ctx context.Context, rows pgx.Rows) ([]Request, error) {
+	defer rows.Close()
+	var list []requestRow
 	ids := map[uuid.UUID]bool{}
 	for rows.Next() {
-		var x row
+		var x requestRow
 		if err := rows.Scan(&x.id, &x.from, &x.to, &x.at); err != nil {
-			rows.Close()
 			return nil, err
 		}
 		list = append(list, x)
 		ids[x.from], ids[x.to] = true, true
 	}
-	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -406,10 +613,43 @@ func (r *repository) ListRequests(ctx context.Context, userID uuid.UUID, incomin
 	return out, nil
 }
 
-func (r *repository) CountRequestsSince(ctx context.Context, from uuid.UUID, since time.Time) (int, error) {
+func (r *repository) ListRequests(ctx context.Context, userID uuid.UUID, incoming bool) ([]Request, error) {
+	col := "from_user"
+	if incoming {
+		col = "to_user"
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id, from_user, to_user, created_at FROM follow_requests
+		WHERE `+col+` = $1 AND status = 'pending' ORDER BY created_at DESC LIMIT 200`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return r.requestsWithCards(ctx, rows)
+}
+
+func (r *repository) ListOneWay(ctx context.Context, userID uuid.UUID, incoming bool, limit int) ([]Request, error) {
+	col := "follower_id"
+	if incoming {
+		col = "followee_id"
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT f.id, f.follower_id, f.followee_id, f.created_at FROM follows f
+		WHERE f.`+col+` = $1
+		  AND NOT EXISTS (SELECT 1 FROM follows b
+		                  WHERE b.follower_id = f.followee_id AND b.followee_id = f.follower_id)
+		ORDER BY f.created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return r.requestsWithCards(ctx, rows)
+}
+
+func (r *repository) CountFollowsSince(ctx context.Context, from uuid.UUID, since time.Time) (int, error) {
 	var n int
-	err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM friend_requests WHERE from_user = $1 AND created_at >= $2`, from, since).Scan(&n)
+	err := r.db.QueryRow(ctx, `
+		SELECT (SELECT COUNT(*) FROM follows WHERE follower_id = $1 AND created_at >= $2)
+		     + (SELECT COUNT(*) FROM follow_requests WHERE from_user = $1 AND created_at >= $2)`,
+		from, since).Scan(&n)
 	return n, err
 }
 
@@ -419,10 +659,62 @@ func (r *repository) MakeFriends(ctx context.Context, a, b uuid.UUID) error {
 		return err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
-	if err := befriend(ctx, tx, a, b); err != nil {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2), ($2, $1)
+		ON CONFLICT DO NOTHING`, a, b); err != nil {
+		return fmt.Errorf("insert follows: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE follow_requests SET status = 'approved', responded_at = NOW()
+		WHERE status = 'pending'
+		  AND ((from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1))`, a, b); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func (r *repository) Privacy(ctx context.Context, userID uuid.UUID) (bool, int32, error) {
+	var (
+		private bool
+		pending int32
+	)
+	err := r.db.QueryRow(ctx, `
+		SELECT is_private,
+		       (SELECT COUNT(*) FROM follow_requests WHERE to_user = $1 AND status = 'pending')
+		FROM users WHERE id = $1`, userID).Scan(&private, &pending)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, 0, ErrNotFound
+	}
+	return private, pending, err
+}
+
+func (r *repository) SetPrivate(ctx context.Context, userID uuid.UUID, private bool) ([]uuid.UUID, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after commit
+	if _, err := tx.Exec(ctx, `UPDATE users SET is_private = $2 WHERE id = $1`, userID, private); err != nil {
+		return nil, fmt.Errorf("set privacy: %w", err)
+	}
+	var approved []uuid.UUID
+	if !private {
+		rows, err := tx.Query(ctx, `
+			UPDATE follow_requests SET status = 'approved', responded_at = NOW()
+			WHERE to_user = $1 AND status = 'pending' RETURNING from_user`, userID)
+		if err != nil {
+			return nil, err
+		}
+		if approved, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID]); err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO follows (follower_id, followee_id)
+			SELECT unnest($2::uuid[]), $1 ON CONFLICT DO NOTHING`, userID, approved); err != nil {
+			return nil, fmt.Errorf("approve pending: %w", err)
+		}
+	}
+	return approved, tx.Commit(ctx)
 }
 
 func (r *repository) Block(ctx context.Context, blocker, blocked uuid.UUID) error {
@@ -437,12 +729,13 @@ func (r *repository) Block(ctx context.Context, blocker, blocked uuid.UUID) erro
 		return err
 	}
 	if _, err := tx.Exec(ctx, `
-		DELETE FROM friendships WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)`,
+		DELETE FROM follows
+		WHERE (follower_id = $1 AND followee_id = $2) OR (follower_id = $2 AND followee_id = $1)`,
 		blocker, blocked); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `
-		UPDATE friend_requests SET status = 'cancelled', responded_at = NOW()
+		UPDATE follow_requests SET status = 'cancelled', responded_at = NOW()
 		WHERE status = 'pending'
 		  AND ((from_user = $1 AND to_user = $2) OR (from_user = $2 AND to_user = $1))`,
 		blocker, blocked); err != nil {
@@ -555,9 +848,26 @@ func (r *repository) Stats(ctx context.Context, owner uuid.UUID, tripVisibilitie
 		  (SELECT COUNT(DISTINCT lower(city_name)) FROM user_visited_cities WHERE user_id = $1),
 		  (SELECT COUNT(DISTINCT NULLIF(country, '')) FROM user_visited_cities WHERE user_id = $1),
 		  (SELECT COUNT(*) FROM trips WHERE user_id = $1 AND visibility = ANY($2)),
-		  (SELECT COUNT(*) FROM friendships WHERE user_id = $1)`,
-		owner, tripVisibilities).Scan(&s.Cities, &s.Countries, &s.VisibleTrips, &s.Friends)
+		  (SELECT COUNT(*) FROM follows a
+		   JOIN follows b ON b.follower_id = a.followee_id AND b.followee_id = a.follower_id
+		   WHERE a.follower_id = $1),
+		  (SELECT COUNT(*) FROM follows f JOIN users u ON u.id = f.follower_id AND u.is_active
+		   WHERE f.followee_id = $1),
+		  (SELECT COUNT(*) FROM follows f JOIN users u ON u.id = f.followee_id AND u.is_active
+		   WHERE f.follower_id = $1)`,
+		owner, tripVisibilities).Scan(&s.Cities, &s.Countries, &s.VisibleTrips, &s.Friends,
+		&s.Followers, &s.Following)
 	return s, err
+}
+
+func (r *repository) ClaimPushSlot(ctx context.Context, userID uuid.UUID, kind string) (bool, error) {
+	ct, err := r.db.Exec(ctx, `
+		INSERT INTO progress_push_log (user_id, kind, local_date) VALUES ($1, $2, CURRENT_DATE)
+		ON CONFLICT DO NOTHING`, userID, kind)
+	if err != nil {
+		return false, fmt.Errorf("claim push slot: %w", err)
+	}
+	return ct.RowsAffected() == 1, nil
 }
 
 func (r *repository) FacebookFriends(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, bool, error) {

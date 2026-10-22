@@ -57,19 +57,27 @@ const (
 	// GamificationServiceMarkStopProcedure is the fully-qualified name of the GamificationService's
 	// MarkStop RPC.
 	GamificationServiceMarkStopProcedure = "/loci.gamification.GamificationService/MarkStop"
+	// GamificationServiceListAchievementsProcedure is the fully-qualified name of the
+	// GamificationService's ListAchievements RPC.
+	GamificationServiceListAchievementsProcedure = "/loci.gamification.GamificationService/ListAchievements"
+	// GamificationServiceMarkAchievementsSeenProcedure is the fully-qualified name of the
+	// GamificationService's MarkAchievementsSeen RPC.
+	GamificationServiceMarkAchievementsSeenProcedure = "/loci.gamification.GamificationService/MarkAchievementsSeen"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
 var (
-	gamificationServiceServiceDescriptor                 = gamification.File_loci_gamification_gamification_proto.Services().ByName("GamificationService")
-	gamificationServiceGetMyProgressMethodDescriptor     = gamificationServiceServiceDescriptor.Methods().ByName("GetMyProgress")
-	gamificationServiceDailyCheckInMethodDescriptor      = gamificationServiceServiceDescriptor.Methods().ByName("DailyCheckIn")
-	gamificationServiceGetLeaderboardMethodDescriptor    = gamificationServiceServiceDescriptor.Methods().ByName("GetLeaderboard")
-	gamificationServiceListPointsHistoryMethodDescriptor = gamificationServiceServiceDescriptor.Methods().ByName("ListPointsHistory")
-	gamificationServiceCompleteTripDayMethodDescriptor   = gamificationServiceServiceDescriptor.Methods().ByName("CompleteTripDay")
-	gamificationServiceGetFieldProfileMethodDescriptor   = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldProfile")
-	gamificationServiceGetFieldBoardMethodDescriptor     = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldBoard")
-	gamificationServiceMarkStopMethodDescriptor          = gamificationServiceServiceDescriptor.Methods().ByName("MarkStop")
+	gamificationServiceServiceDescriptor                    = gamification.File_loci_gamification_gamification_proto.Services().ByName("GamificationService")
+	gamificationServiceGetMyProgressMethodDescriptor        = gamificationServiceServiceDescriptor.Methods().ByName("GetMyProgress")
+	gamificationServiceDailyCheckInMethodDescriptor         = gamificationServiceServiceDescriptor.Methods().ByName("DailyCheckIn")
+	gamificationServiceGetLeaderboardMethodDescriptor       = gamificationServiceServiceDescriptor.Methods().ByName("GetLeaderboard")
+	gamificationServiceListPointsHistoryMethodDescriptor    = gamificationServiceServiceDescriptor.Methods().ByName("ListPointsHistory")
+	gamificationServiceCompleteTripDayMethodDescriptor      = gamificationServiceServiceDescriptor.Methods().ByName("CompleteTripDay")
+	gamificationServiceGetFieldProfileMethodDescriptor      = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldProfile")
+	gamificationServiceGetFieldBoardMethodDescriptor        = gamificationServiceServiceDescriptor.Methods().ByName("GetFieldBoard")
+	gamificationServiceMarkStopMethodDescriptor             = gamificationServiceServiceDescriptor.Methods().ByName("MarkStop")
+	gamificationServiceListAchievementsMethodDescriptor     = gamificationServiceServiceDescriptor.Methods().ByName("ListAchievements")
+	gamificationServiceMarkAchievementsSeenMethodDescriptor = gamificationServiceServiceDescriptor.Methods().ByName("MarkAchievementsSeen")
 )
 
 // GamificationServiceClient is a client for the loci.gamification.GamificationService service.
@@ -80,7 +88,7 @@ type GamificationServiceClient interface {
 	// DailyCheckIn records the device timezone. It no longer awards points or
 	// extends a streak; points_awarded is always 0.
 	DailyCheckIn(context.Context, *connect.Request[gamification.DailyCheckInRequest]) (*connect.Response[gamification.DailyCheckInResponse], error)
-	// GetLeaderboard ranks the caller and their friends. Friends who turned off
+	// GetLeaderboard ranks the caller and the people they follow. People who turned off
 	// leaderboard visibility, and blocked users, are left out. The caller's own
 	// entry is always present.
 	GetLeaderboard(context.Context, *connect.Request[gamification.GetLeaderboardRequest]) (*connect.Response[gamification.GetLeaderboardResponse], error)
@@ -102,6 +110,13 @@ type GamificationServiceClient interface {
 	// one is done; finishing every day finishes the trip. Reopening a stop never
 	// takes back points already awarded, and marking it again never repays them.
 	MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error)
+	// ListAchievements is the whole catalogue as it stands for a user: earned
+	// and locked, with progress. Empty user_id means the caller. Someone else's
+	// private account is PermissionDenied unless the caller is an approved
+	// follower; a user who blocked the caller is NotFound.
+	ListAchievements(context.Context, *connect.Request[gamification.ListAchievementsRequest]) (*connect.Response[gamification.ListAchievementsResponse], error)
+	// MarkAchievementsSeen clears is_new on the caller's achievements.
+	MarkAchievementsSeen(context.Context, *connect.Request[gamification.MarkAchievementsSeenRequest]) (*connect.Response[gamification.MarkAchievementsSeenResponse], error)
 }
 
 // NewGamificationServiceClient constructs a client for the loci.gamification.GamificationService
@@ -162,19 +177,33 @@ func NewGamificationServiceClient(httpClient connect.HTTPClient, baseURL string,
 			connect.WithSchema(gamificationServiceMarkStopMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		listAchievements: connect.NewClient[gamification.ListAchievementsRequest, gamification.ListAchievementsResponse](
+			httpClient,
+			baseURL+GamificationServiceListAchievementsProcedure,
+			connect.WithSchema(gamificationServiceListAchievementsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		markAchievementsSeen: connect.NewClient[gamification.MarkAchievementsSeenRequest, gamification.MarkAchievementsSeenResponse](
+			httpClient,
+			baseURL+GamificationServiceMarkAchievementsSeenProcedure,
+			connect.WithSchema(gamificationServiceMarkAchievementsSeenMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // gamificationServiceClient implements GamificationServiceClient.
 type gamificationServiceClient struct {
-	getMyProgress     *connect.Client[gamification.GetMyProgressRequest, gamification.GetMyProgressResponse]
-	dailyCheckIn      *connect.Client[gamification.DailyCheckInRequest, gamification.DailyCheckInResponse]
-	getLeaderboard    *connect.Client[gamification.GetLeaderboardRequest, gamification.GetLeaderboardResponse]
-	listPointsHistory *connect.Client[gamification.ListPointsHistoryRequest, gamification.ListPointsHistoryResponse]
-	completeTripDay   *connect.Client[gamification.CompleteTripDayRequest, gamification.CompleteTripDayResponse]
-	getFieldProfile   *connect.Client[gamification.GetFieldProfileRequest, gamification.GetFieldProfileResponse]
-	getFieldBoard     *connect.Client[gamification.GetFieldBoardRequest, gamification.GetFieldBoardResponse]
-	markStop          *connect.Client[gamification.MarkStopRequest, gamification.MarkStopResponse]
+	getMyProgress        *connect.Client[gamification.GetMyProgressRequest, gamification.GetMyProgressResponse]
+	dailyCheckIn         *connect.Client[gamification.DailyCheckInRequest, gamification.DailyCheckInResponse]
+	getLeaderboard       *connect.Client[gamification.GetLeaderboardRequest, gamification.GetLeaderboardResponse]
+	listPointsHistory    *connect.Client[gamification.ListPointsHistoryRequest, gamification.ListPointsHistoryResponse]
+	completeTripDay      *connect.Client[gamification.CompleteTripDayRequest, gamification.CompleteTripDayResponse]
+	getFieldProfile      *connect.Client[gamification.GetFieldProfileRequest, gamification.GetFieldProfileResponse]
+	getFieldBoard        *connect.Client[gamification.GetFieldBoardRequest, gamification.GetFieldBoardResponse]
+	markStop             *connect.Client[gamification.MarkStopRequest, gamification.MarkStopResponse]
+	listAchievements     *connect.Client[gamification.ListAchievementsRequest, gamification.ListAchievementsResponse]
+	markAchievementsSeen *connect.Client[gamification.MarkAchievementsSeenRequest, gamification.MarkAchievementsSeenResponse]
 }
 
 // GetMyProgress calls loci.gamification.GamificationService.GetMyProgress.
@@ -217,6 +246,16 @@ func (c *gamificationServiceClient) MarkStop(ctx context.Context, req *connect.R
 	return c.markStop.CallUnary(ctx, req)
 }
 
+// ListAchievements calls loci.gamification.GamificationService.ListAchievements.
+func (c *gamificationServiceClient) ListAchievements(ctx context.Context, req *connect.Request[gamification.ListAchievementsRequest]) (*connect.Response[gamification.ListAchievementsResponse], error) {
+	return c.listAchievements.CallUnary(ctx, req)
+}
+
+// MarkAchievementsSeen calls loci.gamification.GamificationService.MarkAchievementsSeen.
+func (c *gamificationServiceClient) MarkAchievementsSeen(ctx context.Context, req *connect.Request[gamification.MarkAchievementsSeenRequest]) (*connect.Response[gamification.MarkAchievementsSeenResponse], error) {
+	return c.markAchievementsSeen.CallUnary(ctx, req)
+}
+
 // GamificationServiceHandler is an implementation of the loci.gamification.GamificationService
 // service.
 type GamificationServiceHandler interface {
@@ -226,7 +265,7 @@ type GamificationServiceHandler interface {
 	// DailyCheckIn records the device timezone. It no longer awards points or
 	// extends a streak; points_awarded is always 0.
 	DailyCheckIn(context.Context, *connect.Request[gamification.DailyCheckInRequest]) (*connect.Response[gamification.DailyCheckInResponse], error)
-	// GetLeaderboard ranks the caller and their friends. Friends who turned off
+	// GetLeaderboard ranks the caller and the people they follow. People who turned off
 	// leaderboard visibility, and blocked users, are left out. The caller's own
 	// entry is always present.
 	GetLeaderboard(context.Context, *connect.Request[gamification.GetLeaderboardRequest]) (*connect.Response[gamification.GetLeaderboardResponse], error)
@@ -248,6 +287,13 @@ type GamificationServiceHandler interface {
 	// one is done; finishing every day finishes the trip. Reopening a stop never
 	// takes back points already awarded, and marking it again never repays them.
 	MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error)
+	// ListAchievements is the whole catalogue as it stands for a user: earned
+	// and locked, with progress. Empty user_id means the caller. Someone else's
+	// private account is PermissionDenied unless the caller is an approved
+	// follower; a user who blocked the caller is NotFound.
+	ListAchievements(context.Context, *connect.Request[gamification.ListAchievementsRequest]) (*connect.Response[gamification.ListAchievementsResponse], error)
+	// MarkAchievementsSeen clears is_new on the caller's achievements.
+	MarkAchievementsSeen(context.Context, *connect.Request[gamification.MarkAchievementsSeenRequest]) (*connect.Response[gamification.MarkAchievementsSeenResponse], error)
 }
 
 // NewGamificationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -304,6 +350,18 @@ func NewGamificationServiceHandler(svc GamificationServiceHandler, opts ...conne
 		connect.WithSchema(gamificationServiceMarkStopMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	gamificationServiceListAchievementsHandler := connect.NewUnaryHandler(
+		GamificationServiceListAchievementsProcedure,
+		svc.ListAchievements,
+		connect.WithSchema(gamificationServiceListAchievementsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	gamificationServiceMarkAchievementsSeenHandler := connect.NewUnaryHandler(
+		GamificationServiceMarkAchievementsSeenProcedure,
+		svc.MarkAchievementsSeen,
+		connect.WithSchema(gamificationServiceMarkAchievementsSeenMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.gamification.GamificationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GamificationServiceGetMyProgressProcedure:
@@ -322,6 +380,10 @@ func NewGamificationServiceHandler(svc GamificationServiceHandler, opts ...conne
 			gamificationServiceGetFieldBoardHandler.ServeHTTP(w, r)
 		case GamificationServiceMarkStopProcedure:
 			gamificationServiceMarkStopHandler.ServeHTTP(w, r)
+		case GamificationServiceListAchievementsProcedure:
+			gamificationServiceListAchievementsHandler.ServeHTTP(w, r)
+		case GamificationServiceMarkAchievementsSeenProcedure:
+			gamificationServiceMarkAchievementsSeenHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -361,4 +423,12 @@ func (UnimplementedGamificationServiceHandler) GetFieldBoard(context.Context, *c
 
 func (UnimplementedGamificationServiceHandler) MarkStop(context.Context, *connect.Request[gamification.MarkStopRequest]) (*connect.Response[gamification.MarkStopResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.MarkStop is not implemented"))
+}
+
+func (UnimplementedGamificationServiceHandler) ListAchievements(context.Context, *connect.Request[gamification.ListAchievementsRequest]) (*connect.Response[gamification.ListAchievementsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.ListAchievements is not implemented"))
+}
+
+func (UnimplementedGamificationServiceHandler) MarkAchievementsSeen(context.Context, *connect.Request[gamification.MarkAchievementsSeenRequest]) (*connect.Response[gamification.MarkAchievementsSeenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.gamification.GamificationService.MarkAchievementsSeen is not implemented"))
 }

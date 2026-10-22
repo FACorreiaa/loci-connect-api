@@ -144,3 +144,63 @@ func TestTripSharingEndToEnd(t *testing.T) {
 	require.NotNil(t, saved.ShareCode)
 	assert.Equal(t, code, *saved.ShareCode)
 }
+
+// Following is one-way: a follower who is not followed back sees the owner's
+// PUBLIC trips in the friends' trips list but never the FRIENDS ones, and a
+// private account lists nothing to people it has not approved.
+func TestTripSharingFollowers(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := NewRepository(testTripDB, log)
+	socialSvc := social.NewService(social.NewRepository(testTripDB), nil, log)
+	h := NewHandler(repo, "https://api.example", nil, nil).
+		WithSharing(NewSharingRepository(testTripDB, log), socialSvc)
+	ctx := context.Background()
+
+	ana := newTripUser(t, "follow-ana-"+uuid.NewString()+"@loci.test")
+	fan := newTripUser(t, "follow-fan-"+uuid.NewString()+"@loci.test")
+	stranger := newTripUser(t, "follow-stranger-"+uuid.NewString()+"@loci.test")
+
+	save := func(title string, vis tripv1.TripVisibility) {
+		tr, err := repo.SaveTrip(ctx, &Trip{UserID: ana, CityName: "Lisbon", Title: title}, 0)
+		require.NoError(t, err)
+		_, err = h.SetTripVisibility(as(ana), connect.NewRequest(&tripv1.SetTripVisibilityRequest{
+			TripId: tr.ID.String(), Visibility: vis,
+		}))
+		require.NoError(t, err)
+	}
+	save("Public walk", tripv1.TripVisibility_TRIP_VISIBILITY_PUBLIC)
+	save("Friends only", tripv1.TripVisibility_TRIP_VISIBILITY_FRIENDS)
+
+	page := &commonv1.PaginationRequest{Page: 1, PageSize: 20}
+	feedTitles := func(viewer uuid.UUID) []string {
+		resp, err := h.ListFriendTrips(as(viewer), connect.NewRequest(&tripv1.ListFriendTripsRequest{Pagination: page}))
+		require.NoError(t, err)
+		var out []string
+		for _, tr := range resp.Msg.GetTrips() {
+			out = append(out, tr.GetTitle())
+		}
+		return out
+	}
+	listed := func(viewer uuid.UUID) int {
+		resp, err := h.ListUserTrips(as(viewer), connect.NewRequest(&tripv1.ListUserTripsRequest{UserId: ana.String(), Pagination: page}))
+		require.NoError(t, err)
+		return len(resp.Msg.GetTrips())
+	}
+
+	_, _, _, err := socialSvc.Follow(ctx, fan, ana)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"Public walk"}, feedTitles(fan), "a one-way follower saw a FRIENDS trip")
+
+	// Following back makes them friends: both trips now.
+	_, _, _, err = socialSvc.Follow(ctx, ana, fan)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"Public walk", "Friends only"}, feedTitles(fan))
+
+	// Private: a stranger's view of the profile lists nothing; a follower's
+	// does not change.
+	_, err = socialSvc.SetPrivate(ctx, ana, true)
+	require.NoError(t, err)
+	assert.Equal(t, 0, listed(stranger))
+	assert.Equal(t, 2, listed(fan))
+	assert.Empty(t, feedTitles(stranger))
+}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"connectrpc.com/connect"
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
@@ -70,14 +71,21 @@ func CanView(viewer, owner uuid.UUID, vis Visibility, access Access, friends, bl
 	}
 }
 
-// SocialGraph is what trip sharing needs from the friends layer. The social
-// package implements it; trip does not import social.
+// SocialGraph is what trip sharing needs from the people layer. Friends are
+// people who follow each other. The social package implements it; trip does
+// not import social.
 type SocialGraph interface {
 	// Relation reports whether a and b are friends and whether either
 	// blocked the other.
 	Relation(ctx context.Context, a, b uuid.UUID) (friends, blocked bool, err error)
 	// FriendIDs lists a user's friends.
 	FriendIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	// FollowingIDs lists the people a user follows.
+	FollowingIDs(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	// CanView reports whether viewer (uuid.Nil when signed out) may see
+	// owner's profile content (false for a private account viewer is not an
+	// approved follower of), and whether either blocked the other.
+	CanView(ctx context.Context, viewer, owner uuid.UUID) (visible, blocked bool, err error)
 	// PublicUsers returns the public card of each user that exists.
 	PublicUsers(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*socialv1.PublicUser, error)
 }
@@ -95,6 +103,9 @@ type SharingRepository interface {
 	// ListVisibleTrips lists owners' trips with one of the given
 	// visibilities, most recently updated first.
 	ListVisibleTrips(ctx context.Context, owners []uuid.UUID, vis []Visibility, limit, offset int) ([]*Trip, int, error)
+	// ListFollowedTrips lists the PUBLIC trips of following and the FRIENDS
+	// trips of friends, most recently updated first.
+	ListFollowedTrips(ctx context.Context, following, friends []uuid.UUID, limit, offset int) ([]*Trip, int, error)
 }
 
 // WithSharing attaches trip sharing. Without it the sharing RPCs answer
@@ -102,6 +113,18 @@ type SharingRepository interface {
 func (h *Handler) WithSharing(repo SharingRepository, graph SocialGraph) *Handler {
 	h.sharing = repo
 	h.graph = graph
+	return h
+}
+
+// SharingFeed tells the owner's followers about a trip opened to them. Best
+// effort; social.Feed satisfies it.
+type SharingFeed interface {
+	PostTripShared(ctx context.Context, actor, tripID uuid.UUID)
+}
+
+// WithFeed posts the first time a trip is opened to friends or to everyone.
+func (h *Handler) WithFeed(f SharingFeed) *Handler {
+	h.feed = f
 	return h
 }
 
@@ -162,17 +185,36 @@ func (r *sharingRepository) ListVisibleTrips(ctx context.Context, owners []uuid.
 	for i, v := range vis {
 		vals[i] = int32(v)
 	}
+	return r.listTrips(ctx, `user_id = ANY($1) AND visibility = ANY($2)`, []any{owners, vals}, limit, offset)
+}
+
+func (r *sharingRepository) ListFollowedTrips(ctx context.Context, following, friends []uuid.UUID, limit, offset int) ([]*Trip, int, error) {
+	if len(following) == 0 && len(friends) == 0 {
+		return nil, 0, nil
+	}
+	if following == nil {
+		following = []uuid.UUID{}
+	}
+	if friends == nil {
+		friends = []uuid.UUID{}
+	}
+	return r.listTrips(ctx, `(user_id = ANY($1) AND visibility = $3) OR (user_id = ANY($2) AND visibility = $4)`,
+		[]any{following, friends, int32(VisibilityPublic), int32(VisibilityFriends)}, limit, offset)
+}
+
+// listTrips lists the trips matching where (its arguments are args), most
+// recently updated first, days included, with the total.
+func (r *sharingRepository) listTrips(ctx context.Context, where string, args []any, limit, offset int) ([]*Trip, int, error) {
 	var total int
-	if err := r.db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM trips WHERE user_id = ANY($1) AND visibility = ANY($2)`,
-		owners, vals).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM trips WHERE `+where, args...).Scan(&total); err != nil {
 		return nil, 0, fmt.Errorf("count visible trips: %w", err)
 	}
+	n := len(args)
 	rows, err := r.db.Query(ctx, `
 		SELECT `+tripColumns+` FROM trips
-		WHERE user_id = ANY($1) AND visibility = ANY($2)
+		WHERE `+where+`
 		ORDER BY updated_at DESC
-		LIMIT $3 OFFSET $4`, owners, vals, limit, offset)
+		LIMIT $`+strconv.Itoa(n+1)+` OFFSET $`+strconv.Itoa(n+2), append(args, limit, offset)...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("list visible trips: %w", err)
 	}
@@ -233,6 +275,9 @@ func (h *Handler) SetTripVisibility(ctx context.Context, req *connect.Request[tr
 	t, err := h.sharing.SetVisibility(ctx, id, uid, vis, req.Msg.GetShareDetails(), newShareCode())
 	if err != nil {
 		return nil, toConnectErr(err)
+	}
+	if h.feed != nil && (t.Visibility == VisibilityFriends || t.Visibility == VisibilityPublic) {
+		h.feed.PostTripShared(ctx, uid, t.ID)
 	}
 	resp := &tripv1.SetTripVisibilityResponse{Visibility: tripv1.TripVisibility(t.Visibility)}
 	if t.Visibility != VisibilityPrivate && t.ShareCode != nil {
@@ -400,13 +445,19 @@ func (h *Handler) ListFriendTrips(ctx context.Context, req *connect.Request[trip
 	if err != nil {
 		return nil, err
 	}
+	// Public trips of everyone the viewer follows (a row in follows is an
+	// approved follow, so a private account's are included once it approved),
+	// and friends-only trips of friends.
+	following, err := h.graph.FollowingIDs(ctx, viewer)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
 	friends, err := h.graph.FriendIDs(ctx, viewer)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	page, limit := pageArgs(req.Msg.GetPagination())
-	trips, total, err := h.sharing.ListVisibleTrips(ctx, friends,
-		[]Visibility{VisibilityFriends, VisibilityPublic}, limit, (page-1)*limit)
+	trips, total, err := h.sharing.ListFollowedTrips(ctx, following, friends, limit, (page-1)*limit)
 	if err != nil {
 		return nil, toConnectErr(err)
 	}
@@ -423,19 +474,29 @@ func (h *Handler) ListUserTrips(ctx context.Context, req *connect.Request[tripv1
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
 	vis := []Visibility{VisibilityPublic}
-	switch {
-	case viewer == owner:
+	if viewer == owner {
 		vis = []Visibility{VisibilityPrivate, VisibilityFriends, VisibilityLink, VisibilityPublic}
-	case viewer != uuid.Nil:
-		friends, blocked, err := h.graph.Relation(ctx, viewer, owner)
+	} else {
+		visible, blocked, err := h.graph.CanView(ctx, viewer, owner)
 		if err != nil {
 			return nil, connect.NewError(connect.CodeInternal, err)
 		}
 		if blocked {
 			return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
 		}
-		if friends {
-			vis = []Visibility{VisibilityFriends, VisibilityPublic}
+		if !visible {
+			// A private account lists nothing to people it has not approved.
+			page, limit := pageArgs(req.Msg.GetPagination())
+			return connect.NewResponse(&tripv1.ListTripsResponse{Pagination: paginationMeta(page, limit, 0)}), nil
+		}
+		if viewer != uuid.Nil {
+			friends, _, err := h.graph.Relation(ctx, viewer, owner)
+			if err != nil {
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+			if friends {
+				vis = []Visibility{VisibilityFriends, VisibilityPublic}
+			}
 		}
 	}
 	page, limit := pageArgs(req.Msg.GetPagination())

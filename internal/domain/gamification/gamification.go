@@ -81,6 +81,9 @@ var (
 	// ErrInvalid is input the service refuses (an unknown timezone, a day
 	// with no stops).
 	ErrInvalid = errors.New("invalid request")
+	// ErrPrivate is a private account the caller is not an approved
+	// follower of.
+	ErrPrivate = errors.New("private account")
 )
 
 // Award is one action to score. RefKey names the action instance; the same
@@ -91,6 +94,9 @@ type Award struct {
 	Kind   Kind
 	RefKey string
 	Label  string
+	// Name is what the award is about, for the following feed: a new city's
+	// name.
+	Name   string
 	CityID *uuid.UUID
 }
 
@@ -119,6 +125,77 @@ type Totals struct {
 	LongestStreak  int
 	LastActiveDate *time.Time
 	Timezone       string
+	// The weekly streak: WeekStreak weeks in a row up to the week starting
+	// LastStreakWeek (a Monday). See WeekStreakAt for whether it is alive.
+	WeekStreak        int
+	LongestWeekStreak int
+	LastStreakWeek    *time.Time
+}
+
+// Explores reports whether k is exploration, which keeps the weekly streak:
+// a visit, a new city or neighborhood, a walked stop, a finished day or trip.
+// Saving, keeping and noting places do not.
+func (k Kind) Explores() bool {
+	switch k {
+	case KindPlaceVisited, KindNewCity, KindTripDayCompleted, KindTripCompleted, KindStopDone, KindNeighborhood:
+		return true
+	}
+	return false
+}
+
+// WeekStart is the Monday of localDate's ISO week, as a UTC midnight.
+func WeekStart(localDate time.Time) time.Time {
+	return SeasonStart(SeasonID(localDate))
+}
+
+// NextWeekStreak is t's weekly streak after exploring on localDate: the same
+// week counts once, the week after the last one extends the run, and a gap
+// starts a new run. An award dated before the last week counted (a late kept
+// place) leaves it alone. It reports whether anything changed.
+func NextWeekStreak(t Totals, localDate time.Time) (Totals, bool) {
+	week := WeekStart(localDate)
+	switch {
+	case t.LastStreakWeek == nil:
+		t.WeekStreak = 1
+	case !week.After(*t.LastStreakWeek):
+		return t, false
+	case week.Equal(t.LastStreakWeek.AddDate(0, 0, 7)):
+		t.WeekStreak++
+	default:
+		t.WeekStreak = 1
+	}
+	t.LastStreakWeek = &week
+	if t.WeekStreak > t.LongestWeekStreak {
+		t.LongestWeekStreak = t.WeekStreak
+	}
+	return t, true
+}
+
+// WeekStreak is the weekly streak as the app shows it on today.
+type WeekStreak struct {
+	Current          int
+	Longest          int
+	ExploredThisWeek bool
+	WeekStart        time.Time
+}
+
+// WeekStreakAt reads t's weekly streak on today (a local date). A run whose
+// last week is this one or last one is alive: this week can still extend it.
+// An older one is broken and reads 0.
+func WeekStreakAt(t Totals, today time.Time) WeekStreak {
+	week := WeekStart(today)
+	ws := WeekStreak{Longest: t.LongestWeekStreak, WeekStart: week}
+	if t.LastStreakWeek == nil {
+		return ws
+	}
+	last := *t.LastStreakWeek
+	if last.Equal(week) {
+		ws.ExploredThisWeek = true
+	}
+	if !last.Before(week.AddDate(0, 0, -7)) {
+		ws.Current = t.WeekStreak
+	}
+	return ws
 }
 
 // LevelFor turns a total into a level and the points still needed for the
@@ -186,6 +263,13 @@ func LocalHour(now time.Time, tz string) int {
 		loc = time.UTC
 	}
 	return now.In(loc).Hour()
+}
+
+// Quiet reports whether it is quiet hours in tz at now: no progress push is
+// sent from 22:00 to 08:00 in the recipient's zone.
+func Quiet(now time.Time, tz string) bool {
+	h := LocalHour(now, tz)
+	return h >= quietFrom || h < quietTo
 }
 
 // Period is a leaderboard window, in local dates, inclusive. A zero From
@@ -433,33 +517,23 @@ const (
 	StopSkipped StopStatus = 3
 )
 
-// Badge is one achievement.
+// Badge is one of the badges earned before achievements replaced them.
+// Older apps still list them.
 type Badge struct {
 	ID          string
 	Title       string
 	Description string
-	// Earned reports whether the counts reach it.
-	Earned func(c Counts) bool
 }
 
-// Counts are what badges are judged on.
-type Counts struct {
-	Cities        int
-	Places        int
-	ScoutClaims   int
-	TripsDone     int
-	LongestStreak int
-}
-
-// Badges is every badge, in the order the app shows them.
+// Badges is every badge, in the order older apps show them.
 var Badges = []Badge{
-	{ID: "first-city", Title: "First city", Description: "Visit your first city with Loci.", Earned: func(c Counts) bool { return c.Cities >= 1 }},
-	{ID: "globetrotter", Title: "Globetrotter", Description: "Visit 10 cities.", Earned: func(c Counts) bool { return c.Cities >= 10 }},
-	{ID: "trailblazer", Title: "Trailblazer", Description: "Visit 50 places on the spot.", Earned: func(c Counts) bool { return c.Places >= 50 }},
-	{ID: "streak-7", Title: "Week streak", Description: "Open Loci 7 days in a row.", Earned: func(c Counts) bool { return c.LongestStreak >= 7 }},
-	{ID: "streak-30", Title: "Month streak", Description: "Open Loci 30 days in a row.", Earned: func(c Counts) bool { return c.LongestStreak >= 30 }},
-	{ID: "trip-finisher", Title: "Trip finisher", Description: "Walk every day of a trip.", Earned: func(c Counts) bool { return c.TripsDone >= 1 }},
-	{ID: "local-scout", Title: "Local scout", Description: "Have 10 field reports confirmed.", Earned: func(c Counts) bool { return c.ScoutClaims >= 10 }},
+	{ID: "first-city", Title: "First city", Description: "Visit your first city with Loci."},
+	{ID: "globetrotter", Title: "Globetrotter", Description: "Visit 10 cities."},
+	{ID: "trailblazer", Title: "Trailblazer", Description: "Visit 50 places on the spot."},
+	{ID: "streak-7", Title: "Week streak", Description: "Open Loci 7 days in a row."},
+	{ID: "streak-30", Title: "Month streak", Description: "Open Loci 30 days in a row."},
+	{ID: "trip-finisher", Title: "Trip finisher", Description: "Walk every day of a trip."},
+	{ID: "local-scout", Title: "Local scout", Description: "Have 10 field reports confirmed."},
 }
 
 // BadgeByID finds a badge.

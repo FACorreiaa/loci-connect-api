@@ -134,7 +134,7 @@ func (s *Service) firstCity(ctx context.Context, userID, cityID uuid.UUID, name 
 		label = "New city: " + name
 	}
 	return s.AwardQuietly(ctx, Award{
-		UserID: userID, Kind: KindNewCity, RefKey: "city:" + cityID.String(), Label: label, CityID: &cityID,
+		UserID: userID, Kind: KindNewCity, RefKey: "city:" + cityID.String(), Label: label, Name: name, CityID: &cityID,
 	})
 }
 
@@ -256,6 +256,7 @@ type FieldProfile struct {
 	SeasonID     int
 	PlacesKept   int
 	DaysFinished int
+	WeekStreak   WeekStreak
 }
 
 // Profile is userID's field record: lifetime score and rank, rank per city,
@@ -265,8 +266,9 @@ func (s *Service) Profile(ctx context.Context, userID uuid.UUID) (*FieldProfile,
 	if err != nil {
 		return nil, err
 	}
-	season := SeasonID(LocalDate(s.now(), totals.Timezone))
-	p := &FieldProfile{Lifetime: totals.TotalPoints, SeasonID: season}
+	today := LocalDate(s.now(), totals.Timezone)
+	season := SeasonID(today)
+	p := &FieldProfile{Lifetime: totals.TotalPoints, SeasonID: season, WeekStreak: WeekStreakAt(totals, today)}
 	p.Rank, p.Next = RankFor(totals.TotalPoints, s.overallRanks)
 	if !s.enabled {
 		return p, nil
@@ -358,7 +360,8 @@ func (s *Service) Board(ctx context.Context, userID uuid.UUID, req BoardRequest)
 
 	var friends []uuid.UUID
 	if s.graph != nil {
-		if friends, err = s.graph.FriendIDs(ctx, userID); err != nil {
+		// The "friends" board is the people the viewer follows.
+		if friends, err = s.graph.FollowingIDs(ctx, userID); err != nil {
 			return nil, err
 		}
 	}
