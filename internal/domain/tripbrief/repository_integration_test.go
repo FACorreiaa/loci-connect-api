@@ -206,3 +206,47 @@ func TestStops_InOrderWithOpeningHours(t *testing.T) {
 	require.True(t, known)
 	require.True(t, closed)
 }
+
+func (tr traveller) joins(t *testing.T, tripID uuid.UUID, role string) {
+	t.Helper()
+	_, err := testsupport.MustPool().Exec(context.Background(),
+		`INSERT INTO trip_members (trip_id, user_id, role) VALUES ($1, $2, $3)`, tripID, tr.id, role)
+	require.NoError(t, err)
+}
+
+// Planning together: everyone on a trip is travelling it, so each member gets
+// the morning brief once a day, like the owner, and the swap link in it. A
+// member the owner blocked (or who blocked the owner) gets nothing.
+func TestDue_MembersGetTheBriefToo(t *testing.T) {
+	repo := NewRepository(testsupport.MustPool())
+	owner := newTraveller(t, nil, true, true)
+	friend := newTraveller(t, nil, true, true)
+	blocked := newTraveller(t, nil, true, true)
+	lisbon := owner.trip(t, "Lisbon", now.AddDate(0, 0, -1), 3)
+	friend.joins(t, lisbon, "co_planner")
+	blocked.joins(t, lisbon, "viewer")
+	_, err := testsupport.MustPool().Exec(context.Background(),
+		`INSERT INTO user_blocks (blocker_id, blocked_id) VALUES ($1, $2)`, owner.id, blocked.id)
+	require.NoError(t, err)
+
+	got := dueFor(t, repo, KindMorning, 8, 11, friend.id)
+	require.Len(t, got, 1)
+	require.Equal(t, lisbon, got[0].TripID)
+	require.Equal(t, 2, got[0].DayNumber)
+	require.Len(t, dueFor(t, repo, KindMorning, 8, 11, owner.id), 1, "the owner still gets theirs")
+	require.Empty(t, dueFor(t, repo, KindMorning, 8, 11, blocked.id))
+
+	won, err := repo.Claim(context.Background(), got[0], KindMorning, nil)
+	require.NoError(t, err)
+	require.True(t, won)
+	require.Empty(t, dueFor(t, repo, KindMorning, 8, 11, friend.id), "once a day")
+	require.Len(t, dueFor(t, repo, KindMorning, 8, 11, owner.id), 1, "the member's claim is not the owner's")
+
+	// On someone else's trip and their own on the same day, their own wins.
+	own := friend.trip(t, "Sintra", now.AddDate(0, 0, -5), 10)
+	_, err = testsupport.MustPool().Exec(context.Background(), `DELETE FROM trip_brief_log WHERE user_id = $1`, friend.id)
+	require.NoError(t, err)
+	got = dueFor(t, repo, KindMorning, 8, 11, friend.id)
+	require.Len(t, got, 1)
+	require.Equal(t, own, got[0].TripID)
+}

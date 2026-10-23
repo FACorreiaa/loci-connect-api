@@ -34,6 +34,8 @@ type Candidate struct {
 
 // Stop is one of today's planned stops.
 type Stop struct {
+	// ID is the stop's, for a link that suggests swapping it.
+	ID          uuid.UUID
 	Name        string
 	StartMinute *int
 	// OpeningHours is the place's stored hours, in whatever form it has.

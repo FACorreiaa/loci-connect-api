@@ -49,6 +49,27 @@ func TestBuildMorning_Full(t *testing.T) {
 	}
 }
 
+// A closed stop links to swapping it, so a co-planner on a trip day can
+// suggest something open instead.
+func TestBuildMorning_ClosedStopLinksToASwap(t *testing.T) {
+	closed := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	stops := []Stop{
+		{ID: uuid.New(), Name: "Manteigaria"},
+		{ID: closed, Name: "Gulbenkian", OpeningHours: "mon-sat 10:00-18:00; sun closed"},
+	}
+	b, ok := BuildMorning(lisbonDay2(), stops, nil, nil)
+	if !ok {
+		t.Fatal("want a brief")
+	}
+	if want := "https://lociai.fyi/trips/11111111-1111-1111-1111-111111111111?swap=" + closed.String(); b.URL != want {
+		t.Errorf("url = %q, want %q", b.URL, want)
+	}
+	b, _ = BuildMorning(lisbonDay2(), stops[:1], nil, nil)
+	if strings.Contains(b.URL, "swap") {
+		t.Errorf("nothing closed, nothing to swap: %q", b.URL)
+	}
+}
+
 func TestBuildMorning_WeatherOnly(t *testing.T) {
 	b, ok := BuildMorning(lisbonDay2(), nil, &localcontext.WeatherDay{HighC: 21, Condition: "Rain"}, nil)
 	if !ok || b.Body != "21°C, rain" {

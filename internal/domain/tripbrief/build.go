@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/google/uuid"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/localcontext"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
 )
@@ -63,17 +65,35 @@ func stopsPiece(stops []Stop) string {
 	return piece
 }
 
-func closedPiece(c Candidate, stops []Stop) string {
-	var names []string
+// closedToday is the stops whose stored hours say they are closed on c's date.
+func closedToday(c Candidate, stops []Stop) []Stop {
+	var out []Stop
 	for _, s := range stops {
 		if closed, known := ClosedOn(s.OpeningHours, c.LocalDate.Weekday()); known && closed {
-			names = append(names, strings.TrimSpace(s.Name))
+			out = append(out, s)
 		}
 	}
-	if len(names) == 0 {
+	return out
+}
+
+func closedPiece(closed []Stop) string {
+	if len(closed) == 0 {
 		return ""
 	}
+	names := make([]string, len(closed))
+	for i, s := range closed {
+		names[i] = strings.TrimSpace(s.Name)
+	}
 	return "Closed today: " + strings.Join(names, ", ")
+}
+
+// swapURL opens the trip on the swap picker for the first closed stop: the
+// owner swaps it, a co-planner suggests a swap, a viewer just sees the trip.
+func swapURL(c Candidate, closed []Stop) string {
+	if len(closed) == 0 || closed[0].ID == uuid.Nil {
+		return tripURL(c)
+	}
+	return tripURL(c) + "?swap=" + closed[0].ID.String()
 }
 
 // joinCapped joins pieces until the cap, cutting the piece that crosses it
@@ -115,8 +135,9 @@ func BuildMorning(c Candidate, stops []Stop, wx *localcontext.WeatherDay, alerts
 	if wx != nil {
 		pieces = append(pieces, weatherPiece(wx))
 	}
+	closed := closedToday(c, stops)
 	if len(stops) > 0 {
-		pieces = append(pieces, stopsPiece(stops), closedPiece(c, stops))
+		pieces = append(pieces, stopsPiece(stops), closedPiece(closed))
 	}
 	for _, a := range alerts {
 		if t := strings.TrimSpace(a.Title); t != "" {
@@ -124,7 +145,7 @@ func BuildMorning(c Candidate, stops []Stop, wx *localcontext.WeatherDay, alerts
 			break
 		}
 	}
-	return Brief{Title: dayTitle(c), Body: joinCapped(pieces, maxBodyRunes), URL: tripURL(c)}, true
+	return Brief{Title: dayTitle(c), Body: joinCapped(pieces, maxBodyRunes), URL: swapURL(c, closed)}, true
 }
 
 // BuildWeatherTurn is the heads-up when a day that was dry at breakfast is
