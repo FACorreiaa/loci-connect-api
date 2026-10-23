@@ -25,9 +25,10 @@ const (
 	KindRegenerateDays Kind = "regenerate_days"
 	KindSearchFlights  Kind = "search_flights"
 
-	// Stop edits a trip member suggests from the trip page. The extractor
-	// does not produce them (normalize refuses them); checkStopEdit vets them
-	// against the trip instead.
+	// Stop edits. From the trip page they name stops and days by id; from
+	// chat the extractor names them by day number and stop name, and
+	// Service.resolveStopEdit turns those into ids before the card is
+	// stored. checkStopEdit vets either against the trip.
 	KindAddStop     Kind = "add_stop"
 	KindRemoveStop  Kind = "remove_stop"
 	KindReplaceStop Kind = "replace_stop"
@@ -75,6 +76,39 @@ type Action struct {
 	Stop    *trip.TripStop `json:"stop,omitempty"`      // add_stop, replace_stop
 	ToDayID string         `json:"to_day_id,omitempty"` // move_stop
 	ToIndex int            `json:"to_index,omitempty"`
+
+	// What the extractor says about a stop edit, before it is resolved
+	// against the trip: day numbers, a stop's name as listed, and the place
+	// to add or swap in, as the traveller said it.
+	Day        int    `json:"day,omitempty"`
+	StopName   string `json:"stop_name,omitempty"`
+	PlaceQuery string `json:"place,omitempty"`
+	ToDay      int    `json:"to_day,omitempty"`
+}
+
+// maxPlaceQuery bounds the place a chat message asks to add.
+const maxPlaceQuery = 120
+
+// normalizeStopEdit checks an extracted stop edit's shape against the trip's
+// day count. Whether the stop and place exist is resolveStopEdit's to find.
+func normalizeStopEdit(a Action, days int) (Action, error) {
+	a.StopName, a.PlaceQuery = strings.TrimSpace(a.StopName), strings.TrimSpace(a.PlaceQuery)
+	a.DayID, a.StopID, a.ToDayID, a.Stop = "", "", "", nil // ids come from the trip, never the model
+	if a.Day < 1 || a.Day > days {
+		return a, bad("day %d of %d", a.Day, days)
+	}
+	needsStop := a.Kind != KindAddStop
+	needsPlace := a.Kind == KindAddStop || a.Kind == KindReplaceStop
+	if needsStop && a.StopName == "" {
+		return a, bad("which stop")
+	}
+	if needsPlace && (a.PlaceQuery == "" || len([]rune(a.PlaceQuery)) > maxPlaceQuery) {
+		return a, bad("which place")
+	}
+	if a.Kind == KindMoveStop && (a.ToDay < 1 || a.ToDay > days || a.ToDay == a.Day) {
+		return a, bad("move to day %d", a.ToDay)
+	}
+	return a, nil
 }
 
 // maxStopName bounds a suggested stop's name, as SaveTrip does.

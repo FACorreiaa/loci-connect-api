@@ -1116,6 +1116,7 @@ func (d *Dependencies) initHandlers() error {
 				Trips:     d.TripRepo,
 				Plans:     d.TripService,
 				Hotels:    d.POISvc,
+				Spots:     d.POISvc,
 				Places:    newForwardGeocoder(d.AppCache),
 				Regen:     chatImpl,
 				Sessions:  d.ChatRepo,

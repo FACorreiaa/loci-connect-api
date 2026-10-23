@@ -13,6 +13,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/social"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 )
 
@@ -114,4 +115,45 @@ func TestPlanTogetherEndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusPending, open.Status)
 	require.NoError(t, svc.Dismiss(ctx, rui, gone.ID), "the proposer takes it back")
+}
+
+// A co-planner's chat message becomes a suggestion on the real schema, named
+// by day and stop, and the owner applies it.
+func TestPlanTogetherFromChat(t *testing.T) {
+	ctx := context.Background()
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	repo := trip.NewRepository(testDB, log)
+	socialSvc := social.NewService(social.NewRepository(testDB), nil, log)
+	store := NewStore(testDB)
+	reply := `{"actions":[{"kind":"replace_stop","day":1,"stop_name":"Alfama","place":"pastries"}]}`
+	svc := NewService(Deps{
+		LLM:   &scripted{replies: []string{reply}},
+		Store: store, Board: store, Trips: repo,
+		Plans:   trip.NewService(repo, trip.NewPlanRepository(testDB, log), flights.DeepLinks{}),
+		Members: trip.NewMemberAccess(trip.NewSharingRepository(testDB, log), trip.NewMembersRepository(testDB, log), socialSvc),
+		Spots:   &fakeSpots{found: []locitypes.POIDetailedInfo{{Name: "Pastéis de Belém"}}},
+		Notify:  &fakeNotify{}, Logger: log,
+	})
+
+	ana, rui := newPerson(t), newPerson(t)
+	saved, err := repo.SaveTrip(ctx, &trip.Trip{
+		UserID: ana, CityName: "Lisbon", Title: "Lisbon",
+		Days: []trip.TripDay{{DayNumber: 1, Stops: []trip.TripStop{{Name: "Miradouro da Graça"}, {Name: "Alfama"}}}},
+	}, 0)
+	require.NoError(t, err)
+	_, err = testDB.Exec(ctx, `INSERT INTO trip_members (trip_id, user_id, role, invited_by) VALUES ($1, $2, 'co_planner', $3)`, saved.ID, rui, ana)
+	require.NoError(t, err)
+
+	got, err := svc.Propose(ctx, rui, saved.ID, uuid.Nil, "swap Alfama for pastries")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	stored, err := store.GetByID(ctx, got[0].ID)
+	require.NoError(t, err)
+	require.Equal(t, SourceChat, stored.Source)
+	require.Equal(t, rui, stored.UserID)
+	require.Equal(t, saved.Days[0].Stops[1].ID.String(), stored.Action.StopID)
+
+	after, _, err := svc.Apply(ctx, ana, got[0].ID, nil, saved.Version)
+	require.NoError(t, err)
+	require.Equal(t, "Pastéis de Belém", after.Days[0].Stops[1].Name)
 }

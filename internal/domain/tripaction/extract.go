@@ -22,7 +22,24 @@ type Snapshot struct {
 	EndDate   string
 	Days      int
 	Today     time.Time
+	// Itinerary lists each day's stops by name ("Day 1: Belém Tower; LX
+	// Factory"); empty leaves stop edits out of the prompt.
+	Itinerary string
 }
+
+// stopKinds is the prompt's part on stop edits, shown only when the trip
+// has stops to name.
+const stopKinds = `- {"kind":"add_stop","day":N,"place":"<the place or kind of place to add, in the traveller's words>"}  ("add a rooftop bar on day 3")
+- {"kind":"remove_stop","day":N,"stop_name":"<a stop of that day, as listed>"}
+- {"kind":"replace_stop","day":N,"stop_name":"<a stop of that day, as listed>","place":"<what to have instead>"}  ("swap Belém Tower for a fado bar")
+- {"kind":"move_stop","day":N,"stop_name":"<a stop of that day, as listed>","to_day":M}
+Day numbers and stop names come from the itinerary:
+%s
+`
+
+// maxItineraryStops bounds the itinerary the prompt lists; a long trip's
+// tail is left out rather than the prompt growing without end.
+const maxItineraryStops = 60
 
 // maxActions caps one message's cards; a reply listing more is a model
 // rambling, not a traveller asking.
@@ -39,7 +56,7 @@ Action kinds. Use only these, and only for what the message asks:
 - {"kind":"search_hotels","city":"<a city of the trip>","min_stars":N,"max_stars":M}  ("4-star" is 4..4; "4 stars or more" is 4..5; no stars mentioned is 0..0)
 - {"kind":"regenerate_days","days":N}  (re-plan the itinerary as N days)
 - {"kind":"search_flights","origin":{"name":"...","iata":"XXX"},"destination":{"name":"...","iata":"XXX"},"depart":"YYYY-MM-DD","return":"YYYY-MM-DD","passengers":N,"cabin":"economy|premium_economy|business|first"}  (omit return for one way; omit iata when unsure)
-
+%s
 Example message: "4-star hotels in Lisbon from 12 to 17 November, and make it 6 days"
 Example reply: {"other_city":"","actions":[{"kind":"set_dates","start_date":"2026-11-12","end_date":"2026-11-17"},{"kind":"search_hotels","city":"Lisbon","min_stars":4,"max_stars":4},{"kind":"regenerate_days","days":6}]}
 
@@ -54,8 +71,12 @@ func Extract(ctx context.Context, gen Generator, message string, snap Snapshot) 
 	if snap.StartDate != "" {
 		dates = snap.StartDate + " to " + snap.EndDate
 	}
+	stops := ""
+	if snap.Itinerary != "" {
+		stops = fmt.Sprintf(stopKinds, snap.Itinerary)
+	}
 	prompt := fmt.Sprintf(extractPrompt, strings.Join(snap.Cities, ", "), dates, snap.Days,
-		snap.Today.Format(time.DateOnly), message)
+		snap.Today.Format(time.DateOnly), stops, message)
 
 	var (
 		raw   []Action
@@ -82,7 +103,17 @@ func Extract(ctx context.Context, gen Generator, message string, snap Snapshot) 
 
 	out := make([]Action, 0, len(raw))
 	for _, a := range raw {
-		if n, verr := normalize(a, snap.Cities); verr == nil {
+		var (
+			n    Action
+			verr error
+		)
+		switch {
+		case a.Kind.IsStopEdit() && snap.Itinerary != "":
+			n, verr = normalizeStopEdit(a, snap.Days)
+		default:
+			n, verr = normalize(a, snap.Cities)
+		}
+		if verr == nil {
 			out = append(out, n)
 		}
 		if len(out) == maxActions {

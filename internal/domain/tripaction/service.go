@@ -25,6 +25,9 @@ const (
 	maxHotelOptions   = 5
 	sourceLabel       = "Trip planner"
 	giveBackTimeout   = 5 * time.Second
+	// spotTimeout bounds one place lookup; the search can fall back to a
+	// model, and a turn has proposeTimeout in all.
+	spotTimeout = 8 * time.Second
 )
 
 // Trips reads the trip a proposal is about (trip.Repository).
@@ -50,6 +53,12 @@ type Hotels interface {
 	GetNearbyHotels(ctx context.Context, userID uuid.UUID, lat, lon, distance float64, starRating, amenities string) ([]locitypes.POIDetailedInfo, error)
 }
 
+// Spots finds the place a chat message asks to add, in a city (poi.Service,
+// the same search the trip page's place picker runs).
+type Spots interface {
+	SearchPOIsByQueryAndCity(ctx context.Context, query, cityName string) ([]locitypes.POIDetailedInfo, error)
+}
+
 // Regenerator plans n days for a city without saving a trip (the chat
 // service). The generation's session hangs under parentSessionID, so a
 // re-plan never shows up as a search of its own.
@@ -70,6 +79,7 @@ type Deps struct {
 	Plans    Plans
 	Hotels   Hotels
 	Places   geocode.Forward
+	Spots    Spots
 	Regen    Regenerator
 	Sessions Sessions
 	// Planning together; all optional. Without Members and Board a proposal
@@ -97,9 +107,13 @@ func NewService(d Deps) *Service {
 
 // Propose turns message into stored proposals for the caller's trip. No
 // proposals and a nil error means the message asked for no change.
+//
+// Planning together, a co-planner's message makes suggestions: the same
+// cards, waiting for the owner rather than for them, and the owner hears
+// about them. A viewer's message proposes nothing.
 func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UUID, message string) ([]Proposal, error) {
-	t, err := s.d.Trips.GetTrip(ctx, tripID, userID)
-	if err != nil {
+	t, owner, err := s.proposer(ctx, userID, tripID)
+	if err != nil || t == nil {
 		return nil, err
 	}
 	now := s.d.Now()
@@ -109,6 +123,10 @@ func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UU
 	}
 	sessionID = s.ownedSession(ctx, userID, sessionID)
 
+	ttl := proposalTTL
+	if !owner {
+		ttl = memberProposalTTL
+	}
 	out := make([]Proposal, 0, len(actions))
 	for _, a := range actions {
 		// A multi-city trip cannot be re-planned from chat yet; a card that
@@ -116,18 +134,50 @@ func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UU
 		if a.Kind == KindRegenerateDays && len(t.Cities) > 1 {
 			continue
 		}
-		p := Proposal{UserID: userID, TripID: tripID, SessionID: sessionID, Action: a, ExpiresAt: now.Add(proposalTTL)}
-		s.resolve(ctx, userID, &p)
+		// A hotel card is a pick, made in the chat it was offered in; the
+		// owner cannot pick in a co-planner's thread.
+		if a.Kind == KindSearchHotels && !owner {
+			continue
+		}
+		p := Proposal{UserID: userID, TripID: tripID, SessionID: sessionID, Action: a, ExpiresAt: now.Add(ttl), Source: SourceChat}
+		if a.Kind.IsStopEdit() {
+			// A stop or place that can't be found is no card: the turn is
+			// answered as usual instead.
+			if !s.resolveStopEdit(ctx, t, &p) {
+				continue
+			}
+		} else {
+			s.resolve(ctx, userID, &p)
+		}
 		if err := s.d.Store.Create(ctx, &p); err != nil {
 			return nil, err
 		}
 		out = append(out, p)
 	}
+	s.proposed(ctx, userID, t, owner, out)
 	return out, nil
 }
 
+// proposer is the trip a chat message may propose changes to, and whether
+// the caller owns it. A nil trip and nil error means they may not (a viewer).
+// Without planning together only the owner's own trips load.
+func (s *Service) proposer(ctx context.Context, userID, tripID uuid.UUID) (*trip.Trip, bool, error) {
+	if !s.together() {
+		t, err := s.d.Trips.GetTrip(ctx, tripID, userID)
+		return t, true, err
+	}
+	t, role, err := s.d.Members.Resolve(ctx, userID, tripID)
+	if err != nil {
+		return nil, false, err
+	}
+	if !trip.CanEdit(userID, t.UserID, role, false) {
+		return nil, false, nil
+	}
+	return t, role == trip.RoleOwner, nil
+}
+
 func snapshotOf(t *trip.Trip, now time.Time) Snapshot {
-	snap := Snapshot{Days: len(t.Days), Today: now}
+	snap := Snapshot{Days: len(t.Days), Today: now, Itinerary: itinerary(t)}
 	for _, c := range t.Cities {
 		snap.Cities = append(snap.Cities, c.CityName)
 	}
@@ -138,6 +188,27 @@ func snapshotOf(t *trip.Trip, now time.Time) Snapshot {
 		snap.StartDate, snap.EndDate = t.StartDate.Format(time.DateOnly), t.EndDate.Format(time.DateOnly)
 	}
 	return snap
+}
+
+// itinerary lists the trip's stops by day for the extractor.
+func itinerary(t *trip.Trip) string {
+	var b strings.Builder
+	listed := 0
+	for _, d := range t.Days {
+		if listed >= maxItineraryStops {
+			break
+		}
+		names := make([]string, 0, len(d.Stops))
+		for _, st := range d.Stops {
+			if listed >= maxItineraryStops {
+				break
+			}
+			names = append(names, st.Name)
+			listed++
+		}
+		fmt.Fprintf(&b, "Day %d: %s\n", d.DayNumber, strings.Join(names, "; "))
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // ownedSession keeps sessionID only if it is the caller's thread.
