@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	socialv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/social"
+	"github.com/google/uuid"
 )
 
 func TestBuildSocialPayload(t *testing.T) {
@@ -40,5 +41,13 @@ func TestBuildCheerPayload(t *testing.T) {
 	}
 	if p.Origin != "cheered" || p.Category != SocialCategory {
 		t.Errorf("cheer grouping = %+v", p)
+	}
+}
+
+func TestBuildTripPayload(t *testing.T) {
+	id := uuid.MustParse("6f1c2b8e-4a5d-4c3e-9b7a-1d2e3f4a5b6c")
+	p := BuildTripPayload(id, "Lisbon trip", "Ana suggested: Add Miradouro to day 2.")
+	if p.URL != WebOrigin+"/trips/"+id.String() || p.Category != TripCategory || p.ThreadID != "trip-"+id.String() {
+		t.Errorf("trip payload = %+v", p)
 	}
 }

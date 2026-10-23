@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 )
@@ -22,7 +24,24 @@ const (
 	KindSearchHotels   Kind = "search_hotels"
 	KindRegenerateDays Kind = "regenerate_days"
 	KindSearchFlights  Kind = "search_flights"
+
+	// Stop edits a trip member suggests from the trip page. The extractor
+	// does not produce them (normalize refuses them); checkStopEdit vets them
+	// against the trip instead.
+	KindAddStop     Kind = "add_stop"
+	KindRemoveStop  Kind = "remove_stop"
+	KindReplaceStop Kind = "replace_stop"
+	KindMoveStop    Kind = "move_stop"
 )
+
+// IsStopEdit reports whether k is one of the trip-page stop edits.
+func (k Kind) IsStopEdit() bool {
+	switch k {
+	case KindAddStop, KindRemoveStop, KindReplaceStop, KindMoveStop:
+		return true
+	}
+	return false
+}
 
 // Place is one end of a flight as the extractor names it.
 type Place struct {
@@ -50,12 +69,102 @@ type Action struct {
 	Return      string `json:"return,omitempty"`
 	Passengers  int    `json:"passengers,omitempty"`
 	Cabin       string `json:"cabin,omitempty"`
+
+	DayID   string         `json:"day_id,omitempty"`    // add_stop
+	StopID  string         `json:"stop_id,omitempty"`   // remove_stop, replace_stop, move_stop
+	Stop    *trip.TripStop `json:"stop,omitempty"`      // add_stop, replace_stop
+	ToDayID string         `json:"to_day_id,omitempty"` // move_stop
+	ToIndex int            `json:"to_index,omitempty"`
 }
 
-var errInvalid = errors.New("invalid trip action")
+// maxStopName bounds a suggested stop's name, as SaveTrip does.
+const maxStopName = 300
+
+// checkStopEdit vets a suggested stop edit against the trip as it is: the
+// stop and day it names must exist, and a new stop needs a name. It returns
+// a line saying what the edit does, for the card and the push.
+func checkStopEdit(a Action, t *trip.Trip) (string, error) {
+	stopOf := func() (*trip.TripStop, *trip.TripDay, error) {
+		id, err := uuid.Parse(a.StopID)
+		if err != nil {
+			return nil, nil, bad("stop id %q", a.StopID)
+		}
+		s, d := trip.FindStop(t, id)
+		if s == nil {
+			return nil, nil, bad("that stop is no longer on the trip")
+		}
+		return s, d, nil
+	}
+	dayOf := func(raw string) (*trip.TripDay, error) {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			return nil, bad("day id %q", raw)
+		}
+		d := trip.FindDay(t, id)
+		if d == nil {
+			return nil, bad("that day is no longer on the trip")
+		}
+		return d, nil
+	}
+	named := func() error {
+		if a.Stop == nil || strings.TrimSpace(a.Stop.Name) == "" {
+			return bad("a stop needs a name")
+		}
+		if len([]rune(a.Stop.Name)) > maxStopName {
+			return bad("a stop name is at most %d characters", maxStopName)
+		}
+		return nil
+	}
+	switch a.Kind {
+	case KindAddStop:
+		d, err := dayOf(a.DayID)
+		if err != nil {
+			return "", err
+		}
+		if err := named(); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Add %s to day %d.", a.Stop.Name, d.DayNumber), nil
+	case KindRemoveStop:
+		s, d, err := stopOf()
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Remove %s from day %d.", s.Name, d.DayNumber), nil
+	case KindReplaceStop:
+		s, d, err := stopOf()
+		if err != nil {
+			return "", err
+		}
+		if err := named(); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Swap %s for %s on day %d.", s.Name, a.Stop.Name, d.DayNumber), nil
+	case KindMoveStop:
+		s, from, err := stopOf()
+		if err != nil {
+			return "", err
+		}
+		to, err := dayOf(a.ToDayID)
+		if err != nil {
+			return "", err
+		}
+		if a.ToIndex < 0 {
+			return "", bad("position %d", a.ToIndex)
+		}
+		if from.ID == to.ID {
+			return fmt.Sprintf("Move %s to position %d on day %d.", s.Name, a.ToIndex+1, to.DayNumber), nil
+		}
+		return fmt.Sprintf("Move %s from day %d to day %d.", s.Name, from.DayNumber, to.DayNumber), nil
+	}
+	return "", bad("%q is not a stop edit", a.Kind)
+}
+
+// ErrInvalid: a proposed action does not make sense for the trip.
+var ErrInvalid = errors.New("invalid trip action")
 
 func bad(format string, a ...any) error {
-	return fmt.Errorf("%w: %s", errInvalid, fmt.Sprintf(format, a...))
+	return fmt.Errorf("%w: %s", ErrInvalid, fmt.Sprintf(format, a...))
 }
 
 // cabins are the cabin words the extractor may use.

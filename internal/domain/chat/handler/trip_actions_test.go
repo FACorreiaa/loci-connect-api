@@ -56,13 +56,16 @@ func TestApplyTripAction(t *testing.T) {
 
 func TestTripActionErrorCodes(t *testing.T) {
 	for err, code := range map[error]connect.Code{
-		tripaction.ErrNotFound:   connect.CodeNotFound,
-		trip.ErrNotFound:         connect.CodeNotFound,
-		tripaction.ErrNotPending: connect.CodeFailedPrecondition,
-		tripaction.ErrExpired:    connect.CodeFailedPrecondition,
-		trip.ErrVersionConflict:  connect.CodeFailedPrecondition,
-		tripaction.ErrNoOption:   connect.CodeInvalidArgument,
-		trip.ErrInvalidEdit:      connect.CodeInvalidArgument,
+		tripaction.ErrNotFound:    connect.CodeNotFound,
+		trip.ErrNotFound:          connect.CodeNotFound,
+		tripaction.ErrNotPending:  connect.CodeFailedPrecondition,
+		tripaction.ErrExpired:     connect.CodeFailedPrecondition,
+		trip.ErrVersionConflict:   connect.CodeFailedPrecondition,
+		tripaction.ErrNoOption:    connect.CodeInvalidArgument,
+		trip.ErrInvalidEdit:       connect.CodeInvalidArgument,
+		tripaction.ErrInvalid:     connect.CodeInvalidArgument,
+		tripaction.ErrForbidden:   connect.CodePermissionDenied,
+		tripaction.ErrTogetherOff: connect.CodeUnimplemented,
 	} {
 		h := (&ChatHandler{}).WithTripActions(fakeTripActions{err: err})
 		_, got := h.ApplyTripAction(signedIn(), connect.NewRequest(&chatv1.ApplyTripActionRequest{ProposalId: uuid.NewString()}))

@@ -190,25 +190,7 @@ func tripToProto(t *Trip) *tripv1.TripDraft {
 			pd.CompletedAt = timestamppb.New(*d.CompletedAt)
 		}
 		for _, s := range d.Stops {
-			ps := &tripv1.TripStop{
-				Id:              s.ID.String(),
-				PoiId:           s.POIID,
-				OrderIndex:      s.OrderIndex,
-				Name:            s.Name,
-				Notes:           s.Notes,
-				StartMinute:     s.StartMinute,
-				DurationMinutes: s.DurationMinutes,
-				BookingUrl:      s.BookingURL,
-			}
-			ps.RecommendationTrace = traceToProto(s.RecommendationTrace)
-			ps.Status = tripv1.TripStopStatus_TRIP_STOP_STATUS_OPEN
-			if s.Status != 0 {
-				ps.Status = tripv1.TripStopStatus(s.Status)
-			}
-			if s.StatusAt != nil {
-				ps.StatusAt = timestamppb.New(*s.StatusAt)
-			}
-			pd.Stops = append(pd.Stops, ps)
+			pd.Stops = append(pd.Stops, StopToProto(s))
 		}
 		p.Days = append(p.Days, pd)
 	}
@@ -506,5 +488,31 @@ func icsEscape(s string) string {
 func ToProto(t *Trip) *tripv1.TripDraft { return tripToProto(t) }
 
 func StayToProto(s TripStay) *tripv1.TripStay { return stayToProto(s) }
+
+// StopToProto is a stop as clients see it.
+func StopToProto(s TripStop) *tripv1.TripStop {
+	ps := &tripv1.TripStop{
+		Id:              s.ID.String(),
+		PoiId:           s.POIID,
+		OrderIndex:      s.OrderIndex,
+		Name:            s.Name,
+		Notes:           s.Notes,
+		StartMinute:     s.StartMinute,
+		DurationMinutes: s.DurationMinutes,
+		BookingUrl:      s.BookingURL,
+	}
+	ps.RecommendationTrace = traceToProto(s.RecommendationTrace)
+	ps.Status = tripv1.TripStopStatus_TRIP_STOP_STATUS_OPEN
+	if s.Status != 0 {
+		ps.Status = tripv1.TripStopStatus(s.Status)
+	}
+	if s.StatusAt != nil {
+		ps.StatusAt = timestamppb.New(*s.StatusAt)
+	}
+	return ps
+}
+
+// StopFromProto is a client's stop as the trip stores it.
+func StopFromProto(ps *tripv1.TripStop) TripStop { return stopFromProto(ps) }
 
 func FlightToProto(f TripFlight) *tripv1.TripFlight { return flightToProto(f) }

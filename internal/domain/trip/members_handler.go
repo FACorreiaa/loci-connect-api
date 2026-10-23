@@ -64,33 +64,14 @@ func roleFromProto(r tripv1.TripRole) Role {
 	}
 }
 
-// onTrip is the one access check for planning together: it loads the trip and
-// the viewer's role on it, and answers NotFound for anyone who may not see it
-// as a member (strangers, blocked members), never PermissionDenied.
-func (h *Handler) onTrip(ctx context.Context, viewer, tripID uuid.UUID) (*Trip, Role, bool, error) {
-	t, err := h.sharing.TripByID(ctx, tripID)
+// onTrip is the one access check for planning together, as a Connect error:
+// NotFound for anyone who may not see the trip as a member.
+func (h *Handler) onTrip(ctx context.Context, viewer, tripID uuid.UUID) (*Trip, Role, error) {
+	t, role, err := NewMemberAccess(h.sharing, h.members, h.graph).Resolve(ctx, viewer, tripID)
 	if err != nil {
-		return nil, RoleNone, false, toConnectErr(err)
+		return nil, RoleNone, toConnectErr(err)
 	}
-	if viewer == t.UserID {
-		return t, RoleOwner, false, nil
-	}
-	role, err := h.members.Role(ctx, tripID, viewer)
-	if err != nil {
-		return nil, RoleNone, false, connect.NewError(connect.CodeInternal, err)
-	}
-	if role == RoleNone {
-		return nil, RoleNone, false, connect.NewError(connect.CodeNotFound, ErrNotFound)
-	}
-	_, blocked, err := h.graph.Relation(ctx, viewer, t.UserID)
-	if err != nil {
-		return nil, RoleNone, false, connect.NewError(connect.CodeInternal, err)
-	}
-	// Only members get this far, so a private trip stays private to strangers.
-	if !CanSeeAsMember(viewer, t.UserID, role, VisibilityPrivate, AccessByID, false, blocked) {
-		return nil, RoleNone, false, connect.NewError(connect.CodeNotFound, ErrNotFound)
-	}
-	return t, role, blocked, nil
+	return t, role, nil
 }
 
 // memberCards is the owner then the members, with their public cards. A
@@ -150,7 +131,7 @@ func (h *Handler) withMembers(ctx context.Context, p *tripv1.TripDraft, t *Trip)
 
 // getMemberTrip is GetTrip for a trip the caller does not own.
 func (h *Handler) getMemberTrip(ctx context.Context, viewer, id uuid.UUID) (*tripv1.TripDraft, error) {
-	t, role, _, err := h.onTrip(ctx, viewer, id)
+	t, role, err := h.onTrip(ctx, viewer, id)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +344,7 @@ func (h *Handler) ListTripMembers(ctx context.Context, req *connect.Request[trip
 	if err != nil {
 		return nil, err
 	}
-	t, _, _, err := h.onTrip(ctx, uid, id)
+	t, _, err := h.onTrip(ctx, uid, id)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +371,7 @@ func (h *Handler) RemoveTripMember(ctx context.Context, req *connect.Request[tri
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid user ID"))
 	}
-	t, role, _, err := h.onTrip(ctx, uid, id)
+	t, role, err := h.onTrip(ctx, uid, id)
 	if err != nil {
 		return nil, err
 	}

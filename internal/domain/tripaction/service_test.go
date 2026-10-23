@@ -3,6 +3,7 @@ package tripaction
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -93,6 +94,22 @@ func (f *fakePlans) AddFlight(_ context.Context, _, _ uuid.UUID, base int64, _ t
 
 func (f *fakePlans) ReplaceDays(_ context.Context, _, _ uuid.UUID, base int64, _ []trip.TripDay) (*trip.Trip, error) {
 	return f.bump(base, "days")
+}
+
+func (f *fakePlans) AddStop(_ context.Context, _, _ uuid.UUID, base int64, _ uuid.UUID, stop trip.TripStop) (*trip.Trip, error) {
+	return f.bump(base, "add_stop:"+stop.Name)
+}
+
+func (f *fakePlans) RemoveStop(_ context.Context, _, _ uuid.UUID, base int64, _ uuid.UUID) (*trip.Trip, error) {
+	return f.bump(base, "remove_stop")
+}
+
+func (f *fakePlans) ReplaceStop(_ context.Context, _, _ uuid.UUID, base int64, _ uuid.UUID, r trip.TripStop) (*trip.Trip, error) {
+	return f.bump(base, "replace_stop:"+r.Name)
+}
+
+func (f *fakePlans) MoveStop(_ context.Context, _, _ uuid.UUID, base int64, _, _ uuid.UUID, to int) (*trip.Trip, error) {
+	return f.bump(base, fmt.Sprintf("move_stop:%d", to))
 }
 
 func (f *fakePlans) FlightLinks(q flights.Query) ([]flights.Link, error) {

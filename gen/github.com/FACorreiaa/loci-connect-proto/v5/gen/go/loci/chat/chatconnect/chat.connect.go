@@ -74,6 +74,15 @@ const (
 	// ChatServiceDismissTripActionProcedure is the fully-qualified name of the ChatService's
 	// DismissTripAction RPC.
 	ChatServiceDismissTripActionProcedure = "/loci.chat.ChatService/DismissTripAction"
+	// ChatServiceProposeTripChangeProcedure is the fully-qualified name of the ChatService's
+	// ProposeTripChange RPC.
+	ChatServiceProposeTripChangeProcedure = "/loci.chat.ChatService/ProposeTripChange"
+	// ChatServiceListTripProposalsProcedure is the fully-qualified name of the ChatService's
+	// ListTripProposals RPC.
+	ChatServiceListTripProposalsProcedure = "/loci.chat.ChatService/ListTripProposals"
+	// ChatServiceReactToTripProposalProcedure is the fully-qualified name of the ChatService's
+	// ReactToTripProposal RPC.
+	ChatServiceReactToTripProposalProcedure = "/loci.chat.ChatService/ReactToTripProposal"
 	// WatchServiceProposeWatchProcedure is the fully-qualified name of the WatchService's ProposeWatch
 	// RPC.
 	WatchServiceProposeWatchProcedure = "/loci.chat.WatchService/ProposeWatch"
@@ -105,6 +114,9 @@ var (
 	chatServiceGetRunStatusMethodDescriptor          = chatServiceServiceDescriptor.Methods().ByName("GetRunStatus")
 	chatServiceApplyTripActionMethodDescriptor       = chatServiceServiceDescriptor.Methods().ByName("ApplyTripAction")
 	chatServiceDismissTripActionMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("DismissTripAction")
+	chatServiceProposeTripChangeMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("ProposeTripChange")
+	chatServiceListTripProposalsMethodDescriptor     = chatServiceServiceDescriptor.Methods().ByName("ListTripProposals")
+	chatServiceReactToTripProposalMethodDescriptor   = chatServiceServiceDescriptor.Methods().ByName("ReactToTripProposal")
 	watchServiceServiceDescriptor                    = chat.File_loci_chat_chat_proto.Services().ByName("WatchService")
 	watchServiceProposeWatchMethodDescriptor         = watchServiceServiceDescriptor.Methods().ByName("ProposeWatch")
 	watchServiceCreateWatchMethodDescriptor          = watchServiceServiceDescriptor.Methods().ByName("CreateWatch")
@@ -135,8 +147,18 @@ type ChatServiceClient interface {
 	// Applies a proposal the agent streamed (action_proposal) to its trip.
 	// FailedPrecondition when it was already applied or dismissed, has
 	// expired, or base_version is stale.
+	// On a trip with members, only the owner applies, any member's proposal.
 	ApplyTripAction(context.Context, *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error)
+	// The owner dismisses any proposal; a member only their own.
 	DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error)
+	// Planning together. ProposeTripChange stores a co-planner's (or the
+	// owner's) suggested edit for the owner to apply; viewers and strangers
+	// are NotFound.
+	ProposeTripChange(context.Context, *connect.Request[chat.ProposeTripChangeRequest]) (*connect.Response[chat.ActionProposal], error)
+	// ListTripProposals lists a trip's proposals for anyone on the trip.
+	ListTripProposals(context.Context, *connect.Request[chat.ListTripProposalsRequest]) (*connect.Response[chat.ListTripProposalsResponse], error)
+	// ReactToTripProposal sets the caller's 👍/👎 on a pending proposal.
+	ReactToTripProposal(context.Context, *connect.Request[chat.ReactToTripProposalRequest]) (*connect.Response[chat.ActionProposal], error)
 }
 
 // NewChatServiceClient constructs a client for the loci.chat.ChatService service. By default, it
@@ -233,6 +255,24 @@ func NewChatServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(chatServiceDismissTripActionMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		proposeTripChange: connect.NewClient[chat.ProposeTripChangeRequest, chat.ActionProposal](
+			httpClient,
+			baseURL+ChatServiceProposeTripChangeProcedure,
+			connect.WithSchema(chatServiceProposeTripChangeMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listTripProposals: connect.NewClient[chat.ListTripProposalsRequest, chat.ListTripProposalsResponse](
+			httpClient,
+			baseURL+ChatServiceListTripProposalsProcedure,
+			connect.WithSchema(chatServiceListTripProposalsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		reactToTripProposal: connect.NewClient[chat.ReactToTripProposalRequest, chat.ActionProposal](
+			httpClient,
+			baseURL+ChatServiceReactToTripProposalProcedure,
+			connect.WithSchema(chatServiceReactToTripProposalMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -252,6 +292,9 @@ type chatServiceClient struct {
 	getRunStatus          *connect.Client[chat.GetRunStatusRequest, chat.GetRunStatusResponse]
 	applyTripAction       *connect.Client[chat.ApplyTripActionRequest, chat.ApplyTripActionResponse]
 	dismissTripAction     *connect.Client[chat.DismissTripActionRequest, chat.DismissTripActionResponse]
+	proposeTripChange     *connect.Client[chat.ProposeTripChangeRequest, chat.ActionProposal]
+	listTripProposals     *connect.Client[chat.ListTripProposalsRequest, chat.ListTripProposalsResponse]
+	reactToTripProposal   *connect.Client[chat.ReactToTripProposalRequest, chat.ActionProposal]
 }
 
 // StartChat calls loci.chat.ChatService.StartChat.
@@ -324,6 +367,21 @@ func (c *chatServiceClient) DismissTripAction(ctx context.Context, req *connect.
 	return c.dismissTripAction.CallUnary(ctx, req)
 }
 
+// ProposeTripChange calls loci.chat.ChatService.ProposeTripChange.
+func (c *chatServiceClient) ProposeTripChange(ctx context.Context, req *connect.Request[chat.ProposeTripChangeRequest]) (*connect.Response[chat.ActionProposal], error) {
+	return c.proposeTripChange.CallUnary(ctx, req)
+}
+
+// ListTripProposals calls loci.chat.ChatService.ListTripProposals.
+func (c *chatServiceClient) ListTripProposals(ctx context.Context, req *connect.Request[chat.ListTripProposalsRequest]) (*connect.Response[chat.ListTripProposalsResponse], error) {
+	return c.listTripProposals.CallUnary(ctx, req)
+}
+
+// ReactToTripProposal calls loci.chat.ChatService.ReactToTripProposal.
+func (c *chatServiceClient) ReactToTripProposal(ctx context.Context, req *connect.Request[chat.ReactToTripProposalRequest]) (*connect.Response[chat.ActionProposal], error) {
+	return c.reactToTripProposal.CallUnary(ctx, req)
+}
+
 // ChatServiceHandler is an implementation of the loci.chat.ChatService service.
 type ChatServiceHandler interface {
 	StartChat(context.Context, *connect.Request[chat.StartChatRequest]) (*connect.Response[chat.ChatResponse], error)
@@ -347,8 +405,18 @@ type ChatServiceHandler interface {
 	// Applies a proposal the agent streamed (action_proposal) to its trip.
 	// FailedPrecondition when it was already applied or dismissed, has
 	// expired, or base_version is stale.
+	// On a trip with members, only the owner applies, any member's proposal.
 	ApplyTripAction(context.Context, *connect.Request[chat.ApplyTripActionRequest]) (*connect.Response[chat.ApplyTripActionResponse], error)
+	// The owner dismisses any proposal; a member only their own.
 	DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error)
+	// Planning together. ProposeTripChange stores a co-planner's (or the
+	// owner's) suggested edit for the owner to apply; viewers and strangers
+	// are NotFound.
+	ProposeTripChange(context.Context, *connect.Request[chat.ProposeTripChangeRequest]) (*connect.Response[chat.ActionProposal], error)
+	// ListTripProposals lists a trip's proposals for anyone on the trip.
+	ListTripProposals(context.Context, *connect.Request[chat.ListTripProposalsRequest]) (*connect.Response[chat.ListTripProposalsResponse], error)
+	// ReactToTripProposal sets the caller's 👍/👎 on a pending proposal.
+	ReactToTripProposal(context.Context, *connect.Request[chat.ReactToTripProposalRequest]) (*connect.Response[chat.ActionProposal], error)
 }
 
 // NewChatServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -441,6 +509,24 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(chatServiceDismissTripActionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	chatServiceProposeTripChangeHandler := connect.NewUnaryHandler(
+		ChatServiceProposeTripChangeProcedure,
+		svc.ProposeTripChange,
+		connect.WithSchema(chatServiceProposeTripChangeMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceListTripProposalsHandler := connect.NewUnaryHandler(
+		ChatServiceListTripProposalsProcedure,
+		svc.ListTripProposals,
+		connect.WithSchema(chatServiceListTripProposalsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	chatServiceReactToTripProposalHandler := connect.NewUnaryHandler(
+		ChatServiceReactToTripProposalProcedure,
+		svc.ReactToTripProposal,
+		connect.WithSchema(chatServiceReactToTripProposalMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.chat.ChatService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ChatServiceStartChatProcedure:
@@ -471,6 +557,12 @@ func NewChatServiceHandler(svc ChatServiceHandler, opts ...connect.HandlerOption
 			chatServiceApplyTripActionHandler.ServeHTTP(w, r)
 		case ChatServiceDismissTripActionProcedure:
 			chatServiceDismissTripActionHandler.ServeHTTP(w, r)
+		case ChatServiceProposeTripChangeProcedure:
+			chatServiceProposeTripChangeHandler.ServeHTTP(w, r)
+		case ChatServiceListTripProposalsProcedure:
+			chatServiceListTripProposalsHandler.ServeHTTP(w, r)
+		case ChatServiceReactToTripProposalProcedure:
+			chatServiceReactToTripProposalHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -534,6 +626,18 @@ func (UnimplementedChatServiceHandler) ApplyTripAction(context.Context, *connect
 
 func (UnimplementedChatServiceHandler) DismissTripAction(context.Context, *connect.Request[chat.DismissTripActionRequest]) (*connect.Response[chat.DismissTripActionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.DismissTripAction is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ProposeTripChange(context.Context, *connect.Request[chat.ProposeTripChangeRequest]) (*connect.Response[chat.ActionProposal], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.ProposeTripChange is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ListTripProposals(context.Context, *connect.Request[chat.ListTripProposalsRequest]) (*connect.Response[chat.ListTripProposalsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.ListTripProposals is not implemented"))
+}
+
+func (UnimplementedChatServiceHandler) ReactToTripProposal(context.Context, *connect.Request[chat.ReactToTripProposalRequest]) (*connect.Response[chat.ActionProposal], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.chat.ChatService.ReactToTripProposal is not implemented"))
 }
 
 // WatchServiceClient is a client for the loci.chat.WatchService service.

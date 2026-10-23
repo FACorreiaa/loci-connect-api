@@ -353,16 +353,7 @@ func (h *Handler) AddStop(ctx context.Context, req *connect.Request[tripv1.AddSt
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid day ID"))
 	}
 	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
-		for index := range t.Days {
-			if t.Days[index].ID != dayID {
-				continue
-			}
-			stop := stopFromProto(req.Msg.GetStop())
-			stop.OrderIndex = int32(len(t.Days[index].Stops))
-			t.Days[index].Stops = append(t.Days[index].Stops, stop)
-			return nil
-		}
-		return errors.New("day not found in trip")
+		return addStop(t, dayID, stopFromProto(req.Msg.GetStop()))
 	})
 	if err == nil {
 		h.recordStopSignal(ctx, req.Msg.GetTripId(), req.Msg.GetStop(), preference.EventSaved, "added_to_trip")
@@ -371,23 +362,18 @@ func (h *Handler) AddStop(ctx context.Context, req *connect.Request[tripv1.AddSt
 }
 
 func (h *Handler) RemoveStop(ctx context.Context, req *connect.Request[tripv1.RemoveStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	stopID, err := uuid.Parse(req.Msg.GetStopId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid stop ID"))
+	}
 	var removed *tripv1.TripStop
 	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
-		for dayIndex := range t.Days {
-			for stopIndex := range t.Days[dayIndex].Stops {
-				stop := t.Days[dayIndex].Stops[stopIndex]
-				if stop.ID.String() != req.Msg.GetStopId() {
-					continue
-				}
-				removed = &tripv1.TripStop{PoiId: stop.POIID, RecommendationTrace: traceToProto(stop.RecommendationTrace)}
-				t.Days[dayIndex].Stops = append(t.Days[dayIndex].Stops[:stopIndex], t.Days[dayIndex].Stops[stopIndex+1:]...)
-				for index := range t.Days[dayIndex].Stops {
-					t.Days[dayIndex].Stops[index].OrderIndex = int32(index)
-				}
-				return nil
-			}
+		stop, err := removeStop(t, stopID)
+		if err != nil {
+			return err
 		}
-		return errors.New("stop not found")
+		removed = &tripv1.TripStop{PoiId: stop.POIID, RecommendationTrace: traceToProto(stop.RecommendationTrace)}
+		return nil
 	})
 	if err == nil && removed != nil {
 		h.recordStopSignal(ctx, req.Msg.GetTripId(), removed, preference.EventSkipped, "removed_from_trip")
@@ -396,20 +382,12 @@ func (h *Handler) RemoveStop(ctx context.Context, req *connect.Request[tripv1.Re
 }
 
 func (h *Handler) ReplaceStop(ctx context.Context, req *connect.Request[tripv1.ReplaceStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	stopID, err := uuid.Parse(req.Msg.GetStopId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid stop ID"))
+	}
 	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
-		for dayIndex := range t.Days {
-			for stopIndex := range t.Days[dayIndex].Stops {
-				current := t.Days[dayIndex].Stops[stopIndex]
-				if current.ID.String() != req.Msg.GetStopId() {
-					continue
-				}
-				replacement := stopFromProto(req.Msg.GetReplacement())
-				replacement.OrderIndex = current.OrderIndex
-				t.Days[dayIndex].Stops[stopIndex] = replacement
-				return nil
-			}
-		}
-		return errors.New("stop not found")
+		return replaceStop(t, stopID, stopFromProto(req.Msg.GetReplacement()))
 	})
 	if err == nil {
 		h.recordStopSignal(ctx, req.Msg.GetTripId(), req.Msg.GetReplacement(), preference.EventSaved, "replaced_trip_stop")
