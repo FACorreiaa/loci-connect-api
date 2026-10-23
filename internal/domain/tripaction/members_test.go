@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
 // --- planning-together fakes ---
@@ -301,4 +302,89 @@ func TestApply_SoloTripTellsNoOne(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, g.notify.sent, "the owner's own suggestion to themselves pushes no one")
 	require.NotContains(t, g.events.events, "trip_proposal_applied", "a trip planned alone is not a together event")
+}
+
+type fakeSpots struct {
+	found []locitypes.POIDetailedInfo
+	asked []string
+}
+
+func (f *fakeSpots) SearchPOIsByQueryAndCity(_ context.Context, query, city string) ([]locitypes.POIDetailedInfo, error) {
+	f.asked = append(f.asked, query+"@"+city)
+	return f.found, nil
+}
+
+// chat makes the next extraction reply `reply`, with a place search that
+// finds Pastéis de Belém.
+func (g *together) chat(reply string) (*scripted, *fakeSpots) {
+	llm := &scripted{replies: []string{reply, reply}}
+	spots := &fakeSpots{found: []locitypes.POIDetailedInfo{{ID: uuid.New(), Name: "Pastéis de Belém", Description: "Custard tarts"}}}
+	g.svc.d.LLM, g.svc.d.Spots = llm, spots
+	return llm, spots
+}
+
+func TestPropose_CoPlannerChatSuggestsToTheOwner(t *testing.T) {
+	g := newTogether(t)
+	_, spots := g.chat(`{"actions":[{"kind":"add_stop","day":1,"place":"custard tarts"},{"kind":"search_hotels","city":"Lisbon","min_stars":4,"max_stars":4}]}`)
+	ctx := context.Background()
+
+	got, err := g.svc.Propose(ctx, g.co, g.tid, uuid.Nil, "add custard tarts on day 1 and find 4-star hotels")
+	require.NoError(t, err)
+	require.Len(t, got, 1, "a hotel pick is the owner's to make in their own chat")
+	p := got[0]
+	require.Equal(t, "Add Pastéis de Belém to day 1.", p.Summary)
+	require.Equal(t, g.day.String(), p.Action.DayID)
+	require.Equal(t, "Custard tarts", p.Action.Stop.Notes)
+	require.Equal(t, SourceChat, p.Source)
+	require.Equal(t, g.co, p.UserID)
+	require.Equal(t, g.now.Add(memberProposalTTL), p.ExpiresAt)
+	require.Equal(t, []string{"custard tarts@Lisbon"}, spots.asked)
+
+	require.Len(t, g.notify.sent, 1)
+	require.Equal(t, []uuid.UUID{g.uid}, g.notify.sent[0].to)
+	require.Equal(t, "Ana suggested: Add Pastéis de Belém to day 1.", g.notify.sent[0].body)
+	require.Equal(t, []string{"trip_proposal_created"}, g.events.events)
+
+	// The owner applies it like any other suggestion.
+	_, _, err = g.svc.Apply(ctx, g.uid, p.ID, nil, 3)
+	require.NoError(t, err)
+	require.Equal(t, []string{"add_stop:Pastéis de Belém"}, g.plans.applied)
+}
+
+func TestPropose_StopsByNameAndWhatCannotBeFound(t *testing.T) {
+	g := newTogether(t)
+	g.chat(`{"actions":[
+		{"kind":"remove_stop","day":2,"stop_name":"belém"},
+		{"kind":"move_stop","day":1,"stop_name":"Belém Tower","to_day":2},
+		{"kind":"remove_stop","day":1,"stop_name":"Sintra Palace"}]}`)
+	got, err := g.svc.Propose(context.Background(), g.uid, g.tid, uuid.Nil, "drop belém, or move it to day 2, and drop Sintra")
+	require.NoError(t, err)
+	require.Len(t, got, 2, "a stop the trip doesn't have is no card")
+	require.Equal(t, g.stop.String(), got[0].Action.StopID, "the model had the day wrong; the name still finds it")
+	require.Equal(t, "Remove Belém Tower from day 1.", got[0].Summary)
+	require.Equal(t, "Move Belém Tower from day 1 to day 2.", got[1].Summary)
+	require.Equal(t, proposalTTL, got[0].ExpiresAt.Sub(g.now), "the owner's own cards keep the chat TTL")
+	require.Empty(t, g.notify.sent, "the owner's own cards push no one")
+	require.Equal(t, []string{"trip_proposal_created", "trip_proposal_created"}, g.events.events, "the trip has members")
+}
+
+func TestPropose_PlaceNotFoundIsNoCard(t *testing.T) {
+	g := newTogether(t)
+	_, spots := g.chat(`{"actions":[{"kind":"add_stop","day":1,"place":"unicorn bar"}]}`)
+	spots.found = nil
+	got, err := g.svc.Propose(context.Background(), g.co, g.tid, uuid.Nil, "add a unicorn bar")
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Empty(t, g.notify.sent)
+}
+
+func TestPropose_ViewerProposesNothing(t *testing.T) {
+	g := newTogether(t)
+	llm, _ := g.chat(`{"actions":[{"kind":"remove_stop","day":1,"stop_name":"Belém Tower"}]}`)
+	got, err := g.svc.Propose(context.Background(), g.viewer, g.tid, uuid.Nil, "remove the tower")
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Empty(t, llm.prompts, "no model call for someone who can't suggest")
+	_, err = g.svc.Propose(context.Background(), g.nope, g.tid, uuid.Nil, "remove the tower")
+	require.ErrorIs(t, err, trip.ErrNotFound)
 }

@@ -94,3 +94,31 @@ func TestExtract_AnotherCityIsANewTripNotAChange(t *testing.T) {
 		require.Len(t, got, 1, "other_city %q is the trip's own", same)
 	}
 }
+
+func TestExtract_StopEditsByName(t *testing.T) {
+	withStops := snap
+	withStops.Itinerary = "Day 1: Belém Tower; Alfama\nDay 2: \nDay 3: LX Factory"
+	gen := &scripted{replies: []string{`{"actions":[
+		{"kind":"add_stop","day":3,"place":"a rooftop bar"},
+		{"kind":"replace_stop","day":1,"stop_name":" Belém Tower ","place":"fado bar","stop_id":"f00"},
+		{"kind":"move_stop","day":1,"stop_name":"Alfama","to_day":2},
+		{"kind":"remove_stop","day":9,"stop_name":"LX Factory"},
+		{"kind":"move_stop","day":1,"stop_name":"Alfama","to_day":1}]}`}}
+	got, err := Extract(context.Background(), gen, "rooftop bar on day 3, swap the tower for fado, Alfama to day 2", withStops)
+	require.NoError(t, err)
+	require.Len(t, got, 3, "day 9 does not exist; moving to the same day is no move")
+	require.Equal(t, "a rooftop bar", got[0].PlaceQuery)
+	require.Equal(t, "Belém Tower", got[1].StopName)
+	require.Empty(t, got[1].StopID, "ids come from the trip, never the model")
+	require.Equal(t, 2, got[2].ToDay)
+	require.Contains(t, gen.prompts[0], "Day 1: Belém Tower; Alfama")
+	require.Contains(t, gen.prompts[0], `"kind":"add_stop"`)
+}
+
+func TestExtract_NoStopsNoStopEdits(t *testing.T) {
+	gen := &scripted{replies: []string{`{"actions":[{"kind":"add_stop","day":1,"place":"bar"}]}`}}
+	got, err := Extract(context.Background(), gen, "add a bar", snap)
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.NotContains(t, gen.prompts[0], "add_stop", "a trip with no stops is not offered stop edits")
+}
