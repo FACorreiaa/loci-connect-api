@@ -87,8 +87,12 @@ func (h *ChatHandler) tripActionError(ctx context.Context, err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, tripaction.ErrNotPending), errors.Is(err, tripaction.ErrExpired), errors.Is(err, trip.ErrVersionConflict):
 		return connect.NewError(connect.CodeFailedPrecondition, err)
-	case errors.Is(err, tripaction.ErrNoOption), errors.Is(err, trip.ErrInvalidEdit):
+	case errors.Is(err, tripaction.ErrNoOption), errors.Is(err, tripaction.ErrInvalid), errors.Is(err, trip.ErrInvalidEdit):
 		return connect.NewError(connect.CodeInvalidArgument, err)
+	case errors.Is(err, tripaction.ErrForbidden):
+		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, tripaction.ErrTogetherOff):
+		return connect.NewError(connect.CodeUnimplemented, err)
 	default:
 		if h.logger != nil {
 			h.logger.ErrorContext(ctx, "trip action failed", "error", err)

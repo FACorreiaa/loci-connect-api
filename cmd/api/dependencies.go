@@ -959,6 +959,8 @@ func (d *Dependencies) initHandlers() error {
 	var progressNotifier gamification.Notifier
 	var achievementNotifier achievements.Notifier
 	var cheerNotifier socialdomain.CheerNotifier
+	// A shared trip's suggestions and applied changes, gated on trip updates.
+	var tripNotifier tripaction.TripNotifier
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
@@ -967,6 +969,7 @@ func (d *Dependencies) initHandlers() error {
 		progressNotifier = notifier
 		achievementNotifier = notifier
 		cheerNotifier = notifier
+		tripNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
 		}
@@ -1034,8 +1037,8 @@ func (d *Dependencies) initHandlers() error {
 		// brought it here.
 		d.signups = socialSvc
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
-		d.TripHandler = d.TripHandler.WithSharing(trip.NewSharingRepository(d.DB.Pool, d.Logger), socialSvc).
-			WithMembers(trip.NewMembersRepository(d.DB.Pool, d.Logger), socialSvc)
+		sharingRepo, membersRepo := trip.NewSharingRepository(d.DB.Pool, d.Logger), trip.NewMembersRepository(d.DB.Pool, d.Logger)
+		d.TripHandler = d.TripHandler.WithSharing(sharingRepo, socialSvc).WithMembers(membersRepo, socialSvc)
 		// The following feed: new cities, finished and shared trips and the
 		// day's best achievement, read by the people who follow you.
 		var feed *socialdomain.Feed
@@ -1099,20 +1102,27 @@ func (d *Dependencies) initHandlers() error {
 		}
 		// The chat agent's write path: trip-bound turns propose changes, and
 		// ApplyTripAction makes the one the traveller confirms.
+		// Planning together: a trip's members see the same proposals, suggest
+		// stop edits, react, and the owner applies.
 		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
+			store := tripaction.NewStore(d.DB.Pool)
 			tripActions := tripaction.NewService(tripaction.Deps{
-				LLM:      chatImpl.ActionLLM(),
-				Store:    tripaction.NewStore(d.DB.Pool),
-				Trips:    d.TripRepo,
-				Plans:    d.TripService,
-				Hotels:   d.POISvc,
-				Places:   newForwardGeocoder(d.AppCache),
-				Regen:    chatImpl,
-				Sessions: d.ChatRepo,
-				Logger:   d.Logger,
+				LLM:       chatImpl.ActionLLM(),
+				Store:     store,
+				Board:     store,
+				Members:   trip.NewMemberAccess(sharingRepo, membersRepo, socialSvc),
+				Notify:    tripNotifier,
+				Analytics: d.Analytics,
+				Trips:     d.TripRepo,
+				Plans:     d.TripService,
+				Hotels:    d.POISvc,
+				Places:    newForwardGeocoder(d.AppCache),
+				Regen:     chatImpl,
+				Sessions:  d.ChatRepo,
+				Logger:    d.Logger,
 			})
 			chatImpl.SetTripActions(tripActions)
-			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions)
+			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions).WithTripProposals(tripActions)
 			// Telegram gets the same proposals as buttons. The bridge was built
 			// earlier (initMessaging); WithTripPlanner attaches to it in place.
 			if d.Messaging != nil {

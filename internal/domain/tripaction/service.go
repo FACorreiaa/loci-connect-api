@@ -38,6 +38,10 @@ type Plans interface {
 	SetStay(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, stay trip.TripStay) (*trip.Trip, error)
 	AddFlight(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, f trip.TripFlight) (*trip.Trip, error)
 	ReplaceDays(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, days []trip.TripDay) (*trip.Trip, error)
+	AddStop(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, dayID uuid.UUID, stop trip.TripStop) (*trip.Trip, error)
+	RemoveStop(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, stopID uuid.UUID) (*trip.Trip, error)
+	ReplaceStop(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, stopID uuid.UUID, replacement trip.TripStop) (*trip.Trip, error)
+	MoveStop(ctx context.Context, userID, tripID uuid.UUID, baseVersion int64, stopID, toDayID uuid.UUID, toIndex int) (*trip.Trip, error)
 	FlightLinks(q flights.Query) ([]flights.Link, error)
 }
 
@@ -68,8 +72,14 @@ type Deps struct {
 	Places   geocode.Forward
 	Regen    Regenerator
 	Sessions Sessions
-	Logger   *slog.Logger
-	Now      func() time.Time
+	// Planning together; all optional. Without Members and Board a proposal
+	// is only ever its proposer's, as before.
+	Members   Members
+	Board     Board
+	Notify    TripNotifier
+	Analytics Analytics
+	Logger    *slog.Logger
+	Now       func() time.Time
 }
 
 // Service proposes, applies and dismisses the agent's trip actions.
@@ -267,7 +277,7 @@ func (s *Service) flightOption(a Action) (Option, error) {
 // change and given back if the change fails, so a double tap applies once
 // and a failure can be retried.
 func (s *Service) Apply(ctx context.Context, userID, proposalID uuid.UUID, option *int, baseVersion int64) (*trip.Trip, *locitypes.ConversationMessage, error) {
-	p, err := s.d.Store.Get(ctx, proposalID, userID)
+	p, err := s.applicable(ctx, userID, proposalID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -296,7 +306,9 @@ func (s *Service) Apply(ctx context.Context, userID, proposalID uuid.UUID, optio
 		}
 		return nil, nil, err
 	}
-	return t, s.confirm(ctx, p, opt), nil
+	msg := s.confirm(ctx, p, opt)
+	s.applied(ctx, userID, p, t, msg.Content)
+	return t, msg, nil
 }
 
 // ApplyCurrent applies a proposal against the trip as it is now. It is for
@@ -304,7 +316,7 @@ func (s *Service) Apply(ctx context.Context, userID, proposalID uuid.UUID, optio
 // Telegram callback holds 64 bytes. The proposal still applies once and still
 // expires; a change made in between is simply built on.
 func (s *Service) ApplyCurrent(ctx context.Context, userID, proposalID uuid.UUID, option *int) (*trip.Trip, *locitypes.ConversationMessage, error) {
-	p, err := s.d.Store.Get(ctx, proposalID, userID)
+	p, err := s.applicable(ctx, userID, proposalID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -373,8 +385,50 @@ func (s *Service) apply(ctx context.Context, userID uuid.UUID, p *Proposal, opt 
 			return nil, fmt.Errorf("re-plan %s: %w", t.CityName, err)
 		}
 		return s.d.Plans.ReplaceDays(ctx, userID, p.TripID, base, days)
+	case KindAddStop, KindRemoveStop, KindReplaceStop, KindMoveStop:
+		return s.applyStopEdit(ctx, userID, p, base)
 	}
 	return nil, fmt.Errorf("%w: unknown action %q", trip.ErrInvalidEdit, a.Kind)
+}
+
+// applyStopEdit makes a stop edit on the trip as it is at base. The stop or
+// day it names may have gone since it was proposed; the edit then fails
+// with trip.ErrInvalidEdit and the proposal stays open to dismiss.
+func (s *Service) applyStopEdit(ctx context.Context, userID uuid.UUID, p *Proposal, base int64) (*trip.Trip, error) {
+	a := p.Action
+	id := func(raw, what string) (uuid.UUID, error) {
+		v, err := uuid.Parse(raw)
+		if err != nil {
+			return uuid.Nil, fmt.Errorf("%w: %s id %q", trip.ErrInvalidEdit, what, raw)
+		}
+		return v, nil
+	}
+	if (a.Kind == KindAddStop || a.Kind == KindReplaceStop) && a.Stop == nil {
+		return nil, fmt.Errorf("%w: the suggestion has no stop", trip.ErrInvalidEdit)
+	}
+	if a.Kind == KindAddStop {
+		dayID, err := id(a.DayID, "day")
+		if err != nil {
+			return nil, err
+		}
+		return s.d.Plans.AddStop(ctx, userID, p.TripID, base, dayID, *a.Stop)
+	}
+	stopID, err := id(a.StopID, "stop")
+	if err != nil {
+		return nil, err
+	}
+	switch a.Kind {
+	case KindRemoveStop:
+		return s.d.Plans.RemoveStop(ctx, userID, p.TripID, base, stopID)
+	case KindReplaceStop:
+		return s.d.Plans.ReplaceStop(ctx, userID, p.TripID, base, stopID, *a.Stop)
+	default:
+		toDay, err := id(a.ToDayID, "day")
+		if err != nil {
+			return nil, err
+		}
+		return s.d.Plans.MoveStop(ctx, userID, p.TripID, base, stopID, toDay, a.ToIndex)
+	}
 }
 
 // parentSession is the thread a re-plan's generation hangs under: the one
@@ -402,6 +456,8 @@ func (s *Service) confirm(ctx context.Context, p *Proposal, opt *Option) *locity
 		text = fmt.Sprintf("Flight search saved: %s → %s, %s.", p.Action.Origin.Name, p.Action.Destination.Name, flightDates(p.Action))
 	case KindRegenerateDays:
 		text = fmt.Sprintf("Itinerary re-planned as %d days.", p.Action.Days)
+	case KindAddStop, KindRemoveStop, KindReplaceStop, KindMoveStop:
+		text = p.Summary
 	}
 	msg := locitypes.ConversationMessage{
 		ID: uuid.New(), Role: locitypes.RoleAssistant, Content: text, MessageType: locitypes.TypeResponse,
@@ -415,9 +471,10 @@ func (s *Service) confirm(ctx context.Context, p *Proposal, opt *Option) *locity
 	return &msg
 }
 
-// Dismiss drops the caller's proposal.
+// Dismiss drops a proposal: the caller's own, or, planning together, any on
+// a trip they own.
 func (s *Service) Dismiss(ctx context.Context, userID, proposalID uuid.UUID) error {
-	p, err := s.d.Store.Get(ctx, proposalID, userID)
+	p, err := s.dismissable(ctx, userID, proposalID)
 	if err != nil {
 		return err
 	}

@@ -46,6 +46,7 @@ type ChatHandler struct {
 	runs        runs.Store
 	onRunFinish runs.FinishListener
 	tripActions TripActions
+	proposals   TripProposals
 	taste       preference.POIScorer
 }
 
