@@ -66,6 +66,12 @@ type Handler struct {
 	members  MembersRepository
 	befriend Befriender
 
+	// Optional, attached via WithComments (which needs WithMembers). Nil
+	// makes the comment RPCs answer Unimplemented.
+	comments      CommentsRepository
+	commentNotify CommentNotifier
+	commentAdmins map[string]struct{}
+
 	// now is the clock invites expire by. Nil is time.Now; tests set it.
 	now func() time.Time
 }

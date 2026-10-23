@@ -23,9 +23,10 @@ func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }
 // Local time comes from users.timezone, validated against pg_timezone_names
 // so one bad zone ("Mars/Base") falls back to UTC instead of failing the
 // whole query. Only travellers who turned trip reminders on and have a
-// device to reach are considered. With overlapping trips the most recently
-// started one is today's. A weather check needs the morning brief first: it
-// compares against the forecast that brief saw.
+// device to reach are considered. A trip's members are travellers on it too,
+// unless either blocked the other. With overlapping trips the traveller's own
+// trip wins, then the most recently started one. A weather check needs the
+// morning brief first: it compares against the forecast that brief saw.
 const dueSQL = `
 WITH l AS (
 	SELECT ns.user_id,
@@ -43,7 +44,12 @@ SELECT DISTINCT ON (l.user_id)
 	l.local_ts::date, EXTRACT(HOUR FROM l.local_ts)::int,
 	(l.local_ts::date - t.start_date) + 1
 FROM l
-JOIN trips t ON t.user_id = l.user_id
+JOIN trips t ON (t.user_id = l.user_id OR EXISTS (
+		SELECT 1 FROM trip_members m
+		WHERE m.trip_id = t.id AND m.user_id = l.user_id
+		  AND NOT EXISTS (SELECT 1 FROM user_blocks b
+			WHERE (b.blocker_id = m.user_id AND b.blocked_id = t.user_id)
+			   OR (b.blocker_id = t.user_id AND b.blocked_id = m.user_id))))
 	AND t.start_date <= l.local_ts::date AND t.end_date >= l.local_ts::date
 LEFT JOIN trip_days day ON day.trip_id = t.id
 	AND day.day_number = (l.local_ts::date - t.start_date) + 1
@@ -59,7 +65,7 @@ WHERE EXTRACT(HOUR FROM l.local_ts) >= $2 AND EXTRACT(HOUR FROM l.local_ts) < $3
   AND ($4 <> 'weather' OR EXISTS (
 	SELECT 1 FROM trip_brief_log m
 	WHERE m.user_id = l.user_id AND m.local_date = l.local_ts::date AND m.kind = 'morning'))
-ORDER BY l.user_id, t.start_date DESC, t.created_at DESC
+ORDER BY l.user_id, (t.user_id = l.user_id) DESC, t.start_date DESC, t.created_at DESC
 LIMIT $5`
 
 // Due lists up to limit travellers due a brief of kind at now, whose local
@@ -114,7 +120,7 @@ func (r *Repository) MorningPrecip(ctx context.Context, userID uuid.UUID, localD
 // when the stop names a known place.
 func (r *Repository) Stops(ctx context.Context, dayID uuid.UUID) ([]Stop, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT s.name, s.start_minute, COALESCE(p.opening_hours::text, '')
+		SELECT s.id, s.name, s.start_minute, COALESCE(p.opening_hours::text, '')
 		FROM trip_stops s
 		LEFT JOIN points_of_interest p ON p.id = CASE
 			WHEN s.poi_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -128,7 +134,7 @@ func (r *Repository) Stops(ctx context.Context, dayID uuid.UUID) ([]Stop, error)
 	var out []Stop
 	for rows.Next() {
 		var s Stop
-		if err := rows.Scan(&s.Name, &s.StartMinute, &s.OpeningHours); err != nil {
+		if err := rows.Scan(&s.ID, &s.Name, &s.StartMinute, &s.OpeningHours); err != nil {
 			return nil, fmt.Errorf("scan stop: %w", err)
 		}
 		out = append(out, s)

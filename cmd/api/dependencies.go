@@ -961,6 +961,8 @@ func (d *Dependencies) initHandlers() error {
 	var cheerNotifier socialdomain.CheerNotifier
 	// A shared trip's suggestions and applied changes, gated on trip updates.
 	var tripNotifier tripaction.TripNotifier
+	// New comments on a shared trip, gated on friend activity.
+	var commentNotifier trip.CommentNotifier
 	if webSender != nil || apnsSender != nil {
 		notifier := push.NewNotifier(d.RunStore, d.UserRepo, d.PushDevices, webSender, d.Logger).WithSender(push.PlatformAPNS, apnsSender)
 		onRunFinish = notifier.OnRunFinished
@@ -970,6 +972,7 @@ func (d *Dependencies) initHandlers() error {
 		achievementNotifier = notifier
 		cheerNotifier = notifier
 		tripNotifier = notifier
+		commentNotifier = notifier
 		if apnsSender != nil {
 			watchPusher = notifier
 		}
@@ -1039,6 +1042,9 @@ func (d *Dependencies) initHandlers() error {
 		d.AuthHandler = d.AuthHandler.WithSignupHook(socialSvc)
 		sharingRepo, membersRepo := trip.NewSharingRepository(d.DB.Pool, d.Logger), trip.NewMembersRepository(d.DB.Pool, d.Logger)
 		d.TripHandler = d.TripHandler.WithSharing(sharingRepo, socialSvc).WithMembers(membersRepo, socialSvc)
+		// Trip comments, moderated by ADMIN_EMAILS plus the single ADMIN_EMAIL.
+		d.TripHandler = d.TripHandler.WithComments(trip.NewCommentsRepository(d.DB.Pool), commentNotifier,
+			append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)...)
 		// The following feed: new cities, finished and shared trips and the
 		// day's best achievement, read by the people who follow you.
 		var feed *socialdomain.Feed

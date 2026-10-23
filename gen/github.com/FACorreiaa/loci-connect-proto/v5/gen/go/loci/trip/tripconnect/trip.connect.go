@@ -125,6 +125,24 @@ const (
 	// TripServiceRemoveTripMemberProcedure is the fully-qualified name of the TripService's
 	// RemoveTripMember RPC.
 	TripServiceRemoveTripMemberProcedure = "/loci.trip.TripService/RemoveTripMember"
+	// TripServiceAddTripCommentProcedure is the fully-qualified name of the TripService's
+	// AddTripComment RPC.
+	TripServiceAddTripCommentProcedure = "/loci.trip.TripService/AddTripComment"
+	// TripServiceListTripCommentsProcedure is the fully-qualified name of the TripService's
+	// ListTripComments RPC.
+	TripServiceListTripCommentsProcedure = "/loci.trip.TripService/ListTripComments"
+	// TripServiceDeleteTripCommentProcedure is the fully-qualified name of the TripService's
+	// DeleteTripComment RPC.
+	TripServiceDeleteTripCommentProcedure = "/loci.trip.TripService/DeleteTripComment"
+	// TripServiceReportTripCommentProcedure is the fully-qualified name of the TripService's
+	// ReportTripComment RPC.
+	TripServiceReportTripCommentProcedure = "/loci.trip.TripService/ReportTripComment"
+	// TripServiceListReportedTripCommentsProcedure is the fully-qualified name of the TripService's
+	// ListReportedTripComments RPC.
+	TripServiceListReportedTripCommentsProcedure = "/loci.trip.TripService/ListReportedTripComments"
+	// TripServiceResolveTripCommentReportProcedure is the fully-qualified name of the TripService's
+	// ResolveTripCommentReport RPC.
+	TripServiceResolveTripCommentReportProcedure = "/loci.trip.TripService/ResolveTripCommentReport"
 )
 
 // These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
@@ -165,6 +183,12 @@ var (
 	tripServiceRevokeTripInviteMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RevokeTripInvite")
 	tripServiceListTripMembersMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("ListTripMembers")
 	tripServiceRemoveTripMemberMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RemoveTripMember")
+	tripServiceAddTripCommentMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("AddTripComment")
+	tripServiceListTripCommentsMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("ListTripComments")
+	tripServiceDeleteTripCommentMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("DeleteTripComment")
+	tripServiceReportTripCommentMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("ReportTripComment")
+	tripServiceListReportedTripCommentsMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("ListReportedTripComments")
+	tripServiceResolveTripCommentReportMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("ResolveTripCommentReport")
 )
 
 // TripServiceClient is a client for the loci.trip.TripService service.
@@ -245,6 +269,20 @@ type TripServiceClient interface {
 	// RemoveTripMember takes someone off the trip: the owner removes anyone,
 	// a member removes only themselves.
 	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
+	// Trip comments, for the owner and members. AddTripComment is
+	// ResourceExhausted past 60 an hour; a viewer may comment too.
+	AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error)
+	ListTripComments(context.Context, *connect.Request[trip.ListTripCommentsRequest]) (*connect.Response[trip.ListTripCommentsResponse], error)
+	// DeleteTripComment: the author, or the trip's owner. Deleting a missing
+	// comment is NotFound.
+	DeleteTripComment(context.Context, *connect.Request[trip.DeleteTripCommentRequest]) (*connect.Response[trip.DeleteTripCommentResponse], error)
+	// ReportTripComment flags a comment for moderation and hides it from the
+	// reporter at once; three reporters hide it from everyone. Reporting again
+	// replaces the reason. Reporting your own comment is InvalidArgument.
+	ReportTripComment(context.Context, *connect.Request[trip.ReportTripCommentRequest]) (*connect.Response[trip.ReportTripCommentResponse], error)
+	// Moderation (admins only; PermissionDenied otherwise).
+	ListReportedTripComments(context.Context, *connect.Request[trip.ListReportedTripCommentsRequest]) (*connect.Response[trip.ListReportedTripCommentsResponse], error)
+	ResolveTripCommentReport(context.Context, *connect.Request[trip.ResolveTripCommentReportRequest]) (*connect.Response[trip.ResolveTripCommentReportResponse], error)
 }
 
 // NewTripServiceClient constructs a client for the loci.trip.TripService service. By default, it
@@ -467,6 +505,42 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		addTripComment: connect.NewClient[trip.AddTripCommentRequest, trip.TripComment](
+			httpClient,
+			baseURL+TripServiceAddTripCommentProcedure,
+			connect.WithSchema(tripServiceAddTripCommentMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listTripComments: connect.NewClient[trip.ListTripCommentsRequest, trip.ListTripCommentsResponse](
+			httpClient,
+			baseURL+TripServiceListTripCommentsProcedure,
+			connect.WithSchema(tripServiceListTripCommentsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		deleteTripComment: connect.NewClient[trip.DeleteTripCommentRequest, trip.DeleteTripCommentResponse](
+			httpClient,
+			baseURL+TripServiceDeleteTripCommentProcedure,
+			connect.WithSchema(tripServiceDeleteTripCommentMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		reportTripComment: connect.NewClient[trip.ReportTripCommentRequest, trip.ReportTripCommentResponse](
+			httpClient,
+			baseURL+TripServiceReportTripCommentProcedure,
+			connect.WithSchema(tripServiceReportTripCommentMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		listReportedTripComments: connect.NewClient[trip.ListReportedTripCommentsRequest, trip.ListReportedTripCommentsResponse](
+			httpClient,
+			baseURL+TripServiceListReportedTripCommentsProcedure,
+			connect.WithSchema(tripServiceListReportedTripCommentsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		resolveTripCommentReport: connect.NewClient[trip.ResolveTripCommentReportRequest, trip.ResolveTripCommentReportResponse](
+			httpClient,
+			baseURL+TripServiceResolveTripCommentReportProcedure,
+			connect.WithSchema(tripServiceResolveTripCommentReportMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -507,6 +581,12 @@ type tripServiceClient struct {
 	revokeTripInvite         *connect.Client[trip.RevokeTripInviteRequest, trip.RevokeTripInviteResponse]
 	listTripMembers          *connect.Client[trip.ListTripMembersRequest, trip.ListTripMembersResponse]
 	removeTripMember         *connect.Client[trip.RemoveTripMemberRequest, trip.RemoveTripMemberResponse]
+	addTripComment           *connect.Client[trip.AddTripCommentRequest, trip.TripComment]
+	listTripComments         *connect.Client[trip.ListTripCommentsRequest, trip.ListTripCommentsResponse]
+	deleteTripComment        *connect.Client[trip.DeleteTripCommentRequest, trip.DeleteTripCommentResponse]
+	reportTripComment        *connect.Client[trip.ReportTripCommentRequest, trip.ReportTripCommentResponse]
+	listReportedTripComments *connect.Client[trip.ListReportedTripCommentsRequest, trip.ListReportedTripCommentsResponse]
+	resolveTripCommentReport *connect.Client[trip.ResolveTripCommentReportRequest, trip.ResolveTripCommentReportResponse]
 }
 
 // SaveTrip calls loci.trip.TripService.SaveTrip.
@@ -686,6 +766,36 @@ func (c *tripServiceClient) RemoveTripMember(ctx context.Context, req *connect.R
 	return c.removeTripMember.CallUnary(ctx, req)
 }
 
+// AddTripComment calls loci.trip.TripService.AddTripComment.
+func (c *tripServiceClient) AddTripComment(ctx context.Context, req *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error) {
+	return c.addTripComment.CallUnary(ctx, req)
+}
+
+// ListTripComments calls loci.trip.TripService.ListTripComments.
+func (c *tripServiceClient) ListTripComments(ctx context.Context, req *connect.Request[trip.ListTripCommentsRequest]) (*connect.Response[trip.ListTripCommentsResponse], error) {
+	return c.listTripComments.CallUnary(ctx, req)
+}
+
+// DeleteTripComment calls loci.trip.TripService.DeleteTripComment.
+func (c *tripServiceClient) DeleteTripComment(ctx context.Context, req *connect.Request[trip.DeleteTripCommentRequest]) (*connect.Response[trip.DeleteTripCommentResponse], error) {
+	return c.deleteTripComment.CallUnary(ctx, req)
+}
+
+// ReportTripComment calls loci.trip.TripService.ReportTripComment.
+func (c *tripServiceClient) ReportTripComment(ctx context.Context, req *connect.Request[trip.ReportTripCommentRequest]) (*connect.Response[trip.ReportTripCommentResponse], error) {
+	return c.reportTripComment.CallUnary(ctx, req)
+}
+
+// ListReportedTripComments calls loci.trip.TripService.ListReportedTripComments.
+func (c *tripServiceClient) ListReportedTripComments(ctx context.Context, req *connect.Request[trip.ListReportedTripCommentsRequest]) (*connect.Response[trip.ListReportedTripCommentsResponse], error) {
+	return c.listReportedTripComments.CallUnary(ctx, req)
+}
+
+// ResolveTripCommentReport calls loci.trip.TripService.ResolveTripCommentReport.
+func (c *tripServiceClient) ResolveTripCommentReport(ctx context.Context, req *connect.Request[trip.ResolveTripCommentReportRequest]) (*connect.Response[trip.ResolveTripCommentReportResponse], error) {
+	return c.resolveTripCommentReport.CallUnary(ctx, req)
+}
+
 // TripServiceHandler is an implementation of the loci.trip.TripService service.
 type TripServiceHandler interface {
 	SaveTrip(context.Context, *connect.Request[trip.SaveTripRequest]) (*connect.Response[trip.TripDraft], error)
@@ -764,6 +874,20 @@ type TripServiceHandler interface {
 	// RemoveTripMember takes someone off the trip: the owner removes anyone,
 	// a member removes only themselves.
 	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
+	// Trip comments, for the owner and members. AddTripComment is
+	// ResourceExhausted past 60 an hour; a viewer may comment too.
+	AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error)
+	ListTripComments(context.Context, *connect.Request[trip.ListTripCommentsRequest]) (*connect.Response[trip.ListTripCommentsResponse], error)
+	// DeleteTripComment: the author, or the trip's owner. Deleting a missing
+	// comment is NotFound.
+	DeleteTripComment(context.Context, *connect.Request[trip.DeleteTripCommentRequest]) (*connect.Response[trip.DeleteTripCommentResponse], error)
+	// ReportTripComment flags a comment for moderation and hides it from the
+	// reporter at once; three reporters hide it from everyone. Reporting again
+	// replaces the reason. Reporting your own comment is InvalidArgument.
+	ReportTripComment(context.Context, *connect.Request[trip.ReportTripCommentRequest]) (*connect.Response[trip.ReportTripCommentResponse], error)
+	// Moderation (admins only; PermissionDenied otherwise).
+	ListReportedTripComments(context.Context, *connect.Request[trip.ListReportedTripCommentsRequest]) (*connect.Response[trip.ListReportedTripCommentsResponse], error)
+	ResolveTripCommentReport(context.Context, *connect.Request[trip.ResolveTripCommentReportRequest]) (*connect.Response[trip.ResolveTripCommentReportResponse], error)
 }
 
 // NewTripServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -982,6 +1106,42 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceAddTripCommentHandler := connect.NewUnaryHandler(
+		TripServiceAddTripCommentProcedure,
+		svc.AddTripComment,
+		connect.WithSchema(tripServiceAddTripCommentMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceListTripCommentsHandler := connect.NewUnaryHandler(
+		TripServiceListTripCommentsProcedure,
+		svc.ListTripComments,
+		connect.WithSchema(tripServiceListTripCommentsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceDeleteTripCommentHandler := connect.NewUnaryHandler(
+		TripServiceDeleteTripCommentProcedure,
+		svc.DeleteTripComment,
+		connect.WithSchema(tripServiceDeleteTripCommentMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceReportTripCommentHandler := connect.NewUnaryHandler(
+		TripServiceReportTripCommentProcedure,
+		svc.ReportTripComment,
+		connect.WithSchema(tripServiceReportTripCommentMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceListReportedTripCommentsHandler := connect.NewUnaryHandler(
+		TripServiceListReportedTripCommentsProcedure,
+		svc.ListReportedTripComments,
+		connect.WithSchema(tripServiceListReportedTripCommentsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceResolveTripCommentReportHandler := connect.NewUnaryHandler(
+		TripServiceResolveTripCommentReportProcedure,
+		svc.ResolveTripCommentReport,
+		connect.WithSchema(tripServiceResolveTripCommentReportMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/loci.trip.TripService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case TripServiceSaveTripProcedure:
@@ -1054,6 +1214,18 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceListTripMembersHandler.ServeHTTP(w, r)
 		case TripServiceRemoveTripMemberProcedure:
 			tripServiceRemoveTripMemberHandler.ServeHTTP(w, r)
+		case TripServiceAddTripCommentProcedure:
+			tripServiceAddTripCommentHandler.ServeHTTP(w, r)
+		case TripServiceListTripCommentsProcedure:
+			tripServiceListTripCommentsHandler.ServeHTTP(w, r)
+		case TripServiceDeleteTripCommentProcedure:
+			tripServiceDeleteTripCommentHandler.ServeHTTP(w, r)
+		case TripServiceReportTripCommentProcedure:
+			tripServiceReportTripCommentHandler.ServeHTTP(w, r)
+		case TripServiceListReportedTripCommentsProcedure:
+			tripServiceListReportedTripCommentsHandler.ServeHTTP(w, r)
+		case TripServiceResolveTripCommentReportProcedure:
+			tripServiceResolveTripCommentReportHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1201,4 +1373,28 @@ func (UnimplementedTripServiceHandler) ListTripMembers(context.Context, *connect
 
 func (UnimplementedTripServiceHandler) RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveTripMember is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.AddTripComment is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ListTripComments(context.Context, *connect.Request[trip.ListTripCommentsRequest]) (*connect.Response[trip.ListTripCommentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListTripComments is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) DeleteTripComment(context.Context, *connect.Request[trip.DeleteTripCommentRequest]) (*connect.Response[trip.DeleteTripCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.DeleteTripComment is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ReportTripComment(context.Context, *connect.Request[trip.ReportTripCommentRequest]) (*connect.Response[trip.ReportTripCommentResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ReportTripComment is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ListReportedTripComments(context.Context, *connect.Request[trip.ListReportedTripCommentsRequest]) (*connect.Response[trip.ListReportedTripCommentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListReportedTripComments is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ResolveTripCommentReport(context.Context, *connect.Request[trip.ResolveTripCommentReportRequest]) (*connect.Response[trip.ResolveTripCommentReportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ResolveTripCommentReport is not implemented"))
 }

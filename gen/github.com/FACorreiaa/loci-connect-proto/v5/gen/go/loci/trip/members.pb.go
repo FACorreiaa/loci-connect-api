@@ -80,6 +80,58 @@ func (TripRole) EnumDescriptor() ([]byte, []int) {
 	return file_loci_trip_members_proto_rawDescGZIP(), []int{0}
 }
 
+// What a moderator decides about a reported trip comment.
+type TripCommentModerationAction int32
+
+const (
+	TripCommentModerationAction_TRIP_COMMENT_MODERATION_ACTION_UNSPECIFIED TripCommentModerationAction = 0
+	// The comment stays; its open reports are closed.
+	TripCommentModerationAction_TRIP_COMMENT_MODERATION_ACTION_KEEP TripCommentModerationAction = 1
+	// The comment leaves the trip for everyone.
+	TripCommentModerationAction_TRIP_COMMENT_MODERATION_ACTION_REMOVE TripCommentModerationAction = 2
+)
+
+// Enum value maps for TripCommentModerationAction.
+var (
+	TripCommentModerationAction_name = map[int32]string{
+		0: "TRIP_COMMENT_MODERATION_ACTION_UNSPECIFIED",
+		1: "TRIP_COMMENT_MODERATION_ACTION_KEEP",
+		2: "TRIP_COMMENT_MODERATION_ACTION_REMOVE",
+	}
+	TripCommentModerationAction_value = map[string]int32{
+		"TRIP_COMMENT_MODERATION_ACTION_UNSPECIFIED": 0,
+		"TRIP_COMMENT_MODERATION_ACTION_KEEP":        1,
+		"TRIP_COMMENT_MODERATION_ACTION_REMOVE":      2,
+	}
+)
+
+func (x TripCommentModerationAction) Enum() *TripCommentModerationAction {
+	p := new(TripCommentModerationAction)
+	*p = x
+	return p
+}
+
+func (x TripCommentModerationAction) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TripCommentModerationAction) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_trip_members_proto_enumTypes[1].Descriptor()
+}
+
+func (TripCommentModerationAction) Type() protoreflect.EnumType {
+	return &file_loci_trip_members_proto_enumTypes[1]
+}
+
+func (x TripCommentModerationAction) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TripCommentModerationAction.Descriptor instead.
+func (TripCommentModerationAction) EnumDescriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{1}
+}
+
 type TripMember struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	User  *social.PublicUser     `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
@@ -817,6 +869,804 @@ func (*RemoveTripMemberResponse) Descriptor() ([]byte, []int) {
 	return file_loci_trip_members_proto_rawDescGZIP(), []int{12}
 }
 
+// TripComment is a note someone on the trip left, about the trip or one of
+// its stops. Only the owner and members read and write them.
+type TripComment struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Id     string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TripId string                 `protobuf:"bytes,2,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	// Empty for a comment about the whole trip. A stop that has since left the
+	// trip keeps its id here; clients show such comments with the trip's.
+	StopId string `protobuf:"bytes,3,opt,name=stop_id,json=stopId,proto3" json:"stop_id,omitempty"`
+	// Unset when the author's account is gone.
+	Author    *social.PublicUser     `protobuf:"bytes,4,opt,name=author,proto3" json:"author,omitempty"`
+	Body      string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// The caller wrote it.
+	Mine bool `protobuf:"varint,7,opt,name=mine,proto3" json:"mine,omitempty"`
+	// The caller may delete it: its author, or the trip's owner.
+	CanDelete     bool `protobuf:"varint,8,opt,name=can_delete,json=canDelete,proto3" json:"can_delete,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TripComment) Reset() {
+	*x = TripComment{}
+	mi := &file_loci_trip_members_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TripComment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TripComment) ProtoMessage() {}
+
+func (x *TripComment) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TripComment.ProtoReflect.Descriptor instead.
+func (*TripComment) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *TripComment) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *TripComment) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *TripComment) GetStopId() string {
+	if x != nil {
+		return x.StopId
+	}
+	return ""
+}
+
+func (x *TripComment) GetAuthor() *social.PublicUser {
+	if x != nil {
+		return x.Author
+	}
+	return nil
+}
+
+func (x *TripComment) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *TripComment) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *TripComment) GetMine() bool {
+	if x != nil {
+		return x.Mine
+	}
+	return false
+}
+
+func (x *TripComment) GetCanDelete() bool {
+	if x != nil {
+		return x.CanDelete
+	}
+	return false
+}
+
+type AddTripCommentRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	TripId string                 `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	// Empty for a comment about the whole trip.
+	StopId        string `protobuf:"bytes,2,opt,name=stop_id,json=stopId,proto3" json:"stop_id,omitempty"`
+	Body          string `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddTripCommentRequest) Reset() {
+	*x = AddTripCommentRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddTripCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddTripCommentRequest) ProtoMessage() {}
+
+func (x *AddTripCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddTripCommentRequest.ProtoReflect.Descriptor instead.
+func (*AddTripCommentRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AddTripCommentRequest) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *AddTripCommentRequest) GetStopId() string {
+	if x != nil {
+		return x.StopId
+	}
+	return ""
+}
+
+func (x *AddTripCommentRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+type ListTripCommentsRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	TripId string                 `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	// How many; 0 means the server default (100).
+	Limit int32 `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Only comments older than this; unset for the newest.
+	Before        *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=before,proto3" json:"before,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTripCommentsRequest) Reset() {
+	*x = ListTripCommentsRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTripCommentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTripCommentsRequest) ProtoMessage() {}
+
+func (x *ListTripCommentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTripCommentsRequest.ProtoReflect.Descriptor instead.
+func (*ListTripCommentsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListTripCommentsRequest) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *ListTripCommentsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListTripCommentsRequest) GetBefore() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+type ListTripCommentsResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Oldest first: the newest `limit` comments before `before`, in reading
+	// order. Deleted, removed, hidden and blocked-author comments are left out.
+	Comments []*TripComment `protobuf:"bytes,1,rep,name=comments,proto3" json:"comments,omitempty"`
+	// There are older comments: ask again with `before` set to the first
+	// comment's created_at.
+	HasMore       bool `protobuf:"varint,2,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTripCommentsResponse) Reset() {
+	*x = ListTripCommentsResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTripCommentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTripCommentsResponse) ProtoMessage() {}
+
+func (x *ListTripCommentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTripCommentsResponse.ProtoReflect.Descriptor instead.
+func (*ListTripCommentsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ListTripCommentsResponse) GetComments() []*TripComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+func (x *ListTripCommentsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+type DeleteTripCommentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CommentId     string                 `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTripCommentRequest) Reset() {
+	*x = DeleteTripCommentRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTripCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTripCommentRequest) ProtoMessage() {}
+
+func (x *DeleteTripCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTripCommentRequest.ProtoReflect.Descriptor instead.
+func (*DeleteTripCommentRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DeleteTripCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+type DeleteTripCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTripCommentResponse) Reset() {
+	*x = DeleteTripCommentResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTripCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTripCommentResponse) ProtoMessage() {}
+
+func (x *DeleteTripCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTripCommentResponse.ProtoReflect.Descriptor instead.
+func (*DeleteTripCommentResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{18}
+}
+
+type ReportTripCommentRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CommentId string                 `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	// One of "spam", "inappropriate", "offensive", "other". The server rejects
+	// anything else with InvalidArgument.
+	Reason        string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Details       string `protobuf:"bytes,3,opt,name=details,proto3" json:"details,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportTripCommentRequest) Reset() {
+	*x = ReportTripCommentRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportTripCommentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportTripCommentRequest) ProtoMessage() {}
+
+func (x *ReportTripCommentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportTripCommentRequest.ProtoReflect.Descriptor instead.
+func (*ReportTripCommentRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ReportTripCommentRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+func (x *ReportTripCommentRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ReportTripCommentRequest) GetDetails() string {
+	if x != nil {
+		return x.Details
+	}
+	return ""
+}
+
+type ReportTripCommentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportTripCommentResponse) Reset() {
+	*x = ReportTripCommentResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportTripCommentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportTripCommentResponse) ProtoMessage() {}
+
+func (x *ReportTripCommentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportTripCommentResponse.ProtoReflect.Descriptor instead.
+func (*ReportTripCommentResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{20}
+}
+
+type ListReportedTripCommentsRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Page size; 0 means the server default (20).
+	Limit int32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	// 1-based; 0 means the first page.
+	Page          int32 `protobuf:"varint,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReportedTripCommentsRequest) Reset() {
+	*x = ListReportedTripCommentsRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReportedTripCommentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReportedTripCommentsRequest) ProtoMessage() {}
+
+func (x *ListReportedTripCommentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReportedTripCommentsRequest.ProtoReflect.Descriptor instead.
+func (*ListReportedTripCommentsRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ListReportedTripCommentsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListReportedTripCommentsRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+// How many open reports gave one reason.
+type TripCommentReportReason struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reason        string                 `protobuf:"bytes,1,opt,name=reason,proto3" json:"reason,omitempty"`
+	Count         int32                  `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TripCommentReportReason) Reset() {
+	*x = TripCommentReportReason{}
+	mi := &file_loci_trip_members_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TripCommentReportReason) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TripCommentReportReason) ProtoMessage() {}
+
+func (x *TripCommentReportReason) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TripCommentReportReason.ProtoReflect.Descriptor instead.
+func (*TripCommentReportReason) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *TripCommentReportReason) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *TripCommentReportReason) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type ReportedTripComment struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Comment *TripComment           `protobuf:"bytes,1,opt,name=comment,proto3" json:"comment,omitempty"`
+	// Distinct people with an open report on the comment.
+	ReportCount int32                      `protobuf:"varint,2,opt,name=report_count,json=reportCount,proto3" json:"report_count,omitempty"`
+	Reasons     []*TripCommentReportReason `protobuf:"bytes,3,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	// The free-text details reporters gave, newest first; empty ones omitted.
+	Details        []string               `protobuf:"bytes,4,rep,name=details,proto3" json:"details,omitempty"`
+	LastReportedAt *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_reported_at,json=lastReportedAt,proto3" json:"last_reported_at,omitempty"`
+	// True when the comment is out of the trip because of its reports.
+	Hidden        bool `protobuf:"varint,6,opt,name=hidden,proto3" json:"hidden,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportedTripComment) Reset() {
+	*x = ReportedTripComment{}
+	mi := &file_loci_trip_members_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportedTripComment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportedTripComment) ProtoMessage() {}
+
+func (x *ReportedTripComment) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportedTripComment.ProtoReflect.Descriptor instead.
+func (*ReportedTripComment) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *ReportedTripComment) GetComment() *TripComment {
+	if x != nil {
+		return x.Comment
+	}
+	return nil
+}
+
+func (x *ReportedTripComment) GetReportCount() int32 {
+	if x != nil {
+		return x.ReportCount
+	}
+	return 0
+}
+
+func (x *ReportedTripComment) GetReasons() []*TripCommentReportReason {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *ReportedTripComment) GetDetails() []string {
+	if x != nil {
+		return x.Details
+	}
+	return nil
+}
+
+func (x *ReportedTripComment) GetLastReportedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastReportedAt
+	}
+	return nil
+}
+
+func (x *ReportedTripComment) GetHidden() bool {
+	if x != nil {
+		return x.Hidden
+	}
+	return false
+}
+
+type ListReportedTripCommentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Comments      []*ReportedTripComment `protobuf:"bytes,1,rep,name=comments,proto3" json:"comments,omitempty"`
+	HasMore       bool                   `protobuf:"varint,2,opt,name=has_more,json=hasMore,proto3" json:"has_more,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReportedTripCommentsResponse) Reset() {
+	*x = ListReportedTripCommentsResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReportedTripCommentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReportedTripCommentsResponse) ProtoMessage() {}
+
+func (x *ListReportedTripCommentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReportedTripCommentsResponse.ProtoReflect.Descriptor instead.
+func (*ListReportedTripCommentsResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListReportedTripCommentsResponse) GetComments() []*ReportedTripComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+func (x *ListReportedTripCommentsResponse) GetHasMore() bool {
+	if x != nil {
+		return x.HasMore
+	}
+	return false
+}
+
+type ResolveTripCommentReportRequest struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	CommentId     string                      `protobuf:"bytes,1,opt,name=comment_id,json=commentId,proto3" json:"comment_id,omitempty"`
+	Action        TripCommentModerationAction `protobuf:"varint,2,opt,name=action,proto3,enum=loci.trip.TripCommentModerationAction" json:"action,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveTripCommentReportRequest) Reset() {
+	*x = ResolveTripCommentReportRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveTripCommentReportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveTripCommentReportRequest) ProtoMessage() {}
+
+func (x *ResolveTripCommentReportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveTripCommentReportRequest.ProtoReflect.Descriptor instead.
+func (*ResolveTripCommentReportRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ResolveTripCommentReportRequest) GetCommentId() string {
+	if x != nil {
+		return x.CommentId
+	}
+	return ""
+}
+
+func (x *ResolveTripCommentReportRequest) GetAction() TripCommentModerationAction {
+	if x != nil {
+		return x.Action
+	}
+	return TripCommentModerationAction_TRIP_COMMENT_MODERATION_ACTION_UNSPECIFIED
+}
+
+type ResolveTripCommentReportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveTripCommentReportResponse) Reset() {
+	*x = ResolveTripCommentReportResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveTripCommentReportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveTripCommentReportResponse) ProtoMessage() {}
+
+func (x *ResolveTripCommentReportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveTripCommentReportResponse.ProtoReflect.Descriptor instead.
+func (*ResolveTripCommentReportResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{26}
+}
+
 var File_loci_trip_members_proto protoreflect.FileDescriptor
 
 const file_loci_trip_members_proto_rawDesc = "" +
@@ -875,12 +1725,72 @@ const file_loci_trip_members_proto_rawDesc = "" +
 	"\x17RemoveTripMemberRequest\x12!\n" +
 	"\atrip_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06tripId\x12!\n" +
 	"\auser_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x1a\n" +
-	"\x18RemoveTripMemberResponse*j\n" +
+	"\x18RemoveTripMemberResponse\"\xa7\x02\n" +
+	"\vTripComment\x12\x17\n" +
+	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12 \n" +
+	"\atrip_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06tripId\x12 \n" +
+	"\astop_id\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06stopId\x12/\n" +
+	"\x06author\x18\x04 \x01(\v2\x17.loci.social.PublicUserR\x06author\x12\x1c\n" +
+	"\x04body\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\xd0\x0fR\x04body\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
+	"\x04mine\x18\a \x01(\bR\x04mine\x12\x1d\n" +
+	"\n" +
+	"can_delete\x18\b \x01(\bR\tcanDelete\"\x80\x01\n" +
+	"\x15AddTripCommentRequest\x12!\n" +
+	"\atrip_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06tripId\x12$\n" +
+	"\astop_id\x18\x02 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x06stopId\x12\x1e\n" +
+	"\x04body\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xd0\x0fR\x04body\"\x92\x01\n" +
+	"\x17ListTripCommentsRequest\x12!\n" +
+	"\atrip_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06tripId\x12 \n" +
+	"\x05limit\x18\x02 \x01(\x05B\n" +
+	"\xbaH\a\x1a\x05\x18\xc8\x01(\x00R\x05limit\x122\n" +
+	"\x06before\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"i\n" +
+	"\x18ListTripCommentsResponse\x122\n" +
+	"\bcomments\x18\x01 \x03(\v2\x16.loci.trip.TripCommentR\bcomments\x12\x19\n" +
+	"\bhas_more\x18\x02 \x01(\bR\ahasMore\"C\n" +
+	"\x18DeleteTripCommentRequest\x12'\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tcommentId\"\x1b\n" +
+	"\x19DeleteTripCommentResponse\"\x8d\x01\n" +
+	"\x18ReportTripCommentRequest\x12'\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tcommentId\x12!\n" +
+	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x182R\x06reason\x12%\n" +
+	"\adetails\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\x18\xe8\aR\adetails\"\x1b\n" +
+	"\x19ReportTripCommentResponse\"_\n" +
+	"\x1fListReportedTripCommentsRequest\x12\x1f\n" +
+	"\x05limit\x18\x01 \x01(\x05B\t\xbaH\x06\x1a\x04\x18d(\x00R\x05limit\x12\x1b\n" +
+	"\x04page\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02(\x00R\x04page\"G\n" +
+	"\x17TripCommentReportReason\x12\x16\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\x12\x14\n" +
+	"\x05count\x18\x02 \x01(\x05R\x05count\"\xa0\x02\n" +
+	"\x13ReportedTripComment\x120\n" +
+	"\acomment\x18\x01 \x01(\v2\x16.loci.trip.TripCommentR\acomment\x12!\n" +
+	"\freport_count\x18\x02 \x01(\x05R\vreportCount\x12<\n" +
+	"\areasons\x18\x03 \x03(\v2\".loci.trip.TripCommentReportReasonR\areasons\x12\x18\n" +
+	"\adetails\x18\x04 \x03(\tR\adetails\x12D\n" +
+	"\x10last_reported_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x0elastReportedAt\x12\x16\n" +
+	"\x06hidden\x18\x06 \x01(\bR\x06hidden\"y\n" +
+	" ListReportedTripCommentsResponse\x12:\n" +
+	"\bcomments\x18\x01 \x03(\v2\x1e.loci.trip.ReportedTripCommentR\bcomments\x12\x19\n" +
+	"\bhas_more\x18\x02 \x01(\bR\ahasMore\"\x96\x01\n" +
+	"\x1fResolveTripCommentReportRequest\x12'\n" +
+	"\n" +
+	"comment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tcommentId\x12J\n" +
+	"\x06action\x18\x02 \x01(\x0e2&.loci.trip.TripCommentModerationActionB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06action\"\"\n" +
+	" ResolveTripCommentReportResponse*j\n" +
 	"\bTripRole\x12\x19\n" +
 	"\x15TRIP_ROLE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fTRIP_ROLE_OWNER\x10\x01\x12\x18\n" +
 	"\x14TRIP_ROLE_CO_PLANNER\x10\x02\x12\x14\n" +
-	"\x10TRIP_ROLE_VIEWER\x10\x03BCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip;tripb\x06proto3"
+	"\x10TRIP_ROLE_VIEWER\x10\x03*\xa1\x01\n" +
+	"\x1bTripCommentModerationAction\x12.\n" +
+	"*TRIP_COMMENT_MODERATION_ACTION_UNSPECIFIED\x10\x00\x12'\n" +
+	"#TRIP_COMMENT_MODERATION_ACTION_KEEP\x10\x01\x12)\n" +
+	"%TRIP_COMMENT_MODERATION_ACTION_REMOVE\x10\x02BCZAgithub.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip;tripb\x06proto3"
 
 var (
 	file_loci_trip_members_proto_rawDescOnce sync.Once
@@ -894,43 +1804,67 @@ func file_loci_trip_members_proto_rawDescGZIP() []byte {
 	return file_loci_trip_members_proto_rawDescData
 }
 
-var file_loci_trip_members_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_loci_trip_members_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_loci_trip_members_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_loci_trip_members_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_loci_trip_members_proto_goTypes = []any{
-	(TripRole)(0),                    // 0: loci.trip.TripRole
-	(*TripMember)(nil),               // 1: loci.trip.TripMember
-	(*TripInvite)(nil),               // 2: loci.trip.TripInvite
-	(*TripInvitePreview)(nil),        // 3: loci.trip.TripInvitePreview
-	(*CreateTripInviteRequest)(nil),  // 4: loci.trip.CreateTripInviteRequest
-	(*GetTripInviteRequest)(nil),     // 5: loci.trip.GetTripInviteRequest
-	(*AcceptTripInviteRequest)(nil),  // 6: loci.trip.AcceptTripInviteRequest
-	(*AcceptTripInviteResponse)(nil), // 7: loci.trip.AcceptTripInviteResponse
-	(*RevokeTripInviteRequest)(nil),  // 8: loci.trip.RevokeTripInviteRequest
-	(*RevokeTripInviteResponse)(nil), // 9: loci.trip.RevokeTripInviteResponse
-	(*ListTripMembersRequest)(nil),   // 10: loci.trip.ListTripMembersRequest
-	(*ListTripMembersResponse)(nil),  // 11: loci.trip.ListTripMembersResponse
-	(*RemoveTripMemberRequest)(nil),  // 12: loci.trip.RemoveTripMemberRequest
-	(*RemoveTripMemberResponse)(nil), // 13: loci.trip.RemoveTripMemberResponse
-	(*social.PublicUser)(nil),        // 14: loci.social.PublicUser
-	(*timestamppb.Timestamp)(nil),    // 15: google.protobuf.Timestamp
+	(TripRole)(0),                            // 0: loci.trip.TripRole
+	(TripCommentModerationAction)(0),         // 1: loci.trip.TripCommentModerationAction
+	(*TripMember)(nil),                       // 2: loci.trip.TripMember
+	(*TripInvite)(nil),                       // 3: loci.trip.TripInvite
+	(*TripInvitePreview)(nil),                // 4: loci.trip.TripInvitePreview
+	(*CreateTripInviteRequest)(nil),          // 5: loci.trip.CreateTripInviteRequest
+	(*GetTripInviteRequest)(nil),             // 6: loci.trip.GetTripInviteRequest
+	(*AcceptTripInviteRequest)(nil),          // 7: loci.trip.AcceptTripInviteRequest
+	(*AcceptTripInviteResponse)(nil),         // 8: loci.trip.AcceptTripInviteResponse
+	(*RevokeTripInviteRequest)(nil),          // 9: loci.trip.RevokeTripInviteRequest
+	(*RevokeTripInviteResponse)(nil),         // 10: loci.trip.RevokeTripInviteResponse
+	(*ListTripMembersRequest)(nil),           // 11: loci.trip.ListTripMembersRequest
+	(*ListTripMembersResponse)(nil),          // 12: loci.trip.ListTripMembersResponse
+	(*RemoveTripMemberRequest)(nil),          // 13: loci.trip.RemoveTripMemberRequest
+	(*RemoveTripMemberResponse)(nil),         // 14: loci.trip.RemoveTripMemberResponse
+	(*TripComment)(nil),                      // 15: loci.trip.TripComment
+	(*AddTripCommentRequest)(nil),            // 16: loci.trip.AddTripCommentRequest
+	(*ListTripCommentsRequest)(nil),          // 17: loci.trip.ListTripCommentsRequest
+	(*ListTripCommentsResponse)(nil),         // 18: loci.trip.ListTripCommentsResponse
+	(*DeleteTripCommentRequest)(nil),         // 19: loci.trip.DeleteTripCommentRequest
+	(*DeleteTripCommentResponse)(nil),        // 20: loci.trip.DeleteTripCommentResponse
+	(*ReportTripCommentRequest)(nil),         // 21: loci.trip.ReportTripCommentRequest
+	(*ReportTripCommentResponse)(nil),        // 22: loci.trip.ReportTripCommentResponse
+	(*ListReportedTripCommentsRequest)(nil),  // 23: loci.trip.ListReportedTripCommentsRequest
+	(*TripCommentReportReason)(nil),          // 24: loci.trip.TripCommentReportReason
+	(*ReportedTripComment)(nil),              // 25: loci.trip.ReportedTripComment
+	(*ListReportedTripCommentsResponse)(nil), // 26: loci.trip.ListReportedTripCommentsResponse
+	(*ResolveTripCommentReportRequest)(nil),  // 27: loci.trip.ResolveTripCommentReportRequest
+	(*ResolveTripCommentReportResponse)(nil), // 28: loci.trip.ResolveTripCommentReportResponse
+	(*social.PublicUser)(nil),                // 29: loci.social.PublicUser
+	(*timestamppb.Timestamp)(nil),            // 30: google.protobuf.Timestamp
 }
 var file_loci_trip_members_proto_depIdxs = []int32{
-	14, // 0: loci.trip.TripMember.user:type_name -> loci.social.PublicUser
+	29, // 0: loci.trip.TripMember.user:type_name -> loci.social.PublicUser
 	0,  // 1: loci.trip.TripMember.role:type_name -> loci.trip.TripRole
-	15, // 2: loci.trip.TripMember.joined_at:type_name -> google.protobuf.Timestamp
+	30, // 2: loci.trip.TripMember.joined_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: loci.trip.TripInvite.role:type_name -> loci.trip.TripRole
-	15, // 4: loci.trip.TripInvite.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 5: loci.trip.TripInvitePreview.owner:type_name -> loci.social.PublicUser
-	1,  // 6: loci.trip.TripInvitePreview.members:type_name -> loci.trip.TripMember
+	30, // 4: loci.trip.TripInvite.expires_at:type_name -> google.protobuf.Timestamp
+	29, // 5: loci.trip.TripInvitePreview.owner:type_name -> loci.social.PublicUser
+	2,  // 6: loci.trip.TripInvitePreview.members:type_name -> loci.trip.TripMember
 	0,  // 7: loci.trip.TripInvitePreview.role:type_name -> loci.trip.TripRole
 	0,  // 8: loci.trip.CreateTripInviteRequest.role:type_name -> loci.trip.TripRole
 	0,  // 9: loci.trip.AcceptTripInviteResponse.role:type_name -> loci.trip.TripRole
-	1,  // 10: loci.trip.ListTripMembersResponse.members:type_name -> loci.trip.TripMember
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	2,  // 10: loci.trip.ListTripMembersResponse.members:type_name -> loci.trip.TripMember
+	29, // 11: loci.trip.TripComment.author:type_name -> loci.social.PublicUser
+	30, // 12: loci.trip.TripComment.created_at:type_name -> google.protobuf.Timestamp
+	30, // 13: loci.trip.ListTripCommentsRequest.before:type_name -> google.protobuf.Timestamp
+	15, // 14: loci.trip.ListTripCommentsResponse.comments:type_name -> loci.trip.TripComment
+	15, // 15: loci.trip.ReportedTripComment.comment:type_name -> loci.trip.TripComment
+	24, // 16: loci.trip.ReportedTripComment.reasons:type_name -> loci.trip.TripCommentReportReason
+	30, // 17: loci.trip.ReportedTripComment.last_reported_at:type_name -> google.protobuf.Timestamp
+	25, // 18: loci.trip.ListReportedTripCommentsResponse.comments:type_name -> loci.trip.ReportedTripComment
+	1,  // 19: loci.trip.ResolveTripCommentReportRequest.action:type_name -> loci.trip.TripCommentModerationAction
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_loci_trip_members_proto_init() }
@@ -944,8 +1878,8 @@ func file_loci_trip_members_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_trip_members_proto_rawDesc), len(file_loci_trip_members_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   13,
+			NumEnums:      2,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
