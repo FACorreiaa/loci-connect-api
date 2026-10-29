@@ -31,13 +31,20 @@ func TestMapEventToProto_ActionProposal(t *testing.T) {
 	require.Equal(t, "2026-11-12", got.GetAction().GetSetDates().GetStartDate())
 }
 
-type fakeTripActions struct{ err error }
+type fakeTripActions struct {
+	err   error
+	owner uuid.UUID // uuid.Nil: the caller owns the trip
+}
 
-func (f fakeTripActions) Apply(context.Context, uuid.UUID, uuid.UUID, *int, int64) (*trip.Trip, *locitypes.ConversationMessage, error) {
+func (f fakeTripActions) Apply(_ context.Context, userID, _ uuid.UUID, _ *int, _ int64) (*trip.Trip, *locitypes.ConversationMessage, error) {
 	if f.err != nil {
 		return nil, nil, f.err
 	}
-	return &trip.Trip{ID: uuid.New(), Title: "Lisbon", Version: 4}, &locitypes.ConversationMessage{Content: "Dates set"}, nil
+	owner := f.owner
+	if owner == uuid.Nil {
+		owner = userID
+	}
+	return &trip.Trip{ID: uuid.New(), UserID: owner, Title: "Lisbon", Version: 4}, &locitypes.ConversationMessage{Content: "Dates set"}, nil
 }
 
 func (f fakeTripActions) Dismiss(context.Context, uuid.UUID, uuid.UUID) error { return f.err }
@@ -51,6 +58,13 @@ func TestApplyTripAction(t *testing.T) {
 	res, err := h.ApplyTripAction(signedIn(), connect.NewRequest(&chatv1.ApplyTripActionRequest{ProposalId: uuid.NewString(), BaseVersion: 3}))
 	require.NoError(t, err)
 	require.EqualValues(t, 4, res.Msg.GetTrip().GetVersion())
+	require.Equal(t, "Dates set", res.Msg.GetConfirmation().GetContent())
+
+	// A co-planner who applied does not get the owner's view of the trip.
+	h = (&ChatHandler{}).WithTripActions(fakeTripActions{owner: uuid.New()})
+	res, err = h.ApplyTripAction(signedIn(), connect.NewRequest(&chatv1.ApplyTripActionRequest{ProposalId: uuid.NewString(), BaseVersion: 3}))
+	require.NoError(t, err)
+	require.Nil(t, res.Msg.GetTrip())
 	require.Equal(t, "Dates set", res.Msg.GetConfirmation().GetContent())
 }
 
