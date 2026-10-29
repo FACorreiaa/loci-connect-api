@@ -119,6 +119,11 @@ func (h *Handler) withMembers(ctx context.Context, p *tripv1.TripDraft, t *Trip)
 	if h.members == nil || h.graph == nil {
 		return
 	}
+	may, err := h.members.CoPlannersMayApply(ctx, t.ID)
+	if err != nil {
+		h.logWarn("load trip planning rules", err)
+	}
+	p.CoPlannersMayApply = may
 	cards, err := h.memberCards(ctx, t)
 	if err != nil {
 		h.logWarn("load trip members", err)
@@ -385,6 +390,36 @@ func (h *Handler) RemoveTripMember(ctx context.Context, req *connect.Request[tri
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&tripv1.RemoveTripMemberResponse{}), nil
+}
+
+func (h *Handler) SetTripPlanningRules(ctx context.Context, req *connect.Request[tripv1.SetTripPlanningRulesRequest]) (*connect.Response[tripv1.SetTripPlanningRulesResponse], error) {
+	if err := h.membersReady(); err != nil {
+		return nil, err
+	}
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	id, err := parseTripID(req.Msg.GetTripId())
+	if err != nil {
+		return nil, err
+	}
+	_, role, err := h.onTrip(ctx, uid, id)
+	if err != nil {
+		return nil, err
+	}
+	if role != RoleOwner {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only the owner sets how members plan"))
+	}
+	may := req.Msg.GetCoPlannersMayApply()
+	if err := h.members.SetCoPlannersMayApply(ctx, id, may); err != nil {
+		return nil, toConnectErr(err)
+	}
+	h.analytics.Capture(uid.String(), "trip_planning_rules_set", map[string]any{
+		"trip_id":               id.String(),
+		"co_planners_may_apply": may,
+	})
+	return connect.NewResponse(&tripv1.SetTripPlanningRulesResponse{CoPlannersMayApply: may}), nil
 }
 
 // ownerCards loads the public card of each owner in owners.

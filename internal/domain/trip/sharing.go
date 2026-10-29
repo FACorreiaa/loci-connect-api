@@ -95,8 +95,7 @@ func CanSeeAsMember(viewer, owner uuid.UUID, role Role, vis Visibility, access A
 }
 
 // CanEdit reports whether viewer may suggest changes to the trip: the owner,
-// or a co-planner neither side has blocked. Applying a change stays with the
-// owner.
+// or a co-planner neither side has blocked. Applying a change is CanApply.
 func CanEdit(viewer, owner uuid.UUID, role Role, blocked bool) bool {
 	if viewer == uuid.Nil {
 		return false
@@ -107,6 +106,13 @@ func CanEdit(viewer, owner uuid.UUID, role Role, blocked bool) bool {
 	// RoleOwner for someone who is not the owner is a caller's mistake, not
 	// a reason to let them in.
 	return role == RoleCoPlanner && !blocked
+}
+
+// CanApply reports whether someone with role, already resolved on the trip,
+// may apply a suggestion: the owner always, a co-planner only when the owner
+// lets co-planners apply.
+func CanApply(role Role, coPlannersMayApply bool) bool {
+	return role == RoleOwner || coPlannersMayApply && role == RoleCoPlanner
 }
 
 // SocialGraph is what trip sharing needs from the people layer. Friends are
