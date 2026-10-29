@@ -5968,7 +5968,9 @@ func (x *ApplyTripActionRequest) GetBaseVersion() int64 {
 
 type ApplyTripActionResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Trip  *trip.TripDraft        `protobuf:"bytes,1,opt,name=trip,proto3" json:"trip,omitempty"`
+	// The trip after the change, as its owner sees it. Unset when the caller is
+	// a co-planner the owner lets apply: they read it again with GetTrip.
+	Trip *trip.TripDraft `protobuf:"bytes,1,opt,name=trip,proto3" json:"trip,omitempty"`
 	// Posted into the chat thread when the proposal came from one.
 	Confirmation  *ConversationMessage `protobuf:"bytes,2,opt,name=confirmation,proto3" json:"confirmation,omitempty"`
 	unknownFields protoimpl.UnknownFields

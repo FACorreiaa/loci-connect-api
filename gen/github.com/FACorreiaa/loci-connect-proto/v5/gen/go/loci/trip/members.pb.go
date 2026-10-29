@@ -869,6 +869,103 @@ func (*RemoveTripMemberResponse) Descriptor() ([]byte, []int) {
 	return file_loci_trip_members_proto_rawDescGZIP(), []int{12}
 }
 
+type SetTripPlanningRulesRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	TripId string                 `protobuf:"bytes,1,opt,name=trip_id,json=tripId,proto3" json:"trip_id,omitempty"`
+	// Co-planners may apply suggestions, theirs and others', as the owner can.
+	CoPlannersMayApply bool `protobuf:"varint,2,opt,name=co_planners_may_apply,json=coPlannersMayApply,proto3" json:"co_planners_may_apply,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetTripPlanningRulesRequest) Reset() {
+	*x = SetTripPlanningRulesRequest{}
+	mi := &file_loci_trip_members_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTripPlanningRulesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTripPlanningRulesRequest) ProtoMessage() {}
+
+func (x *SetTripPlanningRulesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTripPlanningRulesRequest.ProtoReflect.Descriptor instead.
+func (*SetTripPlanningRulesRequest) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *SetTripPlanningRulesRequest) GetTripId() string {
+	if x != nil {
+		return x.TripId
+	}
+	return ""
+}
+
+func (x *SetTripPlanningRulesRequest) GetCoPlannersMayApply() bool {
+	if x != nil {
+		return x.CoPlannersMayApply
+	}
+	return false
+}
+
+type SetTripPlanningRulesResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	CoPlannersMayApply bool                   `protobuf:"varint,1,opt,name=co_planners_may_apply,json=coPlannersMayApply,proto3" json:"co_planners_may_apply,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetTripPlanningRulesResponse) Reset() {
+	*x = SetTripPlanningRulesResponse{}
+	mi := &file_loci_trip_members_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTripPlanningRulesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTripPlanningRulesResponse) ProtoMessage() {}
+
+func (x *SetTripPlanningRulesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_members_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTripPlanningRulesResponse.ProtoReflect.Descriptor instead.
+func (*SetTripPlanningRulesResponse) Descriptor() ([]byte, []int) {
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SetTripPlanningRulesResponse) GetCoPlannersMayApply() bool {
+	if x != nil {
+		return x.CoPlannersMayApply
+	}
+	return false
+}
+
 // TripComment is a note someone on the trip left, about the trip or one of
 // its stops. Only the owner and members read and write them.
 type TripComment struct {
@@ -892,7 +989,7 @@ type TripComment struct {
 
 func (x *TripComment) Reset() {
 	*x = TripComment{}
-	mi := &file_loci_trip_members_proto_msgTypes[13]
+	mi := &file_loci_trip_members_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -904,7 +1001,7 @@ func (x *TripComment) String() string {
 func (*TripComment) ProtoMessage() {}
 
 func (x *TripComment) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[13]
+	mi := &file_loci_trip_members_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -917,7 +1014,7 @@ func (x *TripComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripComment.ProtoReflect.Descriptor instead.
 func (*TripComment) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{13}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TripComment) GetId() string {
@@ -988,7 +1085,7 @@ type AddTripCommentRequest struct {
 
 func (x *AddTripCommentRequest) Reset() {
 	*x = AddTripCommentRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[14]
+	mi := &file_loci_trip_members_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1000,7 +1097,7 @@ func (x *AddTripCommentRequest) String() string {
 func (*AddTripCommentRequest) ProtoMessage() {}
 
 func (x *AddTripCommentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[14]
+	mi := &file_loci_trip_members_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1013,7 +1110,7 @@ func (x *AddTripCommentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTripCommentRequest.ProtoReflect.Descriptor instead.
 func (*AddTripCommentRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{14}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AddTripCommentRequest) GetTripId() string {
@@ -1050,7 +1147,7 @@ type ListTripCommentsRequest struct {
 
 func (x *ListTripCommentsRequest) Reset() {
 	*x = ListTripCommentsRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[15]
+	mi := &file_loci_trip_members_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1159,7 @@ func (x *ListTripCommentsRequest) String() string {
 func (*ListTripCommentsRequest) ProtoMessage() {}
 
 func (x *ListTripCommentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[15]
+	mi := &file_loci_trip_members_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1172,7 @@ func (x *ListTripCommentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTripCommentsRequest.ProtoReflect.Descriptor instead.
 func (*ListTripCommentsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{15}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListTripCommentsRequest) GetTripId() string {
@@ -1113,7 +1210,7 @@ type ListTripCommentsResponse struct {
 
 func (x *ListTripCommentsResponse) Reset() {
 	*x = ListTripCommentsResponse{}
-	mi := &file_loci_trip_members_proto_msgTypes[16]
+	mi := &file_loci_trip_members_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1125,7 +1222,7 @@ func (x *ListTripCommentsResponse) String() string {
 func (*ListTripCommentsResponse) ProtoMessage() {}
 
 func (x *ListTripCommentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[16]
+	mi := &file_loci_trip_members_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1138,7 +1235,7 @@ func (x *ListTripCommentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTripCommentsResponse.ProtoReflect.Descriptor instead.
 func (*ListTripCommentsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{16}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListTripCommentsResponse) GetComments() []*TripComment {
@@ -1164,7 +1261,7 @@ type DeleteTripCommentRequest struct {
 
 func (x *DeleteTripCommentRequest) Reset() {
 	*x = DeleteTripCommentRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[17]
+	mi := &file_loci_trip_members_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1176,7 +1273,7 @@ func (x *DeleteTripCommentRequest) String() string {
 func (*DeleteTripCommentRequest) ProtoMessage() {}
 
 func (x *DeleteTripCommentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[17]
+	mi := &file_loci_trip_members_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1189,7 +1286,7 @@ func (x *DeleteTripCommentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTripCommentRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTripCommentRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{17}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DeleteTripCommentRequest) GetCommentId() string {
@@ -1207,7 +1304,7 @@ type DeleteTripCommentResponse struct {
 
 func (x *DeleteTripCommentResponse) Reset() {
 	*x = DeleteTripCommentResponse{}
-	mi := &file_loci_trip_members_proto_msgTypes[18]
+	mi := &file_loci_trip_members_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1219,7 +1316,7 @@ func (x *DeleteTripCommentResponse) String() string {
 func (*DeleteTripCommentResponse) ProtoMessage() {}
 
 func (x *DeleteTripCommentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[18]
+	mi := &file_loci_trip_members_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1232,7 +1329,7 @@ func (x *DeleteTripCommentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTripCommentResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTripCommentResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{18}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{20}
 }
 
 type ReportTripCommentRequest struct {
@@ -1248,7 +1345,7 @@ type ReportTripCommentRequest struct {
 
 func (x *ReportTripCommentRequest) Reset() {
 	*x = ReportTripCommentRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[19]
+	mi := &file_loci_trip_members_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1260,7 +1357,7 @@ func (x *ReportTripCommentRequest) String() string {
 func (*ReportTripCommentRequest) ProtoMessage() {}
 
 func (x *ReportTripCommentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[19]
+	mi := &file_loci_trip_members_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1273,7 +1370,7 @@ func (x *ReportTripCommentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportTripCommentRequest.ProtoReflect.Descriptor instead.
 func (*ReportTripCommentRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{19}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ReportTripCommentRequest) GetCommentId() string {
@@ -1305,7 +1402,7 @@ type ReportTripCommentResponse struct {
 
 func (x *ReportTripCommentResponse) Reset() {
 	*x = ReportTripCommentResponse{}
-	mi := &file_loci_trip_members_proto_msgTypes[20]
+	mi := &file_loci_trip_members_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1317,7 +1414,7 @@ func (x *ReportTripCommentResponse) String() string {
 func (*ReportTripCommentResponse) ProtoMessage() {}
 
 func (x *ReportTripCommentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[20]
+	mi := &file_loci_trip_members_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1330,7 +1427,7 @@ func (x *ReportTripCommentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportTripCommentResponse.ProtoReflect.Descriptor instead.
 func (*ReportTripCommentResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{20}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{22}
 }
 
 type ListReportedTripCommentsRequest struct {
@@ -1345,7 +1442,7 @@ type ListReportedTripCommentsRequest struct {
 
 func (x *ListReportedTripCommentsRequest) Reset() {
 	*x = ListReportedTripCommentsRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[21]
+	mi := &file_loci_trip_members_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1357,7 +1454,7 @@ func (x *ListReportedTripCommentsRequest) String() string {
 func (*ListReportedTripCommentsRequest) ProtoMessage() {}
 
 func (x *ListReportedTripCommentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[21]
+	mi := &file_loci_trip_members_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1370,7 +1467,7 @@ func (x *ListReportedTripCommentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReportedTripCommentsRequest.ProtoReflect.Descriptor instead.
 func (*ListReportedTripCommentsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{21}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ListReportedTripCommentsRequest) GetLimit() int32 {
@@ -1398,7 +1495,7 @@ type TripCommentReportReason struct {
 
 func (x *TripCommentReportReason) Reset() {
 	*x = TripCommentReportReason{}
-	mi := &file_loci_trip_members_proto_msgTypes[22]
+	mi := &file_loci_trip_members_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1410,7 +1507,7 @@ func (x *TripCommentReportReason) String() string {
 func (*TripCommentReportReason) ProtoMessage() {}
 
 func (x *TripCommentReportReason) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[22]
+	mi := &file_loci_trip_members_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1423,7 +1520,7 @@ func (x *TripCommentReportReason) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripCommentReportReason.ProtoReflect.Descriptor instead.
 func (*TripCommentReportReason) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{22}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *TripCommentReportReason) GetReason() string {
@@ -1457,7 +1554,7 @@ type ReportedTripComment struct {
 
 func (x *ReportedTripComment) Reset() {
 	*x = ReportedTripComment{}
-	mi := &file_loci_trip_members_proto_msgTypes[23]
+	mi := &file_loci_trip_members_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1469,7 +1566,7 @@ func (x *ReportedTripComment) String() string {
 func (*ReportedTripComment) ProtoMessage() {}
 
 func (x *ReportedTripComment) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[23]
+	mi := &file_loci_trip_members_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1482,7 +1579,7 @@ func (x *ReportedTripComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportedTripComment.ProtoReflect.Descriptor instead.
 func (*ReportedTripComment) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{23}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReportedTripComment) GetComment() *TripComment {
@@ -1537,7 +1634,7 @@ type ListReportedTripCommentsResponse struct {
 
 func (x *ListReportedTripCommentsResponse) Reset() {
 	*x = ListReportedTripCommentsResponse{}
-	mi := &file_loci_trip_members_proto_msgTypes[24]
+	mi := &file_loci_trip_members_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +1646,7 @@ func (x *ListReportedTripCommentsResponse) String() string {
 func (*ListReportedTripCommentsResponse) ProtoMessage() {}
 
 func (x *ListReportedTripCommentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[24]
+	mi := &file_loci_trip_members_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +1659,7 @@ func (x *ListReportedTripCommentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReportedTripCommentsResponse.ProtoReflect.Descriptor instead.
 func (*ListReportedTripCommentsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{24}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListReportedTripCommentsResponse) GetComments() []*ReportedTripComment {
@@ -1589,7 +1686,7 @@ type ResolveTripCommentReportRequest struct {
 
 func (x *ResolveTripCommentReportRequest) Reset() {
 	*x = ResolveTripCommentReportRequest{}
-	mi := &file_loci_trip_members_proto_msgTypes[25]
+	mi := &file_loci_trip_members_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1601,7 +1698,7 @@ func (x *ResolveTripCommentReportRequest) String() string {
 func (*ResolveTripCommentReportRequest) ProtoMessage() {}
 
 func (x *ResolveTripCommentReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[25]
+	mi := &file_loci_trip_members_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1614,7 +1711,7 @@ func (x *ResolveTripCommentReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveTripCommentReportRequest.ProtoReflect.Descriptor instead.
 func (*ResolveTripCommentReportRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{25}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ResolveTripCommentReportRequest) GetCommentId() string {
@@ -1639,7 +1736,7 @@ type ResolveTripCommentReportResponse struct {
 
 func (x *ResolveTripCommentReportResponse) Reset() {
 	*x = ResolveTripCommentReportResponse{}
-	mi := &file_loci_trip_members_proto_msgTypes[26]
+	mi := &file_loci_trip_members_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1651,7 +1748,7 @@ func (x *ResolveTripCommentReportResponse) String() string {
 func (*ResolveTripCommentReportResponse) ProtoMessage() {}
 
 func (x *ResolveTripCommentReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_members_proto_msgTypes[26]
+	mi := &file_loci_trip_members_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1664,7 +1761,7 @@ func (x *ResolveTripCommentReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveTripCommentReportResponse.ProtoReflect.Descriptor instead.
 func (*ResolveTripCommentReportResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_members_proto_rawDescGZIP(), []int{26}
+	return file_loci_trip_members_proto_rawDescGZIP(), []int{28}
 }
 
 var File_loci_trip_members_proto protoreflect.FileDescriptor
@@ -1725,7 +1822,12 @@ const file_loci_trip_members_proto_rawDesc = "" +
 	"\x17RemoveTripMemberRequest\x12!\n" +
 	"\atrip_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06tripId\x12!\n" +
 	"\auser_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06userId\"\x1a\n" +
-	"\x18RemoveTripMemberResponse\"\xa7\x02\n" +
+	"\x18RemoveTripMemberResponse\"s\n" +
+	"\x1bSetTripPlanningRulesRequest\x12!\n" +
+	"\atrip_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x06tripId\x121\n" +
+	"\x15co_planners_may_apply\x18\x02 \x01(\bR\x12coPlannersMayApply\"Q\n" +
+	"\x1cSetTripPlanningRulesResponse\x121\n" +
+	"\x15co_planners_may_apply\x18\x01 \x01(\bR\x12coPlannersMayApply\"\xa7\x02\n" +
 	"\vTripComment\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12 \n" +
 	"\atrip_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x06tripId\x12 \n" +
@@ -1805,7 +1907,7 @@ func file_loci_trip_members_proto_rawDescGZIP() []byte {
 }
 
 var file_loci_trip_members_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_loci_trip_members_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
+var file_loci_trip_members_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_loci_trip_members_proto_goTypes = []any{
 	(TripRole)(0),                            // 0: loci.trip.TripRole
 	(TripCommentModerationAction)(0),         // 1: loci.trip.TripCommentModerationAction
@@ -1822,43 +1924,45 @@ var file_loci_trip_members_proto_goTypes = []any{
 	(*ListTripMembersResponse)(nil),          // 12: loci.trip.ListTripMembersResponse
 	(*RemoveTripMemberRequest)(nil),          // 13: loci.trip.RemoveTripMemberRequest
 	(*RemoveTripMemberResponse)(nil),         // 14: loci.trip.RemoveTripMemberResponse
-	(*TripComment)(nil),                      // 15: loci.trip.TripComment
-	(*AddTripCommentRequest)(nil),            // 16: loci.trip.AddTripCommentRequest
-	(*ListTripCommentsRequest)(nil),          // 17: loci.trip.ListTripCommentsRequest
-	(*ListTripCommentsResponse)(nil),         // 18: loci.trip.ListTripCommentsResponse
-	(*DeleteTripCommentRequest)(nil),         // 19: loci.trip.DeleteTripCommentRequest
-	(*DeleteTripCommentResponse)(nil),        // 20: loci.trip.DeleteTripCommentResponse
-	(*ReportTripCommentRequest)(nil),         // 21: loci.trip.ReportTripCommentRequest
-	(*ReportTripCommentResponse)(nil),        // 22: loci.trip.ReportTripCommentResponse
-	(*ListReportedTripCommentsRequest)(nil),  // 23: loci.trip.ListReportedTripCommentsRequest
-	(*TripCommentReportReason)(nil),          // 24: loci.trip.TripCommentReportReason
-	(*ReportedTripComment)(nil),              // 25: loci.trip.ReportedTripComment
-	(*ListReportedTripCommentsResponse)(nil), // 26: loci.trip.ListReportedTripCommentsResponse
-	(*ResolveTripCommentReportRequest)(nil),  // 27: loci.trip.ResolveTripCommentReportRequest
-	(*ResolveTripCommentReportResponse)(nil), // 28: loci.trip.ResolveTripCommentReportResponse
-	(*social.PublicUser)(nil),                // 29: loci.social.PublicUser
-	(*timestamppb.Timestamp)(nil),            // 30: google.protobuf.Timestamp
+	(*SetTripPlanningRulesRequest)(nil),      // 15: loci.trip.SetTripPlanningRulesRequest
+	(*SetTripPlanningRulesResponse)(nil),     // 16: loci.trip.SetTripPlanningRulesResponse
+	(*TripComment)(nil),                      // 17: loci.trip.TripComment
+	(*AddTripCommentRequest)(nil),            // 18: loci.trip.AddTripCommentRequest
+	(*ListTripCommentsRequest)(nil),          // 19: loci.trip.ListTripCommentsRequest
+	(*ListTripCommentsResponse)(nil),         // 20: loci.trip.ListTripCommentsResponse
+	(*DeleteTripCommentRequest)(nil),         // 21: loci.trip.DeleteTripCommentRequest
+	(*DeleteTripCommentResponse)(nil),        // 22: loci.trip.DeleteTripCommentResponse
+	(*ReportTripCommentRequest)(nil),         // 23: loci.trip.ReportTripCommentRequest
+	(*ReportTripCommentResponse)(nil),        // 24: loci.trip.ReportTripCommentResponse
+	(*ListReportedTripCommentsRequest)(nil),  // 25: loci.trip.ListReportedTripCommentsRequest
+	(*TripCommentReportReason)(nil),          // 26: loci.trip.TripCommentReportReason
+	(*ReportedTripComment)(nil),              // 27: loci.trip.ReportedTripComment
+	(*ListReportedTripCommentsResponse)(nil), // 28: loci.trip.ListReportedTripCommentsResponse
+	(*ResolveTripCommentReportRequest)(nil),  // 29: loci.trip.ResolveTripCommentReportRequest
+	(*ResolveTripCommentReportResponse)(nil), // 30: loci.trip.ResolveTripCommentReportResponse
+	(*social.PublicUser)(nil),                // 31: loci.social.PublicUser
+	(*timestamppb.Timestamp)(nil),            // 32: google.protobuf.Timestamp
 }
 var file_loci_trip_members_proto_depIdxs = []int32{
-	29, // 0: loci.trip.TripMember.user:type_name -> loci.social.PublicUser
+	31, // 0: loci.trip.TripMember.user:type_name -> loci.social.PublicUser
 	0,  // 1: loci.trip.TripMember.role:type_name -> loci.trip.TripRole
-	30, // 2: loci.trip.TripMember.joined_at:type_name -> google.protobuf.Timestamp
+	32, // 2: loci.trip.TripMember.joined_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: loci.trip.TripInvite.role:type_name -> loci.trip.TripRole
-	30, // 4: loci.trip.TripInvite.expires_at:type_name -> google.protobuf.Timestamp
-	29, // 5: loci.trip.TripInvitePreview.owner:type_name -> loci.social.PublicUser
+	32, // 4: loci.trip.TripInvite.expires_at:type_name -> google.protobuf.Timestamp
+	31, // 5: loci.trip.TripInvitePreview.owner:type_name -> loci.social.PublicUser
 	2,  // 6: loci.trip.TripInvitePreview.members:type_name -> loci.trip.TripMember
 	0,  // 7: loci.trip.TripInvitePreview.role:type_name -> loci.trip.TripRole
 	0,  // 8: loci.trip.CreateTripInviteRequest.role:type_name -> loci.trip.TripRole
 	0,  // 9: loci.trip.AcceptTripInviteResponse.role:type_name -> loci.trip.TripRole
 	2,  // 10: loci.trip.ListTripMembersResponse.members:type_name -> loci.trip.TripMember
-	29, // 11: loci.trip.TripComment.author:type_name -> loci.social.PublicUser
-	30, // 12: loci.trip.TripComment.created_at:type_name -> google.protobuf.Timestamp
-	30, // 13: loci.trip.ListTripCommentsRequest.before:type_name -> google.protobuf.Timestamp
-	15, // 14: loci.trip.ListTripCommentsResponse.comments:type_name -> loci.trip.TripComment
-	15, // 15: loci.trip.ReportedTripComment.comment:type_name -> loci.trip.TripComment
-	24, // 16: loci.trip.ReportedTripComment.reasons:type_name -> loci.trip.TripCommentReportReason
-	30, // 17: loci.trip.ReportedTripComment.last_reported_at:type_name -> google.protobuf.Timestamp
-	25, // 18: loci.trip.ListReportedTripCommentsResponse.comments:type_name -> loci.trip.ReportedTripComment
+	31, // 11: loci.trip.TripComment.author:type_name -> loci.social.PublicUser
+	32, // 12: loci.trip.TripComment.created_at:type_name -> google.protobuf.Timestamp
+	32, // 13: loci.trip.ListTripCommentsRequest.before:type_name -> google.protobuf.Timestamp
+	17, // 14: loci.trip.ListTripCommentsResponse.comments:type_name -> loci.trip.TripComment
+	17, // 15: loci.trip.ReportedTripComment.comment:type_name -> loci.trip.TripComment
+	26, // 16: loci.trip.ReportedTripComment.reasons:type_name -> loci.trip.TripCommentReportReason
+	32, // 17: loci.trip.ReportedTripComment.last_reported_at:type_name -> google.protobuf.Timestamp
+	27, // 18: loci.trip.ListReportedTripCommentsResponse.comments:type_name -> loci.trip.ReportedTripComment
 	1,  // 19: loci.trip.ResolveTripCommentReportRequest.action:type_name -> loci.trip.TripCommentModerationAction
 	20, // [20:20] is the sub-list for method output_type
 	20, // [20:20] is the sub-list for method input_type
@@ -1879,7 +1983,7 @@ func file_loci_trip_members_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_trip_members_proto_rawDesc), len(file_loci_trip_members_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   27,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
