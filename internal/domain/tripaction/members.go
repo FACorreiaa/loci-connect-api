@@ -35,6 +35,7 @@ type Members interface {
 	Resolve(ctx context.Context, viewer, tripID uuid.UUID) (*trip.Trip, trip.Role, error)
 	Everyone(ctx context.Context, t *trip.Trip) ([]uuid.UUID, error)
 	PublicUsers(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*socialv1.PublicUser, error)
+	CoPlannersMayApply(ctx context.Context, tripID uuid.UUID) (bool, error)
 }
 
 // TripNotifier tells a trip's people about a change (*push.Notifier).
@@ -178,7 +179,8 @@ func (s *Service) proposalOnTrip(ctx context.Context, userID, proposalID uuid.UU
 }
 
 // applicable is the proposal userID may apply: without planning together,
-// their own card; with it, any card on a trip they own.
+// their own card; with it, any card on a trip they own, or on one whose owner
+// lets co-planners apply.
 func (s *Service) applicable(ctx context.Context, userID, proposalID uuid.UUID) (*Proposal, error) {
 	if !s.together() {
 		return s.d.Store.Get(ctx, proposalID, userID)
@@ -187,7 +189,13 @@ func (s *Service) applicable(ctx context.Context, userID, proposalID uuid.UUID) 
 	if err != nil {
 		return nil, err
 	}
-	if role != trip.RoleOwner {
+	may := false
+	if role == trip.RoleCoPlanner {
+		if may, err = s.d.Members.CoPlannersMayApply(ctx, p.TripID); err != nil {
+			return nil, err
+		}
+	}
+	if !trip.CanApply(role, may) {
 		return nil, ErrForbidden
 	}
 	return p, nil
@@ -206,8 +214,14 @@ func (s *Service) dismissable(ctx context.Context, userID, proposalID uuid.UUID)
 	if p.UserID == userID {
 		return p, nil
 	}
-	if _, err := s.applicable(ctx, userID, proposalID); err != nil {
+	// Owner only, even when co-planners may apply: applying a card is help,
+	// waving away someone else's is the owner's call.
+	_, _, role, err := s.proposalOnTrip(ctx, userID, proposalID)
+	if err != nil {
 		return nil, err
+	}
+	if role != trip.RoleOwner {
+		return nil, ErrForbidden
 	}
 	return p, nil
 }

@@ -118,6 +118,12 @@ type MembersRepository interface {
 	// member of, most recently updated first, with their member role for the
 	// latter.
 	ListWithMember(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Trip, map[uuid.UUID]Role, int, error)
+	// CoPlannersMayApply is the owner's rule for tripID: whether co-planners
+	// may apply suggestions. ErrNotFound when there is no such trip.
+	CoPlannersMayApply(ctx context.Context, tripID uuid.UUID) (bool, error)
+	// SetCoPlannersMayApply sets that rule. ErrNotFound when there is no such
+	// trip.
+	SetCoPlannersMayApply(ctx context.Context, tripID uuid.UUID, may bool) error
 }
 
 type membersRepository struct {
@@ -168,6 +174,29 @@ func (r *membersRepository) Members(ctx context.Context, tripID uuid.UUID) ([]Me
 func (r *membersRepository) RemoveMember(ctx context.Context, tripID, userID uuid.UUID) error {
 	if _, err := r.db.Exec(ctx, `DELETE FROM trip_members WHERE trip_id = $1 AND user_id = $2`, tripID, userID); err != nil {
 		return fmt.Errorf("remove trip member: %w", err)
+	}
+	return nil
+}
+
+func (r *membersRepository) CoPlannersMayApply(ctx context.Context, tripID uuid.UUID) (bool, error) {
+	var may bool
+	err := r.db.QueryRow(ctx, `SELECT co_planners_may_apply FROM trips WHERE id = $1`, tripID).Scan(&may)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, fmt.Errorf("trip planning rules: %w", err)
+	}
+	return may, nil
+}
+
+func (r *membersRepository) SetCoPlannersMayApply(ctx context.Context, tripID uuid.UUID, may bool) error {
+	tag, err := r.db.Exec(ctx, `UPDATE trips SET co_planners_may_apply = $2 WHERE id = $1`, tripID, may)
+	if err != nil {
+		return fmt.Errorf("set trip planning rules: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

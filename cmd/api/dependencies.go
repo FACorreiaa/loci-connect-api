@@ -1244,9 +1244,11 @@ func (d *Dependencies) initHandlers() error {
 		// Verified phone and Facebook links, which friends are found by.
 		d.CustomAuthHandler = d.CustomAuthHandler.WithAccountLinks(customauthservice.NewAccountLinks(d.DB.Pool))
 	}
-	// Moderators of reported reviews: ADMIN_EMAIL, plus any token with role
-	// "admin" (see reviewdomain.Handler.WithAdmins).
-	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger).WithAdmins(d.Config.Auth.AdminEmail)
+	// Moderators of reported reviews: ADMIN_EMAILS plus the single ADMIN_EMAIL,
+	// the same people who moderate trip comments and boards, plus any token
+	// with role "admin" (see reviewdomain.Handler.WithAdmins).
+	d.ReviewHandler = reviewdomain.NewHandler(d.ReviewSvc, d.Logger).
+		WithAdmins(append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)...)
 	d.EntitlementHandler = entitlement.NewHandler(d.SubscriptionService, d.ListRepo, d.FavoritesRepo)
 	d.PlaceIntelligenceHandler = placeintel.NewHandler(d.DB.Pool, d.Logger).
 		WithCityResolver(placeCityResolverAdapter{resolver: d.CityResolver}).

@@ -125,6 +125,9 @@ const (
 	// TripServiceRemoveTripMemberProcedure is the fully-qualified name of the TripService's
 	// RemoveTripMember RPC.
 	TripServiceRemoveTripMemberProcedure = "/loci.trip.TripService/RemoveTripMember"
+	// TripServiceSetTripPlanningRulesProcedure is the fully-qualified name of the TripService's
+	// SetTripPlanningRules RPC.
+	TripServiceSetTripPlanningRulesProcedure = "/loci.trip.TripService/SetTripPlanningRules"
 	// TripServiceAddTripCommentProcedure is the fully-qualified name of the TripService's
 	// AddTripComment RPC.
 	TripServiceAddTripCommentProcedure = "/loci.trip.TripService/AddTripComment"
@@ -183,6 +186,7 @@ var (
 	tripServiceRevokeTripInviteMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RevokeTripInvite")
 	tripServiceListTripMembersMethodDescriptor          = tripServiceServiceDescriptor.Methods().ByName("ListTripMembers")
 	tripServiceRemoveTripMemberMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("RemoveTripMember")
+	tripServiceSetTripPlanningRulesMethodDescriptor     = tripServiceServiceDescriptor.Methods().ByName("SetTripPlanningRules")
 	tripServiceAddTripCommentMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("AddTripComment")
 	tripServiceListTripCommentsMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("ListTripComments")
 	tripServiceDeleteTripCommentMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("DeleteTripComment")
@@ -269,6 +273,8 @@ type TripServiceClient interface {
 	// RemoveTripMember takes someone off the trip: the owner removes anyone,
 	// a member removes only themselves.
 	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
+	// SetTripPlanningRules sets how members may change the trip (owner only).
+	SetTripPlanningRules(context.Context, *connect.Request[trip.SetTripPlanningRulesRequest]) (*connect.Response[trip.SetTripPlanningRulesResponse], error)
 	// Trip comments, for the owner and members. AddTripComment is
 	// ResourceExhausted past 60 an hour; a viewer may comment too.
 	AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error)
@@ -505,6 +511,12 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		setTripPlanningRules: connect.NewClient[trip.SetTripPlanningRulesRequest, trip.SetTripPlanningRulesResponse](
+			httpClient,
+			baseURL+TripServiceSetTripPlanningRulesProcedure,
+			connect.WithSchema(tripServiceSetTripPlanningRulesMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		addTripComment: connect.NewClient[trip.AddTripCommentRequest, trip.TripComment](
 			httpClient,
 			baseURL+TripServiceAddTripCommentProcedure,
@@ -581,6 +593,7 @@ type tripServiceClient struct {
 	revokeTripInvite         *connect.Client[trip.RevokeTripInviteRequest, trip.RevokeTripInviteResponse]
 	listTripMembers          *connect.Client[trip.ListTripMembersRequest, trip.ListTripMembersResponse]
 	removeTripMember         *connect.Client[trip.RemoveTripMemberRequest, trip.RemoveTripMemberResponse]
+	setTripPlanningRules     *connect.Client[trip.SetTripPlanningRulesRequest, trip.SetTripPlanningRulesResponse]
 	addTripComment           *connect.Client[trip.AddTripCommentRequest, trip.TripComment]
 	listTripComments         *connect.Client[trip.ListTripCommentsRequest, trip.ListTripCommentsResponse]
 	deleteTripComment        *connect.Client[trip.DeleteTripCommentRequest, trip.DeleteTripCommentResponse]
@@ -766,6 +779,11 @@ func (c *tripServiceClient) RemoveTripMember(ctx context.Context, req *connect.R
 	return c.removeTripMember.CallUnary(ctx, req)
 }
 
+// SetTripPlanningRules calls loci.trip.TripService.SetTripPlanningRules.
+func (c *tripServiceClient) SetTripPlanningRules(ctx context.Context, req *connect.Request[trip.SetTripPlanningRulesRequest]) (*connect.Response[trip.SetTripPlanningRulesResponse], error) {
+	return c.setTripPlanningRules.CallUnary(ctx, req)
+}
+
 // AddTripComment calls loci.trip.TripService.AddTripComment.
 func (c *tripServiceClient) AddTripComment(ctx context.Context, req *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error) {
 	return c.addTripComment.CallUnary(ctx, req)
@@ -874,6 +892,8 @@ type TripServiceHandler interface {
 	// RemoveTripMember takes someone off the trip: the owner removes anyone,
 	// a member removes only themselves.
 	RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error)
+	// SetTripPlanningRules sets how members may change the trip (owner only).
+	SetTripPlanningRules(context.Context, *connect.Request[trip.SetTripPlanningRulesRequest]) (*connect.Response[trip.SetTripPlanningRulesResponse], error)
 	// Trip comments, for the owner and members. AddTripComment is
 	// ResourceExhausted past 60 an hour; a viewer may comment too.
 	AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error)
@@ -1106,6 +1126,12 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceRemoveTripMemberMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceSetTripPlanningRulesHandler := connect.NewUnaryHandler(
+		TripServiceSetTripPlanningRulesProcedure,
+		svc.SetTripPlanningRules,
+		connect.WithSchema(tripServiceSetTripPlanningRulesMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	tripServiceAddTripCommentHandler := connect.NewUnaryHandler(
 		TripServiceAddTripCommentProcedure,
 		svc.AddTripComment,
@@ -1214,6 +1240,8 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceListTripMembersHandler.ServeHTTP(w, r)
 		case TripServiceRemoveTripMemberProcedure:
 			tripServiceRemoveTripMemberHandler.ServeHTTP(w, r)
+		case TripServiceSetTripPlanningRulesProcedure:
+			tripServiceSetTripPlanningRulesHandler.ServeHTTP(w, r)
 		case TripServiceAddTripCommentProcedure:
 			tripServiceAddTripCommentHandler.ServeHTTP(w, r)
 		case TripServiceListTripCommentsProcedure:
@@ -1373,6 +1401,10 @@ func (UnimplementedTripServiceHandler) ListTripMembers(context.Context, *connect
 
 func (UnimplementedTripServiceHandler) RemoveTripMember(context.Context, *connect.Request[trip.RemoveTripMemberRequest]) (*connect.Response[trip.RemoveTripMemberResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveTripMember is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) SetTripPlanningRules(context.Context, *connect.Request[trip.SetTripPlanningRulesRequest]) (*connect.Response[trip.SetTripPlanningRulesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SetTripPlanningRules is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) AddTripComment(context.Context, *connect.Request[trip.AddTripCommentRequest]) (*connect.Response[trip.TripComment], error) {

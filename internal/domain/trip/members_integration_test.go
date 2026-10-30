@@ -108,6 +108,25 @@ func TestTripMembersEndToEnd(t *testing.T) {
 	assert.Equal(t, tripv1.TripRole_TRIP_ROLE_OWNER, owned.GetViewerRole())
 	assert.Len(t, owned.GetMembers(), 2)
 
+	// Only the owner lets co-planners apply, and everyone on the trip reads the rule.
+	assert.False(t, owned.GetCoPlannersMayApply(), "applying starts with the owner")
+	setRule := func(viewer uuid.UUID, may bool) error {
+		_, err := h.SetTripPlanningRules(as(viewer), connect.NewRequest(&tripv1.SetTripPlanningRulesRequest{
+			TripId: trip.ID.String(), CoPlannersMayApply: may,
+		}))
+		return err
+	}
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(setRule(rui, true)))
+	assert.Equal(t, connect.CodeNotFound, connect.CodeOf(setRule(eve, true)))
+	require.NoError(t, setRule(ana, true))
+	got, err = getTrip(rui)
+	require.NoError(t, err)
+	assert.True(t, got.GetCoPlannersMayApply())
+	require.NoError(t, setRule(ana, false))
+	owned, err = getTrip(ana)
+	require.NoError(t, err)
+	assert.False(t, owned.GetCoPlannersMayApply())
+
 	// Joining again keeps the role and uses nothing up.
 	_, err = h.AcceptTripInvite(as(rui), connect.NewRequest(&tripv1.AcceptTripInviteRequest{Code: inv.GetCode()}))
 	require.NoError(t, err)

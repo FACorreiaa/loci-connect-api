@@ -79,8 +79,13 @@ func (m *memBoard) MarkApplied(_ context.Context, id, by uuid.UUID) error {
 }
 
 type fakeMembers struct {
-	trips *fakeTrips
-	roles map[uuid.UUID]trip.Role
+	trips    *fakeTrips
+	roles    map[uuid.UUID]trip.Role
+	mayApply bool
+}
+
+func (f *fakeMembers) CoPlannersMayApply(context.Context, uuid.UUID) (bool, error) {
+	return f.mayApply, nil
 }
 
 func (f *fakeMembers) Resolve(_ context.Context, viewer, tripID uuid.UUID) (*trip.Trip, trip.Role, error) {
@@ -139,6 +144,7 @@ func (f *fakeAnalytics) Capture(_, event string, _ map[string]any) {
 type together struct {
 	*fixture
 	board            *memBoard
+	members          *fakeMembers
 	notify           *fakeNotify
 	events           *fakeAnalytics
 	co, viewer, nope uuid.UUID
@@ -159,6 +165,7 @@ func newTogether(t *testing.T) *together {
 		co:    uuid.New(), viewer: uuid.New(), nope: uuid.New(), day: day, stop: stop,
 	}
 	members := &fakeMembers{trips: f.plans.trips, roles: map[uuid.UUID]trip.Role{g.co: trip.RoleCoPlanner, g.viewer: trip.RoleViewer}}
+	g.members = members
 	d := f.svc.d
 	d.Members, d.Board, d.Notify, d.Analytics = members, g.board, g.notify, g.events
 	f.svc = NewService(d)
@@ -263,6 +270,35 @@ func TestApply_OnlyOwnerAndEveryoneElseHears(t *testing.T) {
 
 	_, _, err = g.svc.Apply(ctx, g.uid, v.ID, nil, 4)
 	require.ErrorIs(t, err, ErrNotPending, "a second tap applies nothing")
+}
+
+func TestApply_CoPlannerWhenTheOwnerLetsThem(t *testing.T) {
+	g := newTogether(t)
+	g.members.mayApply = true
+	ctx := context.Background()
+	v, err := g.svc.ProposeEdit(ctx, g.co, g.tid, g.addStop("Pastéis de Belém"), 3)
+	require.NoError(t, err)
+	g.notify.sent = nil
+
+	_, _, err = g.svc.Apply(ctx, g.viewer, v.ID, nil, 3)
+	require.ErrorIs(t, err, ErrForbidden, "a viewer never applies")
+
+	tr, _, err := g.svc.Apply(ctx, g.co, v.ID, nil, 3)
+	require.NoError(t, err)
+	require.Equal(t, int64(4), tr.Version)
+	require.Equal(t, g.co, g.board.appliedBy[v.ID])
+	require.Len(t, g.notify.sent, 1)
+	require.ElementsMatch(t, []uuid.UUID{g.uid, g.viewer}, g.notify.sent[0].to, "the owner hears too")
+}
+
+func TestDismiss_CoPlannerWhoMayApplyStillOnlyTakesBackTheirOwn(t *testing.T) {
+	g := newTogether(t)
+	g.members.mayApply = true
+	ctx := context.Background()
+	mine, err := g.svc.ProposeEdit(ctx, g.uid, g.tid, g.addStop("A"), 3)
+	require.NoError(t, err)
+
+	require.ErrorIs(t, g.svc.Dismiss(ctx, g.co, mine.ID), ErrForbidden, "waving away the owner's card is the owner's call")
 }
 
 func TestApply_StopGoneKeepsProposalOpen(t *testing.T) {

@@ -102,6 +102,26 @@ func TestCanEdit(t *testing.T) {
 	}
 }
 
+func TestCanApply(t *testing.T) {
+	cases := []struct {
+		role  Role
+		mayCo bool
+		want  bool
+	}{
+		{RoleOwner, false, true},
+		{RoleOwner, true, true},
+		{RoleCoPlanner, false, false},
+		{RoleCoPlanner, true, true},
+		{RoleViewer, true, false},
+		{RoleNone, true, false},
+	}
+	for _, c := range cases {
+		if got := CanApply(c.role, c.mayCo); got != c.want {
+			t.Errorf("CanApply(%v, %v) = %v, want %v", c.role, c.mayCo, got, c.want)
+		}
+	}
+}
+
 func sharedDraft() *tripv1.TripDraft {
 	url := "https://book.example/1"
 	sid := "session-1"

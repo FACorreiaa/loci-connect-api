@@ -63,7 +63,13 @@ func (h *ChatHandler) ApplyTripAction(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, h.tripActionError(ctx, err)
 	}
-	res := &chatv1.ApplyTripActionResponse{Trip: trip.ToProto(t)}
+	res := &chatv1.ApplyTripActionResponse{}
+	// The trip comes back as its owner sees it, share code and all. A
+	// co-planner who applied, when the owner lets them, reads it again with
+	// GetTrip instead.
+	if t != nil && t.UserID == userID {
+		res.Trip = trip.ToProto(t)
+	}
 	if msg != nil {
 		res.Confirmation = presenter.ToConversationMessage(*msg)
 	}

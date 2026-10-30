@@ -66,6 +66,12 @@ func (a *MemberAccess) Everyone(ctx context.Context, t *Trip) ([]uuid.UUID, erro
 	return out, nil
 }
 
+// CoPlannersMayApply is the owner's rule on whether co-planners apply
+// suggestions too.
+func (a *MemberAccess) CoPlannersMayApply(ctx context.Context, tripID uuid.UUID) (bool, error) {
+	return a.members.CoPlannersMayApply(ctx, tripID)
+}
+
 // PublicUsers is the people layer's public cards, for naming who did what.
 func (a *MemberAccess) PublicUsers(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*socialv1.PublicUser, error) {
 	return a.graph.PublicUsers(ctx, ids)
