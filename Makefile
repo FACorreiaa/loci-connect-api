@@ -1,4 +1,4 @@
-.PHONY: help generate build run bundle-forge test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine hooks lint-go
+.PHONY: help generate build run bundle-forge test test-integration test-e2e clean docker-build docker-run docker-compose-up docker-compose-down migrate-up migrate-down pprof-cpu pprof-heap pprof-goroutine hooks lint-go check-fmt vet staticcheck test-race check-all
 
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -118,3 +118,21 @@ hooks: ## Install versioned git hooks (.githooks → core.hooksPath)
 
 lint-go: ## Run golangci-lint (same command the pre-commit hook runs)
 	$(GOLANGCI_LINT) run
+
+check-fmt: ## Format validation — list files with wrong formatting
+	@bad=$$(find . -name '*.go' -not -path './vendor/*' | xargs gofmt -l); \
+	if [ -n "$$bad" ]; then \
+		echo "The following files need gofmt:"; echo "$$bad"; exit 1; \
+	fi
+	@echo "gofmt: OK"
+
+vet: ## Built-in static analysis
+	go vet ./...
+
+staticcheck: ## Advanced static analysis (requires staticcheck)
+	staticcheck ./...
+
+test-race: ## Unit tests with race detection
+	go test -race ./...
+
+check-all: check-fmt vet staticcheck test-race ## Run all checks (fmt, vet, staticcheck, tests)

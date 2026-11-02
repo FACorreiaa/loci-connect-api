@@ -9,7 +9,7 @@ import (
 
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/google/uuid"
-	"github.com/pashagolub/pgxmock/v4"
+	"github.com/pashagolub/pgxmock/v5"
 )
 
 func TestRepoFindCityByNameAndCountry(t *testing.T) {

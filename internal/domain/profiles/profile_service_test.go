@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"                                          // For mocking transaction
 
 	// For mocking transaction
-	"github.com/pashagolub/pgxmock/v4" // pgxmock for transaction mocking
+	"github.com/pashagolub/pgxmock/v5" // pgxmock for transaction mocking
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -442,7 +442,7 @@ func TestProfilesServiceImpl_CreateSearchProfile(t *testing.T) {
 
 		// --- Setup for CreateSearchProfile (non-CC, transactional version) ---
 		// This requires mocking the transaction object itself.
-		// Using github.com/pashagolub/pgxmock/v4 for this.
+		// Using github.com/pashagolub/pgxmock/v5 for this.
 		// First, the service would need to take a pgxpool.Pool or a TxBeginner interface.
 		// Let's assume for this unit test, `CreateSearchProfile` is the one *without* explicit errgroup/tx in the service.
 		// The `CreateSearchProfileCC` is harder to unit test cleanly without careful mocking of the transaction.

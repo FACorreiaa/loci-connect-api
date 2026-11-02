@@ -65,7 +65,7 @@ func (i *CapInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc)
 		if errors.Is(err, ErrAtCapacity) {
 			// CapMessage is shown to the person verbatim, not an internal Go
 			// error string, hence the capitalized sentence.
-			return connect.NewError(connect.CodeResourceExhausted, errors.New(CapMessage)) //nolint:staticcheck // ST1005: user-facing copy
+			return connect.NewError(connect.CodeResourceExhausted, fmt.Errorf("%s", CapMessage))
 		}
 		if err != nil {
 			// Losing the record must not lose the search: log and serve it

@@ -241,7 +241,7 @@ func (h *ChatHandler) StreamChat(
 			switch {
 			case errors.Is(rErr, runs.ErrAtCapacity):
 				llmCancel()
-				return connect.NewError(connect.CodeResourceExhausted, errors.New(runs.CapMessage)) //nolint:staticcheck // ST1005: user-facing copy
+				return connect.NewError(connect.CodeResourceExhausted, fmt.Errorf("%s", runs.CapMessage))
 			case rErr != nil:
 				// Same fail-open rule as the interceptor: a DB hiccup must
 				// not cost someone their search.

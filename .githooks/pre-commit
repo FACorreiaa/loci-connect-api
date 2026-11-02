@@ -56,4 +56,7 @@ echo "pre-commit: golangci-lint ${GOLANGCI_LINT_VERSION} run"
 # run beside another invocation.
 go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}" run --allow-parallel-runners
 
+echo "pre-commit: make check-all"
+make check-all
+
 echo "pre-commit: ok"
