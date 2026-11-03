@@ -32,3 +32,30 @@ bin
 .DS_Store
 .posthog-wizard-cache/
 *.p8
+
+# --- Build output: never commit a binary. ---
+# CI enforces this by file content (.github/workflows/no-binaries.yml); these
+# entries keep the usual outputs from ever being staged.
+bin/
+tmp/
+.build/
+*.exe
+*.test
+*.o
+*.a
+*.so
+*.dylib
+/air
+/api
+/bundle-forge
+/golangci-lint
+/loci-connect-api
+/loci-doctor
+/loci-mcp
+/main
+/preference-rerank
+/server
+/sqlc
+/tailwindcss
+/telegram-check
+/templ
