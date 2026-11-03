@@ -483,6 +483,26 @@ func (s *service) processStripeEvent(ctx context.Context, event stripe.Event) er
 		return fmt.Errorf("failed to record webhook event: %w", err)
 	}
 
+	err := s.applyStripeEvent(ctx, event)
+	if err != nil {
+		// The id was recorded before the event was applied, and a failure
+		// answers 500 so Stripe redelivers. Release the id, or the redelivery
+		// is skipped above as a duplicate and the event is lost. Every branch
+		// below is safe to re-run: upserts, a customer link, and a fulfilment
+		// that is idempotent per checkout session.
+		//
+		// Detached from ctx: a cancelled request is one common reason to be here.
+		forgetCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if fErr := s.repo.ForgetWebhookEvent(forgetCtx, event.ID); fErr != nil {
+			s.logger.Error("failed webhook event could not be released; Stripe's retry will be skipped",
+				"id", event.ID, "type", event.Type, "error", fErr)
+		}
+	}
+	return err
+}
+
+func (s *service) applyStripeEvent(ctx context.Context, event stripe.Event) error {
 	switch event.Type {
 	case "payment_intent.succeeded":
 		// Handle one-time payments if needed

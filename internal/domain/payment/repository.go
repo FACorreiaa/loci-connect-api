@@ -46,6 +46,9 @@ type Repository interface {
 	GetTotalRefundedAmount(ctx context.Context, paymentID uuid.UUID) (int64, error)
 
 	RecordWebhookEvent(ctx context.Context, eventID, eventType string) error
+	// ForgetWebhookEvent releases an event id whose processing failed, so
+	// Stripe's redelivery is applied instead of skipped as a duplicate.
+	ForgetWebhookEvent(ctx context.Context, eventID string) error
 
 	// Subscriptions (mapping logic)
 	GetSubscriptionByStripeID(ctx context.Context, stripeSubID string) (*Subscription, error)
@@ -336,6 +339,11 @@ func (r *repository) GetTotalRefundedAmount(ctx context.Context, paymentID uuid.
 func (r *repository) RecordWebhookEvent(ctx context.Context, eventID, eventType string) error {
 	query := `INSERT INTO webhook_events (event_id, event_type) VALUES ($1, $2)`
 	_, err := r.db.Exec(ctx, query, eventID, eventType)
+	return err
+}
+
+func (r *repository) ForgetWebhookEvent(ctx context.Context, eventID string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM webhook_events WHERE event_id = $1`, eventID)
 	return err
 }
 

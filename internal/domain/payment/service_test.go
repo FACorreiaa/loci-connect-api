@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"testing"
@@ -66,6 +67,17 @@ func (f *fakePaymentRepo) RecordWebhookEvent(_ context.Context, eventID, _ strin
 		}
 	}
 	f.webhookSeen = append(f.webhookSeen, eventID)
+	return nil
+}
+
+func (f *fakePaymentRepo) ForgetWebhookEvent(_ context.Context, eventID string) error {
+	kept := f.webhookSeen[:0]
+	for _, seen := range f.webhookSeen {
+		if seen != eventID {
+			kept = append(kept, seen)
+		}
+	}
+	f.webhookSeen = kept
 	return nil
 }
 
@@ -492,5 +504,37 @@ func TestAllowedPrice_OnlyConfiguredPrices(t *testing.T) {
 		if got := svc.allowedPrice(id); got != want {
 			t.Errorf("allowedPrice(%q) = %v, want %v", id, got, want)
 		}
+	}
+}
+
+// The event id is recorded before the event is applied. When applying fails the
+// handler answers 500 and Stripe redelivers — and the redelivery used to hit the
+// recorded id and be skipped as a duplicate, losing the upgrade for good.
+func TestProcessStripeEvent_FailedEventIsRetriedNotSkipped(t *testing.T) {
+	repo := &fakePaymentRepo{upsertErr: errors.New("db down")}
+	svc := newTestService(repo)
+	userID := uuid.New()
+	ev := subEvent(t, "customer.subscription.created", map[string]any{
+		"id":       "sub_retry",
+		"status":   "active",
+		"created":  time.Now().Unix(),
+		"metadata": map[string]string{"user_id": userID.String()},
+		"items": map[string]any{
+			"data": []map[string]any{
+				{"price": map[string]any{"id": "price_1", "recurring": map[string]any{"interval": "month"}}},
+			},
+		},
+	})
+
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err == nil {
+		t.Fatal("first delivery must fail while the upsert fails")
+	}
+
+	repo.upsertErr = nil
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("redelivery: %v", err)
+	}
+	if len(repo.upserted) != 1 {
+		t.Fatalf("redelivery must apply the event, got %d upserts", len(repo.upserted))
 	}
 }
