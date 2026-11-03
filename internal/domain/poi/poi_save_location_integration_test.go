@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -50,4 +51,24 @@ func TestSavePOItoPointsOfInterest_NoPositionIsRefused(t *testing.T) {
 	repo := NewRepository(testDB, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	_, err := repo.SavePOItoPointsOfInterest(context.Background(), locitypes.POIDetailedInfo{Name: "Nowhere " + uuid.NewString()}, newSaveCity(t))
 	require.True(t, errors.Is(err, ErrPOIHasNoLocation), "err = %v", err)
+}
+
+// The unique index is on lower(btrim(name)). A lookup on the raw name missed a
+// differently spelled copy of the same place and the insert then failed.
+func TestSavePOItoPointsOfInterest_MatchesTheUniqueIndex(t *testing.T) {
+	ctx := context.Background()
+	repo := NewRepository(testDB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	cityID := newSaveCity(t)
+	name := "Royal Palace " + uuid.NewString()[:8]
+
+	first, err := repo.SavePOItoPointsOfInterest(ctx, locitypes.POIDetailedInfo{
+		Name: name, Latitude: 40.418, Longitude: -3.714, Category: "Palace",
+	}, cityID)
+	require.NoError(t, err)
+
+	second, err := repo.SavePOItoPointsOfInterest(ctx, locitypes.POIDetailedInfo{
+		Name: " " + strings.ToUpper(name) + "  ", Latitude: 40.418, Longitude: -3.714, Category: "Palace",
+	}, cityID)
+	require.NoError(t, err)
+	require.Equal(t, first, second)
 }

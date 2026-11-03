@@ -1967,13 +1967,20 @@ func parsePOISection(responseText string, logger *slog.Logger) ([]locitypes.POID
 
 func (r *RepositoryImpl) GetOrCreatePOI(ctx context.Context, tx pgx.Tx, POIDetailedInfo locitypes.POIDetailedInfo, cityID, _ uuid.UUID) (uuid.UUID, error) {
 	var poiDBID uuid.UUID
-	findPoiQuery := `SELECT id FROM points_of_interest WHERE name = $1 AND city_id = $2 LIMIT 1`
+	// Match the identity the unique index enforces, (city_id, lower(btrim(name))),
+	// or a differently spelled copy of a stored place misses here, fails the
+	// insert below with 23505 and aborts the caller's whole transaction.
+	findPoiQuery := `SELECT id FROM points_of_interest WHERE city_id = $2 AND lower(btrim(name)) = lower(btrim($1)) LIMIT 1`
 	err := tx.QueryRow(ctx, findPoiQuery, POIDetailedInfo.Name, cityID).Scan(&poiDBID)
 
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, pgx.ErrNoRows) {
+		// ON CONFLICT covers a concurrent insert of the same place. The no-op
+		// update is what makes RETURNING hand back the existing id.
 		createPoiQuery := `
             INSERT INTO points_of_interest (name, city_id, location, category, description)
-            VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5, $6) RETURNING id`
+            VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5, $6)
+            ON CONFLICT (city_id, lower(btrim(name))) DO UPDATE SET name = points_of_interest.name
+            RETURNING id`
 		err = tx.QueryRow(ctx, createPoiQuery,
 			POIDetailedInfo.Name,
 			cityID,
