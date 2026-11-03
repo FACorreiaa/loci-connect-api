@@ -195,3 +195,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261026165753-2ffab32bce7e // indirect
 	google.golang.org/grpc v1.85.0 // indirect
 )
+
+replace github.com/pashagolub/pgxmock/v5 => ./third_party/pgxmock
