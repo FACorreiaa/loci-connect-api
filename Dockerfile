@@ -9,8 +9,10 @@ WORKDIR /app
 # Set GOTOOLCHAIN to auto to allow Go to download the required version
 ENV GOTOOLCHAIN=auto
 
-# Copy go mod files
+# Copy go mod files, plus the locally patched module go.mod `replace`s to
+# (third_party/pgxmock/PATCHED.md) — `go mod download` reads its go.mod.
 COPY go.mod go.sum ./
+COPY third_party/ third_party/
 
 # Download dependencies (Go will auto-download the required toolchain)
 RUN go mod download
