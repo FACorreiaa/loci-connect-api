@@ -1913,9 +1913,11 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
 	defer span.End()
 
 	// Check if POI exists
+	// The identity the unique index enforces: (city_id, lower(btrim(name))).
 	queryCheck := `
         SELECT id FROM points_of_interest
-        WHERE name = $1 AND city_id = $2
+        WHERE city_id = $2 AND lower(btrim(name)) = lower(btrim($1))
+        LIMIT 1
     `
 	var existingID uuid.UUID
 	err := r.pgpool.QueryRow(ctx, queryCheck, poi.Name, cityID).Scan(&existingID)
@@ -1936,6 +1938,7 @@ func (r *RepositoryImpl) SavePOItoPointsOfInterest(ctx context.Context, poi loci
 	queryInsert := `
         INSERT INTO points_of_interest (id, city_id, name, location, category)
         VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($5, $4), 4326), $6)
+        ON CONFLICT (city_id, lower(btrim(name))) DO UPDATE SET name = points_of_interest.name
         RETURNING id
     `
 	poiID := uuid.New()
@@ -2898,10 +2901,10 @@ func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() {
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
 			l.ErrorContext(ctx, "Failed to rollback transaction", slog.Any("error", rollbackErr))
 		}
-	}() // Rollback on error
+	}() // Rollback on error; a no-op after Commit
 
 	const insertLLMPOIQuery = `
         INSERT INTO llm_suggested_pois (id, user_id, llm_interaction_id, name, latitude, longitude, category, description_poi, distance, location)
@@ -2939,14 +2942,20 @@ func (r *RepositoryImpl) SaveLlmPoisToDatabase(ctx context.Context, userID uuid.
 	}
 
 	br := tx.SendBatch(ctx, batch)
-	defer br.Close()
-
 	for i := 0; i < validCount; i++ {
 		if _, err := br.Exec(); err != nil {
+			_ = br.Close()
 			l.ErrorContext(ctx, "Failed to execute LLM POI batch insert", slog.Any("error", err), slog.Int("batch_index", i))
 			span.RecordError(err)
 			return fmt.Errorf("failed to insert LLM POI at batch index %d: %w", i, err)
 		}
+	}
+	// The batch holds the connection until it is closed: committing first
+	// fails with "conn busy" and pgx discards the connection.
+	if err := br.Close(); err != nil {
+		l.ErrorContext(ctx, "Failed to close LLM POI batch", slog.Any("error", err))
+		span.RecordError(err)
+		return fmt.Errorf("failed to close LLM POI batch: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
