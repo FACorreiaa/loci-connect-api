@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
 	statisticsv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/statistics/statisticsv1connect"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -35,13 +38,31 @@ type Handler struct {
 	// visits backs VisitedCitiesCount. Nil until wired; the field reports 0
 	// rather than the hotels+restaurants sum it used to invent.
 	visits VisitedCitiesCounter
+
+	// mainStats is what StreamMainPageStatistics serves: the aggregate is heavy
+	// and the stream needs no sign-in, so its cost must not grow with viewers.
+	mainStats         mainStatsCache
+	streamMaxLifetime time.Duration
 }
+
+const (
+	// streamMinInterval is the fastest a stream ticks, whatever the client asks
+	// for. Equal to mainStatsTTL: ticking faster would resend the same numbers.
+	streamMinInterval = 30 * time.Second
+	// streamMaxLifetime ends a stream so that an idle one cannot hold its
+	// connection and goroutine forever. Clients reconnect.
+	streamMaxLifetime = 10 * time.Minute
+
+	mainStatsTTL          = 30 * time.Second
+	mainStatsQueryTimeout = 10 * time.Second
+)
 
 // NewHandler constructs a new statistics handler.
 func NewHandler(svc Service, logger *slog.Logger) *Handler {
 	return &Handler{
-		service: svc,
-		logger:  logger,
+		service:           svc,
+		logger:            logger,
+		streamMaxLifetime: streamMaxLifetime,
 	}
 }
 
@@ -125,44 +146,122 @@ func (h *Handler) StreamMainPageStatistics(
 ) error {
 	l := h.logger.With(slog.String("method", "StreamMainPageStatistics"))
 
-	interval := req.Msg.UpdateIntervalSeconds
-	if interval == 0 {
-		interval = 30 // Default to 30 seconds
+	return h.streamMainStats(ctx, req.Msg.UpdateIntervalSeconds, func(snap mainStatsSnapshot) error {
+		event := &statisticsv1.StatisticsEvent{
+			EventType: "update",
+			Timestamp: timestamppb.Now(),
+			Payload: &statisticsv1.StatisticsEvent_MainStats{
+				MainStats: &statisticsv1.MainPageStatistics{
+					TotalUsers:       snap.stats.TotalUsersCount,
+					TotalItineraries: snap.stats.TotalItinerariesSaved,
+					TotalPois:        snap.stats.TotalUniquePOIs,
+					LastUpdated:      timestamppb.New(snap.fetchedAt),
+				},
+			},
+		}
+		if err := stream.Send(event); err != nil {
+			l.ErrorContext(ctx, "failed to send stream event", "error", err)
+			return err
+		}
+		return nil
+	})
+}
+
+// mainStatsSnapshot is the main page numbers and when they were read.
+type mainStatsSnapshot struct {
+	stats     *locitypes.MainPageStatistics
+	fetchedAt time.Time
+}
+
+// mainStatsCache holds the last read of the main page numbers.
+type mainStatsCache struct {
+	group singleflight.Group
+
+	mu   sync.Mutex
+	last mainStatsSnapshot
+}
+
+func (c *mainStatsCache) fresh() (mainStatsSnapshot, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.last.stats == nil || time.Since(c.last.fetchedAt) >= mainStatsTTL {
+		return mainStatsSnapshot{}, false
+	}
+	return c.last, true
+}
+
+func (c *mainStatsCache) store(snap mainStatsSnapshot) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.last = snap
+}
+
+// sharedMainStats returns the cached numbers, or reads them once on behalf of
+// everyone asking. Failures are not cached.
+//
+// Do rather than DoChan: DoChan re-panics on a goroutine of its own, where no
+// recover can reach it, and a panic here must stay inside this request. The cost
+// is that a stream leaving mid-query waits for it, at most mainStatsQueryTimeout.
+func (h *Handler) sharedMainStats(ctx context.Context) (mainStatsSnapshot, error) {
+	if snap, ok := h.mainStats.fresh(); ok {
+		return snap, nil
 	}
 
-	systemUserID := uuid.MustParse("00000000-0000-0000-0000-000000000000")
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	out, err, _ := h.mainStats.group.Do("main", func() (any, error) {
+		// A caller that lost the race to one that has just finished.
+		if snap, ok := h.mainStats.fresh(); ok {
+			return snap, nil
+		}
+
+		// Detached: the others waiting on this result must not fail because the
+		// stream that happened to start it has gone.
+		queryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mainStatsQueryTimeout)
+		defer cancel()
+
+		// Timed from the start of the read, which is the age of the numbers.
+		fetchedAt := time.Now()
+		stats, err := h.service.GetMainPageStatistics(queryCtx, uuid.Nil)
+		if err != nil {
+			return mainStatsSnapshot{}, err
+		}
+		snap := mainStatsSnapshot{stats: stats, fetchedAt: fetchedAt}
+		h.mainStats.store(snap)
+		return snap, nil
+	})
+	if err != nil {
+		return mainStatsSnapshot{}, err
+	}
+	return out.(mainStatsSnapshot), nil
+}
+
+// streamMainStats sends the numbers on open and on every tick until the client
+// leaves or the stream reaches its lifetime, which is a clean end.
+func (h *Handler) streamMainStats(
+	ctx context.Context,
+	intervalSeconds int32,
+	send func(mainStatsSnapshot) error,
+) error {
+	l := h.logger.With(slog.String("method", "StreamMainPageStatistics"))
+
+	ctx, cancel := context.WithTimeout(ctx, h.streamMaxLifetime)
+	defer cancel()
+
+	ticker := time.NewTicker(max(time.Duration(intervalSeconds)*time.Second, streamMinInterval))
 	defer ticker.Stop()
 
 	for {
+		snap, err := h.sharedMainStats(ctx)
+		if err != nil {
+			l.ErrorContext(ctx, "failed to get statistics for stream", "error", err)
+		} else if err := send(snap); err != nil {
+			return err
+		}
+
 		select {
 		case <-ctx.Done():
-			l.InfoContext(ctx, "stream closed by client")
+			l.InfoContext(ctx, "stream closed")
 			return nil
 		case <-ticker.C:
-			stats, err := h.service.GetMainPageStatistics(ctx, systemUserID)
-			if err != nil {
-				l.ErrorContext(ctx, "failed to get statistics for stream", "error", err)
-				continue
-			}
-
-			event := &statisticsv1.StatisticsEvent{
-				EventType: "update",
-				Timestamp: timestamppb.Now(),
-				Payload: &statisticsv1.StatisticsEvent_MainStats{
-					MainStats: &statisticsv1.MainPageStatistics{
-						TotalUsers:       stats.TotalUsersCount,
-						TotalItineraries: stats.TotalItinerariesSaved,
-						TotalPois:        stats.TotalUniquePOIs,
-						LastUpdated:      timestamppb.Now(),
-					},
-				},
-			}
-
-			if err := stream.Send(event); err != nil {
-				l.ErrorContext(ctx, "failed to send stream event", "error", err)
-				return err
-			}
 		}
 	}
 }
