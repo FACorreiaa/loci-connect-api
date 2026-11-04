@@ -89,7 +89,7 @@ Not settled by these plans: DB-7 (a concurrency issue, not a plan), CACHE-2, OPS
 
 **Kubernetes API:** requests to `lumina-green:6443` timed out for a few minutes during this session while the production API kept answering 200. It recovered without intervention. The cause was not investigated.
 
-### Session 5 (2026-11-05): PAY-2, on branch `fix/go-audit-pay2`, not deployed
+### Session 5 (2026-11-04): PAY-2, on branch `fix/go-audit-pay2`, not deployed
 
 **Production Stripe secrets, new finding PAY-3 (checked by shape only, no value printed):**
 - `STRIPE_WEBHOOK_SECRET` starts with `whsec_` but **ends in a space**, and config did not trim it. Every real Stripe signature would fail against that key, so every delivery would get a 400.
@@ -111,12 +111,38 @@ Trimming fixes the webhook secret on the next deploy, if the value under the spa
 
 **Local disk:** free space on the machine swung between 706 MiB and 54 GiB during this work, with other sessions running `xcodebuild` and `go test` at the same time. A full-repo pre-commit race build needs several GiB. If it fails with `no space left on device`, retry when there is room. The first doc commit failure was stale `vendor/`, not disk.
 
+### Session 5, continued: OPS-1 and OPS-2, same branch, not deployed
+
+| ID | Change | Test |
+|---|---|---|
+| OPS-1 | `main` only calls `run` and exits with its result, so `os.Exit` no longer skips cleanup. The signal cancels the loops and starts the HTTP drain together. A drain that times out closes the open connections and is not an error. Order after that: wait for the loops (5s at most), `deps.Cleanup`, metric flush, trace flush. HTTP drain is now 15s instead of 30s. | `TestServe_*`, `TestLoops_WaitGivesUpOnAStuckLoop` |
+| OPS-2 | `cmd/server/lifecycle.go` supervises the 8 loops. A panic logs the stack and restarts the loop after 1s, doubling to at most 1 minute, and a run of 1 minute or more resets the delay. An error stops the loop, as before, but is now counted. A nil return (switched off) and an error during shutdown are not counted. New metrics: `loci_background_loop_up{loop}` and `loci_background_loop_stops_total{loop,reason}`. `concurrency.Go` and `Run` also log the stack. | `TestLoops_*`, `TestGo_PanicLogsTheStack`, `TestRun_PanicLogsTheStack` |
+
+**Restart safety, checked by reading each loop:** the runners keep state in locals, the advisory lock unlock is deferred so a panic releases it, and the Telegram cursor is in the database.
+
+**Real process check** (binary with fake keys against a throwaway Postgres, SIGTERM):
+
+| Case | Exit | Time | Log |
+|---|---|---|---|
+| Idle | 0 | 0.0s | `server stopped gracefully`, `cleanup completed` |
+| Login request held open with a partial body | 0 | 15.0s | `drain did not finish`, `cleanup completed` |
+
+The old code answered the second case with `graceful shutdown failed` and exit 1, with no cleanup. That comparison is from reading the old code; the old binary was not run.
+
+**Different from the proposal above:**
+- `terminationGracePeriodSeconds` is not set, because the chart has no value for it and this branch does not touch infra. 15s + 5s leaves 10s of the default 30s for cleanup. Streams now get 15s to finish, not 30s. To give them longer, raise both together in infra.
+- Restart is per loop, not per tick. A panic in one tick loses that loop's ticker position and nothing else.
+- `loci_background_last_success_timestamp` and `..._tick_total` were not added, so **a loop that hangs without panicking still shows as up**. No alert rule exists yet for the new metrics.
+- Alert on `loci_background_loop_stops_total`, not on `loci_background_loop_up`: a loop switched off by configuration reads 0.
+
+**Not changed:** goroutines detached from a request can still be running when the pool closes. There is no `preStop` delay, so a request that arrives between SIGTERM and endpoint removal can be refused, as before.
+
 ### Still to do
 
 1. **PAY-3:** reseal `STRIPE_API_KEY` with a real key, and the webhook secret without the space. Check that an endpoint is registered in the Stripe dashboard.
 2. **OPS-9:** give `INFRA_TOKEN` pull request access on the infra repo. Until then every promote needs a PR by hand. When opening one, leave out `apps/loci/data/postgres.yaml` and `bundle-forge-job.yaml` unless the database image really has to change: the generated branch moves them too, and moving the Postgres image restarts the production database. `promote/loci-be63a60` and `promote/loci-3e734b9` are leftovers from the failed runs and were not merged.
 3. **PAY-1, optional:** record the event id in the same transaction as the side effects.
-4. **Then OPS-1/OPS-2, then the rest of P2/P3** from the roadmap below. DB-6, DB-8 and DB-10 can wait for scale. DB-5's ORDER BY and DB-12 should not.
+4. **Then the rest of P2/P3** from the roadmap below. DB-6, DB-8 and DB-10 can wait for scale. DB-5's ORDER BY and DB-12 should not.
 
 ## Commands run
 
