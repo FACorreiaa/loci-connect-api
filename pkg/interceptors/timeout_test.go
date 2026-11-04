@@ -60,6 +60,17 @@ func TestResolveUnaryTimeout_ChatProcedureUsesChatDefault(t *testing.T) {
 	}
 }
 
+func TestResolveUnaryTimeout_AssistantConfirmUsesChatDefault(t *testing.T) {
+	interceptor := NewTimeoutInterceptor(TimeoutConfig{
+		Default: 5 * time.Second,
+		Chat:    90 * time.Second,
+	})
+	timeout, apply := interceptor.resolveUnaryTimeout("/loci.assistant.AssistantService/ConfirmAction", nil)
+	if !apply || timeout != 90*time.Second {
+		t.Fatalf("resolveUnaryTimeout = %v, apply=%v", timeout, apply)
+	}
+}
+
 func TestResolveUnaryTimeout_ClientHeaderOverridesDefault(t *testing.T) {
 	interceptor := NewTimeoutInterceptor(TimeoutConfig{
 		Default: 30 * time.Second,

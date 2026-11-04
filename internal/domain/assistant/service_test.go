@@ -74,6 +74,7 @@ type memStore struct {
 	spend Spend
 	day   int64
 	convs map[uuid.UUID]memConv
+	cards map[uuid.UUID]PlaceAction
 }
 
 type memConv struct {
@@ -83,7 +84,7 @@ type memConv struct {
 }
 
 func newMemStore() *memStore {
-	return &memStore{asks: map[uuid.UUID]int{}, convs: map[uuid.UUID]memConv{}}
+	return &memStore{asks: map[uuid.UUID]int{}, convs: map[uuid.UUID]memConv{}, cards: map[uuid.UUID]PlaceAction{}}
 }
 
 func (m *memStore) ReserveAsk(_ context.Context, u uuid.UUID, _ time.Time, limit int) (bool, error) {
@@ -135,10 +136,42 @@ func (m *memStore) SaveTurns(_ context.Context, u uuid.UUID, id *uuid.UUID, turn
 	return created, nil
 }
 
+func (m *memStore) CreatePlaceAction(_ context.Context, a *PlaceAction) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a.ID, a.Status = uuid.New(), placeStatusPending
+	m.cards[a.ID] = *a
+	return nil
+}
+
+func (m *memStore) GetPlaceAction(_ context.Context, id, userID uuid.UUID) (*PlaceAction, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, ok := m.cards[id]
+	if !ok || a.UserID != userID {
+		return nil, errNoPlaceAction
+	}
+	return &a, nil
+}
+
+func (m *memStore) MovePlaceAction(_ context.Context, id, userID uuid.UUID, from, to string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	a, ok := m.cards[id]
+	if !ok || a.UserID != userID || a.Status != from {
+		return false, nil
+	}
+	a.Status = to
+	m.cards[id] = a
+	return true, nil
+}
+
 // fakeTrips answers for one owner, and reads as not found for everybody else.
 type fakeTrips struct {
 	owner uuid.UUID
 	t     *trip.Trip
+	// role is what the owner field's user is on the trip; unset means its owner.
+	role trip.Role
 }
 
 func (f *fakeTrips) ListTrips(_ context.Context, u uuid.UUID, _, _ int) ([]*trip.Trip, int, error) {
@@ -151,6 +184,9 @@ func (f *fakeTrips) ListTrips(_ context.Context, u uuid.UUID, _, _ int) ([]*trip
 func (f *fakeTrips) Resolve(_ context.Context, viewer, id uuid.UUID) (*trip.Trip, trip.Role, error) {
 	if viewer != f.owner || id != f.t.ID {
 		return nil, trip.RoleNone, trip.ErrNotFound
+	}
+	if f.role != trip.RoleNone {
+		return f.t, f.role, nil
 	}
 	return f.t, trip.RoleOwner, nil
 }
