@@ -138,7 +138,14 @@ func (l *ServiceImpl) StartChat(ctx context.Context, userID, profileID uuid.UUID
 
 // ContinueChat is a unary wrapper around the streaming continuation flow.
 
-func (l *ServiceImpl) ContinueChat(ctx context.Context, _, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
+func (l *ServiceImpl) ContinueChat(ctx context.Context, userID, sessionID uuid.UUID, message, _ string) (*locitypes.ChatResponse, error) {
+	// Continuing writes into the session — its history, its itinerary — and
+	// runs as its owner, so the caller must be that owner. ContinueSessionStreamed
+	// loads the session by id alone.
+	if _, err := l.GetChatSession(ctx, userID, sessionID); err != nil {
+		return nil, err
+	}
+
 	eventCh := make(chan locitypes.StreamEvent, 100) // Buffered channel to prevent blocking
 	// See StartChat: the error belongs to the caller, not just the log.
 	var streamErr error

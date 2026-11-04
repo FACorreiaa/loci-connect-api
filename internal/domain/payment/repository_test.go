@@ -131,6 +131,29 @@ func TestRecordWebhookEvent_Idempotency(t *testing.T) {
 	require.Error(t, err, "duplicate webhook event must be rejected for idempotency")
 }
 
+// Forgetting an event is what lets Stripe's redelivery be applied. It must free
+// that id only, or a later duplicate of another event would be applied twice.
+func TestForgetWebhookEvent_FreesOnlyThatEvent(t *testing.T) {
+	repo, _ := newPaymentRepo(t)
+	ctx := context.Background()
+
+	require.NoError(t, repo.RecordWebhookEvent(ctx, "evt_failed", "invoice.paid"))
+	require.NoError(t, repo.RecordWebhookEvent(ctx, "evt_applied", "invoice.paid"))
+
+	require.NoError(t, repo.ForgetWebhookEvent(ctx, "evt_failed"))
+
+	require.NoError(t, repo.RecordWebhookEvent(ctx, "evt_failed", "invoice.paid"), "redelivery must be accepted")
+	require.Error(t, repo.RecordWebhookEvent(ctx, "evt_applied", "invoice.paid"), "other events stay recorded")
+}
+
+// Forgetting an id that was never recorded is not an error: the cleanup runs
+// after a failure and must not add one of its own.
+func TestForgetWebhookEvent_UnknownEvent(t *testing.T) {
+	repo, _ := newPaymentRepo(t)
+
+	require.NoError(t, repo.ForgetWebhookEvent(context.Background(), "evt_never_seen"))
+}
+
 func TestUpsertSubscription_InsertThenUpdate(t *testing.T) {
 	repo, pool := newPaymentRepo(t)
 	ctx := context.Background()

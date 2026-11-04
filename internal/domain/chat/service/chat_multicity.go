@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
+	"github.com/FACorreiaa/loci-connect-api/pkg/concurrency"
 	"github.com/FACorreiaa/loci-connect-api/pkg/tripspan"
 )
 
@@ -134,9 +137,9 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 	slots := make(chan struct{}, l.multiCityConcurrency())
 	for i, s := range r.Stops {
 		slots <- struct{}{}
-		wg.Add(1)
-		go func(i int, s multiCityStop) {
-			defer wg.Done()
+		// concurrency.Go recovers whatever runCityRecovered does not cover
+		// (the bookkeeping around it), so a panic is one lost city, not the pod.
+		concurrency.Go(&wg, l.logger, func() {
 			defer func() { <-slots }()
 			if tr, ok := l.runStop(cc, r, runStart, i, s); ok {
 				mu.Lock()
@@ -144,7 +147,7 @@ func (l *ServiceImpl) processMultiCity(cc common.ChatContext, r *multiCityRoute)
 				succeeded++
 				mu.Unlock()
 			}
-		}(i, s)
+		})
 	}
 	wg.Wait()
 
@@ -197,6 +200,15 @@ func (l *ServiceImpl) runStop(cc common.ChatContext, r *multiCityRoute, runStart
 	reported := false
 	go func() {
 		defer close(done)
+		defer func() {
+			if p := recover(); p != nil {
+				l.logger.ErrorContext(ctx, "multi-city: event forwarder panicked",
+					slog.Int("stop", i), slog.Any("panic", p), slog.String("stack", string(debug.Stack())))
+				// Keep draining so the city's producer is never left blocked.
+				for range stopCh {
+				}
+			}
+		}()
 		for ev := range stopCh {
 			if ev.Type == locitypes.EventTypeError {
 				reported = true
@@ -212,7 +224,7 @@ func (l *ServiceImpl) runStop(cc common.ChatContext, r *multiCityRoute, runStart
 	left := waves(len(r.Stops)-i, l.multiCityConcurrency())
 	cityCtx, cancelCity := context.WithTimeout(ctx, cityDeadline(multiCityBudget-time.Since(runStart), left))
 	child.Ctx = cityCtx
-	data, err := l.runCity(child)
+	data, err := l.runCityRecovered(child)
 	cancelCity()
 	close(stopCh)
 	<-done
@@ -233,6 +245,25 @@ func (l *ServiceImpl) runStop(cc common.ChatContext, r *multiCityRoute, runStart
 	l.logger.InfoContext(ctx, "multi-city: city generated",
 		slog.Int("stop", i), slog.String("city", s.CityName), slog.Duration("took", time.Since(started)))
 	return stopTrip(child, s, data), true
+}
+
+// runCityRecovered runs one city and turns a panic into that city's error.
+//
+// Cities run on their own goroutines, outside the handler's recover, so an
+// unrecovered panic here would end the process and every stream on it. As an
+// error it takes the ordinary failed-city path: the stop is reported and the
+// rest of the trip carries on.
+func (l *ServiceImpl) runCityRecovered(child common.ChatContext) (data *locitypes.AiCityResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			l.logger.ErrorContext(child.Ctx, "multi-city: city generation panicked",
+				slog.String("city", child.CityName),
+				slog.Any("panic", r),
+				slog.String("stack", string(debug.Stack())))
+			data, err = nil, fmt.Errorf("city %s: generation panicked: %v", child.CityName, r)
+		}
+	}()
+	return l.runCity(child)
 }
 
 // multiCityConcurrency is how many cities generate at once. Unset is one at a
