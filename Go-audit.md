@@ -62,17 +62,61 @@ These changes are in the working tree only, on top of `09b6778`. The owner has n
 
 The cause of the `signal: terminated` was not found, and the branch does not touch that package. If it comes back, look for what is signalling the test binary before looking at the tests.
 
+### Session 4 (2026-11-04): PR merged, plain EXPLAIN on production
+
+PR #154 is merged to `main` as `be63a60`, with all nine checks green. **It is live** through infra PR #544 (`8cb72b8`), promoted by hand because the CD promote step failed (see below). Only the API and the rerank CronJob moved, so Postgres did not restart.
+
+**Checked on production after the rollout:** `loci-api` runs `be63a60` with 0 restarts, and `loci-api-production` is Synced and Healthy in ArgoCD. `/health` and `/ready` return 200, and the pod had logged 0 errors a few minutes in. A 2 MiB login got `resource_exhausted` ("message size 2097164 is larger than configured max 1048576"). Over `curl -N`, a stats stream sent its first event at 0.43s and its next at 30.46s. The SEC-1, PAY-1, DB-1, DB-2 and CON-1 fixes were not exercised on production; they rest on their tests.
+
+**Method.** Plain `EXPLAIN` on `loci_production` through `psql` in `loci-postgres-0`, inside `BEGIN READ ONLY` with a 5s `statement_timeout`, then rolled back. Parameters were invented, except the most common `city_id`, which came from `pg_stats`. Row counts, index definitions and planner statistics were also read. The queries were run with `enable_seqscan=off` as well, to tell "the table is small" from "the index cannot be used". No table rows were read and no user value was printed. These are planner estimates, so **no timings were measured**.
+
+**Scale at the time:** `points_of_interest` 946 rows, `llm_interactions` 113, `restaurant_details` 41, `cities` 20, `hotel_details` 10. These are `pg_stat_user_tables` estimates.
+
+| ID | Result | Evidence | Next |
+|---|---|---|---|
+| DB-6 | **CONFIRMED** | Queries using `location::geography` seq scan even with `enable_seqscan=off`, on `points_of_interest` (including `SearchPOIsHybrid`), `hotel_details`, `restaurant_details` and `cities`. The GIST indexes are on the geometry, so they cannot serve these predicates. When `city_id` is given, the city index narrows the scan first. | Cheap fix, little to gain at 946 rows. Add it when a table reaches about 10k rows or the query shows up in a profile. |
+| DB-5 | Plan is fine; the code issue stands | `GetPOIsByCityID` for the most common city uses `idx_poi_city_id`, about 102 rows. `SearchPOIsHybrid` sorts every match with no LIMIT. | The missing ORDER BY, which makes the "top 8" arbitrary, is a correctness bug and does not depend on scale. Fix it with the P2 work. |
+| DB-8 | **CONFIRMED** in shape | The plan is Limit, Sort, GroupAggregate, Index Scan, so every interaction is aggregated before the LIMIT. | No cost at 113 rows across all users. Defer. |
+| DB-10 | Does not apply today | For the most common city the planner uses a bitmap scan and an exact sort, not HNSW. HNSW appears only with `enable_sort=off`, so results cannot come back short on this plan. pgvector is 0.8.2, so `hnsw.iterative_scan` is available if that changes. | Recheck if a city grows large. |
+
+**New finding, DB-12:** planner statistics put 55% of `points_of_interest.embedding` values at NULL. `FindSimilarPOIsByCity` filters those rows out, so about half the POIs cannot be found by semantic search in that path. Why they are NULL was not investigated.
+
+Not settled by these plans: DB-7 (a concurrency issue, not a plan), CACHE-2, OPS-8 and MEM-1 (these need metrics).
+
+**CD failure, new finding OPS-9:** `_deploy.yml` builds the images and pushes `promote/loci-<sha>` to the infra repo, then `gh pr create` fails with `GraphQL: Resource not accessible by personal access token (repository.pullRequests)`. Both `3e734b9` and `be63a60` failed this way. `INFRA_TOKEN` needs pull request access on `LuminaVault/LuminaVaultInfra`. The branch `promote/loci-be63a60` exists, is one commit ahead of infra `main` with nothing behind, and has no PR.
+
+**New finding, HTTP-6:** `StreamMainPageStatisticsRequest` documents "Default: 30 seconds", but the proto rule `gte: 1` rejects an unset interval with `invalid_argument`, so the default cannot be reached. Either make the field optional or drop the comment.
+
+**Kubernetes API:** requests to `lumina-green:6443` timed out for a few minutes during this session while the production API kept answering 200. It recovered without intervention. The cause was not investigated.
+
+### Session 5 (2026-11-05): PAY-2, on branch `fix/go-audit-pay2`, not deployed
+
+**Production Stripe secrets, new finding PAY-3 (checked by shape only, no value printed):**
+- `STRIPE_WEBHOOK_SECRET` starts with `whsec_` but **ends in a space**, and config did not trim it. Every real Stripe signature would fail against that key, so every delivery would get a 400.
+- `STRIPE_API_KEY` is 27 characters plus a trailing space and has **no `sk_` or `rk_` prefix**, so it is not a standard Stripe secret key. Checkout has probably never worked in production. No call to Stripe was made to confirm it.
+- `webhook_events` has 0 rows and `subscriptions` has 0 rows. That fits both problems, and also fits no Stripe traffic at all. Whether an endpoint is registered in the Stripe dashboard was not checked.
+
+Trimming fixes the webhook secret on the next deploy, if the value under the space is right. **The API key needs resealing by the owner.** Its format is deliberately not a boot check, because that would take the whole API down on the next deploy.
+
+| ID | Change | Test |
+|---|---|---|
+| PAY-2b | Stripe values are trimmed in `config.go`. Production refuses to boot with an API key and no webhook secret. `WebhookHandler` answers 503 to everything when the secret is empty, in any environment. Before the fix, a signature made with the empty key got 200 and the event was processed. | `payment/webhook_test.go`, `TestLoad_TrimsStripeValues`, `TestLoad_ProductionWithStripeNeedsWebhookSecret`, `TestLoad_ProductionBootsWithUnusualStripeKey` |
+| PAY-2a | Migration `0131` adds `subscriptions.last_stripe_event_at`. `UpsertSubscription` skips an event older than the stored one and returns `ErrStaleSubscriptionEvent`, which the service logs and answers as success. Same-second events apply in arrival order, because Stripe's timestamps are whole seconds. | `TestUpsertSubscription_*` (integration), `TestProcessStripeEvent_RecordsWhenTheEventWasCreated`, `TestProcessStripeEvent_StaleSubscriptionEventIsNotAnError` |
+
+**Not covered by PAY-2a:** the row is per user, not per subscription. A late `deleted` for an old subscription, created after a new subscription's event, would still overwrite the new one.
+
+**SEC-1, `AND user_id` on `UpdateSession` dropped.** The original proposal does nothing: every caller loads the session by id and passes it back, so the filter compares the row with itself. The useful check is that each entry point compares the owner with the caller. `ContinueChat`, `GetSessionPOIs`, `EndSession`, the stream path, `tripaction.ownedSession` and `watch.Create` all do. `watch.Run` compares with the watch's own user. No sibling of SEC-1 was found. This is not the full security review the finding asked for.
+
+**DB-1 log search:** no `Failed to commit transaction for saving LLM POIs` in the pod started at 14:40Z on 2026-11-04. Older logs are gone and nothing shows that path has run since, so this neither confirms nor refutes the fix on production.
+
+**Local disk:** free space on the machine swung between 706 MiB and 54 GiB during this work, with other sessions running `xcodebuild` and `go test` at the same time. A full-repo pre-commit race build needs several GiB. If it fails with `no space left on device`, retry when there is room. The first doc commit failure was stale `vendor/`, not disk.
+
 ### Still to do
 
-1. **Commit, push and open a PR**, once the owner asks. Merging the app repo deploys nothing; promotion goes through the PR that `_deploy.yml` opens on the infra repo.
-2. **EXPLAIN and metrics for the database and caching items (DB-5…DB-8, DB-10, CACHE-2, OPS-8, MEM-1).** **Blocked: Loci has no staging environment.** The infra repo has only `argocd/apps/loci-production.yaml`; `*-staging` apps exist for other products only. The owner must choose one of:
-   - (a) Run plain `EXPLAIN` (no ANALYZE, so the query is not executed) read-only against production over `KUBECONFIG=~/.kube/maat.yaml`.
-   - (b) Restore a production snapshot into a local or testcontainers Postgres and run `EXPLAIN (ANALYZE, BUFFERS)` there.
-   - (c) Set up a Loci staging environment.
-   
-   Do **not** run `EXPLAIN ANALYZE` on production without explicit approval. For metrics, there is a Prometheus scrape on `:8080/metrics` (annotation in `apps/loci/api/values-common.yaml`). Check pod OOMKills/restarts (MEM-1) and existing `loci_*` series. `pgxpool.Stat()` is not exported yet (OPS-8), so it has to be added before pool waits can be measured.
+1. **PAY-3:** reseal `STRIPE_API_KEY` with a real key, and the webhook secret without the space. Check that an endpoint is registered in the Stripe dashboard.
+2. **OPS-9:** give `INFRA_TOKEN` pull request access on the infra repo. Until then every promote needs a PR by hand. When opening one, leave out `apps/loci/data/postgres.yaml` and `bundle-forge-job.yaml` unless the database image really has to change: the generated branch moves them too, and moving the Postgres image restarts the production database. `promote/loci-be63a60` and `promote/loci-3e734b9` are leftovers from the failed runs and were not merged.
 3. **PAY-1, optional:** record the event id in the same transaction as the side effects.
-4. **Then P2/P3** from the roadmap below.
+4. **Then OPS-1/OPS-2, then the rest of P2/P3** from the roadmap below. DB-6, DB-8 and DB-10 can wait for scale. DB-5's ORDER BY and DB-12 should not.
 
 ## Commands run
 
@@ -183,7 +227,7 @@ These are fixed: F007 (eventCh buffered to 100), F008 (`NewTimer` + `Stop`), and
 
 ## Proposals rejected or revised
 
-- **REJECT:** a subagent reported "the test build is broken by pgxmock v5.2.0 vs pgx v5.12". With the vendored modules, `vendor/.../pgxmock/v5/batch.go:76` has `Tx()`, and the race test run compiled and passed every pgxmock package (chat/repository, auth/repository, city, list, …). That build was probably resolved against a stale module cache.
+- **REJECT:** a subagent reported "the test build is broken by pgxmock v5.2.0 vs pgx v5.12". With the vendored modules, `vendor/.../pgxmock/v5/batch.go:76` has `Tx()`, and the race test run compiled and passed every pgxmock package (chat/repository, auth/repository, city, list, …). That build was probably resolved against a stale module cache. **Revised in session 4:** this rejection looks wrong. `vendor/` is git-ignored, so a local vendored run can differ from a clean checkout, and `d83f006` on `main` later fixed exactly this ("build tests against pgx v5.12 via patched pgxmock"). When that commit reaches a checkout with an older `vendor/`, the pre-commit hook fails with `go: inconsistent vendoring`; run `go mod vendor`.
 - **REVISE:** "make TrackSearch goroutines faster". The real issue is the missing deadline and recover (CON-2), not speed.
 - **MEASURE FIRST:** all index proposals (DB-6, DB-8, DB-10), GOMEMLIMIT, cache LRU, per-chunk JSON round-trip in streaming (`chat_handler.go:716-719`): profile with pprof before changing.
 
