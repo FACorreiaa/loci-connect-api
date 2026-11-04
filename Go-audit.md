@@ -30,24 +30,49 @@ Tests run after these four: `go test -count=1 ./internal/domain/chat/... ./inter
 - Not yet covered by an integration test: the real `DELETE FROM webhook_events` against Postgres.
 - Why it is safe to re-run a failed event: `bundle.Service.Fulfil` is documented as idempotent per checkout session, and the other branches are upserts or a customer link. The stronger alternative is to record the event id in the same transaction as the side effects.
 
+### Session 3 (2026-11-04): remaining P1 work, not committed
+
+These changes are in the working tree only, on top of `09b6778`. The owner has not yet asked for them to be committed.
+
+| ID | Change | Test |
+|---|---|---|
+| HTTP-1 | `cmd/api/router.go`: `connect.WithReadMaxBytes` of 1 MiB on every Connect service, 14 MiB on Speech. | `cmd/api/read_limit_test.go`, against the real `SetupRouter`. Covers an oversized request, a small gzip body that inflates past the limit, and Speech at both sides of its limit. |
+| HTTP-2 | `statistics/handler.go`: streams share one cached read (30s TTL, singleflight, query detached from the caller, 10s timeout, failures not cached). 30s minimum interval, 10-minute stream lifetime, first event sent on open, and `last_updated` now says when the numbers were read. | `statistics/handler_stream_test.go`: `synctest` for exact counts on a fake clock, plus one test over Connect. |
+| PAY-1 | Integration tests for the real `DELETE FROM webhook_events`. | `TestForgetWebhookEvent_*` in `payment/repository_test.go`. Making the delete a no-op fails the test. |
+
+**Differences from the original proposals:**
+- **Speech limit is 14 MiB, not about 11 MiB.** The web and iOS clients both send JSON, where base64 turns the 10 MiB the proto allows into about 13.4 MiB. An 11 MiB limit would have refused valid recordings, and the "13 MiB is refused" test proposed above would have enforced that. An 11 MiB recording in JSON is now the refused case.
+- **Streams send an event on open.** With a lifetime limit, a client asking for a long interval would otherwise reconnect forever and never receive anything.
+- **`singleflight.Do`, not `DoChan`.** `DoChan` re-panics on its own goroutine, where no recover can reach it. A stream leaving mid-query therefore waits for that query, at most 10s.
+
+**Still open from these two findings:**
+- `/mcp` is outside the Connect limit, and `internal/mcp` has no body limit of its own. Stripe and Telegram already have theirs. Whether the MCP SDK limits the body was not checked.
+- Concurrent stats streams have no cap: the query cost is now flat, but each stream still holds a connection and a goroutine. Whether the IP rate limiter counts stream opens was not checked.
+- The unary `GetMainPageStatistics` is also public and still queries on every call. It was left uncached because it was outside this finding.
+
+**Full runs (2026-11-04), on the code above with API keys and tokens removed from the environment:**
+
+| Suite | Command | Result |
+|---|---|---|
+| Unit | `go test -race -count=1 ./...` | exit 0, 93 packages ok, no data races reported |
+| Lint | `golangci-lint run ./...` | 0 issues |
+| E2E | `go test -tags=e2e -p 1 -count=1 ./cmd/api/...` | ok |
+| Integration | `go test -tags=integration -p 1 -count=1 ./...` | **exit 1:** 95 packages ok, `internal/domain/achievements` ended with `signal: terminated` at 10.9s and no failed assertion |
+| Integration, that package again | `go test -tags=integration -count=1 ./internal/domain/achievements/`, twice | ok both times |
+
+The cause of the `signal: terminated` was not found, and the branch does not touch that package. If it comes back, look for what is signalling the test binary before looking at the tests.
+
 ### Still to do
 
-1. **PAY-1 follow-up:** an integration test for `ForgetWebhookEvent`. Optionally, move to recording the event id in the same transaction as the side effects.
-2. **HTTP-1:** add `connect.WithReadMaxBytes` in `cmd/api/router.go:199-216`. Use 1 MiB globally and about 11 MiB for the Speech service, or wrap the mux in `http.MaxBytesHandler`. Test: a 13 MiB request must get `CodeResourceExhausted`.
-3. **HTTP-2:** `statistics/handler.go:121-165`. One shared ticker or a 30s cached result behind `singleflight`, a minimum interval on the server, and a maximum stream lifetime. Test: 50 streams against a counting stub should make about one query per tick.
-4. **Full test runs** (Docker is available locally, Docker 29.8.2):
-   - `make test`
-   - `make test-integration` (`-tags=integration -p 1`, slow: about 3 minutes per package to start the container)
-   - `make test-e2e`
-   - `golangci-lint` via `make lint`
-5. **Push and open a PR** once the full suites pass. The commits already exist. Merging the app repo deploys nothing; promotion goes through the PR that `_deploy.yml` opens on the infra repo.
-6. **EXPLAIN and metrics for the database and caching items (DB-5…DB-8, DB-10, CACHE-2, OPS-8, MEM-1).** **Blocked: Loci has no staging environment.** The infra repo has only `argocd/apps/loci-production.yaml`; `*-staging` apps exist for other products only. The owner must choose one of:
+1. **Commit, push and open a PR**, once the owner asks. Merging the app repo deploys nothing; promotion goes through the PR that `_deploy.yml` opens on the infra repo.
+2. **EXPLAIN and metrics for the database and caching items (DB-5…DB-8, DB-10, CACHE-2, OPS-8, MEM-1).** **Blocked: Loci has no staging environment.** The infra repo has only `argocd/apps/loci-production.yaml`; `*-staging` apps exist for other products only. The owner must choose one of:
    - (a) Run plain `EXPLAIN` (no ANALYZE, so the query is not executed) read-only against production over `KUBECONFIG=~/.kube/maat.yaml`.
    - (b) Restore a production snapshot into a local or testcontainers Postgres and run `EXPLAIN (ANALYZE, BUFFERS)` there.
    - (c) Set up a Loci staging environment.
    
    Do **not** run `EXPLAIN ANALYZE` on production without explicit approval. For metrics, there is a Prometheus scrape on `:8080/metrics` (annotation in `apps/loci/api/values-common.yaml`). Check pod OOMKills/restarts (MEM-1) and existing `loci_*` series. `pgxpool.Stat()` is not exported yet (OPS-8), so it has to be added before pool waits can be measured.
-7. **Then P2/P3** from the roadmap below.
+3. **PAY-1, optional:** record the event id in the same transaction as the side effects.
+4. **Then P2/P3** from the roadmap below.
 
 ## Commands run
 
@@ -90,7 +115,7 @@ Status labels: **CONFIRMED** = a defect shown by the code (and by library source
 | DB-1 | CONFIRMED (by pgx contract: `vendor/.../pgx/v5/conn.go:947` says "BatchResults must be closed before the connection is used again") | `internal/domain/poi/poi_repository.go:2941-2953` | The code calls `br := tx.SendBatch(...); defer br.Close(); …Exec…; tx.Commit(ctx)`. Commit runs while the pipeline still holds the connection lock ("conn busy"), so pgx closes the connection. Nothing is saved, and the caller only logs a warning (`poi_llm_generation.go:140`). **Fix:** call `br.Close()` and check its error before `Commit`, as `trip/repository.go:600-609` does. **Validate:** an integration test, then search logs for "Failed to commit transaction for saving LLM POIs". |
 | DB-2 | CONFIRMED | `chat/repository/chat_repository.go:1968-1993` (inside the SaveInteraction tx); `poi/poi_repository.go:1911-1946` | `GetOrCreatePOI` looks up with `WHERE name=$1`, but the unique index is on `(city_id, lower(btrim(name)))` (`0068_…up.sql:68`). A name that differs only in case or whitespace, or a concurrent insert, raises 23505 and rolls back the whole interaction and itinerary. **Fix:** reuse the canonical upsert in `poi/poi_identity.go:60-80` (`ON CONFLICT … RETURNING id`). |
 | CON-1 | CONFIRMED | `internal/domain/chat/service/chat_multicity.go:138`, `:198` | City goroutines are launched with a bare `go` and no recover. A panic in `runStop` (prompting, parsing or persisting) crashes the process and every live stream with it. **Fix:** `concurrency.Go(&wg, l.logger, …)`, and turn a panic into a per-stop error event. **Test:** make the `runCityFn` seam panic on stop 1. |
-| HTTP-1 | CONFIRMED | `cmd/api/router.go:199-216` | There is no `connect.WithReadMaxBytes`, and Connect's default is unlimited. Proto `max_len` rules run only after the whole message is decoded into memory. **Fix:** `WithReadMaxBytes(1<<20)` globally, about 11 MiB for Speech, or wrap the mux in `http.MaxBytesHandler`. |
+| HTTP-1 | CONFIRMED | `cmd/api/router.go:199-216` | There is no `connect.WithReadMaxBytes`, and Connect's default is unlimited. Proto `max_len` rules run only after the whole message is decoded into memory. **Fix:** `WithReadMaxBytes(1<<20)` globally and a larger limit for Speech (14 MiB as built, see session 3), or wrap the mux in `http.MaxBytesHandler`. |
 | HTTP-2 | RISK | `internal/domain/statistics/handler.go:121-165` | `StreamMainPageStatistics` is unauthenticated. Each stream runs a heavy aggregate query on its own ticker (interval can be as short as 1s) with no cache and no cap on stream count, so N streams cost N queries per tick against 20 connections. **Fix:** one shared ticker that broadcasts to all streams (or a 30s cache behind singleflight), a server-side minimum interval, and a maximum stream lifetime. |
 
 ### P2
@@ -170,7 +195,7 @@ These are fixed: F007 (eventCh buffered to 100), F008 (`NewTimer` + `Stop`), and
 | 2 | DB-1 `br.Close()` before Commit | poi_repository.go | low | integration test; log search |
 | 3 | PAY-1 transactional idempotency + PAY-2b boot check | payment/service.go, repository.go, config.go | med | fail-once retry test |
 | 4 | CON-1/CON-2 recover everywhere + lint ban | listed sites, .golangci.yml | low | panic-seam tests |
-| 5 | HTTP-1 ReadMaxBytes, HTTP-3 min(timeout) | router.go, timeout.go | low | 13 MiB request test; header-cap test |
+| 5 | HTTP-1 ReadMaxBytes (done), HTTP-3 min(timeout) | router.go, timeout.go | low | read-limit tests; header-cap test |
 | 6 | OPS-1/OPS-2 shutdown + loop health metrics | main.go, safego.go, runners, infra values | med | SIGTERM test; dashboards |
 | 7 | DB-2 canonical upsert | chat_repository.go, poi_repository.go | low | case/whitespace test |
 | 8 | CTX-1, LLM-1, LLM-4, LLM-5 | chat_process_stream.go, fallback.go, chat_events.go | med | deadline/stub-429/slow-reader tests |
