@@ -73,6 +73,17 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/speech"
 )
 
+// Limits on one decoded (decompressed) request message. Connect reads without
+// limit by default, and the proto max_len rules only run once the whole message
+// is in memory, so without these a caller chooses how much this pod buffers.
+const (
+	defaultReadMaxBytes = 1 << 20 // 1 MiB
+
+	// Transcribe's audio field allows 10 MiB. The web client sends JSON, where
+	// base64 turns that into about 13.4 MiB.
+	speechReadMaxBytes = 14 << 20 // 14 MiB
+)
+
 // SetupRouter configures all routes and returns the HTTP service
 func SetupRouter(deps *Dependencies) http.Handler {
 	mux := http.NewServeMux()
@@ -216,7 +227,10 @@ func SetupRouter(deps *Dependencies) http.Handler {
 	)
 
 	// Register Connect RPC routes
-	registerConnectRoutes(mux, deps, interceptorChain)
+	registerConnectRoutes(mux, deps, connect.WithHandlerOptions(
+		interceptorChain,
+		connect.WithReadMaxBytes(defaultReadMaxBytes),
+	))
 
 	// Register Webhooks
 	if deps.PaymentService != nil {
@@ -423,7 +437,7 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	// StreamChat that follows already spends the request. Charging for both
 	// would make speaking cost twice what typing does.
 	speechHandler := speech.NewHandler(deps.Speech, deps.Vocabulary, deps.Logger)
-	speechPath, speechConnect := speechv1connect.NewSpeechServiceHandler(speechHandler, opts)
+	speechPath, speechConnect := speechv1connect.NewSpeechServiceHandler(speechHandler, opts, connect.WithReadMaxBytes(speechReadMaxBytes))
 	mux.Handle(speechPath, speechConnect)
 	deps.Logger.Info("registered Connect RPC service", "path", speechPath)
 
