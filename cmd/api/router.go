@@ -18,6 +18,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/calendar/calendarv1connect"
 
 	authhandler "github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/assistant/assistantconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/boards/v1/boardsv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/bundle/v1/bundlev1connect"
 	chatconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/chat/chatconnect"
@@ -440,6 +441,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	speechPath, speechConnect := speechv1connect.NewSpeechServiceHandler(speechHandler, opts, connect.WithReadMaxBytes(speechReadMaxBytes))
 	mux.Handle(speechPath, speechConnect)
 	deps.Logger.Info("registered Connect RPC service", "path", speechPath)
+
+	// Inside the interceptor chain and not in the metered set: a question is not
+	// an itinerary, and has a daily limit of its own.
+	assistantPath, assistantConnect := assistantconnect.NewAssistantServiceHandler(deps.AssistantHandler, opts)
+	mux.Handle(assistantPath, assistantConnect)
+	deps.Logger.Info("registered Connect RPC service", "path", assistantPath)
 
 	integrationsHandler := deps.IntegrationsHandler
 	if integrationsHandler == nil {

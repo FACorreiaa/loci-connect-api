@@ -18,6 +18,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/aicreds"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/apikey"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/assistant"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/repository"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/auth/service"
@@ -238,6 +239,7 @@ type Dependencies struct {
 	RecommendationHandler    *recommendation.Handler
 	PlaceIntelligenceHandler *placeintel.Handler
 	MemoryHandler            *memory.Handler
+	AssistantHandler         *assistant.Handler
 	LocalContextHandler      *localcontext.Handler
 	CompareHandler           *compare.Handler
 	CityHandler              *cityhandler.CityHandler
@@ -632,6 +634,40 @@ func (d *Dependencies) initIntegrations() {
 	)
 }
 
+// initAssistant builds the press-and-hold assistant when ASSISTANT_ENABLED is on.
+// Its provider links are its own: tools need Anthropic directly, and the answer
+// without tools uses the paid primary alone, never the free chain, because these
+// prompts carry a person's trips and free endpoints may log them.
+func (d *Dependencies) initAssistant(members assistant.TripResolver, friends assistant.FriendLister, mem assistant.MemoryReader) error {
+	if !d.Config.Assistant.Enabled {
+		return nil
+	}
+	deps := assistant.Deps{
+		Store:  assistant.NewStore(d.DB.Pool),
+		Logger: d.Logger,
+		Sources: assistant.Sources{
+			Trips: d.TripRepo, Members: members, Lists: d.ListSvc, POIs: d.POISvc,
+			Memory: mem, Friends: friends, Visits: d.TravelHistoryRepo, Activity: d.RecentsSvc,
+		},
+	}
+	model, err := ai.NewToolClient(d.Config.AI, d.Logger)
+	if err != nil {
+		return err
+	}
+	if model != nil {
+		deps.Model = model
+	}
+	fallback, err := ai.NewPaidPrimaryClient(context.Background(), d.Config.AI, d.Logger)
+	if err != nil {
+		return err
+	}
+	if fallback != nil {
+		deps.Fallback = fallback
+	}
+	d.AssistantHandler = assistant.NewHandler(assistant.NewService(deps), d.Logger)
+	return nil
+}
+
 // initSpeech wires transcription and synthesis.
 //
 // Separate from the bridge, and built before it, because they are independent:
@@ -994,8 +1030,9 @@ func (d *Dependencies) initHandlers() error {
 	// Memory: the learned profile, the evidence behind it, and the ability to
 	// remove either. Forgetting rebuilds the derived vector and traits from the
 	// signals that survive, so a deletion cannot leave the rest inconsistent.
+	memorySvc := memory.NewService(d.DB.Pool, preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser)
 	d.MemoryHandler = memory.NewHandler(
-		memory.NewService(d.DB.Pool, preference.NewReranker(d.DB.Pool, d.PreferenceVectors, d.Logger).RecomputeUser),
+		memorySvc,
 		d.Logger,
 	)
 
@@ -1136,6 +1173,13 @@ func (d *Dependencies) initHandlers() error {
 				d.Messaging.WithTripPlanner(tripcards.New(d.ChatService, trip.NewSessionTrips(d.DB.Pool, d.Logger), tripActions, d.Logger))
 			}
 		}
+		if err := d.initAssistant(trip.NewMemberAccess(sharingRepo, membersRepo, socialSvc), socialdomain.NewRepository(d.DB.Pool), memorySvc); err != nil {
+			return fmt.Errorf("assistant: %w", err)
+		}
+	}
+	if d.AssistantHandler == nil {
+		// Always registered, so a client gets a clean Unimplemented when it is off.
+		d.AssistantHandler = assistant.NewHandler(nil, d.Logger)
 	}
 	if d.DB != nil && d.TripRepo != nil {
 		d.CalendarHandler = calendar.NewHandler(

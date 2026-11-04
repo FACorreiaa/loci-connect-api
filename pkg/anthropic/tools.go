@@ -85,6 +85,9 @@ type ToolTurnRequest struct {
 	AdaptiveThinking bool
 	// FirstEventTimeout zero means the context is the only bound.
 	FirstEventTimeout time.Duration
+	// ForbidTools makes the model answer with what it has. The tools are still
+	// sent, because a history with tool calls in it needs them defined.
+	ForbidTools bool
 }
 
 // ToolUsage is what one call spent.
@@ -207,6 +210,9 @@ func (c *ChatClient) toolParams(req ToolTurnRequest) sdk.MessageNewParams {
 		MaxTokens: maxTokens,
 		Messages:  messageParams(req.Messages),
 		Tools:     toolParams(req.Tools),
+	}
+	if req.ForbidTools {
+		p.ToolChoice = sdk.ToolChoiceUnionParam{OfNone: &sdk.ToolChoiceNoneParam{}}
 	}
 	if req.System != "" {
 		// A breakpoint on the system block caches the tools ahead of it too.

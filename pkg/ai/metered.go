@@ -62,6 +62,15 @@ func recordPrometheus(model, method string, u tokenUsage) {
 	}
 }
 
+// RecordToolTurn counts one tool-use model call, which goes around the metered
+// chain because the chain has no tool support.
+func RecordToolTurn(model string, prompt, completion, cached int64) {
+	recordPrometheus(model, "tool_turn", tokenUsage{
+		Prompt: int32(prompt), Completion: int32(completion), Cached: int32(cached),
+		Total: int32(prompt + completion),
+	})
+}
+
 func usageOf(resp *genai.GenerateContentResponse) (tokenUsage, bool) {
 	if resp == nil || resp.UsageMetadata == nil {
 		return tokenUsage{}, false

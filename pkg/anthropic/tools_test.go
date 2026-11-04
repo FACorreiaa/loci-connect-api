@@ -108,6 +108,24 @@ func TestToolTurnAdaptiveThinkingIsOptIn(t *testing.T) {
 	}
 }
 
+func TestToolTurnForbidToolsKeepsThemDefined(t *testing.T) {
+	f, client := newTestClient(t, sse(evStart, evTextStart(0), evText(0, "hi"), evBlockStop(0), evMsgDelta("end_turn", 2), evMsgStop),
+		Options{})
+	_, err := client.ToolTurn(context.Background(), ToolTurnRequest{
+		Messages: userTurn("x"), Tools: []ToolDef{lookupTool}, ForbidTools: true,
+	}, nil)
+	if err != nil {
+		t.Fatalf("ToolTurn: %v", err)
+	}
+	body := f.body(t)
+	if got := body["tool_choice"].(map[string]any)["type"]; got != "none" {
+		t.Errorf("tool_choice = %v", got)
+	}
+	if len(body["tools"].([]any)) != 1 {
+		t.Errorf("tools must stay defined while the history has tool calls in it")
+	}
+}
+
 func TestToolTurnStreamsTextAndReportsUsage(t *testing.T) {
 	_, client := newTestClient(t, sse(evStart, evTextStart(0), evText(0, "Lisbon "), evText(0, "on Friday."), evBlockStop(0), evMsgDelta("end_turn", 6), evMsgStop),
 		Options{})
