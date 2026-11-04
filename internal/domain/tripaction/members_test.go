@@ -424,3 +424,57 @@ func TestPropose_ViewerProposesNothing(t *testing.T) {
 	_, err = g.svc.Propose(context.Background(), g.nope, g.tid, uuid.Nil, "remove the tower")
 	require.ErrorIs(t, err, trip.ErrNotFound)
 }
+
+// ProposeActions takes actions it did not extract, from a caller that may have
+// been fed anything, so nothing in them is believed: ids are the trip's, every
+// action is vetted, and the rules on who may propose what still apply.
+func TestProposeActions_AsksTheModelNothingAndTrustsNothing(t *testing.T) {
+	g := newTogether(t)
+	llm, _ := g.chat(`{"actions":[]}`)
+	ctx := context.Background()
+	planted := uuid.New().String()
+
+	got, err := g.svc.ProposeActions(ctx, g.uid, g.tid, uuid.Nil, []Action{
+		// Ids from outside must not survive: only the stop's name finds it.
+		{Kind: KindRemoveStop, Day: 1, StopName: "Belém Tower", DayID: planted, StopID: planted},
+		// These fail vetting: no such day, no such city.
+		{Kind: KindRemoveStop, Day: 99, StopName: "Belém Tower"},
+		{Kind: KindSearchHotels, City: "Atlantis"},
+	})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, g.stop.String(), got[0].Action.StopID)
+	require.NotEqual(t, planted, got[0].Action.DayID)
+	require.Empty(t, g.plans.applied, "proposing changes nothing")
+	require.Equal(t, StatusPending, g.store.byID[got[0].ID].Status)
+	require.Empty(t, llm.prompts, "the actions are already decided")
+}
+
+func TestProposeActions_FollowsTheRulesOnWhoMayPropose(t *testing.T) {
+	g := newTogether(t)
+	g.chat(`{"actions":[]}`)
+	ctx := context.Background()
+	remove := []Action{{Kind: KindRemoveStop, Day: 1, StopName: "Belém Tower"}}
+
+	got, err := g.svc.ProposeActions(ctx, g.viewer, g.tid, uuid.Nil, remove)
+	require.NoError(t, err)
+	require.Empty(t, got, "a viewer proposes nothing")
+
+	_, err = g.svc.ProposeActions(ctx, uuid.New(), g.tid, uuid.Nil, remove)
+	require.ErrorIs(t, err, trip.ErrNotFound, "a stranger's request does not find the trip")
+
+	got, err = g.svc.ProposeActions(ctx, g.co, g.tid, uuid.Nil, remove)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, g.now.Add(memberProposalTTL), got[0].ExpiresAt, "a co-planner's card waits for the owner")
+	require.Len(t, g.notify.sent, 1, "and the owner hears about it")
+}
+
+func TestProposeActions_NothingLeftAfterVettingIsNoProposals(t *testing.T) {
+	g := newTogether(t)
+	g.chat(`{"actions":[]}`)
+	got, err := g.svc.ProposeActions(context.Background(), g.uid, g.tid, uuid.Nil, []Action{{Kind: "drop_database"}})
+	require.NoError(t, err)
+	require.Empty(t, got)
+	require.Empty(t, g.notify.sent)
+}

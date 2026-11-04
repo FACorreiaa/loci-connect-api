@@ -116,11 +116,33 @@ func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UU
 	if err != nil || t == nil {
 		return nil, err
 	}
-	now := s.d.Now()
-	actions, err := Extract(ctx, s.d.LLM, message, snapshotOf(t, now))
+	actions, err := Extract(ctx, s.d.LLM, message, snapshotOf(t, s.d.Now()))
 	if err != nil || len(actions) == 0 {
 		return nil, err
 	}
+	return s.storeActions(ctx, userID, t, owner, sessionID, actions)
+}
+
+// ProposeActions stores proposals for changes somebody has already decided on,
+// without asking the model what the message meant. The actions are treated as
+// untrusted: they pass the same vetting as extracted ones, and the same rules
+// on who may propose what. An action that fails is dropped, not an error.
+func (s *Service) ProposeActions(ctx context.Context, userID, tripID, sessionID uuid.UUID, actions []Action) ([]Proposal, error) {
+	t, owner, err := s.proposer(ctx, userID, tripID)
+	if err != nil || t == nil {
+		return nil, err
+	}
+	vetted := vetActions(actions, snapshotOf(t, s.d.Now()))
+	if len(vetted) == 0 {
+		return nil, nil
+	}
+	return s.storeActions(ctx, userID, t, owner, sessionID, vetted)
+}
+
+// storeActions turns vetted actions into stored proposals on t and tells the
+// owner about a co-planner's.
+func (s *Service) storeActions(ctx context.Context, userID uuid.UUID, t *trip.Trip, owner bool, sessionID uuid.UUID, actions []Action) ([]Proposal, error) {
+	now := s.d.Now()
 	sessionID = s.ownedSession(ctx, userID, sessionID)
 
 	ttl := proposalTTL
@@ -139,7 +161,7 @@ func (s *Service) Propose(ctx context.Context, userID, tripID, sessionID uuid.UU
 		if a.Kind == KindSearchHotels && !owner {
 			continue
 		}
-		p := Proposal{UserID: userID, TripID: tripID, SessionID: sessionID, Action: a, ExpiresAt: now.Add(ttl), Source: SourceChat}
+		p := Proposal{UserID: userID, TripID: t.ID, SessionID: sessionID, Action: a, ExpiresAt: now.Add(ttl), Source: SourceChat}
 		if a.Kind.IsStopEdit() {
 			// A stop or place that can't be found is no card: the turn is
 			// answered as usual instead.
