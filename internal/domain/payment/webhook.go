@@ -12,6 +12,15 @@ import (
 // from config (STRIPE_WEBHOOK_SECRET) via the caller.
 func WebhookHandler(service Service, logger *slog.Logger, endpointSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// A signature made with the empty key verifies against the empty key, so
+		// without a secret nothing here can be trusted. 503 makes Stripe retry,
+		// so real events survive until the secret is set.
+		if endpointSecret == "" {
+			logger.Error("Refusing Stripe webhook: STRIPE_WEBHOOK_SECRET is not set")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
 		const MaxBodyBytes = int64(65536)
 		r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
 		payload, err := io.ReadAll(r.Body)

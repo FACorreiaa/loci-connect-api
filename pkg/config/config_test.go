@@ -908,3 +908,69 @@ func TestLoad_AnthropicRejectsUnknownValuesOnlyWhenOn(t *testing.T) {
 		})
 	}
 }
+
+// A sealed value with a stray space boots fine and then fails every signature,
+// so Stripe's values are trimmed like the other secrets here.
+func TestLoad_TrimsStripeValues(t *testing.T) {
+	setLoadableEnv(t)
+	t.Setenv("STRIPE_API_KEY", "sk_test_abc ")
+	t.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_abc ")
+	t.Setenv("STRIPE_PRICE_ID_MONTHLY", "price_m ")
+	t.Setenv("STRIPE_PRICE_ID_ANNUAL", "price_a\n")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	got := []string{cfg.Stripe.APIKey, cfg.Stripe.WebhookSecret, cfg.Stripe.PriceIDMonthly, cfg.Stripe.PriceIDAnnual}
+	want := []string{"sk_test_abc", "whsec_abc", "price_m", "price_a"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("value %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+// With no secret, anyone can sign a webhook: the signature is an HMAC under the
+// empty key. Production that takes payments must not start that way.
+func TestLoad_ProductionWithStripeNeedsWebhookSecret(t *testing.T) {
+	cases := []struct {
+		name, apiKey, secret string
+		wantErr              bool
+	}{
+		{"key without secret", "sk_live_abc", "", true},
+		{"key with blank secret", "sk_live_abc", "   ", true},
+		{"key with secret", "sk_live_abc", "whsec_abc", false},
+		{"no stripe at all", "", "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			baseAuthEnv(t)
+			t.Setenv("APP_ENV", "production")
+			t.Setenv("OPENMETEO_API_KEY", "paid-key")
+			t.Setenv("JWT_REFRESH_SECRET", "different-refresh-secret-that-is-long-enough")
+			t.Setenv("STRIPE_API_KEY", tc.apiKey)
+			t.Setenv("STRIPE_WEBHOOK_SECRET", tc.secret)
+
+			_, err := Load()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("Load error = %v, wantErr %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// The format of the key is deliberately not checked at boot: a wrong key breaks
+// checkout, and refusing to start would take the whole API down with it.
+func TestLoad_ProductionBootsWithUnusualStripeKey(t *testing.T) {
+	baseAuthEnv(t)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("OPENMETEO_API_KEY", "paid-key")
+	t.Setenv("JWT_REFRESH_SECRET", "different-refresh-secret-that-is-long-enough")
+	t.Setenv("STRIPE_API_KEY", "not_a_stripe_shaped_key")
+	t.Setenv("STRIPE_WEBHOOK_SECRET", "whsec_abc")
+
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+}

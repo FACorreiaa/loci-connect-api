@@ -608,12 +608,12 @@ func Load() (*Config, error) {
 			MaxConcurrentUpdates: getEnvAsInt("TRANSCRIBE_MAX_CONCURRENT_UPDATES", 2),
 		},
 		Stripe: StripeConfig{
-			APIKey:         getEnv("STRIPE_API_KEY", ""),
-			WebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
-			PriceIDMonthly: getEnv("STRIPE_PRICE_ID_MONTHLY", ""),
-			PriceIDAnnual:  getEnv("STRIPE_PRICE_ID_ANNUAL", ""),
+			APIKey:         strings.TrimSpace(getEnv("STRIPE_API_KEY", "")),
+			WebhookSecret:  strings.TrimSpace(getEnv("STRIPE_WEBHOOK_SECRET", "")),
+			PriceIDMonthly: strings.TrimSpace(getEnv("STRIPE_PRICE_ID_MONTHLY", "")),
+			PriceIDAnnual:  strings.TrimSpace(getEnv("STRIPE_PRICE_ID_ANNUAL", "")),
 
-			PriceIDCityPack:    getEnv("STRIPE_PRICE_ID_CITY_PACK", ""),
+			PriceIDCityPack:    strings.TrimSpace(getEnv("STRIPE_PRICE_ID_CITY_PACK", "")),
 			CityPackPriceCents: getEnvAsInt("CITY_PACK_PRICE_CENTS", 499),
 			CityPackCurrency:   getEnv("CITY_PACK_CURRENCY", "usd"),
 		},
@@ -795,6 +795,13 @@ func Load() (*Config, error) {
 	}
 	if cfg.Auth.JWTRefreshSecret == cfg.Auth.JWTSecret && strings.EqualFold(getEnv("APP_ENV", "development"), "production") {
 		return nil, errors.New("JWT_REFRESH_SECRET must be set and must differ from JWT_SECRET in production")
+	}
+	// Without a webhook secret anyone can sign an event, because the signature is
+	// an HMAC under the empty key, and an event can grant a plan. The key's format
+	// is deliberately not checked: a bad key breaks checkout, and refusing to boot
+	// over it would take the whole API down with it.
+	if cfg.Stripe.APIKey != "" && cfg.Stripe.WebhookSecret == "" && strings.EqualFold(getEnv("APP_ENV", "development"), "production") {
+		return nil, errors.New("STRIPE_WEBHOOK_SECRET must be set in production when STRIPE_API_KEY is set")
 	}
 	if len(cfg.Auth.JWTRefreshSecret) < 32 {
 		return nil, errors.New("JWT_REFRESH_SECRET must be at least 32 characters")

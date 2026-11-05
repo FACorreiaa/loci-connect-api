@@ -235,6 +235,83 @@ func TestUpsertSubscription_CustomerIDRoundTripAndSticky(t *testing.T) {
 	assert.Equal(t, "canceled", got.Status)
 }
 
+func stripeSubAt(userID uuid.UUID, status string, at *time.Time) *Subscription {
+	return &Subscription{
+		UserID:                 userID,
+		Plan:                   "premium_monthly",
+		Status:                 status,
+		StartDate:              time.Now(),
+		ExternalProvider:       "stripe",
+		ExternalSubscriptionID: util.Ptr("sub_order"),
+		LastEventAt:            at,
+	}
+}
+
+// Stripe does not deliver in order. A late "updated" must not re-activate a
+// subscription that a newer event already cancelled.
+func TestUpsertSubscription_OlderEventDoesNotOverwrite(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+	older, newer := time.Unix(1_700_000_000, 0), time.Unix(1_700_000_100, 0)
+
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "canceled", &newer)))
+
+	err := repo.UpsertSubscription(ctx, stripeSubAt(userID, "active", &older))
+	require.ErrorIs(t, err, ErrStaleSubscriptionEvent)
+
+	got, err := repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	assert.Equal(t, "canceled", got.Status)
+}
+
+func TestUpsertSubscription_NewerEventApplies(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+	older, newer := time.Unix(1_700_000_000, 0), time.Unix(1_700_000_100, 0)
+
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "active", &older)))
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "canceled", &newer)))
+
+	got, err := repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	assert.Equal(t, "canceled", got.Status)
+}
+
+// Stripe's timestamps are whole seconds, and created and updated often share one.
+// Those apply in arrival order, or the second would be lost every time.
+func TestUpsertSubscription_SameSecondEventApplies(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+	at := time.Unix(1_700_000_000, 0)
+
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "trialing", &at)))
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "active", &at)))
+
+	got, err := repo.GetSubscriptionByUserID(ctx, userID)
+	require.NoError(t, err)
+	assert.Equal(t, "active", got.Status)
+}
+
+// A row written before this column existed has no time to compare against. An
+// event with no time must not erase the one already stored.
+func TestUpsertSubscription_MissingTimes(t *testing.T) {
+	repo, pool := newPaymentRepo(t)
+	ctx := context.Background()
+	userID := insertUser(t, pool)
+	at := time.Unix(1_700_000_000, 0)
+	earlier := at.Add(-time.Hour)
+
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "active", nil)))
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "canceled", &at)), "a row with no time accepts an event")
+	require.NoError(t, repo.UpsertSubscription(ctx, stripeSubAt(userID, "active", nil)), "an event with no time still applies")
+
+	err := repo.UpsertSubscription(ctx, stripeSubAt(userID, "canceled", &earlier))
+	require.ErrorIs(t, err, ErrStaleSubscriptionEvent, "the stored time must have survived")
+}
+
 func TestSetStripeCustomerID_CreatesRowAndResolvesUser(t *testing.T) {
 	repo, pool := newPaymentRepo(t)
 	ctx := context.Background()
