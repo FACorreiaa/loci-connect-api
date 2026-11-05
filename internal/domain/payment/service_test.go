@@ -538,3 +538,56 @@ func TestProcessStripeEvent_FailedEventIsRetriedNotSkipped(t *testing.T) {
 		t.Fatalf("redelivery must apply the event, got %d upserts", len(repo.upserted))
 	}
 }
+
+// A subscription event carries when Stripe created it, which is what lets the
+// repository refuse one that arrives after a newer one.
+func TestProcessStripeEvent_RecordsWhenTheEventWasCreated(t *testing.T) {
+	repo := &fakePaymentRepo{}
+	svc := newTestService(repo)
+	userID := uuid.New()
+
+	ev := subEvent(t, "customer.subscription.updated", map[string]any{
+		"id":       "sub_123",
+		"status":   "active",
+		"created":  time.Now().Unix(),
+		"metadata": map[string]string{"user_id": userID.String()},
+	})
+	ev.Created = 1_700_000_000
+
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("ProcessStripeEvent: %v", err)
+	}
+	if len(repo.upserted) != 1 {
+		t.Fatalf("expected 1 upsert, got %d", len(repo.upserted))
+	}
+	got := repo.upserted[0].LastEventAt
+	if got == nil || !got.Equal(time.Unix(1_700_000_000, 0)) {
+		t.Errorf("LastEventAt = %v, want the event's created time", got)
+	}
+}
+
+// An out-of-order delivery is normal, not a failure. It must answer success, or
+// Stripe would keep redelivering an event that can never apply.
+func TestProcessStripeEvent_StaleSubscriptionEventIsNotAnError(t *testing.T) {
+	repo := &fakePaymentRepo{upsertErr: ErrStaleSubscriptionEvent}
+	svc, inv := newTestServiceWithInvalidator(repo)
+	userID := uuid.New()
+
+	ev := subEvent(t, "customer.subscription.updated", map[string]any{
+		"id":       "sub_123",
+		"status":   "active",
+		"created":  time.Now().Unix(),
+		"metadata": map[string]string{"user_id": userID.String()},
+	})
+	ev.Created = 1_700_000_000
+
+	if err := svc.ProcessStripeEvent(context.Background(), ev); err != nil {
+		t.Fatalf("ProcessStripeEvent: %v", err)
+	}
+	if len(repo.webhookSeen) != 1 {
+		t.Errorf("event must stay recorded as handled, webhookSeen = %v", repo.webhookSeen)
+	}
+	if len(inv.invalidated) != 0 {
+		t.Errorf("nothing changed, so no plan should be invalidated, got %v", inv.invalidated)
+	}
+}

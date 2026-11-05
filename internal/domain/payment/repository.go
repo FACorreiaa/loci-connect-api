@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,9 +128,15 @@ type Subscription struct {
 	ExternalProvider       string
 	ExternalSubscriptionID *string
 	ExternalCustomerID     *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	// LastEventAt is when the Stripe event behind this state was created.
+	LastEventAt *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
+
+// ErrStaleSubscriptionEvent means the subscription already reflects a newer
+// Stripe event, so this one changed nothing.
+var ErrStaleSubscriptionEvent = errors.New("subscription already reflects a newer event")
 
 // -- Implementation --
 
@@ -420,9 +427,9 @@ func (r *repository) UpsertSubscription(ctx context.Context, sub *Subscription) 
         INSERT INTO subscriptions (
             id, user_id, plan, status, start_date, end_date, trial_end_date,
             external_provider, external_subscription_id, external_customer_id,
-            created_at, updated_at
+            last_stripe_event_at, created_at, updated_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
         )
         ON CONFLICT (user_id) DO UPDATE SET
             plan = EXCLUDED.plan,
@@ -433,14 +440,24 @@ func (r *repository) UpsertSubscription(ctx context.Context, sub *Subscription) 
             external_provider = EXCLUDED.external_provider,
             external_subscription_id = EXCLUDED.external_subscription_id,
             external_customer_id = COALESCE(EXCLUDED.external_customer_id, subscriptions.external_customer_id),
+            last_stripe_event_at = COALESCE(EXCLUDED.last_stripe_event_at, subscriptions.last_stripe_event_at),
             updated_at = NOW()
+        WHERE subscriptions.last_stripe_event_at IS NULL
+           OR EXCLUDED.last_stripe_event_at IS NULL
+           OR subscriptions.last_stripe_event_at <= EXCLUDED.last_stripe_event_at
     `
 	if sub.ID == uuid.Nil {
 		sub.ID = uuid.New()
 	}
-	_, err := r.db.Exec(ctx, query,
+	tag, err := r.db.Exec(ctx, query,
 		sub.ID, sub.UserID, sub.Plan, sub.Status, sub.StartDate, sub.EndDate, sub.TrialEndDate,
-		sub.ExternalProvider, sub.ExternalSubscriptionID, sub.ExternalCustomerID,
+		sub.ExternalProvider, sub.ExternalSubscriptionID, sub.ExternalCustomerID, sub.LastEventAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrStaleSubscriptionEvent
+	}
+	return nil
 }
