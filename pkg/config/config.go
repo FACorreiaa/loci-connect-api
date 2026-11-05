@@ -30,6 +30,7 @@ type Config struct {
 	Secrets       SecretsConfig
 	Messaging     MessagingConfig
 	Voice         VoiceConfig
+	Assistant     AssistantConfig
 	Push          PushConfig
 	Social        SocialConfig
 	// Storage is the bucket for trip journal photos; unset turns photos off.
@@ -194,6 +195,12 @@ type AnthropicConfig struct {
 	// Scope is AnthropicScopeAll, which also puts the link ahead of the free
 	// tier's chain, or AnthropicScopePaid, which keeps it to paying callers.
 	Scope string
+}
+
+// AssistantConfig is the press-and-hold assistant's switch. Off, its RPCs answer
+// Unimplemented and the clients hide it.
+type AssistantConfig struct {
+	Enabled bool
 }
 
 // Enabled reports whether the link is built at all.
@@ -596,6 +603,7 @@ func Load() (*Config, error) {
 			TelegramBotHandle:     getEnv("TELEGRAM_BOT_HANDLE", ""),
 			TelegramWebhookSecret: strings.TrimSpace(getEnv("TELEGRAM_WEBHOOK_SECRET", "")),
 		},
+		Assistant: AssistantConfig{Enabled: getEnvAsBool("ASSISTANT_ENABLED", false)},
 		Voice: VoiceConfig{
 			Provider:             getEnv("TRANSCRIBE_PROVIDER", "openai_compatible"),
 			BaseURL:              strings.TrimSpace(getEnv("TRANSCRIBE_PROVIDER_OPENAI_BASEURL", "")),
