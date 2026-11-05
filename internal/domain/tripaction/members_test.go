@@ -291,6 +291,19 @@ func TestApply_CoPlannerWhenTheOwnerLetsThem(t *testing.T) {
 	require.ElementsMatch(t, []uuid.UUID{g.uid, g.viewer}, g.notify.sent[0].to, "the owner hears too")
 }
 
+func TestApplyCurrent_CoPlannerWhenTheOwnerLetsThem(t *testing.T) {
+	g := newTogether(t)
+	g.members.mayApply = true
+	ctx := context.Background()
+	v, err := g.svc.ProposeEdit(ctx, g.co, g.tid, g.addStop("Pastéis de Belém"), 3)
+	require.NoError(t, err)
+
+	tr, msg, err := g.svc.ApplyCurrent(ctx, g.co, v.ID, nil)
+	require.NoError(t, err, "a co-planner reads the trip through their membership, not as its owner")
+	require.Equal(t, int64(4), tr.Version)
+	require.NotNil(t, msg)
+}
+
 func TestDismiss_CoPlannerWhoMayApplyStillOnlyTakesBackTheirOwn(t *testing.T) {
 	g := newTogether(t)
 	g.members.mayApply = true

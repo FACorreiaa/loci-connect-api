@@ -74,6 +74,11 @@ type Sources struct {
 	Friends  FriendLister
 	Visits   VisitLister
 	Activity ActivityReader
+
+	// What the propose tools and ConfirmAction use. Nil drops the tools that need it.
+	Proposals  TripProposer
+	Favourites FavouriteWriter
+	ListItems  ListWriter
 }
 
 // modelError is a failure worth telling the model, in words it can act on. Any
@@ -89,6 +94,11 @@ type tool struct {
 	def    anthropic.ToolDef
 	status string
 	run    func(ctx context.Context, userID uuid.UUID, input json.RawMessage) (any, error)
+	// offers marks a tool that puts something in front of the caller, which
+	// Limits.Proposals bounds. It returns an offer from run.
+	offers bool
+	// timeout zero gets Limits.Tool.
+	timeout time.Duration
 }
 
 func objectProp(kind, description string) map[string]any {

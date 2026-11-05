@@ -413,11 +413,35 @@ func (s *Service) ApplyCurrent(ctx context.Context, userID, proposalID uuid.UUID
 	if err != nil {
 		return nil, nil, err
 	}
-	t, err := s.d.Trips.GetTrip(ctx, p.TripID, userID)
+	version, err := s.currentVersion(ctx, userID, p.TripID)
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.Apply(ctx, userID, proposalID, option, t.Version)
+	return s.Apply(ctx, userID, proposalID, option, version)
+}
+
+// currentVersion reads the trip as whoever is applying can see it: planning
+// together that may be a co-planner the owner lets apply, whom GetTrip, scoped
+// to the owner, reads as not found.
+func (s *Service) currentVersion(ctx context.Context, userID, tripID uuid.UUID) (int64, error) {
+	if s.together() {
+		t, _, err := s.d.Members.Resolve(ctx, userID, tripID)
+		if err != nil {
+			return 0, err
+		}
+		return t.Version, nil
+	}
+	t, err := s.d.Trips.GetTrip(ctx, tripID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return t.Version, nil
+}
+
+// Applicable is a proposal the caller may apply, in whatever state it is in. It
+// tells a second confirm whether the first went through.
+func (s *Service) Applicable(ctx context.Context, userID, proposalID uuid.UUID) (*Proposal, error) {
+	return s.applicable(ctx, userID, proposalID)
 }
 
 // pick is the option a pick-one action is applied with. Flights have one,

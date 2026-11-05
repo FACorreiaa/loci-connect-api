@@ -638,7 +638,7 @@ func (d *Dependencies) initIntegrations() {
 // Its provider links are its own: tools need Anthropic directly, and the answer
 // without tools uses the paid primary alone, never the free chain, because these
 // prompts carry a person's trips and free endpoints may log them.
-func (d *Dependencies) initAssistant(members assistant.TripResolver, friends assistant.FriendLister, mem assistant.MemoryReader) error {
+func (d *Dependencies) initAssistant(members assistant.TripResolver, friends assistant.FriendLister, mem assistant.MemoryReader, proposals assistant.TripProposer) error {
 	if !d.Config.Assistant.Enabled {
 		return nil
 	}
@@ -648,6 +648,7 @@ func (d *Dependencies) initAssistant(members assistant.TripResolver, friends ass
 		Sources: assistant.Sources{
 			Trips: d.TripRepo, Members: members, Lists: d.ListSvc, POIs: d.POISvc,
 			Memory: mem, Friends: friends, Visits: d.TravelHistoryRepo, Activity: d.RecentsSvc,
+			Proposals: proposals, Favourites: d.POISvc, ListItems: d.ListSvc,
 		},
 	}
 	model, err := ai.NewToolClient(d.Config.AI, d.Logger)
@@ -1147,6 +1148,7 @@ func (d *Dependencies) initHandlers() error {
 		// ApplyTripAction makes the one the traveller confirms.
 		// Planning together: a trip's members see the same proposals, suggest
 		// stop edits, react, and the owner applies.
+		var assistantProposals assistant.TripProposer
 		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
 			store := tripaction.NewStore(d.DB.Pool)
 			tripActions := tripaction.NewService(tripaction.Deps{
@@ -1167,13 +1169,14 @@ func (d *Dependencies) initHandlers() error {
 			})
 			chatImpl.SetTripActions(tripActions)
 			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions).WithTripProposals(tripActions)
+			assistantProposals = tripActions
 			// Telegram gets the same proposals as buttons. The bridge was built
 			// earlier (initMessaging); WithTripPlanner attaches to it in place.
 			if d.Messaging != nil {
 				d.Messaging.WithTripPlanner(tripcards.New(d.ChatService, trip.NewSessionTrips(d.DB.Pool, d.Logger), tripActions, d.Logger))
 			}
 		}
-		if err := d.initAssistant(trip.NewMemberAccess(sharingRepo, membersRepo, socialSvc), socialdomain.NewRepository(d.DB.Pool), memorySvc); err != nil {
+		if err := d.initAssistant(trip.NewMemberAccess(sharingRepo, membersRepo, socialSvc), socialdomain.NewRepository(d.DB.Pool), memorySvc, assistantProposals); err != nil {
 			return fmt.Errorf("assistant: %w", err)
 		}
 	}
