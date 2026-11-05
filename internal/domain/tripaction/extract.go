@@ -101,6 +101,13 @@ func Extract(ctx context.Context, gen Generator, message string, snap Snapshot) 
 		return nil, nil
 	}
 
+	return vetActions(raw, snap), nil
+}
+
+// vetActions keeps the actions that pass normalize against the trip, up to
+// maxActions. What comes out of here is safe to resolve and store, whoever
+// wrote what went in.
+func vetActions(raw []Action, snap Snapshot) []Action {
 	out := make([]Action, 0, len(raw))
 	for _, a := range raw {
 		var (
@@ -120,7 +127,7 @@ func Extract(ctx context.Context, gen Generator, message string, snap Snapshot) 
 			break
 		}
 	}
-	return out, nil
+	return out
 }
 
 // parseActions reads the first JSON object in text, fenced or not: the
