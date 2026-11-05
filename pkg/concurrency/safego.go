@@ -4,6 +4,7 @@ package concurrency
 
 import (
 	"log/slog"
+	"runtime/debug"
 	"sync"
 )
 
@@ -16,7 +17,7 @@ func Go(wg *sync.WaitGroup, log *slog.Logger, f func()) {
 		defer func() {
 			if r := recover(); r != nil {
 				if log != nil {
-					log.Error("worker goroutine panicked", "recover", r)
+					log.Error("worker goroutine panicked", "recover", r, "stack", string(debug.Stack()))
 				}
 			}
 		}()
@@ -32,7 +33,7 @@ func Run(log *slog.Logger, f func()) {
 		defer func() {
 			if r := recover(); r != nil {
 				if log != nil {
-					log.Error("background goroutine panicked", "recover", r)
+					log.Error("background goroutine panicked", "recover", r, "stack", string(debug.Stack()))
 				}
 			}
 		}()

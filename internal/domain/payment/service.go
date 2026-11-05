@@ -612,8 +612,19 @@ func (s *service) applyStripeEvent(ctx context.Context, event stripe.Event) erro
 		if stripeSub.Customer != nil && stripeSub.Customer.ID != "" {
 			sub.ExternalCustomerID = &stripeSub.Customer.ID
 		}
+		if event.Created > 0 {
+			t := time.Unix(event.Created, 0)
+			sub.LastEventAt = &t
+		}
 
-		if err := s.repo.UpsertSubscription(ctx, sub); err != nil {
+		err = s.repo.UpsertSubscription(ctx, sub)
+		if errors.Is(err, ErrStaleSubscriptionEvent) {
+			// Stripe does not deliver in order, so this is normal. Answering
+			// success stops it redelivering an event that can never apply.
+			s.logger.Info("ignoring out-of-order subscription event", "id", event.ID, "type", event.Type, "stripe_id", stripeSub.ID)
+			return nil
+		}
+		if err != nil {
 			return fmt.Errorf("failed to upsert subscription: %w", err)
 		}
 		s.invalidatePlan(uid)

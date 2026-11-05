@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -20,6 +21,14 @@ import (
 )
 
 func main() {
+	// Everything lives in run because os.Exit skips deferred calls: exiting from
+	// there would lose the cleanup and the telemetry flushes.
+	if err := run(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// A .env file is a development convenience, not a requirement. In a
 	// container every value arrives as an environment variable and there is no
 	// file to read, so a missing one is normal and config.Load below is what
@@ -45,7 +54,7 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Error("failed to load config", "error", err)
-		os.Exit(1)
+		return err
 	}
 
 	// The one line that says what the running value is. OPENROUTER_MODEL lives
@@ -62,7 +71,7 @@ func main() {
 	shutdownTracing, err := observability.InitTracing(context.Background(), "loci-connect-api", logger)
 	if err != nil {
 		logger.Error("failed to initialize tracing", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -77,7 +86,7 @@ func main() {
 	shutdownMetrics, metricsErr := observability.InitMetrics(context.Background(), "loci-connect-api", logger)
 	if metricsErr != nil {
 		logger.Error("failed to initialize metric export", "error", metricsErr)
-		os.Exit(1)
+		return metricsErr
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -91,7 +100,7 @@ func main() {
 	deps, err := api.InitDependencies(cfg, logger)
 	if err != nil {
 		logger.Error("failed to initialize dependencies", "error", err)
-		os.Exit(1)
+		return err
 	}
 	defer deps.Cleanup()
 
@@ -103,90 +112,64 @@ func main() {
 	// Setup router
 	handler := api.SetupRouter(deps)
 
-	// Background loops that live as long as the API does. Cancelled when the
-	// server stops, which ends the Telegram long poll rather than leaving it
-	// holding a request against Telegram.
-	backgroundCtx, stopBackground := context.WithCancel(context.Background())
-	defer stopBackground()
+	// The signal stops the loops at the same moment the server starts draining,
+	// which ends the Telegram long poll rather than leaving it holding a request
+	// against Telegram.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Background loops that live as long as the API does. See loops.start for
+	// what a panic or an error does to them.
+	background := newLoops(logger)
 
 	// Receive Telegram messages alongside the API.
 	//
 	// Returns immediately when no bot is configured, so this is started
-	// unconditionally.
-	concurrency.Run(logger, func() {
-		if err := deps.RunTelegram(backgroundCtx); err != nil {
-			// The bridge stopping is not the API failing: itineraries are
-			// still answered in the app, and taking the server down with it
-			// would turn a chat outage into an outage.
-			logger.Error("telegram bridge stopped", "error", err)
-		}
-	})
+	// unconditionally. The bridge stopping is not the API failing: itineraries
+	// are still answered in the app.
+	background.start(ctx, "telegram", deps.RunTelegram)
 
 	// Keep Apple's client secret fresh alongside the API.
 	//
 	// Returns immediately when Apple sign-in is not configured, so this is
-	// started unconditionally.
-	concurrency.Run(logger, func() {
-		if err := deps.RunAppleSecretRefresh(backgroundCtx); err != nil {
-			// The renewal loop stopping does not break sign-in today — the
-			// secret it last signed is valid for months — so it is not a
-			// reason to take the API down.
-			logger.Error("apple client secret renewal stopped", "error", err)
-		}
-	})
+	// started unconditionally. The renewal loop stopping does not break sign-in
+	// today: the secret it last signed is valid for months.
+	background.start(ctx, "apple_secret", deps.RunAppleSecretRefresh)
 
 	// Post due standing tasks into their chat threads.
 	//
 	// Returns immediately when there is no model to run them on, so this is
 	// started unconditionally.
-	concurrency.Run(logger, func() {
-		if err := deps.RunWatches(backgroundCtx); err != nil {
-			// Standing tasks stopping is not the API failing.
-			logger.Error("standing-task runner stopped", "error", err)
-		}
-	})
+	background.start(ctx, "watches", deps.RunWatches)
 
 	// Close finished field-score weeks, pay places kept a week, and look up
 	// neighborhoods. Returns immediately when switched off.
-	concurrency.Run(logger, func() {
-		if err := deps.RunField(backgroundCtx); err != nil {
-			logger.Error("field runner stopped", "error", err)
-		}
-	})
+	background.start(ctx, "field", deps.RunField)
 
 	// Trip-day briefs (morning brief, weather turn). Returns immediately when off.
-	concurrency.Run(logger, func() {
-		if err := deps.RunTripBriefs(backgroundCtx); err != nil {
-			logger.Error("tripbrief runner stopped", "error", err)
-		}
-	})
+	background.start(ctx, "tripbriefs", deps.RunTripBriefs)
 
 	// Sweep abandoned journal uploads and deleted photos' objects.
-	concurrency.Run(logger, func() {
-		if err := deps.RunJournalSweeper(backgroundCtx); err != nil {
-			logger.Error("journal sweeper stopped", "error", err)
-		}
-	})
+	background.start(ctx, "journal_sweeper", deps.RunJournalSweeper)
 
 	// Queue, build and announce trip recaps. Returns immediately when off.
-	concurrency.Run(logger, func() {
-		if err := deps.RunRecaps(backgroundCtx); err != nil {
-			logger.Error("recap runner stopped", "error", err)
-		}
-	})
+	background.start(ctx, "recaps", deps.RunRecaps)
 
 	// Publish one seasonal editorial destination per UTC calendar day.
-	concurrency.Run(logger, func() {
-		if err := deps.RunDailyPosts(backgroundCtx); err != nil {
-			logger.Error("daily editorial runner stopped", "error", err)
-		}
-	})
+	background.start(ctx, "daily_posts", deps.RunDailyPosts)
 
-	// Start HTTP server
-	if err := runServer(cfg, logger, handler); err != nil {
-		logger.Error("server error", "error", err)
-		os.Exit(1)
+	serverErr := runServer(ctx, cfg, logger, handler)
+	if serverErr != nil {
+		logger.Error("server error", "error", serverErr)
 	}
+
+	// A server that failed got no signal, so the loops are stopped here too. They
+	// end before the deferred deps.Cleanup closes the pool they use.
+	stop()
+	if !background.wait(loopDrainTimeout) {
+		logger.Warn("background loops still running; closing anyway", "waited", loopDrainTimeout)
+	}
+	return serverErr
 }
 
 // startPprofServer starts the pprof profiling server on a separate port
@@ -219,8 +202,8 @@ func startPprofServer(cfg *config.Config, logger *slog.Logger) {
 	}
 }
 
-// runServer starts the HTTP server with graceful shutdown
-func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) error {
+// runServer serves until ctx is cancelled, then shuts down gracefully.
+func runServer(ctx context.Context, cfg *config.Config, logger *slog.Logger, handler http.Handler) error {
 	// Create HTTP server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 
@@ -247,34 +230,11 @@ func runServer(cfg *config.Config, logger *slog.Logger, handler http.Handler) er
 		Protocols:   protocols,
 	}
 
-	// Start server in goroutine
-	serverErrors := make(chan error, 1)
-	go func() {
-		logger.Info("server started", "addr", addr)
-		serverErrors <- srv.ListenAndServe()
-	}()
-
-	// Wait for interrupt signal
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case err := <-serverErrors:
+	lis, err := new(net.ListenConfig).Listen(ctx, "tcp", addr)
+	if err != nil {
 		return fmt.Errorf("server error: %w", err)
-	case sig := <-shutdown:
-		logger.Info("shutdown signal received", "signal", sig)
-
-		// Graceful shutdown with timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		if err := srv.Shutdown(ctx); err != nil {
-			srv.Close()
-			return fmt.Errorf("graceful shutdown failed: %w", err)
-		}
-
-		logger.Info("server stopped gracefully")
 	}
+	logger.Info("server started", "addr", addr)
 
-	return nil
+	return serve(ctx, srv, lis, shutdownTimeout, logger)
 }
