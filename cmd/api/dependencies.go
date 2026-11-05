@@ -635,9 +635,9 @@ func (d *Dependencies) initIntegrations() {
 }
 
 // initAssistant builds the press-and-hold assistant when ASSISTANT_ENABLED is on.
-// Its provider links are its own: tools need Anthropic directly, and the answer
-// without tools uses the paid primary alone, never the free chain, because these
-// prompts carry a person's trips and free endpoints may log them.
+// Both of its provider links are Anthropic, direct: tools need it, and the answer
+// without tools stays on it, never the chat chain, because these prompts carry a
+// person's trips and free endpoints may log them.
 func (d *Dependencies) initAssistant(members assistant.TripResolver, friends assistant.FriendLister, mem assistant.MemoryReader, proposals assistant.TripProposer) error {
 	if !d.Config.Assistant.Enabled {
 		return nil
@@ -658,7 +658,7 @@ func (d *Dependencies) initAssistant(members assistant.TripResolver, friends ass
 	if model != nil {
 		deps.Model = model
 	}
-	fallback, err := ai.NewPaidPrimaryClient(context.Background(), d.Config.AI, d.Logger)
+	fallback, err := ai.NewAnthropicClient(d.Config.AI, d.Logger)
 	if err != nil {
 		return err
 	}

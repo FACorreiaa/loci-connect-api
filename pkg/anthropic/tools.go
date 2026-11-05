@@ -109,6 +109,9 @@ type ToolTurnResult struct {
 	// with tools: the caller decides what to tell the user.
 	StopReason string
 	Model      string
+	// FirstEvent is how long the model took to start answering. A new set of
+	// strict tool schemas has to compile first, so the first call can be slow.
+	FirstEvent time.Duration
 	Usage      ToolUsage
 }
 
@@ -153,6 +156,8 @@ func (c *ChatClient) ToolTurn(
 		return classify(err)
 	}
 
+	started := time.Now()
+	var firstEvent time.Duration
 	stream := c.sdk.Messages.NewStreaming(ctx, c.toolParams(req))
 	defer func() { _ = stream.Close() }()
 	if err := stream.Err(); err != nil {
@@ -163,6 +168,9 @@ func (c *ChatClient) ToolTurn(
 	for stream.Next() {
 		if watchdog != nil {
 			watchdog.Stop()
+		}
+		if firstEvent == 0 {
+			firstEvent = time.Since(started)
 		}
 		event := stream.Current()
 		if err := msg.Accumulate(event); err != nil {
@@ -190,6 +198,7 @@ func (c *ChatClient) ToolTurn(
 		Message:    ToolMessage{Role: RoleAssistant, Blocks: blocksFromContent(msg.Content)},
 		StopReason: string(msg.StopReason),
 		Model:      string(msg.Model),
+		FirstEvent: firstEvent,
 		Usage: ToolUsage{
 			InputTokens:      msg.Usage.InputTokens,
 			OutputTokens:     msg.Usage.OutputTokens,

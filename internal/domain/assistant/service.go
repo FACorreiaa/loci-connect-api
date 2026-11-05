@@ -3,9 +3,9 @@
 //
 // It owns a small tool loop on Anthropic directly. The tools read the caller's
 // own data or put a card in front of them; none of them writes, and only the
-// caller confirming a card does. If Anthropic cannot answer, one call to the
-// paid primary answers from a snapshot, without tools, and says it can change
-// nothing. The free chain is never used here, because its endpoints may log
+// caller confirming a card does. If the tool loop cannot answer, one more call to
+// Anthropic answers from a snapshot, without tools, and says it can change
+// nothing. The chat chain is never used here, because its free endpoints may log
 // prompts and these prompts carry a person's trips.
 package assistant
 
@@ -48,11 +48,14 @@ type Limits struct {
 // DefaultLimits are tunable; none is a contract.
 func DefaultLimits() Limits {
 	return Limits{
-		ModelCalls:   4,
-		ToolCalls:    6,
-		MaxTokens:    1024,
-		Tool:         5 * time.Second,
-		FirstEvent:   12 * time.Second,
+		ModelCalls: 4,
+		ToolCalls:  6,
+		MaxTokens:  1024,
+		Tool:       5 * time.Second,
+		// Generous for a stream because the first call with a new set of strict
+		// tool schemas waits for them to compile, and again after 24 idle hours.
+		// Leaves the rest of Ask for an answer without tools.
+		FirstEvent:   30 * time.Second,
 		Ask:          40 * time.Second,
 		ToolOutput:   4096,
 		HistoryTurns: 10,
@@ -70,8 +73,8 @@ const (
 	// is spent; waiting a little is all that can help.
 	creditCooldown = 5 * time.Minute
 
-	// degradedMaxTokens is larger than a tool turn's because the paid primary
-	// may reason before it writes, and reasoning spends from this budget.
+	// degradedMaxTokens is larger than a tool turn's because the answer without
+	// tools runs with thinking on, and thinking spends from this budget.
 	degradedMaxTokens = 4096
 	maxRememberedText = 2000
 
@@ -354,6 +357,11 @@ func (a *askRun) loop() outcome {
 			return a.modelFailed(err)
 		}
 		a.spend.add(res.Usage)
+		s.d.Logger.Info("assistant: model call",
+			slog.Int("call", call),
+			slog.Int64("first_event_ms", res.FirstEvent.Milliseconds()),
+			slog.String("stop_reason", res.StopReason),
+		)
 
 		switch res.StopReason {
 		case "end_turn", "stop_sequence":
@@ -608,8 +616,9 @@ func plainLabel(s string) string {
 	return strings.NewReplacer("<", "", ">", "").Replace(s)
 }
 
-// degraded answers without tools from what can be gathered up front. Friends and
-// what Loci has learned are left out: this goes to another company's model.
+// degraded answers without tools from what can be gathered up front, on Anthropic
+// with no strict schemas to compile. Friends and what Loci has learned are left
+// out, so it stays a smaller answer than the tools would give.
 func (a *askRun) degraded() outcome {
 	s := a.s
 	if s.d.Fallback == nil {

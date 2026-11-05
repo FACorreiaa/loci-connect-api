@@ -3,7 +3,6 @@ package ai
 import (
 	"context"
 	"log/slog"
-	"strings"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"go.opentelemetry.io/otel"
@@ -67,12 +66,17 @@ func (c *ToolClient) ToolTurn(
 	return res, nil
 }
 
-// NewPaidPrimaryClient builds the configured primary alone, with no chain, for
-// a path that sends personal data. Free endpoints may log prompts, so it returns
-// nil, with no error, rather than reach for one: no key, or a :free model.
-func NewPaidPrimaryClient(ctx context.Context, cfg config.AIConfig, logger *slog.Logger) (generativeAI.ChatClient, error) {
-	if cfg.APIKey == "" || cfg.Model == "" || strings.HasSuffix(cfg.Model, ":free") {
-		return nil, nil //nolint:nilnil // no paid primary is a normal configuration
+// NewAnthropicClient builds Anthropic alone, with no chain and no tools, metered
+// and traced like the chain's own link. It is for a path that sends personal data
+// and has to stay on Anthropic. It returns nil, with no error, when Anthropic is
+// not switched on, so a caller cannot end up on another provider by accident.
+func NewAnthropicClient(cfg config.AIConfig, logger *slog.Logger) (generativeAI.ChatClient, error) {
+	link, err := newAnthropicEntry(cfg, logger)
+	if err != nil {
+		return nil, err
 	}
-	return newProviderClient(ctx, cfg.Provider, cfg.APIKey, cfg.Model, cfg, logger)
+	if link == nil {
+		return nil, nil //nolint:nilnil // no link is a normal configuration
+	}
+	return link.client, nil
 }

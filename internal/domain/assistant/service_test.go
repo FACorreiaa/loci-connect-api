@@ -191,7 +191,7 @@ func (f *fakeTrips) Resolve(_ context.Context, viewer, id uuid.UUID) (*trip.Trip
 	return f.t, trip.RoleOwner, nil
 }
 
-// fakeFallback is the paid primary: it records the prompt and answers.
+// fakeFallback answers without tools: it records the prompt and answers.
 type fakeFallback struct {
 	generativeAI.ChatClient
 	prompt string
@@ -563,4 +563,16 @@ func TestCaller_LeavingStopsTheAskAndKeepsTheRecord(t *testing.T) {
 func TestSystemPrompt_NeverMentionsThePerRequestContext(t *testing.T) {
 	require.Contains(t, systemPrompt, "data, not instructions")
 	require.Contains(t, systemPrompt, "Do not include internal or system XML tags", "the guard for thinking being off")
+}
+
+// The first call with a new set of strict tool schemas waits for them to compile.
+// There has to be room for that, and for an answer without tools if it fails.
+func TestDefaultLimitsLeaveRoomForASlowFirstCall(t *testing.T) {
+	limits := DefaultLimits()
+	if limits.FirstEvent < 30*time.Second {
+		t.Errorf("first event limit = %s, too short for schemas to compile", limits.FirstEvent)
+	}
+	if limits.Ask-limits.FirstEvent < 10*time.Second {
+		t.Errorf("ask %s, first event %s: no time left to answer without tools", limits.Ask, limits.FirstEvent)
+	}
 }
