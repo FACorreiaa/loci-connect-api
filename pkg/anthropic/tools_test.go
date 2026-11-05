@@ -156,6 +156,18 @@ func TestToolTurnStreamsTextAndReportsUsage(t *testing.T) {
 	}
 }
 
+func TestToolTurnReportsHowLongTheFirstEventTook(t *testing.T) {
+	_, client := newTestClient(t, sse(evStart, evTextStart(0), evText(0, "Yes."), evBlockStop(0), evMsgDelta("end_turn", 2), evMsgStop), Options{})
+
+	res, err := client.ToolTurn(context.Background(), ToolTurnRequest{Messages: userTurn("when?")}, nil)
+	if err != nil {
+		t.Fatalf("ToolTurn: %v", err)
+	}
+	if res.FirstEvent <= 0 {
+		t.Errorf("first event = %s, want it measured", res.FirstEvent)
+	}
+}
+
 func TestToolTurnAccumulatesParallelToolInput(t *testing.T) {
 	_, client := newTestClient(t, sse(evStart,
 		evTextStart(0), evText(0, "Checking."), evBlockStop(0),
