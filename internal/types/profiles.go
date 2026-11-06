@@ -153,8 +153,11 @@ type UserPreferenceProfileResponse struct {
 	DiningPreferences        *DiningPreferences        `json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences      `json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences     `json:"itinerary_preferences,omitempty"`
-	CreatedAt                time.Time                 `json:"created_at"`
-	UpdatedAt                time.Time                 `json:"updated_at"`
+	// AccessibilityNeeds is nil until the traveller has set needs and
+	// consented to storing them. Its ConsentAt carries the consent time.
+	AccessibilityNeeds *AccessibilityNeeds `json:"-"`
+	CreatedAt          time.Time           `json:"created_at"`
+	UpdatedAt          time.Time           `json:"updated_at"`
 }
 
 // CreateUserPreferenceProfileParams defines required fields for creating a new profile.
@@ -178,6 +181,9 @@ type CreateUserPreferenceProfileParams struct {
 	DiningPreferences        *DiningPreferences        `json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences      `json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences     `json:"itinerary_preferences,omitempty"`
+	// AccessibilityNeeds is stored only when AccessibilityConsentGiven is true.
+	AccessibilityNeeds        *AccessibilityNeeds `json:"-"`
+	AccessibilityConsentGiven bool                `json:"-"`
 }
 
 func (p *CreateUserPreferenceProfileParams) UnmarshalJSON(b []byte) error {
@@ -255,7 +261,14 @@ type UpdateSearchProfileParams struct {
 	DiningPreferences        *DiningPreferences        `json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences      `json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences     `json:"itinerary_preferences,omitempty"`
-	UpdateAt                 *time.Time                `json:"updated_at,omitempty"` // Optional, can be set to nil
+	// AccessibilityNeeds replaces the stored needs wholesale. It needs
+	// AccessibilityConsentGiven, or consent already on the profile.
+	AccessibilityNeeds        *AccessibilityNeeds `json:"-"`
+	AccessibilityConsentGiven bool                `json:"-"`
+	// ClearAccessibilityNeeds deletes the needs and the consent record. It
+	// wins over AccessibilityNeeds.
+	ClearAccessibilityNeeds bool       `json:"-"`
+	UpdateAt                *time.Time `json:"updated_at,omitempty"` // Optional, can be set to nil
 }
 
 // Domain-specific preference structures

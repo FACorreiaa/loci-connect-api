@@ -123,6 +123,10 @@ func (s *ServiceImpl) CreateSearchProfile(ctx context.Context, userID uuid.UUID,
 	ctx, span := otel.Tracer("ProfilesService").Start(ctx, "CreateSearchProfile")
 	defer span.End()
 
+	if err := checkAccessibilityConsent(p.AccessibilityNeeds, p.AccessibilityConsentGiven, false); err != nil {
+		return nil, err
+	}
+
 	// If this is the first profile for the user, set it as default
 	profiles, err := s.prefRepo.GetSearchProfiles(ctx, userID)
 	if err != nil {
@@ -189,8 +193,23 @@ func (s *ServiceImpl) UpdateSearchProfile(ctx context.Context, userID, profileID
 	))
 	defer span.End()
 
-	l := s.logger.With(slog.String("method", "SetDefaultSearchProfile"), slog.String("profileID", profileID.String()))
-	l.DebugContext(ctx, "Setting profile as default")
+	l := s.logger.With(slog.String("method", "UpdateSearchProfile"), slog.String("profileID", profileID.String()))
+	l.DebugContext(ctx, "Updating search profile")
+
+	if params.AccessibilityNeeds != nil && !params.ClearAccessibilityNeeds && !params.AccessibilityConsentGiven {
+		// Saving needs without fresh consent is allowed only when the profile
+		// already holds consent (an edit, not a first save).
+		current, err := s.prefRepo.GetSearchProfile(ctx, userID, profileID)
+		if err != nil {
+			return fmt.Errorf("error loading profile for consent check: %w", err)
+		}
+		hasConsent := current.AccessibilityNeeds != nil && current.AccessibilityNeeds.ConsentAt != nil
+		if err := checkAccessibilityConsent(params.AccessibilityNeeds, false, hasConsent); err != nil {
+			return err
+		}
+	} else if err := params.AccessibilityNeeds.Validate(); err != nil {
+		return err
+	}
 
 	if err := s.prefRepo.UpdateSearchProfile(ctx, userID, profileID, params); err != nil {
 		l.ErrorContext(ctx, "Failed to set default user preference profile", slog.Any("error", err))
@@ -201,5 +220,21 @@ func (s *ServiceImpl) UpdateSearchProfile(ctx context.Context, userID, profileID
 
 	l.InfoContext(ctx, "User search profile updated successfully")
 	span.SetStatus(codes.Ok, "User preference profile updated successfully")
+	return nil
+}
+
+// ErrAccessibilityConsentRequired is returned when accessibility needs arrive
+// without the traveller's explicit consent to store them (GDPR Art. 9(2)(a)).
+var ErrAccessibilityConsentRequired = fmt.Errorf("accessibility needs require explicit consent: %w", locitypes.ErrBadRequest)
+
+// checkAccessibilityConsent validates needs and enforces the consent rule.
+// Needs that say nothing need no consent: they are stored as "no needs".
+func checkAccessibilityConsent(needs *locitypes.AccessibilityNeeds, consentGiven, alreadyConsented bool) error {
+	if err := needs.Validate(); err != nil {
+		return err
+	}
+	if needs.Active() && !consentGiven && !alreadyConsented {
+		return ErrAccessibilityConsentRequired
+	}
 	return nil
 }

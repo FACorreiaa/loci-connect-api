@@ -85,26 +85,27 @@ func ToPOIDetailedInfoSlice(pois []locitypes.POIDetailedInfo) []*poiv1.POIDetail
 
 func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	resp := &poiv1.POIDetailedInfo{
-		Id:               poi.ID.String(),
-		City:             poi.City,
-		CityId:           poi.CityID.String(),
-		Name:             poi.Name,
-		Distance:         poi.Distance,
-		Category:         poi.Category,
-		Description:      poi.Description,
-		Rating:           poi.Rating,
-		Address:          poi.Address,
-		PhoneNumber:      poi.PhoneNumber,
-		Website:          poi.Website,
-		OpeningHours:     poi.OpeningHours,
-		Images:           poi.Images,
-		ImageCredits:     toPOIImages(poi.ImageCredits),
-		PriceRange:       poi.PriceRange,
-		PriceLevel:       poi.PriceLevel,
-		Reviews:          poi.Reviews,
-		LlmInteractionId: poi.LlmInteractionID.String(),
-		Tags:             poi.Tags,
-		Amenities:        poi.Amenities,
+		Id:                 poi.ID.String(),
+		City:               poi.City,
+		CityId:             poi.CityID.String(),
+		Name:               poi.Name,
+		Distance:           poi.Distance,
+		Category:           poi.Category,
+		Description:        poi.Description,
+		Rating:             poi.Rating,
+		Address:            poi.Address,
+		PhoneNumber:        poi.PhoneNumber,
+		Website:            poi.Website,
+		OpeningHours:       poi.OpeningHours,
+		Images:             poi.Images,
+		ImageCredits:       toPOIImages(poi.ImageCredits),
+		AccessibilityNotes: ToProtoAccessibilityNotes(poi.AccessibilityNotes),
+		PriceRange:         poi.PriceRange,
+		PriceLevel:         poi.PriceLevel,
+		Reviews:            poi.Reviews,
+		LlmInteractionId:   poi.LlmInteractionID.String(),
+		Tags:               poi.Tags,
+		Amenities:          poi.Amenities,
 	}
 
 	if poi.DescriptionPOI != "" {
@@ -289,4 +290,59 @@ func toPOIImages(images []locitypes.POIImage) []*poiv1.POIImage {
 		})
 	}
 	return out
+}
+
+// ToProtoAccessibilityNotes maps notes onto the wire. A note with an unknown
+// source is sent as an AI estimate: claiming less confidence than we have is
+// the safe failure.
+func ToProtoAccessibilityNotes(notes []locitypes.AccessibilityNote) []*poiv1.AccessibilityNote {
+	if len(notes) == 0 {
+		return nil
+	}
+	out := make([]*poiv1.AccessibilityNote, 0, min(len(notes), locitypes.MaxAccessibilityNotes))
+	for _, n := range notes {
+		if n.Text == "" {
+			continue
+		}
+		note := &poiv1.AccessibilityNote{
+			Text:     n.Text,
+			Severity: toProtoNoteSeverity(n.Severity),
+			Source:   toProtoNoteSource(n.Source),
+		}
+		if n.SourceLicence != "" {
+			note.SourceLicence = proto.String(n.SourceLicence)
+		}
+		if n.ObservedAt != nil {
+			note.ObservedAt = timestamppb.New(*n.ObservedAt)
+		}
+		out = append(out, note)
+		if len(out) == locitypes.MaxAccessibilityNotes {
+			break
+		}
+	}
+	return out
+}
+
+func toProtoNoteSeverity(s locitypes.AccessibilityNoteSeverity) poiv1.AccessibilityNoteSeverity {
+	switch s {
+	case locitypes.AccessibilitySeverityInfo:
+		return poiv1.AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_INFO
+	case locitypes.AccessibilitySeverityBarrier:
+		return poiv1.AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_BARRIER
+	default:
+		return poiv1.AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_CAUTION
+	}
+}
+
+func toProtoNoteSource(s locitypes.AccessibilityNoteSource) poiv1.AccessibilityNoteSource {
+	switch s {
+	case locitypes.AccessibilitySourceVerifiedCrowd:
+		return poiv1.AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_VERIFIED_CROWD
+	case locitypes.AccessibilitySourceOpenData:
+		return poiv1.AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_OPEN_DATA
+	case locitypes.AccessibilitySourceRouted:
+		return poiv1.AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_ROUTED
+	default:
+		return poiv1.AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_AI_ESTIMATE
+	}
 }
