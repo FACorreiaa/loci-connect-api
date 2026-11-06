@@ -81,6 +81,8 @@ func FromCreateProto(req *profilev1.CreateUserPreferenceProfileRequest) (locityp
 	params.DiningPreferences = fromProtoDiningPreferences(req.GetDiningPreferences())
 	params.ActivityPreferences = fromProtoActivityPreferences(req.GetActivityPreferences())
 	params.ItineraryPreferences = fromProtoItineraryPreferences(req.GetItineraryPreferences())
+	params.AccessibilityNeeds = FromProtoAccessibilityNeeds(req.GetAccessibilityNeeds())
+	params.AccessibilityConsentGiven = req.GetAccessibilityConsentGiven()
 
 	return params, nil
 }
@@ -151,6 +153,11 @@ func FromUpdateProto(req *profilev1.UpdateUserPreferenceProfileRequest) (locityp
 	params.DiningPreferences = fromProtoDiningPreferences(req.GetDiningPreferences())
 	params.ActivityPreferences = fromProtoActivityPreferences(req.GetActivityPreferences())
 	params.ItineraryPreferences = fromProtoItineraryPreferences(req.GetItineraryPreferences())
+	// Needs are replaced wholesale when sent and left alone when absent: the
+	// message has presence, unlike the repeated fields above.
+	params.AccessibilityNeeds = FromProtoAccessibilityNeeds(req.GetAccessibilityNeeds())
+	params.AccessibilityConsentGiven = req.GetAccessibilityConsentGiven()
+	params.ClearAccessibilityNeeds = req.GetClearAccessibilityNeeds()
 
 	return params, nil
 }
@@ -194,6 +201,7 @@ func ToProtoProfile(p locitypes.UserPreferenceProfileResponse) *profilev1.UserPr
 	resp.DiningPreferences = ToProtoDiningPreferences(p.DiningPreferences)
 	resp.ActivityPreferences = ToProtoActivityPreferences(p.ActivityPreferences)
 	resp.ItineraryPreferences = ToProtoItineraryPreferences(p.ItineraryPreferences)
+	resp.AccessibilityNeeds = ToProtoAccessibilityNeeds(p.AccessibilityNeeds)
 	return resp
 }
 

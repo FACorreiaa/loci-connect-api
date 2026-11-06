@@ -144,6 +144,7 @@ func scopeProfileForPart(part generationPart, profile *locitypes.UserPreferenceP
 		DietaryNeeds:         canonicalStrings(profile.DietaryNeeds),
 		Interests:            canonicalInterests(profile.Interests),
 		Tags:                 canonicalTags(profile.Tags),
+		AccessibilityNeeds:   scopeAccessibility(profile.AccessibilityNeeds),
 	}
 
 	keepAll := part == partItinerary
@@ -317,6 +318,17 @@ func profileSnapshotHash(scoped *locitypes.UserPreferenceProfileResponse) string
 		// The struct is plain data; Marshal cannot fail on it. Should it ever,
 		// a stable non-empty marker is safer than a panic on the chat path.
 		return "unhashable"
+	}
+	// AccessibilityNeeds is tagged json:"-" so it can never leak into any
+	// serialised profile, which also keeps it out of raw. It is folded in
+	// explicitly, and only when set, so a profile without needs hashes exactly
+	// as it did before the field existed.
+	if scoped.AccessibilityNeeds.Active() {
+		needs, err := json.Marshal(scoped.AccessibilityNeeds)
+		if err != nil {
+			return "unhashable"
+		}
+		raw = append(append(raw, "\x00accessibility:"...), needs...)
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])

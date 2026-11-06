@@ -33,6 +33,7 @@ func TestGetSearchProfiles(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1
@@ -43,14 +44,15 @@ func TestGetSearchProfiles(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}).
 				AddRow(profileID1, userID, "Default Profile", true, 5.0,
 					"any", 2, "moderate", false, false, false,
-					[]string{"cozy", "quiet"}, "walk", []string{"vegetarian"}, now, now).
+					[]string{"cozy", "quiet"}, "walk", []string{"vegetarian"}, []byte(nil), (*time.Time)(nil), now, now).
 				AddRow(profileID2, userID, "Adventure Profile", false, 10.0,
 					"day", 3, "fast", true, true, true,
-					[]string{"lively"}, "public", []string{}, now, now),
+					[]string{"lively"}, "public", []string{}, []byte(nil), (*time.Time)(nil), now, now),
 		)
 
 	// The list endpoint now also loads the four domain-preference blobs and the
@@ -131,6 +133,7 @@ func TestGetSearchProfilesEmpty(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1
@@ -141,7 +144,8 @@ func TestGetSearchProfilesEmpty(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}),
 		)
 
@@ -175,6 +179,7 @@ func TestGetSearchProfile(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE id = $1 AND user_id = $2`)).
@@ -184,11 +189,12 @@ func TestGetSearchProfile(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}).
 				AddRow(profileID, userID, "Test Profile", true, 5.0,
 					"night", 1, "relaxed", false, true, false,
-					[]string{"romantic"}, "car", []string{"gluten_free"}, now, now),
+					[]string{"romantic"}, "car", []string{"gluten_free"}, []byte(nil), (*time.Time)(nil), now, now),
 		)
 
 	repo := NewPostgresUserRepo(mock, slog.Default())
@@ -229,6 +235,7 @@ func TestGetSearchProfileNotFound(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE id = $1 AND user_id = $2`)).
@@ -238,7 +245,8 @@ func TestGetSearchProfileNotFound(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}),
 		)
 
@@ -268,6 +276,7 @@ func TestGetDefaultSearchProfile(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1 AND is_default = TRUE`)).
@@ -277,11 +286,12 @@ func TestGetDefaultSearchProfile(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}).
 				AddRow(profileID, userID, "Default Profile", true, 5.0,
 					"any", 2, "moderate", false, false, false,
-					[]string{}, "any", []string{}, now, now),
+					[]string{}, "any", []string{}, []byte(nil), (*time.Time)(nil), now, now),
 		)
 
 	repo := NewPostgresUserRepo(mock, slog.Default())
@@ -315,6 +325,7 @@ func TestGetDefaultSearchProfileNotFound(t *testing.T) {
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1 AND is_default = TRUE`)).
@@ -324,7 +335,8 @@ func TestGetDefaultSearchProfileNotFound(t *testing.T) {
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}),
 		)
 
@@ -355,28 +367,32 @@ func TestCreateSearchProfile(t *testing.T) {
         INSERT INTO user_preference_profiles (
             user_id, profile_name, is_default, search_radius_km, preferred_time,
             budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
-            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs
+            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+            accessibility_needs, accessibility_consent_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
         ) RETURNING id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                    budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                    prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+                   accessibility_needs, accessibility_consent_at,
                    created_at, updated_at`)).
 		WithArgs(
 			userID, "New Profile", false, 5.0, locitypes.DayPreferenceAny,
 			0, locitypes.SearchPaceAny, false, false, false,
 			[]string{}, locitypes.TransportPreferenceAny, []string{},
+			[]byte(nil), (*time.Time)(nil),
 		).
 		WillReturnRows(
 			pgxmock.NewRows([]string{
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}).
 				AddRow(profileID, userID, "New Profile", false, 5.0,
 					"any", 0, "any", false, false, false,
-					[]string{}, "any", []string{}, now, now),
+					[]string{}, "any", []string{}, []byte(nil), (*time.Time)(nil), now, now),
 		)
 	mock.ExpectCommit()
 
@@ -424,28 +440,32 @@ func TestCreateSearchProfileWithDefaultFlag(t *testing.T) {
         INSERT INTO user_preference_profiles (
             user_id, profile_name, is_default, search_radius_km, preferred_time,
             budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
-            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs
+            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+            accessibility_needs, accessibility_consent_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
         ) RETURNING id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                    budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                    prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+                   accessibility_needs, accessibility_consent_at,
                    created_at, updated_at`)).
 		WithArgs(
 			userID, "Default Profile", true, 5.0, locitypes.DayPreferenceAny,
 			0, locitypes.SearchPaceAny, false, false, false,
 			[]string{}, locitypes.TransportPreferenceAny, []string{},
+			[]byte(nil), (*time.Time)(nil),
 		).
 		WillReturnRows(
 			pgxmock.NewRows([]string{
 				"id", "user_id", "profile_name", "is_default", "search_radius_km",
 				"preferred_time", "budget_level", "preferred_pace", "prefer_accessible_pois",
 				"prefer_outdoor_seating", "prefer_dog_friendly", "preferred_vibes",
-				"preferred_transport", "dietary_needs", "created_at", "updated_at",
+				"preferred_transport", "dietary_needs", "accessibility_needs", "accessibility_consent_at",
+				"created_at", "updated_at",
 			}).
 				AddRow(profileID, userID, "Default Profile", true, 5.0,
 					"any", 0, "any", false, false, false,
-					[]string{}, "any", []string{}, now, now),
+					[]string{}, "any", []string{}, []byte(nil), (*time.Time)(nil), now, now),
 		)
 	mock.ExpectCommit()
 

@@ -121,7 +121,7 @@ func TestBuildQuestionPromptCombinesEverySource(t *testing.T) {
 		Evidence: []retrieval.Evidence{{POIID: poiID, Name: "Time Out Market", Category: "food hall"}},
 	}
 
-	got := buildQuestionPrompt("is the market open on Monday?", session, packet)
+	got := buildQuestionPrompt("is the market open on Monday?", session, packet, nil)
 
 	for _, want := range []string{
 		"Lisbon",
@@ -146,7 +146,7 @@ func TestBuildQuestionPromptWorksWithoutOptionalContext(t *testing.T) {
 		SessionContext: locitypes.SessionContext{CityName: "Porto"},
 	}
 
-	got := buildQuestionPrompt("what is there to do?", session, nil)
+	got := buildQuestionPrompt("what is there to do?", session, nil, nil)
 
 	if !strings.Contains(got, "Porto") || !strings.Contains(got, "what is there to do?") {
 		t.Errorf("bare prompt lost its essentials:\n%s", got)

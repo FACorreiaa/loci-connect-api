@@ -112,6 +112,13 @@ type POIDetailedInfo struct {
 	// survives the session round-trip, and a page read back out of it carries
 	// the day without any extra plumbing.
 	Day int `json:"day,omitempty"`
+
+	// AccessibilityNotes is what a traveller with access needs should know
+	// here. Present only when the request carried needs. Notes parsed from a
+	// model answer are forced to the AI-estimate source (see
+	// SanitizeModelAccessibilityNotes); only Loci's own data paths add
+	// verified ones.
+	AccessibilityNotes []AccessibilityNote `json:"accessibility_notes,omitempty"`
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for POIDetailedInfo.

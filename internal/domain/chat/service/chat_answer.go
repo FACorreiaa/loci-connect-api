@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -100,6 +101,7 @@ func buildQuestionPrompt(
 	question string,
 	session *locitypes.ChatSession,
 	packet *retrieval.ContextPacket,
+	needs *locitypes.AccessibilityNeeds,
 ) string {
 	var b strings.Builder
 
@@ -117,6 +119,10 @@ func buildQuestionPrompt(
 	}
 	if packet != nil {
 		b.WriteString(retrieval.Render(packet))
+		b.WriteString("\n")
+	}
+	if block := accessibilityAnswerPrompt(needs); block != "" {
+		b.WriteString(block)
 		b.WriteString("\n")
 	}
 
@@ -190,7 +196,7 @@ func (l *ServiceImpl) answerQuestionStreamed(
 	packet *retrieval.ContextPacket,
 	eventCh chan<- locitypes.StreamEvent,
 ) (string, error) {
-	prompt := buildQuestionPrompt(question, session, packet)
+	prompt := buildQuestionPrompt(question, session, packet, l.sessionAccessibilityNeeds(ctx, session))
 
 	release, err := l.acquireLLMSlot(ctx)
 	if err != nil {
@@ -249,4 +255,34 @@ func (l *ServiceImpl) answerQuestionStreamed(
 		}
 	}
 	return retrieval.StripCitations(answer), nil
+}
+
+// sessionAccessibilityNeeds loads the needs on the profile a session was
+// planned with (the default profile when it names none). It is best-effort:
+// an answer without the needs is better than no answer, so a failed lookup is
+// logged without the needs themselves and returns nil.
+func (l *ServiceImpl) sessionAccessibilityNeeds(ctx context.Context, session *locitypes.ChatSession) *locitypes.AccessibilityNeeds {
+	if l.searchProfileRepo == nil || session == nil || session.UserID == uuid.Nil {
+		return nil
+	}
+	var (
+		profile *locitypes.UserPreferenceProfileResponse
+		err     error
+	)
+	if session.ProfileID != uuid.Nil {
+		profile, err = l.searchProfileRepo.GetSearchProfile(ctx, session.UserID, session.ProfileID)
+	} else {
+		profile, err = l.searchProfileRepo.GetDefaultSearchProfile(ctx, session.UserID)
+	}
+	if err != nil {
+		if !errors.Is(err, locitypes.ErrNotFound) {
+			l.logger.WarnContext(ctx, "answering without accessibility needs: profile lookup failed",
+				slog.Any("error", err))
+		}
+		return nil
+	}
+	if profile == nil {
+		return nil
+	}
+	return profile.AccessibilityNeeds
 }

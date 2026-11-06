@@ -118,6 +118,14 @@ func tripFromProto(p *tripv1.TripDraft, uid uuid.UUID) (*Trip, error) {
 	return t, nil
 }
 
+// constraintFromProto deliberately drops TripConstraint.accessibility.
+//
+// Those are health needs (GDPR Art. 9), and a trip is shared: co-planners and
+// friends read it, and sharing copies its constraints into their copies. Until
+// the per-trip override has an owner-only design, storing it here would hand
+// one traveller's needs to everyone the trip is shared with. Profile needs
+// cover the planning case. TestConstraintFromProtoDropsAccessibility guards
+// this.
 func constraintFromProto(p *tripv1.TripConstraint) TripConstraint {
 	if p == nil {
 		return TripConstraint{}

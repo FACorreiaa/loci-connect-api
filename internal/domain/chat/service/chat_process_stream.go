@@ -276,6 +276,13 @@ func (l *ServiceImpl) aggregateAndParse(cc *common.ChatContext, rawResponses map
 	parsePart(partHotels, &data.Hotels)
 	parsePart(partRestaurants, &data.Restaurants)
 	parsePart(partActivities, &data.Activities)
+
+	// Accessibility notes in a model answer are the model's word, whatever
+	// source it claims. Cached parts replay model text too, so this runs on
+	// every parse rather than only on fresh generations.
+	locitypes.SanitizeModelPOINotes(data.PointsOfInterest)
+	locitypes.SanitizeModelPOINotes(data.AIItineraryResponse.PointsOfInterest)
+	locitypes.SanitizeModelPOINotes(data.Activities)
 	if raw, ok := rawResponses[string(partGastronomy)]; ok {
 		if g, err := parseGastronomy(raw); err == nil && g.Usable() {
 			data.Gastronomy = g

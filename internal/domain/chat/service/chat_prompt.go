@@ -67,6 +67,8 @@ BASIC PREFERENCES:`
     - Tags to Avoid: [%s]`, strings.Join(tags, ", "))
 	}
 
+	basePrefs += accessibilityPrompt(searchProfile.AccessibilityNeeds)
+
 	// Accommodation preferences
 	if searchProfile.AccommodationPreferences != nil {
 		accom := searchProfile.AccommodationPreferences

@@ -2,6 +2,7 @@ package profiles
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -80,6 +81,8 @@ type profileRow struct {
 	PreferredVibes       []string                      `db:"preferred_vibes"`
 	PreferredTransport   locitypes.TransportPreference `db:"preferred_transport"`
 	DietaryNeeds         []string                      `db:"dietary_needs"`
+	AccessibilityNeeds   []byte                        `db:"accessibility_needs"`
+	AccessibilityConsent *time.Time                    `db:"accessibility_consent_at"`
 	CreatedAt            time.Time                     `db:"created_at"`
 	UpdatedAt            time.Time                     `db:"updated_at"`
 }
@@ -101,9 +104,41 @@ func (r *profileRow) toResponse() locitypes.UserPreferenceProfileResponse {
 		PreferredVibes:       r.PreferredVibes,
 		PreferredTransport:   r.PreferredTransport,
 		DietaryNeeds:         r.DietaryNeeds,
+		AccessibilityNeeds:   decodeAccessibilityNeeds(r.AccessibilityNeeds, r.AccessibilityConsent),
 		CreatedAt:            r.CreatedAt,
 		UpdatedAt:            r.UpdatedAt,
 	}
+}
+
+// decodeAccessibilityNeeds reads the stored needs. Needs without a consent
+// record are never returned: the CHECK constraint forbids them, and treating
+// them as absent is the safe reading if one ever slips through. A blob that no
+// longer parses is dropped rather than logged, because its contents are
+// special-category data.
+func decodeAccessibilityNeeds(raw []byte, consentAt *time.Time) *locitypes.AccessibilityNeeds {
+	if len(raw) == 0 || consentAt == nil {
+		return nil
+	}
+	var needs locitypes.AccessibilityNeeds
+	if err := json.Unmarshal(raw, &needs); err != nil {
+		return nil
+	}
+	at := *consentAt
+	needs.ConsentAt = &at
+	return &needs
+}
+
+// encodeAccessibilityNeeds is the write-side twin of decodeAccessibilityNeeds.
+// Needs that say nothing are stored as NULL, so "no needs" has one shape.
+func encodeAccessibilityNeeds(needs *locitypes.AccessibilityNeeds) ([]byte, error) {
+	if !needs.Active() {
+		return nil, nil
+	}
+	raw, err := json.Marshal(needs)
+	if err != nil {
+		return nil, fmt.Errorf("encoding accessibility needs: %w", err)
+	}
+	return raw, nil
 }
 
 // GetProfiles implements user.UserRepo.
@@ -122,6 +157,7 @@ func (r *RepositoryImpl) GetSearchProfiles(ctx context.Context, userID uuid.UUID
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1
@@ -188,6 +224,7 @@ func (r *RepositoryImpl) GetSearchProfile(ctx context.Context, userID, profileID
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE id = $1 AND user_id = $2`
@@ -241,6 +278,7 @@ func (r *RepositoryImpl) GetDefaultSearchProfile(ctx context.Context, userID uui
         SELECT id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+               accessibility_needs, accessibility_consent_at,
                created_at, updated_at
         FROM user_preference_profiles
         WHERE user_id = $1 AND is_default = TRUE`
@@ -343,6 +381,21 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
 	if dietaryNeeds == nil {
 		dietaryNeeds = []string{}
 	}
+	// Needs are written only with consent; the service has already rejected
+	// needs sent without it, so this is the second of two locks (the third is
+	// the table's CHECK constraint).
+	var accessibilityNeeds []byte
+	var accessibilityConsentAt *time.Time
+	if params.AccessibilityConsentGiven {
+		raw, err := encodeAccessibilityNeeds(params.AccessibilityNeeds)
+		if err != nil {
+			return nil, rollback(ctx, l, tx, err)
+		}
+		if raw != nil {
+			now := time.Now()
+			accessibilityNeeds, accessibilityConsentAt = raw, &now
+		}
+	}
 
 	if isDefault {
 		query := "UPDATE user_preference_profiles SET is_default = FALSE WHERE user_id = $1 AND id != $2"
@@ -363,18 +416,21 @@ func (r *RepositoryImpl) CreateSearchProfile(ctx context.Context, userID uuid.UU
         INSERT INTO user_preference_profiles (
             user_id, profile_name, is_default, search_radius_km, preferred_time,
             budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
-            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs
+            prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+            accessibility_needs, accessibility_consent_at
         ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
         ) RETURNING id, user_id, profile_name, is_default, search_radius_km, preferred_time,
                    budget_level, preferred_pace, prefer_accessible_pois, prefer_outdoor_seating,
                    prefer_dog_friendly, preferred_vibes, preferred_transport, dietary_needs,
+                   accessibility_needs, accessibility_consent_at,
                    created_at, updated_at`
 
 	rows, err := tx.Query(ctx, query,
 		userID, params.ProfileName, isDefault, searchRadiusKm, preferredTime,
 		budgetLevel, preferredPace, preferAccessiblePOIs, preferOutdoorSeating,
 		preferDogFriendly, preferredVibes, preferredTransport, dietaryNeeds,
+		accessibilityNeeds, accessibilityConsentAt,
 	)
 	if err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
@@ -532,6 +588,28 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 		updateBuilder = updateBuilder.Set("dietary_needs", params.DietaryNeeds)
 		hasUpdates = true
 	}
+	switch {
+	case params.ClearAccessibilityNeeds || (params.AccessibilityNeeds != nil && !params.AccessibilityNeeds.Active()):
+		// Clearing drops the consent record too: there is nothing left to
+		// consent to, and a later save must ask again.
+		updateBuilder = updateBuilder.
+			Set("accessibility_needs", nil).
+			Set("accessibility_consent_at", nil)
+		hasUpdates = true
+	case params.AccessibilityNeeds != nil:
+		raw, err := encodeAccessibilityNeeds(params.AccessibilityNeeds)
+		if err != nil {
+			return rollback(ctx, l, tx, err)
+		}
+		updateBuilder = updateBuilder.Set("accessibility_needs", raw)
+		if params.AccessibilityConsentGiven {
+			updateBuilder = updateBuilder.Set("accessibility_consent_at", squirrel.Expr("now()"))
+		}
+		// Without fresh consent the existing consent_at stands. If there is
+		// none, the CHECK constraint fails the UPDATE rather than storing
+		// needs nobody agreed to.
+		hasUpdates = true
+	}
 
 	// Update main profile if there are changes
 	if hasUpdates {
@@ -556,6 +634,11 @@ func (r *RepositoryImpl) UpdateSearchProfile(ctx context.Context, userID, profil
 				span.RecordError(err)
 				span.SetStatus(codes.Error, "Profile name conflict")
 				return fmt.Errorf("profile name already exists: %w", locitypes.ErrConflict)
+			}
+			if errors.As(err, &pgErr) && pgErr.Code == "23514" &&
+				pgErr.ConstraintName == "user_preference_profiles_accessibility_consent_chk" {
+				span.SetStatus(codes.Error, "Accessibility needs without consent")
+				return fmt.Errorf("accessibility needs require consent: %w", locitypes.ErrBadRequest)
 			}
 			l.ErrorContext(ctx, "Failed to update user preference profile", slog.Any("error", err))
 			span.RecordError(err)
