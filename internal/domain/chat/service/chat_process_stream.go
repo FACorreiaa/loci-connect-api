@@ -94,6 +94,9 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 	// the generation plan renders and hashes its own scoped slice of it, and a
 	// slice cannot be recovered from the finished prose.
 	cc.Profile = searchProfile
+	if searchProfile != nil {
+		cc.AccessibilityNeeds = searchProfile.AccessibilityNeeds
+	}
 	personalizationEnabled := preference.ExperimentVariant(cc.UserID) != "control"
 	if settings, ok := l.prefVectors.(preference.SettingsReader); ok {
 		enabled, settingsErr := settings.PersonalizationEnabled(ctx, cc.UserID)
@@ -103,7 +106,10 @@ func (l *ServiceImpl) prepareChatContext(cc *common.ChatContext) ([]partPlan, er
 		personalizationEnabled = personalizationEnabled && enabled
 	}
 	if !personalizationEnabled {
-		cc.BasePreferences = ""
+		// Accessibility needs survive this on purpose (cc.AccessibilityNeeds):
+		// switching off taste-based personalisation must not switch off
+		// step-free routing for a wheelchair user.
+		cc.BasePreferences = accessibilityPrompt(cc.AccessibilityNeeds)
 		cc.Profile = nil
 	}
 

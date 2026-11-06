@@ -215,3 +215,61 @@ func TestSessionAccessibilityNeeds(t *testing.T) {
 		repo.AssertNotCalled(t, "GetDefaultSearchProfile", mock.Anything, mock.Anything)
 	})
 }
+
+func itineraryPart(t *testing.T, plan []partPlan) partPlan {
+	t.Helper()
+	for _, p := range plan {
+		if p.Part == partItinerary {
+			return p
+		}
+	}
+	t.Fatal("no itinerary part planned")
+	return partPlan{}
+}
+
+// Regression: turning personalisation off used to nil the profile, and the
+// needs with it, so a wheelchair user in the control arm got a plan with
+// steps in it. Needs are requirements, not personalisation.
+func TestPlanGenerationKeepsNeedsWithPersonalisationOff(t *testing.T) {
+	l := newPlanService(t, newFakeGenerationStore())
+
+	plain := testChatContext(t, "three days in funchal")
+	withNeeds := testChatContext(t, "three days in funchal")
+	withNeeds.AccessibilityNeeds = fixtureNeeds()
+
+	plainPart := itineraryPart(t, l.planGeneration(plain))
+	needsPart := itineraryPart(t, l.planGeneration(withNeeds))
+
+	prompt := needsPart.Prompt(nil)
+	if !strings.Contains(prompt, "ACCESSIBILITY NEEDS") || !strings.Contains(prompt, "uses a manual wheelchair") {
+		t.Fatalf("itinerary prompt without a profile dropped the needs:\n%s", prompt)
+	}
+	if strings.Contains(plainPart.Prompt(nil), "ACCESSIBILITY") {
+		t.Fatal("prompt mentions accessibility for a traveller without needs")
+	}
+	if needsPart.CacheKey == plainPart.CacheKey {
+		t.Fatal("needs-only plan shares a cache key with the same traveller's plan without needs")
+	}
+
+	changed := testChatContext(t, "three days in funchal")
+	changed.AccessibilityNeeds = fixtureNeeds()
+	changed.AccessibilityNeeds.MaxWalkMinutesPerLeg = 25
+	if itineraryPart(t, l.planGeneration(changed)).CacheKey == needsPart.CacheKey {
+		t.Fatal("changing a need did not change the needs-only cache key")
+	}
+}
+
+// With a profile, the needs travel inside the scoped profile; the separate
+// needs-only path must not render them a second time.
+func TestPlanGenerationRendersNeedsOnceWithProfile(t *testing.T) {
+	l := newPlanService(t, newFakeGenerationStore())
+	cc := testChatContext(t, "three days in funchal")
+	cc.Profile = fixtureProfile()
+	cc.Profile.AccessibilityNeeds = fixtureNeeds()
+	cc.AccessibilityNeeds = cc.Profile.AccessibilityNeeds
+
+	prompt := itineraryPart(t, l.planGeneration(cc)).Prompt(nil)
+	if n := strings.Count(prompt, "ACCESSIBILITY NEEDS"); n != 1 {
+		t.Fatalf("needs rendered %d times, want 1", n)
+	}
+}
