@@ -666,6 +666,13 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 			Pois: pois, GeneralCityData: gcd, SessionId: sid,
 		}}
 
+	case locitypes.EventTypeAccessibleRoute:
+		var rd locitypes.StreamAccessibleRouteData
+		if !decodeData(event.Data, &rd) {
+			return nil, fmt.Errorf("accessible route event %q: undecodable data", event.EventID)
+		}
+		resp.Payload = &chatv1.StreamEvent_AccessibleRoute{AccessibleRoute: accessibleRouteToProto(rd)}
+
 	case locitypes.EventTypeGastronomy:
 		var gd locitypes.StreamGastronomyData
 		if !decodeData(event.Data, &gd) {
@@ -910,6 +917,8 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_GASTRONOMY
 	case locitypes.EventTypeActionProposal:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACTION_PROPOSAL
+	case locitypes.EventTypeAccessibleRoute:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACCESSIBLE_ROUTE
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
 	}
@@ -1278,4 +1287,49 @@ func multiCityCapable(h http.Header) bool {
 		}
 	}
 	return false
+}
+
+// accessibleRouteToProto maps one day's walking legs onto the wire, clamped to
+// the payload's validation limits.
+func accessibleRouteToProto(rd locitypes.StreamAccessibleRouteData) *chatv1.AccessibleRoutePayload {
+	out := &chatv1.AccessibleRoutePayload{
+		Day:              int32(min(max(rd.Day, 1), 60)),
+		TotalWalkMinutes: int32(max(rd.TotalWalkMinutes, 0)),
+	}
+	for i, w := range rd.Warnings {
+		if i == 10 {
+			break
+		}
+		if r := []rune(w); len(r) > 300 {
+			w = string(r[:300])
+		}
+		out.Warnings = append(out.Warnings, w)
+	}
+	for i, leg := range rd.Legs {
+		if i == 50 {
+			break
+		}
+		pl := &chatv1.WalkingLeg{
+			FromPoiId:   truncateRunes(leg.FromPOIID, 100),
+			ToPoiId:     truncateRunes(leg.ToPOIID, 100),
+			DistanceM:   int32(max(leg.DistanceM, 0)),
+			DurationMin: int32(max(leg.DurationMin, 0)),
+			AscentM:     int32(max(leg.AscentM, 0)),
+			Routed:      leg.Routed,
+			Notes:       presenter.ToProtoAccessibilityNotes(leg.Notes),
+		}
+		if leg.SuggestMode == "taxi" || leg.SuggestMode == "transit" {
+			mode := leg.SuggestMode
+			pl.SuggestMode = &mode
+		}
+		out.Legs = append(out.Legs, pl)
+	}
+	return out
+}
+
+func truncateRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
 }

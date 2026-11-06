@@ -756,6 +756,9 @@ func Load() (*Config, error) {
 		if err := checkWeatherLicence(); err != nil {
 			return nil, err
 		}
+		if err := checkRoutingConfig(); err != nil {
+			return nil, err
+		}
 	}
 	if cfg.AI.EmbeddingModel == "" {
 		return nil, fmt.Errorf("%s is required", providerEmbeddingModelEnv(cfg.AI.Provider))
@@ -958,6 +961,30 @@ func providerAPIKeyEnv(provider string) string {
 	}
 	return "GEMINI_API_KEY"
 }
+
+// checkRoutingConfig refuses a production boot whose accessible routing is
+// misconfigured. Without the check, ROUTING_PROVIDER=openrouteservice with no
+// key (or a misspelt provider) would start fine and quietly give every
+// wheelchair user straight-line estimates instead of step-free routes. "none"
+// (the default) is a deliberate choice and passes.
+func checkRoutingConfig() error {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ROUTING_PROVIDER"))) {
+	case "", "none":
+		return nil
+	case "openrouteservice":
+		if strings.TrimSpace(os.Getenv("ORS_API_KEY")) == "" {
+			return errors.New(routingKeyErr)
+		}
+		return nil
+	default:
+		return errors.New(routingProviderErr)
+	}
+}
+
+const (
+	routingKeyErr      = "ROUTING_PROVIDER=openrouteservice needs ORS_API_KEY in production"
+	routingProviderErr = "ROUTING_PROVIDER must be none or openrouteservice"
+)
 
 // checkWeatherLicence refuses a production boot that would use Open-Meteo's
 // non-commercial free tier.

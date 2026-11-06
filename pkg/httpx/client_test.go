@@ -3,6 +3,7 @@ package httpx
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -386,5 +387,41 @@ func TestGetJSON_EmptyBodyIsAnEmptyResult(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected an empty result, got %v", got)
+	}
+}
+
+func TestPostJSONResendsBodyOnRetry(t *testing.T) {
+	var bodies []string
+	var auth []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(b))
+		auth = append(auth, r.Header.Get("Authorization"))
+		if r.Method != http.MethodPost || r.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("method %s content-type %q", r.Method, r.Header.Get("Content-Type"))
+		}
+		if len(bodies) == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer srv.Close()
+
+	c := New(Config{MaxRetries: 1, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond})
+	got, err := PostJSON[struct {
+		OK bool `json:"ok"`
+	}](context.Background(), c, "test", srv.URL, map[string]int{"n": 1}, http.Header{"Authorization": {"key"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.OK {
+		t.Fatal("response not decoded")
+	}
+	if len(bodies) != 2 || bodies[0] != `{"n":1}` || bodies[1] != `{"n":1}` {
+		t.Fatalf("retry did not resend the full body: %q", bodies)
+	}
+	if auth[1] != "key" {
+		t.Fatalf("headers lost on retry: %q", auth)
 	}
 }

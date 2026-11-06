@@ -12,6 +12,10 @@ import (
 	"time"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/linkimport"
+	"github.com/FACorreiaa/loci-connect-api/pkg/accessibility"
+	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
+	"github.com/FACorreiaa/loci-connect-api/pkg/routing"
 	"github.com/FACorreiaa/loci-connect-api/pkg/safefetch"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
@@ -501,6 +505,16 @@ func (d *Dependencies) initServices() error {
 	// city name and preference text alone.
 	d.RetrievalAssembler = retrieval.NewAssembler(d.DB.Pool, d.Logger)
 	chatSvc.SetRetrievalAssembler(d.RetrievalAssembler)
+	// Accessibility evidence for travellers with access needs: open data on
+	// places, and step-free walking legs. Both are off unless configured; the
+	// traveller then still gets the model's estimates, labelled as such, and
+	// straight-line legs marked "route not checked".
+	if src := newPlaceAccessibility(appCache); src != nil {
+		chatSvc.SetPlaceAccessibility(src)
+	}
+	if router := newPedestrianRouter(appCache, d.Logger); router != nil {
+		chatSvc.SetPedestrianRouter(router)
+	}
 	// Report which cache layer served each part of each answer, so the hit rate
 	// and the tokens it saves are visible next to the rest of the funnel.
 	chatSvc.SetAnalytics(d.Analytics)
@@ -1452,6 +1466,64 @@ func (d *Dependencies) Cleanup() {
 // It shares the signals HTTP client so this new host sits under the same
 // outbound rate limit and reports the same external-request metrics as every
 // other provider.
+// newPlaceAccessibility builds the open accessibility-data source, or nil when
+// ACCESSIBILITY_CLOUD_TOKEN is unset. It shares the signals client: that
+// client's per-host limiter is what keeps us inside free APIs' policies.
+//
+//	ACCESSIBILITY_CLOUD_TOKEN     app token from accessibility.cloud (enables it)
+//	ACCESSIBILITY_CLOUD_BASE_URL  override the host (tests, self-hosting)
+func newPlaceAccessibility(cache cachestore.Store) accessibility.PlaceAccessibilitySource {
+	token := strings.TrimSpace(os.Getenv("ACCESSIBILITY_CLOUD_TOKEN"))
+	if token == "" {
+		return nil
+	}
+	return accessibility.NewAccessibilityCloud(
+		os.Getenv("ACCESSIBILITY_CLOUD_BASE_URL"), token, localcontext.NewSignalsHTTPClient(), cache)
+}
+
+// newPedestrianRouter builds the accessible walking router, or nil when
+// ROUTING_PROVIDER is "none" (the default) or unconfigured.
+//
+//	ROUTING_PROVIDER     none | openrouteservice
+//	ORS_API_KEY          HeiGIT API key (required for openrouteservice)
+//	ORS_BASE_URL         override the host (tests, self-hosting)
+//	ORS_DAILY_BUDGET     calls per UTC day before falling back to estimates
+//	                     (default 1800, under the free tier's 2,000)
+//	ORS_RATE_PER_MINUTE  request rate (default 40, the free tier's limit)
+//
+// It gets its own client rather than the signals one: the router's per-minute
+// limit is far below the 5 req/s the signals client allows.
+func newPedestrianRouter(cache cachestore.Store, logger *slog.Logger) routing.PedestrianRouter {
+	provider := strings.ToLower(strings.TrimSpace(os.Getenv("ROUTING_PROVIDER")))
+	if provider == "" || provider == "none" {
+		return nil
+	}
+	if provider != "openrouteservice" {
+		logger.Warn("unknown ROUTING_PROVIDER; accessible routing stays off", slog.String("provider", provider))
+		return nil
+	}
+	key := strings.TrimSpace(os.Getenv("ORS_API_KEY"))
+	if key == "" {
+		// Production refuses to start in this state (config.checkRoutingConfig);
+		// elsewhere, run without the router rather than fail every leg.
+		logger.Warn("ROUTING_PROVIDER=openrouteservice without ORS_API_KEY; accessible routing stays off")
+		return nil
+	}
+	perMinute := envInt("ORS_RATE_PER_MINUTE", 40)
+	client := httpx.New(httpx.Config{
+		Timeout:       8 * time.Second,
+		MaxRetries:    1,
+		RatePerSecond: float64(perMinute) / 60,
+		Burst:         min(10, perMinute),
+		UserAgent:     "loci/1.0 (+https://lociai.fyi)",
+	}).WithObserver(func(source, outcome string, d time.Duration) {
+		observability.ExternalRequestsTotal.WithLabelValues(source, outcome).Inc()
+		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
+	})
+	return routing.NewOpenRouteService(os.Getenv("ORS_BASE_URL"), key, client, cache,
+		routing.NewDailyBudget(envInt("ORS_DAILY_BUDGET", 1800)))
+}
+
 func newForwardGeocoder(cache cachestore.Store) geocode.Forward {
 	if !envFlag("GEOCODER_ENABLED", true) {
 		return nil

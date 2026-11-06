@@ -699,6 +699,12 @@ func (l *ServiceImpl) persistResults(
 		// the id of the row they hang off.
 		l.attachImages(storageCtx, data)
 
+		// Also after canonicalisation: crowd-verified facts hang off the
+		// stored row's id. Bounded, so the itinerary event waits at most
+		// enrichBudget for it.
+		l.enrichAccessibility(storageCtx, cc.AccessibilityNeeds,
+			data.AIItineraryResponse.PointsOfInterest, data.PointsOfInterest, data.Activities)
+
 		// Give the places this turn discovered their vectors now, instead of at
 		// 03:15 tomorrow. Without it the first person to ask about a city gets
 		// an ungrounded answer — and the generation cache then replays it.
@@ -771,6 +777,11 @@ func (l *ServiceImpl) persistResults(
 			EventID: recommendationRunID,
 			Data:    *data,
 		}, 3)
+		// Walking legs follow the itinerary rather than precede it, so routing
+		// never holds back first paint. The request context, not storageCtx:
+		// legs are not persisted, so routing for a client that has left would
+		// only spend the router's daily budget.
+		l.emitAccessibleRoutes(ctx, cc, data.AIItineraryResponse.PointsOfInterest)
 	}
 	// 4. Update Session
 	session, err := l.llmInteractionRepo.GetSession(storageCtx, cc.SessionID)

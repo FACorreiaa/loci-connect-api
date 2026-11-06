@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/accessibility"
+	"github.com/FACorreiaa/loci-connect-api/pkg/routing"
+
 	"github.com/google/uuid"
 	"google.golang.org/genai"
 
@@ -126,6 +129,15 @@ type ServiceImpl struct {
 	// assembler grounds generation in retrieved rows. Optional: when nil the
 	// chat path behaves exactly as it did before evidence packets existed.
 	assembler *retrieval.Assembler
+
+	// crowdAccess reads crowd-verified accessibility facts for the places in
+	// an answer; set together with assembler. placeAccessibility looks places
+	// up in open accessibility data, and pedestrianRouter computes walking
+	// legs. All optional: nil skips that source, and the traveller still gets
+	// the model's (labelled) estimates and straight-line legs.
+	crowdAccess        crowdAccessibility
+	placeAccessibility accessibility.PlaceAccessibilitySource
+	pedestrianRouter   routing.PedestrianRouter
 	// assembleEvidence overrides how a turn retrieves its evidence. Nil in
 	// production; tests set it to observe that a fully cached turn retrieves
 	// nothing at all.
@@ -304,6 +316,25 @@ func (l *ServiceImpl) SetPreferenceVectors(r preference.VectorReader) {
 func (l *ServiceImpl) SetRetrievalAssembler(a *retrieval.Assembler) {
 	if l != nil {
 		l.assembler = a
+		// A nil *Assembler in an interface would not compare equal to nil.
+		if a != nil {
+			l.crowdAccess = a
+		}
+	}
+}
+
+// SetPlaceAccessibility enables open-data accessibility notes on places.
+func (l *ServiceImpl) SetPlaceAccessibility(src accessibility.PlaceAccessibilitySource) {
+	if l != nil {
+		l.placeAccessibility = src
+	}
+}
+
+// SetPedestrianRouter enables routed walking legs for travellers with access
+// needs. Without one, legs are straight-line estimates labelled as such.
+func (l *ServiceImpl) SetPedestrianRouter(r routing.PedestrianRouter) {
+	if l != nil {
+		l.pedestrianRouter = r
 	}
 }
 
