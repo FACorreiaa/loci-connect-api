@@ -319,11 +319,16 @@ type ChatContext struct {
 	Verification retrieval.Verification
 
 	// Profile is the preference profile this turn's prompts are rendered from.
-	// Nil when personalisation is off for this user, which is the same state
-	// BasePreferences == "" records — kept as the structured value because the
+	// Nil when personalisation is off for this user (BasePreferences then
+	// carries at most the accessibility needs) — kept as the structured value because the
 	// generation cache hashes the fields each part actually renders, not the
 	// rendered text.
 	Profile *locitypes.UserPreferenceProfileResponse
+	// AccessibilityNeeds are the traveller's access needs, kept apart from
+	// Profile because they are requirements, not personalisation: a traveller
+	// with personalisation off (or in the control arm) still uses a
+	// wheelchair. Nil when no needs are stored.
+	AccessibilityNeeds *locitypes.AccessibilityNeeds
 
 	// Cacheable says whether this turn's answers may be stored and replayed.
 	// False for requests pinned to the present moment ("open now") and for the

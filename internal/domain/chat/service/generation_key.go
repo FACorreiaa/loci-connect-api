@@ -334,6 +334,21 @@ func profileSnapshotHash(scoped *locitypes.UserPreferenceProfileResponse) string
 	return hex.EncodeToString(sum[:])
 }
 
+// needsOnlySnapshotHash fingerprints access needs for a traveller with no
+// scoped profile (personalisation off). The prefix keeps it from ever equalling
+// a profile hash.
+func needsOnlySnapshotHash(needs *locitypes.AccessibilityNeeds) string {
+	if !needs.Active() {
+		return ""
+	}
+	raw, err := json.Marshal(needs)
+	if err != nil {
+		return "unhashable"
+	}
+	sum := sha256.Sum256(append([]byte("accessibility-only\x00"), raw...))
+	return hex.EncodeToString(sum[:])
+}
+
 // liveWordsRE matches phrasing that pins a request to the present moment. An
 // answer to "what is open right now" is wrong an hour later, so such requests
 // are never served from a durable cache.

@@ -147,6 +147,15 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 	part := func(p generationPart, render func(prefs string, packet *retrieval.ContextPacket) string) partPlan {
 		scoped := scopeProfileForPart(p, cc.Profile)
 		prefs := getUserPreferencesPrompt(scoped)
+		snapshot := profileSnapshotHash(scoped)
+		// With personalisation off there is no profile, but access needs still
+		// apply: render them alone and key them alone, so the answer cached for
+		// this traveller without needs is never replayed to them with needs.
+		if scoped == nil && isPersonalPart(p) && cc.AccessibilityNeeds.Active() {
+			needs := scopeAccessibility(cc.AccessibilityNeeds)
+			prefs = accessibilityPrompt(needs)
+			snapshot = needsOnlySnapshotHash(needs)
+		}
 		return partPlan{
 			Part:      p,
 			POITarget: cc.POITarget,
@@ -157,7 +166,7 @@ func (l *ServiceImpl) planGeneration(cc *common.ChatContext) []partPlan {
 				CityName:     cc.CityName,
 				ModelID:      modelID,
 				Query:        cc.Message,
-				SnapshotHash: profileSnapshotHash(scoped),
+				SnapshotHash: snapshot,
 				UserID:       cc.UserID,
 				Lat:          lat,
 				Lon:          lon,
