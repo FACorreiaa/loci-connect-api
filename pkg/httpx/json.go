@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 )
 
 // GetJSON fetches a URL and decodes the body into T.
@@ -12,11 +13,31 @@ import (
 // A free function rather than a method because Go does not allow type
 // parameters on methods.
 func GetJSON[T any](ctx context.Context, c *Client, source, url string) (T, error) {
-	var out T
 	body, err := c.Get(ctx, source, url)
+	if err != nil {
+		var out T
+		return out, err
+	}
+	return decodeJSON[T](source, body)
+}
+
+// PostJSON sends in as a JSON body and decodes the response into T. The same
+// idempotency rule as Client.Post applies.
+func PostJSON[T any](ctx context.Context, c *Client, source, url string, in any, header http.Header) (T, error) {
+	var out T
+	payload, err := json.Marshal(in)
+	if err != nil {
+		return out, fmt.Errorf("%s encode: %w", source, err)
+	}
+	body, err := c.Post(ctx, source, url, "application/json", payload, header)
 	if err != nil {
 		return out, err
 	}
+	return decodeJSON[T](source, body)
+}
+
+func decodeJSON[T any](source string, body []byte) (T, error) {
+	var out T
 	// A 204, or any empty 2xx body, means "nothing to report". Decoding it
 	// would fail on unexpected end of JSON input and turn a valid empty answer
 	// into a provider failure.

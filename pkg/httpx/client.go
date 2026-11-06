@@ -14,6 +14,7 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -148,12 +149,40 @@ func (c *Client) limiterFor(host string) *rate.Limiter {
 // `source` is the logical provider name used for metrics and error messages
 // ("open-meteo", "usgs", "nager"), not a URL.
 func (c *Client) Get(ctx context.Context, source, url string) ([]byte, error) {
+	return c.do(ctx, source, http.MethodGet, url, nil, nil)
+}
+
+// Post issues a rate-limited POST of body with retries and returns the
+// response body. It is for idempotent calls only — a provider computing an
+// answer (a route, a lookup), never one creating something — because a retry
+// after a lost response sends the same request again.
+func (c *Client) Post(ctx context.Context, source, url, contentType string, body []byte, header http.Header) ([]byte, error) {
+	h := header.Clone()
+	if h == nil {
+		h = http.Header{}
+	}
+	h.Set("Content-Type", contentType)
+	return c.do(ctx, source, http.MethodPost, url, body, h)
+}
+
+func (c *Client) do(ctx context.Context, source, method, url string, body []byte, header http.Header) ([]byte, error) {
 	var lastErr error
 
 	for attempt := 0; attempt <= c.cfg.MaxRetries; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		// A fresh reader per attempt: a retry must resend the whole body, not
+		// whatever the previous attempt left unread.
+		var reqBody io.Reader
+		if body != nil {
+			reqBody = bytes.NewReader(body)
+		}
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
 			return nil, err
+		}
+		for k, vs := range header {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
 		}
 		req.Header.Set("User-Agent", c.cfg.UserAgent)
 		req.Header.Set("Accept", "application/json")

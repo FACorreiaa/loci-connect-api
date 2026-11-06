@@ -285,7 +285,10 @@ const (
 	// EventTypeActionProposal carries a tripaction.Proposal: a change to the
 	// turn's trip the traveller can confirm with ApplyTripAction.
 	EventTypeActionProposal = "action_proposal"
-	EventTypeChunk          = "chunk" // For immediate text chunks (Google GenAI pattern)
+	// EventTypeAccessibleRoute carries one day's walking legs for a traveller
+	// with access needs (StreamAccessibleRouteData), sent after the itinerary.
+	EventTypeAccessibleRoute = "accessible_route"
+	EventTypeChunk           = "chunk" // For immediate text chunks (Google GenAI pattern)
 )
 
 // --- Typed stream payloads (Slice 1) ---
@@ -314,6 +317,28 @@ type StreamDomainListData struct {
 type StreamGastronomyData struct {
 	Gastronomy CityGastronomy `json:"gastronomy"`
 	SessionID  string         `json:"session_id"`
+}
+
+// StreamAccessibleRouteData is the payload for EventTypeAccessibleRoute.
+type StreamAccessibleRouteData struct {
+	Day              int          `json:"day"`
+	Legs             []WalkingLeg `json:"legs"`
+	TotalWalkMinutes int          `json:"total_walk_minutes"`
+	Warnings         []string     `json:"warnings,omitempty"`
+}
+
+// WalkingLeg is the walk (or roll) between two consecutive stops of a day.
+type WalkingLeg struct {
+	FromPOIID   string `json:"from_poi_id"`
+	ToPOIID     string `json:"to_poi_id"`
+	DistanceM   int    `json:"distance_m"`
+	DurationMin int    `json:"duration_min"`
+	AscentM     int    `json:"ascent_m"`
+	// Routed is true when an accessible router computed the leg; false means a
+	// straight-line estimate the client must label "route not checked".
+	Routed      bool                `json:"routed"`
+	Notes       []AccessibilityNote `json:"notes,omitempty"`
+	SuggestMode string              `json:"suggest_mode,omitempty"`
 }
 
 // StreamChunkData is the payload for EventTypeChunk (incremental text token).
