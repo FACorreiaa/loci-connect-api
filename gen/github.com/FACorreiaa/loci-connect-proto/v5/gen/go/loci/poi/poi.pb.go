@@ -26,6 +26,123 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// AccessibilityNoteSeverity is how much a note affects the traveller's plan.
+type AccessibilityNoteSeverity int32
+
+const (
+	AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_UNSPECIFIED AccessibilityNoteSeverity = 0
+	// Useful to know; nothing to change.
+	AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_INFO AccessibilityNoteSeverity = 1
+	// Possible difficulty; check ahead or plan around it.
+	AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_CAUTION AccessibilityNoteSeverity = 2
+	// Likely blocks the traveller (steps with no alternative, no lift).
+	AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_BARRIER AccessibilityNoteSeverity = 3
+)
+
+// Enum value maps for AccessibilityNoteSeverity.
+var (
+	AccessibilityNoteSeverity_name = map[int32]string{
+		0: "ACCESSIBILITY_NOTE_SEVERITY_UNSPECIFIED",
+		1: "ACCESSIBILITY_NOTE_SEVERITY_INFO",
+		2: "ACCESSIBILITY_NOTE_SEVERITY_CAUTION",
+		3: "ACCESSIBILITY_NOTE_SEVERITY_BARRIER",
+	}
+	AccessibilityNoteSeverity_value = map[string]int32{
+		"ACCESSIBILITY_NOTE_SEVERITY_UNSPECIFIED": 0,
+		"ACCESSIBILITY_NOTE_SEVERITY_INFO":        1,
+		"ACCESSIBILITY_NOTE_SEVERITY_CAUTION":     2,
+		"ACCESSIBILITY_NOTE_SEVERITY_BARRIER":     3,
+	}
+)
+
+func (x AccessibilityNoteSeverity) Enum() *AccessibilityNoteSeverity {
+	p := new(AccessibilityNoteSeverity)
+	*p = x
+	return p
+}
+
+func (x AccessibilityNoteSeverity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AccessibilityNoteSeverity) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_poi_poi_proto_enumTypes[0].Descriptor()
+}
+
+func (AccessibilityNoteSeverity) Type() protoreflect.EnumType {
+	return &file_loci_poi_poi_proto_enumTypes[0]
+}
+
+func (x AccessibilityNoteSeverity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AccessibilityNoteSeverity.Descriptor instead.
+func (AccessibilityNoteSeverity) EnumDescriptor() ([]byte, []int) {
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{0}
+}
+
+// AccessibilityNoteSource is where a note's claim comes from. Only
+// AI_ESTIMATE notes are unverified; clients must label them as such.
+type AccessibilityNoteSource int32
+
+const (
+	AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_UNSPECIFIED AccessibilityNoteSource = 0
+	// Confirmed by Loci travellers (verified place facts).
+	AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_VERIFIED_CROWD AccessibilityNoteSource = 1
+	// Open data: OpenStreetMap / Wheelmap via accessibility.cloud.
+	AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_OPEN_DATA AccessibilityNoteSource = 2
+	// Computed by the accessible walking router.
+	AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_ROUTED AccessibilityNoteSource = 3
+	// The model's estimate. Unverified; the traveller should call ahead.
+	AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_AI_ESTIMATE AccessibilityNoteSource = 4
+)
+
+// Enum value maps for AccessibilityNoteSource.
+var (
+	AccessibilityNoteSource_name = map[int32]string{
+		0: "ACCESSIBILITY_NOTE_SOURCE_UNSPECIFIED",
+		1: "ACCESSIBILITY_NOTE_SOURCE_VERIFIED_CROWD",
+		2: "ACCESSIBILITY_NOTE_SOURCE_OPEN_DATA",
+		3: "ACCESSIBILITY_NOTE_SOURCE_ROUTED",
+		4: "ACCESSIBILITY_NOTE_SOURCE_AI_ESTIMATE",
+	}
+	AccessibilityNoteSource_value = map[string]int32{
+		"ACCESSIBILITY_NOTE_SOURCE_UNSPECIFIED":    0,
+		"ACCESSIBILITY_NOTE_SOURCE_VERIFIED_CROWD": 1,
+		"ACCESSIBILITY_NOTE_SOURCE_OPEN_DATA":      2,
+		"ACCESSIBILITY_NOTE_SOURCE_ROUTED":         3,
+		"ACCESSIBILITY_NOTE_SOURCE_AI_ESTIMATE":    4,
+	}
+)
+
+func (x AccessibilityNoteSource) Enum() *AccessibilityNoteSource {
+	p := new(AccessibilityNoteSource)
+	*p = x
+	return p
+}
+
+func (x AccessibilityNoteSource) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AccessibilityNoteSource) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_poi_poi_proto_enumTypes[1].Descriptor()
+}
+
+func (AccessibilityNoteSource) Type() protoreflect.EnumType {
+	return &file_loci_poi_poi_proto_enumTypes[1]
+}
+
+func (x AccessibilityNoteSource) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AccessibilityNoteSource.Descriptor instead.
+func (AccessibilityNoteSource) EnumDescriptor() ([]byte, []int) {
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{1}
+}
+
 // POIDetailedInfo represents a point of interest
 type POIDetailedInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -93,9 +210,13 @@ type POIDetailedInfo struct {
 	// without naming its author and licence breaches the terms it was offered
 	// under. The URL and its credit therefore travel together — a client that
 	// renders one renders the other.
-	ImageCredits  []*POIImage `protobuf:"bytes,34,rep,name=image_credits,json=imageCredits,proto3" json:"image_credits,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	ImageCredits []*POIImage `protobuf:"bytes,34,rep,name=image_credits,json=imageCredits,proto3" json:"image_credits,omitempty"`
+	// What a traveller with access needs should know about this place. Set only
+	// when the request carried accessibility needs. Each note names its source,
+	// so clients can show how far to trust it.
+	AccessibilityNotes []*AccessibilityNote `protobuf:"bytes,37,rep,name=accessibility_notes,json=accessibilityNotes,proto3" json:"accessibility_notes,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *POIDetailedInfo) Reset() {
@@ -380,6 +501,93 @@ func (x *POIDetailedInfo) GetImageCredits() []*POIImage {
 	return nil
 }
 
+func (x *POIDetailedInfo) GetAccessibilityNotes() []*AccessibilityNote {
+	if x != nil {
+		return x.AccessibilityNotes
+	}
+	return nil
+}
+
+// AccessibilityNote is one access fact or caveat about a place or a leg.
+type AccessibilityNote struct {
+	state    protoimpl.MessageState    `protogen:"open.v1"`
+	Text     string                    `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Severity AccessibilityNoteSeverity `protobuf:"varint,2,opt,name=severity,proto3,enum=loci.poi.AccessibilityNoteSeverity" json:"severity,omitempty"`
+	Source   AccessibilityNoteSource   `protobuf:"varint,3,opt,name=source,proto3,enum=loci.poi.AccessibilityNoteSource" json:"source,omitempty"`
+	// Licence the underlying data was offered under (for example "ODbL-1.0"),
+	// which clients must show alongside OPEN_DATA notes.
+	SourceLicence *string `protobuf:"bytes,4,opt,name=source_licence,json=sourceLicence,proto3,oneof" json:"source_licence,omitempty"`
+	// When the underlying fact was last observed or updated.
+	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=observed_at,json=observedAt,proto3,oneof" json:"observed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessibilityNote) Reset() {
+	*x = AccessibilityNote{}
+	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessibilityNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessibilityNote) ProtoMessage() {}
+
+func (x *AccessibilityNote) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessibilityNote.ProtoReflect.Descriptor instead.
+func (*AccessibilityNote) Descriptor() ([]byte, []int) {
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AccessibilityNote) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *AccessibilityNote) GetSeverity() AccessibilityNoteSeverity {
+	if x != nil {
+		return x.Severity
+	}
+	return AccessibilityNoteSeverity_ACCESSIBILITY_NOTE_SEVERITY_UNSPECIFIED
+}
+
+func (x *AccessibilityNote) GetSource() AccessibilityNoteSource {
+	if x != nil {
+		return x.Source
+	}
+	return AccessibilityNoteSource_ACCESSIBILITY_NOTE_SOURCE_UNSPECIFIED
+}
+
+func (x *AccessibilityNote) GetSourceLicence() string {
+	if x != nil && x.SourceLicence != nil {
+		return *x.SourceLicence
+	}
+	return ""
+}
+
+func (x *AccessibilityNote) GetObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ObservedAt
+	}
+	return nil
+}
+
 // TasteMatch explains why a place fits the traveller, not whether it is good.
 type TasteMatch struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -394,7 +602,7 @@ type TasteMatch struct {
 
 func (x *TasteMatch) Reset() {
 	*x = TasteMatch{}
-	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	mi := &file_loci_poi_poi_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +614,7 @@ func (x *TasteMatch) String() string {
 func (*TasteMatch) ProtoMessage() {}
 
 func (x *TasteMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[1]
+	mi := &file_loci_poi_poi_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +627,7 @@ func (x *TasteMatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TasteMatch.ProtoReflect.Descriptor instead.
 func (*TasteMatch) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{1}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *TasteMatch) GetScore() float32 {
@@ -454,7 +662,7 @@ type POIImage struct {
 
 func (x *POIImage) Reset() {
 	*x = POIImage{}
-	mi := &file_loci_poi_poi_proto_msgTypes[2]
+	mi := &file_loci_poi_poi_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -466,7 +674,7 @@ func (x *POIImage) String() string {
 func (*POIImage) ProtoMessage() {}
 
 func (x *POIImage) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[2]
+	mi := &file_loci_poi_poi_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -479,7 +687,7 @@ func (x *POIImage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use POIImage.ProtoReflect.Descriptor instead.
 func (*POIImage) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{2}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *POIImage) GetUrl() string {
@@ -544,7 +752,7 @@ type HotelDetailedInfo struct {
 
 func (x *HotelDetailedInfo) Reset() {
 	*x = HotelDetailedInfo{}
-	mi := &file_loci_poi_poi_proto_msgTypes[3]
+	mi := &file_loci_poi_poi_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +764,7 @@ func (x *HotelDetailedInfo) String() string {
 func (*HotelDetailedInfo) ProtoMessage() {}
 
 func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[3]
+	mi := &file_loci_poi_poi_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +777,7 @@ func (x *HotelDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HotelDetailedInfo.ProtoReflect.Descriptor instead.
 func (*HotelDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{3}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *HotelDetailedInfo) GetId() string {
@@ -727,7 +935,7 @@ type RestaurantDetailedInfo struct {
 
 func (x *RestaurantDetailedInfo) Reset() {
 	*x = RestaurantDetailedInfo{}
-	mi := &file_loci_poi_poi_proto_msgTypes[4]
+	mi := &file_loci_poi_poi_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -739,7 +947,7 @@ func (x *RestaurantDetailedInfo) String() string {
 func (*RestaurantDetailedInfo) ProtoMessage() {}
 
 func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[4]
+	mi := &file_loci_poi_poi_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -752,7 +960,7 @@ func (x *RestaurantDetailedInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestaurantDetailedInfo.ProtoReflect.Descriptor instead.
 func (*RestaurantDetailedInfo) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{4}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *RestaurantDetailedInfo) GetId() string {
@@ -900,7 +1108,7 @@ type POIFilters struct {
 
 func (x *POIFilters) Reset() {
 	*x = POIFilters{}
-	mi := &file_loci_poi_poi_proto_msgTypes[5]
+	mi := &file_loci_poi_poi_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +1120,7 @@ func (x *POIFilters) String() string {
 func (*POIFilters) ProtoMessage() {}
 
 func (x *POIFilters) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[5]
+	mi := &file_loci_poi_poi_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1133,7 @@ func (x *POIFilters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use POIFilters.ProtoReflect.Descriptor instead.
 func (*POIFilters) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{5}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *POIFilters) GetCity() string {
@@ -978,7 +1186,7 @@ type SearchPOIRequest struct {
 
 func (x *SearchPOIRequest) Reset() {
 	*x = SearchPOIRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[6]
+	mi := &file_loci_poi_poi_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1198,7 @@ func (x *SearchPOIRequest) String() string {
 func (*SearchPOIRequest) ProtoMessage() {}
 
 func (x *SearchPOIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[6]
+	mi := &file_loci_poi_poi_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1211,7 @@ func (x *SearchPOIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPOIRequest.ProtoReflect.Descriptor instead.
 func (*SearchPOIRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{6}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchPOIRequest) GetQuery() string {
@@ -1108,7 +1316,7 @@ type SearchPOIResponse struct {
 
 func (x *SearchPOIResponse) Reset() {
 	*x = SearchPOIResponse{}
-	mi := &file_loci_poi_poi_proto_msgTypes[7]
+	mi := &file_loci_poi_poi_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1120,7 +1328,7 @@ func (x *SearchPOIResponse) String() string {
 func (*SearchPOIResponse) ProtoMessage() {}
 
 func (x *SearchPOIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[7]
+	mi := &file_loci_poi_poi_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1133,7 +1341,7 @@ func (x *SearchPOIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchPOIResponse.ProtoReflect.Descriptor instead.
 func (*SearchPOIResponse) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{7}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SearchPOIResponse) GetPois() []*POIDetailedInfo {
@@ -1160,7 +1368,7 @@ type GetPOIRequest struct {
 
 func (x *GetPOIRequest) Reset() {
 	*x = GetPOIRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[8]
+	mi := &file_loci_poi_poi_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1172,7 +1380,7 @@ func (x *GetPOIRequest) String() string {
 func (*GetPOIRequest) ProtoMessage() {}
 
 func (x *GetPOIRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[8]
+	mi := &file_loci_poi_poi_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1393,7 @@ func (x *GetPOIRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPOIRequest.ProtoReflect.Descriptor instead.
 func (*GetPOIRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{8}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetPOIRequest) GetPoiId() string {
@@ -1205,7 +1413,7 @@ type GetPOIResponse struct {
 
 func (x *GetPOIResponse) Reset() {
 	*x = GetPOIResponse{}
-	mi := &file_loci_poi_poi_proto_msgTypes[9]
+	mi := &file_loci_poi_poi_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1217,7 +1425,7 @@ func (x *GetPOIResponse) String() string {
 func (*GetPOIResponse) ProtoMessage() {}
 
 func (x *GetPOIResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[9]
+	mi := &file_loci_poi_poi_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1230,7 +1438,7 @@ func (x *GetPOIResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPOIResponse.ProtoReflect.Descriptor instead.
 func (*GetPOIResponse) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{9}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetPOIResponse) GetPoi() *POIDetailedInfo {
@@ -1252,7 +1460,7 @@ type AddPoiRequest struct {
 
 func (x *AddPoiRequest) Reset() {
 	*x = AddPoiRequest{}
-	mi := &file_loci_poi_poi_proto_msgTypes[10]
+	mi := &file_loci_poi_poi_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1264,7 +1472,7 @@ func (x *AddPoiRequest) String() string {
 func (*AddPoiRequest) ProtoMessage() {}
 
 func (x *AddPoiRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_poi_poi_proto_msgTypes[10]
+	mi := &file_loci_poi_poi_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1277,7 +1485,7 @@ func (x *AddPoiRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddPoiRequest.ProtoReflect.Descriptor instead.
 func (*AddPoiRequest) Descriptor() ([]byte, []int) {
-	return file_loci_poi_poi_proto_rawDescGZIP(), []int{10}
+	return file_loci_poi_poi_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AddPoiRequest) GetPoiId() string {
@@ -1305,7 +1513,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\x80\x11\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xd8\x11\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1361,7 +1569,9 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x03day\x18# \x01(\x05B\t\xbaH\x06\x1a\x04\x18<(\x01H\fR\x03day\x88\x01\x01\x12:\n" +
 	"\vtaste_match\x18$ \x01(\v2\x14.loci.poi.TasteMatchH\rR\n" +
 	"tasteMatch\x88\x01\x01\x12A\n" +
-	"\rimage_credits\x18\" \x03(\v2\x12.loci.poi.POIImageB\b\xbaH\x05\x92\x01\x02\x10\x14R\fimageCredits\x1a?\n" +
+	"\rimage_credits\x18\" \x03(\v2\x12.loci.poi.POIImageB\b\xbaH\x05\x92\x01\x02\x10\x14R\fimageCredits\x12V\n" +
+	"\x13accessibility_notes\x18% \x03(\v2\x1b.loci.poi.AccessibilityNoteB\b\xbaH\x05\x92\x01\x02\x10\n" +
+	"R\x12accessibilityNotes\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x12\n" +
@@ -1379,7 +1589,17 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x0f_verified_factsB\v\n" +
 	"\t_groundedB\x06\n" +
 	"\x04_dayB\x0e\n" +
-	"\f_taste_match\"_\n" +
+	"\f_taste_match\"\xdd\x02\n" +
+	"\x11AccessibilityNote\x12\x1e\n" +
+	"\x04text\x18\x01 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\x04text\x12I\n" +
+	"\bseverity\x18\x02 \x01(\x0e2#.loci.poi.AccessibilityNoteSeverityB\b\xbaH\x05\x82\x01\x02\x10\x01R\bseverity\x12C\n" +
+	"\x06source\x18\x03 \x01(\x0e2!.loci.poi.AccessibilityNoteSourceB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06source\x123\n" +
+	"\x0esource_licence\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x18dH\x00R\rsourceLicence\x88\x01\x01\x12@\n" +
+	"\vobserved_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampH\x01R\n" +
+	"observedAt\x88\x01\x01B\x11\n" +
+	"\x0f_source_licenceB\x0e\n" +
+	"\f_observed_at\"_\n" +
 	"\n" +
 	"TasteMatch\x12%\n" +
 	"\x05score\x18\x01 \x01(\x02B\x0f\xbaH\f\n" +
@@ -1535,7 +1755,18 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
 	"is_llm_poi\x18\x02 \x01(\bR\bisLlmPoi\x129\n" +
 	"\bpoi_data\x18\x03 \x01(\v2\x19.loci.poi.POIDetailedInfoH\x00R\apoiData\x88\x01\x01B\v\n" +
-	"\t_poi_data2\x8f\x01\n" +
+	"\t_poi_data*\xc0\x01\n" +
+	"\x19AccessibilityNoteSeverity\x12+\n" +
+	"'ACCESSIBILITY_NOTE_SEVERITY_UNSPECIFIED\x10\x00\x12$\n" +
+	" ACCESSIBILITY_NOTE_SEVERITY_INFO\x10\x01\x12'\n" +
+	"#ACCESSIBILITY_NOTE_SEVERITY_CAUTION\x10\x02\x12'\n" +
+	"#ACCESSIBILITY_NOTE_SEVERITY_BARRIER\x10\x03*\xec\x01\n" +
+	"\x17AccessibilityNoteSource\x12)\n" +
+	"%ACCESSIBILITY_NOTE_SOURCE_UNSPECIFIED\x10\x00\x12,\n" +
+	"(ACCESSIBILITY_NOTE_SOURCE_VERIFIED_CROWD\x10\x01\x12'\n" +
+	"#ACCESSIBILITY_NOTE_SOURCE_OPEN_DATA\x10\x02\x12$\n" +
+	" ACCESSIBILITY_NOTE_SOURCE_ROUTED\x10\x03\x12)\n" +
+	"%ACCESSIBILITY_NOTE_SOURCE_AI_ESTIMATE\x10\x042\x8f\x01\n" +
 	"\n" +
 	"POIService\x12D\n" +
 	"\tSearchPOI\x12\x1a.loci.poi.SearchPOIRequest\x1a\x1b.loci.poi.SearchPOIResponse\x12;\n" +
@@ -1553,47 +1784,55 @@ func file_loci_poi_poi_proto_rawDescGZIP() []byte {
 	return file_loci_poi_poi_proto_rawDescData
 }
 
-var file_loci_poi_poi_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_loci_poi_poi_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_loci_poi_poi_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_loci_poi_poi_proto_goTypes = []any{
-	(*POIDetailedInfo)(nil),                    // 0: loci.poi.POIDetailedInfo
-	(*TasteMatch)(nil),                         // 1: loci.poi.TasteMatch
-	(*POIImage)(nil),                           // 2: loci.poi.POIImage
-	(*HotelDetailedInfo)(nil),                  // 3: loci.poi.HotelDetailedInfo
-	(*RestaurantDetailedInfo)(nil),             // 4: loci.poi.RestaurantDetailedInfo
-	(*POIFilters)(nil),                         // 5: loci.poi.POIFilters
-	(*SearchPOIRequest)(nil),                   // 6: loci.poi.SearchPOIRequest
-	(*SearchPOIResponse)(nil),                  // 7: loci.poi.SearchPOIResponse
-	(*GetPOIRequest)(nil),                      // 8: loci.poi.GetPOIRequest
-	(*GetPOIResponse)(nil),                     // 9: loci.poi.GetPOIResponse
-	(*AddPoiRequest)(nil),                      // 10: loci.poi.AddPoiRequest
-	nil,                                        // 11: loci.poi.POIDetailedInfo.OpeningHoursEntry
-	(*timestamppb.Timestamp)(nil),              // 12: google.protobuf.Timestamp
-	(*recommendation.RecommendationTrace)(nil), // 13: loci.recommendation.RecommendationTrace
-	(*place.PlaceFacts)(nil),                   // 14: loci.place.PlaceFacts
-	(*common.PaginationMetadata)(nil),          // 15: loci.common.PaginationMetadata
+	(AccessibilityNoteSeverity)(0),             // 0: loci.poi.AccessibilityNoteSeverity
+	(AccessibilityNoteSource)(0),               // 1: loci.poi.AccessibilityNoteSource
+	(*POIDetailedInfo)(nil),                    // 2: loci.poi.POIDetailedInfo
+	(*AccessibilityNote)(nil),                  // 3: loci.poi.AccessibilityNote
+	(*TasteMatch)(nil),                         // 4: loci.poi.TasteMatch
+	(*POIImage)(nil),                           // 5: loci.poi.POIImage
+	(*HotelDetailedInfo)(nil),                  // 6: loci.poi.HotelDetailedInfo
+	(*RestaurantDetailedInfo)(nil),             // 7: loci.poi.RestaurantDetailedInfo
+	(*POIFilters)(nil),                         // 8: loci.poi.POIFilters
+	(*SearchPOIRequest)(nil),                   // 9: loci.poi.SearchPOIRequest
+	(*SearchPOIResponse)(nil),                  // 10: loci.poi.SearchPOIResponse
+	(*GetPOIRequest)(nil),                      // 11: loci.poi.GetPOIRequest
+	(*GetPOIResponse)(nil),                     // 12: loci.poi.GetPOIResponse
+	(*AddPoiRequest)(nil),                      // 13: loci.poi.AddPoiRequest
+	nil,                                        // 14: loci.poi.POIDetailedInfo.OpeningHoursEntry
+	(*timestamppb.Timestamp)(nil),              // 15: google.protobuf.Timestamp
+	(*recommendation.RecommendationTrace)(nil), // 16: loci.recommendation.RecommendationTrace
+	(*place.PlaceFacts)(nil),                   // 17: loci.place.PlaceFacts
+	(*common.PaginationMetadata)(nil),          // 18: loci.common.PaginationMetadata
 }
 var file_loci_poi_poi_proto_depIdxs = []int32{
-	11, // 0: loci.poi.POIDetailedInfo.opening_hours:type_name -> loci.poi.POIDetailedInfo.OpeningHoursEntry
-	12, // 1: loci.poi.POIDetailedInfo.created_at:type_name -> google.protobuf.Timestamp
-	13, // 2: loci.poi.POIDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	14, // 3: loci.poi.POIDetailedInfo.verified_facts:type_name -> loci.place.PlaceFacts
-	1,  // 4: loci.poi.POIDetailedInfo.taste_match:type_name -> loci.poi.TasteMatch
-	2,  // 5: loci.poi.POIDetailedInfo.image_credits:type_name -> loci.poi.POIImage
-	13, // 6: loci.poi.HotelDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	13, // 7: loci.poi.RestaurantDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	0,  // 8: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
-	15, // 9: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
-	0,  // 10: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
-	0,  // 11: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
-	6,  // 12: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
-	8,  // 13: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
-	7,  // 14: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
-	9,  // 15: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
-	14, // [14:16] is the sub-list for method output_type
-	12, // [12:14] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	14, // 0: loci.poi.POIDetailedInfo.opening_hours:type_name -> loci.poi.POIDetailedInfo.OpeningHoursEntry
+	15, // 1: loci.poi.POIDetailedInfo.created_at:type_name -> google.protobuf.Timestamp
+	16, // 2: loci.poi.POIDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	17, // 3: loci.poi.POIDetailedInfo.verified_facts:type_name -> loci.place.PlaceFacts
+	4,  // 4: loci.poi.POIDetailedInfo.taste_match:type_name -> loci.poi.TasteMatch
+	5,  // 5: loci.poi.POIDetailedInfo.image_credits:type_name -> loci.poi.POIImage
+	3,  // 6: loci.poi.POIDetailedInfo.accessibility_notes:type_name -> loci.poi.AccessibilityNote
+	0,  // 7: loci.poi.AccessibilityNote.severity:type_name -> loci.poi.AccessibilityNoteSeverity
+	1,  // 8: loci.poi.AccessibilityNote.source:type_name -> loci.poi.AccessibilityNoteSource
+	15, // 9: loci.poi.AccessibilityNote.observed_at:type_name -> google.protobuf.Timestamp
+	16, // 10: loci.poi.HotelDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	16, // 11: loci.poi.RestaurantDetailedInfo.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	2,  // 12: loci.poi.SearchPOIResponse.pois:type_name -> loci.poi.POIDetailedInfo
+	18, // 13: loci.poi.SearchPOIResponse.pagination:type_name -> loci.common.PaginationMetadata
+	2,  // 14: loci.poi.GetPOIResponse.poi:type_name -> loci.poi.POIDetailedInfo
+	2,  // 15: loci.poi.AddPoiRequest.poi_data:type_name -> loci.poi.POIDetailedInfo
+	9,  // 16: loci.poi.POIService.SearchPOI:input_type -> loci.poi.SearchPOIRequest
+	11, // 17: loci.poi.POIService.GetPOI:input_type -> loci.poi.GetPOIRequest
+	10, // 18: loci.poi.POIService.SearchPOI:output_type -> loci.poi.SearchPOIResponse
+	12, // 19: loci.poi.POIService.GetPOI:output_type -> loci.poi.GetPOIResponse
+	18, // [18:20] is the sub-list for method output_type
+	16, // [16:18] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_loci_poi_poi_proto_init() }
@@ -1602,23 +1841,25 @@ func file_loci_poi_poi_proto_init() {
 		return
 	}
 	file_loci_poi_poi_proto_msgTypes[0].OneofWrappers = []any{}
-	file_loci_poi_poi_proto_msgTypes[3].OneofWrappers = []any{}
+	file_loci_poi_poi_proto_msgTypes[1].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[4].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[5].OneofWrappers = []any{}
 	file_loci_poi_poi_proto_msgTypes[6].OneofWrappers = []any{}
-	file_loci_poi_poi_proto_msgTypes[10].OneofWrappers = []any{}
+	file_loci_poi_poi_proto_msgTypes[7].OneofWrappers = []any{}
+	file_loci_poi_poi_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_poi_poi_proto_rawDesc), len(file_loci_poi_poi_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   12,
+			NumEnums:      2,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_loci_poi_poi_proto_goTypes,
 		DependencyIndexes: file_loci_poi_poi_proto_depIdxs,
+		EnumInfos:         file_loci_poi_poi_proto_enumTypes,
 		MessageInfos:      file_loci_poi_poi_proto_msgTypes,
 	}.Build()
 	File_loci_poi_poi_proto = out.File
