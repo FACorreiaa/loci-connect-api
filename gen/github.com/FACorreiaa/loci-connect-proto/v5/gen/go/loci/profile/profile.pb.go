@@ -188,6 +188,129 @@ func (TransportPreference) EnumDescriptor() ([]byte, []int) {
 	return file_loci_profile_profile_proto_rawDescGZIP(), []int{2}
 }
 
+// MobilityLevel is how the traveller gets around on foot. It describes a
+// functional need, not a diagnosis.
+type MobilityLevel int32
+
+const (
+	MobilityLevel_MOBILITY_LEVEL_UNSPECIFIED MobilityLevel = 0
+	// No mobility constraint.
+	MobilityLevel_MOBILITY_LEVEL_NONE MobilityLevel = 1
+	// Walks unaided, but only short distances or slowly.
+	MobilityLevel_MOBILITY_LEVEL_LIMITED_WALKING MobilityLevel = 2
+	// Walks with a cane, crutches, or a walker/rollator.
+	MobilityLevel_MOBILITY_LEVEL_WALKING_AID       MobilityLevel = 3
+	MobilityLevel_MOBILITY_LEVEL_MANUAL_WHEELCHAIR MobilityLevel = 4
+	MobilityLevel_MOBILITY_LEVEL_POWER_WHEELCHAIR  MobilityLevel = 5
+	MobilityLevel_MOBILITY_LEVEL_MOBILITY_SCOOTER  MobilityLevel = 6
+)
+
+// Enum value maps for MobilityLevel.
+var (
+	MobilityLevel_name = map[int32]string{
+		0: "MOBILITY_LEVEL_UNSPECIFIED",
+		1: "MOBILITY_LEVEL_NONE",
+		2: "MOBILITY_LEVEL_LIMITED_WALKING",
+		3: "MOBILITY_LEVEL_WALKING_AID",
+		4: "MOBILITY_LEVEL_MANUAL_WHEELCHAIR",
+		5: "MOBILITY_LEVEL_POWER_WHEELCHAIR",
+		6: "MOBILITY_LEVEL_MOBILITY_SCOOTER",
+	}
+	MobilityLevel_value = map[string]int32{
+		"MOBILITY_LEVEL_UNSPECIFIED":       0,
+		"MOBILITY_LEVEL_NONE":              1,
+		"MOBILITY_LEVEL_LIMITED_WALKING":   2,
+		"MOBILITY_LEVEL_WALKING_AID":       3,
+		"MOBILITY_LEVEL_MANUAL_WHEELCHAIR": 4,
+		"MOBILITY_LEVEL_POWER_WHEELCHAIR":  5,
+		"MOBILITY_LEVEL_MOBILITY_SCOOTER":  6,
+	}
+)
+
+func (x MobilityLevel) Enum() *MobilityLevel {
+	p := new(MobilityLevel)
+	*p = x
+	return p
+}
+
+func (x MobilityLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MobilityLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_profile_profile_proto_enumTypes[3].Descriptor()
+}
+
+func (MobilityLevel) Type() protoreflect.EnumType {
+	return &file_loci_profile_profile_proto_enumTypes[3]
+}
+
+func (x MobilityLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MobilityLevel.Descriptor instead.
+func (MobilityLevel) EnumDescriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{3}
+}
+
+// MaxIncline is the steepest slope the traveller can manage. The values map
+// onto OpenRouteService's wheelchair `maximum_incline` restriction.
+type MaxIncline int32
+
+const (
+	MaxIncline_MAX_INCLINE_UNSPECIFIED MaxIncline = 0
+	MaxIncline_MAX_INCLINE_ANY         MaxIncline = 1
+	MaxIncline_MAX_INCLINE_PCT_3       MaxIncline = 2
+	MaxIncline_MAX_INCLINE_PCT_6       MaxIncline = 3
+	MaxIncline_MAX_INCLINE_PCT_10      MaxIncline = 4
+)
+
+// Enum value maps for MaxIncline.
+var (
+	MaxIncline_name = map[int32]string{
+		0: "MAX_INCLINE_UNSPECIFIED",
+		1: "MAX_INCLINE_ANY",
+		2: "MAX_INCLINE_PCT_3",
+		3: "MAX_INCLINE_PCT_6",
+		4: "MAX_INCLINE_PCT_10",
+	}
+	MaxIncline_value = map[string]int32{
+		"MAX_INCLINE_UNSPECIFIED": 0,
+		"MAX_INCLINE_ANY":         1,
+		"MAX_INCLINE_PCT_3":       2,
+		"MAX_INCLINE_PCT_6":       3,
+		"MAX_INCLINE_PCT_10":      4,
+	}
+)
+
+func (x MaxIncline) Enum() *MaxIncline {
+	p := new(MaxIncline)
+	*p = x
+	return p
+}
+
+func (x MaxIncline) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MaxIncline) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_profile_profile_proto_enumTypes[4].Descriptor()
+}
+
+func (MaxIncline) Type() protoreflect.EnumType {
+	return &file_loci_profile_profile_proto_enumTypes[4]
+}
+
+func (x MaxIncline) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MaxIncline.Descriptor instead.
+func (MaxIncline) EnumDescriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{4}
+}
+
 // AccommodationPreferences represents accommodation-specific filters
 type AccommodationPreferences struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -800,6 +923,229 @@ func (x *ItineraryPreferences) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// AccessibilityNeeds are the traveller's self-described access needs, which
+// Loci uses to shape itineraries, walking legs and answers.
+//
+// This is special-category (health) data under GDPR Article 9. The server
+// stores it only after explicit consent (see `accessibility_consent_given` on
+// the create/update requests), never logs it, and drops it entirely on
+// `clear_accessibility_needs`.
+type AccessibilityNeeds struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Mobility MobilityLevel          `protobuf:"varint,1,opt,name=mobility,proto3,enum=loci.profile.MobilityLevel" json:"mobility,omitempty"`
+	// Longest walk/roll between two stops, in minutes. 0 means no limit.
+	MaxWalkMinutesPerLeg int32 `protobuf:"varint,2,opt,name=max_walk_minutes_per_leg,json=maxWalkMinutesPerLeg,proto3" json:"max_walk_minutes_per_leg,omitempty"`
+	// Total walking/rolling across a day, in minutes. 0 means no limit.
+	MaxWalkMinutesPerDay int32 `protobuf:"varint,3,opt,name=max_walk_minutes_per_day,json=maxWalkMinutesPerDay,proto3" json:"max_walk_minutes_per_day,omitempty"`
+	// Avoid any stairs or steps, on routes and at entrances.
+	StepFreeOnly bool       `protobuf:"varint,4,opt,name=step_free_only,json=stepFreeOnly,proto3" json:"step_free_only,omitempty"`
+	MaxIncline   MaxIncline `protobuf:"varint,5,opt,name=max_incline,json=maxIncline,proto3,enum=loci.profile.MaxIncline" json:"max_incline,omitempty"`
+	// Wants a seated rest at least this often, in minutes. 0 means no rule.
+	RestEveryMinutes      int32 `protobuf:"varint,6,opt,name=rest_every_minutes,json=restEveryMinutes,proto3" json:"rest_every_minutes,omitempty"`
+	NeedsSeatingAtStops   bool  `protobuf:"varint,7,opt,name=needs_seating_at_stops,json=needsSeatingAtStops,proto3" json:"needs_seating_at_stops,omitempty"`
+	NeedsAccessibleToilet bool  `protobuf:"varint,8,opt,name=needs_accessible_toilet,json=needsAccessibleToilet,proto3" json:"needs_accessible_toilet,omitempty"`
+	// Avoid cobblestones and rough surfaces.
+	AvoidCobbles        bool `protobuf:"varint,9,opt,name=avoid_cobbles,json=avoidCobbles,proto3" json:"avoid_cobbles,omitempty"`
+	LowVision           bool `protobuf:"varint,10,opt,name=low_vision,json=lowVision,proto3" json:"low_vision,omitempty"`
+	Blind               bool `protobuf:"varint,11,opt,name=blind,proto3" json:"blind,omitempty"`
+	DeafOrHardOfHearing bool `protobuf:"varint,12,opt,name=deaf_or_hard_of_hearing,json=deafOrHardOfHearing,proto3" json:"deaf_or_hard_of_hearing,omitempty"`
+	// Noise, crowds or bright light are hard to cope with.
+	SensorySensitive bool `protobuf:"varint,13,opt,name=sensory_sensitive,json=sensorySensitive,proto3" json:"sensory_sensitive,omitempty"`
+	// Prefers quiet hours and off-peak visits.
+	PrefersQuietTimes bool `protobuf:"varint,14,opt,name=prefers_quiet_times,json=prefersQuietTimes,proto3" json:"prefers_quiet_times,omitempty"`
+	// Benefits from a predictable, detailed plan with fewer surprises.
+	NeedsPredictablePlan bool `protobuf:"varint,15,opt,name=needs_predictable_plan,json=needsPredictablePlan,proto3" json:"needs_predictable_plan,omitempty"`
+	// Tires quickly or lives with chronic pain; plan shorter, slower days.
+	FatigueOrChronicPain    bool `protobuf:"varint,16,opt,name=fatigue_or_chronic_pain,json=fatigueOrChronicPain,proto3" json:"fatigue_or_chronic_pain,omitempty"`
+	ServiceAnimal           bool `protobuf:"varint,17,opt,name=service_animal,json=serviceAnimal,proto3" json:"service_animal,omitempty"`
+	Stroller                bool `protobuf:"varint,18,opt,name=stroller,proto3" json:"stroller,omitempty"`
+	TravellingWithCompanion bool `protobuf:"varint,19,opt,name=travelling_with_companion,json=travellingWithCompanion,proto3" json:"travelling_with_companion,omitempty"`
+	// Anything else, in the traveller's own words.
+	Notes string `protobuf:"bytes,20,opt,name=notes,proto3" json:"notes,omitempty"`
+	// When the traveller consented to Loci storing these needs. Set by the
+	// server; ignored on requests.
+	ConsentAt     *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=consent_at,json=consentAt,proto3,oneof" json:"consent_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccessibilityNeeds) Reset() {
+	*x = AccessibilityNeeds{}
+	mi := &file_loci_profile_profile_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccessibilityNeeds) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccessibilityNeeds) ProtoMessage() {}
+
+func (x *AccessibilityNeeds) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_profile_profile_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccessibilityNeeds.ProtoReflect.Descriptor instead.
+func (*AccessibilityNeeds) Descriptor() ([]byte, []int) {
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AccessibilityNeeds) GetMobility() MobilityLevel {
+	if x != nil {
+		return x.Mobility
+	}
+	return MobilityLevel_MOBILITY_LEVEL_UNSPECIFIED
+}
+
+func (x *AccessibilityNeeds) GetMaxWalkMinutesPerLeg() int32 {
+	if x != nil {
+		return x.MaxWalkMinutesPerLeg
+	}
+	return 0
+}
+
+func (x *AccessibilityNeeds) GetMaxWalkMinutesPerDay() int32 {
+	if x != nil {
+		return x.MaxWalkMinutesPerDay
+	}
+	return 0
+}
+
+func (x *AccessibilityNeeds) GetStepFreeOnly() bool {
+	if x != nil {
+		return x.StepFreeOnly
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetMaxIncline() MaxIncline {
+	if x != nil {
+		return x.MaxIncline
+	}
+	return MaxIncline_MAX_INCLINE_UNSPECIFIED
+}
+
+func (x *AccessibilityNeeds) GetRestEveryMinutes() int32 {
+	if x != nil {
+		return x.RestEveryMinutes
+	}
+	return 0
+}
+
+func (x *AccessibilityNeeds) GetNeedsSeatingAtStops() bool {
+	if x != nil {
+		return x.NeedsSeatingAtStops
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetNeedsAccessibleToilet() bool {
+	if x != nil {
+		return x.NeedsAccessibleToilet
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetAvoidCobbles() bool {
+	if x != nil {
+		return x.AvoidCobbles
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetLowVision() bool {
+	if x != nil {
+		return x.LowVision
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetBlind() bool {
+	if x != nil {
+		return x.Blind
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetDeafOrHardOfHearing() bool {
+	if x != nil {
+		return x.DeafOrHardOfHearing
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetSensorySensitive() bool {
+	if x != nil {
+		return x.SensorySensitive
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetPrefersQuietTimes() bool {
+	if x != nil {
+		return x.PrefersQuietTimes
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetNeedsPredictablePlan() bool {
+	if x != nil {
+		return x.NeedsPredictablePlan
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetFatigueOrChronicPain() bool {
+	if x != nil {
+		return x.FatigueOrChronicPain
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetServiceAnimal() bool {
+	if x != nil {
+		return x.ServiceAnimal
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetStroller() bool {
+	if x != nil {
+		return x.Stroller
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetTravellingWithCompanion() bool {
+	if x != nil {
+		return x.TravellingWithCompanion
+	}
+	return false
+}
+
+func (x *AccessibilityNeeds) GetNotes() string {
+	if x != nil {
+		return x.Notes
+	}
+	return ""
+}
+
+func (x *AccessibilityNeeds) GetConsentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ConsentAt
+	}
+	return nil
+}
+
 // UserPreferenceProfile represents a user's preference profile
 type UserPreferenceProfile struct {
 	state                    protoimpl.MessageState    `protogen:"open.v1"`
@@ -827,13 +1173,15 @@ type UserPreferenceProfile struct {
 	ItineraryPreferences     *ItineraryPreferences     `protobuf:"bytes,22,opt,name=itinerary_preferences,json=itineraryPreferences,proto3,oneof" json:"itinerary_preferences,omitempty"`
 	CreatedAt                *timestamppb.Timestamp    `protobuf:"bytes,23,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt                *timestamppb.Timestamp    `protobuf:"bytes,24,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Absent until the traveller has set needs and consented to storing them.
+	AccessibilityNeeds *AccessibilityNeeds `protobuf:"bytes,25,opt,name=accessibility_needs,json=accessibilityNeeds,proto3,oneof" json:"accessibility_needs,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *UserPreferenceProfile) Reset() {
 	*x = UserPreferenceProfile{}
-	mi := &file_loci_profile_profile_proto_msgTypes[4]
+	mi := &file_loci_profile_profile_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -845,7 +1193,7 @@ func (x *UserPreferenceProfile) String() string {
 func (*UserPreferenceProfile) ProtoMessage() {}
 
 func (x *UserPreferenceProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[4]
+	mi := &file_loci_profile_profile_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -858,7 +1206,7 @@ func (x *UserPreferenceProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserPreferenceProfile.ProtoReflect.Descriptor instead.
 func (*UserPreferenceProfile) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{4}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UserPreferenceProfile) GetId() string {
@@ -1029,6 +1377,13 @@ func (x *UserPreferenceProfile) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *UserPreferenceProfile) GetAccessibilityNeeds() *AccessibilityNeeds {
+	if x != nil {
+		return x.AccessibilityNeeds
+	}
+	return nil
+}
+
 // CreateUserPreferenceProfileRequest for creating a preference profile
 type CreateUserPreferenceProfileRequest struct {
 	state                    protoimpl.MessageState    `protogen:"open.v1"`
@@ -1050,13 +1405,18 @@ type CreateUserPreferenceProfileRequest struct {
 	DiningPreferences        *DiningPreferences        `protobuf:"bytes,16,opt,name=dining_preferences,json=diningPreferences,proto3,oneof" json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences      `protobuf:"bytes,17,opt,name=activity_preferences,json=activityPreferences,proto3,oneof" json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences     `protobuf:"bytes,18,opt,name=itinerary_preferences,json=itineraryPreferences,proto3,oneof" json:"itinerary_preferences,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Requires accessibility_consent_given = true; rejected otherwise.
+	AccessibilityNeeds *AccessibilityNeeds `protobuf:"bytes,19,opt,name=accessibility_needs,json=accessibilityNeeds,proto3,oneof" json:"accessibility_needs,omitempty"`
+	// The traveller explicitly agreed to Loci storing their accessibility
+	// needs. Must be a separate, unticked-by-default choice in the client.
+	AccessibilityConsentGiven *bool `protobuf:"varint,20,opt,name=accessibility_consent_given,json=accessibilityConsentGiven,proto3,oneof" json:"accessibility_consent_given,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *CreateUserPreferenceProfileRequest) Reset() {
 	*x = CreateUserPreferenceProfileRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[5]
+	mi := &file_loci_profile_profile_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1428,7 @@ func (x *CreateUserPreferenceProfileRequest) String() string {
 func (*CreateUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *CreateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[5]
+	mi := &file_loci_profile_profile_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1441,7 @@ func (x *CreateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CreateUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{5}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateUserPreferenceProfileRequest) GetProfileName() string {
@@ -1210,6 +1570,20 @@ func (x *CreateUserPreferenceProfileRequest) GetItineraryPreferences() *Itinerar
 	return nil
 }
 
+func (x *CreateUserPreferenceProfileRequest) GetAccessibilityNeeds() *AccessibilityNeeds {
+	if x != nil {
+		return x.AccessibilityNeeds
+	}
+	return nil
+}
+
+func (x *CreateUserPreferenceProfileRequest) GetAccessibilityConsentGiven() bool {
+	if x != nil && x.AccessibilityConsentGiven != nil {
+		return *x.AccessibilityConsentGiven
+	}
+	return false
+}
+
 // UpdateUserPreferenceProfileRequest for updating a preference profile
 type UpdateUserPreferenceProfileRequest struct {
 	state                    protoimpl.MessageState    `protogen:"open.v1"`
@@ -1232,13 +1606,20 @@ type UpdateUserPreferenceProfileRequest struct {
 	DiningPreferences        *DiningPreferences        `protobuf:"bytes,17,opt,name=dining_preferences,json=diningPreferences,proto3,oneof" json:"dining_preferences,omitempty"`
 	ActivityPreferences      *ActivityPreferences      `protobuf:"bytes,18,opt,name=activity_preferences,json=activityPreferences,proto3,oneof" json:"activity_preferences,omitempty"`
 	ItineraryPreferences     *ItineraryPreferences     `protobuf:"bytes,19,opt,name=itinerary_preferences,json=itineraryPreferences,proto3,oneof" json:"itinerary_preferences,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Replaces the stored needs wholesale. Requires accessibility_consent_given
+	// = true unless the profile already holds consent.
+	AccessibilityNeeds *AccessibilityNeeds `protobuf:"bytes,20,opt,name=accessibility_needs,json=accessibilityNeeds,proto3,oneof" json:"accessibility_needs,omitempty"`
+	// Deletes the stored needs and the consent record. Wins over
+	// accessibility_needs when both are sent.
+	ClearAccessibilityNeeds   *bool `protobuf:"varint,21,opt,name=clear_accessibility_needs,json=clearAccessibilityNeeds,proto3,oneof" json:"clear_accessibility_needs,omitempty"`
+	AccessibilityConsentGiven *bool `protobuf:"varint,22,opt,name=accessibility_consent_given,json=accessibilityConsentGiven,proto3,oneof" json:"accessibility_consent_given,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *UpdateUserPreferenceProfileRequest) Reset() {
 	*x = UpdateUserPreferenceProfileRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[6]
+	mi := &file_loci_profile_profile_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1250,7 +1631,7 @@ func (x *UpdateUserPreferenceProfileRequest) String() string {
 func (*UpdateUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *UpdateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[6]
+	mi := &file_loci_profile_profile_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1263,7 +1644,7 @@ func (x *UpdateUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use UpdateUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{6}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateUserPreferenceProfileRequest) GetProfileId() string {
@@ -1399,6 +1780,27 @@ func (x *UpdateUserPreferenceProfileRequest) GetItineraryPreferences() *Itinerar
 	return nil
 }
 
+func (x *UpdateUserPreferenceProfileRequest) GetAccessibilityNeeds() *AccessibilityNeeds {
+	if x != nil {
+		return x.AccessibilityNeeds
+	}
+	return nil
+}
+
+func (x *UpdateUserPreferenceProfileRequest) GetClearAccessibilityNeeds() bool {
+	if x != nil && x.ClearAccessibilityNeeds != nil {
+		return *x.ClearAccessibilityNeeds
+	}
+	return false
+}
+
+func (x *UpdateUserPreferenceProfileRequest) GetAccessibilityConsentGiven() bool {
+	if x != nil && x.AccessibilityConsentGiven != nil {
+		return *x.AccessibilityConsentGiven
+	}
+	return false
+}
+
 // GetUserPreferenceProfilesRequest for retrieving user preference profiles
 type GetUserPreferenceProfilesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1409,7 +1811,7 @@ type GetUserPreferenceProfilesRequest struct {
 
 func (x *GetUserPreferenceProfilesRequest) Reset() {
 	*x = GetUserPreferenceProfilesRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[7]
+	mi := &file_loci_profile_profile_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1421,7 +1823,7 @@ func (x *GetUserPreferenceProfilesRequest) String() string {
 func (*GetUserPreferenceProfilesRequest) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[7]
+	mi := &file_loci_profile_profile_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1434,7 +1836,7 @@ func (x *GetUserPreferenceProfilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserPreferenceProfilesRequest.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfilesRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{7}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetUserPreferenceProfilesRequest) GetUserId() string {
@@ -1454,7 +1856,7 @@ type GetUserPreferenceProfilesResponse struct {
 
 func (x *GetUserPreferenceProfilesResponse) Reset() {
 	*x = GetUserPreferenceProfilesResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[8]
+	mi := &file_loci_profile_profile_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1466,7 +1868,7 @@ func (x *GetUserPreferenceProfilesResponse) String() string {
 func (*GetUserPreferenceProfilesResponse) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[8]
+	mi := &file_loci_profile_profile_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1479,7 +1881,7 @@ func (x *GetUserPreferenceProfilesResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetUserPreferenceProfilesResponse.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfilesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{8}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *GetUserPreferenceProfilesResponse) GetProfiles() []*UserPreferenceProfile {
@@ -1499,7 +1901,7 @@ type GetUserPreferenceProfileRequest struct {
 
 func (x *GetUserPreferenceProfileRequest) Reset() {
 	*x = GetUserPreferenceProfileRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[9]
+	mi := &file_loci_profile_profile_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1511,7 +1913,7 @@ func (x *GetUserPreferenceProfileRequest) String() string {
 func (*GetUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[9]
+	mi := &file_loci_profile_profile_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1524,7 +1926,7 @@ func (x *GetUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{9}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *GetUserPreferenceProfileRequest) GetProfileId() string {
@@ -1543,7 +1945,7 @@ type GetUserPreferenceProfileResponse struct {
 
 func (x *GetUserPreferenceProfileResponse) Reset() {
 	*x = GetUserPreferenceProfileResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[10]
+	mi := &file_loci_profile_profile_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1555,7 +1957,7 @@ func (x *GetUserPreferenceProfileResponse) String() string {
 func (*GetUserPreferenceProfileResponse) ProtoMessage() {}
 
 func (x *GetUserPreferenceProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[10]
+	mi := &file_loci_profile_profile_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1568,7 +1970,7 @@ func (x *GetUserPreferenceProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserPreferenceProfileResponse.ProtoReflect.Descriptor instead.
 func (*GetUserPreferenceProfileResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{10}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetUserPreferenceProfileResponse) GetProfile() *UserPreferenceProfile {
@@ -1588,7 +1990,7 @@ type DeleteUserPreferenceProfileRequest struct {
 
 func (x *DeleteUserPreferenceProfileRequest) Reset() {
 	*x = DeleteUserPreferenceProfileRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[11]
+	mi := &file_loci_profile_profile_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1600,7 +2002,7 @@ func (x *DeleteUserPreferenceProfileRequest) String() string {
 func (*DeleteUserPreferenceProfileRequest) ProtoMessage() {}
 
 func (x *DeleteUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[11]
+	mi := &file_loci_profile_profile_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1613,7 +2015,7 @@ func (x *DeleteUserPreferenceProfileRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use DeleteUserPreferenceProfileRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserPreferenceProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{11}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeleteUserPreferenceProfileRequest) GetProfileId() string {
@@ -1633,7 +2035,7 @@ type SetDefaultProfileRequest struct {
 
 func (x *SetDefaultProfileRequest) Reset() {
 	*x = SetDefaultProfileRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[12]
+	mi := &file_loci_profile_profile_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1645,7 +2047,7 @@ func (x *SetDefaultProfileRequest) String() string {
 func (*SetDefaultProfileRequest) ProtoMessage() {}
 
 func (x *SetDefaultProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[12]
+	mi := &file_loci_profile_profile_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1658,7 +2060,7 @@ func (x *SetDefaultProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetDefaultProfileRequest.ProtoReflect.Descriptor instead.
 func (*SetDefaultProfileRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{12}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SetDefaultProfileRequest) GetProfileId() string {
@@ -1678,7 +2080,7 @@ type GetDomainPreferencesRequest struct {
 
 func (x *GetDomainPreferencesRequest) Reset() {
 	*x = GetDomainPreferencesRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[13]
+	mi := &file_loci_profile_profile_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1690,7 +2092,7 @@ func (x *GetDomainPreferencesRequest) String() string {
 func (*GetDomainPreferencesRequest) ProtoMessage() {}
 
 func (x *GetDomainPreferencesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[13]
+	mi := &file_loci_profile_profile_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1703,7 +2105,7 @@ func (x *GetDomainPreferencesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDomainPreferencesRequest.ProtoReflect.Descriptor instead.
 func (*GetDomainPreferencesRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{13}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetDomainPreferencesRequest) GetProfileId() string {
@@ -1724,7 +2126,7 @@ type AccommodationPreferencesResponse struct {
 
 func (x *AccommodationPreferencesResponse) Reset() {
 	*x = AccommodationPreferencesResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[14]
+	mi := &file_loci_profile_profile_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1736,7 +2138,7 @@ func (x *AccommodationPreferencesResponse) String() string {
 func (*AccommodationPreferencesResponse) ProtoMessage() {}
 
 func (x *AccommodationPreferencesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[14]
+	mi := &file_loci_profile_profile_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1749,7 +2151,7 @@ func (x *AccommodationPreferencesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccommodationPreferencesResponse.ProtoReflect.Descriptor instead.
 func (*AccommodationPreferencesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{14}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AccommodationPreferencesResponse) GetSuccess() bool {
@@ -1784,7 +2186,7 @@ type DiningPreferencesResponse struct {
 
 func (x *DiningPreferencesResponse) Reset() {
 	*x = DiningPreferencesResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[15]
+	mi := &file_loci_profile_profile_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1796,7 +2198,7 @@ func (x *DiningPreferencesResponse) String() string {
 func (*DiningPreferencesResponse) ProtoMessage() {}
 
 func (x *DiningPreferencesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[15]
+	mi := &file_loci_profile_profile_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1809,7 +2211,7 @@ func (x *DiningPreferencesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiningPreferencesResponse.ProtoReflect.Descriptor instead.
 func (*DiningPreferencesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{15}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *DiningPreferencesResponse) GetSuccess() bool {
@@ -1844,7 +2246,7 @@ type ActivityPreferencesResponse struct {
 
 func (x *ActivityPreferencesResponse) Reset() {
 	*x = ActivityPreferencesResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[16]
+	mi := &file_loci_profile_profile_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1856,7 +2258,7 @@ func (x *ActivityPreferencesResponse) String() string {
 func (*ActivityPreferencesResponse) ProtoMessage() {}
 
 func (x *ActivityPreferencesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[16]
+	mi := &file_loci_profile_profile_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1869,7 +2271,7 @@ func (x *ActivityPreferencesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityPreferencesResponse.ProtoReflect.Descriptor instead.
 func (*ActivityPreferencesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{16}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ActivityPreferencesResponse) GetSuccess() bool {
@@ -1904,7 +2306,7 @@ type ItineraryPreferencesResponse struct {
 
 func (x *ItineraryPreferencesResponse) Reset() {
 	*x = ItineraryPreferencesResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[17]
+	mi := &file_loci_profile_profile_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1916,7 +2318,7 @@ func (x *ItineraryPreferencesResponse) String() string {
 func (*ItineraryPreferencesResponse) ProtoMessage() {}
 
 func (x *ItineraryPreferencesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[17]
+	mi := &file_loci_profile_profile_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1929,7 +2331,7 @@ func (x *ItineraryPreferencesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ItineraryPreferencesResponse.ProtoReflect.Descriptor instead.
 func (*ItineraryPreferencesResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{17}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ItineraryPreferencesResponse) GetSuccess() bool {
@@ -1964,7 +2366,7 @@ type GetCombinedFiltersRequest struct {
 
 func (x *GetCombinedFiltersRequest) Reset() {
 	*x = GetCombinedFiltersRequest{}
-	mi := &file_loci_profile_profile_proto_msgTypes[18]
+	mi := &file_loci_profile_profile_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1976,7 +2378,7 @@ func (x *GetCombinedFiltersRequest) String() string {
 func (*GetCombinedFiltersRequest) ProtoMessage() {}
 
 func (x *GetCombinedFiltersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[18]
+	mi := &file_loci_profile_profile_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1989,7 +2391,7 @@ func (x *GetCombinedFiltersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCombinedFiltersRequest.ProtoReflect.Descriptor instead.
 func (*GetCombinedFiltersRequest) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{18}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetCombinedFiltersRequest) GetProfileId() string {
@@ -2021,7 +2423,7 @@ type CombinedFiltersResponse struct {
 
 func (x *CombinedFiltersResponse) Reset() {
 	*x = CombinedFiltersResponse{}
-	mi := &file_loci_profile_profile_proto_msgTypes[19]
+	mi := &file_loci_profile_profile_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2033,7 +2435,7 @@ func (x *CombinedFiltersResponse) String() string {
 func (*CombinedFiltersResponse) ProtoMessage() {}
 
 func (x *CombinedFiltersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_profile_profile_proto_msgTypes[19]
+	mi := &file_loci_profile_profile_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2046,7 +2448,7 @@ func (x *CombinedFiltersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CombinedFiltersResponse.ProtoReflect.Descriptor instead.
 func (*CombinedFiltersResponse) Descriptor() ([]byte, []int) {
-	return file_loci_profile_profile_proto_rawDescGZIP(), []int{19}
+	return file_loci_profile_profile_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CombinedFiltersResponse) GetSuccess() bool {
@@ -2216,7 +2618,36 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x13_morning_vs_eveningB\x15\n" +
 	"\x13_weekend_vs_weekdayB\x1a\n" +
 	"\x18_adventure_vs_relaxationB\x19\n" +
-	"\x17_spontaneous_vs_planned\"\xfa\f\n" +
+	"\x17_spontaneous_vs_planned\"\xb8\b\n" +
+	"\x12AccessibilityNeeds\x12A\n" +
+	"\bmobility\x18\x01 \x01(\x0e2\x1b.loci.profile.MobilityLevelB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmobility\x12A\n" +
+	"\x18max_walk_minutes_per_leg\x18\x02 \x01(\x05B\t\xbaH\x06\x1a\x04\x18x(\x00R\x14maxWalkMinutesPerLeg\x12B\n" +
+	"\x18max_walk_minutes_per_day\x18\x03 \x01(\x05B\n" +
+	"\xbaH\a\x1a\x05\x18\xd8\x04(\x00R\x14maxWalkMinutesPerDay\x12$\n" +
+	"\x0estep_free_only\x18\x04 \x01(\bR\fstepFreeOnly\x12C\n" +
+	"\vmax_incline\x18\x05 \x01(\x0e2\x18.loci.profile.MaxInclineB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
+	"maxIncline\x128\n" +
+	"\x12rest_every_minutes\x18\x06 \x01(\x05B\n" +
+	"\xbaH\a\x1a\x05\x18\xf0\x01(\x00R\x10restEveryMinutes\x123\n" +
+	"\x16needs_seating_at_stops\x18\a \x01(\bR\x13needsSeatingAtStops\x126\n" +
+	"\x17needs_accessible_toilet\x18\b \x01(\bR\x15needsAccessibleToilet\x12#\n" +
+	"\ravoid_cobbles\x18\t \x01(\bR\favoidCobbles\x12\x1d\n" +
+	"\n" +
+	"low_vision\x18\n" +
+	" \x01(\bR\tlowVision\x12\x14\n" +
+	"\x05blind\x18\v \x01(\bR\x05blind\x124\n" +
+	"\x17deaf_or_hard_of_hearing\x18\f \x01(\bR\x13deafOrHardOfHearing\x12+\n" +
+	"\x11sensory_sensitive\x18\r \x01(\bR\x10sensorySensitive\x12.\n" +
+	"\x13prefers_quiet_times\x18\x0e \x01(\bR\x11prefersQuietTimes\x124\n" +
+	"\x16needs_predictable_plan\x18\x0f \x01(\bR\x14needsPredictablePlan\x125\n" +
+	"\x17fatigue_or_chronic_pain\x18\x10 \x01(\bR\x14fatigueOrChronicPain\x12%\n" +
+	"\x0eservice_animal\x18\x11 \x01(\bR\rserviceAnimal\x12\x1a\n" +
+	"\bstroller\x18\x12 \x01(\bR\bstroller\x12:\n" +
+	"\x19travelling_with_companion\x18\x13 \x01(\bR\x17travellingWithCompanion\x12\x1e\n" +
+	"\x05notes\x18\x14 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03R\x05notes\x12>\n" +
+	"\n" +
+	"consent_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampH\x00R\tconsentAt\x88\x01\x01B\r\n" +
+	"\v_consent_at\"\xea\r\n" +
 	"\x15UserPreferenceProfile\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\"\n" +
 	"\auser_id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x06userId\x12-\n" +
@@ -2249,13 +2680,15 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x17 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tcreatedAt\x12A\n" +
 	"\n" +
-	"updated_at\x18\x18 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAtB\x10\n" +
+	"updated_at\x18\x18 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tupdatedAt\x12V\n" +
+	"\x13accessibility_needs\x18\x19 \x01(\v2 .loci.profile.AccessibilityNeedsH\x06R\x12accessibilityNeeds\x88\x01\x01B\x10\n" +
 	"\x0e_user_latitudeB\x11\n" +
 	"\x0f_user_longitudeB\x1c\n" +
 	"\x1a_accommodation_preferencesB\x15\n" +
 	"\x13_dining_preferencesB\x17\n" +
 	"\x15_activity_preferencesB\x18\n" +
-	"\x16_itinerary_preferences\"\x8d\f\n" +
+	"\x16_itinerary_preferencesB\x16\n" +
+	"\x14_accessibility_needs\"\xe2\r\n" +
 	"\"CreateUserPreferenceProfileRequest\x12-\n" +
 	"\fprofile_name\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xc8\x01R\vprofileName\x12\"\n" +
@@ -2283,7 +2716,9 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x12dining_preferences\x18\x10 \x01(\v2\x1f.loci.profile.DiningPreferencesH\n" +
 	"R\x11diningPreferences\x88\x01\x01\x12Y\n" +
 	"\x14activity_preferences\x18\x11 \x01(\v2!.loci.profile.ActivityPreferencesH\vR\x13activityPreferences\x88\x01\x01\x12\\\n" +
-	"\x15itinerary_preferences\x18\x12 \x01(\v2\".loci.profile.ItineraryPreferencesH\fR\x14itineraryPreferences\x88\x01\x01B\r\n" +
+	"\x15itinerary_preferences\x18\x12 \x01(\v2\".loci.profile.ItineraryPreferencesH\fR\x14itineraryPreferences\x88\x01\x01\x12V\n" +
+	"\x13accessibility_needs\x18\x13 \x01(\v2 .loci.profile.AccessibilityNeedsH\rR\x12accessibilityNeeds\x88\x01\x01\x12C\n" +
+	"\x1baccessibility_consent_given\x18\x14 \x01(\bH\x0eR\x19accessibilityConsentGiven\x88\x01\x01B\r\n" +
 	"\v_is_defaultB\x13\n" +
 	"\x11_search_radius_kmB\x11\n" +
 	"\x0f_preferred_timeB\x0f\n" +
@@ -2296,7 +2731,9 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x1a_accommodation_preferencesB\x15\n" +
 	"\x13_dining_preferencesB\x17\n" +
 	"\x15_activity_preferencesB\x18\n" +
-	"\x16_itinerary_preferences\"\xcd\f\n" +
+	"\x16_itinerary_preferencesB\x16\n" +
+	"\x14_accessibility_needsB\x1e\n" +
+	"\x1c_accessibility_consent_given\"\x81\x0f\n" +
 	"\"UpdateUserPreferenceProfileRequest\x12(\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\tprofileId\x122\n" +
@@ -2326,7 +2763,10 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"R\x18accommodationPreferences\x88\x01\x01\x12S\n" +
 	"\x12dining_preferences\x18\x11 \x01(\v2\x1f.loci.profile.DiningPreferencesH\vR\x11diningPreferences\x88\x01\x01\x12Y\n" +
 	"\x14activity_preferences\x18\x12 \x01(\v2!.loci.profile.ActivityPreferencesH\fR\x13activityPreferences\x88\x01\x01\x12\\\n" +
-	"\x15itinerary_preferences\x18\x13 \x01(\v2\".loci.profile.ItineraryPreferencesH\rR\x14itineraryPreferences\x88\x01\x01B\x0f\n" +
+	"\x15itinerary_preferences\x18\x13 \x01(\v2\".loci.profile.ItineraryPreferencesH\rR\x14itineraryPreferences\x88\x01\x01\x12V\n" +
+	"\x13accessibility_needs\x18\x14 \x01(\v2 .loci.profile.AccessibilityNeedsH\x0eR\x12accessibilityNeeds\x88\x01\x01\x12?\n" +
+	"\x19clear_accessibility_needs\x18\x15 \x01(\bH\x0fR\x17clearAccessibilityNeeds\x88\x01\x01\x12C\n" +
+	"\x1baccessibility_consent_given\x18\x16 \x01(\bH\x10R\x19accessibilityConsentGiven\x88\x01\x01B\x0f\n" +
 	"\r_profile_nameB\r\n" +
 	"\v_is_defaultB\x13\n" +
 	"\x11_search_radius_kmB\x11\n" +
@@ -2340,7 +2780,10 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x1a_accommodation_preferencesB\x15\n" +
 	"\x13_dining_preferencesB\x17\n" +
 	"\x15_activity_preferencesB\x18\n" +
-	"\x16_itinerary_preferences\"W\n" +
+	"\x16_itinerary_preferencesB\x16\n" +
+	"\x14_accessibility_needsB\x1c\n" +
+	"\x1a_clear_accessibility_needsB\x1e\n" +
+	"\x1c_accessibility_consent_given\"W\n" +
 	" GetUserPreferenceProfilesRequest\x12'\n" +
 	"\auser_id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dH\x00R\x06userId\x88\x01\x01B\n" +
 	"\n" +
@@ -2412,7 +2855,22 @@ const file_loci_profile_profile_proto_rawDesc = "" +
 	"\x18TRANSPORT_PREFERENCE_ANY\x10\x01\x12\x1d\n" +
 	"\x19TRANSPORT_PREFERENCE_WALK\x10\x02\x12\x1f\n" +
 	"\x1bTRANSPORT_PREFERENCE_PUBLIC\x10\x03\x12\x1c\n" +
-	"\x18TRANSPORT_PREFERENCE_CAR\x10\x042\xc3\t\n" +
+	"\x18TRANSPORT_PREFERENCE_CAR\x10\x04*\xfc\x01\n" +
+	"\rMobilityLevel\x12\x1e\n" +
+	"\x1aMOBILITY_LEVEL_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13MOBILITY_LEVEL_NONE\x10\x01\x12\"\n" +
+	"\x1eMOBILITY_LEVEL_LIMITED_WALKING\x10\x02\x12\x1e\n" +
+	"\x1aMOBILITY_LEVEL_WALKING_AID\x10\x03\x12$\n" +
+	" MOBILITY_LEVEL_MANUAL_WHEELCHAIR\x10\x04\x12#\n" +
+	"\x1fMOBILITY_LEVEL_POWER_WHEELCHAIR\x10\x05\x12#\n" +
+	"\x1fMOBILITY_LEVEL_MOBILITY_SCOOTER\x10\x06*\x84\x01\n" +
+	"\n" +
+	"MaxIncline\x12\x1b\n" +
+	"\x17MAX_INCLINE_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fMAX_INCLINE_ANY\x10\x01\x12\x15\n" +
+	"\x11MAX_INCLINE_PCT_3\x10\x02\x12\x15\n" +
+	"\x11MAX_INCLINE_PCT_6\x10\x03\x12\x16\n" +
+	"\x12MAX_INCLINE_PCT_10\x10\x042\xc3\t\n" +
 	"\x0eProfileService\x12|\n" +
 	"\x19GetUserPreferenceProfiles\x12..loci.profile.GetUserPreferenceProfilesRequest\x1a/.loci.profile.GetUserPreferenceProfilesResponse\x12y\n" +
 	"\x18GetUserPreferenceProfile\x12-.loci.profile.GetUserPreferenceProfileRequest\x1a..loci.profile.GetUserPreferenceProfileResponse\x12f\n" +
@@ -2438,113 +2896,122 @@ func file_loci_profile_profile_proto_rawDescGZIP() []byte {
 	return file_loci_profile_profile_proto_rawDescData
 }
 
-var file_loci_profile_profile_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_loci_profile_profile_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_loci_profile_profile_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_loci_profile_profile_proto_goTypes = []any{
 	(DayPreference)(0),                         // 0: loci.profile.DayPreference
 	(SearchPace)(0),                            // 1: loci.profile.SearchPace
 	(TransportPreference)(0),                   // 2: loci.profile.TransportPreference
-	(*AccommodationPreferences)(nil),           // 3: loci.profile.AccommodationPreferences
-	(*DiningPreferences)(nil),                  // 4: loci.profile.DiningPreferences
-	(*ActivityPreferences)(nil),                // 5: loci.profile.ActivityPreferences
-	(*ItineraryPreferences)(nil),               // 6: loci.profile.ItineraryPreferences
-	(*UserPreferenceProfile)(nil),              // 7: loci.profile.UserPreferenceProfile
-	(*CreateUserPreferenceProfileRequest)(nil), // 8: loci.profile.CreateUserPreferenceProfileRequest
-	(*UpdateUserPreferenceProfileRequest)(nil), // 9: loci.profile.UpdateUserPreferenceProfileRequest
-	(*GetUserPreferenceProfilesRequest)(nil),   // 10: loci.profile.GetUserPreferenceProfilesRequest
-	(*GetUserPreferenceProfilesResponse)(nil),  // 11: loci.profile.GetUserPreferenceProfilesResponse
-	(*GetUserPreferenceProfileRequest)(nil),    // 12: loci.profile.GetUserPreferenceProfileRequest
-	(*GetUserPreferenceProfileResponse)(nil),   // 13: loci.profile.GetUserPreferenceProfileResponse
-	(*DeleteUserPreferenceProfileRequest)(nil), // 14: loci.profile.DeleteUserPreferenceProfileRequest
-	(*SetDefaultProfileRequest)(nil),           // 15: loci.profile.SetDefaultProfileRequest
-	(*GetDomainPreferencesRequest)(nil),        // 16: loci.profile.GetDomainPreferencesRequest
-	(*AccommodationPreferencesResponse)(nil),   // 17: loci.profile.AccommodationPreferencesResponse
-	(*DiningPreferencesResponse)(nil),          // 18: loci.profile.DiningPreferencesResponse
-	(*ActivityPreferencesResponse)(nil),        // 19: loci.profile.ActivityPreferencesResponse
-	(*ItineraryPreferencesResponse)(nil),       // 20: loci.profile.ItineraryPreferencesResponse
-	(*GetCombinedFiltersRequest)(nil),          // 21: loci.profile.GetCombinedFiltersRequest
-	(*CombinedFiltersResponse)(nil),            // 22: loci.profile.CombinedFiltersResponse
-	(*common.RangeFilter)(nil),                 // 23: loci.common.RangeFilter
-	(*timestamppb.Timestamp)(nil),              // 24: google.protobuf.Timestamp
-	(*interest.Interest)(nil),                  // 25: loci.interest.Interest
-	(*interest.Tags)(nil),                      // 26: loci.interest.Tags
-	(*common.Response)(nil),                    // 27: loci.common.Response
+	(MobilityLevel)(0),                         // 3: loci.profile.MobilityLevel
+	(MaxIncline)(0),                            // 4: loci.profile.MaxIncline
+	(*AccommodationPreferences)(nil),           // 5: loci.profile.AccommodationPreferences
+	(*DiningPreferences)(nil),                  // 6: loci.profile.DiningPreferences
+	(*ActivityPreferences)(nil),                // 7: loci.profile.ActivityPreferences
+	(*ItineraryPreferences)(nil),               // 8: loci.profile.ItineraryPreferences
+	(*AccessibilityNeeds)(nil),                 // 9: loci.profile.AccessibilityNeeds
+	(*UserPreferenceProfile)(nil),              // 10: loci.profile.UserPreferenceProfile
+	(*CreateUserPreferenceProfileRequest)(nil), // 11: loci.profile.CreateUserPreferenceProfileRequest
+	(*UpdateUserPreferenceProfileRequest)(nil), // 12: loci.profile.UpdateUserPreferenceProfileRequest
+	(*GetUserPreferenceProfilesRequest)(nil),   // 13: loci.profile.GetUserPreferenceProfilesRequest
+	(*GetUserPreferenceProfilesResponse)(nil),  // 14: loci.profile.GetUserPreferenceProfilesResponse
+	(*GetUserPreferenceProfileRequest)(nil),    // 15: loci.profile.GetUserPreferenceProfileRequest
+	(*GetUserPreferenceProfileResponse)(nil),   // 16: loci.profile.GetUserPreferenceProfileResponse
+	(*DeleteUserPreferenceProfileRequest)(nil), // 17: loci.profile.DeleteUserPreferenceProfileRequest
+	(*SetDefaultProfileRequest)(nil),           // 18: loci.profile.SetDefaultProfileRequest
+	(*GetDomainPreferencesRequest)(nil),        // 19: loci.profile.GetDomainPreferencesRequest
+	(*AccommodationPreferencesResponse)(nil),   // 20: loci.profile.AccommodationPreferencesResponse
+	(*DiningPreferencesResponse)(nil),          // 21: loci.profile.DiningPreferencesResponse
+	(*ActivityPreferencesResponse)(nil),        // 22: loci.profile.ActivityPreferencesResponse
+	(*ItineraryPreferencesResponse)(nil),       // 23: loci.profile.ItineraryPreferencesResponse
+	(*GetCombinedFiltersRequest)(nil),          // 24: loci.profile.GetCombinedFiltersRequest
+	(*CombinedFiltersResponse)(nil),            // 25: loci.profile.CombinedFiltersResponse
+	(*common.RangeFilter)(nil),                 // 26: loci.common.RangeFilter
+	(*timestamppb.Timestamp)(nil),              // 27: google.protobuf.Timestamp
+	(*interest.Interest)(nil),                  // 28: loci.interest.Interest
+	(*interest.Tags)(nil),                      // 29: loci.interest.Tags
+	(*common.Response)(nil),                    // 30: loci.common.Response
 }
 var file_loci_profile_profile_proto_depIdxs = []int32{
-	23, // 0: loci.profile.AccommodationPreferences.star_rating:type_name -> loci.common.RangeFilter
-	23, // 1: loci.profile.AccommodationPreferences.price_range_per_night:type_name -> loci.common.RangeFilter
-	24, // 2: loci.profile.AccommodationPreferences.created_at:type_name -> google.protobuf.Timestamp
-	24, // 3: loci.profile.AccommodationPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	23, // 4: loci.profile.DiningPreferences.price_range_per_person:type_name -> loci.common.RangeFilter
-	24, // 5: loci.profile.DiningPreferences.created_at:type_name -> google.protobuf.Timestamp
-	24, // 6: loci.profile.DiningPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	24, // 7: loci.profile.ActivityPreferences.created_at:type_name -> google.protobuf.Timestamp
-	24, // 8: loci.profile.ActivityPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	24, // 9: loci.profile.ItineraryPreferences.created_at:type_name -> google.protobuf.Timestamp
-	24, // 10: loci.profile.ItineraryPreferences.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 11: loci.profile.UserPreferenceProfile.preferred_time:type_name -> loci.profile.DayPreference
-	1,  // 12: loci.profile.UserPreferenceProfile.preferred_pace:type_name -> loci.profile.SearchPace
-	2,  // 13: loci.profile.UserPreferenceProfile.preferred_transport:type_name -> loci.profile.TransportPreference
-	25, // 14: loci.profile.UserPreferenceProfile.interests:type_name -> loci.interest.Interest
-	26, // 15: loci.profile.UserPreferenceProfile.tags:type_name -> loci.interest.Tags
-	3,  // 16: loci.profile.UserPreferenceProfile.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
-	4,  // 17: loci.profile.UserPreferenceProfile.dining_preferences:type_name -> loci.profile.DiningPreferences
-	5,  // 18: loci.profile.UserPreferenceProfile.activity_preferences:type_name -> loci.profile.ActivityPreferences
-	6,  // 19: loci.profile.UserPreferenceProfile.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
-	24, // 20: loci.profile.UserPreferenceProfile.created_at:type_name -> google.protobuf.Timestamp
-	24, // 21: loci.profile.UserPreferenceProfile.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 22: loci.profile.CreateUserPreferenceProfileRequest.preferred_time:type_name -> loci.profile.DayPreference
-	1,  // 23: loci.profile.CreateUserPreferenceProfileRequest.preferred_pace:type_name -> loci.profile.SearchPace
-	2,  // 24: loci.profile.CreateUserPreferenceProfileRequest.preferred_transport:type_name -> loci.profile.TransportPreference
-	3,  // 25: loci.profile.CreateUserPreferenceProfileRequest.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
-	4,  // 26: loci.profile.CreateUserPreferenceProfileRequest.dining_preferences:type_name -> loci.profile.DiningPreferences
-	5,  // 27: loci.profile.CreateUserPreferenceProfileRequest.activity_preferences:type_name -> loci.profile.ActivityPreferences
-	6,  // 28: loci.profile.CreateUserPreferenceProfileRequest.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
-	0,  // 29: loci.profile.UpdateUserPreferenceProfileRequest.preferred_time:type_name -> loci.profile.DayPreference
-	1,  // 30: loci.profile.UpdateUserPreferenceProfileRequest.preferred_pace:type_name -> loci.profile.SearchPace
-	2,  // 31: loci.profile.UpdateUserPreferenceProfileRequest.preferred_transport:type_name -> loci.profile.TransportPreference
-	3,  // 32: loci.profile.UpdateUserPreferenceProfileRequest.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
-	4,  // 33: loci.profile.UpdateUserPreferenceProfileRequest.dining_preferences:type_name -> loci.profile.DiningPreferences
-	5,  // 34: loci.profile.UpdateUserPreferenceProfileRequest.activity_preferences:type_name -> loci.profile.ActivityPreferences
-	6,  // 35: loci.profile.UpdateUserPreferenceProfileRequest.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
-	7,  // 36: loci.profile.GetUserPreferenceProfilesResponse.profiles:type_name -> loci.profile.UserPreferenceProfile
-	7,  // 37: loci.profile.GetUserPreferenceProfileResponse.profile:type_name -> loci.profile.UserPreferenceProfile
-	3,  // 38: loci.profile.AccommodationPreferencesResponse.preferences:type_name -> loci.profile.AccommodationPreferences
-	4,  // 39: loci.profile.DiningPreferencesResponse.preferences:type_name -> loci.profile.DiningPreferences
-	5,  // 40: loci.profile.ActivityPreferencesResponse.preferences:type_name -> loci.profile.ActivityPreferences
-	6,  // 41: loci.profile.ItineraryPreferencesResponse.preferences:type_name -> loci.profile.ItineraryPreferences
-	7,  // 42: loci.profile.CombinedFiltersResponse.profile:type_name -> loci.profile.UserPreferenceProfile
-	3,  // 43: loci.profile.CombinedFiltersResponse.accommodation:type_name -> loci.profile.AccommodationPreferences
-	4,  // 44: loci.profile.CombinedFiltersResponse.dining:type_name -> loci.profile.DiningPreferences
-	5,  // 45: loci.profile.CombinedFiltersResponse.activity:type_name -> loci.profile.ActivityPreferences
-	6,  // 46: loci.profile.CombinedFiltersResponse.itinerary:type_name -> loci.profile.ItineraryPreferences
-	10, // 47: loci.profile.ProfileService.GetUserPreferenceProfiles:input_type -> loci.profile.GetUserPreferenceProfilesRequest
-	12, // 48: loci.profile.ProfileService.GetUserPreferenceProfile:input_type -> loci.profile.GetUserPreferenceProfileRequest
-	8,  // 49: loci.profile.ProfileService.CreateUserPreferenceProfile:input_type -> loci.profile.CreateUserPreferenceProfileRequest
-	9,  // 50: loci.profile.ProfileService.UpdateUserPreferenceProfile:input_type -> loci.profile.UpdateUserPreferenceProfileRequest
-	14, // 51: loci.profile.ProfileService.DeleteUserPreferenceProfile:input_type -> loci.profile.DeleteUserPreferenceProfileRequest
-	15, // 52: loci.profile.ProfileService.SetDefaultProfile:input_type -> loci.profile.SetDefaultProfileRequest
-	16, // 53: loci.profile.ProfileService.GetAccommodationPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
-	16, // 54: loci.profile.ProfileService.GetDiningPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
-	16, // 55: loci.profile.ProfileService.GetActivityPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
-	16, // 56: loci.profile.ProfileService.GetItineraryPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
-	21, // 57: loci.profile.ProfileService.GetCombinedFilters:input_type -> loci.profile.GetCombinedFiltersRequest
-	11, // 58: loci.profile.ProfileService.GetUserPreferenceProfiles:output_type -> loci.profile.GetUserPreferenceProfilesResponse
-	13, // 59: loci.profile.ProfileService.GetUserPreferenceProfile:output_type -> loci.profile.GetUserPreferenceProfileResponse
-	27, // 60: loci.profile.ProfileService.CreateUserPreferenceProfile:output_type -> loci.common.Response
-	27, // 61: loci.profile.ProfileService.UpdateUserPreferenceProfile:output_type -> loci.common.Response
-	27, // 62: loci.profile.ProfileService.DeleteUserPreferenceProfile:output_type -> loci.common.Response
-	27, // 63: loci.profile.ProfileService.SetDefaultProfile:output_type -> loci.common.Response
-	17, // 64: loci.profile.ProfileService.GetAccommodationPreferences:output_type -> loci.profile.AccommodationPreferencesResponse
-	18, // 65: loci.profile.ProfileService.GetDiningPreferences:output_type -> loci.profile.DiningPreferencesResponse
-	19, // 66: loci.profile.ProfileService.GetActivityPreferences:output_type -> loci.profile.ActivityPreferencesResponse
-	20, // 67: loci.profile.ProfileService.GetItineraryPreferences:output_type -> loci.profile.ItineraryPreferencesResponse
-	22, // 68: loci.profile.ProfileService.GetCombinedFilters:output_type -> loci.profile.CombinedFiltersResponse
-	58, // [58:69] is the sub-list for method output_type
-	47, // [47:58] is the sub-list for method input_type
-	47, // [47:47] is the sub-list for extension type_name
-	47, // [47:47] is the sub-list for extension extendee
-	0,  // [0:47] is the sub-list for field type_name
+	26, // 0: loci.profile.AccommodationPreferences.star_rating:type_name -> loci.common.RangeFilter
+	26, // 1: loci.profile.AccommodationPreferences.price_range_per_night:type_name -> loci.common.RangeFilter
+	27, // 2: loci.profile.AccommodationPreferences.created_at:type_name -> google.protobuf.Timestamp
+	27, // 3: loci.profile.AccommodationPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	26, // 4: loci.profile.DiningPreferences.price_range_per_person:type_name -> loci.common.RangeFilter
+	27, // 5: loci.profile.DiningPreferences.created_at:type_name -> google.protobuf.Timestamp
+	27, // 6: loci.profile.DiningPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	27, // 7: loci.profile.ActivityPreferences.created_at:type_name -> google.protobuf.Timestamp
+	27, // 8: loci.profile.ActivityPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	27, // 9: loci.profile.ItineraryPreferences.created_at:type_name -> google.protobuf.Timestamp
+	27, // 10: loci.profile.ItineraryPreferences.updated_at:type_name -> google.protobuf.Timestamp
+	3,  // 11: loci.profile.AccessibilityNeeds.mobility:type_name -> loci.profile.MobilityLevel
+	4,  // 12: loci.profile.AccessibilityNeeds.max_incline:type_name -> loci.profile.MaxIncline
+	27, // 13: loci.profile.AccessibilityNeeds.consent_at:type_name -> google.protobuf.Timestamp
+	0,  // 14: loci.profile.UserPreferenceProfile.preferred_time:type_name -> loci.profile.DayPreference
+	1,  // 15: loci.profile.UserPreferenceProfile.preferred_pace:type_name -> loci.profile.SearchPace
+	2,  // 16: loci.profile.UserPreferenceProfile.preferred_transport:type_name -> loci.profile.TransportPreference
+	28, // 17: loci.profile.UserPreferenceProfile.interests:type_name -> loci.interest.Interest
+	29, // 18: loci.profile.UserPreferenceProfile.tags:type_name -> loci.interest.Tags
+	5,  // 19: loci.profile.UserPreferenceProfile.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
+	6,  // 20: loci.profile.UserPreferenceProfile.dining_preferences:type_name -> loci.profile.DiningPreferences
+	7,  // 21: loci.profile.UserPreferenceProfile.activity_preferences:type_name -> loci.profile.ActivityPreferences
+	8,  // 22: loci.profile.UserPreferenceProfile.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
+	27, // 23: loci.profile.UserPreferenceProfile.created_at:type_name -> google.protobuf.Timestamp
+	27, // 24: loci.profile.UserPreferenceProfile.updated_at:type_name -> google.protobuf.Timestamp
+	9,  // 25: loci.profile.UserPreferenceProfile.accessibility_needs:type_name -> loci.profile.AccessibilityNeeds
+	0,  // 26: loci.profile.CreateUserPreferenceProfileRequest.preferred_time:type_name -> loci.profile.DayPreference
+	1,  // 27: loci.profile.CreateUserPreferenceProfileRequest.preferred_pace:type_name -> loci.profile.SearchPace
+	2,  // 28: loci.profile.CreateUserPreferenceProfileRequest.preferred_transport:type_name -> loci.profile.TransportPreference
+	5,  // 29: loci.profile.CreateUserPreferenceProfileRequest.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
+	6,  // 30: loci.profile.CreateUserPreferenceProfileRequest.dining_preferences:type_name -> loci.profile.DiningPreferences
+	7,  // 31: loci.profile.CreateUserPreferenceProfileRequest.activity_preferences:type_name -> loci.profile.ActivityPreferences
+	8,  // 32: loci.profile.CreateUserPreferenceProfileRequest.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
+	9,  // 33: loci.profile.CreateUserPreferenceProfileRequest.accessibility_needs:type_name -> loci.profile.AccessibilityNeeds
+	0,  // 34: loci.profile.UpdateUserPreferenceProfileRequest.preferred_time:type_name -> loci.profile.DayPreference
+	1,  // 35: loci.profile.UpdateUserPreferenceProfileRequest.preferred_pace:type_name -> loci.profile.SearchPace
+	2,  // 36: loci.profile.UpdateUserPreferenceProfileRequest.preferred_transport:type_name -> loci.profile.TransportPreference
+	5,  // 37: loci.profile.UpdateUserPreferenceProfileRequest.accommodation_preferences:type_name -> loci.profile.AccommodationPreferences
+	6,  // 38: loci.profile.UpdateUserPreferenceProfileRequest.dining_preferences:type_name -> loci.profile.DiningPreferences
+	7,  // 39: loci.profile.UpdateUserPreferenceProfileRequest.activity_preferences:type_name -> loci.profile.ActivityPreferences
+	8,  // 40: loci.profile.UpdateUserPreferenceProfileRequest.itinerary_preferences:type_name -> loci.profile.ItineraryPreferences
+	9,  // 41: loci.profile.UpdateUserPreferenceProfileRequest.accessibility_needs:type_name -> loci.profile.AccessibilityNeeds
+	10, // 42: loci.profile.GetUserPreferenceProfilesResponse.profiles:type_name -> loci.profile.UserPreferenceProfile
+	10, // 43: loci.profile.GetUserPreferenceProfileResponse.profile:type_name -> loci.profile.UserPreferenceProfile
+	5,  // 44: loci.profile.AccommodationPreferencesResponse.preferences:type_name -> loci.profile.AccommodationPreferences
+	6,  // 45: loci.profile.DiningPreferencesResponse.preferences:type_name -> loci.profile.DiningPreferences
+	7,  // 46: loci.profile.ActivityPreferencesResponse.preferences:type_name -> loci.profile.ActivityPreferences
+	8,  // 47: loci.profile.ItineraryPreferencesResponse.preferences:type_name -> loci.profile.ItineraryPreferences
+	10, // 48: loci.profile.CombinedFiltersResponse.profile:type_name -> loci.profile.UserPreferenceProfile
+	5,  // 49: loci.profile.CombinedFiltersResponse.accommodation:type_name -> loci.profile.AccommodationPreferences
+	6,  // 50: loci.profile.CombinedFiltersResponse.dining:type_name -> loci.profile.DiningPreferences
+	7,  // 51: loci.profile.CombinedFiltersResponse.activity:type_name -> loci.profile.ActivityPreferences
+	8,  // 52: loci.profile.CombinedFiltersResponse.itinerary:type_name -> loci.profile.ItineraryPreferences
+	13, // 53: loci.profile.ProfileService.GetUserPreferenceProfiles:input_type -> loci.profile.GetUserPreferenceProfilesRequest
+	15, // 54: loci.profile.ProfileService.GetUserPreferenceProfile:input_type -> loci.profile.GetUserPreferenceProfileRequest
+	11, // 55: loci.profile.ProfileService.CreateUserPreferenceProfile:input_type -> loci.profile.CreateUserPreferenceProfileRequest
+	12, // 56: loci.profile.ProfileService.UpdateUserPreferenceProfile:input_type -> loci.profile.UpdateUserPreferenceProfileRequest
+	17, // 57: loci.profile.ProfileService.DeleteUserPreferenceProfile:input_type -> loci.profile.DeleteUserPreferenceProfileRequest
+	18, // 58: loci.profile.ProfileService.SetDefaultProfile:input_type -> loci.profile.SetDefaultProfileRequest
+	19, // 59: loci.profile.ProfileService.GetAccommodationPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	19, // 60: loci.profile.ProfileService.GetDiningPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	19, // 61: loci.profile.ProfileService.GetActivityPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	19, // 62: loci.profile.ProfileService.GetItineraryPreferences:input_type -> loci.profile.GetDomainPreferencesRequest
+	24, // 63: loci.profile.ProfileService.GetCombinedFilters:input_type -> loci.profile.GetCombinedFiltersRequest
+	14, // 64: loci.profile.ProfileService.GetUserPreferenceProfiles:output_type -> loci.profile.GetUserPreferenceProfilesResponse
+	16, // 65: loci.profile.ProfileService.GetUserPreferenceProfile:output_type -> loci.profile.GetUserPreferenceProfileResponse
+	30, // 66: loci.profile.ProfileService.CreateUserPreferenceProfile:output_type -> loci.common.Response
+	30, // 67: loci.profile.ProfileService.UpdateUserPreferenceProfile:output_type -> loci.common.Response
+	30, // 68: loci.profile.ProfileService.DeleteUserPreferenceProfile:output_type -> loci.common.Response
+	30, // 69: loci.profile.ProfileService.SetDefaultProfile:output_type -> loci.common.Response
+	20, // 70: loci.profile.ProfileService.GetAccommodationPreferences:output_type -> loci.profile.AccommodationPreferencesResponse
+	21, // 71: loci.profile.ProfileService.GetDiningPreferences:output_type -> loci.profile.DiningPreferencesResponse
+	22, // 72: loci.profile.ProfileService.GetActivityPreferences:output_type -> loci.profile.ActivityPreferencesResponse
+	23, // 73: loci.profile.ProfileService.GetItineraryPreferences:output_type -> loci.profile.ItineraryPreferencesResponse
+	25, // 74: loci.profile.ProfileService.GetCombinedFilters:output_type -> loci.profile.CombinedFiltersResponse
+	64, // [64:75] is the sub-list for method output_type
+	53, // [53:64] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_loci_profile_profile_proto_init() }
@@ -2560,15 +3027,16 @@ func file_loci_profile_profile_proto_init() {
 	file_loci_profile_profile_proto_msgTypes[5].OneofWrappers = []any{}
 	file_loci_profile_profile_proto_msgTypes[6].OneofWrappers = []any{}
 	file_loci_profile_profile_proto_msgTypes[7].OneofWrappers = []any{}
-	file_loci_profile_profile_proto_msgTypes[18].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[8].OneofWrappers = []any{}
 	file_loci_profile_profile_proto_msgTypes[19].OneofWrappers = []any{}
+	file_loci_profile_profile_proto_msgTypes[20].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_profile_profile_proto_rawDesc), len(file_loci_profile_profile_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   20,
+			NumEnums:      5,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
