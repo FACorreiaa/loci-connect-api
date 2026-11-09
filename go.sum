@@ -32,8 +32,8 @@ github.com/FACorreiaa/go-genai-sdk/v2 v2.2.0 h1:NCSKqbT0Vf+JDiog0iJW1JstVFiLObqf
 github.com/FACorreiaa/go-genai-sdk/v2 v2.2.0/go.mod h1:oEubhErXzUj22nEmOT+vAYv5hvohG9lfXdIaxJc6Qkc=
 github.com/FACorreiaa/go-utils v1.2.0 h1:QDa6Zm7dyaYIOiDrDvYbptRWw1GnsyW2PL7bbHB0MpA=
 github.com/FACorreiaa/go-utils v1.2.0/go.mod h1:71jEB4wk4KeQpwYFL5SZ3a7snAFs1EJYsbnTnuFTiYw=
-github.com/FACorreiaa/loci-connect-proto/v5 v5.52.0 h1:pTtXlnxjmd/9Ma4v6ny+WfMqgWxo2z84Z+zKt11ur2Y=
-github.com/FACorreiaa/loci-connect-proto/v5 v5.52.0/go.mod h1:qQ80NNF1YEjjBw8EUn27J2UHL8viUDS+KEmACaRm+L4=
+github.com/FACorreiaa/loci-connect-proto/v5 v5.53.0 h1:Bi8VlzWsPyhn0HyWiB/7MSRlYaOKyy++eOnMZ9ynx+Q=
+github.com/FACorreiaa/loci-connect-proto/v5 v5.53.0/go.mod h1:c2z4sE/JLE7d5sfBJ9PIqWm8bAg3mGZECe2HJHvdQ80=
 github.com/Masterminds/squirrel v1.5.4 h1:uUcX/aBc8O7Fg9kaISIUsHXdKuqehiXAMQTYX8afzqM=
 github.com/Masterminds/squirrel v1.5.4/go.mod h1:NNaOrjSoIDfDA40n7sr2tPNZRfjzjA400rg+riTZj10=
 github.com/Microsoft/go-winio v0.6.3 h1:M/52tsoyTfwaxajLnXZm7PqkbMGRH8iSWP+8fcg9MQ4=

@@ -215,8 +215,12 @@ type POIDetailedInfo struct {
 	// when the request carried accessibility needs. Each note names its source,
 	// so clients can show how far to trust it.
 	AccessibilityNotes []*AccessibilityNote `protobuf:"bytes,37,rep,name=accessibility_notes,json=accessibilityNotes,proto3" json:"accessibility_notes,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// price_tier is the place's price band, 1 ($) to 4 ($$$$), read from
+	// price_level / price_range. Unset when unknown. Use it for filtering;
+	// the free-text fields stay for display and older clients.
+	PriceTier     *int32 `protobuf:"varint,38,opt,name=price_tier,json=priceTier,proto3,oneof" json:"price_tier,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *POIDetailedInfo) Reset() {
@@ -506,6 +510,13 @@ func (x *POIDetailedInfo) GetAccessibilityNotes() []*AccessibilityNote {
 		return x.AccessibilityNotes
 	}
 	return nil
+}
+
+func (x *POIDetailedInfo) GetPriceTier() int32 {
+	if x != nil && x.PriceTier != nil {
+		return *x.PriceTier
+	}
+	return 0
 }
 
 // AccessibilityNote is one access fact or caveat about a place or a leg.
@@ -1513,7 +1524,7 @@ var File_loci_poi_poi_proto protoreflect.FileDescriptor
 
 const file_loci_poi_poi_proto_rawDesc = "" +
 	"\n" +
-	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\xd8\x11\n" +
+	"\x12loci/poi/poi.proto\x12\bloci.poi\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18loci/common/common.proto\x1a#loci/place/place_intelligence.proto\x1a(loci/recommendation/recommendation.proto\"\x96\x12\n" +
 	"\x0fPOIDetailedInfo\x12\x19\n" +
 	"\x02id\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\x12\x1e\n" +
 	"\x04city\x18\x02 \x01(\tB\n" +
@@ -1571,7 +1582,9 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"tasteMatch\x88\x01\x01\x12A\n" +
 	"\rimage_credits\x18\" \x03(\v2\x12.loci.poi.POIImageB\b\xbaH\x05\x92\x01\x02\x10\x14R\fimageCredits\x12V\n" +
 	"\x13accessibility_notes\x18% \x03(\v2\x1b.loci.poi.AccessibilityNoteB\b\xbaH\x05\x92\x01\x02\x10\n" +
-	"R\x12accessibilityNotes\x1a?\n" +
+	"R\x12accessibilityNotes\x12-\n" +
+	"\n" +
+	"price_tier\x18& \x01(\x05B\t\xbaH\x06\x1a\x04\x18\x04(\x01H\x0eR\tpriceTier\x88\x01\x01\x1a?\n" +
 	"\x11OpeningHoursEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x12\n" +
@@ -1589,7 +1602,8 @@ const file_loci_poi_poi_proto_rawDesc = "" +
 	"\x0f_verified_factsB\v\n" +
 	"\t_groundedB\x06\n" +
 	"\x04_dayB\x0e\n" +
-	"\f_taste_match\"\xdd\x02\n" +
+	"\f_taste_matchB\r\n" +
+	"\v_price_tier\"\xdd\x02\n" +
 	"\x11AccessibilityNote\x12\x1e\n" +
 	"\x04text\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\xac\x02R\x04text\x12I\n" +
