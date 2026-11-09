@@ -42,6 +42,7 @@ import (
 	paymentv1connect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/payment/v1/paymentv1connect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/place/placeconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi/poiconnect"
+	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/pricing/v1/pricingv1connect"
 	profileconnect "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/profile/profileconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/ranking/rankingconnect"
 	"github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/recap/recapconnect"
@@ -563,6 +564,12 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 		cmpPath, cmpHandler := comparev1connect.NewCompareServiceHandler(deps.CompareHandler, opts)
 		mux.Handle(cmpPath, cmpHandler)
 		deps.Logger.Info("registered Connect RPC service", "path", cmpPath)
+	}
+
+	if deps.PricingHandler != nil {
+		pricingPath, pricingHandler := pricingv1connect.NewPricingServiceHandler(deps.PricingHandler, opts)
+		mux.Handle(pricingPath, pricingHandler)
+		deps.Logger.Info("registered Connect RPC service", "path", pricingPath)
 	}
 
 	if deps.POIHandler != nil {

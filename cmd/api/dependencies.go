@@ -13,6 +13,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/linkimport"
 	"github.com/FACorreiaa/loci-connect-api/pkg/accessibility"
+	"github.com/FACorreiaa/loci-connect-api/pkg/hotelrates"
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/FACorreiaa/loci-connect-api/pkg/routing"
@@ -61,6 +62,7 @@ import (
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	poihandler "github.com/FACorreiaa/loci-connect-api/internal/domain/poi/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/pricing"
 	profiles "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles"
 	profilehandler "github.com/FACorreiaa/loci-connect-api/internal/domain/profiles/handler"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/push"
@@ -246,6 +248,7 @@ type Dependencies struct {
 	AssistantHandler         *assistant.Handler
 	LocalContextHandler      *localcontext.Handler
 	CompareHandler           *compare.Handler
+	PricingHandler           *pricing.Handler
 	CityHandler              *cityhandler.CityHandler
 	TravelHistoryHandler     *travelhistory.Handler
 	// RecapHandler serves trip recaps; RecapImages draws their shared images.
@@ -1422,6 +1425,7 @@ func (d *Dependencies) initHandlers() error {
 		compareSvc = compareSvc.WithDiscovery(d.POISvc)
 	}
 	d.CompareHandler = compare.NewHandler(compareSvc)
+	d.PricingHandler = pricing.NewHandler(newHotelRates(d.AppCache, d.Logger), d.Logger)
 	d.Logger.Info("handlers initialized")
 	return nil
 }
@@ -1479,6 +1483,50 @@ func newPlaceAccessibility(cache cachestore.Store) accessibility.PlaceAccessibil
 	}
 	return accessibility.NewAccessibilityCloud(
 		os.Getenv("ACCESSIBILITY_CLOUD_BASE_URL"), token, localcontext.NewSignalsHTTPClient(), cache)
+}
+
+// newHotelRates builds the live hotel-rate provider, or nil when
+// LITEAPI_API_KEY is unset; every hotel then shows "no live price".
+//
+//	LITEAPI_API_KEY            LiteAPI key, sandbox or live (enables it)
+//	LITEAPI_BASE_URL           override the host (tests)
+//	LITEAPI_WHITELABEL_URL     booking site the "check availability" links open
+//	LITEAPI_MARGIN             markup in percent (default: the account's)
+//	LITEAPI_GUEST_NATIONALITY  ISO-2 code rates are quoted for (default US)
+//
+// Its own client: the rates call is slow (the provider fans out to
+// suppliers) and must not hold the signals client's per-host budget.
+func newHotelRates(cache cachestore.Store, logger *slog.Logger) hotelrates.Provider {
+	key := strings.TrimSpace(os.Getenv("LITEAPI_API_KEY"))
+	if key == "" {
+		return nil
+	}
+	var margin *float64
+	if raw := strings.TrimSpace(os.Getenv("LITEAPI_MARGIN")); raw != "" {
+		m, err := strconv.ParseFloat(raw, 64)
+		if err != nil || m < 0 || m > 50 {
+			logger.Warn("ignoring LITEAPI_MARGIN; want a percent between 0 and 50", slog.String("value", raw))
+		} else {
+			margin = &m
+		}
+	}
+	client := httpx.New(httpx.Config{
+		Timeout:       12 * time.Second,
+		MaxRetries:    1,
+		RatePerSecond: 5,
+		Burst:         10,
+		UserAgent:     "loci/1.0 (+https://lociai.fyi)",
+	}).WithObserver(func(source, outcome string, d time.Duration) {
+		observability.ExternalRequestsTotal.WithLabelValues(source, outcome).Inc()
+		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
+	})
+	return hotelrates.NewLiteAPI(hotelrates.LiteAPIConfig{
+		BaseURL:          os.Getenv("LITEAPI_BASE_URL"),
+		APIKey:           key,
+		WhitelabelURL:    os.Getenv("LITEAPI_WHITELABEL_URL"),
+		Margin:           margin,
+		GuestNationality: os.Getenv("LITEAPI_GUEST_NATIONALITY"),
+	}, client, cache)
 }
 
 // newPedestrianRouter builds the accessible walking router, or nil when

@@ -21,6 +21,16 @@ func GetJSON[T any](ctx context.Context, c *Client, source, url string) (T, erro
 	return decodeJSON[T](source, body)
 }
 
+// GetJSONWithHeader is GetJSON with extra request headers.
+func GetJSONWithHeader[T any](ctx context.Context, c *Client, source, url string, header http.Header) (T, error) {
+	body, err := c.GetWithHeader(ctx, source, url, header)
+	if err != nil {
+		var out T
+		return out, err
+	}
+	return decodeJSON[T](source, body)
+}
+
 // PostJSON sends in as a JSON body and decodes the response into T. The same
 // idempotency rule as Client.Post applies.
 func PostJSON[T any](ctx context.Context, c *Client, source, url string, in any, header http.Header) (T, error) {

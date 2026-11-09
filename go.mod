@@ -10,7 +10,7 @@ require (
 	connectrpc.com/validate v0.9.0
 	github.com/FACorreiaa/go-genai-sdk/v2 v2.2.0
 	github.com/FACorreiaa/go-utils v1.2.0
-	github.com/FACorreiaa/loci-connect-proto/v5 v5.52.0
+	github.com/FACorreiaa/loci-connect-proto/v5 v5.53.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/alicebob/miniredis/v2 v2.38.0

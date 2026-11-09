@@ -45,6 +45,10 @@ func ToPOIProto(poi *locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 		// UpdatedAt:      timestamppb.New(poi.UpdatedAt),
 	}
 
+	if tier := locitypes.PriceTier(poi.PriceLevel, poi.PriceRange); tier > 0 {
+		out.PriceTier = &tier
+	}
+
 	// Trust/transparency signals (Slice 3).
 	score, missing, rationale := locitypes.TrustSignals(*poi)
 	out.UncertaintyScore = &score

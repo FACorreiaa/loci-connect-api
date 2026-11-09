@@ -26,7 +26,7 @@ import (
 // written; serving it under a new template would replay text the new prompt
 // would never have produced. TestGenerationTemplateFingerprint pins the
 // rendered templates and fails until this constant moves.
-const generationTemplateVersion = "v3"
+const generationTemplateVersion = "v4"
 
 // generationLanguage is the language every template is written in today. It
 // sits in the key so that localised templates, when they exist, cannot serve
