@@ -188,10 +188,27 @@ type Repository interface {
 type repository struct {
 	db     *pgxpool.Pool
 	logger *slog.Logger
+	// links, when set, rebuilds a saved flight's links on every read, so a
+	// change to how links are built (an affiliate tag turned on, a new site)
+	// reaches flights saved before it. The stored links column is then only
+	// a fallback for readers without a provider.
+	links flights.Provider
 }
 
-func NewRepository(db *pgxpool.Pool, logger *slog.Logger) Repository {
-	return &repository{db: db, logger: logger.With(slog.String("component", "trip-repository"))}
+// RepositoryOption configures NewRepository.
+type RepositoryOption func(*repository)
+
+// WithFlightLinks makes reads rebuild saved flights' links with p.
+func WithFlightLinks(p flights.Provider) RepositoryOption {
+	return func(r *repository) { r.links = p }
+}
+
+func NewRepository(db *pgxpool.Pool, logger *slog.Logger, opts ...RepositoryOption) Repository {
+	r := &repository{db: db, logger: logger.With(slog.String("component", "trip-repository"))}
+	for _, o := range opts {
+		o(r)
+	}
+	return r
 }
 
 func (r *repository) GetTrip(ctx context.Context, id, userID uuid.UUID) (*Trip, error) {
@@ -947,7 +964,22 @@ func (r *repository) loadPlan(ctx context.Context, t *Trip) error {
 		}
 		t.Flights = append(t.Flights, f)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rebuildFlightLinks(t.Flights, r.links)
+	return nil
+}
+
+// rebuildFlightLinks replaces each flight's stored links with ones built now
+// from its query. A nil provider leaves them as stored.
+func rebuildFlightLinks(fs []TripFlight, p flights.Provider) {
+	if p == nil {
+		return
+	}
+	for i := range fs {
+		fs[i].Links = p.Links(FlightQuery(fs[i]))
+	}
 }
 
 // SessionTrips finds the trip a chat conversation produced, for a chat

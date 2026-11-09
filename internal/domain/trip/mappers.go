@@ -312,7 +312,7 @@ func flightToProto(f TripFlight) *tripv1.TripFlight {
 		Carrier: f.Carrier, FlightNo: f.FlightNo, PriceText: f.PriceText, Notes: f.Notes,
 	}
 	for _, l := range f.Links {
-		p.Links = append(p.Links, &tripv1.FlightLink{Provider: l.Provider, Label: l.Label, Url: l.URL})
+		p.Links = append(p.Links, flightLinkToProto(l))
 	}
 	return p
 }
@@ -524,3 +524,15 @@ func StopToProto(s TripStop) *tripv1.TripStop {
 func StopFromProto(ps *tripv1.TripStop) TripStop { return stopFromProto(ps) }
 
 func FlightToProto(f TripFlight) *tripv1.TripFlight { return flightToProto(f) }
+
+func flightLinkToProto(l flights.Link) *tripv1.FlightLink {
+	return &tripv1.FlightLink{Provider: l.Provider, Label: l.Label, Url: l.URL, Sponsored: l.Sponsored}
+}
+
+func placeOptionToProto(o flights.PlaceOption) *tripv1.FlightPlaceOption {
+	kind := tripv1.FlightPlaceKind_FLIGHT_PLACE_KIND_AIRPORT
+	if o.Kind == flights.KindMetro {
+		kind = tripv1.FlightPlaceKind_FLIGHT_PLACE_KIND_METRO
+	}
+	return &tripv1.FlightPlaceOption{Iata: o.IATA, Name: o.Name, City: o.City, CountryCode: o.CountryCode, Kind: kind}
+}

@@ -7,6 +7,7 @@ package flights
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -46,6 +47,8 @@ type Link struct {
 	Provider string `json:"provider"`
 	Label    string `json:"label"`
 	URL      string `json:"url"`
+	// Sponsored is true when URL carries an affiliate tag.
+	Sponsored bool `json:"sponsored,omitempty"`
 }
 
 // Provider turns a query into links.
@@ -60,16 +63,69 @@ var iataRE = regexp.MustCompile(`^[A-Z]{3}$`)
 // yields a search the traveller can correct on the site.
 func ValidIATA(s string) bool { return iataRE.MatchString(s) }
 
+// IATAResolver turns a bare place name into an airport or metro code, or
+// reports that it cannot do so without guessing.
+type IATAResolver interface {
+	ResolveName(name string) (string, bool)
+}
+
 // DeepLinks builds Google Flights links always, and Skyscanner links when both
 // ends carry a valid IATA code (Skyscanner's URL takes codes, not names).
-type DeepLinks struct{}
+//
+// Resolver, when set, fills a missing code for Skyscanner only: Google keeps
+// exactly the place it was given, so a wrong resolution can never break the
+// one link that works on names. SkyscannerTemplate, when set, wraps the
+// Skyscanner URL for an affiliate network ({url} is replaced by the encoded
+// URL). The zero value builds exactly what v1 did.
+type DeepLinks struct {
+	Resolver           IATAResolver
+	SkyscannerTemplate string
+}
 
-func (DeepLinks) Links(q Query) []Link {
+// NewDeepLinks builds DeepLinks, dropping a template that would produce a
+// broken link (no {url}, or not https) with a warning.
+func NewDeepLinks(r IATAResolver, skyscannerTemplate string, logger *slog.Logger) DeepLinks {
+	tpl := strings.TrimSpace(skyscannerTemplate)
+	if tpl != "" && !ValidTemplate(tpl) {
+		if logger != nil {
+			logger.Warn("ignoring FLIGHTS_LINK_TEMPLATE_SKYSCANNER; it needs https:// and {url}")
+		}
+		tpl = ""
+	}
+	return DeepLinks{Resolver: r, SkyscannerTemplate: tpl}
+}
+
+// ValidTemplate reports whether t can wrap a link: https, with a {url} slot.
+func ValidTemplate(t string) bool {
+	return strings.HasPrefix(t, "https://") && strings.Contains(t, "{url}")
+}
+
+func (d DeepLinks) Links(q Query) []Link {
 	links := []Link{googleFlights(q)}
-	if l, ok := skyscanner(q); ok {
+	if l, ok := skyscanner(d.fill(q)); ok {
+		if d.SkyscannerTemplate != "" {
+			l.URL = strings.ReplaceAll(d.SkyscannerTemplate, "{url}", url.QueryEscape(l.URL))
+			l.Sponsored = true
+		}
 		links = append(links, l)
 	}
 	return links
+}
+
+// fill adds codes the resolver is sure of to ends that have only a name.
+func (d DeepLinks) fill(q Query) Query {
+	if d.Resolver == nil {
+		return q
+	}
+	for _, p := range []*Place{&q.Origin, &q.Destination} {
+		if ValidIATA(p.IATA) || strings.TrimSpace(p.Name) == "" {
+			continue
+		}
+		if code, ok := d.Resolver.ResolveName(p.Name); ok && ValidIATA(code) {
+			p.IATA = code
+		}
+	}
+	return q
 }
 
 // googleFlights uses the natural-language q= form. The structured tfs=
@@ -120,7 +176,7 @@ func skyscanner(q Query) (Link, bool) {
 		return Link{}, false
 	}
 	u := fmt.Sprintf("https://www.skyscanner.net/transport/flights/%s/%s/%s/",
-		strings.ToLower(q.Origin.IATA), strings.ToLower(q.Destination.IATA), q.Depart.Format("060102"))
+		skyscannerCode(q.Origin.IATA), skyscannerCode(q.Destination.IATA), q.Depart.Format("060102"))
 	rtn := "0"
 	if q.Return != nil {
 		u += q.Return.Format("060102") + "/"

@@ -230,11 +230,16 @@ type Dependencies struct {
 	AICredentialsHandler *aicreds.Handler
 	// MessagingHandler and IntegrationsHandler are always built too, for the
 	// same reason: each answers "off" over a nil service.
-	MessagingHandler         *messaging.Handler
-	IntegrationsHandler      *integrations.Handler
-	ExportHandler            *export.Handler
-	ShareHandler             *share.Handler
-	TripHandler              *trip.Handler
+	MessagingHandler    *messaging.Handler
+	IntegrationsHandler *integrations.Handler
+	ExportHandler       *export.Handler
+	ShareHandler        *share.Handler
+	TripHandler         *trip.Handler
+	// flightAirports and flightLinks are shared by the trip repository (which
+	// rebuilds saved flights' links on read), the trip service and the
+	// airport RPCs, so every flight link is built one way.
+	flightAirports           *flights.Airports
+	flightLinks              flights.DeepLinks
 	TripService              *trip.Service
 	CalendarHandler          *calendar.Handler
 	BundleHandler            *bundle.Handler
@@ -377,7 +382,8 @@ func (d *Dependencies) initRepositories() error {
 	d.APIKeyRepo = apikey.NewRepository(d.DB.Pool)
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
-	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger)
+	d.flightAirports, d.flightLinks = newFlightLinks(d.Logger)
+	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger, trip.WithFlightLinks(d.flightLinks))
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
@@ -1146,8 +1152,8 @@ func (d *Dependencies) initHandlers() error {
 		d.FavoritesHandler = d.FavoritesHandler.WithScorer(d.gamification)
 		// Dates, stays and flights. The service is kept for the chat agent,
 		// which edits a trip's plan through the same rules as the editor.
-		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), flights.DeepLinks{})
-		d.TripHandler = d.TripHandler.WithPlan(d.TripService)
+		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), d.flightLinks)
+		d.TripHandler = d.TripHandler.WithPlan(d.TripService).WithAirports(d.flightAirports)
 		// Boards moderators are ADMIN_EMAILS plus the single ADMIN_EMAIL.
 		boardAdmins := append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)
 		boardsSvc := boardsdomain.NewService(boardsdomain.NewRepository(d.DB.Pool), boardAdmins, boardsdomain.DefaultLimits)
@@ -1483,6 +1489,24 @@ func newPlaceAccessibility(cache cachestore.Store) accessibility.PlaceAccessibil
 	}
 	return accessibility.NewAccessibilityCloud(
 		os.Getenv("ACCESSIBILITY_CLOUD_BASE_URL"), token, localcontext.NewSignalsHTTPClient(), cache)
+}
+
+// newFlightLinks loads the embedded airport dataset and builds the flight
+// link builder every flight surface shares.
+//
+//	FLIGHTS_LINK_TEMPLATE_SKYSCANNER  affiliate wrapper for Skyscanner links,
+//	                                  https and containing {url}; unset in
+//	                                  phase 1 (links stay plain)
+//
+// A dataset that fails to load leaves airport search empty and links on
+// names only (Google Flights), rather than failing boot.
+func newFlightLinks(logger *slog.Logger) (*flights.Airports, flights.DeepLinks) {
+	airports, err := flights.LoadAirports()
+	if err != nil {
+		logger.Error("airport dataset failed to load; flight search falls back to names", slog.Any("error", err))
+		return nil, flights.NewDeepLinks(nil, os.Getenv("FLIGHTS_LINK_TEMPLATE_SKYSCANNER"), logger)
+	}
+	return airports, flights.NewDeepLinks(airports, os.Getenv("FLIGHTS_LINK_TEMPLATE_SKYSCANNER"), logger)
 }
 
 // newHotelRates builds the live hotel-rate provider, or nil when
