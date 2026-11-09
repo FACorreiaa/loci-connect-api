@@ -104,8 +104,13 @@ func TestResolvePrefersLargestThenNearest(t *testing.T) {
 	if !ok || o.IATA != "BCN" {
 		t.Fatalf("Barcelona = %+v %v, want BCN", o, ok)
 	}
-	if o, ok := airports(t).Resolve("barcelona", "", nil, nil); !ok || o.IATA != "BCN" {
-		t.Fatalf("barcelona (no country) = %+v %v, want BCN", o, ok)
+	if o, ok := airports(t).Resolve("barcelona", "es", nil, nil); !ok || o.IATA != "BCN" {
+		t.Fatalf("barcelona ES = %+v %v, want BCN", o, ok)
+	}
+	// Barcelona VE (BLA) is large too: with neither country nor position
+	// there is no answer to give.
+	if o, ok := airports(t).Resolve("barcelona", "", nil, nil); ok {
+		t.Fatalf("barcelona alone resolved to %s", o.IATA)
 	}
 }
 
@@ -129,16 +134,17 @@ func TestResolveNameAmbiguous(t *testing.T) {
 }
 
 func TestPickAirportNearestAmongSameSize(t *testing.T) {
-	near := airport{PlaceOption: PlaceOption{IATA: "NEA", Lat: 41.0, Lon: 2.0}, size: 2}
-	far := airport{PlaceOption: PlaceOption{IATA: "FAR", Lat: 45.0, Lon: 9.0}, size: 2}
-	small := airport{PlaceOption: PlaceOption{IATA: "SML", Lat: 41.0, Lon: 2.0}, size: 1}
+	ap := func(code string, lat, lon float64, size int) candidate {
+		return candidate{airport{PlaceOption: PlaceOption{IATA: code, Lat: lat, Lon: lon}, size: size}, matchCity}
+	}
+	near, far, small := ap("NEA", 41.0, 2.0, 2), ap("FAR", 45.0, 9.0, 2), ap("SML", 41.0, 2.0, 1)
 	lat, lon := 41.01, 2.01
-	for _, order := range [][]airport{{near, far, small}, {far, near, small}, {small, far, near}} {
+	for _, order := range [][]candidate{{near, far, small}, {far, near, small}, {small, far, near}} {
 		if got := pickAirport(order, &lat, &lon); got.IATA != "NEA" {
 			t.Errorf("order %v: picked %s, want NEA", []string{order[0].IATA, order[1].IATA, order[2].IATA}, got.IATA)
 		}
 	}
-	if got := pickAirport([]airport{small, far}, nil, nil); got.IATA != "FAR" {
+	if got := pickAirport([]candidate{small, far}, nil, nil); got.IATA != "FAR" {
 		t.Errorf("no coords: picked %s, want the larger FAR", got.IATA)
 	}
 }

@@ -176,7 +176,7 @@ func skyscanner(q Query) (Link, bool) {
 		return Link{}, false
 	}
 	u := fmt.Sprintf("https://www.skyscanner.net/transport/flights/%s/%s/%s/",
-		strings.ToLower(q.Origin.IATA), strings.ToLower(q.Destination.IATA), q.Depart.Format("060102"))
+		skyscannerCode(q.Origin.IATA), skyscannerCode(q.Destination.IATA), q.Depart.Format("060102"))
 	rtn := "0"
 	if q.Return != nil {
 		u += q.Return.Format("060102") + "/"
