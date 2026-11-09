@@ -152,6 +152,12 @@ func (c *Client) Get(ctx context.Context, source, url string) ([]byte, error) {
 	return c.do(ctx, source, http.MethodGet, url, nil, nil)
 }
 
+// GetWithHeader is Get with extra request headers, for providers that take
+// their key in a header rather than the query string.
+func (c *Client) GetWithHeader(ctx context.Context, source, url string, header http.Header) ([]byte, error) {
+	return c.do(ctx, source, http.MethodGet, url, nil, header)
+}
+
 // Post issues a rate-limited POST of body with retries and returns the
 // response body. It is for idempotent calls only — a provider computing an
 // answer (a route, a lookup), never one creating something — because a retry

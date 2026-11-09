@@ -8,14 +8,10 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"unicode"
-
-	"golang.org/x/text/runes"
-	"golang.org/x/text/transform"
-	"golang.org/x/text/unicode/norm"
 
 	"github.com/FACorreiaa/loci-connect-api/pkg/cachestore"
 	"github.com/FACorreiaa/loci-connect-api/pkg/httpx"
+	"github.com/FACorreiaa/loci-connect-api/pkg/placematch"
 )
 
 const (
@@ -224,45 +220,11 @@ func featureName(raw json.RawMessage) string {
 	return ""
 }
 
-// nameSimilarity is the overlap of two names' word sets, ignoring case and
-// accents, with containment counted as a match ("Pastéis de Belém" vs
-// "Antiga Confeitaria de Belém - Pastéis de Belém").
-func nameSimilarity(a, b string) float64 {
-	ta, tb := tokens(a), tokens(b)
-	if len(ta) == 0 || len(tb) == 0 {
-		return 0
-	}
-	inter := 0
-	for t := range ta {
-		if tb[t] {
-			inter++
-		}
-	}
-	smaller := min(len(ta), len(tb))
-	if inter == smaller {
-		return 1
-	}
-	union := len(ta) + len(tb) - inter
-	return float64(inter) / float64(union)
-}
+// nameSimilarity is placematch.NameSimilarity; the indirection keeps this
+// file's call sites and tests unchanged.
+func nameSimilarity(a, b string) float64 { return placematch.NameSimilarity(a, b) }
 
-var stopWords = map[string]bool{"the": true, "de": true, "da": true, "do": true, "of": true, "la": true, "le": true, "el": true, "a": true, "o": true}
-
-var foldAccents = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-
-func tokens(s string) map[string]bool {
-	folded, _, err := transform.String(foldAccents, strings.ToLower(s))
-	if err != nil {
-		folded = strings.ToLower(s)
-	}
-	out := map[string]bool{}
-	for _, w := range strings.FieldsFunc(folded, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) }) {
-		if !stopWords[w] {
-			out[w] = true
-		}
-	}
-	return out
-}
+func tokens(s string) map[string]bool { return placematch.Tokens(s) }
 
 func cacheKey(lat, lon float64, name string) string {
 	return fmt.Sprintf("a11y:ac:v1:%.4f,%.4f:%s", lat, lon, strings.Join(sortedTokens(name), "-"))

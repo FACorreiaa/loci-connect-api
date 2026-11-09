@@ -545,7 +545,9 @@ func TestGenerationKeyIsStable(t *testing.T) {
 	// per cached answer, once, instead of a wrong-length plan served forever.
 	// Moved again when the query became canonical (canonicalRequestText): one
 	// miss per cached answer, once, and then equivalent wordings share it.
-	const want = "gen:1596902235df0d5976723eb145e79d646a5beda232247fa125825871fa5644f9"
+	// Moved again with generationTemplateVersion v4 (restaurant price_level
+	// band fixed): the version is the key's first component.
+	const want = "gen:3e5b3c37f99bf86e3ffc53ff1e552367f0c37b633bf18e34a49f4e248e0456f0"
 	if got := buildGenerationKey(in); got != want {
 		t.Errorf("generation key = %q, want %q", got, want)
 	}

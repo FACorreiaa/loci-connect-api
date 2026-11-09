@@ -547,7 +547,7 @@ Respond with JSON:
             "website": "",
             "phone_number": "",
             "opening_hours": "e.g., 'Mon-Fri 9:00-17:00'",
-            "price_level": "$|$|$$|$$",
+            "price_level": "$|$$|$$$|$$$$ (typical cost per person for this city)",
             "cuisine_type": "",
             "tags": [],
             "images": [],

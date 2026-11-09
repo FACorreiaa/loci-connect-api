@@ -223,14 +223,14 @@ func TestEachPartRendersOnlyItsOwnSection(t *testing.T) {
 // pinnedTemplateVersion is the generationTemplateVersion these fingerprints
 // were taken under. When a template changes, bump generationTemplateVersion
 // in generation_key.go, then set this and the hashes below to the new values.
-const pinnedTemplateVersion = "v3"
+const pinnedTemplateVersion = "v4"
 
 var pinnedTemplateFingerprints = map[generationPart]string{
 	partCityData:    "8584eec11a770e0268d1d25fb68b0d1e91fcefd20fe39fe2cb1673d8a63268c8",
 	partGeneralPOIs: "fd64c21a365a5b7c8ba0e420c126b61a44a083e0498e1da621bf03a7a87bd8f1",
 	partItinerary:   "3e12ee27ca39d270f7d636422ec98f44708392eabc14e740b42c2040238d62e7",
 	partHotels:      "8674f47c7d6334b224833f922def2cc7352c7a379d9192b56626c4abac523344",
-	partRestaurants: "da8ae369da2b7d7e045ec16552c85c26429ef4e474a227eb05588bf0336cc892",
+	partRestaurants: "3fe5ea8b59ffc9e4fc8aeacbc067622d51a48bdfd05d9b450165e08e120f279e",
 	partActivities:  "b44b4f30cb1bfabb94ebba67d1fea60f0204176543e519007ca0c4be4ac61244",
 	partGastronomy:  "baa201539d834052c4579acc83ed5cd058615f074e30c86923083f824e1b8c64",
 }

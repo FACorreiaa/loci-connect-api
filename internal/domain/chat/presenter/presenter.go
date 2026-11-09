@@ -115,6 +115,9 @@ func ToPOIDetailedInfo(poi locitypes.POIDetailedInfo) *poiv1.POIDetailedInfo {
 	// tell "Loci checked and this is unverified" from "this response predates
 	// grounding". An omitted field means the latter.
 	resp.Grounded = proto.Bool(poi.Grounded)
+	if tier := locitypes.PriceTier(poi.PriceLevel, poi.PriceRange); tier > 0 {
+		resp.PriceTier = proto.Int32(tier)
+	}
 	if poi.Latitude != 0 {
 		resp.Latitude = proto.Float64(poi.Latitude)
 	}
