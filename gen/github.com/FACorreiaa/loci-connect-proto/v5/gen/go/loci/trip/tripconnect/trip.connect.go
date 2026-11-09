@@ -90,6 +90,12 @@ const (
 	// TripServiceBuildFlightLinksProcedure is the fully-qualified name of the TripService's
 	// BuildFlightLinks RPC.
 	TripServiceBuildFlightLinksProcedure = "/loci.trip.TripService/BuildFlightLinks"
+	// TripServiceSearchAirportsProcedure is the fully-qualified name of the TripService's
+	// SearchAirports RPC.
+	TripServiceSearchAirportsProcedure = "/loci.trip.TripService/SearchAirports"
+	// TripServiceResolveFlightDestinationProcedure is the fully-qualified name of the TripService's
+	// ResolveFlightDestination RPC.
+	TripServiceResolveFlightDestinationProcedure = "/loci.trip.TripService/ResolveFlightDestination"
 	// TripServiceExportTripProcedure is the fully-qualified name of the TripService's ExportTrip RPC.
 	TripServiceExportTripProcedure = "/loci.trip.TripService/ExportTrip"
 	// TripServiceSuggestPackingProcedure is the fully-qualified name of the TripService's
@@ -174,6 +180,8 @@ var (
 	tripServiceAddFlightMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("AddFlight")
 	tripServiceRemoveFlightMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("RemoveFlight")
 	tripServiceBuildFlightLinksMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("BuildFlightLinks")
+	tripServiceSearchAirportsMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("SearchAirports")
+	tripServiceResolveFlightDestinationMethodDescriptor = tripServiceServiceDescriptor.Methods().ByName("ResolveFlightDestination")
 	tripServiceExportTripMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("ExportTrip")
 	tripServiceSuggestPackingMethodDescriptor           = tripServiceServiceDescriptor.Methods().ByName("SuggestPacking")
 	tripServiceGetTripChecklistMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("GetTripChecklist")
@@ -241,6 +249,10 @@ type TripServiceClient interface {
 	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
+	// SearchAirports is the flight form's airport autocomplete.
+	SearchAirports(context.Context, *connect.Request[trip.SearchAirportsRequest]) (*connect.Response[trip.SearchAirportsResponse], error)
+	// ResolveFlightDestination picks the airport (or metro code) for a city.
+	ResolveFlightDestination(context.Context, *connect.Request[trip.ResolveFlightDestinationRequest]) (*connect.Response[trip.ResolveFlightDestinationResponse], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
@@ -439,6 +451,18 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceBuildFlightLinksMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		searchAirports: connect.NewClient[trip.SearchAirportsRequest, trip.SearchAirportsResponse](
+			httpClient,
+			baseURL+TripServiceSearchAirportsProcedure,
+			connect.WithSchema(tripServiceSearchAirportsMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		resolveFlightDestination: connect.NewClient[trip.ResolveFlightDestinationRequest, trip.ResolveFlightDestinationResponse](
+			httpClient,
+			baseURL+TripServiceResolveFlightDestinationProcedure,
+			connect.WithSchema(tripServiceResolveFlightDestinationMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		exportTrip: connect.NewClient[trip.ExportTripRequest, trip.ExportTripResponse](
 			httpClient,
 			baseURL+TripServiceExportTripProcedure,
@@ -581,6 +605,8 @@ type tripServiceClient struct {
 	addFlight                *connect.Client[trip.AddFlightRequest, trip.TripDraft]
 	removeFlight             *connect.Client[trip.RemoveFlightRequest, trip.TripDraft]
 	buildFlightLinks         *connect.Client[trip.BuildFlightLinksRequest, trip.BuildFlightLinksResponse]
+	searchAirports           *connect.Client[trip.SearchAirportsRequest, trip.SearchAirportsResponse]
+	resolveFlightDestination *connect.Client[trip.ResolveFlightDestinationRequest, trip.ResolveFlightDestinationResponse]
 	exportTrip               *connect.Client[trip.ExportTripRequest, trip.ExportTripResponse]
 	suggestPacking           *connect.Client[trip.SuggestPackingRequest, trip.SuggestPackingResponse]
 	getTripChecklist         *connect.Client[trip.GetTripChecklistRequest, trip.GetTripChecklistResponse]
@@ -717,6 +743,16 @@ func (c *tripServiceClient) RemoveFlight(ctx context.Context, req *connect.Reque
 // BuildFlightLinks calls loci.trip.TripService.BuildFlightLinks.
 func (c *tripServiceClient) BuildFlightLinks(ctx context.Context, req *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error) {
 	return c.buildFlightLinks.CallUnary(ctx, req)
+}
+
+// SearchAirports calls loci.trip.TripService.SearchAirports.
+func (c *tripServiceClient) SearchAirports(ctx context.Context, req *connect.Request[trip.SearchAirportsRequest]) (*connect.Response[trip.SearchAirportsResponse], error) {
+	return c.searchAirports.CallUnary(ctx, req)
+}
+
+// ResolveFlightDestination calls loci.trip.TripService.ResolveFlightDestination.
+func (c *tripServiceClient) ResolveFlightDestination(ctx context.Context, req *connect.Request[trip.ResolveFlightDestinationRequest]) (*connect.Response[trip.ResolveFlightDestinationResponse], error) {
+	return c.resolveFlightDestination.CallUnary(ctx, req)
 }
 
 // ExportTrip calls loci.trip.TripService.ExportTrip.
@@ -860,6 +896,10 @@ type TripServiceHandler interface {
 	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
+	// SearchAirports is the flight form's airport autocomplete.
+	SearchAirports(context.Context, *connect.Request[trip.SearchAirportsRequest]) (*connect.Response[trip.SearchAirportsResponse], error)
+	// ResolveFlightDestination picks the airport (or metro code) for a city.
+	ResolveFlightDestination(context.Context, *connect.Request[trip.ResolveFlightDestinationRequest]) (*connect.Response[trip.ResolveFlightDestinationResponse], error)
 	ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error)
 	// SuggestPacking derives a packing list from the trip: its length, its cities'
 	// forecasts, the driving between them, and the traveller's stated interests.
@@ -1054,6 +1094,18 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceBuildFlightLinksMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceSearchAirportsHandler := connect.NewUnaryHandler(
+		TripServiceSearchAirportsProcedure,
+		svc.SearchAirports,
+		connect.WithSchema(tripServiceSearchAirportsMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceResolveFlightDestinationHandler := connect.NewUnaryHandler(
+		TripServiceResolveFlightDestinationProcedure,
+		svc.ResolveFlightDestination,
+		connect.WithSchema(tripServiceResolveFlightDestinationMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	tripServiceExportTripHandler := connect.NewUnaryHandler(
 		TripServiceExportTripProcedure,
 		svc.ExportTrip,
@@ -1216,6 +1268,10 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceRemoveFlightHandler.ServeHTTP(w, r)
 		case TripServiceBuildFlightLinksProcedure:
 			tripServiceBuildFlightLinksHandler.ServeHTTP(w, r)
+		case TripServiceSearchAirportsProcedure:
+			tripServiceSearchAirportsHandler.ServeHTTP(w, r)
+		case TripServiceResolveFlightDestinationProcedure:
+			tripServiceResolveFlightDestinationHandler.ServeHTTP(w, r)
 		case TripServiceExportTripProcedure:
 			tripServiceExportTripHandler.ServeHTTP(w, r)
 		case TripServiceSuggestPackingProcedure:
@@ -1353,6 +1409,14 @@ func (UnimplementedTripServiceHandler) RemoveFlight(context.Context, *connect.Re
 
 func (UnimplementedTripServiceHandler) BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.BuildFlightLinks is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) SearchAirports(context.Context, *connect.Request[trip.SearchAirportsRequest]) (*connect.Response[trip.SearchAirportsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.SearchAirports is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) ResolveFlightDestination(context.Context, *connect.Request[trip.ResolveFlightDestinationRequest]) (*connect.Response[trip.ResolveFlightDestinationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ResolveFlightDestination is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) ExportTrip(context.Context, *connect.Request[trip.ExportTripRequest]) (*connect.Response[trip.ExportTripResponse], error) {

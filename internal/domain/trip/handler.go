@@ -17,6 +17,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
 	"github.com/FACorreiaa/loci-connect-api/pkg/analytics"
 	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
+	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 )
 
@@ -27,6 +28,8 @@ type Handler struct {
 	baseURL string
 	prefs   preference.Recorder
 	plans   PlanChecker
+	// airports backs SearchAirports and ResolveFlightDestination; see WithAirports.
+	airports *flights.Airports
 
 	// Optional, attached via WithPacking and used only by SuggestPacking. Nil is
 	// supported: the packing list then carries no weather-driven items rather

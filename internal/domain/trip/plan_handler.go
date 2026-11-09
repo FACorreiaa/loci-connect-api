@@ -133,7 +133,7 @@ func (h *Handler) BuildFlightLinks(ctx context.Context, req *connect.Request[tri
 	}
 	res := &tripv1.BuildFlightLinksResponse{}
 	for _, l := range links {
-		res.Links = append(res.Links, &tripv1.FlightLink{Provider: l.Provider, Label: l.Label, Url: l.URL})
+		res.Links = append(res.Links, flightLinkToProto(l))
 	}
 	return connect.NewResponse(res), nil
 }
