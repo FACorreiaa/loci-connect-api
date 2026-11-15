@@ -72,6 +72,31 @@ func addStop(t *Trip, dayID uuid.UUID, stop TripStop) error {
 	return nil
 }
 
+// addStopAfter puts stop directly after afterID, which must be on dayID. It
+// is what "add this restaurant after the castle" means: a place found near a
+// stop belongs next to it, not at the end of the day.
+func addStopAfter(t *Trip, dayID, afterID uuid.UUID, stop TripStop) error {
+	di := dayIndex(t, dayID)
+	if di < 0 {
+		return ErrDayNotFound
+	}
+	stops := t.Days[di].Stops
+	at := -1
+	for i := range stops {
+		if stops[i].ID == afterID {
+			at = i + 1
+			break
+		}
+	}
+	if at < 0 {
+		return ErrStopNotFound
+	}
+	stops = append(stops[:at], append([]TripStop{stop}, stops[at:]...)...)
+	renumber(stops)
+	t.Days[di].Stops = stops
+	return nil
+}
+
 // removeStop takes a stop off its day and returns it.
 func removeStop(t *Trip, stopID uuid.UUID) (TripStop, error) {
 	di, si := stopIndex(t, stopID)

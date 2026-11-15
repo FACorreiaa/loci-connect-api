@@ -1523,6 +1523,8 @@ type searchPOIsRow struct {
 	Longitude      float64   `db:"longitude"`
 	Latitude       float64   `db:"latitude"`
 	Category       string    `db:"category"`
+	Address        string    `db:"address"`
+	Rating         float64   `db:"rating"`
 	DistanceMeters float64   `db:"distance_meters"`
 }
 
@@ -1547,6 +1549,8 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
             COALESCE(category, '') AS category,
+            COALESCE(address, '') AS address,
+            COALESCE(average_rating, 0)::float8 AS rating,
             ST_Distance(
                 location,
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -1568,6 +1572,10 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 	if filter.Category != "" {
 		query += ` AND category = $4`
 		args = append(args, filter.Category) // $4
+	}
+	if len(filter.Categories) > 0 {
+		args = append(args, filter.Categories)
+		query += fmt.Sprintf(` AND lower(category) = ANY($%d)`, len(args))
 	}
 
 	// Order by distance. The cap goes in the same statement so a dense city
@@ -1605,6 +1613,8 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 			Longitude:      row.Longitude,
 			Latitude:       row.Latitude,
 			Category:       row.Category,
+			Address:        row.Address,
+			Rating:         row.Rating,
 			Distance:       row.DistanceMeters / 1000, // Convert meters to km
 		}
 	}

@@ -1173,7 +1173,8 @@ type SearchPOIRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Optional. Empty asks for a nearby listing rather than a search: the places
 	// around latitude/longitude, nearest first, at most 50, optionally narrowed
-	// to the category in search_tags[0]. An empty query with no location is
+	// to the categories in search_tags: a place is listed when its category
+	// equals any of them, ignoring case. An empty query with no location is
 	// rejected with INVALID_ARGUMENT, since there is nothing to rank by.
 	Query string `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
 	// Optional. Empty means "no city": the server searches around

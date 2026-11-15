@@ -99,3 +99,55 @@ func TestSearchPOIs_LimitKeepsTheNearest(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 4)
 }
+
+// "Eat nearby" asks for several kinds of place at once, and categories are
+// free text written at generation time, so the same kind of place is stored
+// as "Restaurant" in one city and "restaurant" in the next. The listing
+// matches any of the categories asked for, whatever their case, and carries
+// the address and rating a card needs.
+func TestSearchPOIs_MatchesAnyCategoryIgnoringCase(t *testing.T) {
+	ctx := context.Background()
+	cityID := uuid.New()
+	insertTestCity(t, cityID, "Food City "+cityID.String()[:8])
+
+	const lat, lon = -47.0, 172.0
+	seed := func(name, category string, dLat float64) uuid.UUID {
+		id := uuid.New()
+		_, err := testDB.Exec(ctx, `
+			INSERT INTO points_of_interest (id, city_id, name, category, address, average_rating, location)
+			VALUES ($1, $2, $3, $4, 'Rua 1', 4.5, ST_SetSRID(ST_MakePoint($5, $6), 4326))`,
+			id, cityID, name, category, lon, lat+dLat)
+		require.NoError(t, err)
+		return id
+	}
+	bistro := seed("Bistro", "Restaurant", 0.001)
+	seed("Museum", "museum", 0.002)
+	cafe := seed("Cafe", "CAFE", 0.003)
+	seed("Far bar", "bar", 1.0) // ~110 km away: outside the radius
+
+	filter := locitypes.POIFilter{
+		Location:   locitypes.GeoPoint{Latitude: lat, Longitude: lon},
+		Radius:     2,
+		Categories: []string{"restaurant", "cafe", "bar"},
+	}
+	got, err := testService.SearchPOIs(ctx, filter)
+	require.NoError(t, err)
+	require.Len(t, got, 2, "the museum is not food and the bar is too far")
+	require.Equal(t, bistro, got[0].ID, "nearest first")
+	require.Equal(t, cafe, got[1].ID)
+	require.Equal(t, "Rua 1", got[0].Address)
+	require.InDelta(t, 4.5, got[0].Rating, 1e-9)
+
+	// The cap still binds to the right placeholder after the category list.
+	filter.Limit = 1
+	got, err = testService.SearchPOIs(ctx, filter)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, bistro, got[0].ID)
+
+	// No categories lists everything in range.
+	filter.Categories, filter.Limit = nil, 0
+	got, err = testService.SearchPOIs(ctx, filter)
+	require.NoError(t, err)
+	require.Len(t, got, 3)
+}

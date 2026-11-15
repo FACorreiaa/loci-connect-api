@@ -803,6 +803,14 @@ func (l *ServiceImpl) persistResults(
 	// in /trips. Best-effort for itinerary/general domains — never fail the stream
 	// on a trip-save error. Persisted ID is stashed on cc.TripID so the completion
 	// event can deep-link the client to /trips/:id.
+	//
+	// A follow-up in a session that already has its trip keeps that trip: the
+	// traveller may have edited it, and a second one would both fork the plan
+	// and leave the itinerary page pointing at an unedited copy.
+	if kept := l.sessionTripToKeep(storageCtx, *cc); kept != uuid.Nil {
+		cc.TripID = kept
+		cc.SuppressTripSave = true
+	}
 	if l.tripRepo != nil && !cc.SuppressTripSave && (cc.Domain == locitypes.DomainItinerary || cc.Domain == locitypes.DomainGeneral) {
 		if tr := buildTripFromCityResponse(cc, data, recommendationRunID); tr != nil {
 			saved, terr := l.tripRepo.SaveTrip(storageCtx, tr, 0)

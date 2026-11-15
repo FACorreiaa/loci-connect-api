@@ -401,6 +401,15 @@ func stopFromProto(ps *tripv1.TripStop) TripStop {
 		b := ps.GetBookingUrl()
 		s.BookingURL = &b
 	}
+	// A pin is a pair. Half of one is not a position, so it is dropped rather
+	// than stored as a point on the equator or the prime meridian.
+	if ps.Latitude != nil && ps.Longitude != nil {
+		lat, lon := ps.GetLatitude(), ps.GetLongitude()
+		s.Lat, s.Lon = &lat, &lon
+	}
+	if a := strings.TrimSpace(ps.GetAddress()); a != "" {
+		s.Address = &a
+	}
 	return s
 }
 
@@ -508,6 +517,10 @@ func StopToProto(s TripStop) *tripv1.TripStop {
 		StartMinute:     s.StartMinute,
 		DurationMinutes: s.DurationMinutes,
 		BookingUrl:      s.BookingURL,
+		Address:         s.Address,
+	}
+	if s.Lat != nil && s.Lon != nil {
+		ps.Latitude, ps.Longitude = s.Lat, s.Lon
 	}
 	ps.RecommendationTrace = traceToProto(s.RecommendationTrace)
 	ps.Status = tripv1.TripStopStatus_TRIP_STOP_STATUS_OPEN

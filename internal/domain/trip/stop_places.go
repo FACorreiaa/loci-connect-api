@@ -76,7 +76,24 @@ func (h *Handler) hydrateStops(ctx context.Context, draft *tripv1.TripDraft) {
 			}
 			if poi != nil {
 				stop.Poi = presenter.ToPOIProto(poi)
+				pinFromPlace(stop, poi)
 			}
 		}
+	}
+}
+
+// pinFromPlace gives a stop its place's position and address when it has none
+// of its own, so a client places any stop from the stop's own
+// latitude/longitude and never has to know which kind it is. A pin the stop
+// already carries wins: it is what the traveller put there. A place with no
+// stored position (0,0) gives none.
+func pinFromPlace(stop *tripv1.TripStop, poi *locitypes.POIDetailedInfo) {
+	if stop.Latitude == nil && stop.Longitude == nil && (poi.Latitude != 0 || poi.Longitude != 0) {
+		lat, lon := poi.Latitude, poi.Longitude
+		stop.Latitude, stop.Longitude = &lat, &lon
+	}
+	if stop.Address == nil && poi.Address != "" {
+		addr := poi.Address
+		stop.Address = &addr
 	}
 }

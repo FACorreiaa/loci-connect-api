@@ -37,6 +37,9 @@ const (
 	TripServiceSaveTripProcedure = "/loci.trip.TripService/SaveTrip"
 	// TripServiceGetTripProcedure is the fully-qualified name of the TripService's GetTrip RPC.
 	TripServiceGetTripProcedure = "/loci.trip.TripService/GetTrip"
+	// TripServiceGetTripForSessionProcedure is the fully-qualified name of the TripService's
+	// GetTripForSession RPC.
+	TripServiceGetTripForSessionProcedure = "/loci.trip.TripService/GetTripForSession"
 	// TripServiceListTripsProcedure is the fully-qualified name of the TripService's ListTrips RPC.
 	TripServiceListTripsProcedure = "/loci.trip.TripService/ListTrips"
 	// TripServiceShareTripProcedure is the fully-qualified name of the TripService's ShareTrip RPC.
@@ -73,6 +76,8 @@ const (
 	TripServiceAddStopProcedure = "/loci.trip.TripService/AddStop"
 	// TripServiceRemoveStopProcedure is the fully-qualified name of the TripService's RemoveStop RPC.
 	TripServiceRemoveStopProcedure = "/loci.trip.TripService/RemoveStop"
+	// TripServiceMoveStopProcedure is the fully-qualified name of the TripService's MoveStop RPC.
+	TripServiceMoveStopProcedure = "/loci.trip.TripService/MoveStop"
 	// TripServiceReplaceStopProcedure is the fully-qualified name of the TripService's ReplaceStop RPC.
 	TripServiceReplaceStopProcedure = "/loci.trip.TripService/ReplaceStop"
 	// TripServiceSetTripDatesProcedure is the fully-qualified name of the TripService's SetTripDates
@@ -159,6 +164,7 @@ var (
 	tripServiceServiceDescriptor                        = trip.File_loci_trip_trip_proto.Services().ByName("TripService")
 	tripServiceSaveTripMethodDescriptor                 = tripServiceServiceDescriptor.Methods().ByName("SaveTrip")
 	tripServiceGetTripMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("GetTrip")
+	tripServiceGetTripForSessionMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("GetTripForSession")
 	tripServiceListTripsMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ListTrips")
 	tripServiceShareTripMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ShareTrip")
 	tripServiceSetTripVisibilityMethodDescriptor        = tripServiceServiceDescriptor.Methods().ByName("SetTripVisibility")
@@ -173,6 +179,7 @@ var (
 	tripServiceSetConstraintMethodDescriptor            = tripServiceServiceDescriptor.Methods().ByName("SetConstraint")
 	tripServiceAddStopMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("AddStop")
 	tripServiceRemoveStopMethodDescriptor               = tripServiceServiceDescriptor.Methods().ByName("RemoveStop")
+	tripServiceMoveStopMethodDescriptor                 = tripServiceServiceDescriptor.Methods().ByName("MoveStop")
 	tripServiceReplaceStopMethodDescriptor              = tripServiceServiceDescriptor.Methods().ByName("ReplaceStop")
 	tripServiceSetTripDatesMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("SetTripDates")
 	tripServiceSetStayMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("SetStay")
@@ -209,6 +216,11 @@ type TripServiceClient interface {
 	// GetTrip opens one of the caller's trips, or a trip the caller is a
 	// member of (with viewer_role and members set). Anything else is NotFound.
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// The caller's own trip built from a chat session: the session itself, or a
+	// city of a multi-city trip. NOT_FOUND when the session has no trip of
+	// theirs. When a session has produced more than one, the most recently
+	// updated wins.
+	GetTripForSession(context.Context, *connect.Request[trip.GetTripForSessionRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
 	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
 	// false sets PRIVATE. Use SetTripVisibility.
@@ -240,6 +252,8 @@ type TripServiceClient interface {
 	SetConstraint(context.Context, *connect.Request[trip.SetConstraintRequest]) (*connect.Response[trip.TripDraft], error)
 	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
+	// Moves a stop within its day or to another day of the trip.
+	MoveStop(context.Context, *connect.Request[trip.MoveStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
 	// The trip's plan. Each takes base_version and answers FailedPrecondition
 	// when it is stale, like the stop edits above.
@@ -325,6 +339,12 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceGetTripMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getTripForSession: connect.NewClient[trip.GetTripForSessionRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceGetTripForSessionProcedure,
+			connect.WithSchema(tripServiceGetTripForSessionMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		listTrips: connect.NewClient[trip.ListTripsRequest, trip.ListTripsResponse](
 			httpClient,
 			baseURL+TripServiceListTripsProcedure,
@@ -407,6 +427,12 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+TripServiceRemoveStopProcedure,
 			connect.WithSchema(tripServiceRemoveStopMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
+		moveStop: connect.NewClient[trip.MoveStopRequest, trip.TripDraft](
+			httpClient,
+			baseURL+TripServiceMoveStopProcedure,
+			connect.WithSchema(tripServiceMoveStopMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		replaceStop: connect.NewClient[trip.ReplaceStopRequest, trip.TripDraft](
@@ -584,6 +610,7 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 type tripServiceClient struct {
 	saveTrip                 *connect.Client[trip.SaveTripRequest, trip.TripDraft]
 	getTrip                  *connect.Client[trip.GetTripRequest, trip.TripDraft]
+	getTripForSession        *connect.Client[trip.GetTripForSessionRequest, trip.TripDraft]
 	listTrips                *connect.Client[trip.ListTripsRequest, trip.ListTripsResponse]
 	shareTrip                *connect.Client[trip.ShareTripRequest, trip.ShareTripResponse]
 	setTripVisibility        *connect.Client[trip.SetTripVisibilityRequest, trip.SetTripVisibilityResponse]
@@ -598,6 +625,7 @@ type tripServiceClient struct {
 	setConstraint            *connect.Client[trip.SetConstraintRequest, trip.TripDraft]
 	addStop                  *connect.Client[trip.AddStopRequest, trip.TripDraft]
 	removeStop               *connect.Client[trip.RemoveStopRequest, trip.TripDraft]
+	moveStop                 *connect.Client[trip.MoveStopRequest, trip.TripDraft]
 	replaceStop              *connect.Client[trip.ReplaceStopRequest, trip.TripDraft]
 	setTripDates             *connect.Client[trip.SetTripDatesRequest, trip.TripDraft]
 	setStay                  *connect.Client[trip.SetStayRequest, trip.TripDraft]
@@ -636,6 +664,11 @@ func (c *tripServiceClient) SaveTrip(ctx context.Context, req *connect.Request[t
 // GetTrip calls loci.trip.TripService.GetTrip.
 func (c *tripServiceClient) GetTrip(ctx context.Context, req *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error) {
 	return c.getTrip.CallUnary(ctx, req)
+}
+
+// GetTripForSession calls loci.trip.TripService.GetTripForSession.
+func (c *tripServiceClient) GetTripForSession(ctx context.Context, req *connect.Request[trip.GetTripForSessionRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.getTripForSession.CallUnary(ctx, req)
 }
 
 // ListTrips calls loci.trip.TripService.ListTrips.
@@ -708,6 +741,11 @@ func (c *tripServiceClient) AddStop(ctx context.Context, req *connect.Request[tr
 // RemoveStop calls loci.trip.TripService.RemoveStop.
 func (c *tripServiceClient) RemoveStop(ctx context.Context, req *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
 	return c.removeStop.CallUnary(ctx, req)
+}
+
+// MoveStop calls loci.trip.TripService.MoveStop.
+func (c *tripServiceClient) MoveStop(ctx context.Context, req *connect.Request[trip.MoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return c.moveStop.CallUnary(ctx, req)
 }
 
 // ReplaceStop calls loci.trip.TripService.ReplaceStop.
@@ -856,6 +894,11 @@ type TripServiceHandler interface {
 	// GetTrip opens one of the caller's trips, or a trip the caller is a
 	// member of (with viewer_role and members set). Anything else is NotFound.
 	GetTrip(context.Context, *connect.Request[trip.GetTripRequest]) (*connect.Response[trip.TripDraft], error)
+	// The caller's own trip built from a chat session: the session itself, or a
+	// city of a multi-city trip. NOT_FOUND when the session has no trip of
+	// theirs. When a session has produced more than one, the most recently
+	// updated wins.
+	GetTripForSession(context.Context, *connect.Request[trip.GetTripForSessionRequest]) (*connect.Response[trip.TripDraft], error)
 	ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error)
 	// ShareTrip is the old sharing call: is_public = true sets LINK visibility,
 	// false sets PRIVATE. Use SetTripVisibility.
@@ -887,6 +930,8 @@ type TripServiceHandler interface {
 	SetConstraint(context.Context, *connect.Request[trip.SetConstraintRequest]) (*connect.Response[trip.TripDraft], error)
 	AddStop(context.Context, *connect.Request[trip.AddStopRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error)
+	// Moves a stop within its day or to another day of the trip.
+	MoveStop(context.Context, *connect.Request[trip.MoveStopRequest]) (*connect.Response[trip.TripDraft], error)
 	ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error)
 	// The trip's plan. Each takes base_version and answers FailedPrecondition
 	// when it is stale, like the stop edits above.
@@ -966,6 +1011,12 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		TripServiceGetTripProcedure,
 		svc.GetTrip,
 		connect.WithSchema(tripServiceGetTripMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceGetTripForSessionHandler := connect.NewUnaryHandler(
+		TripServiceGetTripForSessionProcedure,
+		svc.GetTripForSession,
+		connect.WithSchema(tripServiceGetTripForSessionMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	tripServiceListTripsHandler := connect.NewUnaryHandler(
@@ -1050,6 +1101,12 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		TripServiceRemoveStopProcedure,
 		svc.RemoveStop,
 		connect.WithSchema(tripServiceRemoveStopMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
+	tripServiceMoveStopHandler := connect.NewUnaryHandler(
+		TripServiceMoveStopProcedure,
+		svc.MoveStop,
+		connect.WithSchema(tripServiceMoveStopMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	tripServiceReplaceStopHandler := connect.NewUnaryHandler(
@@ -1226,6 +1283,8 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceSaveTripHandler.ServeHTTP(w, r)
 		case TripServiceGetTripProcedure:
 			tripServiceGetTripHandler.ServeHTTP(w, r)
+		case TripServiceGetTripForSessionProcedure:
+			tripServiceGetTripForSessionHandler.ServeHTTP(w, r)
 		case TripServiceListTripsProcedure:
 			tripServiceListTripsHandler.ServeHTTP(w, r)
 		case TripServiceShareTripProcedure:
@@ -1254,6 +1313,8 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceAddStopHandler.ServeHTTP(w, r)
 		case TripServiceRemoveStopProcedure:
 			tripServiceRemoveStopHandler.ServeHTTP(w, r)
+		case TripServiceMoveStopProcedure:
+			tripServiceMoveStopHandler.ServeHTTP(w, r)
 		case TripServiceReplaceStopProcedure:
 			tripServiceReplaceStopHandler.ServeHTTP(w, r)
 		case TripServiceSetTripDatesProcedure:
@@ -1327,6 +1388,10 @@ func (UnimplementedTripServiceHandler) GetTrip(context.Context, *connect.Request
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetTrip is not implemented"))
 }
 
+func (UnimplementedTripServiceHandler) GetTripForSession(context.Context, *connect.Request[trip.GetTripForSessionRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetTripForSession is not implemented"))
+}
+
 func (UnimplementedTripServiceHandler) ListTrips(context.Context, *connect.Request[trip.ListTripsRequest]) (*connect.Response[trip.ListTripsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ListTrips is not implemented"))
 }
@@ -1381,6 +1446,10 @@ func (UnimplementedTripServiceHandler) AddStop(context.Context, *connect.Request
 
 func (UnimplementedTripServiceHandler) RemoveStop(context.Context, *connect.Request[trip.RemoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.RemoveStop is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) MoveStop(context.Context, *connect.Request[trip.MoveStopRequest]) (*connect.Response[trip.TripDraft], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.MoveStop is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) ReplaceStop(context.Context, *connect.Request[trip.ReplaceStopRequest]) (*connect.Response[trip.TripDraft], error) {

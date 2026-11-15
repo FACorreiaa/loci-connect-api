@@ -53,7 +53,7 @@ func (s *Service) resolveStopEdit(ctx context.Context, t *trip.Trip, p *Proposal
 	return true
 }
 
-// lookUpStop is the first place the city search finds for query, as a stop.
+// lookUpStop is the place the city search finds for query, as a stop.
 func (s *Service) lookUpStop(ctx context.Context, query, city string) (*trip.TripStop, bool) {
 	if s.d.Spots == nil || query == "" || city == "" {
 		return nil, false
@@ -65,17 +65,53 @@ func (s *Service) lookUpStop(ctx context.Context, query, city string) (*trip.Tri
 		s.d.Logger.WarnContext(ctx, "trip action: place search failed", slog.String("query", query), slog.Any("error", err))
 		return nil, false
 	}
-	for _, f := range found {
-		if strings.TrimSpace(f.Name) == "" {
+	names := make([]string, len(found))
+	for i := range found {
+		names[i] = found[i].Name
+	}
+	i := pickSpot(query, names)
+	if i < 0 {
+		return nil, false
+	}
+	f := found[i]
+	stop := &trip.TripStop{Name: f.Name, Notes: firstNonEmpty(f.DescriptionPOI, f.Description, "Suggested in chat")}
+	if f.ID != uuid.Nil {
+		stop.POIID = f.ID.String()
+	}
+	return stop, true
+}
+
+// pickSpot is which search result a message meant, or -1 when none has a
+// name.
+//
+// The search ranks by meaning, so asking for a place by name often puts a
+// similar place first: "Time Out Market" finds a food hall two streets away
+// ahead of the market itself. A result whose name is what was asked for wins,
+// then one whose name contains it, and only then the search's own first
+// result, which is the right answer when the message described a kind of
+// place ("a coffee shop") rather than naming one.
+func pickSpot(query string, names []string) int {
+	want := strings.ToLower(strings.TrimSpace(query))
+	first, contains := -1, -1
+	for i, name := range names {
+		got := strings.ToLower(strings.TrimSpace(name))
+		if got == "" {
 			continue
 		}
-		stop := &trip.TripStop{Name: f.Name, Notes: firstNonEmpty(f.DescriptionPOI, f.Description, "Suggested in chat")}
-		if f.ID != uuid.Nil {
-			stop.POIID = f.ID.String()
+		if got == want {
+			return i
 		}
-		return stop, true
+		if contains < 0 && want != "" && strings.Contains(got, want) {
+			contains = i
+		}
+		if first < 0 {
+			first = i
+		}
 	}
-	return nil, false
+	if contains >= 0 {
+		return contains
+	}
+	return first
 }
 
 func dayNumbered(t *trip.Trip, n int) *trip.TripDay {

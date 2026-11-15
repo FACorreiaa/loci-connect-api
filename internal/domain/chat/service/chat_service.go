@@ -120,8 +120,11 @@ type ServiceImpl struct {
 	// Optional, attached with SetTripActions: turns bound to a trip propose
 	// changes to it (dates, hotels, re-plan, flights) instead of regenerating.
 	tripActions TripActionProposer
-	cache       cachestore.Store
-	model       string
+	// sessionTrips finds the trip a resumed session already produced, so a
+	// follow-up does not save a second one. Nil keeps the old behaviour.
+	sessionTrips trip.SessionTrips
+	cache        cachestore.Store
+	model        string
 	// provider is the configured upstream, used to attribute an interaction
 	// whose model id does not name its vendor.
 	provider    string
