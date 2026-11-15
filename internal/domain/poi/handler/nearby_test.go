@@ -67,7 +67,7 @@ func TestSearchPOI_EmptyQueryListsNearby(t *testing.T) {
 
 	resp, err := h.SearchPOI(context.Background(), connect.NewRequest(&poiv1.SearchPOIRequest{
 		Query: "  ", Latitude: 38.7, Longitude: -9.1, RadiusKm: &radius, SearchType: &hybrid,
-		CityName: "Lisbon", SearchTags: []string{"restaurant"},
+		CityName: "Lisbon", SearchTags: []string{"Restaurant", " cafe ", "restaurant", ""},
 	}))
 	if err != nil {
 		t.Fatalf("SearchPOI: %v", err)
@@ -76,7 +76,8 @@ func TestSearchPOI_EmptyQueryListsNearby(t *testing.T) {
 		t.Fatal("distance search was not called")
 	}
 	f := svc.gotFilter
-	if f.Location.Latitude != 38.7 || f.Location.Longitude != -9.1 || f.Radius != 10 || f.Category != "restaurant" {
+	if f.Location.Latitude != 38.7 || f.Location.Longitude != -9.1 || f.Radius != 10 || f.Category != "" ||
+		len(f.Categories) != 2 || f.Categories[0] != "restaurant" || f.Categories[1] != "cafe" {
 		t.Fatalf("filter = %+v", *f)
 	}
 	if f.Limit != nearbyListLimit {

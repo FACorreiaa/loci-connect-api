@@ -57,6 +57,13 @@ type TripStop struct {
 	BookingURL          *string
 	RecommendationTrace *RecommendationTrace
 
+	// The stop's own pin, for a place with no POI behind it (pasted from a
+	// map link). Lat and Lon are set together or not at all. A stop with a
+	// POI usually leaves them nil and is placed by the POI when read.
+	Lat     *float64
+	Lon     *float64
+	Address *string
+
 	// Read side only: how the traveller marked the stop (gamification
 	// MarkStop). Zero is open; SaveTrip never writes it.
 	Status   int16
@@ -382,6 +389,9 @@ func writeTrip(ctx context.Context, tx pgx.Tx, t *Trip, baseVersion int64) error
 	if err != nil {
 		return err
 	}
+	if err := carryPins(ctx, tx, t); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM trip_days WHERE trip_id = $1`, t.ID); err != nil {
 		return fmt.Errorf("clear days: %w", err)
 	}
@@ -541,6 +551,66 @@ func ownedIDs(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) (map[uuid.UUID]b
 	return owned, rows.Err()
 }
 
+// carryPins keeps the pin of every stop that comes back without one.
+//
+// A save replaces all stops, and a client built before stops had pins sends
+// none: without this its next whole-trip save (a rename, a reorder) would
+// erase the position of every pasted place. A stop is matched by its id and
+// must still name the same place, so replacing a stop does not inherit the
+// old one's position. A client cannot clear a pin by omitting it; nothing
+// needs to.
+func carryPins(ctx context.Context, tx pgx.Tx, t *Trip) error {
+	if t.ID == uuid.Nil {
+		return nil
+	}
+	type pin struct {
+		poiID    string
+		lat, lon *float64
+		address  *string
+	}
+	rows, err := tx.Query(ctx, `
+		SELECT s.id, s.poi_id, s.lat, s.lon, s.address
+		FROM trip_stops s JOIN trip_days d ON d.id = s.day_id
+		WHERE d.trip_id = $1 AND (s.lat IS NOT NULL OR s.address IS NOT NULL)`, t.ID)
+	if err != nil {
+		return fmt.Errorf("stored pins: %w", err)
+	}
+	defer rows.Close()
+	stored := map[uuid.UUID]pin{}
+	for rows.Next() {
+		var (
+			id uuid.UUID
+			p  pin
+		)
+		if err := rows.Scan(&id, &p.poiID, &p.lat, &p.lon, &p.address); err != nil {
+			return fmt.Errorf("stored pins: %w", err)
+		}
+		stored[id] = p
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("stored pins: %w", err)
+	}
+	if len(stored) == 0 {
+		return nil
+	}
+	for di := range t.Days {
+		for si := range t.Days[di].Stops {
+			s := &t.Days[di].Stops[si]
+			p, ok := stored[s.ID]
+			if !ok || p.poiID != s.POIID {
+				continue
+			}
+			if s.Lat == nil && s.Lon == nil {
+				s.Lat, s.Lon = p.lat, p.lon
+			}
+			if s.Address == nil {
+				s.Address = p.address
+			}
+		}
+	}
+	return nil
+}
+
 // finishedDays is when each finished day of a trip was finished, read before
 // SaveTrip replaces the days.
 func finishedDays(ctx context.Context, tx pgx.Tx, tripID uuid.UUID) (map[uuid.UUID]time.Time, error) {
@@ -635,9 +705,10 @@ func insertDays(ctx context.Context, tx pgx.Tx, t *Trip, owned map[uuid.UUID]boo
 				return fmt.Errorf("marshal recommendation trace: %w", err)
 			}
 			stops.Queue(`
-				INSERT INTO trip_stops (id, day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace)
-				VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-				keepID(s.ID, owned), day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON)
+				INSERT INTO trip_stops (id, day_id, poi_id, order_index, name, start_minute, duration_minutes, notes, booking_url, recommendation_trace, lat, lon, address)
+				VALUES (COALESCE($1, gen_random_uuid()), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+				keepID(s.ID, owned), day.ID, s.POIID, s.OrderIndex, s.Name, s.StartMinute, s.DurationMinutes, s.Notes, s.BookingURL, traceJSON,
+				s.Lat, s.Lon, s.Address)
 		}
 	}
 	if stops.Len() == 0 {
@@ -807,7 +878,7 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 	stopRows, err := r.db.Query(ctx, `
 		SELECT s.id, s.day_id, s.poi_id, s.order_index, s.name, s.start_minute,
 		       s.duration_minutes, s.notes, s.booking_url, s.recommendation_trace,
-		       COALESCE(m.status, 0::smallint), m.marked_at
+		       COALESCE(m.status, 0::smallint), m.marked_at, s.lat, s.lon, s.address
 		FROM trip_stops s
 		JOIN trip_days d ON d.id = s.day_id
 		LEFT JOIN trip_stop_marks m ON m.stop_id = s.id
@@ -826,7 +897,7 @@ func (r *repository) loadDays(ctx context.Context, t *Trip) error {
 		)
 		if err := stopRows.Scan(&s.ID, &dayID, &s.POIID, &s.OrderIndex, &s.Name,
 			&s.StartMinute, &s.DurationMinutes, &s.Notes, &s.BookingURL, &traceJSON,
-			&s.Status, &s.StatusAt); err != nil {
+			&s.Status, &s.StatusAt, &s.Lat, &s.Lon, &s.Address); err != nil {
 			return fmt.Errorf("scan stop: %w", err)
 		}
 		if len(traceJSON) > 0 && string(traceJSON) != "null" {
@@ -994,12 +1065,18 @@ func NewSessionTrips(db *pgxpool.Pool, logger *slog.Logger) SessionTrips {
 }
 
 // LatestForSession is the user's most recently edited trip generated in
-// sessionID (trips.source_session_id), or ErrNotFound.
+// sessionID, or ErrNotFound. A session is a trip's own
+// (trips.source_session_id) or the session of one of a multi-city trip's
+// cities (trip_cities.session_id), so opening any city of a route finds the
+// route's trip.
 func (r *repository) LatestForSession(ctx context.Context, userID, sessionID uuid.UUID) (*Trip, error) {
 	var id uuid.UUID
 	err := r.db.QueryRow(ctx, `
-		SELECT id FROM trips WHERE user_id = $1 AND source_session_id = $2
-		ORDER BY updated_at DESC LIMIT 1`, userID, sessionID.String()).Scan(&id)
+		SELECT t.id FROM trips t
+		WHERE t.user_id = $1
+		  AND (t.source_session_id = $2
+		       OR EXISTS (SELECT 1 FROM trip_cities c WHERE c.trip_id = t.id AND c.session_id = $3))
+		ORDER BY t.updated_at DESC LIMIT 1`, userID, sessionID.String(), sessionID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

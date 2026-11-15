@@ -154,9 +154,7 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 	if msg.RadiusKm != nil {
 		filter.Radius = msg.GetRadiusKm()
 	}
-	if tags := msg.GetSearchTags(); len(tags) > 0 {
-		filter.Category = strings.TrimSpace(tags[0])
-	}
+	filter.Categories = nearbyCategories(msg.GetSearchTags())
 	pois, err := h.service.SearchPOIs(ctx, filter)
 	if err != nil {
 		return nil, apierr.ToConnect(err)
@@ -164,6 +162,23 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 	out := presenter.ToPOIProtos(pois)
 	h.withTaste(ctx, out...)
 	return connect.NewResponse(&poiv1.SearchPOIResponse{Pois: out}), nil
+}
+
+// nearbyCategories turns a nearby listing's search_tags into the categories
+// to match: trimmed, lowercased, without blanks or repeats. Nil when there
+// are none, which lists every kind of place.
+func nearbyCategories(tags []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		c := strings.ToLower(strings.TrimSpace(tag))
+		if c == "" || seen[c] {
+			continue
+		}
+		seen[c] = true
+		out = append(out, c)
+	}
+	return out
 }
 
 func (h *POIHandler) GetPOI(ctx context.Context, req *connect.Request[poiv1.GetPOIRequest]) (*connect.Response[poiv1.GetPOIResponse], error) {

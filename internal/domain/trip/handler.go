@@ -38,6 +38,10 @@ type Handler struct {
 	weatherEstimated bool
 	log              *slog.Logger
 
+	// Optional, attached via WithSessionTrips. Nil makes GetTripForSession
+	// answer Unimplemented.
+	sessionTrips SessionTrips
+
 	// Optional, attached via WithPlaces: fills each stop's `poi` in every
 	// TripDraft response. Nil leaves stops with their id and name only.
 	places PlaceLookup
@@ -361,13 +365,77 @@ func (h *Handler) AddStop(ctx context.Context, req *connect.Request[tripv1.AddSt
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid day ID"))
 	}
+	// after_stop_id is optional: unset appends, which is what every client
+	// built before it does.
+	afterID := uuid.Nil
+	if req.Msg.AfterStopId != nil {
+		if afterID, err = uuid.Parse(req.Msg.GetAfterStopId()); err != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid after stop ID"))
+		}
+	}
 	resp, err := h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
-		return addStop(t, dayID, stopFromProto(req.Msg.GetStop()))
+		stop := stopFromProto(req.Msg.GetStop())
+		// The server numbers the day and names the stop: a client's id for a
+		// stop that does not exist yet would only collide.
+		stop.ID = uuid.Nil
+		if afterID != uuid.Nil {
+			return addStopAfter(t, dayID, afterID, stop)
+		}
+		return addStop(t, dayID, stop)
 	})
 	if err == nil {
 		h.recordStopSignal(ctx, req.Msg.GetTripId(), req.Msg.GetStop(), preference.EventSaved, "added_to_trip")
 	}
 	return resp, err
+}
+
+// MoveStop moves a stop within its day or to another day of the trip.
+func (h *Handler) MoveStop(ctx context.Context, req *connect.Request[tripv1.MoveStopRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	stopID, err := uuid.Parse(req.Msg.GetStopId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid stop ID"))
+	}
+	dayID, err := uuid.Parse(req.Msg.GetToDayId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid day ID"))
+	}
+	return h.mutate(ctx, req.Msg.GetTripId(), req.Msg.GetBaseVersion(), func(t *Trip) error {
+		return moveStop(t, stopID, dayID, int(req.Msg.GetToIndex()))
+	})
+}
+
+// WithSessionTrips attaches the lookup behind GetTripForSession. Nil makes
+// that RPC answer Unimplemented, which clients read as "no trip".
+func (h *Handler) WithSessionTrips(s SessionTrips) *Handler {
+	h.sessionTrips = s
+	return h
+}
+
+var errSessionTripsOff = errors.New("trip lookup by session is not enabled")
+
+// GetTripForSession is the caller's own trip built from a chat session, so an
+// itinerary opened by its session can be edited as that trip. Owner only: a
+// co-planner reaches a shared trip by its id, not by someone else's session.
+func (h *Handler) GetTripForSession(ctx context.Context, req *connect.Request[tripv1.GetTripForSessionRequest]) (*connect.Response[tripv1.TripDraft], error) {
+	if h.sessionTrips == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, errSessionTripsOff)
+	}
+	uid, err := userID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sessionID, err := uuid.Parse(req.Msg.GetSessionId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid session ID"))
+	}
+	t, err := h.sessionTrips.LatestForSession(ctx, uid, sessionID)
+	if err != nil {
+		return nil, toConnectErr(err)
+	}
+	p := h.respond(ctx, t)
+	p.ViewerRole = tripv1.TripRole_TRIP_ROLE_OWNER
+	h.withMembers(ctx, p, t)
+	return connect.NewResponse(p), nil
 }
 
 func (h *Handler) RemoveStop(ctx context.Context, req *connect.Request[tripv1.RemoveStopRequest]) (*connect.Response[tripv1.TripDraft], error) {

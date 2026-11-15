@@ -1087,7 +1087,9 @@ func (d *Dependencies) initHandlers() error {
 	// Share links must land on a page: the web app's origin (FRONTEND_URL, the
 	// same one the auth emails use), not the API's own BASE_URL.
 	d.ShareHandler = share.NewHandler(shareOrigin(d.Config.Server.BaseURL), d.ShareRepo)
-	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).WithPlaces(d.POIRepo)
+	d.TripHandler = trip.NewHandler(d.TripRepo, d.Config.Server.BaseURL, d.PreferenceRecorder, d.SubscriptionService).
+		WithPlaces(d.POIRepo).
+		WithSessionTrips(trip.NewSessionTrips(d.DB.Pool, d.Logger))
 	if d.DB != nil {
 		d.TripHandler = d.TripHandler.WithChecklist(trip.NewChecklistRepository(d.DB.Pool))
 		// Every stop with a poi_id shows the POI's first stored picture, so a
@@ -1173,6 +1175,9 @@ func (d *Dependencies) initHandlers() error {
 		// stop edits, react, and the owner applies.
 		var assistantProposals assistant.TripProposer
 		if chatImpl, ok := d.ChatService.(*chatservice.ServiceImpl); ok {
+			// A follow-up in a session that already has a trip keeps it
+			// rather than saving another.
+			chatImpl.SetSessionTrips(trip.NewSessionTrips(d.DB.Pool, d.Logger))
 			store := tripaction.NewStore(d.DB.Pool)
 			tripActions := tripaction.NewService(tripaction.Deps{
 				LLM:       chatImpl.ActionLLM(),

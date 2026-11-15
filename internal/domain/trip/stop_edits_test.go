@@ -64,3 +64,23 @@ func TestStopEdits(t *testing.T) {
 	require.Equal(t, int32(2), d.DayNumber)
 	require.Nil(t, FindDay(tr, uuid.New()))
 }
+
+func TestAddStopAfter(t *testing.T) {
+	tr, days, stops := editTrip()
+	require.NoError(t, addStopAfter(tr, days[0], stops[0], TripStop{Name: "Lunch"}))
+	require.Equal(t, []string{"A", "Lunch", "B"}, names(tr.Days[0]), "lands directly after the anchor")
+
+	tr, days, stops = editTrip()
+	require.NoError(t, addStopAfter(tr, days[0], stops[1], TripStop{Name: "Dinner"}))
+	require.Equal(t, []string{"A", "B", "Dinner"}, names(tr.Days[0]), "after the last stop is the end of the day")
+
+	// The anchor has to be on the day named: a stale client that still shows a
+	// stop on the day it was moved off must not add somewhere unexpected.
+	tr, days, stops = editTrip()
+	err := addStopAfter(tr, days[1], stops[0], TripStop{Name: "X"})
+	require.ErrorIs(t, err, ErrStopNotFound)
+	require.ErrorIs(t, err, ErrInvalidEdit)
+	require.Equal(t, []string{"C"}, names(tr.Days[1]), "a refused edit changes nothing")
+
+	require.ErrorIs(t, addStopAfter(tr, uuid.New(), stops[0], TripStop{Name: "X"}), ErrDayNotFound)
+}

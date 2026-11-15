@@ -242,6 +242,11 @@ type POIFilter struct {
 	Location GeoPoint `json:"location"` // e.g., "restaurant", "hotel", "bar"
 	Radius   float64  `json:"radius"`   // Radius in kilometers for filtering POIs
 	Category string   `json:"category"` // e.g., "restaurant", "hotel", "bar"
+	// Categories narrows to places whose category is any of these, ignoring
+	// case. Callers pass them lowercased. It is what "somewhere to eat" needs:
+	// categories are free text written at generation time, so one meal spot
+	// is a "restaurant", the next a "Cafe". Combined with Category by AND.
+	Categories []string `json:"categories,omitempty"`
 	// Limit caps how many of the nearest matches are returned, applied in SQL
 	// after ordering by distance. Zero means no cap.
 	Limit int `json:"limit,omitempty"`
