@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"google.golang.org/genai"
@@ -166,14 +167,37 @@ func (s *ServiceImpl) SearchPOIsByQueryAndCity(ctx context.Context, query, cityN
 			attribute.String("city.id", city.ID.String()),
 		)
 
-		// Use the semantic search by city method
 		limit := 20 // default limit
+
+		// A place asked for by name is found by name. The semantic lane only
+		// sees rows that already have an embedding, and a freshly planned
+		// city has none for a while, so "El Rinconcillo" fell through to the
+		// model: ten seconds or more for a place sitting in the table, long
+		// enough that a chat request to add it timed out and re-planned the
+		// trip instead.
+		lexical, lexErr := s.poiRepository.SearchPOIsLexical(ctx, city.ID, query, limit)
+		if lexErr != nil {
+			l.WarnContext(ctx, "Name search failed, trying the semantic lane",
+				slog.Any("error", lexErr),
+				slog.String("city_id", city.ID.String()))
+		}
+		if named := lexicalPOIs(lexical); namesQuery(lexical, query) {
+			span.SetAttributes(attribute.Int("results.count", len(named)), attribute.String("source", "name"))
+			span.SetStatus(codes.Ok, "Search completed by name")
+			return named, nil
+		}
+
+		// Use the semantic search by city method
 		pois, err = s.SearchPOIsSemanticByCity(ctx, query, city.ID, limit)
 		if err != nil {
 			l.WarnContext(ctx, "Database search failed, will try LLM fallback",
 				slog.Any("error", err),
 				slog.String("query", query),
 				slog.String("city_id", city.ID.String()))
+		}
+		// Words that matched something stored beat inventing places.
+		if len(pois) == 0 {
+			pois = lexicalPOIs(lexical)
 		}
 	}
 
@@ -488,4 +512,32 @@ func (s *ServiceImpl) personalizeEmbedding(ctx context.Context, query []float32)
 		return query
 	}
 	return preference.PersonalizeQuery(ctx, s.prefVectors, uid, query)
+}
+
+// lexicalPOIs is the places a name search found, in its order.
+func lexicalPOIs(hits []LexicalHit) []locitypes.POIDetailedInfo {
+	if len(hits) == 0 {
+		return nil
+	}
+	out := make([]locitypes.POIDetailedInfo, len(hits))
+	for i := range hits {
+		out[i] = hits[i].POI
+	}
+	return out
+}
+
+// namesQuery reports whether the search's best hit is the place query names:
+// the same name, or a name that contains it ("Rinconcillo" for "El
+// Rinconcillo"). A query that describes a kind of place ("a quiet cafe")
+// names nothing and is left to the semantic lane.
+func namesQuery(hits []LexicalHit, query string) bool {
+	if len(hits) == 0 {
+		return false
+	}
+	if hits[0].ExactName {
+		return true
+	}
+	want := strings.ToLower(strings.TrimSpace(query))
+	got := strings.ToLower(strings.TrimSpace(hits[0].POI.Name))
+	return len(want) >= 4 && got != "" && strings.Contains(got, want)
 }

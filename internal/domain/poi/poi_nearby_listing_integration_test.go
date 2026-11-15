@@ -151,3 +151,43 @@ func TestSearchPOIs_MatchesAnyCategoryIgnoringCase(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 }
+
+// Kinds are free text and live in either of two columns. A stop surrounded by
+// a "Tapas Bar" (category) and a "Wine Bar" (poi_type only) used to be told
+// Loci knew nowhere to eat nearby.
+func TestSearchPOIs_MatchesKindWordsInEitherColumn(t *testing.T) {
+	ctx := context.Background()
+	cityID := uuid.New()
+	insertTestCity(t, cityID, "Kind City "+cityID.String()[:8])
+
+	const lat, lon = -48.0, 173.0
+	seed := func(name string, category, poiType any, dLat float64) uuid.UUID {
+		id := uuid.New()
+		_, err := testDB.Exec(ctx, `
+			INSERT INTO points_of_interest (id, city_id, name, category, poi_type, location)
+			VALUES ($1, $2, $3, $4, $5, ST_SetSRID(ST_MakePoint($6, $7), 4326))`,
+			id, cityID, name, category, poiType, lon, lat+dLat)
+		require.NoError(t, err)
+		return id
+	}
+	tapas := seed("Casa", "Tapas Bar", nil, 0.001)
+	wine := seed("Bodega", nil, "Wine Bar", 0.002)
+	blank := seed("Taberna", "", "Traditional Restaurants", 0.003)
+	seed("Barber", "Barber Shop", nil, 0.004)
+	seed("Quarter", nil, "Barrio", 0.005)
+	seed("Palace", "Palace", "restaurant", 0.006) // category wins when both are set
+
+	filter := locitypes.POIFilter{
+		Location:   locitypes.GeoPoint{Latitude: lat, Longitude: lon},
+		Radius:     2,
+		Categories: []string{"restaurant", "bar"},
+	}
+	got, err := testService.SearchPOIs(ctx, filter)
+	require.NoError(t, err)
+	ids := make([]uuid.UUID, 0, len(got))
+	for _, p := range got {
+		ids = append(ids, p.ID)
+	}
+	require.Equal(t, []uuid.UUID{tapas, wine, blank}, ids)
+	require.Equal(t, "Wine Bar", got[1].Category, "the kind comes back whichever column held it")
+}

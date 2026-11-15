@@ -1548,7 +1548,7 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
             COALESCE(description, '') AS description,
             ST_X(location::geometry) AS longitude,
             ST_Y(location::geometry) AS latitude,
-            COALESCE(category, '') AS category,
+            ` + poiKindSQL + ` AS category,
             COALESCE(address, '') AS address,
             COALESCE(average_rating, 0)::float8 AS rating,
             ST_Distance(
@@ -1573,9 +1573,9 @@ func (r *RepositoryImpl) SearchPOIs(ctx context.Context, filter locitypes.POIFil
 		query += ` AND category = $4`
 		args = append(args, filter.Category) // $4
 	}
-	if len(filter.Categories) > 0 {
-		args = append(args, filter.Categories)
-		query += fmt.Sprintf(` AND lower(category) = ANY($%d)`, len(args))
+	if pattern := categoryWordsPattern(filter.Categories); pattern != "" {
+		args = append(args, pattern)
+		query += fmt.Sprintf(` AND lower(`+poiKindSQL+`) ~ $%d`, len(args))
 	}
 
 	// Order by distance. The cap goes in the same statement so a dense city
