@@ -30,6 +30,7 @@ func TestRepoGetTrendingDiscoveries(t *testing.T) {
 			created_at >= NOW() - INTERVAL '7 days'
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY city_name
 		ORDER BY search_count DESC, last_search DESC
 		LIMIT $1`)).
@@ -77,6 +78,7 @@ func TestRepoGetTrendingDiscoveries_QueryError(t *testing.T) {
 			created_at >= NOW() - INTERVAL '7 days'
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY city_name
 		ORDER BY search_count DESC, last_search DESC
 		LIMIT $1`)).
@@ -526,6 +528,7 @@ func TestRepoGetTrendingSearchesToday(t *testing.T) {
 			AND query != ''
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY query, city_name
 		ORDER BY search_count DESC, last_searched DESC
 		LIMIT $1`)).
@@ -576,6 +579,7 @@ func TestRepoGetTrendingSearchesToday_QueryError(t *testing.T) {
 			AND query != ''
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY query, city_name
 		ORDER BY search_count DESC, last_searched DESC
 		LIMIT $1`)).
