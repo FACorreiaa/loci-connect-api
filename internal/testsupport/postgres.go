@@ -35,7 +35,13 @@ const (
 	// amd64-only, so it cannot build on Apple Silicon; this prebuilt image runs
 	// everywhere and avoids a multi-minute source compile. Override with
 	// TEST_POSTGRES_IMAGE if a different version is needed.
-	defaultImage = "timescale/timescaledb-ha:pg17"
+	//
+	// Pinned by digest (the multi-arch index of pg17 as published 2026-10-27:
+	// PostgreSQL 17.11, PostGIS 3.6.4, TimescaleDB 2.31.0). The floating pg17
+	// tag was republished without postgis_tiger_geocoder, which migration 0001
+	// creates, and every integration test then failed before its first query.
+	// Move the pin on purpose, after checking the new image against 0001.
+	defaultImage = "timescale/timescaledb-ha:pg17@sha256:3f0b3f6bdf4912878444a36e6113a18346309583c4d1a61d81a0c511342a1afd"
 )
 
 func image() string {
