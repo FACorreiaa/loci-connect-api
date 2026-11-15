@@ -64,7 +64,11 @@ type trendingDiscoveryRow struct {
 	LastSearch  time.Time `db:"last_search"`
 }
 
-// GetTrendingDiscoveries retrieves trending discoveries based on recent search activity
+// GetTrendingDiscoveries retrieves trending discoveries based on recent search activity.
+//
+// Near me sessions carry the city name "nearme": a routing marker for "where I
+// am standing", not a place (see notACity in the vocabulary package). Both
+// trending queries leave it out, or it is listed as a city nobody can open.
 func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) ([]locitypes.TrendingDiscovery, error) {
 	l := r.logger.With(slog.String("repository", "GetTrendingDiscoveries"))
 	l.DebugContext(ctx, "Fetching trending discoveries", slog.Int("limit", limit))
@@ -79,6 +83,7 @@ func (r *RepositoryImpl) GetTrendingDiscoveries(ctx context.Context, limit int) 
 			created_at >= NOW() - INTERVAL '7 days'
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY city_name
 		ORDER BY search_count DESC, last_search DESC
 		LIMIT $1
@@ -453,6 +458,7 @@ func (r *RepositoryImpl) GetTrendingSearchesToday(ctx context.Context, limit int
 			AND query != ''
 			AND city_name IS NOT NULL
 			AND city_name != ''
+			AND LOWER(city_name) != 'nearme'
 		GROUP BY query, city_name
 		ORDER BY search_count DESC, last_searched DESC
 		LIMIT $1
