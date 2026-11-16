@@ -264,6 +264,12 @@ func TestImport_MapsLinkWithHintNeedsNoFetchOrModel(t *testing.T) {
 	require.Equal(t, "Torre de Belém", res.seen[0].Name)
 	require.Equal(t, "Lisbon", res.seen[0].City)
 	require.NotNil(t, res.seen[0].Lat)
+	// Loci does not know it, so the link's own pin is all the position
+	// there is; it must reach the answer.
+	require.Nil(t, out.Places[0].Place)
+	require.NotNil(t, out.Places[0].Lat)
+	require.InDelta(t, 38.6916, *out.Places[0].Lat, 1e-9)
+	require.InDelta(t, -9.2160, *out.Places[0].Lon, 1e-9)
 }
 
 // Short links are followed; the place is read from the redirect chain even

@@ -93,11 +93,15 @@ type Place struct {
 }
 
 // Imported is one place in the answer; Place is nil when it was not found.
+// Lat and Lon are the link's own pin, when it had one: a place Loci does not
+// know yet still has a position, and losing it put a pasted Maps link on the
+// trip with no pin at all.
 type Imported struct {
-	Name  string
-	City  string
-	Note  string
-	Place *Place
+	Name     string
+	City     string
+	Note     string
+	Place    *Place
+	Lat, Lon *float64
 }
 
 // Result is what a link held.
@@ -199,7 +203,7 @@ func (s *Service) resolveAll(ctx context.Context, cands []Candidate) []Imported 
 	sem := make(chan struct{}, resolveConcurrency)
 	var wg sync.WaitGroup
 	for i, c := range cands {
-		out[i] = Imported{Name: c.Name, City: c.City, Note: c.Note}
+		out[i] = Imported{Name: c.Name, City: c.City, Note: c.Note, Lat: c.Lat, Lon: c.Lon}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
