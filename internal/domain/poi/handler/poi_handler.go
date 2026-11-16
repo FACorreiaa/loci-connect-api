@@ -160,6 +160,15 @@ func (h *POIHandler) listNearby(ctx context.Context, msg *poiv1.SearchPOIRequest
 		return nil, apierr.ToConnect(err)
 	}
 	out := presenter.ToPOIProtos(pois)
+	// How far each place is, in km, is what a nearby list is about. The
+	// presenter leaves distance out because the semantic searches reuse the
+	// field for a similarity score; here it is a real distance. Without it the
+	// client read the proto default, and every place was "1 min walk".
+	for i := range out {
+		if i < len(pois) && pois[i].Distance > 0 {
+			out[i].Distance = pois[i].Distance
+		}
+	}
 	h.withTaste(ctx, out...)
 	return connect.NewResponse(&poiv1.SearchPOIResponse{Pois: out}), nil
 }

@@ -110,3 +110,24 @@ func TestSearchPOI_EmptyQueryWithoutLocationIsInvalid(t *testing.T) {
 		t.Fatal("no search should run")
 	}
 }
+
+// A nearby list is about how far each place is. The presenter leaves
+// distance out (semantic searches reuse the field for a similarity score),
+// so the listing has to carry it, or the client reads the proto default and
+// every place is "1 min walk".
+func TestSearchPOI_NearbyListingCarriesDistance(t *testing.T) {
+	svc := &nearbyService{result: []locitypes.POIDetailedInfo{
+		{ID: uuid.New(), Name: "near", Latitude: 38.7, Longitude: -9.1, Distance: 0.12},
+		{ID: uuid.New(), Name: "far", Latitude: 38.7, Longitude: -9.1, Distance: 0.64},
+	}}
+	resp, err := NewPOIHandler(svc).SearchPOI(context.Background(), connect.NewRequest(&poiv1.SearchPOIRequest{
+		Latitude: 38.7, Longitude: -9.1,
+	}))
+	if err != nil {
+		t.Fatalf("SearchPOI: %v", err)
+	}
+	got := resp.Msg.GetPois()
+	if len(got) != 2 || got[0].GetDistance() != 0.12 || got[1].GetDistance() != 0.64 {
+		t.Fatalf("distances = %v, %v", got[0].GetDistance(), got[1].GetDistance())
+	}
+}
