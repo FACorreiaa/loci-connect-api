@@ -54,6 +54,9 @@ func (h *Handler) ImportPlaces(ctx context.Context, req *connect.Request[placev1
 			if p.Place.Category != "" {
 				ip.Category = &p.Place.Category
 			}
+		} else if p.Lat != nil && p.Lon != nil {
+			// Not a place Loci knows, but the link pinned it.
+			ip.Latitude, ip.Longitude = p.Lat, p.Lon
 		}
 		out.Places = append(out.Places, ip)
 	}

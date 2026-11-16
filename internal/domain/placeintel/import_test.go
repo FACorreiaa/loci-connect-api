@@ -86,3 +86,20 @@ func TestImportPlaces_ErrorCodes(t *testing.T) {
 		require.Equal(t, want, connect.CodeOf(err), in.Error())
 	}
 }
+
+// A pasted Maps link for a place Loci does not know yet: no POI, but the
+// link pinned it, and that pin is what puts it on the map once it is added.
+func TestImportPlaces_KeepsTheLinksPinForAnUnknownPlace(t *testing.T) {
+	lat, lon := 37.3934, -5.9946
+	imp := &stubImporter{res: &linkimport.Result{
+		Source: linkimport.SourceGoogleMaps, City: "Seville",
+		Places: []linkimport.Imported{{Name: "Confitería La Campana", City: "Seville", Lat: &lat, Lon: &lon}},
+	}}
+	resp, err := NewHandler(nil, nil).WithLinkImport(imp).ImportPlaces(signedIn(),
+		connect.NewRequest(&placev1.ImportPlacesRequest{Url: "https://maps.app.goo.gl/x"}))
+	require.NoError(t, err)
+	p := resp.Msg.GetPlaces()[0]
+	require.Nil(t, p.PoiId)
+	require.InDelta(t, lat, p.GetLatitude(), 1e-9)
+	require.InDelta(t, lon, p.GetLongitude(), 1e-9)
+}
