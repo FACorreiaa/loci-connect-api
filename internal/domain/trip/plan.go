@@ -32,6 +32,8 @@ const (
 	maxStarRating = 10
 	maxPOIID      = 100
 	maxBookingURL = 2000
+	maxAddress    = 300
+	maxPriceNote  = 120
 	maxPlaceName  = 200
 	maxCarrier    = 100
 	maxFlightNo   = 20
@@ -125,6 +127,19 @@ func upsertStay(t *Trip, s TripStay) error {
 		return invalid("a booking link must be an https:// address of at most %d characters", maxBookingURL)
 	case s.CheckIn != nil && s.CheckOut != nil && s.CheckOut.Before(*s.CheckIn):
 		return invalid("check-out is before check-in")
+	case tooLong(s.Address, maxAddress), tooLongPtr(s.PriceNote, maxPriceNote):
+		return invalid("a stay field is too long")
+	case (s.Lat == nil) != (s.Lon == nil):
+		return invalid("a stay's position needs both a latitude and a longitude")
+	case s.HasPin() && (*s.Lat < -90 || *s.Lat > 90 || *s.Lon < -180 || *s.Lon > 180):
+		return invalid("a stay's position is off the map")
+	}
+	if s.PriceNote != nil {
+		if note := strings.TrimSpace(*s.PriceNote); note == "" {
+			s.PriceNote = nil
+		} else {
+			s.PriceNote = &note
+		}
 	}
 	for i := range t.Stays {
 		if sameCity(t.Stays[i].CityName, s.CityName) {

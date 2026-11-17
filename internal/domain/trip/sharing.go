@@ -381,6 +381,8 @@ func redactForViewer(p *tripv1.TripDraft, shareDetails bool, owner *socialv1.Pub
 		}
 		for _, s := range p.GetStays() {
 			s.BookingUrl = nil
+			// What the traveller is paying is theirs, like a flight's price.
+			s.PriceNote = nil
 		}
 		// What the traveller typed about a flight can place them (a flight
 		// number, a booking reference in notes); friends see the route and date.

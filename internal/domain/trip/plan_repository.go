@@ -81,9 +81,11 @@ func (r *planRepository) SavePlan(ctx context.Context, t *Trip, baseVersion int6
 			id = uuid.New()
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO trip_stays (id, trip_id, city_name, poi_id, name, star_rating, check_in, check_out, booking_url)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-			id, t.ID, s.CityName, s.POIID, s.Name, s.StarRating, s.CheckIn, s.CheckOut, s.BookingURL); err != nil {
+			INSERT INTO trip_stays (id, trip_id, city_name, poi_id, name, star_rating, check_in, check_out, booking_url,
+				lat, lon, address, price_note)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+			id, t.ID, s.CityName, s.POIID, s.Name, s.StarRating, s.CheckIn, s.CheckOut, s.BookingURL,
+			s.Lat, s.Lon, s.Address, s.PriceNote); err != nil {
 			return nil, fmt.Errorf("insert stay: %w", err)
 		}
 	}

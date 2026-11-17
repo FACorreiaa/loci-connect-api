@@ -131,7 +131,16 @@ type TripStay struct {
 	CheckIn    *time.Time
 	CheckOut   *time.Time
 	BookingURL *string
+	// Lat and Lon are set together or not at all. A stay without them has no
+	// transport section.
+	Lat, Lon *float64
+	Address  string
+	// PriceNote is what the traveller said they would pay, as they wrote it.
+	PriceNote *string
 }
+
+// HasPin reports whether the stay knows where it is.
+func (s TripStay) HasPin() bool { return s.Lat != nil && s.Lon != nil }
 
 // TripFlight is a flight the traveller chose. Links are server-built; the
 // pointer fields are whatever the traveller typed, never a quoted fare.
@@ -990,7 +999,8 @@ func (r *repository) loadCities(ctx context.Context, t *Trip) error {
 // loadPlan populates t.Stays and t.Flights. Dates come with the trip row.
 func (r *repository) loadPlan(ctx context.Context, t *Trip) error {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, city_name, poi_id, name, star_rating, check_in, check_out, booking_url
+		SELECT id, city_name, poi_id, name, star_rating, check_in, check_out, booking_url,
+		       lat, lon, address, price_note
 		FROM trip_stays WHERE trip_id = $1 ORDER BY check_in NULLS LAST, city_name`, t.ID)
 	if err != nil {
 		return fmt.Errorf("load stays: %w", err)
@@ -998,7 +1008,8 @@ func (r *repository) loadPlan(ctx context.Context, t *Trip) error {
 	t.Stays = nil
 	for rows.Next() {
 		var s TripStay
-		if err := rows.Scan(&s.ID, &s.CityName, &s.POIID, &s.Name, &s.StarRating, &s.CheckIn, &s.CheckOut, &s.BookingURL); err != nil {
+		if err := rows.Scan(&s.ID, &s.CityName, &s.POIID, &s.Name, &s.StarRating, &s.CheckIn, &s.CheckOut, &s.BookingURL,
+			&s.Lat, &s.Lon, &s.Address, &s.PriceNote); err != nil {
 			rows.Close()
 			return fmt.Errorf("scan stay: %w", err)
 		}
