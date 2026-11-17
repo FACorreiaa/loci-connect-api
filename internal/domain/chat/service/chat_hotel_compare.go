@@ -64,6 +64,17 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 		}
 	}
 
+	// The turn opens like any other: a session of its own (or the one the
+	// client is continuing) and a START naming it, which is what a client
+	// navigates on and files the answer under.
+	sessionID := l.compareSession(ctx, cc)
+	l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
+		Type: locitypes.EventTypeStart,
+		Data: map[string]any{
+			"domain": string(locitypes.DomainAccommodation), "city": req.CityHint, "session_id": sessionID.String(),
+		},
+	}, 3)
+
 	rep, err := l.hotelCompare.Compare(ctx, req, func(stage string) {
 		l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
 			Type: locitypes.EventTypeProgress, Data: map[string]any{"status": stage},
@@ -77,15 +88,21 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 		}, 3)
 		return true
 	case err != nil:
-		l.logger.WarnContext(cc.Ctx, "hotel compare: failed; answering as usual", slog.Any("error", err))
-		return false
+		// The turn has started under its own session, so it ends here rather
+		// than being handed to the planner half-way.
+		l.logger.WarnContext(cc.Ctx, "hotel compare: failed", slog.Any("error", err))
+		l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
+			Type: locitypes.EventTypeError, IsFinal: true,
+			Error: "I couldn't compare those hotels just now. Try again in a moment.",
+		}, 3)
+		return true
 	}
 
 	ev := hotelcompare.Event{Report: rep}
 	var prop *tripaction.Proposal
 	if l.stayChoices != nil && rep.City != "" {
 		if tripID := hotelcompare.TripFor(ctx, l.tripRepo, cc.UserID, cc.TripID, rep.City, time.Now()); tripID != uuid.Nil {
-			prop, err = l.stayChoices.ProposeStayChoice(ctx, cc.UserID, tripID, cc.RequestedSessionID, rep.City, rep.ID.String(), rep.Stays())
+			prop, err = l.stayChoices.ProposeStayChoice(ctx, cc.UserID, tripID, sessionID, rep.City, rep.ID.String(), rep.Stays())
 			if err != nil {
 				// The report still stands; the client's own picker can save a stay.
 				l.logger.WarnContext(cc.Ctx, "hotel compare: offering the stays failed", slog.Any("error", err))
@@ -101,6 +118,7 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 	if summary == "" {
 		summary = "Here is what I could check about these hotels."
 	}
+	l.remember(ctx, sessionID, summary)
 	l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeHotelComparison, Message: summary, Data: ev}, 3)
 	if prop != nil {
 		l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeActionProposal, Message: prop.Summary, Data: *prop}, 3)
@@ -109,4 +127,51 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 		Type: locitypes.EventTypeComplete, Data: "Turn completed.", IsFinal: true,
 	}, 3)
 	return true
+}
+
+// compareSession is the session a comparison turn is filed under: the one
+// the client is continuing when it is theirs, else a new one. The thread
+// keeps the question and the verdict; the report card itself is not stored
+// there (a client keeps the one it was sent).
+//
+// A session that cannot be stored still gets an id, so the turn is answered:
+// losing the thread is better than losing the answer.
+func (l *ServiceImpl) compareSession(ctx context.Context, cc common.ChatContext) uuid.UUID {
+	question := locitypes.ConversationMessage{Role: "user", Content: cc.Message, Timestamp: time.Now()}
+	if l.llmInteractionRepo == nil {
+		return uuid.New()
+	}
+	if cc.RequestedSessionID != uuid.Nil {
+		if existing, err := l.llmInteractionRepo.GetSession(ctx, cc.RequestedSessionID); err == nil && existing != nil && existing.UserID == cc.UserID {
+			if err := l.llmInteractionRepo.AddMessageToSession(ctx, existing.ID, question); err != nil {
+				l.logger.WarnContext(ctx, "hotel compare: question not added to the session", slog.Any("error", err))
+			}
+			return existing.ID
+		}
+	}
+	id := uuid.New()
+	now := time.Now()
+	err := l.llmInteractionRepo.CreateSession(ctx, locitypes.ChatSession{
+		ID: id, UserID: cc.UserID, ProfileID: cc.ProfileID, CityName: cc.CityName,
+		ConversationHistory: []locitypes.ConversationMessage{question},
+		SessionContext:      locitypes.SessionContext{CityName: cc.CityName, ConversationSummary: "Hotel comparison"},
+		CreatedAt:           now, UpdatedAt: now, ExpiresAt: now.Add(24 * time.Hour), Status: "active",
+	})
+	if err != nil {
+		l.logger.WarnContext(ctx, "hotel compare: session not stored", slog.Any("error", err))
+	}
+	return id
+}
+
+// remember adds the verdict to the turn's thread. Best effort.
+func (l *ServiceImpl) remember(ctx context.Context, sessionID uuid.UUID, text string) {
+	if l.llmInteractionRepo == nil {
+		return
+	}
+	msg := locitypes.ConversationMessage{
+		ID: uuid.New(), Role: locitypes.RoleAssistant, Content: text, MessageType: locitypes.TypeResponse, Timestamp: time.Now(),
+	}
+	if err := l.llmInteractionRepo.AddMessageToSession(ctx, sessionID, msg); err != nil {
+		l.logger.WarnContext(ctx, "hotel compare: verdict not added to the session", slog.Any("error", err))
+	}
 }

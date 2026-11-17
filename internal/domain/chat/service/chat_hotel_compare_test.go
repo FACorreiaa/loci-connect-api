@@ -104,7 +104,14 @@ func TestHotelLinks_ReportThenStayCardThenComplete(t *testing.T) {
 	ch := make(chan locitypes.StreamEvent, 10)
 	require.NoError(t, l.ProcessUnifiedChatMessageStream(compareTurn(ch, uid)))
 	evs := drainEvents(ch)
-	require.Len(t, evs, 5)
+	require.Len(t, evs, 6)
+	// It opens like any turn, so a client navigates and files the answer.
+	require.Equal(t, locitypes.EventTypeStart, evs[0].Type)
+	start := evs[0].Data.(map[string]any)
+	require.Equal(t, string(locitypes.DomainAccommodation), start["domain"])
+	_, err := uuid.Parse(start["session_id"].(string))
+	require.NoError(t, err)
+	evs = evs[1:]
 	require.Equal(t, locitypes.EventTypeProgress, evs[0].Type)
 	require.Equal(t, map[string]any{"status": hotelcompare.StageLinks}, evs[0].Data)
 
@@ -144,8 +151,8 @@ func TestHotelLinks_NoTripToOfferTheStayTo(t *testing.T) {
 			ch := make(chan locitypes.StreamEvent, 10)
 			require.NoError(t, l.ProcessUnifiedChatMessageStream(compareTurn(ch, uid)))
 			evs := drainEvents(ch)
-			require.Len(t, evs, 4, "progress twice, the report, completion: no card")
-			require.Empty(t, evs[2].Data.(hotelcompare.Event).StayProposalID)
+			require.Len(t, evs, 5, "start, progress twice, the report, completion: no card")
+			require.Empty(t, evs[3].Data.(hotelcompare.Event).StayProposalID)
 			require.Equal(t, uuid.Nil, stays.tripID, "nothing was proposed")
 		})
 	}
@@ -167,7 +174,8 @@ func TestHotelLinks_BoundTripGivesTheCityAndDates(t *testing.T) {
 	cc.TripID = bound.ID
 	require.NoError(t, l.ProcessUnifiedChatMessageStream(cc))
 	evs := drainEvents(ch)
-	require.Equal(t, locitypes.EventTypeHotelComparison, evs[2].Type, "compared, not turned into trip changes")
+	require.Equal(t, locitypes.EventTypeHotelComparison, evs[3].Type, "compared, not turned into trip changes")
+	require.Equal(t, "Barcelona", evs[0].Data.(map[string]any)["city"], "the trip's city, for a client that titles the page by it")
 	require.Equal(t, "Barcelona", cmp.got.CityHint)
 	require.Equal(t, &start, cmp.got.CheckIn)
 	require.Equal(t, bound.ID, stays.tripID, "the trip the chat is about, though another has the city too")
@@ -179,7 +187,7 @@ func TestHotelLinks_BoundTripGivesTheCityAndDates(t *testing.T) {
 	ch = make(chan locitypes.StreamEvent, 10)
 	cc.EventCh = ch
 	require.NoError(t, l.ProcessUnifiedChatMessageStream(cc))
-	require.Len(t, drainEvents(ch), 4)
+	require.Len(t, drainEvents(ch), 5)
 }
 
 func TestHotelLinks_AnsweredAsUsualWhenNotAComparison(t *testing.T) {
@@ -191,9 +199,6 @@ func TestHotelLinks_AnsweredAsUsualWhenNotAComparison(t *testing.T) {
 		},
 		"a resumed turn is replayed": func(cc *common.ChatContext, _ *ServiceImpl) { cc.ResumeToken = "tok" },
 		"comparison is switched off": func(_ *common.ChatContext, l *ServiceImpl) { l.SetHotelCompare(nil, nil) },
-		"the comparison failed": func(_ *common.ChatContext, l *ServiceImpl) {
-			l.SetHotelCompare(&fakeComparer{err: errors.New("boom")}, nil)
-		},
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -226,9 +231,25 @@ func TestHotelLinks_DailyLimitSaysSoAndStops(t *testing.T) {
 	ch := make(chan locitypes.StreamEvent, 10)
 	require.NoError(t, l.ProcessUnifiedChatMessageStream(compareTurn(ch, uuid.New())))
 	evs := drainEvents(ch)
-	require.Len(t, evs, 1)
-	require.Equal(t, locitypes.EventTypeError, evs[0].Type)
-	require.Contains(t, evs[0].Error, "Try again tomorrow")
+	require.Len(t, evs, 2)
+	require.Equal(t, locitypes.EventTypeStart, evs[0].Type)
+	require.Equal(t, locitypes.EventTypeError, evs[1].Type)
+	require.Contains(t, evs[1].Error, "Try again tomorrow")
+}
+
+// A turn that has started under its own session ends there: it is not handed
+// to the planner half-way, which would open a second session on the client.
+func TestHotelLinks_AFailedComparisonSaysSoAndStops(t *testing.T) {
+	l := newStreamService(t, &TestLLMClient{})
+	neverPlans(t, l)
+	l.SetHotelCompare(&fakeComparer{err: errors.New("boom")}, nil)
+	ch := make(chan locitypes.StreamEvent, 10)
+	require.NoError(t, l.ProcessUnifiedChatMessageStream(compareTurn(ch, uuid.New())))
+	evs := drainEvents(ch)
+	require.Len(t, evs, 2)
+	require.Equal(t, locitypes.EventTypeError, evs[1].Type)
+	require.True(t, evs[1].IsFinal)
+	require.NotContains(t, evs[1].Error, "boom", "an operator's error is not read to a traveller")
 }
 
 func TestHotelLinks_AFailedCardStillLeavesTheReport(t *testing.T) {
@@ -240,6 +261,6 @@ func TestHotelLinks_AFailedCardStillLeavesTheReport(t *testing.T) {
 	ch := make(chan locitypes.StreamEvent, 10)
 	require.NoError(t, l.ProcessUnifiedChatMessageStream(compareTurn(ch, uid)))
 	evs := drainEvents(ch)
-	require.Len(t, evs, 4)
-	require.Empty(t, evs[2].Data.(hotelcompare.Event).StayProposalID)
+	require.Len(t, evs, 5)
+	require.Empty(t, evs[3].Data.(hotelcompare.Event).StayProposalID)
 }
