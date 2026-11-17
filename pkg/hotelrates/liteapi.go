@@ -197,6 +197,11 @@ type liteHotel struct {
 	Longitude float64 `json:"longitude"`
 	City      string  `json:"city"`
 	Country   string  `json:"country"`
+	// Only read by Identify. LiteAPI leaves any of them out for some hotels.
+	Address     string  `json:"address"`
+	Stars       float64 `json:"stars"`
+	Rating      float64 `json:"rating"`
+	ReviewCount int     `json:"reviewCount"`
 }
 
 type hotelsResponse struct {
