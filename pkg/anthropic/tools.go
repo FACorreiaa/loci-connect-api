@@ -88,6 +88,30 @@ type ToolTurnRequest struct {
 	// ForbidTools makes the model answer with what it has. The tools are still
 	// sent, because a history with tool calls in it needs them defined.
 	ForbidTools bool
+	// ForceTool names the one tool the model must call. It cannot be combined
+	// with AdaptiveThinking, which the API refuses alongside a forced tool.
+	ForceTool string
+	// WebSearch, when set, lets the model search the web inside this one call.
+	// The search runs on Anthropic's side and is billed per search on top of
+	// tokens. Its result blocks are not kept in Message, so a turn that used
+	// it cannot be replayed: use it for a call that ends the conversation.
+	WebSearch *WebSearch
+}
+
+// WebSearch bounds the web search tool for one call.
+type WebSearch struct {
+	// MaxUses caps the searches in the call. Zero or less means one.
+	MaxUses int64
+	// BlockedDomains never appear in results.
+	BlockedDomains []string
+}
+
+// WebSource is one page a web search returned.
+type WebSource struct {
+	URL   string
+	Title string
+	// PageAge is the API's own wording for how old the page is; may be empty.
+	PageAge string
 }
 
 // ToolUsage is what one call spent.
@@ -96,6 +120,8 @@ type ToolUsage struct {
 	OutputTokens     int64
 	CacheReadTokens  int64
 	CacheWriteTokens int64
+	// WebSearchRequests is how many web searches the call ran.
+	WebSearchRequests int64
 }
 
 // ToolTurnResult is what one call produced.
@@ -113,6 +139,10 @@ type ToolTurnResult struct {
 	// strict tool schemas has to compile first, so the first call can be slow.
 	FirstEvent time.Duration
 	Usage      ToolUsage
+	// WebSources are the pages web searches in this call returned, in order,
+	// without duplicates. Only these may be cited as sources: a URL the model
+	// writes that is not among them was not read.
+	WebSources []WebSource
 }
 
 // ToolUses returns the tool calls in the turn.
@@ -200,11 +230,13 @@ func (c *ChatClient) ToolTurn(
 		Model:      string(msg.Model),
 		FirstEvent: firstEvent,
 		Usage: ToolUsage{
-			InputTokens:      msg.Usage.InputTokens,
-			OutputTokens:     msg.Usage.OutputTokens,
-			CacheReadTokens:  msg.Usage.CacheReadInputTokens,
-			CacheWriteTokens: msg.Usage.CacheCreationInputTokens,
+			InputTokens:       msg.Usage.InputTokens,
+			OutputTokens:      msg.Usage.OutputTokens,
+			CacheReadTokens:   msg.Usage.CacheReadInputTokens,
+			CacheWriteTokens:  msg.Usage.CacheCreationInputTokens,
+			WebSearchRequests: msg.Usage.ServerToolUse.WebSearchRequests,
 		},
+		WebSources: webSources(msg.Content),
 	}, nil
 }
 
@@ -220,8 +252,21 @@ func (c *ChatClient) toolParams(req ToolTurnRequest) sdk.MessageNewParams {
 		Messages:  messageParams(req.Messages),
 		Tools:     toolParams(req.Tools),
 	}
-	if req.ForbidTools {
+	if req.WebSearch != nil {
+		maxUses := req.WebSearch.MaxUses
+		if maxUses <= 0 {
+			maxUses = 1
+		}
+		p.Tools = append(p.Tools, sdk.ToolUnionParam{OfWebSearchTool20250305: &sdk.WebSearchTool20250305Param{
+			MaxUses:        sdk.Int(maxUses),
+			BlockedDomains: req.WebSearch.BlockedDomains,
+		}})
+	}
+	switch {
+	case req.ForbidTools:
 		p.ToolChoice = sdk.ToolChoiceUnionParam{OfNone: &sdk.ToolChoiceNoneParam{}}
+	case req.ForceTool != "":
+		p.ToolChoice = sdk.ToolChoiceUnionParam{OfTool: &sdk.ToolChoiceToolParam{Name: req.ForceTool}}
 	}
 	if req.System != "" {
 		// A breakpoint on the system block caches the tools ahead of it too.
@@ -293,6 +338,27 @@ func messageParams(messages []ToolMessage) []sdk.MessageParam {
 		}
 	}
 	return params
+}
+
+// webSources lists the pages every web search in the turn returned. A search
+// that failed has an error in place of results and contributes nothing.
+func webSources(content []sdk.ContentBlockUnion) []WebSource {
+	var out []WebSource
+	seen := map[string]bool{}
+	for _, block := range content {
+		b, ok := block.AsAny().(sdk.WebSearchToolResultBlock)
+		if !ok {
+			continue
+		}
+		for _, r := range b.Content.AsWebSearchResultBlockArray() {
+			if r.URL == "" || seen[r.URL] {
+				continue
+			}
+			seen[r.URL] = true
+			out = append(out, WebSource{URL: r.URL, Title: r.Title, PageAge: r.PageAge})
+		}
+	}
+	return out
 }
 
 // blocksFromContent keeps what can be replayed. Block types added later are
