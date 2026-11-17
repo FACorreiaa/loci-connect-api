@@ -316,7 +316,11 @@ func (s *Service) hotelOptions(ctx context.Context, userID uuid.UUID, a Action) 
 		if v, ok := starsOf(h.StarRating); ok {
 			stars = strconv.FormatFloat(v, 'f', -1, 64)
 		}
-		stay := &trip.TripStay{CityName: a.City, Name: h.Name, StarRating: stars}
+		stay := &trip.TripStay{CityName: a.City, Name: h.Name, StarRating: stars, Address: clipRunes(h.Address, 300)}
+		// With a position the trip can say what is near the hotel.
+		if lat, lon := h.Latitude, h.Longitude; (lat != 0 || lon != 0) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180 {
+			stay.Lat, stay.Lon = &lat, &lon
+		}
 		if h.ID != uuid.Nil {
 			stay.POIID = h.ID.String()
 		}
@@ -332,6 +336,65 @@ func (s *Service) hotelOptions(ctx context.Context, userID uuid.UUID, a Action) 
 		opts = append(opts, Option{Label: label, Detail: h.Address, Stay: stay})
 	}
 	return opts, nil
+}
+
+func clipRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+// maxStayChoices is how many hotels one comparison offers.
+const maxStayChoices = 3
+
+// ProposeStayChoice stores a card offering the hotels a comparison report
+// looked at, for the caller to pick one as the stay in city. The stays come
+// from the report, which the server wrote from its own hotel and map data;
+// nothing a model said reaches the trip through here.
+//
+// It answers nil, with no error, when there is nothing to offer: the caller
+// is not the trip's owner (a stay is the owner's pick, like a hotel card),
+// the city is not on the trip, or no stay is fit to save.
+func (s *Service) ProposeStayChoice(ctx context.Context, userID, tripID, sessionID uuid.UUID, city, reportID string, stays []trip.TripStay) (*Proposal, error) {
+	t, owner, err := s.proposer(ctx, userID, tripID)
+	if err != nil || t == nil || !owner {
+		return nil, err
+	}
+	onTrip, ok := pickCity(city, snapshotOf(t, s.d.Now()).Cities)
+	if !ok {
+		return nil, nil
+	}
+	p := Proposal{
+		UserID: userID, TripID: t.ID, SessionID: s.ownedSession(ctx, userID, sessionID),
+		Action:    Action{Kind: KindChooseStay, City: onTrip, ReportID: reportID},
+		ExpiresAt: s.d.Now().Add(proposalTTL), Source: SourceChat,
+	}
+	for _, st := range stays {
+		st.Name = strings.TrimSpace(st.Name)
+		if st.Name == "" || len(p.Options) == maxStayChoices {
+			continue
+		}
+		st.ID, st.CityName = uuid.Nil, onTrip
+		label := st.Name
+		if st.StarRating != "" {
+			label += " · " + st.StarRating + "★"
+		}
+		detail := st.Address
+		if st.PriceNote != nil {
+			detail = strings.TrimSpace(strings.TrimSuffix(*st.PriceNote+" · "+detail, " · "))
+		}
+		p.Options = append(p.Options, Option{Label: label, Detail: detail, Stay: &st})
+	}
+	if len(p.Options) == 0 {
+		return nil, nil
+	}
+	p.Summary = fmt.Sprintf("Pick the one to stay at in %s.", onTrip)
+	if err := s.d.Store.Create(ctx, &p); err != nil {
+		return nil, err
+	}
+	s.proposed(ctx, userID, t, owner, []Proposal{p})
+	return &p, nil
 }
 
 func (s *Service) flightOption(a Action) (Option, error) {
@@ -448,7 +511,7 @@ func (s *Service) Applicable(ctx context.Context, userID, proposalID uuid.UUID) 
 // taken by default; hotels need the traveller's choice.
 func pick(p *Proposal, option *int) (*Option, error) {
 	switch p.Action.Kind {
-	case KindSearchHotels:
+	case KindSearchHotels, KindChooseStay:
 		if option == nil || *option < 0 || *option >= len(p.Options) {
 			return nil, ErrNoOption
 		}
@@ -480,7 +543,7 @@ func (s *Service) apply(ctx context.Context, userID uuid.UUID, p *Proposal, opt 
 			return nil, fmt.Errorf("%w: end date %q", trip.ErrInvalidEdit, a.EndDate)
 		}
 		return s.d.Plans.SetDates(ctx, userID, p.TripID, base, start, end)
-	case KindSearchHotels:
+	case KindSearchHotels, KindChooseStay:
 		return s.d.Plans.SetStay(ctx, userID, p.TripID, base, *opt.Stay)
 	case KindSearchFlights:
 		return s.d.Plans.AddFlight(ctx, userID, p.TripID, base, *opt.Flight)
@@ -567,7 +630,7 @@ func (s *Service) confirm(ctx context.Context, p *Proposal, opt *Option) *locity
 	switch p.Action.Kind {
 	case KindSetDates:
 		text = "Dates set: " + dayRange(p.Action.StartDate, p.Action.EndDate) + "."
-	case KindSearchHotels:
+	case KindSearchHotels, KindChooseStay:
 		text = fmt.Sprintf("Staying at %s in %s.", opt.Stay.Name, opt.Stay.CityName)
 	case KindSearchFlights:
 		text = fmt.Sprintf("Flight search saved: %s → %s, %s.", p.Action.Origin.Name, p.Action.Destination.Name, flightDates(p.Action))

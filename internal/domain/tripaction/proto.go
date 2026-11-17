@@ -100,6 +100,10 @@ func actionToProto(a Action) *chatv1.TripAction {
 		return &chatv1.TripAction{Kind: &chatv1.TripAction_SearchHotels{SearchHotels: &chatv1.SearchHotelsAction{
 			CityName: a.City, MinStars: int32(a.MinStars), MaxStars: int32(a.MaxStars),
 		}}}
+	case KindChooseStay:
+		return &chatv1.TripAction{Kind: &chatv1.TripAction_ChooseStay{ChooseStay: &chatv1.ChooseStayAction{
+			CityName: a.City, ReportId: a.ReportID,
+		}}}
 	case KindRegenerateDays:
 		return &chatv1.TripAction{Kind: &chatv1.TripAction_RegenerateDays{RegenerateDays: &chatv1.RegenerateDaysAction{
 			Days: int32(a.Days),
