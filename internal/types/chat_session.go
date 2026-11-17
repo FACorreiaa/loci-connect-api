@@ -288,6 +288,10 @@ const (
 	// EventTypeAccessibleRoute carries one day's walking legs for a traveller
 	// with access needs (StreamAccessibleRouteData), sent after the itinerary.
 	EventTypeAccessibleRoute = "accessible_route"
+	// EventTypeHotelComparison carries a hotelcompare.Event: the answer to a
+	// message with hotel listing links in it. Only sent to a client that says
+	// it can render one.
+	EventTypeHotelComparison = "hotel_comparison"
 	EventTypeChunk           = "chunk" // For immediate text chunks (Google GenAI pattern)
 )
 

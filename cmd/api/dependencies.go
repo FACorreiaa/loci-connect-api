@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/linkimport"
 	"github.com/FACorreiaa/loci-connect-api/pkg/accessibility"
 	"github.com/FACorreiaa/loci-connect-api/pkg/hotelrates"
@@ -18,6 +19,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/FACorreiaa/loci-connect-api/pkg/routing"
 	"github.com/FACorreiaa/loci-connect-api/pkg/safefetch"
+	"github.com/FACorreiaa/loci-connect-api/pkg/transit"
 
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/achievements"
@@ -251,11 +253,15 @@ type Dependencies struct {
 	PlaceIntelligenceHandler *placeintel.Handler
 	MemoryHandler            *memory.Handler
 	AssistantHandler         *assistant.Handler
-	LocalContextHandler      *localcontext.Handler
-	CompareHandler           *compare.Handler
-	PricingHandler           *pricing.Handler
-	CityHandler              *cityhandler.CityHandler
-	TravelHistoryHandler     *travelhistory.Handler
+	// hotelCompare answers pasted hotel links in both chats, and stayChoices
+	// offers its hotels as a trip's stay. Nil unless HOTEL_COMPARE_ENABLED.
+	hotelCompare         *hotelcompare.Service
+	stayChoices          *tripaction.Service
+	LocalContextHandler  *localcontext.Handler
+	CompareHandler       *compare.Handler
+	PricingHandler       *pricing.Handler
+	CityHandler          *cityhandler.CityHandler
+	TravelHistoryHandler *travelhistory.Handler
 	// RecapHandler serves trip recaps; RecapImages draws their shared images.
 	RecapHandler *recap.Handler
 	RecapImages  *recap.ImageHandler
@@ -521,7 +527,7 @@ func (d *Dependencies) initServices() error {
 	if src := newPlaceAccessibility(appCache); src != nil {
 		chatSvc.SetPlaceAccessibility(src)
 	}
-	if router := newPedestrianRouter(appCache, d.Logger); router != nil {
+	if router := newPedestrianRouter(appCache, d.Logger, envInt("ORS_DAILY_BUDGET", 1800)); router != nil {
 		chatSvc.SetPedestrianRouter(router)
 	}
 	// Report which cache layer served each part of each answer, so the hit rate
@@ -673,6 +679,9 @@ func (d *Dependencies) initAssistant(members assistant.TripResolver, friends ass
 			Memory: mem, Friends: friends, Visits: d.TravelHistoryRepo, Activity: d.RecentsSvc,
 			Proposals: proposals, Favourites: d.POISvc, ListItems: d.ListSvc,
 		},
+	}
+	if d.hotelCompare != nil {
+		deps.Hotels, deps.StayChoices, deps.Trips = d.hotelCompare, d.stayChoices, d.TripRepo
 	}
 	model, err := ai.NewToolClient(d.Config.AI, d.Logger)
 	if err != nil {
@@ -1156,6 +1165,17 @@ func (d *Dependencies) initHandlers() error {
 		// which edits a trip's plan through the same rules as the editor.
 		d.TripService = trip.NewService(d.TripRepo, trip.NewPlanRepository(d.DB.Pool, d.Logger), d.flightLinks)
 		d.TripHandler = d.TripHandler.WithPlan(d.TripService).WithAirports(d.flightAirports)
+		// What is near a stay, and the walk from it. Both optional: without
+		// the map the answer has no stops, without the router no routed walks.
+		stayMap := newStayMap(d.AppCache, d.Logger)
+		{
+			var around trip.StaySurroundings
+			if stayMap != nil {
+				around = stayMap
+			}
+			d.TripHandler = d.TripHandler.WithStayTransport(around,
+				newPedestrianRouter(d.AppCache, d.Logger, envInt("TRANSIT_ORS_DAILY_BUDGET", 150)))
+		}
 		// Boards moderators are ADMIN_EMAILS plus the single ADMIN_EMAIL.
 		boardAdmins := append([]string{d.Config.Auth.AdminEmail}, d.Config.Auth.AdminEmails...)
 		boardsSvc := boardsdomain.NewService(boardsdomain.NewRepository(d.DB.Pool), boardAdmins, boardsdomain.DefaultLimits)
@@ -1196,6 +1216,11 @@ func (d *Dependencies) initHandlers() error {
 				Logger:    d.Logger,
 			})
 			chatImpl.SetTripActions(tripActions)
+			// Pasted hotel links, in both chats. Off unless switched on.
+			if cmp := d.newHotelCompare(stayMap); cmp != nil {
+				d.hotelCompare, d.stayChoices = cmp, tripActions
+				chatImpl.SetHotelCompare(cmp, tripActions)
+			}
 			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions).WithTripProposals(tripActions)
 			assistantProposals = tripActions
 			// Telegram gets the same proposals as buttons. The bridge was built
@@ -1570,7 +1595,7 @@ func newHotelRates(cache cachestore.Store, logger *slog.Logger) hotelrates.Provi
 //
 // It gets its own client rather than the signals one: the router's per-minute
 // limit is far below the 5 req/s the signals client allows.
-func newPedestrianRouter(cache cachestore.Store, logger *slog.Logger) routing.PedestrianRouter {
+func newPedestrianRouter(cache cachestore.Store, logger *slog.Logger, dailyBudget int) routing.PedestrianRouter {
 	provider := strings.ToLower(strings.TrimSpace(os.Getenv("ROUTING_PROVIDER")))
 	if provider == "" || provider == "none" {
 		return nil
@@ -1598,7 +1623,100 @@ func newPedestrianRouter(cache cachestore.Store, logger *slog.Logger) routing.Pe
 		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
 	})
 	return routing.NewOpenRouteService(os.Getenv("ORS_BASE_URL"), key, client, cache,
-		routing.NewDailyBudget(envInt("ORS_DAILY_BUDGET", 1800)))
+		routing.NewDailyBudget(dailyBudget))
+}
+
+// newStayMap builds the reader of what is around a stay (public transport
+// stops with their lines, places to eat, shops), or nil when
+// TRANSIT_OVERPASS_URL is unset. A stay then has walking times and maps links
+// but no stops, and a hotel comparison has no "what is nearby".
+//
+//	TRANSIT_OVERPASS_URL           interpreter endpoint of a server that speaks
+//	                               the Overpass query language (enables it)
+//	TRANSIT_OVERPASS_FALLBACK_URL  tried once when the first fails
+//	TRANSIT_OVERPASS_DAILY_BUDGET  queries per UTC day (default 2000)
+//	TRANSIT_ORS_DAILY_BUDGET       routed walks a day for stay transport
+//	                               (default 150; with ORS_DAILY_BUDGET it must
+//	                               stay under the router's own daily quota)
+//
+// There is deliberately no default address. The public Overpass servers are
+// for people at a map, say so, and are often full: production must point at
+// an instance Loci runs or pays for.
+func newStayMap(cache cachestore.Store, logger *slog.Logger) *transit.Overpass {
+	base := strings.TrimSpace(os.Getenv("TRANSIT_OVERPASS_URL"))
+	if base == "" {
+		return nil
+	}
+	client := httpx.New(httpx.Config{
+		Timeout:       15 * time.Second,
+		MaxRetries:    1,
+		RatePerSecond: 1,
+		Burst:         2,
+		UserAgent:     "loci/1.0 (+https://lociai.fyi)",
+	}).WithObserver(func(source, outcome string, d time.Duration) {
+		observability.ExternalRequestsTotal.WithLabelValues(source, outcome).Inc()
+		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
+	})
+	logger.Info("stay transport: map data on", slog.String("server", base))
+	return transit.NewOverpass(transit.OverpassConfig{
+		BaseURL: base, FallbackURL: os.Getenv("TRANSIT_OVERPASS_FALLBACK_URL"),
+	}, client, cache, routing.NewDailyBudget(envInt("TRANSIT_OVERPASS_DAILY_BUDGET", 2000)))
+}
+
+// newHotelCompare builds what answers a chat message with hotel listing
+// links in it, or nil when HOTEL_COMPARE_ENABLED is off.
+//
+//	HOTEL_COMPARE_ENABLED              on/off (default off)
+//	HOTEL_COMPARE_DAILY_PER_USER       comparisons a traveller gets a day (default 5)
+//	HOTEL_COMPARE_WEB_SEARCH           let the report search the web and cite
+//	                                   what it read (default off; switch on only
+//	                                   after pkg/anthropic TestLiveWebSearch passes
+//	                                   on the model in use)
+//	HOTEL_COMPARE_WEB_SEARCH_MAX_USES  searches per report (default 3)
+//	HOTEL_COMPARE_WEB_SEARCH_DAILY     reports a day that may search (default 60)
+//
+// The report is written on Anthropic only, never the chat chain: the message
+// carries what a traveller is paying, and free endpoints may log prompts.
+// With Anthropic off the report still lists what could be checked, with no
+// verdict. Its spend counts against the assistant's daily ceiling.
+func (d *Dependencies) newHotelCompare(stayMap *transit.Overpass) *hotelcompare.Service {
+	if !envFlag("HOTEL_COMPARE_ENABLED", false) {
+		return nil
+	}
+	deps := hotelcompare.Deps{
+		Fetch:  safefetch.New(safefetch.Options{Timeout: 5 * time.Second}),
+		Places: newForwardGeocoder(d.AppCache),
+		Logger: d.Logger,
+		Config: hotelcompare.Config{
+			WebSearch:        envFlag("HOTEL_COMPARE_WEB_SEARCH", false),
+			WebSearchMaxUses: envInt("HOTEL_COMPARE_WEB_SEARCH_MAX_USES", 3),
+			WebSearchDaily:   envInt("HOTEL_COMPARE_WEB_SEARCH_DAILY", 60),
+			PerUserDaily:     envInt("HOTEL_COMPARE_DAILY_PER_USER", 5),
+		},
+	}
+	// Each of these is an interface field: assign only what exists, so a
+	// missing provider is a nil interface and not a nil pointer inside one.
+	if stayMap != nil {
+		deps.Map = stayMap
+	}
+	if rates := newHotelRates(d.AppCache, d.Logger); rates != nil {
+		deps.Rates = rates
+		if partner, ok := rates.(hotelrates.Identifier); ok {
+			deps.Partner = partner
+		}
+	}
+	model, err := ai.NewToolClient(d.Config.AI, d.Logger)
+	if err != nil {
+		d.Logger.Warn("hotel compare: no model; reports will list facts without a verdict", slog.Any("error", err))
+	} else if model != nil {
+		deps.LLM = model
+		ledger := assistant.NewLedger(assistant.NewStore(d.DB.Pool), 0, d.Logger)
+		deps.CanSpend, deps.Spent = ledger.CanSpend, ledger.Spent
+	}
+	d.Logger.Info("hotel compare: on",
+		slog.Bool("model", deps.LLM != nil), slog.Bool("web_search", deps.Config.WebSearch && deps.LLM != nil),
+		slog.Bool("partner", deps.Partner != nil), slog.Bool("map", deps.Map != nil))
+	return hotelcompare.NewService(deps)
 }
 
 func newForwardGeocoder(cache cachestore.Store) geocode.Forward {

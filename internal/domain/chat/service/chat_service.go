@@ -120,6 +120,10 @@ type ServiceImpl struct {
 	// Optional, attached with SetTripActions: turns bound to a trip propose
 	// changes to it (dates, hotels, re-plan, flights) instead of regenerating.
 	tripActions TripActionProposer
+	// Optional, attached with SetHotelCompare: a message with hotel listing
+	// links in it is answered with a comparison report instead of a plan.
+	hotelCompare HotelComparer
+	stayChoices  StayChoiceProposer
 	// sessionTrips finds the trip a resumed session already produced, so a
 	// follow-up does not save a second one. Nil keeps the old behaviour.
 	sessionTrips trip.SessionTrips

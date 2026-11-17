@@ -3,6 +3,7 @@ package handler
 import (
 	"strings"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -25,6 +26,9 @@ var progressStatusStages = map[string]string{
 	"extracting_poi_name":         "reading your request",
 	"generating_poi_data":         "looking up that place",
 	"no_pois_found":               "widening the search",
+	hotelcompare.StageLinks:       "opening the links",
+	hotelcompare.StageLookup:      "finding the hotels",
+	hotelcompare.StageWrite:       "comparing the hotels",
 }
 
 // progressTypeStages maps event types that collapse to progress.

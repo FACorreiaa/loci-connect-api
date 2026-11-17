@@ -27,6 +27,7 @@ import (
 	generativeAI "github.com/FACorreiaa/go-genai-sdk/v2/lib"
 	assistantv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/assistant"
 
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
 	"github.com/FACorreiaa/loci-connect-api/pkg/anthropic"
 	"github.com/FACorreiaa/loci-connect-api/pkg/llmerrors"
 )
@@ -84,6 +85,9 @@ const (
 	inputMicroUSDPerMTok      = 100_000
 	outputMicroUSDPerMTok     = 500_000
 	cacheWriteMicroUSDPerMTok = 125_000
+	// webSearchMicroUSD is one web search at $10 a thousand. Only hotel
+	// comparison searches; the assistant's own loop has no search tool.
+	webSearchMicroUSD = 10_000
 )
 
 const systemPrompt = `You are Loci, a travel companion inside the Loci app. Somebody has pressed and held to ask you something, and may be listening rather than reading.
@@ -120,6 +124,13 @@ type Deps struct {
 	// DailyAsks and DailyCeilingMicroUSD zero get the defaults.
 	DailyAsks            int
 	DailyCeilingMicroUSD int64
+	// Hotels answers a message with hotel listing links in it. Nil is normal:
+	// such a message is then answered like any other. See hotels.go.
+	Hotels HotelComparer
+	// StayChoices offers a report's hotels as the stay on a trip, and Trips
+	// finds which trip. Either nil leaves the report without that card.
+	StayChoices StayChoiceProposer
+	Trips       hotelcompare.TripSource
 }
 
 // Service answers asks.
@@ -166,7 +177,12 @@ var ErrInvalidConversation = errors.New("assistant: invalid conversation id")
 // Ask answers one message. It returns an error only for a caller that has gone
 // or a request it could not begin; everything else ends in a Done.
 func (s *Service) Ask(ctx context.Context, userID uuid.UUID, req *assistantv1.AskAssistantRequest, emit Emit) error {
-	ctx, cancel := context.WithTimeout(ctx, s.d.Limits.Ask)
+	limit := s.d.Limits.Ask
+	if s.comparesHotels(req) {
+		// Following links and writing a report takes longer than an answer.
+		limit = max(limit, hotelCompareBudget)
+	}
+	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 
 	now := s.d.Now()
@@ -296,6 +312,9 @@ func (a *askRun) sendText(text string) {
 }
 
 func (a *askRun) answer() outcome {
+	if o, ok := a.compareHotels(); ok {
+		return o
+	}
 	if !a.s.anthropicWorthTrying(a.ctx, a.now, a.day) {
 		return a.degraded()
 	}
@@ -516,7 +535,8 @@ func (sp *Spend) add(u anthropic.ToolUsage) {
 	sp.OutputTokens += u.OutputTokens
 	sp.CostMicroUSD += (u.InputTokens+u.CacheReadTokens)*inputMicroUSDPerMTok/1_000_000 +
 		u.CacheWriteTokens*cacheWriteMicroUSDPerMTok/1_000_000 +
-		u.OutputTokens*outputMicroUSDPerMTok/1_000_000
+		u.OutputTokens*outputMicroUSDPerMTok/1_000_000 +
+		u.WebSearchRequests*webSearchMicroUSD
 }
 
 func doneEvent(conversationID string, degraded bool, reason assistantv1.DoneReason) *assistantv1.AssistantEvent {

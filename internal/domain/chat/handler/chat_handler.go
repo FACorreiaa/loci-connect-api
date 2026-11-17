@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/presenter"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/resumebuf"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/service"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/preference"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
@@ -203,6 +205,8 @@ func (h *ChatHandler) StreamChat(
 		RequestedSessionID: requestedSessionID,
 		ResumeToken:        req.Msg.GetResumeToken(),
 		TripID:             tripID,
+		HotelComparisonCapable: slices.Contains(req.Msg.GetCapabilities(),
+			chatv1.ClientCapability_CLIENT_CAPABILITY_HOTEL_COMPARISON),
 	}
 
 	// bufSessionID keys the resume buffer. The start event names the session
@@ -683,6 +687,15 @@ func (h *ChatHandler) mapEventToProto(ctx context.Context, event locitypes.Strea
 			SessionId:  gd.SessionID,
 		}}
 
+	case locitypes.EventTypeHotelComparison:
+		var ev hotelcompare.Event
+		if !decodeData(event.Data, &ev) || ev.Report == nil {
+			return nil, fmt.Errorf("hotel comparison event %q: undecodable data", event.EventID)
+		}
+		resp.Payload = &chatv1.StreamEvent_HotelComparison{HotelComparison: &chatv1.HotelComparisonPayload{
+			Report: hotelcompare.ToProto(ev.Report, ev.StayProposalID),
+		}}
+
 	case locitypes.EventTypeActionProposal:
 		var p tripaction.Proposal
 		if !decodeData(event.Data, &p) {
@@ -919,6 +932,8 @@ func eventTypeToProto(t string) chatv1.StreamEventType {
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACTION_PROPOSAL
 	case locitypes.EventTypeAccessibleRoute:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_ACCESSIBLE_ROUTE
+	case locitypes.EventTypeHotelComparison:
+		return chatv1.StreamEventType_STREAM_EVENT_TYPE_HOTEL_COMPARISON
 	default:
 		return chatv1.StreamEventType_STREAM_EVENT_TYPE_PROGRESS
 	}
