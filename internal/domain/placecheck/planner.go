@@ -34,7 +34,9 @@ type Stop struct {
 	// which have nothing to check.
 	POIID string
 	// Name is the place's name, the thing looked for on the map.
-	Name            string
+	Name string
+	// Category is what the plan says the place is, as free text.
+	Category        string
 	StartMinute     *int32
 	DurationMinutes *int32
 }
@@ -113,7 +115,7 @@ func (p *Planner) Check(ctx context.Context, days []Day) [][]Check {
 			if !ok || !v.Fresh(now) {
 				// A stale answer is still shown; it is refreshed behind it.
 				if name := strings.TrimSpace(s.Name); name != "" {
-					due = append(due, POI{ID: s.POIID, Name: name})
+					due = append(due, POI{ID: s.POIID, Name: name, Category: s.Category})
 				}
 			}
 			if !ok {

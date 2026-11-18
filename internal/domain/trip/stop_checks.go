@@ -54,7 +54,7 @@ func (h *Handler) checkStops(ctx context.Context, draft *tripv1.TripDraft) {
 				name = stop.GetName()
 			}
 			d.Stops[j] = placecheck.Stop{
-				POIID: stop.GetPoiId(), Name: name,
+				POIID: stop.GetPoiId(), Name: name, Category: stop.GetPoi().GetCategory(),
 				StartMinute: stop.StartMinute, DurationMinutes: stop.DurationMinutes,
 			}
 		}

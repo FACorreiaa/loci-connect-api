@@ -175,12 +175,24 @@ func (f *fakeStore) Save(_ context.Context, vs []Verification) error {
 type fakeFinder struct {
 	answers map[string]transit.PlaceMatch
 	asked   [][]string
-	err     error
+	// venues holds the names asked for as a business.
+	venues map[string]bool
+	err    error
 }
 
-func (f *fakeFinder) FindPlaces(_ context.Context, names []string, _ transit.LatLon) ([]transit.PlaceMatch, error) {
+func (f *fakeFinder) FindPlaces(_ context.Context, asks []transit.PlaceQuery, _ transit.LatLon) ([]transit.PlaceMatch, error) {
+	names := make([]string, len(asks))
+	out := make([]transit.PlaceMatch, len(asks))
+	for i, a := range asks {
+		names[i] = a.Name
+		if a.Venue {
+			if f.venues == nil {
+				f.venues = map[string]bool{}
+			}
+			f.venues[a.Name] = true
+		}
+	}
 	f.asked = append(f.asked, names)
-	out := make([]transit.PlaceMatch, len(names))
 	if f.err != nil {
 		return out, f.err
 	}
@@ -295,5 +307,46 @@ func TestCheckPOIsStoreError(t *testing.T) {
 	_, err := newService(&fakeStore{getErr: boom}, finder).CheckPOIs(context.Background(), lisbon, []POI{{ID: "a", Name: "A"}})
 	if !errors.Is(err, boom) || len(finder.asked) != 0 {
 		t.Errorf("err = %v, asked = %v", err, finder.asked)
+	}
+}
+
+func TestVenueCategory(t *testing.T) {
+	for category, want := range map[string]bool{
+		"Restaurant":      true,
+		"Fine Dining":     true,
+		"Cafe":            true,
+		"Café":            true,
+		"Bar":             true,
+		"Wine Bar":        true,
+		"Hotel":           true,
+		"Shopping":        true,
+		"Museum":          false,
+		"Historical Site": false,
+		"Park":            false,
+		"Barcelona":       false, // "bar" is a word here, not a prefix
+		"Cultural":        false,
+		"":                false,
+	} {
+		if got := venueCategory(category); got != want {
+			t.Errorf("venueCategory(%q) = %v, want %v", category, got, want)
+		}
+	}
+}
+
+// A plan's category decides whether a business on the map can answer for the
+// place, so it has to reach the map with the name.
+func TestCheckPOIsAsksForBusinessesAsBusinesses(t *testing.T) {
+	finder := &fakeFinder{}
+	svc := newService(&fakeStore{rows: map[string]Verification{}}, finder)
+	_, err := svc.CheckPOIs(context.Background(), lisbon, []POI{
+		{ID: "a", Name: "Tasca do Chico", Category: "Restaurant"},
+		{ID: "b", Name: "Plaza Mayor", Category: "Historical Site"},
+		{ID: "c", Name: "Somewhere"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !finder.venues["Tasca do Chico"] || finder.venues["Plaza Mayor"] || finder.venues["Somewhere"] {
+		t.Errorf("asked as businesses: %v", finder.venues)
 	}
 }

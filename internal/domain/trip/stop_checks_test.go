@@ -31,7 +31,7 @@ func TestCheckStopsFillsStopsAndTheDayVerdict(t *testing.T) {
 	draft := &tripv1.TripDraft{Days: []*tripv1.TripDay{{
 		DayNumber: 1, Date: timestamppb.New(tuesday), CityLat: f64(38.72), CityLon: f64(-9.14),
 		Stops: []*tripv1.TripStop{
-			{PoiId: "a", Name: "Lunch", Poi: &poiv1.POIDetailedInfo{Name: "Museu Nacional do Azulejo"}, StartMinute: i32(570), DurationMinutes: i32(90)},
+			{PoiId: "a", Name: "Lunch", Poi: &poiv1.POIDetailedInfo{Name: "Museu Nacional do Azulejo", Category: "Museum"}, StartMinute: i32(570), DurationMinutes: i32(90)},
 			{PoiId: "b", Name: "Tasca do Chico"},
 			{PoiId: "c", Name: "Still being looked up"},
 			{Name: "A pasted pin"},
@@ -54,6 +54,9 @@ func TestCheckStopsFillsStopsAndTheDayVerdict(t *testing.T) {
 	}
 	if day.Stops[0].Name != "Museu Nacional do Azulejo" {
 		t.Errorf("asked for %q, want the place's own name, not the stop's", day.Stops[0].Name)
+	}
+	if day.Stops[0].Category != "Museum" {
+		t.Errorf("category asked = %q, want the place's own", day.Stops[0].Category)
 	}
 	if day.Stops[1].Name != "Tasca do Chico" || day.Stops[3].POIID != "" {
 		t.Errorf("stops asked = %+v", day.Stops)

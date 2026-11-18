@@ -6,13 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/placematch"
 	"github.com/FACorreiaa/loci-connect-api/pkg/transit"
 )
 
 // Finder looks named places up on the map. *transit.Overpass is the one in
 // production.
 type Finder interface {
-	FindPlaces(ctx context.Context, names []string, near transit.LatLon) ([]transit.PlaceMatch, error)
+	FindPlaces(ctx context.Context, asks []transit.PlaceQuery, near transit.LatLon) ([]transit.PlaceMatch, error)
 }
 
 // Store keeps verifications.
@@ -29,6 +30,34 @@ type Store interface {
 type POI struct {
 	ID   string
 	Name string
+	// Category is what the plan says the place is ("Museum", "Cafe"), as
+	// free text. It decides whether a restaurant or a shop on the map can be
+	// the answer; see venueCategory.
+	Category string
+}
+
+// venueWords are the words of a plan's category that mean somewhere to eat,
+// drink, shop or sleep. Categories are free text from the model ("Fine
+// Dining", "Cafe", "Bar", "Hotel"), so this reads words, not a fixed list of
+// values. A category it does not know is not a venue: the place is then
+// looked for among sights only, which can miss a restaurant and cannot
+// mistake one for the monument it is named after.
+var venueWords = map[string]bool{
+	"restaurant": true, "restaurante": true, "dining": true, "food": true, "eatery": true, "bistro": true, "tapas": true,
+	"cafe": true, "coffee": true, "bakery": true, "pastry": true, "patisserie": true, "dessert": true, "gelato": true,
+	"bar": true, "pub": true, "tavern": true, "taberna": true, "winery": true, "brewery": true, "nightlife": true, "nightclub": true, "club": true,
+	"shop": true, "shopping": true, "store": true, "boutique": true, "bookshop": true, "bookstore": true,
+	"hotel": true, "hostel": true, "guesthouse": true, "apartment": true, "lodging": true, "accommodation": true,
+}
+
+// venueCategory reports whether a plan's category means a business.
+func venueCategory(category string) bool {
+	for w := range placematch.Tokens(category) {
+		if venueWords[w] {
+			return true
+		}
+	}
+	return false
 }
 
 // Service checks places against the map and remembers the answers.
@@ -83,17 +112,17 @@ func (s *Service) CheckPOIs(ctx context.Context, near transit.LatLon, pois []POI
 			continue
 		}
 		asked[p.ID] = true
-		due = append(due, POI{ID: p.ID, Name: name})
+		due = append(due, POI{ID: p.ID, Name: name, Category: p.Category})
 	}
 	if len(due) == 0 {
 		return held, nil
 	}
 
-	names := make([]string, len(due))
+	asks := make([]transit.PlaceQuery, len(due))
 	for i, p := range due {
-		names[i] = p.Name
+		asks[i] = transit.PlaceQuery{Name: p.Name, Venue: venueCategory(p.Category)}
 	}
-	matches, err := s.finder.FindPlaces(ctx, names, near)
+	matches, err := s.finder.FindPlaces(ctx, asks, near)
 	if err != nil {
 		// A failed lookup may have answered some names and not others, and
 		// does not say which. Nothing is written: an unanswered name saved
