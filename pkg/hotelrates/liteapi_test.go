@@ -55,6 +55,9 @@ type fakeLiteAPI struct {
 	lastRates ratesRequest
 	queries   []url.Values
 	status    int
+	// hotel id -> /data/hotel body
+	details    map[string]string
+	detailHits atomic.Int32
 }
 
 func (f *fakeLiteAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +100,14 @@ func (f *fakeLiteAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		_, _ = io.WriteString(w, `{"data":[`+strings.Join(parts, ",")+`]}`)
+	case "/data/hotel":
+		f.detailHits.Add(1)
+		body, ok := f.details[r.URL.Query().Get("hotelId")]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, body)
 	default:
 		f.t.Errorf("unexpected path %q", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)

@@ -249,6 +249,11 @@ type ChatContext struct {
 	ResumeToken string
 	// TripID binds this stream to a persisted TripDraft (Slice 2). Optional.
 	TripID uuid.UUID
+	// HotelComparisonCapable says the caller renders hotel comparison reports
+	// (ChatRequest.capabilities). A message with hotel links in it is only
+	// answered with one for such a caller; an older one gets the answer it
+	// always got.
+	HotelComparisonCapable bool
 
 	// Stops is a multi-city trip from the stop builder (ChatRequest.stops).
 	// Two or more skip city extraction.

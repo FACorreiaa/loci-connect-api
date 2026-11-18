@@ -118,7 +118,7 @@ func card(p tripaction.Proposal) messaging.TripCard {
 	b.WriteString(p.Summary)
 	var buttons []messaging.Button
 	switch p.Action.Kind {
-	case tripaction.KindSearchHotels:
+	case tripaction.KindSearchHotels, tripaction.KindChooseStay:
 		for i, o := range p.Options {
 			fmt.Fprintf(&b, "\n%d. %s", i+1, o.Label)
 			if o.Detail != "" {

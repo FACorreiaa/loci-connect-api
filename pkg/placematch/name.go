@@ -71,3 +71,29 @@ func Tokens(s string, ignore ...map[string]bool) map[string]bool {
 	}
 	return out
 }
+
+// NamedBy reports whether full is what a traveller meant by given, for a
+// match made on names alone, with no position to back it up. NameSimilarity
+// counts containment either way as a match, which is right beside a
+// coordinate and wrong without one: "Verdi 254" is not "Hotel Verdi".
+//
+// Every word of given must be in full, and full may add at most one word of
+// its own ("Casa Fuster" names "Casa Fuster Barcelona"); a one-word name must
+// match exactly. extra is how many words full adds, so a caller can prefer
+// the closest of several.
+func NamedBy(given, full string, ignore ...map[string]bool) (ok bool, extra int) {
+	tg, tf := Tokens(given, ignore...), Tokens(full, ignore...)
+	if len(tg) == 0 || len(tf) < len(tg) {
+		return false, 0
+	}
+	for t := range tg {
+		if !tf[t] {
+			return false, 0
+		}
+	}
+	extra = len(tf) - len(tg)
+	if extra > 1 || (len(tg) == 1 && extra > 0) {
+		return false, 0
+	}
+	return true, extra
+}

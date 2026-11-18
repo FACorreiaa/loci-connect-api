@@ -24,6 +24,11 @@ const (
 	KindSearchHotels   Kind = "search_hotels"
 	KindRegenerateDays Kind = "regenerate_days"
 	KindSearchFlights  Kind = "search_flights"
+	// KindChooseStay offers the hotels a comparison report looked at, to pick
+	// one as the stay. It is only ever made by the server from a report
+	// (Service.ProposeStayChoice): the extractor cannot ask for it, and
+	// normalize refuses it, so a model never gets to name a hotel to save.
+	KindChooseStay Kind = "choose_stay"
 
 	// Stop edits. From the trip page they name stops and days by id; from
 	// chat the extractor names them by day number and stop name, and
@@ -58,11 +63,13 @@ type Action struct {
 	StartDate string `json:"start_date,omitempty"` // set_dates
 	EndDate   string `json:"end_date,omitempty"`
 
-	City     string `json:"city,omitempty"` // search_hotels
+	City     string `json:"city,omitempty"` // search_hotels, choose_stay
 	MinStars int    `json:"min_stars,omitempty"`
 	MaxStars int    `json:"max_stars,omitempty"`
 
 	Days int `json:"days,omitempty"` // regenerate_days
+
+	ReportID string `json:"report_id,omitempty"` // choose_stay
 
 	Origin      Place  `json:"origin,omitzero"` // search_flights
 	Destination Place  `json:"destination,omitzero"`

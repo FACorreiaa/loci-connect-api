@@ -671,6 +671,12 @@ func (l *ServiceImpl) ProcessUnifiedChatMessageStream(cc common.ChatContext) err
 	// is editing one. A resumed turn already proposed (its cards stand), and
 	// a bound turn is never planned as a new multi-city trip, which would
 	// save one.
+	// A message with hotel links in it asks which to book. That is answered
+	// from the links, whatever else the turn is bound to: planning a city or
+	// proposing trip changes would both miss the question.
+	if l.compareHotels(cc) {
+		return nil
+	}
 	bound := cc.TripID != uuid.Nil && l.tripActions != nil
 	if bound {
 		if cc.ResumeToken == "" && l.proposeTripActions(cc) {

@@ -258,6 +258,7 @@ func stayToProto(s TripStay) *tripv1.TripStay {
 		CityName: s.CityName, PoiId: s.POIID, Name: s.Name, StarRating: s.StarRating,
 		CheckIn: formatOptionalDate(s.CheckIn), CheckOut: formatOptionalDate(s.CheckOut),
 		BookingUrl: s.BookingURL,
+		Latitude:   s.Lat, Longitude: s.Lon, Address: s.Address, PriceNote: s.PriceNote,
 	}
 }
 
@@ -273,6 +274,7 @@ func stayFromProto(p *tripv1.TripStay) (TripStay, error) {
 	return TripStay{
 		CityName: p.GetCityName(), POIID: p.GetPoiId(), Name: p.GetName(), StarRating: p.GetStarRating(),
 		CheckIn: in, CheckOut: out, BookingURL: p.BookingUrl,
+		Lat: p.Latitude, Lon: p.Longitude, Address: p.GetAddress(), PriceNote: p.PriceNote,
 	}, nil
 }
 

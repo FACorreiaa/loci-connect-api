@@ -92,7 +92,7 @@ func TestBuildFlightLinks(t *testing.T) {
 func TestRedactForViewer_HidesPlanDetails(t *testing.T) {
 	booking, notes, price, no, carrier := "https://hotel.example", "door code 1234", "€420", "TP 202", "TAP"
 	p := tripToProto(&Trip{
-		Stays: []TripStay{{CityName: "Lisbon", Name: "Hotel Avenida", BookingURL: &booking}},
+		Stays: []TripStay{{CityName: "Lisbon", Name: "Hotel Avenida", BookingURL: &booking, PriceNote: &price}},
 		Flights: []TripFlight{{
 			Origin: flights.Place{Name: "NYC"}, Destination: flights.Place{Name: "Lisbon"}, DepartDate: day("2026-11-12"),
 			Notes: &notes, PriceText: &price, FlightNo: &no, Carrier: &carrier,
@@ -100,6 +100,7 @@ func TestRedactForViewer_HidesPlanDetails(t *testing.T) {
 	})
 	got := redactForViewer(p, false, nil)
 	require.Nil(t, got.GetStays()[0].BookingUrl)
+	require.Nil(t, got.GetStays()[0].PriceNote, "what the traveller pays is theirs")
 	f := got.GetFlights()[0]
 	require.Nil(t, f.Notes)
 	require.Nil(t, f.PriceText)

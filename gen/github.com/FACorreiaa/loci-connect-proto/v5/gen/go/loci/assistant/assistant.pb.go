@@ -535,6 +535,7 @@ type AssistantEvent struct {
 	//	*AssistantEvent_Proposal
 	//	*AssistantEvent_Handoff
 	//	*AssistantEvent_Done
+	//	*AssistantEvent_HotelReport
 	Event         isAssistantEvent_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -622,6 +623,15 @@ func (x *AssistantEvent) GetDone() *Done {
 	return nil
 }
 
+func (x *AssistantEvent) GetHotelReport() *chat.HotelComparisonReport {
+	if x != nil {
+		if x, ok := x.Event.(*AssistantEvent_HotelReport); ok {
+			return x.HotelReport
+		}
+	}
+	return nil
+}
+
 type isAssistantEvent_Event interface {
 	isAssistantEvent_Event()
 }
@@ -646,6 +656,13 @@ type AssistantEvent_Done struct {
 	Done *Done `protobuf:"bytes,5,opt,name=done,proto3,oneof"`
 }
 
+type AssistantEvent_HotelReport struct {
+	// A comparison of hotel links the caller pasted. When one of the caller's
+	// trips has the city, a trip Proposal with the same hotels as options
+	// follows it.
+	HotelReport *chat.HotelComparisonReport `protobuf:"bytes,6,opt,name=hotel_report,json=hotelReport,proto3,oneof"`
+}
+
 func (*AssistantEvent_TextDelta) isAssistantEvent_Event() {}
 
 func (*AssistantEvent_ToolStatus) isAssistantEvent_Event() {}
@@ -655,6 +672,8 @@ func (*AssistantEvent_Proposal) isAssistantEvent_Event() {}
 func (*AssistantEvent_Handoff) isAssistantEvent_Event() {}
 
 func (*AssistantEvent_Done) isAssistantEvent_Event() {}
+
+func (*AssistantEvent_HotelReport) isAssistantEvent_Event() {}
 
 // TextDelta is the next piece of the answer. Plain text: clients render it as
 // text, with no links or images, because tool results can carry words written
@@ -1256,7 +1275,7 @@ var File_loci_assistant_assistant_proto protoreflect.FileDescriptor
 
 const file_loci_assistant_assistant_proto_rawDesc = "" +
 	"\n" +
-	"\x1eloci/assistant/assistant.proto\x12\x0eloci.assistant\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14loci/chat/chat.proto\x1a\x14loci/trip/trip.proto\"\xf4\x01\n" +
+	"\x1eloci/assistant/assistant.proto\x12\x0eloci.assistant\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14loci/chat/chat.proto\x1a\x1cloci/chat/hotel_report.proto\x1a\x14loci/trip/trip.proto\"\xf4\x01\n" +
 	"\x13AskAssistantRequest\x126\n" +
 	"\x0fconversation_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01H\x00R\x0econversationId\x88\x01\x01\x12\x1e\n" +
 	"\x04text\x18\x02 \x01(\tB\n" +
@@ -1281,7 +1300,7 @@ const file_loci_assistant_assistant_proto_rawDesc = "" +
 	"_longitude\"k\n" +
 	"\rContextEntity\x12?\n" +
 	"\x04type\x18\x01 \x01(\x0e2!.loci.assistant.ContextEntityTypeB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04type\x12\x19\n" +
-	"\x02id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\"\xad\x02\n" +
+	"\x02id\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18dR\x02id\"\xf4\x02\n" +
 	"\x0eAssistantEvent\x12:\n" +
 	"\n" +
 	"text_delta\x18\x01 \x01(\v2\x19.loci.assistant.TextDeltaH\x00R\ttextDelta\x12=\n" +
@@ -1289,7 +1308,8 @@ const file_loci_assistant_assistant_proto_rawDesc = "" +
 	"toolStatus\x126\n" +
 	"\bproposal\x18\x03 \x01(\v2\x18.loci.assistant.ProposalH\x00R\bproposal\x123\n" +
 	"\ahandoff\x18\x04 \x01(\v2\x17.loci.assistant.HandoffH\x00R\ahandoff\x12*\n" +
-	"\x04done\x18\x05 \x01(\v2\x14.loci.assistant.DoneH\x00R\x04doneB\a\n" +
+	"\x04done\x18\x05 \x01(\v2\x14.loci.assistant.DoneH\x00R\x04done\x12E\n" +
+	"\fhotel_report\x18\x06 \x01(\v2 .loci.chat.HotelComparisonReportH\x00R\vhotelReportB\a\n" +
 	"\x05event\"\x1f\n" +
 	"\tTextDelta\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\"\n" +
@@ -1383,28 +1403,29 @@ func file_loci_assistant_assistant_proto_rawDescGZIP() []byte {
 var file_loci_assistant_assistant_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_loci_assistant_assistant_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_loci_assistant_assistant_proto_goTypes = []any{
-	(InputMode)(0),                // 0: loci.assistant.InputMode
-	(Surface)(0),                  // 1: loci.assistant.Surface
-	(ContextEntityType)(0),        // 2: loci.assistant.ContextEntityType
-	(PlaceActionKind)(0),          // 3: loci.assistant.PlaceActionKind
-	(DoneReason)(0),               // 4: loci.assistant.DoneReason
-	(*AskAssistantRequest)(nil),   // 5: loci.assistant.AskAssistantRequest
-	(*ClientContext)(nil),         // 6: loci.assistant.ClientContext
-	(*ContextEntity)(nil),         // 7: loci.assistant.ContextEntity
-	(*AssistantEvent)(nil),        // 8: loci.assistant.AssistantEvent
-	(*TextDelta)(nil),             // 9: loci.assistant.TextDelta
-	(*ToolStatus)(nil),            // 10: loci.assistant.ToolStatus
-	(*Proposal)(nil),              // 11: loci.assistant.Proposal
-	(*PlaceAction)(nil),           // 12: loci.assistant.PlaceAction
-	(*Handoff)(nil),               // 13: loci.assistant.Handoff
-	(*Done)(nil),                  // 14: loci.assistant.Done
-	(*ConfirmActionRequest)(nil),  // 15: loci.assistant.ConfirmActionRequest
-	(*ConfirmActionResponse)(nil), // 16: loci.assistant.ConfirmActionResponse
-	(*DismissActionRequest)(nil),  // 17: loci.assistant.DismissActionRequest
-	(*DismissActionResponse)(nil), // 18: loci.assistant.DismissActionResponse
-	(*chat.ActionProposal)(nil),   // 19: loci.chat.ActionProposal
-	(*timestamppb.Timestamp)(nil), // 20: google.protobuf.Timestamp
-	(*trip.TripDraft)(nil),        // 21: loci.trip.TripDraft
+	(InputMode)(0),                     // 0: loci.assistant.InputMode
+	(Surface)(0),                       // 1: loci.assistant.Surface
+	(ContextEntityType)(0),             // 2: loci.assistant.ContextEntityType
+	(PlaceActionKind)(0),               // 3: loci.assistant.PlaceActionKind
+	(DoneReason)(0),                    // 4: loci.assistant.DoneReason
+	(*AskAssistantRequest)(nil),        // 5: loci.assistant.AskAssistantRequest
+	(*ClientContext)(nil),              // 6: loci.assistant.ClientContext
+	(*ContextEntity)(nil),              // 7: loci.assistant.ContextEntity
+	(*AssistantEvent)(nil),             // 8: loci.assistant.AssistantEvent
+	(*TextDelta)(nil),                  // 9: loci.assistant.TextDelta
+	(*ToolStatus)(nil),                 // 10: loci.assistant.ToolStatus
+	(*Proposal)(nil),                   // 11: loci.assistant.Proposal
+	(*PlaceAction)(nil),                // 12: loci.assistant.PlaceAction
+	(*Handoff)(nil),                    // 13: loci.assistant.Handoff
+	(*Done)(nil),                       // 14: loci.assistant.Done
+	(*ConfirmActionRequest)(nil),       // 15: loci.assistant.ConfirmActionRequest
+	(*ConfirmActionResponse)(nil),      // 16: loci.assistant.ConfirmActionResponse
+	(*DismissActionRequest)(nil),       // 17: loci.assistant.DismissActionRequest
+	(*DismissActionResponse)(nil),      // 18: loci.assistant.DismissActionResponse
+	(*chat.HotelComparisonReport)(nil), // 19: loci.chat.HotelComparisonReport
+	(*chat.ActionProposal)(nil),        // 20: loci.chat.ActionProposal
+	(*timestamppb.Timestamp)(nil),      // 21: google.protobuf.Timestamp
+	(*trip.TripDraft)(nil),             // 22: loci.trip.TripDraft
 }
 var file_loci_assistant_assistant_proto_depIdxs = []int32{
 	0,  // 0: loci.assistant.AskAssistantRequest.input_mode:type_name -> loci.assistant.InputMode
@@ -1417,23 +1438,24 @@ var file_loci_assistant_assistant_proto_depIdxs = []int32{
 	11, // 7: loci.assistant.AssistantEvent.proposal:type_name -> loci.assistant.Proposal
 	13, // 8: loci.assistant.AssistantEvent.handoff:type_name -> loci.assistant.Handoff
 	14, // 9: loci.assistant.AssistantEvent.done:type_name -> loci.assistant.Done
-	19, // 10: loci.assistant.Proposal.trip:type_name -> loci.chat.ActionProposal
-	12, // 11: loci.assistant.Proposal.place:type_name -> loci.assistant.PlaceAction
-	3,  // 12: loci.assistant.PlaceAction.kind:type_name -> loci.assistant.PlaceActionKind
-	20, // 13: loci.assistant.PlaceAction.expires_at:type_name -> google.protobuf.Timestamp
-	4,  // 14: loci.assistant.Done.reason:type_name -> loci.assistant.DoneReason
-	21, // 15: loci.assistant.ConfirmActionResponse.trip:type_name -> loci.trip.TripDraft
-	5,  // 16: loci.assistant.AssistantService.AskAssistant:input_type -> loci.assistant.AskAssistantRequest
-	15, // 17: loci.assistant.AssistantService.ConfirmAction:input_type -> loci.assistant.ConfirmActionRequest
-	17, // 18: loci.assistant.AssistantService.DismissAction:input_type -> loci.assistant.DismissActionRequest
-	8,  // 19: loci.assistant.AssistantService.AskAssistant:output_type -> loci.assistant.AssistantEvent
-	16, // 20: loci.assistant.AssistantService.ConfirmAction:output_type -> loci.assistant.ConfirmActionResponse
-	18, // 21: loci.assistant.AssistantService.DismissAction:output_type -> loci.assistant.DismissActionResponse
-	19, // [19:22] is the sub-list for method output_type
-	16, // [16:19] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	19, // 10: loci.assistant.AssistantEvent.hotel_report:type_name -> loci.chat.HotelComparisonReport
+	20, // 11: loci.assistant.Proposal.trip:type_name -> loci.chat.ActionProposal
+	12, // 12: loci.assistant.Proposal.place:type_name -> loci.assistant.PlaceAction
+	3,  // 13: loci.assistant.PlaceAction.kind:type_name -> loci.assistant.PlaceActionKind
+	21, // 14: loci.assistant.PlaceAction.expires_at:type_name -> google.protobuf.Timestamp
+	4,  // 15: loci.assistant.Done.reason:type_name -> loci.assistant.DoneReason
+	22, // 16: loci.assistant.ConfirmActionResponse.trip:type_name -> loci.trip.TripDraft
+	5,  // 17: loci.assistant.AssistantService.AskAssistant:input_type -> loci.assistant.AskAssistantRequest
+	15, // 18: loci.assistant.AssistantService.ConfirmAction:input_type -> loci.assistant.ConfirmActionRequest
+	17, // 19: loci.assistant.AssistantService.DismissAction:input_type -> loci.assistant.DismissActionRequest
+	8,  // 20: loci.assistant.AssistantService.AskAssistant:output_type -> loci.assistant.AssistantEvent
+	16, // 21: loci.assistant.AssistantService.ConfirmAction:output_type -> loci.assistant.ConfirmActionResponse
+	18, // 22: loci.assistant.AssistantService.DismissAction:output_type -> loci.assistant.DismissActionResponse
+	20, // [20:23] is the sub-list for method output_type
+	17, // [17:20] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_loci_assistant_assistant_proto_init() }
@@ -1449,6 +1471,7 @@ func file_loci_assistant_assistant_proto_init() {
 		(*AssistantEvent_Proposal)(nil),
 		(*AssistantEvent_Handoff)(nil),
 		(*AssistantEvent_Done)(nil),
+		(*AssistantEvent_HotelReport)(nil),
 	}
 	file_loci_assistant_assistant_proto_msgTypes[6].OneofWrappers = []any{
 		(*Proposal_Trip)(nil),

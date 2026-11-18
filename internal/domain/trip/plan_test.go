@@ -57,6 +57,34 @@ func TestUpsertStay_Rejects(t *testing.T) {
 	require.ErrorIs(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "X", CheckIn: &in, CheckOut: &out}), ErrInvalidEdit)
 }
 
+func TestUpsertStay_Position(t *testing.T) {
+	tr := threeDayLisbon()
+	lat, lon, note := 38.72, -9.14, "  385 euros with breakfast "
+	require.NoError(t, upsertStay(tr, TripStay{
+		CityName: "Lisbon", Name: "Hotel Avenida", Lat: &lat, Lon: &lon, Address: "Av. da Liberdade 129", PriceNote: &note,
+	}))
+	require.True(t, tr.Stays[0].HasPin())
+	require.Equal(t, "385 euros with breakfast", *tr.Stays[0].PriceNote, "kept as written, trimmed")
+
+	blank := "   "
+	require.NoError(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "Hotel Avenida", PriceNote: &blank}))
+	require.Nil(t, tr.Stays[0].PriceNote, "a blank note is no note")
+
+	require.ErrorIs(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "X", Lat: &lat}), ErrInvalidEdit, "half a position")
+	off := 91.0
+	require.ErrorIs(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "X", Lat: &off, Lon: &lon}), ErrInvalidEdit, "off the map")
+	long := strings.Repeat("x", maxPriceNote+1)
+	require.ErrorIs(t, upsertStay(tr, TripStay{CityName: "Lisbon", Name: "X", PriceNote: &long}), ErrInvalidEdit)
+}
+
+func TestStayProto_RoundTripsPosition(t *testing.T) {
+	lat, lon, note := 41.4036, 2.1565, "349 without breakfast"
+	in := TripStay{CityName: "Barcelona", Name: "Verdi 254", Lat: &lat, Lon: &lon, Address: "Carrer de Verdi 254", PriceNote: &note}
+	out, err := stayFromProto(stayToProto(in))
+	require.NoError(t, err)
+	require.Equal(t, in, out)
+}
+
 func TestHasCity_MultiCity(t *testing.T) {
 	tr := &Trip{CityName: "Lisbon", Cities: []TripCity{{CityName: "Lisbon"}, {CityName: "Porto"}}}
 	require.True(t, tr.HasCity("PORTO"))

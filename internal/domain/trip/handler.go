@@ -19,6 +19,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/pkg/apierr"
 	"github.com/FACorreiaa/loci-connect-api/pkg/flights"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
+	"github.com/FACorreiaa/loci-connect-api/pkg/routing"
 )
 
 // Handler implements TripService.
@@ -30,6 +31,11 @@ type Handler struct {
 	plans   PlanChecker
 	// airports backs SearchAirports and ResolveFlightDestination; see WithAirports.
 	airports *flights.Airports
+
+	// Optional, attached via WithStayTransport and used only by
+	// GetStayTransport.
+	around StaySurroundings
+	walks  routing.PedestrianRouter
 
 	// Optional, attached via WithPacking and used only by SuggestPacking. Nil is
 	// supported: the packing list then carries no weather-driven items rather
