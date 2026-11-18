@@ -87,6 +87,9 @@ const (
 	TripServiceSetStayProcedure = "/loci.trip.TripService/SetStay"
 	// TripServiceClearStayProcedure is the fully-qualified name of the TripService's ClearStay RPC.
 	TripServiceClearStayProcedure = "/loci.trip.TripService/ClearStay"
+	// TripServiceGetStayTransportProcedure is the fully-qualified name of the TripService's
+	// GetStayTransport RPC.
+	TripServiceGetStayTransportProcedure = "/loci.trip.TripService/GetStayTransport"
 	// TripServiceAddFlightProcedure is the fully-qualified name of the TripService's AddFlight RPC.
 	TripServiceAddFlightProcedure = "/loci.trip.TripService/AddFlight"
 	// TripServiceRemoveFlightProcedure is the fully-qualified name of the TripService's RemoveFlight
@@ -184,6 +187,7 @@ var (
 	tripServiceSetTripDatesMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("SetTripDates")
 	tripServiceSetStayMethodDescriptor                  = tripServiceServiceDescriptor.Methods().ByName("SetStay")
 	tripServiceClearStayMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("ClearStay")
+	tripServiceGetStayTransportMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("GetStayTransport")
 	tripServiceAddFlightMethodDescriptor                = tripServiceServiceDescriptor.Methods().ByName("AddFlight")
 	tripServiceRemoveFlightMethodDescriptor             = tripServiceServiceDescriptor.Methods().ByName("RemoveFlight")
 	tripServiceBuildFlightLinksMethodDescriptor         = tripServiceServiceDescriptor.Methods().ByName("BuildFlightLinks")
@@ -260,6 +264,11 @@ type TripServiceClient interface {
 	SetTripDates(context.Context, *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error)
 	SetStay(context.Context, *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error)
 	ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetStayTransport is how to get around from the stay in one city: nearby
+	// public transport stops, the walk to each day's first stop, and links
+	// into a maps app. For anyone who may open the trip. A city with no stay
+	// is NotFound.
+	GetStayTransport(context.Context, *connect.Request[trip.GetStayTransportRequest]) (*connect.Response[trip.GetStayTransportResponse], error)
 	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
@@ -459,6 +468,12 @@ func NewTripServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(tripServiceClearStayMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
+		getStayTransport: connect.NewClient[trip.GetStayTransportRequest, trip.GetStayTransportResponse](
+			httpClient,
+			baseURL+TripServiceGetStayTransportProcedure,
+			connect.WithSchema(tripServiceGetStayTransportMethodDescriptor),
+			connect.WithClientOptions(opts...),
+		),
 		addFlight: connect.NewClient[trip.AddFlightRequest, trip.TripDraft](
 			httpClient,
 			baseURL+TripServiceAddFlightProcedure,
@@ -630,6 +645,7 @@ type tripServiceClient struct {
 	setTripDates             *connect.Client[trip.SetTripDatesRequest, trip.TripDraft]
 	setStay                  *connect.Client[trip.SetStayRequest, trip.TripDraft]
 	clearStay                *connect.Client[trip.ClearStayRequest, trip.TripDraft]
+	getStayTransport         *connect.Client[trip.GetStayTransportRequest, trip.GetStayTransportResponse]
 	addFlight                *connect.Client[trip.AddFlightRequest, trip.TripDraft]
 	removeFlight             *connect.Client[trip.RemoveFlightRequest, trip.TripDraft]
 	buildFlightLinks         *connect.Client[trip.BuildFlightLinksRequest, trip.BuildFlightLinksResponse]
@@ -766,6 +782,11 @@ func (c *tripServiceClient) SetStay(ctx context.Context, req *connect.Request[tr
 // ClearStay calls loci.trip.TripService.ClearStay.
 func (c *tripServiceClient) ClearStay(ctx context.Context, req *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error) {
 	return c.clearStay.CallUnary(ctx, req)
+}
+
+// GetStayTransport calls loci.trip.TripService.GetStayTransport.
+func (c *tripServiceClient) GetStayTransport(ctx context.Context, req *connect.Request[trip.GetStayTransportRequest]) (*connect.Response[trip.GetStayTransportResponse], error) {
+	return c.getStayTransport.CallUnary(ctx, req)
 }
 
 // AddFlight calls loci.trip.TripService.AddFlight.
@@ -938,6 +959,11 @@ type TripServiceHandler interface {
 	SetTripDates(context.Context, *connect.Request[trip.SetTripDatesRequest]) (*connect.Response[trip.TripDraft], error)
 	SetStay(context.Context, *connect.Request[trip.SetStayRequest]) (*connect.Response[trip.TripDraft], error)
 	ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error)
+	// GetStayTransport is how to get around from the stay in one city: nearby
+	// public transport stops, the walk to each day's first stop, and links
+	// into a maps app. For anyone who may open the trip. A city with no stay
+	// is NotFound.
+	GetStayTransport(context.Context, *connect.Request[trip.GetStayTransportRequest]) (*connect.Response[trip.GetStayTransportResponse], error)
 	AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	RemoveFlight(context.Context, *connect.Request[trip.RemoveFlightRequest]) (*connect.Response[trip.TripDraft], error)
 	BuildFlightLinks(context.Context, *connect.Request[trip.BuildFlightLinksRequest]) (*connect.Response[trip.BuildFlightLinksResponse], error)
@@ -1133,6 +1159,12 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(tripServiceClearStayMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
+	tripServiceGetStayTransportHandler := connect.NewUnaryHandler(
+		TripServiceGetStayTransportProcedure,
+		svc.GetStayTransport,
+		connect.WithSchema(tripServiceGetStayTransportMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
+	)
 	tripServiceAddFlightHandler := connect.NewUnaryHandler(
 		TripServiceAddFlightProcedure,
 		svc.AddFlight,
@@ -1323,6 +1355,8 @@ func NewTripServiceHandler(svc TripServiceHandler, opts ...connect.HandlerOption
 			tripServiceSetStayHandler.ServeHTTP(w, r)
 		case TripServiceClearStayProcedure:
 			tripServiceClearStayHandler.ServeHTTP(w, r)
+		case TripServiceGetStayTransportProcedure:
+			tripServiceGetStayTransportHandler.ServeHTTP(w, r)
 		case TripServiceAddFlightProcedure:
 			tripServiceAddFlightHandler.ServeHTTP(w, r)
 		case TripServiceRemoveFlightProcedure:
@@ -1466,6 +1500,10 @@ func (UnimplementedTripServiceHandler) SetStay(context.Context, *connect.Request
 
 func (UnimplementedTripServiceHandler) ClearStay(context.Context, *connect.Request[trip.ClearStayRequest]) (*connect.Response[trip.TripDraft], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.ClearStay is not implemented"))
+}
+
+func (UnimplementedTripServiceHandler) GetStayTransport(context.Context, *connect.Request[trip.GetStayTransportRequest]) (*connect.Response[trip.GetStayTransportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("loci.trip.TripService.GetStayTransport is not implemented"))
 }
 
 func (UnimplementedTripServiceHandler) AddFlight(context.Context, *connect.Request[trip.AddFlightRequest]) (*connect.Response[trip.TripDraft], error) {
