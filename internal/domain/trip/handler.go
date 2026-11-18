@@ -52,6 +52,10 @@ type Handler struct {
 	// TripDraft response. Nil leaves stops with their id and name only.
 	places PlaceLookup
 
+	// Optional, attached via WithStopChecks: fills each stop's `check` and
+	// each day's `verdict` from what a real map says. Nil leaves both absent.
+	checks StopChecker
+
 	// Optional, attached via WithStopImages: fills each stop's `image` from
 	// the POI's first stored picture. Nil leaves stops without one.
 	images StopImageLookup
