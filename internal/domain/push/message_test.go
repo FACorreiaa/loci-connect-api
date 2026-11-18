@@ -23,12 +23,18 @@ func TestBuildPayload(t *testing.T) {
 	require.Equal(t, "failed", p.Status)
 
 	for domain, want := range map[string]string{
-		"general":       "Your Lisbon itinerary is ready",
-		"accommodation": "Your Lisbon hotels are ready",
-		"activities":    "Your Lisbon activities are ready",
-		"dining":        "Your Lisbon restaurants are ready",
-		"nearby":        "Your Lisbon nearby places are ready",
+		"general":                  "Your Lisbon itinerary is ready",
+		"accommodation":            "Your Lisbon hotels are ready",
+		"activities":               "Your Lisbon activities are ready",
+		"dining":                   "Your Lisbon restaurants are ready",
+		"nearby":                   "Your Lisbon nearby places are ready",
+		runs.DomainHotelComparison: "Your Lisbon hotel comparison is ready",
 	} {
 		require.Equal(t, want, BuildPayload(runs.Run{SessionID: sid, Domain: domain, CityName: "Lisbon", Status: runs.StatusDone}).Title, domain)
 	}
+
+	// A comparison opens in the chat thread, the one page that shows it.
+	p = BuildPayload(runs.Run{SessionID: sid, Domain: runs.DomainHotelComparison, CityName: "Lisbon", Status: runs.StatusDone})
+	require.Equal(t, "/chat?sessionId="+sid.String()+"&cityName=Lisbon&domain=chat", p.URL)
+	require.Equal(t, "chat", p.Domain)
 }

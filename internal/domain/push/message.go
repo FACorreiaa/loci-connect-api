@@ -37,12 +37,20 @@ var nouns = map[string]string{
 	"nearby":        "nearby places",
 }
 
+// singularNouns name the runs whose result is one thing ("is ready").
+var singularNouns = map[string]string{
+	runs.DomainHotelComparison: "hotel comparison",
+}
+
 func BuildPayload(run runs.Run) Payload {
-	// Every mapped noun is plural ("hotels are ready"); the itinerary
-	// fallback is the one singular.
+	// Every noun in nouns is plural ("hotels are ready"); the itinerary
+	// fallback and singularNouns are singular.
 	noun, plural := nouns[run.Domain]
 	if !plural {
 		noun = "itinerary"
+		if n, ok := singularNouns[run.Domain]; ok {
+			noun = n
+		}
 	}
 	verb := "is"
 	if plural {
