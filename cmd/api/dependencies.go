@@ -142,6 +142,7 @@ type Dependencies struct {
 	ReviewRepo        reviewdomain.Repository
 	ShareRepo         share.Repository
 	TripRepo          trip.Repository
+	tripSaves         *trip.SaveNotifier
 	TravelHistoryRepo travelhistory.Repository
 	// RunStore backs the cap interceptor and the run-status/notification RPCs.
 	RunStore runs.Store
@@ -390,7 +391,11 @@ func (d *Dependencies) initRepositories() error {
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 	d.flightAirports, d.flightLinks = newFlightLinks(d.Logger)
-	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger, trip.WithFlightLinks(d.flightLinks))
+	// Wrapped so the stop checker, built later with the trip handler, hears
+	// about trips the chat pipeline saves and has their checks ready by the
+	// time someone opens them. With checks off the wrapper does nothing.
+	d.tripSaves = trip.NotifyOnSave(trip.NewRepository(d.DB.Pool, d.Logger, trip.WithFlightLinks(d.flightLinks)))
+	d.TripRepo = d.tripSaves
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
@@ -1107,6 +1112,9 @@ func (d *Dependencies) initHandlers() error {
 		d.TripHandler = d.TripHandler.WithStopImages(trip.NewStopImageStore(d.DB.Pool))
 		if checks := d.newStopChecks(); checks != nil {
 			d.TripHandler = d.TripHandler.WithStopChecks(checks)
+			if d.tripSaves != nil {
+				d.tripSaves.OnSave(d.TripHandler.WarmStopChecks)
+			}
 		}
 		// The friends layer, and trip sharing on top of it: one service is
 		// both SocialService and the graph trip visibility is checked against.
