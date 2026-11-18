@@ -26,6 +26,9 @@ func TestResultPath(t *testing.T) {
 		{"activities", "/activities?sessionId=" + sid.String() + "&cityName=Crete&domain=activities", "activities", trip},
 		{"nearby", "/nearme?sessionId=" + sid.String() + "&cityName=Crete&domain=nearme", "nearme", trip},
 		{"itinerary", "/itinerary?sessionId=" + sid.String() + "&cityName=Crete&domain=itinerary&tripId=" + trip.String(), "itinerary", trip},
+		// A comparison has no list page: its report lives in the chat thread.
+		{DomainHotelComparison, "/chat?sessionId=" + sid.String() + "&cityName=Crete&domain=chat", "chat", uuid.Nil},
+		{DomainHotelComparison, "/chat?sessionId=" + sid.String() + "&cityName=Crete&domain=chat", "chat", trip},
 	}
 	for _, c := range cases {
 		got, route, query := ResultPath(c.domain, sid, "Crete", c.trip)

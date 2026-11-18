@@ -21,7 +21,7 @@ var protoStatus = map[Status]chatv1.RunStatus{
 // that copy now calls this one instead.
 func DomainToProto(d string) chatv1.DomainType {
 	switch strings.ToLower(d) {
-	case "accommodation":
+	case "accommodation", DomainHotelComparison:
 		return chatv1.DomainType_DOMAIN_TYPE_ACCOMMODATION
 	case "dining":
 		return chatv1.DomainType_DOMAIN_TYPE_DINING

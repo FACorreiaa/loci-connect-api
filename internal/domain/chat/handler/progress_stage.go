@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
 )
 
@@ -59,6 +60,7 @@ var progressDomainStages = map[string]string{
 	string(locitypes.DomainItinerary):     "planning your day",
 	string(locitypes.DomainTransport):     "checking how to get there",
 	string(locitypes.DomainNearby):        "looking around you",
+	runs.DomainHotelComparison:            "comparing hotels",
 }
 
 // progressTextStages maps the free-text progress messages some service paths

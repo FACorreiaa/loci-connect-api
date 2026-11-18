@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -108,8 +110,10 @@ func TestHotelLinks_ReportThenStayCardThenComplete(t *testing.T) {
 	// It opens like any turn, so a client navigates and files the answer.
 	require.Equal(t, locitypes.EventTypeStart, evs[0].Type)
 	start := evs[0].Data.(map[string]any)
-	require.Equal(t, string(locitypes.DomainAccommodation), start["domain"])
-	_, err := uuid.Parse(start["session_id"].(string))
+	// Its own run domain: a run that finishes off-page links to the chat
+	// thread, not to /hotels, which lists searched hotels and has none here.
+	require.Equal(t, runs.DomainHotelComparison, start["domain"])
+	sid, err := uuid.Parse(start["session_id"].(string))
 	require.NoError(t, err)
 	evs = evs[1:]
 	require.Equal(t, locitypes.EventTypeProgress, evs[0].Type)
@@ -129,6 +133,10 @@ func TestHotelLinks_ReportThenStayCardThenComplete(t *testing.T) {
 
 	require.Equal(t, locitypes.EventTypeComplete, evs[4].Type)
 	require.True(t, evs[4].IsFinal)
+	require.NotNil(t, evs[4].Navigation, "a client that was not watching opens the thread")
+	require.Equal(t, "chat", evs[4].Navigation.RouteType)
+	require.Equal(t, sid.String(), evs[4].Navigation.QueryParams["sessionId"])
+	require.True(t, strings.HasPrefix(evs[4].Navigation.URL, "/chat?sessionId="+sid.String()))
 	require.Equal(t, hotelLinksMessage, cmp.got.Text)
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/chat/common"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/hotelcompare"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/tripaction"
 	locitypes "github.com/FACorreiaa/loci-connect-api/internal/types"
@@ -71,7 +72,10 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 	l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeStart,
 		Data: map[string]any{
-			"domain": string(locitypes.DomainAccommodation), "city": req.CityHint, "session_id": sessionID.String(),
+			// The run is filed as a comparison so a finish nobody watched
+			// links to this thread (runs.ResultPath); clients still read
+			// ACCOMMODATION, as DomainToProto maps it.
+			"domain": runs.DomainHotelComparison, "city": req.CityHint, "session_id": sessionID.String(),
 		},
 	}, 3)
 
@@ -123,8 +127,10 @@ func (l *ServiceImpl) compareHotels(cc common.ChatContext) bool {
 	if prop != nil {
 		l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{Type: locitypes.EventTypeActionProposal, Message: prop.Summary, Data: *prop}, 3)
 	}
+	navURL, routeType, query := runs.ResultPath(runs.DomainHotelComparison, sessionID, req.CityHint, uuid.Nil)
 	l.sendEvent(cc.Ctx, cc.EventCh, locitypes.StreamEvent{
 		Type: locitypes.EventTypeComplete, Data: "Turn completed.", IsFinal: true,
+		Navigation: &locitypes.NavigationData{URL: navURL, RouteType: routeType, QueryParams: query},
 	}, 3)
 	return true
 }
