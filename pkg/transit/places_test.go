@@ -286,7 +286,7 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "the same café is an answer for a plan that means a café",
-			ask:  PlaceQuery{Name: "Puerta del Sol", Venue: true},
+			ask:  PlaceQuery{Name: "Puerta del Sol", Venue: VenueFood},
 			els: []el{
 				node(1, 40.4151, -3.7032, map[string]string{"amenity": "cafe", "name": "Puerta del Sol"}),
 			},
@@ -302,7 +302,7 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "of a chain's branches, the one the map knows as notable, though another carries the bare name",
-			ask:  PlaceQuery{Name: "Livraria Bertrand", Venue: true},
+			ask:  PlaceQuery{Name: "Livraria Bertrand", Venue: VenueShop},
 			els: []el{
 				node(1, 38.6811, -9.1547, map[string]string{"shop": "books", "name": "Livraria Bertrand"}),
 				node(2, 38.7107, -9.1412, map[string]string{"shop": "books", "name": "Livraria Bertrand - Chiado", "wikidata": "Q1866547"}),
@@ -311,7 +311,7 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "branches the map cannot tell apart are no answer",
-			ask:  PlaceQuery{Name: "A Padaria Portuguesa", Venue: true},
+			ask:  PlaceQuery{Name: "A Padaria Portuguesa", Venue: VenueFood},
 			els: []el{
 				node(1, 38.7100, -9.1400, map[string]string{"shop": "bakery", "name": "A Padaria Portuguesa"}),
 				node(2, 38.7400, -9.1500, map[string]string{"shop": "bakery", "name": "A Padaria Portuguesa"}),
@@ -319,10 +319,76 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "another business whose name adds a word is not the one asked for",
-			ask:  PlaceQuery{Name: "Café Iruña", Venue: true},
+			ask:  PlaceQuery{Name: "Café Iruña", Venue: VenueFood},
 			els: []el{
 				node(1, 43.2300, -2.9800, map[string]string{"amenity": "restaurant", "name": "Cafe Iruña Berria"}),
 			},
+		},
+		{
+			name: "a plan's café is not the square it is named after",
+			ask:  PlaceQuery{Name: "Puerta del Sol", Venue: VenueFood},
+			els: []el{
+				node(1, 40.4169, -3.7035, map[string]string{"tourism": "attraction", "name": "Puerta del Sol", "wikidata": "Q427163"}),
+			},
+		},
+		{
+			name: "of a square and the café named after it, a plan's café is the café",
+			ask:  PlaceQuery{Name: "Puerta del Sol", Venue: VenueFood},
+			els: []el{
+				node(1, 40.4169, -3.7035, map[string]string{"tourism": "attraction", "name": "Puerta del Sol", "wikidata": "Q427163"}),
+				node(2, 40.4151, -3.7032, map[string]string{"amenity": "cafe", "name": "Puerta del Sol"}),
+			},
+			wantID: 2,
+		},
+		{
+			name: "a café that is itself an attraction answers for a plan's café",
+			ask:  PlaceQuery{Name: "Café Majestic", Venue: VenueFood},
+			els: []el{
+				node(1, 41.1472, -8.6066, map[string]string{"tourism": "attraction", "amenity": "cafe", "name": "Café Majestic"}),
+			},
+			wantID: 1,
+		},
+		{
+			name: "a guest house is not the restaurant it shares a name with",
+			ask:  PlaceQuery{Name: "Espacio Eslava", Venue: VenueFood},
+			els: []el{
+				node(1, 37.3975, -5.9970, map[string]string{"tourism": "guest_house", "name": "Espacio Eslava"}),
+			},
+		},
+		{
+			name: "of two restaurants with one name, the one that is a monument",
+			ask:  PlaceQuery{Name: "El Rinconcillo", Venue: VenueFood},
+			els: []el{
+				node(1, 37.4224, -5.9858, map[string]string{"amenity": "cafe", "name": "El Rinconcillo"}),
+				node(2, 37.3933, -5.9883, map[string]string{"historic": "restaurant", "amenity": "restaurant", "name": "El Rinconcillo"}),
+			},
+			wantID: 2,
+		},
+		{
+			name: "the next town's church has the bare name; this town's adds the town and is the notable one",
+			ask:  PlaceQuery{Name: "Igreja Matriz"},
+			els: []el{
+				node(1, 38.80, -9.38, map[string]string{"amenity": "place_of_worship", "name": "Igreja Matriz"}),
+				node(2, 38.70, -9.42, map[string]string{"amenity": "place_of_worship", "name": "Igreja Matriz de Cascais", "wikidata": "Q10300001"}),
+			},
+			wantID: 2,
+		},
+		{
+			name: "two churches with the name and nothing to tell them apart are no answer",
+			ask:  PlaceQuery{Name: "Igreja Matriz"},
+			els: []el{
+				node(1, 38.80, -9.38, map[string]string{"amenity": "place_of_worship", "name": "Igreja Matriz"}),
+				node(2, 38.70, -9.42, map[string]string{"amenity": "place_of_worship", "name": "Igreja Matriz de Cascais"}),
+			},
+		},
+		{
+			name: "of two notable places, the one with the exact name",
+			ask:  PlaceQuery{Name: "Palacio Real"},
+			els: []el{
+				node(1, 40.4180, -3.7142, map[string]string{"historic": "castle", "name": "Palacio Real", "wikidata": "Q171517"}),
+				node(2, 40.5190, -3.7750, map[string]string{"historic": "castle", "name": "Palacio Real de El Pardo", "wikidata": "Q1479279"}),
+			},
+			wantID: 1,
 		},
 		{
 			name: "a square drawn as a pedestrian area, among namesakes in other towns",
@@ -345,7 +411,7 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "a board about the sight, a car park and a clinic named after it are not the sight",
-			ask:  PlaceQuery{Name: "Sagrada Família", Venue: true},
+			ask:  PlaceQuery{Name: "Sagrada Família"},
 			els: []el{
 				node(1, 41.4029, 2.1722, map[string]string{"amenity": "parking", "name": "Sagrada Familia"}),
 				node(2, 41.4040, 2.1745, map[string]string{"tourism": "information", "name": "Sagrada Família"}),
@@ -363,7 +429,7 @@ func TestMatchPlace(t *testing.T) {
 		},
 		{
 			name: "a hotel that kept the old name of what stood there is not it",
-			ask:  PlaceQuery{Name: "Estadio Santiago Bernabéu", Venue: true},
+			ask:  PlaceQuery{Name: "Estadio Santiago Bernabéu", Venue: VenueStay},
 			els: []el{
 				node(1, 40.4500, -3.6900, map[string]string{"tourism": "hotel", "name": "Canopy", "old_name": "Estadio Santiago Bernabéu"}),
 			},

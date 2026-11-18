@@ -60,14 +60,31 @@ type MapPlace struct {
 	Confidence float64 `json:"confidence"`
 }
 
+// VenueKind says what kind of business a plan means. Zero is no business: a
+// sight.
+type VenueKind uint8
+
+const (
+	// VenueFood is somewhere to eat or drink.
+	VenueFood VenueKind = 1 << iota
+	// VenueShop is somewhere to buy things.
+	VenueShop
+	// VenueStay is somewhere to sleep.
+	VenueStay
+)
+
 // PlaceQuery is one place to look for.
 type PlaceQuery struct {
 	Name string
-	// Venue says the plan means somewhere to eat, drink, shop or sleep. Only
-	// then is a restaurant, a shop or a hotel an answer: businesses borrow
-	// the names of the sights beside them ("Farmacia Las Setas", a bar called
-	// "Plaza Mayor"), and one of those must not stand in for the sight.
-	Venue bool
+	// Venue is the kind of business the plan means, or zero for a sight.
+	//
+	// It decides what on the map can be the answer. Businesses borrow the
+	// names of the sights beside them ("Farmacia Las Setas", a bar called
+	// "Plaza Mayor"), and sights lend theirs: a plan's café called "Puerta
+	// del Sol" is not the square. So a sight is looked for among sights, a
+	// restaurant among places that serve food, and neither stands in for
+	// the other.
+	Venue VenueKind
 }
 
 // PlaceMatch is the answer for one asked name.
@@ -103,7 +120,7 @@ const (
 	classSight
 )
 
-// sightTags and venueTags say which values of a tag make an entry a sight or
+// sightTags says which values of a tag make an entry a sight;
 // a venue; a nil set means any value. They are lists of what counts, so a
 // kind of thing nobody thought of is not an answer until it is added.
 var sightTags = []struct {
@@ -121,14 +138,47 @@ var sightTags = []struct {
 	{"highway", map[string]bool{"pedestrian": true}},
 }
 
-var venueTags = []struct {
-	key    string
-	values map[string]bool
-}{
-	{"amenity", map[string]bool{"restaurant": true, "cafe": true, "bar": true, "pub": true, "fast_food": true, "biergarten": true, "ice_cream": true, "nightclub": true}},
-	{"shop", nil},
-	{"tourism", map[string]bool{"hotel": true, "hostel": true, "guest_house": true, "apartment": true, "motel": true}},
-	{"craft", map[string]bool{"brewery": true, "winery": true, "distillery": true}},
+// foodAmenities and the sets after it say which map entries are which kind of
+// business.
+var (
+	foodAmenities = map[string]bool{"restaurant": true, "cafe": true, "bar": true, "pub": true, "fast_food": true, "biergarten": true, "ice_cream": true, "nightclub": true}
+	// marketAmenities sell food and goods both.
+	marketAmenities = map[string]bool{"marketplace": true, "food_court": true}
+	// foodShops are shops a plan would call a bakery, a wine bar or a café.
+	foodShops   = map[string]bool{"bakery": true, "pastry": true, "confectionery": true, "chocolate": true, "alcohol": true, "wine": true, "deli": true, "coffee": true, "tea": true, "ice_cream": true, "cheese": true, "beverages": true}
+	stayTourism = map[string]bool{"hotel": true, "hostel": true, "guest_house": true, "apartment": true, "motel": true}
+	foodCrafts  = map[string]bool{"brewery": true, "winery": true, "distillery": true}
+)
+
+// entryVenue says which kinds of business a map entry is, and what the map
+// calls it.
+func entryVenue(tags map[string]string) (VenueKind, string) {
+	var kinds VenueKind
+	label := ""
+	add := func(k VenueKind, v string) {
+		kinds |= k
+		if label == "" {
+			label = v
+		}
+	}
+	if v := tags["amenity"]; foodAmenities[v] {
+		add(VenueFood, v)
+	} else if marketAmenities[v] {
+		add(VenueFood|VenueShop, v)
+	}
+	if v := strings.TrimSpace(tags["shop"]); v != "" && v != "no" && v != "vacant" {
+		add(VenueShop, v)
+		if foodShops[v] {
+			kinds |= VenueFood
+		}
+	}
+	if v := tags["tourism"]; stayTourism[v] {
+		add(VenueStay, v)
+	}
+	if v := tags["craft"]; foodCrafts[v] {
+		add(VenueFood, v)
+	}
+	return kinds, clip(label, 40)
 }
 
 // placeKindWords say what kind of place a name is, not which one, in the
@@ -193,11 +243,7 @@ func placeWord(name string) string {
 }
 
 func placeCacheKey(q PlaceQuery, near LatLon) string {
-	kind := "sight"
-	if q.Venue {
-		kind = "venue"
-	}
-	return fmt.Sprintf("transit:overpass:v2:place:%.2f,%.2f:%s:%s", near.Lat, near.Lon, kind, placematch.Fold(strings.TrimSpace(q.Name)))
+	return fmt.Sprintf("transit:overpass:v3:place:%.2f,%.2f:%d:%s", near.Lat, near.Lon, q.Venue, placematch.Fold(strings.TrimSpace(q.Name)))
 }
 
 // FindPlaces looks for each place near a point (the city centre) and answers
@@ -237,12 +283,19 @@ func (o *Overpass) FindPlaces(ctx context.Context, asks []PlaceQuery, near LatLo
 				words = append(words, a.word)
 			}
 		}
-		els, err := o.placeCandidates(ctx, words, near)
+		cutOff := map[string]bool{}
+		els, err := o.placeCandidates(ctx, words, near, cutOff)
 		if err != nil {
 			return out, err
 		}
 		for _, a := range batch {
-			place, found := matchPlace(asks[a.idx], els)
+			place, found := MapPlace{}, false
+			// A name whose word's answer was cut off is not answered at
+			// all: with entries missing, the one left standing could be
+			// the wrong one of two.
+			if !cutOff[a.word] {
+				place, found = matchPlace(asks[a.idx], els)
+			}
 			out[a.idx] = PlaceMatch{Place: place, Found: found}
 			ttl := ttlPlaceMiss
 			if found {
@@ -257,9 +310,8 @@ func (o *Overpass) FindPlaces(ctx context.Context, asks []PlaceQuery, near LatLo
 // placeCandidates fetches every map entry near the point whose name holds
 // one of the words. An answer long enough to have been cut off is not used:
 // the words are split and asked again. A single word whose answer is still
-// cut off brings nothing back, so the names behind it go unanswered: with
-// entries missing, the one left standing could be the wrong one of two.
-func (o *Overpass) placeCandidates(ctx context.Context, words []string, near LatLon) ([]element, error) {
+// cut off brings nothing back and is noted in cutOff.
+func (o *Overpass) placeCandidates(ctx context.Context, words []string, near LatLon, cutOff map[string]bool) ([]element, error) {
 	els, err := o.run(ctx, placesQuery(words, near))
 	if err != nil {
 		return nil, err
@@ -268,14 +320,15 @@ func (o *Overpass) placeCandidates(ctx context.Context, words []string, near Lat
 		return els, nil
 	}
 	if len(words) < 2 {
+		cutOff[words[0]] = true
 		return nil, nil
 	}
 	half := len(words) / 2
-	first, err := o.placeCandidates(ctx, words[:half], near)
+	first, err := o.placeCandidates(ctx, words[:half], near, cutOff)
 	if err != nil {
 		return nil, err
 	}
-	second, err := o.placeCandidates(ctx, words[half:], near)
+	second, err := o.placeCandidates(ctx, words[half:], near, cutOff)
 	if err != nil {
 		return nil, err
 	}
@@ -313,18 +366,20 @@ out tags center %d;`,
 		name, name, maxPlaceCandidates)
 }
 
-// classify says what kind of answer a map entry can be, and what the map
-// calls it ("museum", "restaurant"). An entry with a sight's tag is a sight
-// whatever else it carries: the café that is itself an attraction is one.
-func classify(tags map[string]string) (placeClass, string) {
+// classify says what kind of answer a map entry can be, what the map calls
+// it ("museum", "restaurant"), and which kinds of business it is. An entry
+// with a sight's tag is a sight whatever else it carries, and may be a
+// business too: the café that is itself an attraction is both.
+func classify(tags map[string]string) (placeClass, string, VenueKind) {
 	for _, k := range []string{"public_transport", "railway", "route", "boundary"} {
 		if tags[k] != "" {
-			return classNone, ""
+			return classNone, "", 0
 		}
 	}
 	if hw := tags["highway"]; hw != "" && hw != "pedestrian" {
-		return classNone, ""
+		return classNone, "", 0
 	}
+	venue, venueLabel := entryVenue(tags)
 	for _, t := range sightTags {
 		v := strings.TrimSpace(tags[t.key])
 		if v == "" || v == "no" || (t.values != nil && !t.values[v]) {
@@ -333,21 +388,17 @@ func classify(tags map[string]string) (placeClass, string) {
 		if t.key == "highway" {
 			v = "square"
 		}
-		return classSight, clip(v, 40)
+		return classSight, clip(v, 40), venue
 	}
-	for _, t := range venueTags {
-		v := strings.TrimSpace(tags[t.key])
-		if v == "" || v == "no" || (t.values != nil && !t.values[v]) {
-			continue
-		}
-		return classVenue, clip(v, 40)
+	if venue != 0 {
+		return classVenue, venueLabel, venue
 	}
 	// A building the map says nothing more about is a sight only when the
 	// map also knows it as notable; otherwise it is an address.
 	if b := tags["building"]; b != "" && b != "no" && tags["wikidata"] != "" {
-		return classSight, "building"
+		return classSight, "building", 0
 	}
-	return classNone, ""
+	return classNone, "", 0
 }
 
 // nameConfidence scores how closely a map name agrees with the asked one; 0
@@ -375,35 +426,38 @@ func nameConfidence(given, candidate string) float64 {
 type placeCandidate struct {
 	MapPlace
 	class placeClass
+	venue VenueKind
 }
 
 // matchPlace picks the map entry a plan means, if exactly one place fits.
 //
 // Every step drops candidates and none of them guesses:
-//  1. where a sight has the closest name, it is the answer and a business
-//     with the same name is not;
-//  2. otherwise the businesses are weighed, exact names and names with a
-//     word added alike: a chain's branches share a name and the map tells
-//     them apart by adding one ("Livraria Bertrand - Chiado"), so the one
-//     branch that happens to carry the bare name is not thereby the one
+//  1. the entry must be the kind of place the plan means. For a business,
+//     an entry that is that kind of business. For a sight, a sight; or,
+//     where no sight has the name, a business the map knows as notable
+//     (the plan's "landmark" that is a famous café);
+//  2. exact names and names with a word added are weighed together. A
+//     chain's branches share a name and the map tells them apart by adding
+//     a word ("Livraria Bertrand - Chiado"), and the parish church of the
+//     next town can carry the bare name while this town's adds the town;
+//     the entry that happens to have the bare name is not thereby the one
 //     meant;
-//  3. a business is an answer only for a plan that means one, or when the
-//     map knows it as notable;
+//  3. what is left must be one place. Entries count as one place when they
+//     are within samePlaceM of each other or carry the same wikidata id (a
+//     park's outline and its gate). Of several places, those the map knows
+//     as notable are weighed alone, and among them one with the exact name
+//     wins over ones that add a word ("Palacio Real" over "Palacio Real de
+//     El Pardo"). Short of that the name fits no one place and there is no
+//     answer;
 //  4. a name with a word added is an answer only when the map knows the
 //     place as notable. "Real Alcázar de Sevilla" is the Real Alcázar; the
 //     "Cafe Iruña Berria" across town is not the Café Iruña, and nothing in
-//     the two names says which case this is;
-//  5. what is left must be one place. Entries count as one place when they
-//     are within samePlaceM of each other or carry the same wikidata id (a
-//     park's outline and its gate). Of several places, one the map knows as
-//     notable wins over ones it does not; otherwise the name fits no one
-//     place and there is no answer.
+//     the two names says which case this is.
 func matchPlace(q PlaceQuery, els []element) (MapPlace, bool) {
 	var cands []placeCandidate
-	top := 0.0
 	for _, e := range els {
 		pt, ok := e.point()
-		class, kind := classify(e.Tags)
+		class, kind, venue := classify(e.Tags)
 		if !ok || class == classNone {
 			continue
 		}
@@ -419,12 +473,11 @@ func matchPlace(q PlaceQuery, els []element) (MapPlace, bool) {
 		if conf == 0 {
 			continue
 		}
-		top = math.Max(top, conf)
 		name := strings.TrimSpace(e.Tags["name"])
 		if name == "" {
 			name = matched
 		}
-		cands = append(cands, placeCandidate{class: class, MapPlace: MapPlace{
+		cands = append(cands, placeCandidate{class: class, venue: venue, MapPlace: MapPlace{
 			OSMType: e.Type, OSMID: e.ID, Name: clip(name, 200), Lat: pt.Lat, Lon: pt.Lon, Kind: kind,
 			OpeningHours: clip(strings.TrimSpace(e.Tags["opening_hours"]), 500),
 			Wikidata:     clip(strings.TrimSpace(e.Tags["wikidata"]), 20),
@@ -432,28 +485,31 @@ func matchPlace(q PlaceQuery, els []element) (MapPlace, bool) {
 		}})
 	}
 
-	sights := keepPlaces(cands, func(c placeCandidate) bool { return c.class == classSight && c.Confidence == top })
-	if len(sights) > 0 {
+	if q.Venue != 0 {
+		cands = keepPlaces(cands, func(c placeCandidate) bool { return c.venue&q.Venue != 0 })
+	} else if sights := keepPlaces(cands, func(c placeCandidate) bool { return c.class == classSight }); len(sights) > 0 {
 		cands = sights
 	} else {
-		cands = keepPlaces(cands, func(c placeCandidate) bool {
-			return c.class == classVenue && (q.Venue || c.Wikidata != "")
-		})
+		cands = keepPlaces(cands, func(c placeCandidate) bool { return c.Wikidata != "" })
 	}
 	if len(cands) == 0 {
 		return MapPlace{}, false
 	}
 
+	// Notable: the map carries a wikidata id for it, or, for a business, it
+	// is tagged as a sight in its own right (the tavern that is a monument).
+	notable := func(c placeCandidate) bool {
+		return c.Wikidata != "" || (q.Venue != 0 && c.class == classSight)
+	}
+	anyIn := func(pass func(placeCandidate) bool) func([]placeCandidate) bool {
+		return func(g []placeCandidate) bool { return len(keepPlaces(g, pass)) > 0 }
+	}
 	places := groupPlaces(cands)
-	if len(places) > 1 {
-		places = keepGroups(places, func(g []placeCandidate) bool {
-			for _, c := range g {
-				if c.Wikidata != "" {
-					return true
-				}
-			}
-			return false
-		})
+	if known := keepGroups(places, anyIn(notable)); len(known) > 0 {
+		places = known
+		if exact := keepGroups(known, anyIn(func(c placeCandidate) bool { return c.Confidence == confidenceExact })); len(exact) > 0 {
+			places = exact
+		}
 	}
 	if len(places) != 1 {
 		return MapPlace{}, false

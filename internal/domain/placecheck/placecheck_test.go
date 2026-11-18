@@ -185,7 +185,7 @@ func (f *fakeFinder) FindPlaces(_ context.Context, asks []transit.PlaceQuery, _ 
 	out := make([]transit.PlaceMatch, len(asks))
 	for i, a := range asks {
 		names[i] = a.Name
-		if a.Venue {
+		if a.Venue != 0 {
 			if f.venues == nil {
 				f.venues = map[string]bool{}
 			}
@@ -311,21 +311,22 @@ func TestCheckPOIsStoreError(t *testing.T) {
 }
 
 func TestVenueCategory(t *testing.T) {
-	for category, want := range map[string]bool{
-		"Restaurant":      true,
-		"Fine Dining":     true,
-		"Cafe":            true,
-		"Café":            true,
-		"Bar":             true,
-		"Wine Bar":        true,
-		"Hotel":           true,
-		"Shopping":        true,
-		"Museum":          false,
-		"Historical Site": false,
-		"Park":            false,
-		"Barcelona":       false, // "bar" is a word here, not a prefix
-		"Cultural":        false,
-		"":                false,
+	for category, want := range map[string]transit.VenueKind{
+		"Restaurant":      transit.VenueFood,
+		"Fine Dining":     transit.VenueFood,
+		"Cafe":            transit.VenueFood,
+		"Café":            transit.VenueFood,
+		"Bar":             transit.VenueFood,
+		"Wine Bar":        transit.VenueFood,
+		"Hotel":           transit.VenueStay,
+		"Shopping":        transit.VenueShop,
+		"Coffee Shop":     transit.VenueFood | transit.VenueShop,
+		"Museum":          0,
+		"Historical Site": 0,
+		"Park":            0,
+		"Barcelona":       0, // "bar" is a word here, not a prefix
+		"Cultural":        0,
+		"":                0,
 	} {
 		if got := venueCategory(category); got != want {
 			t.Errorf("venueCategory(%q) = %v, want %v", category, got, want)

@@ -31,33 +31,42 @@ type POI struct {
 	ID   string
 	Name string
 	// Category is what the plan says the place is ("Museum", "Cafe"), as
-	// free text. It decides whether a restaurant or a shop on the map can be
-	// the answer; see venueCategory.
+	// free text. It decides what on the map can be the answer: a sight, or
+	// a business of that kind; see venueCategory.
 	Category string
 }
 
-// venueWords are the words of a plan's category that mean somewhere to eat,
-// drink, shop or sleep. Categories are free text from the model ("Fine
-// Dining", "Cafe", "Bar", "Hotel"), so this reads words, not a fixed list of
-// values. A category it does not know is not a venue: the place is then
-// looked for among sights only, which can miss a restaurant and cannot
-// mistake one for the monument it is named after.
-var venueWords = map[string]bool{
-	"restaurant": true, "restaurante": true, "dining": true, "food": true, "eatery": true, "bistro": true, "tapas": true,
-	"cafe": true, "coffee": true, "bakery": true, "pastry": true, "patisserie": true, "dessert": true, "gelato": true,
-	"bar": true, "pub": true, "tavern": true, "taberna": true, "winery": true, "brewery": true, "nightlife": true, "nightclub": true, "club": true,
-	"shop": true, "shopping": true, "store": true, "boutique": true, "bookshop": true, "bookstore": true,
-	"hotel": true, "hostel": true, "guesthouse": true, "apartment": true, "lodging": true, "accommodation": true,
-}
-
-// venueCategory reports whether a plan's category means a business.
-func venueCategory(category string) bool {
-	for w := range placematch.Tokens(category) {
-		if venueWords[w] {
-			return true
+// venueWords are the words of a plan's category that mean a business, and
+// which kind. Categories are free text from the model ("Fine Dining",
+// "Cafe", "Bar", "Hotel"), so this reads words, not a fixed list of values.
+// A category it does not know is not a business: the place is then looked
+// for among sights, which can miss a restaurant and cannot mistake one for
+// the monument it is named after.
+var venueWords = func() map[string]transit.VenueKind {
+	out := map[string]transit.VenueKind{}
+	for kind, words := range map[transit.VenueKind][]string{
+		transit.VenueFood: {
+			"restaurant", "restaurante", "dining", "food", "eatery", "bistro", "tapas",
+			"cafe", "coffee", "bakery", "pastry", "patisserie", "dessert", "gelato",
+			"bar", "pub", "tavern", "taberna", "winery", "brewery", "nightlife", "nightclub", "club",
+		},
+		transit.VenueShop: {"shop", "shopping", "store", "boutique", "bookshop", "bookstore"},
+		transit.VenueStay: {"hotel", "hostel", "guesthouse", "apartment", "lodging", "accommodation"},
+	} {
+		for _, w := range words {
+			out[w] = kind
 		}
 	}
-	return false
+	return out
+}()
+
+// venueCategory is the kind of business a plan's category means, or zero.
+func venueCategory(category string) transit.VenueKind {
+	var kind transit.VenueKind
+	for w := range placematch.Tokens(category) {
+		kind |= venueWords[w]
+	}
+	return kind
 }
 
 // Service checks places against the map and remembers the answers.
