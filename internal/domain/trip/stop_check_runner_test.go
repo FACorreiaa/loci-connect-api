@@ -29,22 +29,29 @@ func (f *tripsByID) GetTrip(_ context.Context, id, _ uuid.UUID) (*Trip, error) {
 }
 
 // wantingRefresher goes to the map `each` times for every plan it is given,
-// for as long as it is allowed to.
+// for as long as it is allowed to. failAt, when set, makes that plan's first
+// visit fail.
 type wantingRefresher struct {
-	each  int
-	plans int
+	each   int
+	plans  int
+	failAt int
+	days   [][]placecheck.Day
 }
 
-func (f *wantingRefresher) Refresh(_ context.Context, _ []placecheck.Day, allow func() bool) int {
+func (f *wantingRefresher) Refresh(_ context.Context, days []placecheck.Day, allow func() bool) (int, error) {
 	f.plans++
+	f.days = append(f.days, days)
 	n := 0
 	for range f.each {
 		if !allow() {
 			break
 		}
 		n++
+		if f.failAt == f.plans {
+			return n, errors.New("map is down")
+		}
 	}
-	return n
+	return n, nil
 }
 
 type fakeUpcoming struct {
@@ -163,4 +170,16 @@ func TestStopCheckRunner_StopsWhenCancelled(t *testing.T) {
 	cancel()
 	require.Zero(t, r.runner.Tick(ctx))
 	require.Empty(t, r.repo.loaded)
+}
+
+func TestStopCheckRunner_EndsTheTickWhenALookupFails(t *testing.T) {
+	r := newCheckRig(4, 100)
+	r.refresh.failAt = 2
+
+	require.Equal(t, 3, r.runner.Tick(context.Background()), "two visits for the first trip, one failed for the second")
+	require.Len(t, r.repo.loaded, 2, "the trips after the failure are left for the next tick")
+
+	// The next tick starts over; the map answers again.
+	r.refresh.failAt = 0
+	require.Equal(t, 8, r.runner.Tick(context.Background()))
 }

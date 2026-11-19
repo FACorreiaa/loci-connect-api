@@ -33,7 +33,7 @@ const (
 // StopRefresher asks the map again about a plan's places; see
 // placecheck.Planner.Refresh.
 type StopRefresher interface {
-	Refresh(ctx context.Context, days []placecheck.Day, allow func() bool) int
+	Refresh(ctx context.Context, days []placecheck.Day, allow func() bool) (int, error)
 }
 
 // TripRef names a trip and its owner.
@@ -171,9 +171,18 @@ func (r *StopCheckRunner) Tick(ctx context.Context) int {
 		// place to search around.
 		draft := tripToProto(t)
 		r.h.hydrateStops(ctx, draft)
-		if n := r.refresh.Refresh(ctx, checkPlan(draft.GetDays()), func() bool { return r.allow(ctx) }); n > 0 {
+		n, err := r.refresh.Refresh(ctx, checkPlan(draft.GetDays()), func() bool { return r.allow(ctx) })
+		if n > 0 {
 			visits += n
 			trips++
+		}
+		if err != nil {
+			// The map is down or busy. Every further trip would wait out
+			// the same timeout against a server people are waiting on, and
+			// spend the day's visits doing it. The next tick tries again.
+			r.log.WarnContext(ctx, "place check: refresh stopped, a lookup failed",
+				slog.String("source", "runner"), slog.Any("error", err))
+			break
 		}
 	}
 	if visits > 0 {
