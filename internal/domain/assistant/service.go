@@ -85,8 +85,8 @@ const (
 	inputMicroUSDPerMTok      = 100_000
 	outputMicroUSDPerMTok     = 500_000
 	cacheWriteMicroUSDPerMTok = 125_000
-	// webSearchMicroUSD is one web search at $10 a thousand. Only hotel
-	// comparison searches; the assistant's own loop has no search tool.
+	// webSearchMicroUSD is one web search at $10 a thousand. Hotel comparison
+	// and search_web search; the loop itself never does, so it stays replayable.
 	webSearchMicroUSD = 10_000
 )
 
@@ -131,6 +131,9 @@ type Deps struct {
 	// finds which trip. Either nil leaves the report without that card.
 	StayChoices StayChoiceProposer
 	Trips       hotelcompare.TripSource
+	// WebSearch adds the search_web tool. Off unless enabled, and never
+	// without Model, which runs the search.
+	WebSearch WebSearch
 }
 
 // Service answers asks.
@@ -160,6 +163,7 @@ func NewService(d Deps) *Service {
 		d.DailyCeilingMicroUSD = defaultDailyCeilingMicroUSD
 	}
 	tools := append(readTools(d.Sources), proposeTools(d.Sources, d.Store, d.Now)...)
+	tools = append(tools, searchWebTools(d.Model, d.WebSearch, d.Now)...)
 	byName := make(map[string]tool, len(tools))
 	for _, t := range tools {
 		byName[t.def.Name] = t
@@ -428,6 +432,7 @@ func (a *askRun) runTools(uses []anthropic.ToolBlock) []anthropic.ToolBlock {
 	s := a.s
 	results := make([]anthropic.ToolBlock, len(uses))
 	events := make([]*assistantv1.AssistantEvent, len(uses))
+	usages := make([]anthropic.ToolUsage, len(uses))
 	var group errgroup.Group
 	for i, use := range uses {
 		results[i] = anthropic.ToolBlock{Type: anthropic.BlockToolResult, ToolUseID: use.ToolUseID, IsError: true}
@@ -451,11 +456,15 @@ func (a *askRun) runTools(uses []anthropic.ToolBlock) []anthropic.ToolBlock {
 		a.sendStatus(t.status)
 
 		group.Go(func() error {
-			results[i].Result, results[i].IsError, events[i] = s.runTool(a.ctx, t, a.userID, use.Input)
+			results[i].Result, results[i].IsError, events[i], usages[i] = s.runTool(a.ctx, t, a.userID, use.Input)
 			return nil
 		})
 	}
 	_ = group.Wait()
+	// A tool that called the model itself (search_web) spent from this ask.
+	for _, u := range usages {
+		a.spend.add(u)
+	}
 	// Here and not in the tools, which run together: the stream takes one at a
 	// time, and the cards should arrive in the order the model asked for them.
 	for _, event := range events {
@@ -481,7 +490,9 @@ func (a *askRun) sendStatus(label string) {
 
 // runTool returns what to tell the model, whether that is a failure, and what to
 // show the caller if the tool made an offer.
-func (s *Service) runTool(ctx context.Context, t tool, userID uuid.UUID, input json.RawMessage) (string, bool, *assistantv1.AssistantEvent) {
+func (s *Service) runTool(
+	ctx context.Context, t tool, userID uuid.UUID, input json.RawMessage,
+) (string, bool, *assistantv1.AssistantEvent, anthropic.ToolUsage) {
 	limit := s.d.Limits.Tool
 	if t.timeout > 0 {
 		limit = t.timeout
@@ -491,17 +502,24 @@ func (s *Service) runTool(ctx context.Context, t tool, userID uuid.UUID, input j
 	out, err := t.run(ctx, userID, input)
 	if err != nil {
 		s.d.Logger.Info("assistant: tool failed", slog.String("tool", t.def.Name), slog.Any("error", err))
-		return toolFailure(ctx, err), true, nil
+		return toolFailure(ctx, err), true, nil, anthropic.ToolUsage{}
 	}
 	var event *assistantv1.AssistantEvent
-	if o, ok := out.(offer); ok {
+	var usage anthropic.ToolUsage
+	switch o := out.(type) {
+	case offer:
 		out, event = o.reply, o.event
+	case searched:
+		out, usage = o.reply, o.usage
+		s.d.Logger.Info("assistant: web search",
+			slog.Int64("searches", o.usage.WebSearchRequests),
+			slog.Int64("output_tokens", o.usage.OutputTokens))
 	}
 	raw, err := json.Marshal(out)
 	if err != nil {
-		return "that could not be read", true, nil
+		return "that could not be read", true, nil, usage
 	}
-	return clipBytes(string(raw), s.d.Limits.ToolOutput), false, event
+	return clipBytes(string(raw), s.d.Limits.ToolOutput), false, event, usage
 }
 
 // toolFailure tells the model what it can act on and no more: an internal error

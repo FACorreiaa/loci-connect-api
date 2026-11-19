@@ -689,6 +689,17 @@ func (d *Dependencies) initAssistant(members assistant.TripResolver, friends ass
 	if d.hotelCompare != nil {
 		deps.Hotels, deps.StayChoices, deps.Trips = d.hotelCompare, d.stayChoices, d.TripRepo
 	}
+	// ASSISTANT_WEB_SEARCH (default off) adds search_web: one Claude call with
+	// Anthropic's web search tool, $10 a thousand searches on top of tokens.
+	//	ASSISTANT_WEB_SEARCH_MAX_USES       searches behind one search_web (default 2)
+	//	ASSISTANT_WEB_SEARCH_PER_USER_DAILY search_web calls per traveller a day (default 5)
+	//	ASSISTANT_WEB_SEARCH_DAILY          search_web calls a day, everyone (default 100)
+	deps.WebSearch = assistant.WebSearch{
+		Enabled:      envFlag("ASSISTANT_WEB_SEARCH", false),
+		MaxUses:      envInt("ASSISTANT_WEB_SEARCH_MAX_USES", 2),
+		PerUserDaily: envInt("ASSISTANT_WEB_SEARCH_PER_USER_DAILY", 5),
+		Daily:        envInt("ASSISTANT_WEB_SEARCH_DAILY", 100),
+	}
 	model, err := ai.NewToolClient(d.Config.AI, d.Logger)
 	if err != nil {
 		return err
@@ -703,6 +714,7 @@ func (d *Dependencies) initAssistant(members assistant.TripResolver, friends ass
 	if fallback != nil {
 		deps.Fallback = fallback
 	}
+	d.Logger.Info("assistant: on", slog.Bool("web_search", deps.WebSearch.Enabled && deps.Model != nil))
 	d.AssistantHandler = assistant.NewHandler(assistant.NewService(deps), d.Logger)
 	return nil
 }
