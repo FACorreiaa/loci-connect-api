@@ -143,6 +143,7 @@ type Dependencies struct {
 	ShareRepo         share.Repository
 	TripRepo          trip.Repository
 	tripSaves         *trip.SaveNotifier
+	stopCheckRunner   *trip.StopCheckRunner
 	TravelHistoryRepo travelhistory.Repository
 	// RunStore backs the cap interceptor and the run-status/notification RPCs.
 	RunStore runs.Store
@@ -825,6 +826,16 @@ func (d *Dependencies) RunWatches(ctx context.Context) error {
 	return d.watchRunner.Run(ctx)
 }
 
+// RunStopChecks renews the map's answers for trips in the coming week until
+// ctx is cancelled. Returns nil immediately when it is off. Every replica
+// runs the loop; an advisory lock lets one of them work in any tick.
+func (d *Dependencies) RunStopChecks(ctx context.Context) error {
+	if d.stopCheckRunner == nil {
+		return nil
+	}
+	return d.stopCheckRunner.Run(ctx)
+}
+
 // RunTripBriefs sends trip-day briefs until ctx is cancelled. Returns nil
 // immediately when they are off. Every replica runs the loop; an advisory
 // lock lets one of them work in any tick.
@@ -1126,6 +1137,17 @@ func (d *Dependencies) initHandlers() error {
 			d.TripHandler = d.TripHandler.WithStopChecks(checks)
 			if d.tripSaves != nil {
 				d.tripSaves.OnSave(d.TripHandler.WarmStopChecks)
+			}
+			// PLACE_CHECK_REFRESH (default off) renews the map's answers for
+			// trips in the coming week, so a trip not opened for a month is
+			// not read on its first morning with answers that have aged out.
+			// PLACE_CHECK_REFRESH_DAILY (default 200) is its own ceiling of
+			// visits to the map per UTC day, below PLACE_CHECK_DAILY_BUDGET,
+			// which it also draws on: a backlog cannot spend what a reader
+			// waiting on a stamp needs.
+			if envFlag("PLACE_CHECK_REFRESH", false) {
+				d.stopCheckRunner = trip.NewStopCheckRunner(d.TripHandler, checks, trip.NewUpcomingTrips(d.DB.Pool),
+					pglock.New(d.DB.Pool, trip.StopCheckRunnerLockKey), envInt("PLACE_CHECK_REFRESH_DAILY", 200), d.Logger)
 			}
 		}
 		// The friends layer, and trip sharing on top of it: one service is

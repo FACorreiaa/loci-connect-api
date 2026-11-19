@@ -149,6 +149,10 @@ func run() error {
 	// Trip-day briefs (morning brief, weather turn). Returns immediately when off.
 	background.start(ctx, "tripbriefs", deps.RunTripBriefs)
 
+	// Renew the map's answers for trips in the coming week. Returns
+	// immediately when off.
+	background.start(ctx, "stop_checks", deps.RunStopChecks)
+
 	// Sweep abandoned journal uploads and deleted photos' objects.
 	background.start(ctx, "journal_sweeper", deps.RunJournalSweeper)
 
