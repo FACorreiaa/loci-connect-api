@@ -40,6 +40,7 @@ func (h *Handler) respondAll(ctx context.Context, trips []*Trip) []*tripv1.TripD
 	for _, t := range trips {
 		p := tripToProto(t)
 		h.hydrateStops(ctx, p)
+		h.checkStops(ctx, p)
 		out = append(out, p)
 	}
 	h.fillStopImages(ctx, out...)

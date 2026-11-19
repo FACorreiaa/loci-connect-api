@@ -60,6 +60,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/messaging/tripcards"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/mfa"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/payment"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/placecheck"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placeintel"
 	poirepo "github.com/FACorreiaa/loci-connect-api/internal/domain/poi"
 	poihandler "github.com/FACorreiaa/loci-connect-api/internal/domain/poi/handler"
@@ -141,6 +142,7 @@ type Dependencies struct {
 	ReviewRepo        reviewdomain.Repository
 	ShareRepo         share.Repository
 	TripRepo          trip.Repository
+	tripSaves         *trip.SaveNotifier
 	TravelHistoryRepo travelhistory.Repository
 	// RunStore backs the cap interceptor and the run-status/notification RPCs.
 	RunStore runs.Store
@@ -389,7 +391,11 @@ func (d *Dependencies) initRepositories() error {
 	d.ReviewRepo = reviewdomain.NewRepository(d.DB.Pool, d.Logger)
 	d.ShareRepo = share.NewRepository(d.DB.Pool, d.Logger)
 	d.flightAirports, d.flightLinks = newFlightLinks(d.Logger)
-	d.TripRepo = trip.NewRepository(d.DB.Pool, d.Logger, trip.WithFlightLinks(d.flightLinks))
+	// Wrapped so the stop checker, built later with the trip handler, hears
+	// about trips the chat pipeline saves and has their checks ready by the
+	// time someone opens them. With checks off the wrapper does nothing.
+	d.tripSaves = trip.NotifyOnSave(trip.NewRepository(d.DB.Pool, d.Logger, trip.WithFlightLinks(d.flightLinks)))
+	d.TripRepo = d.tripSaves
 	d.TravelHistoryRepo = travelhistory.NewRepository(d.DB.Pool, d.Logger)
 	d.PreferenceRecorder = preference.NewRecorder(d.DB.Pool, d.Logger)
 	d.PreferenceVectors = preference.NewVectorStore(d.DB.Pool, d.Logger)
@@ -1104,6 +1110,12 @@ func (d *Dependencies) initHandlers() error {
 		// Every stop with a poi_id shows the POI's first stored picture, so a
 		// trip claimed from a City Pack keeps the photos the pack showed.
 		d.TripHandler = d.TripHandler.WithStopImages(trip.NewStopImageStore(d.DB.Pool))
+		if checks := d.newStopChecks(); checks != nil {
+			d.TripHandler = d.TripHandler.WithStopChecks(checks)
+			if d.tripSaves != nil {
+				d.tripSaves.OnSave(d.TripHandler.WarmStopChecks)
+			}
+		}
 		// The friends layer, and trip sharing on top of it: one service is
 		// both SocialService and the graph trip visibility is checked against.
 		socialSvc := socialdomain.NewService(socialdomain.NewRepository(d.DB.Pool), socialNotifier, d.Logger)
@@ -1643,6 +1655,18 @@ func newPedestrianRouter(cache cachestore.Store, logger *slog.Logger, dailyBudge
 // for people at a map, say so, and are often full: production must point at
 // an instance Loci runs or pays for.
 func newStayMap(cache cachestore.Store, logger *slog.Logger) *transit.Overpass {
+	m := newMapClient(cache, envInt("TRANSIT_OVERPASS_DAILY_BUDGET", 2000))
+	if m != nil {
+		logger.Info("stay transport: map data on", slog.String("server", strings.TrimSpace(os.Getenv("TRANSIT_OVERPASS_URL"))))
+	}
+	return m
+}
+
+// newMapClient builds a client for the map server at TRANSIT_OVERPASS_URL
+// with its own daily budget, or nil when no server is configured. Each
+// feature takes its own client so one cannot spend another's budget; they
+// share the cache, so a question one has asked is free for the other.
+func newMapClient(cache cachestore.Store, dailyBudget int) *transit.Overpass {
 	base := strings.TrimSpace(os.Getenv("TRANSIT_OVERPASS_URL"))
 	if base == "" {
 		return nil
@@ -1657,10 +1681,50 @@ func newStayMap(cache cachestore.Store, logger *slog.Logger) *transit.Overpass {
 		observability.ExternalRequestsTotal.WithLabelValues(source, outcome).Inc()
 		observability.ExternalRequestDuration.WithLabelValues(source).Observe(d.Seconds())
 	})
-	logger.Info("stay transport: map data on", slog.String("server", base))
 	return transit.NewOverpass(transit.OverpassConfig{
 		BaseURL: base, FallbackURL: os.Getenv("TRANSIT_OVERPASS_FALLBACK_URL"),
-	}, client, cache, routing.NewDailyBudget(envInt("TRANSIT_OVERPASS_DAILY_BUDGET", 2000)))
+	}, client, cache, routing.NewDailyBudget(dailyBudget))
+}
+
+// newStopChecks builds what puts a real map's answer on every trip stop
+// ("Checked · opens 10:00"), or nil when it is switched off or there is no
+// map server to ask.
+//
+//	PLACE_CHECK_ENABLED       on/off (default off)
+//	PLACE_CHECK_DAILY_BUDGET  map queries per UTC day (default 1500)
+//	PLACE_CHECK_MOVE_PLACES   also move each matched place to the map's
+//	                          position (default off). It overwrites the
+//	                          place's stored position and cannot be undone,
+//	                          so leave it off until the matches logged as
+//	                          "place check: found on the map" have been read
+//	                          on real plans and found right.
+//
+// It asks the same server as stay transport (TRANSIT_OVERPASS_URL) on a
+// budget of its own. A city outside the area that server holds comes back
+// "not found" for every stop, which a client words as "Couldn't check".
+func (d *Dependencies) newStopChecks() *placecheck.Planner {
+	if !envFlag("PLACE_CHECK_ENABLED", false) || d.DB == nil {
+		return nil
+	}
+	m := newMapClient(d.AppCache, envInt("PLACE_CHECK_DAILY_BUDGET", 1500))
+	if m == nil {
+		d.Logger.Warn("stop checks: PLACE_CHECK_ENABLED is on but TRANSIT_OVERPASS_URL is unset; checks stay off")
+		return nil
+	}
+	signals := localcontext.NewSignalCacheFromEnv(d.AppCache, d.Logger)
+	client := localcontext.NewSignalsHTTPClient()
+	calendar := localcontext.NewHolidayCalendar(
+		localcontext.NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), client, signals),
+		localcontext.NewHolidaySource(os.Getenv("NAGER_DATE_BASE_URL"), client, signals),
+	)
+	store := placecheck.NewRepository(d.DB.Pool)
+	movePlaces := envFlag("PLACE_CHECK_MOVE_PLACES", false)
+	if movePlaces {
+		store = store.MovingPlaces()
+	}
+	d.Logger.Info("stop checks: on", slog.Bool("move_places", movePlaces))
+	return placecheck.NewPlanner(
+		placecheck.NewService(m, store).WithLogger(d.Logger), calendar, d.Logger)
 }
 
 // newHotelCompare builds what answers a chat message with hotel listing

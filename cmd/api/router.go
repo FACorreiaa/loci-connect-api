@@ -69,6 +69,7 @@ import (
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/recap"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/runs"
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/subscription"
+	"github.com/FACorreiaa/loci-connect-api/internal/domain/trip"
 	locimcp "github.com/FACorreiaa/loci-connect-api/internal/mcp"
 	"github.com/FACorreiaa/loci-connect-api/pkg/interceptors"
 	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
@@ -494,6 +495,8 @@ func registerConnectRoutes(mux *http.ServeMux, deps *Dependencies, opts connect.
 	if deps.TripHandler != nil {
 		tripPath, tripHandler := tripconnect.NewTripServiceHandler(deps.TripHandler, opts)
 		mux.Handle(tripPath, tripHandler)
+		// Shared trips' link previews, public.
+		mux.Handle(trip.ShareImagePath, deps.TripHandler.ShareImages(deps.Logger))
 		deps.Logger.Info("registered Connect RPC service", "path", tripPath)
 	}
 

@@ -142,6 +142,139 @@ func (TripPace) EnumDescriptor() ([]byte, []int) {
 	return file_loci_trip_trip_proto_rawDescGZIP(), []int{1}
 }
 
+type StopCheckStatus int32
+
+const (
+	// The place has not been looked up yet. Render it like an absent check.
+	StopCheckStatus_STOP_CHECK_STATUS_UNSPECIFIED StopCheckStatus = 0
+	// One place on the map carries this name near the city. Its position is
+	// the stop's latitude/longitude.
+	StopCheckStatus_STOP_CHECK_STATUS_CHECKED StopCheckStatus = 1
+	// Nothing on the map matched with confidence, or the city is outside the
+	// area the server has a map for. This does not mean the place is not real:
+	// word it "Couldn't check", never "doesn't exist".
+	StopCheckStatus_STOP_CHECK_STATUS_NOT_FOUND StopCheckStatus = 2
+)
+
+// Enum value maps for StopCheckStatus.
+var (
+	StopCheckStatus_name = map[int32]string{
+		0: "STOP_CHECK_STATUS_UNSPECIFIED",
+		1: "STOP_CHECK_STATUS_CHECKED",
+		2: "STOP_CHECK_STATUS_NOT_FOUND",
+	}
+	StopCheckStatus_value = map[string]int32{
+		"STOP_CHECK_STATUS_UNSPECIFIED": 0,
+		"STOP_CHECK_STATUS_CHECKED":     1,
+		"STOP_CHECK_STATUS_NOT_FOUND":   2,
+	}
+)
+
+func (x StopCheckStatus) Enum() *StopCheckStatus {
+	p := new(StopCheckStatus)
+	*p = x
+	return p
+}
+
+func (x StopCheckStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StopCheckStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_trip_trip_proto_enumTypes[2].Descriptor()
+}
+
+func (StopCheckStatus) Type() protoreflect.EnumType {
+	return &file_loci_trip_trip_proto_enumTypes[2]
+}
+
+func (x StopCheckStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StopCheckStatus.Descriptor instead.
+func (StopCheckStatus) EnumDescriptor() ([]byte, []int) {
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+}
+
+type StopHoursState int32
+
+const (
+	// The map lists no opening hours for the place.
+	StopHoursState_STOP_HOURS_STATE_UNSPECIFIED StopHoursState = 0
+	// Hours are listed in a form the server does not read (seasons, sunrise,
+	// by appointment). Treat as unknown; never guess.
+	StopHoursState_STOP_HOURS_STATE_UNREADABLE StopHoursState = 1
+	// Hours are listed, but the trip day has no calendar date to hold them to.
+	StopHoursState_STOP_HOURS_STATE_LISTED StopHoursState = 2
+	// Open at some point that day; the stop has no start time to compare.
+	StopHoursState_STOP_HOURS_STATE_OPEN_THAT_DAY StopHoursState = 3
+	// Open for the whole planned visit.
+	StopHoursState_STOP_HOURS_STATE_OPEN StopHoursState = 4
+	// Shut for the whole day of the visit.
+	StopHoursState_STOP_HOURS_STATE_SHUT_THAT_DAY StopHoursState = 5
+	// Not yet open at the planned start; opens at opens_minute.
+	StopHoursState_STOP_HOURS_STATE_OPENS_LATER StopHoursState = 6
+	// Open at the planned start but shuts, at closes_minute, before the visit
+	// ends.
+	StopHoursState_STOP_HOURS_STATE_CLOSES_EARLY StopHoursState = 7
+	// Already shut for the day by the planned start.
+	StopHoursState_STOP_HOURS_STATE_SHUT_BY_THEN StopHoursState = 8
+)
+
+// Enum value maps for StopHoursState.
+var (
+	StopHoursState_name = map[int32]string{
+		0: "STOP_HOURS_STATE_UNSPECIFIED",
+		1: "STOP_HOURS_STATE_UNREADABLE",
+		2: "STOP_HOURS_STATE_LISTED",
+		3: "STOP_HOURS_STATE_OPEN_THAT_DAY",
+		4: "STOP_HOURS_STATE_OPEN",
+		5: "STOP_HOURS_STATE_SHUT_THAT_DAY",
+		6: "STOP_HOURS_STATE_OPENS_LATER",
+		7: "STOP_HOURS_STATE_CLOSES_EARLY",
+		8: "STOP_HOURS_STATE_SHUT_BY_THEN",
+	}
+	StopHoursState_value = map[string]int32{
+		"STOP_HOURS_STATE_UNSPECIFIED":   0,
+		"STOP_HOURS_STATE_UNREADABLE":    1,
+		"STOP_HOURS_STATE_LISTED":        2,
+		"STOP_HOURS_STATE_OPEN_THAT_DAY": 3,
+		"STOP_HOURS_STATE_OPEN":          4,
+		"STOP_HOURS_STATE_SHUT_THAT_DAY": 5,
+		"STOP_HOURS_STATE_OPENS_LATER":   6,
+		"STOP_HOURS_STATE_CLOSES_EARLY":  7,
+		"STOP_HOURS_STATE_SHUT_BY_THEN":  8,
+	}
+)
+
+func (x StopHoursState) Enum() *StopHoursState {
+	p := new(StopHoursState)
+	*p = x
+	return p
+}
+
+func (x StopHoursState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StopHoursState) Descriptor() protoreflect.EnumDescriptor {
+	return file_loci_trip_trip_proto_enumTypes[3].Descriptor()
+}
+
+func (StopHoursState) Type() protoreflect.EnumType {
+	return &file_loci_trip_trip_proto_enumTypes[3]
+}
+
+func (x StopHoursState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StopHoursState.Descriptor instead.
+func (StopHoursState) EnumDescriptor() ([]byte, []int) {
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
+}
+
 type TripStopStatus int32
 
 const (
@@ -178,11 +311,11 @@ func (x TripStopStatus) String() string {
 }
 
 func (TripStopStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[2].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[4].Descriptor()
 }
 
 func (TripStopStatus) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[2]
+	return &file_loci_trip_trip_proto_enumTypes[4]
 }
 
 func (x TripStopStatus) Number() protoreflect.EnumNumber {
@@ -191,7 +324,7 @@ func (x TripStopStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TripStopStatus.Descriptor instead.
 func (TripStopStatus) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
 }
 
 // TransitMode is the kind of public transport a stop serves.
@@ -237,11 +370,11 @@ func (x TransitMode) String() string {
 }
 
 func (TransitMode) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[3].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[5].Descriptor()
 }
 
 func (TransitMode) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[3]
+	return &file_loci_trip_trip_proto_enumTypes[5]
 }
 
 func (x TransitMode) Number() protoreflect.EnumNumber {
@@ -250,7 +383,7 @@ func (x TransitMode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TransitMode.Descriptor instead.
 func (TransitMode) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
 }
 
 type StayTransportStatus int32
@@ -291,11 +424,11 @@ func (x StayTransportStatus) String() string {
 }
 
 func (StayTransportStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[4].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[6].Descriptor()
 }
 
 func (StayTransportStatus) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[4]
+	return &file_loci_trip_trip_proto_enumTypes[6]
 }
 
 func (x StayTransportStatus) Number() protoreflect.EnumNumber {
@@ -304,7 +437,7 @@ func (x StayTransportStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StayTransportStatus.Descriptor instead.
 func (StayTransportStatus) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{6}
 }
 
 type FlightCabin int32
@@ -346,11 +479,11 @@ func (x FlightCabin) String() string {
 }
 
 func (FlightCabin) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[5].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[7].Descriptor()
 }
 
 func (FlightCabin) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[5]
+	return &file_loci_trip_trip_proto_enumTypes[7]
 }
 
 func (x FlightCabin) Number() protoreflect.EnumNumber {
@@ -359,7 +492,7 @@ func (x FlightCabin) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FlightCabin.Descriptor instead.
 func (FlightCabin) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{7}
 }
 
 // FlightPlaceKind says whether a place option is one airport or a metro code
@@ -397,11 +530,11 @@ func (x FlightPlaceKind) String() string {
 }
 
 func (FlightPlaceKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[6].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[8].Descriptor()
 }
 
 func (FlightPlaceKind) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[6]
+	return &file_loci_trip_trip_proto_enumTypes[8]
 }
 
 func (x FlightPlaceKind) Number() protoreflect.EnumNumber {
@@ -410,7 +543,7 @@ func (x FlightPlaceKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use FlightPlaceKind.Descriptor instead.
 func (FlightPlaceKind) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{6}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{8}
 }
 
 // PackingCategory groups suggestions so a long list stays scannable.
@@ -462,11 +595,11 @@ func (x PackingCategory) String() string {
 }
 
 func (PackingCategory) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[7].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[9].Descriptor()
 }
 
 func (PackingCategory) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[7]
+	return &file_loci_trip_trip_proto_enumTypes[9]
 }
 
 func (x PackingCategory) Number() protoreflect.EnumNumber {
@@ -475,7 +608,7 @@ func (x PackingCategory) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use PackingCategory.Descriptor instead.
 func (PackingCategory) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{7}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{9}
 }
 
 // ChecklistItemKind says which list an item belongs to.
@@ -512,11 +645,11 @@ func (x ChecklistItemKind) String() string {
 }
 
 func (ChecklistItemKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[8].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[10].Descriptor()
 }
 
 func (ChecklistItemKind) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[8]
+	return &file_loci_trip_trip_proto_enumTypes[10]
 }
 
 func (x ChecklistItemKind) Number() protoreflect.EnumNumber {
@@ -525,7 +658,7 @@ func (x ChecklistItemKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ChecklistItemKind.Descriptor instead.
 func (ChecklistItemKind) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{8}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{10}
 }
 
 // ExportFormat selects the export artifact.
@@ -565,11 +698,11 @@ func (x ExportFormat) String() string {
 }
 
 func (ExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_loci_trip_trip_proto_enumTypes[9].Descriptor()
+	return file_loci_trip_trip_proto_enumTypes[11].Descriptor()
 }
 
 func (ExportFormat) Type() protoreflect.EnumType {
-	return &file_loci_trip_trip_proto_enumTypes[9]
+	return &file_loci_trip_trip_proto_enumTypes[11]
 }
 
 func (x ExportFormat) Number() protoreflect.EnumNumber {
@@ -578,7 +711,7 @@ func (x ExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ExportFormat.Descriptor instead.
 func (ExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{9}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{11}
 }
 
 // TripConstraint holds the planning constraints for a trip. These override the
@@ -719,7 +852,11 @@ type TripStop struct {
 	Latitude  *float64 `protobuf:"fixed64,14,opt,name=latitude,proto3,oneof" json:"latitude,omitempty"`
 	Longitude *float64 `protobuf:"fixed64,15,opt,name=longitude,proto3,oneof" json:"longitude,omitempty"`
 	// Street address shown with the pin; same rules as latitude/longitude.
-	Address       *string `protobuf:"bytes,16,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	Address *string `protobuf:"bytes,16,opt,name=address,proto3,oneof" json:"address,omitempty"`
+	// What the map says about this stop (read side only; computed on every read
+	// and ignored by SaveTrip). Absent when the server has not looked the place
+	// up, or does not check places at all: render no stamp then.
+	Check         *StopCheck `protobuf:"bytes,17,opt,name=check,proto3,oneof" json:"check,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -866,6 +1003,198 @@ func (x *TripStop) GetAddress() string {
 	return ""
 }
 
+func (x *TripStop) GetCheck() *StopCheck {
+	if x != nil {
+		return x.Check
+	}
+	return nil
+}
+
+// StopCheck is the result of looking a stop's place up on a real map. It
+// holds two separate facts, and a client must not merge them: whether the
+// place exists (status), and what its listed opening hours say about the
+// planned visit (hours). A place can be found and still have no hours listed.
+type StopCheck struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Status StopCheckStatus        `protobuf:"varint,1,opt,name=status,proto3,enum=loci.trip.StopCheckStatus" json:"status,omitempty"`
+	// Only meaningful when status is CHECKED.
+	Hours StopHoursState `protobuf:"varint,2,opt,name=hours,proto3,enum=loci.trip.StopHoursState" json:"hours,omitempty"`
+	// Minutes from midnight on the day of the visit. opens_minute is set for
+	// OPEN_THAT_DAY, OPEN, OPENS_LATER, CLOSES_EARLY and SHUT_BY_THEN when the
+	// place has hours that day; closes_minute likewise. A closing time after
+	// midnight is more than 1440.
+	OpensMinute  *int32 `protobuf:"varint,3,opt,name=opens_minute,json=opensMinute,proto3,oneof" json:"opens_minute,omitempty"`
+	ClosesMinute *int32 `protobuf:"varint,4,opt,name=closes_minute,json=closesMinute,proto3,oneof" json:"closes_minute,omitempty"`
+	// The public holiday the visit falls on, in the local language. Empty on an
+	// ordinary day.
+	HolidayName string `protobuf:"bytes,5,opt,name=holiday_name,json=holidayName,proto3" json:"holiday_name,omitempty"`
+	// True when the visit falls on a public holiday and the map lists no hours
+	// for holidays: the hours above are the ordinary weekday's and may be wrong
+	// that day. Say so next to them.
+	HolidayHoursUnknown bool `protobuf:"varint,6,opt,name=holiday_hours_unknown,json=holidayHoursUnknown,proto3" json:"holiday_hours_unknown,omitempty"`
+	// Where the answer came from; "osm" for OpenStreetMap. Show the credit
+	// "© OpenStreetMap contributors" wherever checks are shown.
+	Source string `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`
+	// When the map was last asked about this place.
+	CheckedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=checked_at,json=checkedAt,proto3" json:"checked_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopCheck) Reset() {
+	*x = StopCheck{}
+	mi := &file_loci_trip_trip_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopCheck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopCheck) ProtoMessage() {}
+
+func (x *StopCheck) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_trip_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopCheck.ProtoReflect.Descriptor instead.
+func (*StopCheck) Descriptor() ([]byte, []int) {
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *StopCheck) GetStatus() StopCheckStatus {
+	if x != nil {
+		return x.Status
+	}
+	return StopCheckStatus_STOP_CHECK_STATUS_UNSPECIFIED
+}
+
+func (x *StopCheck) GetHours() StopHoursState {
+	if x != nil {
+		return x.Hours
+	}
+	return StopHoursState_STOP_HOURS_STATE_UNSPECIFIED
+}
+
+func (x *StopCheck) GetOpensMinute() int32 {
+	if x != nil && x.OpensMinute != nil {
+		return *x.OpensMinute
+	}
+	return 0
+}
+
+func (x *StopCheck) GetClosesMinute() int32 {
+	if x != nil && x.ClosesMinute != nil {
+		return *x.ClosesMinute
+	}
+	return 0
+}
+
+func (x *StopCheck) GetHolidayName() string {
+	if x != nil {
+		return x.HolidayName
+	}
+	return ""
+}
+
+func (x *StopCheck) GetHolidayHoursUnknown() bool {
+	if x != nil {
+		return x.HolidayHoursUnknown
+	}
+	return false
+}
+
+func (x *StopCheck) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *StopCheck) GetCheckedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CheckedAt
+	}
+	return nil
+}
+
+// DayVerdict sums a day's stop checks. `checked` counts places found on the
+// map, not places confirmed open: "5 of 5 checked" says each exists.
+type DayVerdict struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Stops whose place was found on the map.
+	Checked int32 `protobuf:"varint,1,opt,name=checked,proto3" json:"checked,omitempty"`
+	// Stops the map has answered for, found or not. A stop with no poi_id, and
+	// one still waiting to be looked up, is not counted: the sum never reads
+	// "0 of 5" while the answers are on their way.
+	Total int32 `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	// Found stops whose hours clash with the plan: shut that day, opens later,
+	// closes early, or shut by then.
+	NeedAttention int32 `protobuf:"varint,3,opt,name=need_attention,json=needAttention,proto3" json:"need_attention,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DayVerdict) Reset() {
+	*x = DayVerdict{}
+	mi := &file_loci_trip_trip_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DayVerdict) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DayVerdict) ProtoMessage() {}
+
+func (x *DayVerdict) ProtoReflect() protoreflect.Message {
+	mi := &file_loci_trip_trip_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DayVerdict.ProtoReflect.Descriptor instead.
+func (*DayVerdict) Descriptor() ([]byte, []int) {
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DayVerdict) GetChecked() int32 {
+	if x != nil {
+		return x.Checked
+	}
+	return 0
+}
+
+func (x *DayVerdict) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *DayVerdict) GetNeedAttention() int32 {
+	if x != nil {
+		return x.NeedAttention
+	}
+	return 0
+}
+
 // TripDay is one day of a trip.
 type TripDay struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -886,14 +1215,17 @@ type TripDay struct {
 	TravelDay bool `protobuf:"varint,9,opt,name=travel_day,json=travelDay,proto3" json:"travel_day,omitempty"`
 	// When the traveller finished the day (read side only; ignored by
 	// SaveTrip). Absent while unfinished.
-	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	CompletedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	// The day's stop checks summed (read side only; ignored by SaveTrip).
+	// Absent when no stop on the day carries a check.
+	Verdict       *DayVerdict `protobuf:"bytes,11,opt,name=verdict,proto3,oneof" json:"verdict,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TripDay) Reset() {
 	*x = TripDay{}
-	mi := &file_loci_trip_trip_proto_msgTypes[2]
+	mi := &file_loci_trip_trip_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -905,7 +1237,7 @@ func (x *TripDay) String() string {
 func (*TripDay) ProtoMessage() {}
 
 func (x *TripDay) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[2]
+	mi := &file_loci_trip_trip_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -918,7 +1250,7 @@ func (x *TripDay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripDay.ProtoReflect.Descriptor instead.
 func (*TripDay) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{2}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TripDay) GetId() string {
@@ -991,6 +1323,13 @@ func (x *TripDay) GetCompletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *TripDay) GetVerdict() *DayVerdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return nil
+}
+
 // TripLeg is travel between two consecutive places in a multi-city trip.
 type TripLeg struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
@@ -1014,7 +1353,7 @@ type TripLeg struct {
 
 func (x *TripLeg) Reset() {
 	*x = TripLeg{}
-	mi := &file_loci_trip_trip_proto_msgTypes[3]
+	mi := &file_loci_trip_trip_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1026,7 +1365,7 @@ func (x *TripLeg) String() string {
 func (*TripLeg) ProtoMessage() {}
 
 func (x *TripLeg) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[3]
+	mi := &file_loci_trip_trip_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1039,7 +1378,7 @@ func (x *TripLeg) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripLeg.ProtoReflect.Descriptor instead.
 func (*TripLeg) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{3}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TripLeg) GetId() string {
@@ -1143,7 +1482,7 @@ type TripCity struct {
 
 func (x *TripCity) Reset() {
 	*x = TripCity{}
-	mi := &file_loci_trip_trip_proto_msgTypes[4]
+	mi := &file_loci_trip_trip_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1155,7 +1494,7 @@ func (x *TripCity) String() string {
 func (*TripCity) ProtoMessage() {}
 
 func (x *TripCity) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[4]
+	mi := &file_loci_trip_trip_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1168,7 +1507,7 @@ func (x *TripCity) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripCity.ProtoReflect.Descriptor instead.
 func (*TripCity) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{4}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *TripCity) GetCityName() string {
@@ -1233,7 +1572,7 @@ type TripStay struct {
 
 func (x *TripStay) Reset() {
 	*x = TripStay{}
-	mi := &file_loci_trip_trip_proto_msgTypes[5]
+	mi := &file_loci_trip_trip_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1245,7 +1584,7 @@ func (x *TripStay) String() string {
 func (*TripStay) ProtoMessage() {}
 
 func (x *TripStay) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[5]
+	mi := &file_loci_trip_trip_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1258,7 +1597,7 @@ func (x *TripStay) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripStay.ProtoReflect.Descriptor instead.
 func (*TripStay) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{5}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TripStay) GetCityName() string {
@@ -1358,7 +1697,7 @@ type TransitStop struct {
 
 func (x *TransitStop) Reset() {
 	*x = TransitStop{}
-	mi := &file_loci_trip_trip_proto_msgTypes[6]
+	mi := &file_loci_trip_trip_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1370,7 +1709,7 @@ func (x *TransitStop) String() string {
 func (*TransitStop) ProtoMessage() {}
 
 func (x *TransitStop) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[6]
+	mi := &file_loci_trip_trip_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1383,7 +1722,7 @@ func (x *TransitStop) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TransitStop.ProtoReflect.Descriptor instead.
 func (*TransitStop) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{6}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TransitStop) GetName() string {
@@ -1462,7 +1801,7 @@ type DayStart struct {
 
 func (x *DayStart) Reset() {
 	*x = DayStart{}
-	mi := &file_loci_trip_trip_proto_msgTypes[7]
+	mi := &file_loci_trip_trip_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1474,7 +1813,7 @@ func (x *DayStart) String() string {
 func (*DayStart) ProtoMessage() {}
 
 func (x *DayStart) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[7]
+	mi := &file_loci_trip_trip_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1487,7 +1826,7 @@ func (x *DayStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DayStart.ProtoReflect.Descriptor instead.
 func (*DayStart) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{7}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DayStart) GetDayId() string {
@@ -1567,7 +1906,7 @@ type AirportConnection struct {
 
 func (x *AirportConnection) Reset() {
 	*x = AirportConnection{}
-	mi := &file_loci_trip_trip_proto_msgTypes[8]
+	mi := &file_loci_trip_trip_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1579,7 +1918,7 @@ func (x *AirportConnection) String() string {
 func (*AirportConnection) ProtoMessage() {}
 
 func (x *AirportConnection) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[8]
+	mi := &file_loci_trip_trip_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1592,7 +1931,7 @@ func (x *AirportConnection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AirportConnection.ProtoReflect.Descriptor instead.
 func (*AirportConnection) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{8}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AirportConnection) GetAirportName() string {
@@ -1649,7 +1988,7 @@ type StayTransport struct {
 
 func (x *StayTransport) Reset() {
 	*x = StayTransport{}
-	mi := &file_loci_trip_trip_proto_msgTypes[9]
+	mi := &file_loci_trip_trip_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1661,7 +2000,7 @@ func (x *StayTransport) String() string {
 func (*StayTransport) ProtoMessage() {}
 
 func (x *StayTransport) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[9]
+	mi := &file_loci_trip_trip_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1674,7 +2013,7 @@ func (x *StayTransport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StayTransport.ProtoReflect.Descriptor instead.
 func (*StayTransport) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{9}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *StayTransport) GetCityName() string {
@@ -1743,7 +2082,7 @@ type GetStayTransportRequest struct {
 
 func (x *GetStayTransportRequest) Reset() {
 	*x = GetStayTransportRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[10]
+	mi := &file_loci_trip_trip_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1755,7 +2094,7 @@ func (x *GetStayTransportRequest) String() string {
 func (*GetStayTransportRequest) ProtoMessage() {}
 
 func (x *GetStayTransportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[10]
+	mi := &file_loci_trip_trip_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1768,7 +2107,7 @@ func (x *GetStayTransportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStayTransportRequest.ProtoReflect.Descriptor instead.
 func (*GetStayTransportRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{10}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetStayTransportRequest) GetTripId() string {
@@ -1794,7 +2133,7 @@ type GetStayTransportResponse struct {
 
 func (x *GetStayTransportResponse) Reset() {
 	*x = GetStayTransportResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[11]
+	mi := &file_loci_trip_trip_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1806,7 +2145,7 @@ func (x *GetStayTransportResponse) String() string {
 func (*GetStayTransportResponse) ProtoMessage() {}
 
 func (x *GetStayTransportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[11]
+	mi := &file_loci_trip_trip_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1819,7 +2158,7 @@ func (x *GetStayTransportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStayTransportResponse.ProtoReflect.Descriptor instead.
 func (*GetStayTransportResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{11}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetStayTransportResponse) GetTransport() *StayTransport {
@@ -1841,7 +2180,7 @@ type FlightPlace struct {
 
 func (x *FlightPlace) Reset() {
 	*x = FlightPlace{}
-	mi := &file_loci_trip_trip_proto_msgTypes[12]
+	mi := &file_loci_trip_trip_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1853,7 +2192,7 @@ func (x *FlightPlace) String() string {
 func (*FlightPlace) ProtoMessage() {}
 
 func (x *FlightPlace) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[12]
+	mi := &file_loci_trip_trip_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1866,7 +2205,7 @@ func (x *FlightPlace) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlightPlace.ProtoReflect.Descriptor instead.
 func (*FlightPlace) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{12}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *FlightPlace) GetName() string {
@@ -1899,7 +2238,7 @@ type FlightLink struct {
 
 func (x *FlightLink) Reset() {
 	*x = FlightLink{}
-	mi := &file_loci_trip_trip_proto_msgTypes[13]
+	mi := &file_loci_trip_trip_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1911,7 +2250,7 @@ func (x *FlightLink) String() string {
 func (*FlightLink) ProtoMessage() {}
 
 func (x *FlightLink) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[13]
+	mi := &file_loci_trip_trip_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1924,7 +2263,7 @@ func (x *FlightLink) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlightLink.ProtoReflect.Descriptor instead.
 func (*FlightLink) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{13}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FlightLink) GetProvider() string {
@@ -1972,7 +2311,7 @@ type FlightPlaceOption struct {
 
 func (x *FlightPlaceOption) Reset() {
 	*x = FlightPlaceOption{}
-	mi := &file_loci_trip_trip_proto_msgTypes[14]
+	mi := &file_loci_trip_trip_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2323,7 @@ func (x *FlightPlaceOption) String() string {
 func (*FlightPlaceOption) ProtoMessage() {}
 
 func (x *FlightPlaceOption) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[14]
+	mi := &file_loci_trip_trip_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2336,7 @@ func (x *FlightPlaceOption) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FlightPlaceOption.ProtoReflect.Descriptor instead.
 func (*FlightPlaceOption) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{14}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *FlightPlaceOption) GetIata() string {
@@ -2059,7 +2398,7 @@ type TripFlight struct {
 
 func (x *TripFlight) Reset() {
 	*x = TripFlight{}
-	mi := &file_loci_trip_trip_proto_msgTypes[15]
+	mi := &file_loci_trip_trip_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2071,7 +2410,7 @@ func (x *TripFlight) String() string {
 func (*TripFlight) ProtoMessage() {}
 
 func (x *TripFlight) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[15]
+	mi := &file_loci_trip_trip_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2084,7 +2423,7 @@ func (x *TripFlight) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripFlight.ProtoReflect.Descriptor instead.
 func (*TripFlight) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{15}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *TripFlight) GetId() string {
@@ -2234,7 +2573,7 @@ type TripDraft struct {
 
 func (x *TripDraft) Reset() {
 	*x = TripDraft{}
-	mi := &file_loci_trip_trip_proto_msgTypes[16]
+	mi := &file_loci_trip_trip_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2246,7 +2585,7 @@ func (x *TripDraft) String() string {
 func (*TripDraft) ProtoMessage() {}
 
 func (x *TripDraft) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[16]
+	mi := &file_loci_trip_trip_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2259,7 +2598,7 @@ func (x *TripDraft) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripDraft.ProtoReflect.Descriptor instead.
 func (*TripDraft) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{16}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *TripDraft) GetId() string {
@@ -2445,7 +2784,7 @@ type TripSnapshot struct {
 
 func (x *TripSnapshot) Reset() {
 	*x = TripSnapshot{}
-	mi := &file_loci_trip_trip_proto_msgTypes[17]
+	mi := &file_loci_trip_trip_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2457,7 +2796,7 @@ func (x *TripSnapshot) String() string {
 func (*TripSnapshot) ProtoMessage() {}
 
 func (x *TripSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[17]
+	mi := &file_loci_trip_trip_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2470,7 +2809,7 @@ func (x *TripSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TripSnapshot.ProtoReflect.Descriptor instead.
 func (*TripSnapshot) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{17}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *TripSnapshot) GetId() string {
@@ -2525,7 +2864,7 @@ type PackingSuggestion struct {
 
 func (x *PackingSuggestion) Reset() {
 	*x = PackingSuggestion{}
-	mi := &file_loci_trip_trip_proto_msgTypes[18]
+	mi := &file_loci_trip_trip_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2537,7 +2876,7 @@ func (x *PackingSuggestion) String() string {
 func (*PackingSuggestion) ProtoMessage() {}
 
 func (x *PackingSuggestion) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[18]
+	mi := &file_loci_trip_trip_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2550,7 +2889,7 @@ func (x *PackingSuggestion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackingSuggestion.ProtoReflect.Descriptor instead.
 func (*PackingSuggestion) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{18}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PackingSuggestion) GetText() string {
@@ -2591,7 +2930,7 @@ type SuggestPackingRequest struct {
 
 func (x *SuggestPackingRequest) Reset() {
 	*x = SuggestPackingRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[19]
+	mi := &file_loci_trip_trip_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2603,7 +2942,7 @@ func (x *SuggestPackingRequest) String() string {
 func (*SuggestPackingRequest) ProtoMessage() {}
 
 func (x *SuggestPackingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[19]
+	mi := &file_loci_trip_trip_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2616,7 +2955,7 @@ func (x *SuggestPackingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestPackingRequest.ProtoReflect.Descriptor instead.
 func (*SuggestPackingRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{19}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SuggestPackingRequest) GetTripId() string {
@@ -2642,7 +2981,7 @@ type SuggestPackingResponse struct {
 
 func (x *SuggestPackingResponse) Reset() {
 	*x = SuggestPackingResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[20]
+	mi := &file_loci_trip_trip_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2654,7 +2993,7 @@ func (x *SuggestPackingResponse) String() string {
 func (*SuggestPackingResponse) ProtoMessage() {}
 
 func (x *SuggestPackingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[20]
+	mi := &file_loci_trip_trip_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2667,7 +3006,7 @@ func (x *SuggestPackingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestPackingResponse.ProtoReflect.Descriptor instead.
 func (*SuggestPackingResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{20}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SuggestPackingResponse) GetSuggestions() []*PackingSuggestion {
@@ -2714,7 +3053,7 @@ type ChecklistItem struct {
 
 func (x *ChecklistItem) Reset() {
 	*x = ChecklistItem{}
-	mi := &file_loci_trip_trip_proto_msgTypes[21]
+	mi := &file_loci_trip_trip_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2726,7 +3065,7 @@ func (x *ChecklistItem) String() string {
 func (*ChecklistItem) ProtoMessage() {}
 
 func (x *ChecklistItem) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[21]
+	mi := &file_loci_trip_trip_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2739,7 +3078,7 @@ func (x *ChecklistItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChecklistItem.ProtoReflect.Descriptor instead.
 func (*ChecklistItem) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{21}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ChecklistItem) GetId() string {
@@ -2807,7 +3146,7 @@ type GetTripChecklistRequest struct {
 
 func (x *GetTripChecklistRequest) Reset() {
 	*x = GetTripChecklistRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[22]
+	mi := &file_loci_trip_trip_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2819,7 +3158,7 @@ func (x *GetTripChecklistRequest) String() string {
 func (*GetTripChecklistRequest) ProtoMessage() {}
 
 func (x *GetTripChecklistRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[22]
+	mi := &file_loci_trip_trip_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2832,7 +3171,7 @@ func (x *GetTripChecklistRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTripChecklistRequest.ProtoReflect.Descriptor instead.
 func (*GetTripChecklistRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{22}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetTripChecklistRequest) GetTripId() string {
@@ -2854,7 +3193,7 @@ type GetTripChecklistResponse struct {
 
 func (x *GetTripChecklistResponse) Reset() {
 	*x = GetTripChecklistResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[23]
+	mi := &file_loci_trip_trip_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2866,7 +3205,7 @@ func (x *GetTripChecklistResponse) String() string {
 func (*GetTripChecklistResponse) ProtoMessage() {}
 
 func (x *GetTripChecklistResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[23]
+	mi := &file_loci_trip_trip_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2879,7 +3218,7 @@ func (x *GetTripChecklistResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTripChecklistResponse.ProtoReflect.Descriptor instead.
 func (*GetTripChecklistResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{23}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *GetTripChecklistResponse) GetItems() []*ChecklistItem {
@@ -2906,7 +3245,7 @@ type UpsertChecklistItemRequest struct {
 
 func (x *UpsertChecklistItemRequest) Reset() {
 	*x = UpsertChecklistItemRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[24]
+	mi := &file_loci_trip_trip_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2918,7 +3257,7 @@ func (x *UpsertChecklistItemRequest) String() string {
 func (*UpsertChecklistItemRequest) ProtoMessage() {}
 
 func (x *UpsertChecklistItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[24]
+	mi := &file_loci_trip_trip_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2931,7 +3270,7 @@ func (x *UpsertChecklistItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertChecklistItemRequest.ProtoReflect.Descriptor instead.
 func (*UpsertChecklistItemRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{24}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpsertChecklistItemRequest) GetTripId() string {
@@ -2958,7 +3297,7 @@ type DeleteChecklistItemRequest struct {
 
 func (x *DeleteChecklistItemRequest) Reset() {
 	*x = DeleteChecklistItemRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[25]
+	mi := &file_loci_trip_trip_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2970,7 +3309,7 @@ func (x *DeleteChecklistItemRequest) String() string {
 func (*DeleteChecklistItemRequest) ProtoMessage() {}
 
 func (x *DeleteChecklistItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[25]
+	mi := &file_loci_trip_trip_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2983,7 +3322,7 @@ func (x *DeleteChecklistItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteChecklistItemRequest.ProtoReflect.Descriptor instead.
 func (*DeleteChecklistItemRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{25}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *DeleteChecklistItemRequest) GetTripId() string {
@@ -3008,7 +3347,7 @@ type DeleteChecklistItemResponse struct {
 
 func (x *DeleteChecklistItemResponse) Reset() {
 	*x = DeleteChecklistItemResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[26]
+	mi := &file_loci_trip_trip_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3020,7 +3359,7 @@ func (x *DeleteChecklistItemResponse) String() string {
 func (*DeleteChecklistItemResponse) ProtoMessage() {}
 
 func (x *DeleteChecklistItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[26]
+	mi := &file_loci_trip_trip_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3033,7 +3372,7 @@ func (x *DeleteChecklistItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteChecklistItemResponse.ProtoReflect.Descriptor instead.
 func (*DeleteChecklistItemResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{26}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{28}
 }
 
 type DismissPackingSuggestionRequest struct {
@@ -3047,7 +3386,7 @@ type DismissPackingSuggestionRequest struct {
 
 func (x *DismissPackingSuggestionRequest) Reset() {
 	*x = DismissPackingSuggestionRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[27]
+	mi := &file_loci_trip_trip_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3059,7 +3398,7 @@ func (x *DismissPackingSuggestionRequest) String() string {
 func (*DismissPackingSuggestionRequest) ProtoMessage() {}
 
 func (x *DismissPackingSuggestionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[27]
+	mi := &file_loci_trip_trip_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3072,7 +3411,7 @@ func (x *DismissPackingSuggestionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPackingSuggestionRequest.ProtoReflect.Descriptor instead.
 func (*DismissPackingSuggestionRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{27}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DismissPackingSuggestionRequest) GetTripId() string {
@@ -3097,7 +3436,7 @@ type DismissPackingSuggestionResponse struct {
 
 func (x *DismissPackingSuggestionResponse) Reset() {
 	*x = DismissPackingSuggestionResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[28]
+	mi := &file_loci_trip_trip_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3109,7 +3448,7 @@ func (x *DismissPackingSuggestionResponse) String() string {
 func (*DismissPackingSuggestionResponse) ProtoMessage() {}
 
 func (x *DismissPackingSuggestionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[28]
+	mi := &file_loci_trip_trip_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3122,7 +3461,7 @@ func (x *DismissPackingSuggestionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissPackingSuggestionResponse.ProtoReflect.Descriptor instead.
 func (*DismissPackingSuggestionResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{28}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{30}
 }
 
 type SaveTripRequest struct {
@@ -3138,7 +3477,7 @@ type SaveTripRequest struct {
 
 func (x *SaveTripRequest) Reset() {
 	*x = SaveTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[29]
+	mi := &file_loci_trip_trip_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3150,7 +3489,7 @@ func (x *SaveTripRequest) String() string {
 func (*SaveTripRequest) ProtoMessage() {}
 
 func (x *SaveTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[29]
+	mi := &file_loci_trip_trip_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3163,7 +3502,7 @@ func (x *SaveTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveTripRequest.ProtoReflect.Descriptor instead.
 func (*SaveTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{29}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SaveTripRequest) GetTrip() *TripDraft {
@@ -3189,7 +3528,7 @@ type GetTripRequest struct {
 
 func (x *GetTripRequest) Reset() {
 	*x = GetTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[30]
+	mi := &file_loci_trip_trip_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3201,7 +3540,7 @@ func (x *GetTripRequest) String() string {
 func (*GetTripRequest) ProtoMessage() {}
 
 func (x *GetTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[30]
+	mi := &file_loci_trip_trip_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3214,7 +3553,7 @@ func (x *GetTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTripRequest.ProtoReflect.Descriptor instead.
 func (*GetTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{30}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetTripRequest) GetTripId() string {
@@ -3235,7 +3574,7 @@ type ListTripsRequest struct {
 
 func (x *ListTripsRequest) Reset() {
 	*x = ListTripsRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[31]
+	mi := &file_loci_trip_trip_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3247,7 +3586,7 @@ func (x *ListTripsRequest) String() string {
 func (*ListTripsRequest) ProtoMessage() {}
 
 func (x *ListTripsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[31]
+	mi := &file_loci_trip_trip_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3260,7 +3599,7 @@ func (x *ListTripsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTripsRequest.ProtoReflect.Descriptor instead.
 func (*ListTripsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{31}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ListTripsRequest) GetPagination() *common.PaginationRequest {
@@ -3287,7 +3626,7 @@ type ListTripsResponse struct {
 
 func (x *ListTripsResponse) Reset() {
 	*x = ListTripsResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[32]
+	mi := &file_loci_trip_trip_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3299,7 +3638,7 @@ func (x *ListTripsResponse) String() string {
 func (*ListTripsResponse) ProtoMessage() {}
 
 func (x *ListTripsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[32]
+	mi := &file_loci_trip_trip_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3312,7 +3651,7 @@ func (x *ListTripsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTripsResponse.ProtoReflect.Descriptor instead.
 func (*ListTripsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{32}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ListTripsResponse) GetTrips() []*TripDraft {
@@ -3339,7 +3678,7 @@ type ShareTripRequest struct {
 
 func (x *ShareTripRequest) Reset() {
 	*x = ShareTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[33]
+	mi := &file_loci_trip_trip_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3351,7 +3690,7 @@ func (x *ShareTripRequest) String() string {
 func (*ShareTripRequest) ProtoMessage() {}
 
 func (x *ShareTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[33]
+	mi := &file_loci_trip_trip_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3364,7 +3703,7 @@ func (x *ShareTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShareTripRequest.ProtoReflect.Descriptor instead.
 func (*ShareTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{33}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ShareTripRequest) GetTripId() string {
@@ -3393,7 +3732,7 @@ type SetTripVisibilityRequest struct {
 
 func (x *SetTripVisibilityRequest) Reset() {
 	*x = SetTripVisibilityRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[34]
+	mi := &file_loci_trip_trip_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3405,7 +3744,7 @@ func (x *SetTripVisibilityRequest) String() string {
 func (*SetTripVisibilityRequest) ProtoMessage() {}
 
 func (x *SetTripVisibilityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[34]
+	mi := &file_loci_trip_trip_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3418,7 +3757,7 @@ func (x *SetTripVisibilityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTripVisibilityRequest.ProtoReflect.Descriptor instead.
 func (*SetTripVisibilityRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{34}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SetTripVisibilityRequest) GetTripId() string {
@@ -3454,7 +3793,7 @@ type SetTripVisibilityResponse struct {
 
 func (x *SetTripVisibilityResponse) Reset() {
 	*x = SetTripVisibilityResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[35]
+	mi := &file_loci_trip_trip_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3466,7 +3805,7 @@ func (x *SetTripVisibilityResponse) String() string {
 func (*SetTripVisibilityResponse) ProtoMessage() {}
 
 func (x *SetTripVisibilityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[35]
+	mi := &file_loci_trip_trip_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3479,7 +3818,7 @@ func (x *SetTripVisibilityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTripVisibilityResponse.ProtoReflect.Descriptor instead.
 func (*SetTripVisibilityResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{35}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *SetTripVisibilityResponse) GetVisibility() TripVisibility {
@@ -3512,7 +3851,7 @@ type GetSharedTripRequest struct {
 
 func (x *GetSharedTripRequest) Reset() {
 	*x = GetSharedTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[36]
+	mi := &file_loci_trip_trip_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3524,7 +3863,7 @@ func (x *GetSharedTripRequest) String() string {
 func (*GetSharedTripRequest) ProtoMessage() {}
 
 func (x *GetSharedTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[36]
+	mi := &file_loci_trip_trip_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3537,7 +3876,7 @@ func (x *GetSharedTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSharedTripRequest.ProtoReflect.Descriptor instead.
 func (*GetSharedTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{36}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *GetSharedTripRequest) GetShareCode() string {
@@ -3556,7 +3895,7 @@ type GetFriendTripRequest struct {
 
 func (x *GetFriendTripRequest) Reset() {
 	*x = GetFriendTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[37]
+	mi := &file_loci_trip_trip_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3568,7 +3907,7 @@ func (x *GetFriendTripRequest) String() string {
 func (*GetFriendTripRequest) ProtoMessage() {}
 
 func (x *GetFriendTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[37]
+	mi := &file_loci_trip_trip_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3581,7 +3920,7 @@ func (x *GetFriendTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFriendTripRequest.ProtoReflect.Descriptor instead.
 func (*GetFriendTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{37}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *GetFriendTripRequest) GetTripId() string {
@@ -3600,7 +3939,7 @@ type ListFriendTripsRequest struct {
 
 func (x *ListFriendTripsRequest) Reset() {
 	*x = ListFriendTripsRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[38]
+	mi := &file_loci_trip_trip_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3612,7 +3951,7 @@ func (x *ListFriendTripsRequest) String() string {
 func (*ListFriendTripsRequest) ProtoMessage() {}
 
 func (x *ListFriendTripsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[38]
+	mi := &file_loci_trip_trip_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3625,7 +3964,7 @@ func (x *ListFriendTripsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListFriendTripsRequest.ProtoReflect.Descriptor instead.
 func (*ListFriendTripsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{38}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListFriendTripsRequest) GetPagination() *common.PaginationRequest {
@@ -3645,7 +3984,7 @@ type ListUserTripsRequest struct {
 
 func (x *ListUserTripsRequest) Reset() {
 	*x = ListUserTripsRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[39]
+	mi := &file_loci_trip_trip_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3657,7 +3996,7 @@ func (x *ListUserTripsRequest) String() string {
 func (*ListUserTripsRequest) ProtoMessage() {}
 
 func (x *ListUserTripsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[39]
+	mi := &file_loci_trip_trip_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3670,7 +4009,7 @@ func (x *ListUserTripsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUserTripsRequest.ProtoReflect.Descriptor instead.
 func (*ListUserTripsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{39}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *ListUserTripsRequest) GetUserId() string {
@@ -3700,7 +4039,7 @@ type CopyTripRequest struct {
 
 func (x *CopyTripRequest) Reset() {
 	*x = CopyTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[40]
+	mi := &file_loci_trip_trip_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3712,7 +4051,7 @@ func (x *CopyTripRequest) String() string {
 func (*CopyTripRequest) ProtoMessage() {}
 
 func (x *CopyTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[40]
+	mi := &file_loci_trip_trip_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3725,7 +4064,7 @@ func (x *CopyTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CopyTripRequest.ProtoReflect.Descriptor instead.
 func (*CopyTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{40}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CopyTripRequest) GetSource() isCopyTripRequest_Source {
@@ -3778,7 +4117,7 @@ type CopyTripResponse struct {
 
 func (x *CopyTripResponse) Reset() {
 	*x = CopyTripResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[41]
+	mi := &file_loci_trip_trip_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3790,7 +4129,7 @@ func (x *CopyTripResponse) String() string {
 func (*CopyTripResponse) ProtoMessage() {}
 
 func (x *CopyTripResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[41]
+	mi := &file_loci_trip_trip_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3803,7 +4142,7 @@ func (x *CopyTripResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CopyTripResponse.ProtoReflect.Descriptor instead.
 func (*CopyTripResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{41}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *CopyTripResponse) GetTripId() string {
@@ -3823,7 +4162,7 @@ type ShareTripResponse struct {
 
 func (x *ShareTripResponse) Reset() {
 	*x = ShareTripResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[42]
+	mi := &file_loci_trip_trip_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3835,7 +4174,7 @@ func (x *ShareTripResponse) String() string {
 func (*ShareTripResponse) ProtoMessage() {}
 
 func (x *ShareTripResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[42]
+	mi := &file_loci_trip_trip_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3848,7 +4187,7 @@ func (x *ShareTripResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShareTripResponse.ProtoReflect.Descriptor instead.
 func (*ShareTripResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{42}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ShareTripResponse) GetShareId() string {
@@ -3878,7 +4217,7 @@ type ReorderStopsRequest struct {
 
 func (x *ReorderStopsRequest) Reset() {
 	*x = ReorderStopsRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[43]
+	mi := &file_loci_trip_trip_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3890,7 +4229,7 @@ func (x *ReorderStopsRequest) String() string {
 func (*ReorderStopsRequest) ProtoMessage() {}
 
 func (x *ReorderStopsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[43]
+	mi := &file_loci_trip_trip_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3903,7 +4242,7 @@ func (x *ReorderStopsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReorderStopsRequest.ProtoReflect.Descriptor instead.
 func (*ReorderStopsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{43}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ReorderStopsRequest) GetTripId() string {
@@ -3946,7 +4285,7 @@ type RenameStopRequest struct {
 
 func (x *RenameStopRequest) Reset() {
 	*x = RenameStopRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[44]
+	mi := &file_loci_trip_trip_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3958,7 +4297,7 @@ func (x *RenameStopRequest) String() string {
 func (*RenameStopRequest) ProtoMessage() {}
 
 func (x *RenameStopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[44]
+	mi := &file_loci_trip_trip_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3971,7 +4310,7 @@ func (x *RenameStopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameStopRequest.ProtoReflect.Descriptor instead.
 func (*RenameStopRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{44}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *RenameStopRequest) GetTripId() string {
@@ -4015,7 +4354,7 @@ type EditStopDurationRequest struct {
 
 func (x *EditStopDurationRequest) Reset() {
 	*x = EditStopDurationRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[45]
+	mi := &file_loci_trip_trip_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4027,7 +4366,7 @@ func (x *EditStopDurationRequest) String() string {
 func (*EditStopDurationRequest) ProtoMessage() {}
 
 func (x *EditStopDurationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[45]
+	mi := &file_loci_trip_trip_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4040,7 +4379,7 @@ func (x *EditStopDurationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditStopDurationRequest.ProtoReflect.Descriptor instead.
 func (*EditStopDurationRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{45}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *EditStopDurationRequest) GetTripId() string {
@@ -4089,7 +4428,7 @@ type SetConstraintRequest struct {
 
 func (x *SetConstraintRequest) Reset() {
 	*x = SetConstraintRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[46]
+	mi := &file_loci_trip_trip_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4101,7 +4440,7 @@ func (x *SetConstraintRequest) String() string {
 func (*SetConstraintRequest) ProtoMessage() {}
 
 func (x *SetConstraintRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[46]
+	mi := &file_loci_trip_trip_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4114,7 +4453,7 @@ func (x *SetConstraintRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetConstraintRequest.ProtoReflect.Descriptor instead.
 func (*SetConstraintRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{46}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *SetConstraintRequest) GetTripId() string {
@@ -4153,7 +4492,7 @@ type SetTripDatesRequest struct {
 
 func (x *SetTripDatesRequest) Reset() {
 	*x = SetTripDatesRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[47]
+	mi := &file_loci_trip_trip_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4165,7 +4504,7 @@ func (x *SetTripDatesRequest) String() string {
 func (*SetTripDatesRequest) ProtoMessage() {}
 
 func (x *SetTripDatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[47]
+	mi := &file_loci_trip_trip_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4178,7 +4517,7 @@ func (x *SetTripDatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTripDatesRequest.ProtoReflect.Descriptor instead.
 func (*SetTripDatesRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{47}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *SetTripDatesRequest) GetTripId() string {
@@ -4220,7 +4559,7 @@ type SetStayRequest struct {
 
 func (x *SetStayRequest) Reset() {
 	*x = SetStayRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[48]
+	mi := &file_loci_trip_trip_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4232,7 +4571,7 @@ func (x *SetStayRequest) String() string {
 func (*SetStayRequest) ProtoMessage() {}
 
 func (x *SetStayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[48]
+	mi := &file_loci_trip_trip_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4245,7 +4584,7 @@ func (x *SetStayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetStayRequest.ProtoReflect.Descriptor instead.
 func (*SetStayRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{48}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *SetStayRequest) GetTripId() string {
@@ -4280,7 +4619,7 @@ type ClearStayRequest struct {
 
 func (x *ClearStayRequest) Reset() {
 	*x = ClearStayRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[49]
+	mi := &file_loci_trip_trip_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4292,7 +4631,7 @@ func (x *ClearStayRequest) String() string {
 func (*ClearStayRequest) ProtoMessage() {}
 
 func (x *ClearStayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[49]
+	mi := &file_loci_trip_trip_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4305,7 +4644,7 @@ func (x *ClearStayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearStayRequest.ProtoReflect.Descriptor instead.
 func (*ClearStayRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{49}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *ClearStayRequest) GetTripId() string {
@@ -4340,7 +4679,7 @@ type AddFlightRequest struct {
 
 func (x *AddFlightRequest) Reset() {
 	*x = AddFlightRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[50]
+	mi := &file_loci_trip_trip_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4352,7 +4691,7 @@ func (x *AddFlightRequest) String() string {
 func (*AddFlightRequest) ProtoMessage() {}
 
 func (x *AddFlightRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[50]
+	mi := &file_loci_trip_trip_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4365,7 +4704,7 @@ func (x *AddFlightRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddFlightRequest.ProtoReflect.Descriptor instead.
 func (*AddFlightRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{50}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *AddFlightRequest) GetTripId() string {
@@ -4400,7 +4739,7 @@ type RemoveFlightRequest struct {
 
 func (x *RemoveFlightRequest) Reset() {
 	*x = RemoveFlightRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[51]
+	mi := &file_loci_trip_trip_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4412,7 +4751,7 @@ func (x *RemoveFlightRequest) String() string {
 func (*RemoveFlightRequest) ProtoMessage() {}
 
 func (x *RemoveFlightRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[51]
+	mi := &file_loci_trip_trip_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4425,7 +4764,7 @@ func (x *RemoveFlightRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveFlightRequest.ProtoReflect.Descriptor instead.
 func (*RemoveFlightRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{51}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *RemoveFlightRequest) GetTripId() string {
@@ -4465,7 +4804,7 @@ type BuildFlightLinksRequest struct {
 
 func (x *BuildFlightLinksRequest) Reset() {
 	*x = BuildFlightLinksRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[52]
+	mi := &file_loci_trip_trip_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4477,7 +4816,7 @@ func (x *BuildFlightLinksRequest) String() string {
 func (*BuildFlightLinksRequest) ProtoMessage() {}
 
 func (x *BuildFlightLinksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[52]
+	mi := &file_loci_trip_trip_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4490,7 +4829,7 @@ func (x *BuildFlightLinksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildFlightLinksRequest.ProtoReflect.Descriptor instead.
 func (*BuildFlightLinksRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{52}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *BuildFlightLinksRequest) GetOrigin() *FlightPlace {
@@ -4544,7 +4883,7 @@ type BuildFlightLinksResponse struct {
 
 func (x *BuildFlightLinksResponse) Reset() {
 	*x = BuildFlightLinksResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[53]
+	mi := &file_loci_trip_trip_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4556,7 +4895,7 @@ func (x *BuildFlightLinksResponse) String() string {
 func (*BuildFlightLinksResponse) ProtoMessage() {}
 
 func (x *BuildFlightLinksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[53]
+	mi := &file_loci_trip_trip_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4569,7 +4908,7 @@ func (x *BuildFlightLinksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildFlightLinksResponse.ProtoReflect.Descriptor instead.
 func (*BuildFlightLinksResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{53}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *BuildFlightLinksResponse) GetLinks() []*FlightLink {
@@ -4592,7 +4931,7 @@ type SearchAirportsRequest struct {
 
 func (x *SearchAirportsRequest) Reset() {
 	*x = SearchAirportsRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[54]
+	mi := &file_loci_trip_trip_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4604,7 +4943,7 @@ func (x *SearchAirportsRequest) String() string {
 func (*SearchAirportsRequest) ProtoMessage() {}
 
 func (x *SearchAirportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[54]
+	mi := &file_loci_trip_trip_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4617,7 +4956,7 @@ func (x *SearchAirportsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchAirportsRequest.ProtoReflect.Descriptor instead.
 func (*SearchAirportsRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{54}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *SearchAirportsRequest) GetQuery() string {
@@ -4643,7 +4982,7 @@ type SearchAirportsResponse struct {
 
 func (x *SearchAirportsResponse) Reset() {
 	*x = SearchAirportsResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[55]
+	mi := &file_loci_trip_trip_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4655,7 +4994,7 @@ func (x *SearchAirportsResponse) String() string {
 func (*SearchAirportsResponse) ProtoMessage() {}
 
 func (x *SearchAirportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[55]
+	mi := &file_loci_trip_trip_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4668,7 +5007,7 @@ func (x *SearchAirportsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchAirportsResponse.ProtoReflect.Descriptor instead.
 func (*SearchAirportsResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{55}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *SearchAirportsResponse) GetOptions() []*FlightPlaceOption {
@@ -4692,7 +5031,7 @@ type ResolveFlightDestinationRequest struct {
 
 func (x *ResolveFlightDestinationRequest) Reset() {
 	*x = ResolveFlightDestinationRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[56]
+	mi := &file_loci_trip_trip_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4704,7 +5043,7 @@ func (x *ResolveFlightDestinationRequest) String() string {
 func (*ResolveFlightDestinationRequest) ProtoMessage() {}
 
 func (x *ResolveFlightDestinationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[56]
+	mi := &file_loci_trip_trip_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4717,7 +5056,7 @@ func (x *ResolveFlightDestinationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveFlightDestinationRequest.ProtoReflect.Descriptor instead.
 func (*ResolveFlightDestinationRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{56}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ResolveFlightDestinationRequest) GetCity() string {
@@ -4759,7 +5098,7 @@ type ResolveFlightDestinationResponse struct {
 
 func (x *ResolveFlightDestinationResponse) Reset() {
 	*x = ResolveFlightDestinationResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[57]
+	mi := &file_loci_trip_trip_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4771,7 +5110,7 @@ func (x *ResolveFlightDestinationResponse) String() string {
 func (*ResolveFlightDestinationResponse) ProtoMessage() {}
 
 func (x *ResolveFlightDestinationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[57]
+	mi := &file_loci_trip_trip_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4784,7 +5123,7 @@ func (x *ResolveFlightDestinationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveFlightDestinationResponse.ProtoReflect.Descriptor instead.
 func (*ResolveFlightDestinationResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{57}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ResolveFlightDestinationResponse) GetDestination() *FlightPlaceOption {
@@ -4810,7 +5149,7 @@ type AddStopRequest struct {
 
 func (x *AddStopRequest) Reset() {
 	*x = AddStopRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[58]
+	mi := &file_loci_trip_trip_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4822,7 +5161,7 @@ func (x *AddStopRequest) String() string {
 func (*AddStopRequest) ProtoMessage() {}
 
 func (x *AddStopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[58]
+	mi := &file_loci_trip_trip_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4835,7 +5174,7 @@ func (x *AddStopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddStopRequest.ProtoReflect.Descriptor instead.
 func (*AddStopRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{58}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *AddStopRequest) GetTripId() string {
@@ -4890,7 +5229,7 @@ type MoveStopRequest struct {
 
 func (x *MoveStopRequest) Reset() {
 	*x = MoveStopRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[59]
+	mi := &file_loci_trip_trip_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4902,7 +5241,7 @@ func (x *MoveStopRequest) String() string {
 func (*MoveStopRequest) ProtoMessage() {}
 
 func (x *MoveStopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[59]
+	mi := &file_loci_trip_trip_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4915,7 +5254,7 @@ func (x *MoveStopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveStopRequest.ProtoReflect.Descriptor instead.
 func (*MoveStopRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{59}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *MoveStopRequest) GetTripId() string {
@@ -4964,7 +5303,7 @@ type GetTripForSessionRequest struct {
 
 func (x *GetTripForSessionRequest) Reset() {
 	*x = GetTripForSessionRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[60]
+	mi := &file_loci_trip_trip_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4976,7 +5315,7 @@ func (x *GetTripForSessionRequest) String() string {
 func (*GetTripForSessionRequest) ProtoMessage() {}
 
 func (x *GetTripForSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[60]
+	mi := &file_loci_trip_trip_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4989,7 +5328,7 @@ func (x *GetTripForSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTripForSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetTripForSessionRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{60}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *GetTripForSessionRequest) GetSessionId() string {
@@ -5010,7 +5349,7 @@ type RemoveStopRequest struct {
 
 func (x *RemoveStopRequest) Reset() {
 	*x = RemoveStopRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[61]
+	mi := &file_loci_trip_trip_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5022,7 +5361,7 @@ func (x *RemoveStopRequest) String() string {
 func (*RemoveStopRequest) ProtoMessage() {}
 
 func (x *RemoveStopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[61]
+	mi := &file_loci_trip_trip_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5035,7 +5374,7 @@ func (x *RemoveStopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RemoveStopRequest.ProtoReflect.Descriptor instead.
 func (*RemoveStopRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{61}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *RemoveStopRequest) GetTripId() string {
@@ -5071,7 +5410,7 @@ type ReplaceStopRequest struct {
 
 func (x *ReplaceStopRequest) Reset() {
 	*x = ReplaceStopRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[62]
+	mi := &file_loci_trip_trip_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5083,7 +5422,7 @@ func (x *ReplaceStopRequest) String() string {
 func (*ReplaceStopRequest) ProtoMessage() {}
 
 func (x *ReplaceStopRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[62]
+	mi := &file_loci_trip_trip_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5096,7 +5435,7 @@ func (x *ReplaceStopRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplaceStopRequest.ProtoReflect.Descriptor instead.
 func (*ReplaceStopRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{62}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *ReplaceStopRequest) GetTripId() string {
@@ -5137,7 +5476,7 @@ type ExportTripRequest struct {
 
 func (x *ExportTripRequest) Reset() {
 	*x = ExportTripRequest{}
-	mi := &file_loci_trip_trip_proto_msgTypes[63]
+	mi := &file_loci_trip_trip_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5149,7 +5488,7 @@ func (x *ExportTripRequest) String() string {
 func (*ExportTripRequest) ProtoMessage() {}
 
 func (x *ExportTripRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[63]
+	mi := &file_loci_trip_trip_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5162,7 +5501,7 @@ func (x *ExportTripRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportTripRequest.ProtoReflect.Descriptor instead.
 func (*ExportTripRequest) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{63}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *ExportTripRequest) GetTripId() string {
@@ -5190,7 +5529,7 @@ type ExportTripResponse struct {
 
 func (x *ExportTripResponse) Reset() {
 	*x = ExportTripResponse{}
-	mi := &file_loci_trip_trip_proto_msgTypes[64]
+	mi := &file_loci_trip_trip_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5202,7 +5541,7 @@ func (x *ExportTripResponse) String() string {
 func (*ExportTripResponse) ProtoMessage() {}
 
 func (x *ExportTripResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_loci_trip_trip_proto_msgTypes[64]
+	mi := &file_loci_trip_trip_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5215,7 +5554,7 @@ func (x *ExportTripResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportTripResponse.ProtoReflect.Descriptor instead.
 func (*ExportTripResponse) Descriptor() ([]byte, []int) {
-	return file_loci_trip_trip_proto_rawDescGZIP(), []int{64}
+	return file_loci_trip_trip_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ExportTripResponse) GetData() []byte {
@@ -5259,7 +5598,7 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\t_mobilityB\x13\n" +
 	"\x11_day_start_minuteB\x11\n" +
 	"\x0f_day_end_minuteB\x10\n" +
-	"\x0e_accessibility\"\xa5\a\n" +
+	"\x0e_accessibility\"\xe0\a\n" +
 	"\bTripStop\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12\x1e\n" +
 	"\x06poi_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x18dR\x05poiId\x12(\n" +
@@ -5282,7 +5621,8 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\tstatus_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bstatusAt\x128\n" +
 	"\blatitude\x18\x0e \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80V@)\x00\x00\x00\x00\x00\x80V\xc0H\x06R\blatitude\x88\x01\x01\x12:\n" +
 	"\tlongitude\x18\x0f \x01(\x01B\x17\xbaH\x14\x12\x12\x19\x00\x00\x00\x00\x00\x80f@)\x00\x00\x00\x00\x00\x80f\xc0H\aR\tlongitude\x88\x01\x01\x12'\n" +
-	"\aaddress\x18\x10 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03H\bR\aaddress\x88\x01\x01B\x0f\n" +
+	"\aaddress\x18\x10 \x01(\tB\b\xbaH\x05r\x03\x18\xf4\x03H\bR\aaddress\x88\x01\x01\x12/\n" +
+	"\x05check\x18\x11 \x01(\v2\x14.loci.trip.StopCheckH\tR\x05check\x88\x01\x01B\x0f\n" +
 	"\r_start_minuteB\x13\n" +
 	"\x11_duration_minutesB\x0e\n" +
 	"\f_booking_urlB\x06\n" +
@@ -5293,7 +5633,25 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\n" +
 	"_longitudeB\n" +
 	"\n" +
-	"\b_address\"\xf9\x03\n" +
+	"\b_addressB\b\n" +
+	"\x06_check\"\x98\x03\n" +
+	"\tStopCheck\x122\n" +
+	"\x06status\x18\x01 \x01(\x0e2\x1a.loci.trip.StopCheckStatusR\x06status\x12/\n" +
+	"\x05hours\x18\x02 \x01(\x0e2\x19.loci.trip.StopHoursStateR\x05hours\x12&\n" +
+	"\fopens_minute\x18\x03 \x01(\x05H\x00R\vopensMinute\x88\x01\x01\x12(\n" +
+	"\rcloses_minute\x18\x04 \x01(\x05H\x01R\fclosesMinute\x88\x01\x01\x12!\n" +
+	"\fholiday_name\x18\x05 \x01(\tR\vholidayName\x122\n" +
+	"\x15holiday_hours_unknown\x18\x06 \x01(\bR\x13holidayHoursUnknown\x12\x1f\n" +
+	"\x06source\x18\a \x01(\tB\a\xbaH\x04r\x02\x18(R\x06source\x129\n" +
+	"\n" +
+	"checked_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcheckedAtB\x0f\n" +
+	"\r_opens_minuteB\x10\n" +
+	"\x0e_closes_minute\"c\n" +
+	"\n" +
+	"DayVerdict\x12\x18\n" +
+	"\achecked\x18\x01 \x01(\x05R\achecked\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12%\n" +
+	"\x0eneed_attention\x18\x03 \x01(\x05R\rneedAttention\"\xbb\x04\n" +
 	"\aTripDay\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12&\n" +
 	"\n" +
@@ -5307,12 +5665,15 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\n" +
 	"travel_day\x18\t \x01(\bR\ttravelDay\x12=\n" +
 	"\fcompleted_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAtB\a\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x124\n" +
+	"\averdict\x18\v \x01(\v2\x15.loci.trip.DayVerdictH\x04R\averdict\x88\x01\x01B\a\n" +
 	"\x05_dateB\n" +
 	"\n" +
 	"\b_city_idB\v\n" +
 	"\t_city_latB\v\n" +
-	"\t_city_lon\"\x9f\x04\n" +
+	"\t_city_lonB\n" +
+	"\n" +
+	"\b_verdict\"\x9f\x04\n" +
 	"\aTripLeg\x12\x17\n" +
 	"\x02id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x18dR\x02id\x12'\n" +
 	"\tfrom_name\x18\x02 \x01(\tB\n" +
@@ -5734,7 +6095,21 @@ const file_loci_trip_trip_proto_rawDesc = "" +
 	"\x15TRIP_PACE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11TRIP_PACE_RELAXED\x10\x01\x12\x16\n" +
 	"\x12TRIP_PACE_MODERATE\x10\x02\x12\x14\n" +
-	"\x10TRIP_PACE_PACKED\x10\x03*\x86\x01\n" +
+	"\x10TRIP_PACE_PACKED\x10\x03*t\n" +
+	"\x0fStopCheckStatus\x12!\n" +
+	"\x1dSTOP_CHECK_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19STOP_CHECK_STATUS_CHECKED\x10\x01\x12\x1f\n" +
+	"\x1bSTOP_CHECK_STATUS_NOT_FOUND\x10\x02*\xbb\x02\n" +
+	"\x0eStopHoursState\x12 \n" +
+	"\x1cSTOP_HOURS_STATE_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bSTOP_HOURS_STATE_UNREADABLE\x10\x01\x12\x1b\n" +
+	"\x17STOP_HOURS_STATE_LISTED\x10\x02\x12\"\n" +
+	"\x1eSTOP_HOURS_STATE_OPEN_THAT_DAY\x10\x03\x12\x19\n" +
+	"\x15STOP_HOURS_STATE_OPEN\x10\x04\x12\"\n" +
+	"\x1eSTOP_HOURS_STATE_SHUT_THAT_DAY\x10\x05\x12 \n" +
+	"\x1cSTOP_HOURS_STATE_OPENS_LATER\x10\x06\x12!\n" +
+	"\x1dSTOP_HOURS_STATE_CLOSES_EARLY\x10\a\x12!\n" +
+	"\x1dSTOP_HOURS_STATE_SHUT_BY_THEN\x10\b*\x86\x01\n" +
 	"\x0eTripStopStatus\x12 \n" +
 	"\x1cTRIP_STOP_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15TRIP_STOP_STATUS_OPEN\x10\x01\x12\x19\n" +
@@ -5844,283 +6219,292 @@ func file_loci_trip_trip_proto_rawDescGZIP() []byte {
 	return file_loci_trip_trip_proto_rawDescData
 }
 
-var file_loci_trip_trip_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
-var file_loci_trip_trip_proto_msgTypes = make([]protoimpl.MessageInfo, 65)
+var file_loci_trip_trip_proto_enumTypes = make([]protoimpl.EnumInfo, 12)
+var file_loci_trip_trip_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
 var file_loci_trip_trip_proto_goTypes = []any{
 	(TripVisibility)(0),                        // 0: loci.trip.TripVisibility
 	(TripPace)(0),                              // 1: loci.trip.TripPace
-	(TripStopStatus)(0),                        // 2: loci.trip.TripStopStatus
-	(TransitMode)(0),                           // 3: loci.trip.TransitMode
-	(StayTransportStatus)(0),                   // 4: loci.trip.StayTransportStatus
-	(FlightCabin)(0),                           // 5: loci.trip.FlightCabin
-	(FlightPlaceKind)(0),                       // 6: loci.trip.FlightPlaceKind
-	(PackingCategory)(0),                       // 7: loci.trip.PackingCategory
-	(ChecklistItemKind)(0),                     // 8: loci.trip.ChecklistItemKind
-	(ExportFormat)(0),                          // 9: loci.trip.ExportFormat
-	(*TripConstraint)(nil),                     // 10: loci.trip.TripConstraint
-	(*TripStop)(nil),                           // 11: loci.trip.TripStop
-	(*TripDay)(nil),                            // 12: loci.trip.TripDay
-	(*TripLeg)(nil),                            // 13: loci.trip.TripLeg
-	(*TripCity)(nil),                           // 14: loci.trip.TripCity
-	(*TripStay)(nil),                           // 15: loci.trip.TripStay
-	(*TransitStop)(nil),                        // 16: loci.trip.TransitStop
-	(*DayStart)(nil),                           // 17: loci.trip.DayStart
-	(*AirportConnection)(nil),                  // 18: loci.trip.AirportConnection
-	(*StayTransport)(nil),                      // 19: loci.trip.StayTransport
-	(*GetStayTransportRequest)(nil),            // 20: loci.trip.GetStayTransportRequest
-	(*GetStayTransportResponse)(nil),           // 21: loci.trip.GetStayTransportResponse
-	(*FlightPlace)(nil),                        // 22: loci.trip.FlightPlace
-	(*FlightLink)(nil),                         // 23: loci.trip.FlightLink
-	(*FlightPlaceOption)(nil),                  // 24: loci.trip.FlightPlaceOption
-	(*TripFlight)(nil),                         // 25: loci.trip.TripFlight
-	(*TripDraft)(nil),                          // 26: loci.trip.TripDraft
-	(*TripSnapshot)(nil),                       // 27: loci.trip.TripSnapshot
-	(*PackingSuggestion)(nil),                  // 28: loci.trip.PackingSuggestion
-	(*SuggestPackingRequest)(nil),              // 29: loci.trip.SuggestPackingRequest
-	(*SuggestPackingResponse)(nil),             // 30: loci.trip.SuggestPackingResponse
-	(*ChecklistItem)(nil),                      // 31: loci.trip.ChecklistItem
-	(*GetTripChecklistRequest)(nil),            // 32: loci.trip.GetTripChecklistRequest
-	(*GetTripChecklistResponse)(nil),           // 33: loci.trip.GetTripChecklistResponse
-	(*UpsertChecklistItemRequest)(nil),         // 34: loci.trip.UpsertChecklistItemRequest
-	(*DeleteChecklistItemRequest)(nil),         // 35: loci.trip.DeleteChecklistItemRequest
-	(*DeleteChecklistItemResponse)(nil),        // 36: loci.trip.DeleteChecklistItemResponse
-	(*DismissPackingSuggestionRequest)(nil),    // 37: loci.trip.DismissPackingSuggestionRequest
-	(*DismissPackingSuggestionResponse)(nil),   // 38: loci.trip.DismissPackingSuggestionResponse
-	(*SaveTripRequest)(nil),                    // 39: loci.trip.SaveTripRequest
-	(*GetTripRequest)(nil),                     // 40: loci.trip.GetTripRequest
-	(*ListTripsRequest)(nil),                   // 41: loci.trip.ListTripsRequest
-	(*ListTripsResponse)(nil),                  // 42: loci.trip.ListTripsResponse
-	(*ShareTripRequest)(nil),                   // 43: loci.trip.ShareTripRequest
-	(*SetTripVisibilityRequest)(nil),           // 44: loci.trip.SetTripVisibilityRequest
-	(*SetTripVisibilityResponse)(nil),          // 45: loci.trip.SetTripVisibilityResponse
-	(*GetSharedTripRequest)(nil),               // 46: loci.trip.GetSharedTripRequest
-	(*GetFriendTripRequest)(nil),               // 47: loci.trip.GetFriendTripRequest
-	(*ListFriendTripsRequest)(nil),             // 48: loci.trip.ListFriendTripsRequest
-	(*ListUserTripsRequest)(nil),               // 49: loci.trip.ListUserTripsRequest
-	(*CopyTripRequest)(nil),                    // 50: loci.trip.CopyTripRequest
-	(*CopyTripResponse)(nil),                   // 51: loci.trip.CopyTripResponse
-	(*ShareTripResponse)(nil),                  // 52: loci.trip.ShareTripResponse
-	(*ReorderStopsRequest)(nil),                // 53: loci.trip.ReorderStopsRequest
-	(*RenameStopRequest)(nil),                  // 54: loci.trip.RenameStopRequest
-	(*EditStopDurationRequest)(nil),            // 55: loci.trip.EditStopDurationRequest
-	(*SetConstraintRequest)(nil),               // 56: loci.trip.SetConstraintRequest
-	(*SetTripDatesRequest)(nil),                // 57: loci.trip.SetTripDatesRequest
-	(*SetStayRequest)(nil),                     // 58: loci.trip.SetStayRequest
-	(*ClearStayRequest)(nil),                   // 59: loci.trip.ClearStayRequest
-	(*AddFlightRequest)(nil),                   // 60: loci.trip.AddFlightRequest
-	(*RemoveFlightRequest)(nil),                // 61: loci.trip.RemoveFlightRequest
-	(*BuildFlightLinksRequest)(nil),            // 62: loci.trip.BuildFlightLinksRequest
-	(*BuildFlightLinksResponse)(nil),           // 63: loci.trip.BuildFlightLinksResponse
-	(*SearchAirportsRequest)(nil),              // 64: loci.trip.SearchAirportsRequest
-	(*SearchAirportsResponse)(nil),             // 65: loci.trip.SearchAirportsResponse
-	(*ResolveFlightDestinationRequest)(nil),    // 66: loci.trip.ResolveFlightDestinationRequest
-	(*ResolveFlightDestinationResponse)(nil),   // 67: loci.trip.ResolveFlightDestinationResponse
-	(*AddStopRequest)(nil),                     // 68: loci.trip.AddStopRequest
-	(*MoveStopRequest)(nil),                    // 69: loci.trip.MoveStopRequest
-	(*GetTripForSessionRequest)(nil),           // 70: loci.trip.GetTripForSessionRequest
-	(*RemoveStopRequest)(nil),                  // 71: loci.trip.RemoveStopRequest
-	(*ReplaceStopRequest)(nil),                 // 72: loci.trip.ReplaceStopRequest
-	(*ExportTripRequest)(nil),                  // 73: loci.trip.ExportTripRequest
-	(*ExportTripResponse)(nil),                 // 74: loci.trip.ExportTripResponse
-	(*profile.AccessibilityNeeds)(nil),         // 75: loci.profile.AccessibilityNeeds
-	(*poi.POIDetailedInfo)(nil),                // 76: loci.poi.POIDetailedInfo
-	(*recommendation.RecommendationTrace)(nil), // 77: loci.recommendation.RecommendationTrace
-	(*poi.POIImage)(nil),                       // 78: loci.poi.POIImage
-	(*timestamppb.Timestamp)(nil),              // 79: google.protobuf.Timestamp
-	(*social.PublicUser)(nil),                  // 80: loci.social.PublicUser
-	(TripRole)(0),                              // 81: loci.trip.TripRole
-	(*TripMember)(nil),                         // 82: loci.trip.TripMember
-	(*common.PaginationRequest)(nil),           // 83: loci.common.PaginationRequest
-	(*common.PaginationMetadata)(nil),          // 84: loci.common.PaginationMetadata
-	(*CreateTripInviteRequest)(nil),            // 85: loci.trip.CreateTripInviteRequest
-	(*GetTripInviteRequest)(nil),               // 86: loci.trip.GetTripInviteRequest
-	(*AcceptTripInviteRequest)(nil),            // 87: loci.trip.AcceptTripInviteRequest
-	(*RevokeTripInviteRequest)(nil),            // 88: loci.trip.RevokeTripInviteRequest
-	(*ListTripMembersRequest)(nil),             // 89: loci.trip.ListTripMembersRequest
-	(*RemoveTripMemberRequest)(nil),            // 90: loci.trip.RemoveTripMemberRequest
-	(*SetTripPlanningRulesRequest)(nil),        // 91: loci.trip.SetTripPlanningRulesRequest
-	(*AddTripCommentRequest)(nil),              // 92: loci.trip.AddTripCommentRequest
-	(*ListTripCommentsRequest)(nil),            // 93: loci.trip.ListTripCommentsRequest
-	(*DeleteTripCommentRequest)(nil),           // 94: loci.trip.DeleteTripCommentRequest
-	(*ReportTripCommentRequest)(nil),           // 95: loci.trip.ReportTripCommentRequest
-	(*ListReportedTripCommentsRequest)(nil),    // 96: loci.trip.ListReportedTripCommentsRequest
-	(*ResolveTripCommentReportRequest)(nil),    // 97: loci.trip.ResolveTripCommentReportRequest
-	(*TripInvite)(nil),                         // 98: loci.trip.TripInvite
-	(*TripInvitePreview)(nil),                  // 99: loci.trip.TripInvitePreview
-	(*AcceptTripInviteResponse)(nil),           // 100: loci.trip.AcceptTripInviteResponse
-	(*RevokeTripInviteResponse)(nil),           // 101: loci.trip.RevokeTripInviteResponse
-	(*ListTripMembersResponse)(nil),            // 102: loci.trip.ListTripMembersResponse
-	(*RemoveTripMemberResponse)(nil),           // 103: loci.trip.RemoveTripMemberResponse
-	(*SetTripPlanningRulesResponse)(nil),       // 104: loci.trip.SetTripPlanningRulesResponse
-	(*TripComment)(nil),                        // 105: loci.trip.TripComment
-	(*ListTripCommentsResponse)(nil),           // 106: loci.trip.ListTripCommentsResponse
-	(*DeleteTripCommentResponse)(nil),          // 107: loci.trip.DeleteTripCommentResponse
-	(*ReportTripCommentResponse)(nil),          // 108: loci.trip.ReportTripCommentResponse
-	(*ListReportedTripCommentsResponse)(nil),   // 109: loci.trip.ListReportedTripCommentsResponse
-	(*ResolveTripCommentReportResponse)(nil),   // 110: loci.trip.ResolveTripCommentReportResponse
+	(StopCheckStatus)(0),                       // 2: loci.trip.StopCheckStatus
+	(StopHoursState)(0),                        // 3: loci.trip.StopHoursState
+	(TripStopStatus)(0),                        // 4: loci.trip.TripStopStatus
+	(TransitMode)(0),                           // 5: loci.trip.TransitMode
+	(StayTransportStatus)(0),                   // 6: loci.trip.StayTransportStatus
+	(FlightCabin)(0),                           // 7: loci.trip.FlightCabin
+	(FlightPlaceKind)(0),                       // 8: loci.trip.FlightPlaceKind
+	(PackingCategory)(0),                       // 9: loci.trip.PackingCategory
+	(ChecklistItemKind)(0),                     // 10: loci.trip.ChecklistItemKind
+	(ExportFormat)(0),                          // 11: loci.trip.ExportFormat
+	(*TripConstraint)(nil),                     // 12: loci.trip.TripConstraint
+	(*TripStop)(nil),                           // 13: loci.trip.TripStop
+	(*StopCheck)(nil),                          // 14: loci.trip.StopCheck
+	(*DayVerdict)(nil),                         // 15: loci.trip.DayVerdict
+	(*TripDay)(nil),                            // 16: loci.trip.TripDay
+	(*TripLeg)(nil),                            // 17: loci.trip.TripLeg
+	(*TripCity)(nil),                           // 18: loci.trip.TripCity
+	(*TripStay)(nil),                           // 19: loci.trip.TripStay
+	(*TransitStop)(nil),                        // 20: loci.trip.TransitStop
+	(*DayStart)(nil),                           // 21: loci.trip.DayStart
+	(*AirportConnection)(nil),                  // 22: loci.trip.AirportConnection
+	(*StayTransport)(nil),                      // 23: loci.trip.StayTransport
+	(*GetStayTransportRequest)(nil),            // 24: loci.trip.GetStayTransportRequest
+	(*GetStayTransportResponse)(nil),           // 25: loci.trip.GetStayTransportResponse
+	(*FlightPlace)(nil),                        // 26: loci.trip.FlightPlace
+	(*FlightLink)(nil),                         // 27: loci.trip.FlightLink
+	(*FlightPlaceOption)(nil),                  // 28: loci.trip.FlightPlaceOption
+	(*TripFlight)(nil),                         // 29: loci.trip.TripFlight
+	(*TripDraft)(nil),                          // 30: loci.trip.TripDraft
+	(*TripSnapshot)(nil),                       // 31: loci.trip.TripSnapshot
+	(*PackingSuggestion)(nil),                  // 32: loci.trip.PackingSuggestion
+	(*SuggestPackingRequest)(nil),              // 33: loci.trip.SuggestPackingRequest
+	(*SuggestPackingResponse)(nil),             // 34: loci.trip.SuggestPackingResponse
+	(*ChecklistItem)(nil),                      // 35: loci.trip.ChecklistItem
+	(*GetTripChecklistRequest)(nil),            // 36: loci.trip.GetTripChecklistRequest
+	(*GetTripChecklistResponse)(nil),           // 37: loci.trip.GetTripChecklistResponse
+	(*UpsertChecklistItemRequest)(nil),         // 38: loci.trip.UpsertChecklistItemRequest
+	(*DeleteChecklistItemRequest)(nil),         // 39: loci.trip.DeleteChecklistItemRequest
+	(*DeleteChecklistItemResponse)(nil),        // 40: loci.trip.DeleteChecklistItemResponse
+	(*DismissPackingSuggestionRequest)(nil),    // 41: loci.trip.DismissPackingSuggestionRequest
+	(*DismissPackingSuggestionResponse)(nil),   // 42: loci.trip.DismissPackingSuggestionResponse
+	(*SaveTripRequest)(nil),                    // 43: loci.trip.SaveTripRequest
+	(*GetTripRequest)(nil),                     // 44: loci.trip.GetTripRequest
+	(*ListTripsRequest)(nil),                   // 45: loci.trip.ListTripsRequest
+	(*ListTripsResponse)(nil),                  // 46: loci.trip.ListTripsResponse
+	(*ShareTripRequest)(nil),                   // 47: loci.trip.ShareTripRequest
+	(*SetTripVisibilityRequest)(nil),           // 48: loci.trip.SetTripVisibilityRequest
+	(*SetTripVisibilityResponse)(nil),          // 49: loci.trip.SetTripVisibilityResponse
+	(*GetSharedTripRequest)(nil),               // 50: loci.trip.GetSharedTripRequest
+	(*GetFriendTripRequest)(nil),               // 51: loci.trip.GetFriendTripRequest
+	(*ListFriendTripsRequest)(nil),             // 52: loci.trip.ListFriendTripsRequest
+	(*ListUserTripsRequest)(nil),               // 53: loci.trip.ListUserTripsRequest
+	(*CopyTripRequest)(nil),                    // 54: loci.trip.CopyTripRequest
+	(*CopyTripResponse)(nil),                   // 55: loci.trip.CopyTripResponse
+	(*ShareTripResponse)(nil),                  // 56: loci.trip.ShareTripResponse
+	(*ReorderStopsRequest)(nil),                // 57: loci.trip.ReorderStopsRequest
+	(*RenameStopRequest)(nil),                  // 58: loci.trip.RenameStopRequest
+	(*EditStopDurationRequest)(nil),            // 59: loci.trip.EditStopDurationRequest
+	(*SetConstraintRequest)(nil),               // 60: loci.trip.SetConstraintRequest
+	(*SetTripDatesRequest)(nil),                // 61: loci.trip.SetTripDatesRequest
+	(*SetStayRequest)(nil),                     // 62: loci.trip.SetStayRequest
+	(*ClearStayRequest)(nil),                   // 63: loci.trip.ClearStayRequest
+	(*AddFlightRequest)(nil),                   // 64: loci.trip.AddFlightRequest
+	(*RemoveFlightRequest)(nil),                // 65: loci.trip.RemoveFlightRequest
+	(*BuildFlightLinksRequest)(nil),            // 66: loci.trip.BuildFlightLinksRequest
+	(*BuildFlightLinksResponse)(nil),           // 67: loci.trip.BuildFlightLinksResponse
+	(*SearchAirportsRequest)(nil),              // 68: loci.trip.SearchAirportsRequest
+	(*SearchAirportsResponse)(nil),             // 69: loci.trip.SearchAirportsResponse
+	(*ResolveFlightDestinationRequest)(nil),    // 70: loci.trip.ResolveFlightDestinationRequest
+	(*ResolveFlightDestinationResponse)(nil),   // 71: loci.trip.ResolveFlightDestinationResponse
+	(*AddStopRequest)(nil),                     // 72: loci.trip.AddStopRequest
+	(*MoveStopRequest)(nil),                    // 73: loci.trip.MoveStopRequest
+	(*GetTripForSessionRequest)(nil),           // 74: loci.trip.GetTripForSessionRequest
+	(*RemoveStopRequest)(nil),                  // 75: loci.trip.RemoveStopRequest
+	(*ReplaceStopRequest)(nil),                 // 76: loci.trip.ReplaceStopRequest
+	(*ExportTripRequest)(nil),                  // 77: loci.trip.ExportTripRequest
+	(*ExportTripResponse)(nil),                 // 78: loci.trip.ExportTripResponse
+	(*profile.AccessibilityNeeds)(nil),         // 79: loci.profile.AccessibilityNeeds
+	(*poi.POIDetailedInfo)(nil),                // 80: loci.poi.POIDetailedInfo
+	(*recommendation.RecommendationTrace)(nil), // 81: loci.recommendation.RecommendationTrace
+	(*poi.POIImage)(nil),                       // 82: loci.poi.POIImage
+	(*timestamppb.Timestamp)(nil),              // 83: google.protobuf.Timestamp
+	(*social.PublicUser)(nil),                  // 84: loci.social.PublicUser
+	(TripRole)(0),                              // 85: loci.trip.TripRole
+	(*TripMember)(nil),                         // 86: loci.trip.TripMember
+	(*common.PaginationRequest)(nil),           // 87: loci.common.PaginationRequest
+	(*common.PaginationMetadata)(nil),          // 88: loci.common.PaginationMetadata
+	(*CreateTripInviteRequest)(nil),            // 89: loci.trip.CreateTripInviteRequest
+	(*GetTripInviteRequest)(nil),               // 90: loci.trip.GetTripInviteRequest
+	(*AcceptTripInviteRequest)(nil),            // 91: loci.trip.AcceptTripInviteRequest
+	(*RevokeTripInviteRequest)(nil),            // 92: loci.trip.RevokeTripInviteRequest
+	(*ListTripMembersRequest)(nil),             // 93: loci.trip.ListTripMembersRequest
+	(*RemoveTripMemberRequest)(nil),            // 94: loci.trip.RemoveTripMemberRequest
+	(*SetTripPlanningRulesRequest)(nil),        // 95: loci.trip.SetTripPlanningRulesRequest
+	(*AddTripCommentRequest)(nil),              // 96: loci.trip.AddTripCommentRequest
+	(*ListTripCommentsRequest)(nil),            // 97: loci.trip.ListTripCommentsRequest
+	(*DeleteTripCommentRequest)(nil),           // 98: loci.trip.DeleteTripCommentRequest
+	(*ReportTripCommentRequest)(nil),           // 99: loci.trip.ReportTripCommentRequest
+	(*ListReportedTripCommentsRequest)(nil),    // 100: loci.trip.ListReportedTripCommentsRequest
+	(*ResolveTripCommentReportRequest)(nil),    // 101: loci.trip.ResolveTripCommentReportRequest
+	(*TripInvite)(nil),                         // 102: loci.trip.TripInvite
+	(*TripInvitePreview)(nil),                  // 103: loci.trip.TripInvitePreview
+	(*AcceptTripInviteResponse)(nil),           // 104: loci.trip.AcceptTripInviteResponse
+	(*RevokeTripInviteResponse)(nil),           // 105: loci.trip.RevokeTripInviteResponse
+	(*ListTripMembersResponse)(nil),            // 106: loci.trip.ListTripMembersResponse
+	(*RemoveTripMemberResponse)(nil),           // 107: loci.trip.RemoveTripMemberResponse
+	(*SetTripPlanningRulesResponse)(nil),       // 108: loci.trip.SetTripPlanningRulesResponse
+	(*TripComment)(nil),                        // 109: loci.trip.TripComment
+	(*ListTripCommentsResponse)(nil),           // 110: loci.trip.ListTripCommentsResponse
+	(*DeleteTripCommentResponse)(nil),          // 111: loci.trip.DeleteTripCommentResponse
+	(*ReportTripCommentResponse)(nil),          // 112: loci.trip.ReportTripCommentResponse
+	(*ListReportedTripCommentsResponse)(nil),   // 113: loci.trip.ListReportedTripCommentsResponse
+	(*ResolveTripCommentReportResponse)(nil),   // 114: loci.trip.ResolveTripCommentReportResponse
 }
 var file_loci_trip_trip_proto_depIdxs = []int32{
 	1,   // 0: loci.trip.TripConstraint.pace:type_name -> loci.trip.TripPace
-	75,  // 1: loci.trip.TripConstraint.accessibility:type_name -> loci.profile.AccessibilityNeeds
-	76,  // 2: loci.trip.TripStop.poi:type_name -> loci.poi.POIDetailedInfo
-	77,  // 3: loci.trip.TripStop.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
-	78,  // 4: loci.trip.TripStop.image:type_name -> loci.poi.POIImage
-	2,   // 5: loci.trip.TripStop.status:type_name -> loci.trip.TripStopStatus
-	79,  // 6: loci.trip.TripStop.status_at:type_name -> google.protobuf.Timestamp
-	79,  // 7: loci.trip.TripDay.date:type_name -> google.protobuf.Timestamp
-	11,  // 8: loci.trip.TripDay.stops:type_name -> loci.trip.TripStop
-	79,  // 9: loci.trip.TripDay.completed_at:type_name -> google.protobuf.Timestamp
-	3,   // 10: loci.trip.TransitStop.mode:type_name -> loci.trip.TransitMode
-	16,  // 11: loci.trip.StayTransport.stops:type_name -> loci.trip.TransitStop
-	17,  // 12: loci.trip.StayTransport.day_starts:type_name -> loci.trip.DayStart
-	18,  // 13: loci.trip.StayTransport.airport:type_name -> loci.trip.AirportConnection
-	79,  // 14: loci.trip.StayTransport.fetched_at:type_name -> google.protobuf.Timestamp
-	4,   // 15: loci.trip.StayTransport.status:type_name -> loci.trip.StayTransportStatus
-	19,  // 16: loci.trip.GetStayTransportResponse.transport:type_name -> loci.trip.StayTransport
-	6,   // 17: loci.trip.FlightPlaceOption.kind:type_name -> loci.trip.FlightPlaceKind
-	22,  // 18: loci.trip.TripFlight.origin:type_name -> loci.trip.FlightPlace
-	22,  // 19: loci.trip.TripFlight.destination:type_name -> loci.trip.FlightPlace
-	5,   // 20: loci.trip.TripFlight.cabin:type_name -> loci.trip.FlightCabin
-	23,  // 21: loci.trip.TripFlight.links:type_name -> loci.trip.FlightLink
-	10,  // 22: loci.trip.TripDraft.constraints:type_name -> loci.trip.TripConstraint
-	12,  // 23: loci.trip.TripDraft.days:type_name -> loci.trip.TripDay
-	13,  // 24: loci.trip.TripDraft.legs:type_name -> loci.trip.TripLeg
-	14,  // 25: loci.trip.TripDraft.cities:type_name -> loci.trip.TripCity
-	79,  // 26: loci.trip.TripDraft.created_at:type_name -> google.protobuf.Timestamp
-	79,  // 27: loci.trip.TripDraft.updated_at:type_name -> google.protobuf.Timestamp
-	0,   // 28: loci.trip.TripDraft.visibility:type_name -> loci.trip.TripVisibility
-	80,  // 29: loci.trip.TripDraft.owner:type_name -> loci.social.PublicUser
-	15,  // 30: loci.trip.TripDraft.stays:type_name -> loci.trip.TripStay
-	25,  // 31: loci.trip.TripDraft.flights:type_name -> loci.trip.TripFlight
-	81,  // 32: loci.trip.TripDraft.viewer_role:type_name -> loci.trip.TripRole
-	82,  // 33: loci.trip.TripDraft.members:type_name -> loci.trip.TripMember
-	26,  // 34: loci.trip.TripSnapshot.trip:type_name -> loci.trip.TripDraft
-	79,  // 35: loci.trip.TripSnapshot.created_at:type_name -> google.protobuf.Timestamp
-	7,   // 36: loci.trip.PackingSuggestion.category:type_name -> loci.trip.PackingCategory
-	28,  // 37: loci.trip.SuggestPackingResponse.suggestions:type_name -> loci.trip.PackingSuggestion
-	8,   // 38: loci.trip.ChecklistItem.kind:type_name -> loci.trip.ChecklistItemKind
-	79,  // 39: loci.trip.ChecklistItem.updated_at:type_name -> google.protobuf.Timestamp
-	31,  // 40: loci.trip.GetTripChecklistResponse.items:type_name -> loci.trip.ChecklistItem
-	31,  // 41: loci.trip.UpsertChecklistItemRequest.item:type_name -> loci.trip.ChecklistItem
-	26,  // 42: loci.trip.SaveTripRequest.trip:type_name -> loci.trip.TripDraft
-	83,  // 43: loci.trip.ListTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	26,  // 44: loci.trip.ListTripsResponse.trips:type_name -> loci.trip.TripDraft
-	84,  // 45: loci.trip.ListTripsResponse.pagination:type_name -> loci.common.PaginationMetadata
-	0,   // 46: loci.trip.SetTripVisibilityRequest.visibility:type_name -> loci.trip.TripVisibility
-	0,   // 47: loci.trip.SetTripVisibilityResponse.visibility:type_name -> loci.trip.TripVisibility
-	83,  // 48: loci.trip.ListFriendTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	83,  // 49: loci.trip.ListUserTripsRequest.pagination:type_name -> loci.common.PaginationRequest
-	10,  // 50: loci.trip.SetConstraintRequest.constraints:type_name -> loci.trip.TripConstraint
-	15,  // 51: loci.trip.SetStayRequest.stay:type_name -> loci.trip.TripStay
-	25,  // 52: loci.trip.AddFlightRequest.flight:type_name -> loci.trip.TripFlight
-	22,  // 53: loci.trip.BuildFlightLinksRequest.origin:type_name -> loci.trip.FlightPlace
-	22,  // 54: loci.trip.BuildFlightLinksRequest.destination:type_name -> loci.trip.FlightPlace
-	5,   // 55: loci.trip.BuildFlightLinksRequest.cabin:type_name -> loci.trip.FlightCabin
-	23,  // 56: loci.trip.BuildFlightLinksResponse.links:type_name -> loci.trip.FlightLink
-	24,  // 57: loci.trip.SearchAirportsResponse.options:type_name -> loci.trip.FlightPlaceOption
-	24,  // 58: loci.trip.ResolveFlightDestinationResponse.destination:type_name -> loci.trip.FlightPlaceOption
-	11,  // 59: loci.trip.AddStopRequest.stop:type_name -> loci.trip.TripStop
-	11,  // 60: loci.trip.ReplaceStopRequest.replacement:type_name -> loci.trip.TripStop
-	9,   // 61: loci.trip.ExportTripRequest.format:type_name -> loci.trip.ExportFormat
-	39,  // 62: loci.trip.TripService.SaveTrip:input_type -> loci.trip.SaveTripRequest
-	40,  // 63: loci.trip.TripService.GetTrip:input_type -> loci.trip.GetTripRequest
-	70,  // 64: loci.trip.TripService.GetTripForSession:input_type -> loci.trip.GetTripForSessionRequest
-	41,  // 65: loci.trip.TripService.ListTrips:input_type -> loci.trip.ListTripsRequest
-	43,  // 66: loci.trip.TripService.ShareTrip:input_type -> loci.trip.ShareTripRequest
-	44,  // 67: loci.trip.TripService.SetTripVisibility:input_type -> loci.trip.SetTripVisibilityRequest
-	46,  // 68: loci.trip.TripService.GetSharedTrip:input_type -> loci.trip.GetSharedTripRequest
-	47,  // 69: loci.trip.TripService.GetFriendTrip:input_type -> loci.trip.GetFriendTripRequest
-	48,  // 70: loci.trip.TripService.ListFriendTrips:input_type -> loci.trip.ListFriendTripsRequest
-	49,  // 71: loci.trip.TripService.ListUserTrips:input_type -> loci.trip.ListUserTripsRequest
-	50,  // 72: loci.trip.TripService.CopyTrip:input_type -> loci.trip.CopyTripRequest
-	53,  // 73: loci.trip.TripService.ReorderStops:input_type -> loci.trip.ReorderStopsRequest
-	54,  // 74: loci.trip.TripService.RenameStop:input_type -> loci.trip.RenameStopRequest
-	55,  // 75: loci.trip.TripService.EditStopDuration:input_type -> loci.trip.EditStopDurationRequest
-	56,  // 76: loci.trip.TripService.SetConstraint:input_type -> loci.trip.SetConstraintRequest
-	68,  // 77: loci.trip.TripService.AddStop:input_type -> loci.trip.AddStopRequest
-	71,  // 78: loci.trip.TripService.RemoveStop:input_type -> loci.trip.RemoveStopRequest
-	69,  // 79: loci.trip.TripService.MoveStop:input_type -> loci.trip.MoveStopRequest
-	72,  // 80: loci.trip.TripService.ReplaceStop:input_type -> loci.trip.ReplaceStopRequest
-	57,  // 81: loci.trip.TripService.SetTripDates:input_type -> loci.trip.SetTripDatesRequest
-	58,  // 82: loci.trip.TripService.SetStay:input_type -> loci.trip.SetStayRequest
-	59,  // 83: loci.trip.TripService.ClearStay:input_type -> loci.trip.ClearStayRequest
-	20,  // 84: loci.trip.TripService.GetStayTransport:input_type -> loci.trip.GetStayTransportRequest
-	60,  // 85: loci.trip.TripService.AddFlight:input_type -> loci.trip.AddFlightRequest
-	61,  // 86: loci.trip.TripService.RemoveFlight:input_type -> loci.trip.RemoveFlightRequest
-	62,  // 87: loci.trip.TripService.BuildFlightLinks:input_type -> loci.trip.BuildFlightLinksRequest
-	64,  // 88: loci.trip.TripService.SearchAirports:input_type -> loci.trip.SearchAirportsRequest
-	66,  // 89: loci.trip.TripService.ResolveFlightDestination:input_type -> loci.trip.ResolveFlightDestinationRequest
-	73,  // 90: loci.trip.TripService.ExportTrip:input_type -> loci.trip.ExportTripRequest
-	29,  // 91: loci.trip.TripService.SuggestPacking:input_type -> loci.trip.SuggestPackingRequest
-	32,  // 92: loci.trip.TripService.GetTripChecklist:input_type -> loci.trip.GetTripChecklistRequest
-	34,  // 93: loci.trip.TripService.UpsertChecklistItem:input_type -> loci.trip.UpsertChecklistItemRequest
-	35,  // 94: loci.trip.TripService.DeleteChecklistItem:input_type -> loci.trip.DeleteChecklistItemRequest
-	37,  // 95: loci.trip.TripService.DismissPackingSuggestion:input_type -> loci.trip.DismissPackingSuggestionRequest
-	85,  // 96: loci.trip.TripService.CreateTripInvite:input_type -> loci.trip.CreateTripInviteRequest
-	86,  // 97: loci.trip.TripService.GetTripInvite:input_type -> loci.trip.GetTripInviteRequest
-	87,  // 98: loci.trip.TripService.AcceptTripInvite:input_type -> loci.trip.AcceptTripInviteRequest
-	88,  // 99: loci.trip.TripService.RevokeTripInvite:input_type -> loci.trip.RevokeTripInviteRequest
-	89,  // 100: loci.trip.TripService.ListTripMembers:input_type -> loci.trip.ListTripMembersRequest
-	90,  // 101: loci.trip.TripService.RemoveTripMember:input_type -> loci.trip.RemoveTripMemberRequest
-	91,  // 102: loci.trip.TripService.SetTripPlanningRules:input_type -> loci.trip.SetTripPlanningRulesRequest
-	92,  // 103: loci.trip.TripService.AddTripComment:input_type -> loci.trip.AddTripCommentRequest
-	93,  // 104: loci.trip.TripService.ListTripComments:input_type -> loci.trip.ListTripCommentsRequest
-	94,  // 105: loci.trip.TripService.DeleteTripComment:input_type -> loci.trip.DeleteTripCommentRequest
-	95,  // 106: loci.trip.TripService.ReportTripComment:input_type -> loci.trip.ReportTripCommentRequest
-	96,  // 107: loci.trip.TripService.ListReportedTripComments:input_type -> loci.trip.ListReportedTripCommentsRequest
-	97,  // 108: loci.trip.TripService.ResolveTripCommentReport:input_type -> loci.trip.ResolveTripCommentReportRequest
-	26,  // 109: loci.trip.TripService.SaveTrip:output_type -> loci.trip.TripDraft
-	26,  // 110: loci.trip.TripService.GetTrip:output_type -> loci.trip.TripDraft
-	26,  // 111: loci.trip.TripService.GetTripForSession:output_type -> loci.trip.TripDraft
-	42,  // 112: loci.trip.TripService.ListTrips:output_type -> loci.trip.ListTripsResponse
-	52,  // 113: loci.trip.TripService.ShareTrip:output_type -> loci.trip.ShareTripResponse
-	45,  // 114: loci.trip.TripService.SetTripVisibility:output_type -> loci.trip.SetTripVisibilityResponse
-	26,  // 115: loci.trip.TripService.GetSharedTrip:output_type -> loci.trip.TripDraft
-	26,  // 116: loci.trip.TripService.GetFriendTrip:output_type -> loci.trip.TripDraft
-	42,  // 117: loci.trip.TripService.ListFriendTrips:output_type -> loci.trip.ListTripsResponse
-	42,  // 118: loci.trip.TripService.ListUserTrips:output_type -> loci.trip.ListTripsResponse
-	51,  // 119: loci.trip.TripService.CopyTrip:output_type -> loci.trip.CopyTripResponse
-	26,  // 120: loci.trip.TripService.ReorderStops:output_type -> loci.trip.TripDraft
-	26,  // 121: loci.trip.TripService.RenameStop:output_type -> loci.trip.TripDraft
-	26,  // 122: loci.trip.TripService.EditStopDuration:output_type -> loci.trip.TripDraft
-	26,  // 123: loci.trip.TripService.SetConstraint:output_type -> loci.trip.TripDraft
-	26,  // 124: loci.trip.TripService.AddStop:output_type -> loci.trip.TripDraft
-	26,  // 125: loci.trip.TripService.RemoveStop:output_type -> loci.trip.TripDraft
-	26,  // 126: loci.trip.TripService.MoveStop:output_type -> loci.trip.TripDraft
-	26,  // 127: loci.trip.TripService.ReplaceStop:output_type -> loci.trip.TripDraft
-	26,  // 128: loci.trip.TripService.SetTripDates:output_type -> loci.trip.TripDraft
-	26,  // 129: loci.trip.TripService.SetStay:output_type -> loci.trip.TripDraft
-	26,  // 130: loci.trip.TripService.ClearStay:output_type -> loci.trip.TripDraft
-	21,  // 131: loci.trip.TripService.GetStayTransport:output_type -> loci.trip.GetStayTransportResponse
-	26,  // 132: loci.trip.TripService.AddFlight:output_type -> loci.trip.TripDraft
-	26,  // 133: loci.trip.TripService.RemoveFlight:output_type -> loci.trip.TripDraft
-	63,  // 134: loci.trip.TripService.BuildFlightLinks:output_type -> loci.trip.BuildFlightLinksResponse
-	65,  // 135: loci.trip.TripService.SearchAirports:output_type -> loci.trip.SearchAirportsResponse
-	67,  // 136: loci.trip.TripService.ResolveFlightDestination:output_type -> loci.trip.ResolveFlightDestinationResponse
-	74,  // 137: loci.trip.TripService.ExportTrip:output_type -> loci.trip.ExportTripResponse
-	30,  // 138: loci.trip.TripService.SuggestPacking:output_type -> loci.trip.SuggestPackingResponse
-	33,  // 139: loci.trip.TripService.GetTripChecklist:output_type -> loci.trip.GetTripChecklistResponse
-	31,  // 140: loci.trip.TripService.UpsertChecklistItem:output_type -> loci.trip.ChecklistItem
-	36,  // 141: loci.trip.TripService.DeleteChecklistItem:output_type -> loci.trip.DeleteChecklistItemResponse
-	38,  // 142: loci.trip.TripService.DismissPackingSuggestion:output_type -> loci.trip.DismissPackingSuggestionResponse
-	98,  // 143: loci.trip.TripService.CreateTripInvite:output_type -> loci.trip.TripInvite
-	99,  // 144: loci.trip.TripService.GetTripInvite:output_type -> loci.trip.TripInvitePreview
-	100, // 145: loci.trip.TripService.AcceptTripInvite:output_type -> loci.trip.AcceptTripInviteResponse
-	101, // 146: loci.trip.TripService.RevokeTripInvite:output_type -> loci.trip.RevokeTripInviteResponse
-	102, // 147: loci.trip.TripService.ListTripMembers:output_type -> loci.trip.ListTripMembersResponse
-	103, // 148: loci.trip.TripService.RemoveTripMember:output_type -> loci.trip.RemoveTripMemberResponse
-	104, // 149: loci.trip.TripService.SetTripPlanningRules:output_type -> loci.trip.SetTripPlanningRulesResponse
-	105, // 150: loci.trip.TripService.AddTripComment:output_type -> loci.trip.TripComment
-	106, // 151: loci.trip.TripService.ListTripComments:output_type -> loci.trip.ListTripCommentsResponse
-	107, // 152: loci.trip.TripService.DeleteTripComment:output_type -> loci.trip.DeleteTripCommentResponse
-	108, // 153: loci.trip.TripService.ReportTripComment:output_type -> loci.trip.ReportTripCommentResponse
-	109, // 154: loci.trip.TripService.ListReportedTripComments:output_type -> loci.trip.ListReportedTripCommentsResponse
-	110, // 155: loci.trip.TripService.ResolveTripCommentReport:output_type -> loci.trip.ResolveTripCommentReportResponse
-	109, // [109:156] is the sub-list for method output_type
-	62,  // [62:109] is the sub-list for method input_type
-	62,  // [62:62] is the sub-list for extension type_name
-	62,  // [62:62] is the sub-list for extension extendee
-	0,   // [0:62] is the sub-list for field type_name
+	79,  // 1: loci.trip.TripConstraint.accessibility:type_name -> loci.profile.AccessibilityNeeds
+	80,  // 2: loci.trip.TripStop.poi:type_name -> loci.poi.POIDetailedInfo
+	81,  // 3: loci.trip.TripStop.recommendation_trace:type_name -> loci.recommendation.RecommendationTrace
+	82,  // 4: loci.trip.TripStop.image:type_name -> loci.poi.POIImage
+	4,   // 5: loci.trip.TripStop.status:type_name -> loci.trip.TripStopStatus
+	83,  // 6: loci.trip.TripStop.status_at:type_name -> google.protobuf.Timestamp
+	14,  // 7: loci.trip.TripStop.check:type_name -> loci.trip.StopCheck
+	2,   // 8: loci.trip.StopCheck.status:type_name -> loci.trip.StopCheckStatus
+	3,   // 9: loci.trip.StopCheck.hours:type_name -> loci.trip.StopHoursState
+	83,  // 10: loci.trip.StopCheck.checked_at:type_name -> google.protobuf.Timestamp
+	83,  // 11: loci.trip.TripDay.date:type_name -> google.protobuf.Timestamp
+	13,  // 12: loci.trip.TripDay.stops:type_name -> loci.trip.TripStop
+	83,  // 13: loci.trip.TripDay.completed_at:type_name -> google.protobuf.Timestamp
+	15,  // 14: loci.trip.TripDay.verdict:type_name -> loci.trip.DayVerdict
+	5,   // 15: loci.trip.TransitStop.mode:type_name -> loci.trip.TransitMode
+	20,  // 16: loci.trip.StayTransport.stops:type_name -> loci.trip.TransitStop
+	21,  // 17: loci.trip.StayTransport.day_starts:type_name -> loci.trip.DayStart
+	22,  // 18: loci.trip.StayTransport.airport:type_name -> loci.trip.AirportConnection
+	83,  // 19: loci.trip.StayTransport.fetched_at:type_name -> google.protobuf.Timestamp
+	6,   // 20: loci.trip.StayTransport.status:type_name -> loci.trip.StayTransportStatus
+	23,  // 21: loci.trip.GetStayTransportResponse.transport:type_name -> loci.trip.StayTransport
+	8,   // 22: loci.trip.FlightPlaceOption.kind:type_name -> loci.trip.FlightPlaceKind
+	26,  // 23: loci.trip.TripFlight.origin:type_name -> loci.trip.FlightPlace
+	26,  // 24: loci.trip.TripFlight.destination:type_name -> loci.trip.FlightPlace
+	7,   // 25: loci.trip.TripFlight.cabin:type_name -> loci.trip.FlightCabin
+	27,  // 26: loci.trip.TripFlight.links:type_name -> loci.trip.FlightLink
+	12,  // 27: loci.trip.TripDraft.constraints:type_name -> loci.trip.TripConstraint
+	16,  // 28: loci.trip.TripDraft.days:type_name -> loci.trip.TripDay
+	17,  // 29: loci.trip.TripDraft.legs:type_name -> loci.trip.TripLeg
+	18,  // 30: loci.trip.TripDraft.cities:type_name -> loci.trip.TripCity
+	83,  // 31: loci.trip.TripDraft.created_at:type_name -> google.protobuf.Timestamp
+	83,  // 32: loci.trip.TripDraft.updated_at:type_name -> google.protobuf.Timestamp
+	0,   // 33: loci.trip.TripDraft.visibility:type_name -> loci.trip.TripVisibility
+	84,  // 34: loci.trip.TripDraft.owner:type_name -> loci.social.PublicUser
+	19,  // 35: loci.trip.TripDraft.stays:type_name -> loci.trip.TripStay
+	29,  // 36: loci.trip.TripDraft.flights:type_name -> loci.trip.TripFlight
+	85,  // 37: loci.trip.TripDraft.viewer_role:type_name -> loci.trip.TripRole
+	86,  // 38: loci.trip.TripDraft.members:type_name -> loci.trip.TripMember
+	30,  // 39: loci.trip.TripSnapshot.trip:type_name -> loci.trip.TripDraft
+	83,  // 40: loci.trip.TripSnapshot.created_at:type_name -> google.protobuf.Timestamp
+	9,   // 41: loci.trip.PackingSuggestion.category:type_name -> loci.trip.PackingCategory
+	32,  // 42: loci.trip.SuggestPackingResponse.suggestions:type_name -> loci.trip.PackingSuggestion
+	10,  // 43: loci.trip.ChecklistItem.kind:type_name -> loci.trip.ChecklistItemKind
+	83,  // 44: loci.trip.ChecklistItem.updated_at:type_name -> google.protobuf.Timestamp
+	35,  // 45: loci.trip.GetTripChecklistResponse.items:type_name -> loci.trip.ChecklistItem
+	35,  // 46: loci.trip.UpsertChecklistItemRequest.item:type_name -> loci.trip.ChecklistItem
+	30,  // 47: loci.trip.SaveTripRequest.trip:type_name -> loci.trip.TripDraft
+	87,  // 48: loci.trip.ListTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	30,  // 49: loci.trip.ListTripsResponse.trips:type_name -> loci.trip.TripDraft
+	88,  // 50: loci.trip.ListTripsResponse.pagination:type_name -> loci.common.PaginationMetadata
+	0,   // 51: loci.trip.SetTripVisibilityRequest.visibility:type_name -> loci.trip.TripVisibility
+	0,   // 52: loci.trip.SetTripVisibilityResponse.visibility:type_name -> loci.trip.TripVisibility
+	87,  // 53: loci.trip.ListFriendTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	87,  // 54: loci.trip.ListUserTripsRequest.pagination:type_name -> loci.common.PaginationRequest
+	12,  // 55: loci.trip.SetConstraintRequest.constraints:type_name -> loci.trip.TripConstraint
+	19,  // 56: loci.trip.SetStayRequest.stay:type_name -> loci.trip.TripStay
+	29,  // 57: loci.trip.AddFlightRequest.flight:type_name -> loci.trip.TripFlight
+	26,  // 58: loci.trip.BuildFlightLinksRequest.origin:type_name -> loci.trip.FlightPlace
+	26,  // 59: loci.trip.BuildFlightLinksRequest.destination:type_name -> loci.trip.FlightPlace
+	7,   // 60: loci.trip.BuildFlightLinksRequest.cabin:type_name -> loci.trip.FlightCabin
+	27,  // 61: loci.trip.BuildFlightLinksResponse.links:type_name -> loci.trip.FlightLink
+	28,  // 62: loci.trip.SearchAirportsResponse.options:type_name -> loci.trip.FlightPlaceOption
+	28,  // 63: loci.trip.ResolveFlightDestinationResponse.destination:type_name -> loci.trip.FlightPlaceOption
+	13,  // 64: loci.trip.AddStopRequest.stop:type_name -> loci.trip.TripStop
+	13,  // 65: loci.trip.ReplaceStopRequest.replacement:type_name -> loci.trip.TripStop
+	11,  // 66: loci.trip.ExportTripRequest.format:type_name -> loci.trip.ExportFormat
+	43,  // 67: loci.trip.TripService.SaveTrip:input_type -> loci.trip.SaveTripRequest
+	44,  // 68: loci.trip.TripService.GetTrip:input_type -> loci.trip.GetTripRequest
+	74,  // 69: loci.trip.TripService.GetTripForSession:input_type -> loci.trip.GetTripForSessionRequest
+	45,  // 70: loci.trip.TripService.ListTrips:input_type -> loci.trip.ListTripsRequest
+	47,  // 71: loci.trip.TripService.ShareTrip:input_type -> loci.trip.ShareTripRequest
+	48,  // 72: loci.trip.TripService.SetTripVisibility:input_type -> loci.trip.SetTripVisibilityRequest
+	50,  // 73: loci.trip.TripService.GetSharedTrip:input_type -> loci.trip.GetSharedTripRequest
+	51,  // 74: loci.trip.TripService.GetFriendTrip:input_type -> loci.trip.GetFriendTripRequest
+	52,  // 75: loci.trip.TripService.ListFriendTrips:input_type -> loci.trip.ListFriendTripsRequest
+	53,  // 76: loci.trip.TripService.ListUserTrips:input_type -> loci.trip.ListUserTripsRequest
+	54,  // 77: loci.trip.TripService.CopyTrip:input_type -> loci.trip.CopyTripRequest
+	57,  // 78: loci.trip.TripService.ReorderStops:input_type -> loci.trip.ReorderStopsRequest
+	58,  // 79: loci.trip.TripService.RenameStop:input_type -> loci.trip.RenameStopRequest
+	59,  // 80: loci.trip.TripService.EditStopDuration:input_type -> loci.trip.EditStopDurationRequest
+	60,  // 81: loci.trip.TripService.SetConstraint:input_type -> loci.trip.SetConstraintRequest
+	72,  // 82: loci.trip.TripService.AddStop:input_type -> loci.trip.AddStopRequest
+	75,  // 83: loci.trip.TripService.RemoveStop:input_type -> loci.trip.RemoveStopRequest
+	73,  // 84: loci.trip.TripService.MoveStop:input_type -> loci.trip.MoveStopRequest
+	76,  // 85: loci.trip.TripService.ReplaceStop:input_type -> loci.trip.ReplaceStopRequest
+	61,  // 86: loci.trip.TripService.SetTripDates:input_type -> loci.trip.SetTripDatesRequest
+	62,  // 87: loci.trip.TripService.SetStay:input_type -> loci.trip.SetStayRequest
+	63,  // 88: loci.trip.TripService.ClearStay:input_type -> loci.trip.ClearStayRequest
+	24,  // 89: loci.trip.TripService.GetStayTransport:input_type -> loci.trip.GetStayTransportRequest
+	64,  // 90: loci.trip.TripService.AddFlight:input_type -> loci.trip.AddFlightRequest
+	65,  // 91: loci.trip.TripService.RemoveFlight:input_type -> loci.trip.RemoveFlightRequest
+	66,  // 92: loci.trip.TripService.BuildFlightLinks:input_type -> loci.trip.BuildFlightLinksRequest
+	68,  // 93: loci.trip.TripService.SearchAirports:input_type -> loci.trip.SearchAirportsRequest
+	70,  // 94: loci.trip.TripService.ResolveFlightDestination:input_type -> loci.trip.ResolveFlightDestinationRequest
+	77,  // 95: loci.trip.TripService.ExportTrip:input_type -> loci.trip.ExportTripRequest
+	33,  // 96: loci.trip.TripService.SuggestPacking:input_type -> loci.trip.SuggestPackingRequest
+	36,  // 97: loci.trip.TripService.GetTripChecklist:input_type -> loci.trip.GetTripChecklistRequest
+	38,  // 98: loci.trip.TripService.UpsertChecklistItem:input_type -> loci.trip.UpsertChecklistItemRequest
+	39,  // 99: loci.trip.TripService.DeleteChecklistItem:input_type -> loci.trip.DeleteChecklistItemRequest
+	41,  // 100: loci.trip.TripService.DismissPackingSuggestion:input_type -> loci.trip.DismissPackingSuggestionRequest
+	89,  // 101: loci.trip.TripService.CreateTripInvite:input_type -> loci.trip.CreateTripInviteRequest
+	90,  // 102: loci.trip.TripService.GetTripInvite:input_type -> loci.trip.GetTripInviteRequest
+	91,  // 103: loci.trip.TripService.AcceptTripInvite:input_type -> loci.trip.AcceptTripInviteRequest
+	92,  // 104: loci.trip.TripService.RevokeTripInvite:input_type -> loci.trip.RevokeTripInviteRequest
+	93,  // 105: loci.trip.TripService.ListTripMembers:input_type -> loci.trip.ListTripMembersRequest
+	94,  // 106: loci.trip.TripService.RemoveTripMember:input_type -> loci.trip.RemoveTripMemberRequest
+	95,  // 107: loci.trip.TripService.SetTripPlanningRules:input_type -> loci.trip.SetTripPlanningRulesRequest
+	96,  // 108: loci.trip.TripService.AddTripComment:input_type -> loci.trip.AddTripCommentRequest
+	97,  // 109: loci.trip.TripService.ListTripComments:input_type -> loci.trip.ListTripCommentsRequest
+	98,  // 110: loci.trip.TripService.DeleteTripComment:input_type -> loci.trip.DeleteTripCommentRequest
+	99,  // 111: loci.trip.TripService.ReportTripComment:input_type -> loci.trip.ReportTripCommentRequest
+	100, // 112: loci.trip.TripService.ListReportedTripComments:input_type -> loci.trip.ListReportedTripCommentsRequest
+	101, // 113: loci.trip.TripService.ResolveTripCommentReport:input_type -> loci.trip.ResolveTripCommentReportRequest
+	30,  // 114: loci.trip.TripService.SaveTrip:output_type -> loci.trip.TripDraft
+	30,  // 115: loci.trip.TripService.GetTrip:output_type -> loci.trip.TripDraft
+	30,  // 116: loci.trip.TripService.GetTripForSession:output_type -> loci.trip.TripDraft
+	46,  // 117: loci.trip.TripService.ListTrips:output_type -> loci.trip.ListTripsResponse
+	56,  // 118: loci.trip.TripService.ShareTrip:output_type -> loci.trip.ShareTripResponse
+	49,  // 119: loci.trip.TripService.SetTripVisibility:output_type -> loci.trip.SetTripVisibilityResponse
+	30,  // 120: loci.trip.TripService.GetSharedTrip:output_type -> loci.trip.TripDraft
+	30,  // 121: loci.trip.TripService.GetFriendTrip:output_type -> loci.trip.TripDraft
+	46,  // 122: loci.trip.TripService.ListFriendTrips:output_type -> loci.trip.ListTripsResponse
+	46,  // 123: loci.trip.TripService.ListUserTrips:output_type -> loci.trip.ListTripsResponse
+	55,  // 124: loci.trip.TripService.CopyTrip:output_type -> loci.trip.CopyTripResponse
+	30,  // 125: loci.trip.TripService.ReorderStops:output_type -> loci.trip.TripDraft
+	30,  // 126: loci.trip.TripService.RenameStop:output_type -> loci.trip.TripDraft
+	30,  // 127: loci.trip.TripService.EditStopDuration:output_type -> loci.trip.TripDraft
+	30,  // 128: loci.trip.TripService.SetConstraint:output_type -> loci.trip.TripDraft
+	30,  // 129: loci.trip.TripService.AddStop:output_type -> loci.trip.TripDraft
+	30,  // 130: loci.trip.TripService.RemoveStop:output_type -> loci.trip.TripDraft
+	30,  // 131: loci.trip.TripService.MoveStop:output_type -> loci.trip.TripDraft
+	30,  // 132: loci.trip.TripService.ReplaceStop:output_type -> loci.trip.TripDraft
+	30,  // 133: loci.trip.TripService.SetTripDates:output_type -> loci.trip.TripDraft
+	30,  // 134: loci.trip.TripService.SetStay:output_type -> loci.trip.TripDraft
+	30,  // 135: loci.trip.TripService.ClearStay:output_type -> loci.trip.TripDraft
+	25,  // 136: loci.trip.TripService.GetStayTransport:output_type -> loci.trip.GetStayTransportResponse
+	30,  // 137: loci.trip.TripService.AddFlight:output_type -> loci.trip.TripDraft
+	30,  // 138: loci.trip.TripService.RemoveFlight:output_type -> loci.trip.TripDraft
+	67,  // 139: loci.trip.TripService.BuildFlightLinks:output_type -> loci.trip.BuildFlightLinksResponse
+	69,  // 140: loci.trip.TripService.SearchAirports:output_type -> loci.trip.SearchAirportsResponse
+	71,  // 141: loci.trip.TripService.ResolveFlightDestination:output_type -> loci.trip.ResolveFlightDestinationResponse
+	78,  // 142: loci.trip.TripService.ExportTrip:output_type -> loci.trip.ExportTripResponse
+	34,  // 143: loci.trip.TripService.SuggestPacking:output_type -> loci.trip.SuggestPackingResponse
+	37,  // 144: loci.trip.TripService.GetTripChecklist:output_type -> loci.trip.GetTripChecklistResponse
+	35,  // 145: loci.trip.TripService.UpsertChecklistItem:output_type -> loci.trip.ChecklistItem
+	40,  // 146: loci.trip.TripService.DeleteChecklistItem:output_type -> loci.trip.DeleteChecklistItemResponse
+	42,  // 147: loci.trip.TripService.DismissPackingSuggestion:output_type -> loci.trip.DismissPackingSuggestionResponse
+	102, // 148: loci.trip.TripService.CreateTripInvite:output_type -> loci.trip.TripInvite
+	103, // 149: loci.trip.TripService.GetTripInvite:output_type -> loci.trip.TripInvitePreview
+	104, // 150: loci.trip.TripService.AcceptTripInvite:output_type -> loci.trip.AcceptTripInviteResponse
+	105, // 151: loci.trip.TripService.RevokeTripInvite:output_type -> loci.trip.RevokeTripInviteResponse
+	106, // 152: loci.trip.TripService.ListTripMembers:output_type -> loci.trip.ListTripMembersResponse
+	107, // 153: loci.trip.TripService.RemoveTripMember:output_type -> loci.trip.RemoveTripMemberResponse
+	108, // 154: loci.trip.TripService.SetTripPlanningRules:output_type -> loci.trip.SetTripPlanningRulesResponse
+	109, // 155: loci.trip.TripService.AddTripComment:output_type -> loci.trip.TripComment
+	110, // 156: loci.trip.TripService.ListTripComments:output_type -> loci.trip.ListTripCommentsResponse
+	111, // 157: loci.trip.TripService.DeleteTripComment:output_type -> loci.trip.DeleteTripCommentResponse
+	112, // 158: loci.trip.TripService.ReportTripComment:output_type -> loci.trip.ReportTripCommentResponse
+	113, // 159: loci.trip.TripService.ListReportedTripComments:output_type -> loci.trip.ListReportedTripCommentsResponse
+	114, // 160: loci.trip.TripService.ResolveTripCommentReport:output_type -> loci.trip.ResolveTripCommentReportResponse
+	114, // [114:161] is the sub-list for method output_type
+	67,  // [67:114] is the sub-list for method input_type
+	67,  // [67:67] is the sub-list for extension type_name
+	67,  // [67:67] is the sub-list for extension extendee
+	0,   // [0:67] is the sub-list for field type_name
 }
 
 func init() { file_loci_trip_trip_proto_init() }
@@ -6132,28 +6516,29 @@ func file_loci_trip_trip_proto_init() {
 	file_loci_trip_trip_proto_msgTypes[0].OneofWrappers = []any{}
 	file_loci_trip_trip_proto_msgTypes[1].OneofWrappers = []any{}
 	file_loci_trip_trip_proto_msgTypes[2].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[3].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[4].OneofWrappers = []any{}
 	file_loci_trip_trip_proto_msgTypes[5].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[9].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[12].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[15].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[16].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[40].OneofWrappers = []any{
+	file_loci_trip_trip_proto_msgTypes[7].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[11].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[14].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[17].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[18].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[42].OneofWrappers = []any{
 		(*CopyTripRequest_TripId)(nil),
 		(*CopyTripRequest_ShareCode)(nil),
 	}
-	file_loci_trip_trip_proto_msgTypes[45].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[52].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[56].OneofWrappers = []any{}
-	file_loci_trip_trip_proto_msgTypes[57].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[47].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[54].OneofWrappers = []any{}
 	file_loci_trip_trip_proto_msgTypes[58].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[59].OneofWrappers = []any{}
+	file_loci_trip_trip_proto_msgTypes[60].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_loci_trip_trip_proto_rawDesc), len(file_loci_trip_trip_proto_rawDesc)),
-			NumEnums:      10,
-			NumMessages:   65,
+			NumEnums:      12,
+			NumMessages:   67,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
