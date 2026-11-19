@@ -88,8 +88,11 @@ type Deps struct {
 	Board     Board
 	Notify    TripNotifier
 	Analytics Analytics
-	Logger    *slog.Logger
-	Now       func() time.Time
+	// Checker keeps the stop checker's offers; optional. Without it (and
+	// Board) OfferMoves does nothing.
+	Checker CheckerStore
+	Logger  *slog.Logger
+	Now     func() time.Time
 }
 
 // Service proposes, applies and dismisses the agent's trip actions.

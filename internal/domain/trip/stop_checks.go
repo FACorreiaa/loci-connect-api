@@ -3,6 +3,9 @@ package trip
 import (
 	"context"
 	"sort"
+	"time"
+
+	"github.com/google/uuid"
 
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -16,6 +19,68 @@ import (
 // production. It must not block on the map; a trip read waits for it.
 type StopChecker interface {
 	Check(ctx context.Context, days []placecheck.Day) [][]placecheck.Check
+	// Moves offers another day for stops whose place is shut all day. It
+	// reads what is already held and never asks the map.
+	Moves(ctx context.Context, days []placecheck.Day) []placecheck.Move
+}
+
+// StopMove is a move the map's hours support: take a stop whose place does
+// not open on its day to a day it does.
+type StopMove struct {
+	StopID  uuid.UUID
+	ToDayID uuid.UUID
+	ToIndex int
+	// Opens and Closes are the place's hours on the new day, in minutes from
+	// midnight; both zero when the stop has no time and only the day is known.
+	Opens, Closes int
+}
+
+// StopFixer turns moves into something the trip's owner can accept. It is
+// told every time the owner reads the trip, with all the moves that hold for
+// the trip as it is then (none included), so it can also take back an offer
+// that no longer holds.
+type StopFixer interface {
+	OfferMoves(ctx context.Context, t *Trip, moves []StopMove)
+}
+
+// WithStopFixes attaches the fixer. Nil is supported and is the default: a
+// shut stop is then stamped and nothing is offered for it.
+func (h *Handler) WithStopFixes(fixes StopFixer) *Handler {
+	h.fixes = fixes
+	return h
+}
+
+// offerFixesTimeout bounds the work one read sets off behind itself.
+const offerFixesTimeout = 10 * time.Second
+
+// offerFixes works out, behind an owner's read of their trip, which shut
+// stops could go to a day their place is open, and hands them to the fixer.
+// draft is the trip as just answered; it is only read.
+func (h *Handler) offerFixes(t *Trip, draft *tripv1.TripDraft) {
+	if h.fixes == nil || h.checks == nil || t == nil || draft == nil {
+		return
+	}
+	days := draft.GetDays()
+	plan := checkPlan(days)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), offerFixesTimeout)
+		defer cancel()
+		var moves []StopMove
+		for _, m := range h.checks.Moves(ctx, plan) {
+			if m.FromDay >= len(days) || m.ToDay >= len(days) || m.Stop >= len(days[m.FromDay].GetStops()) {
+				continue
+			}
+			stopID, err1 := uuid.Parse(days[m.FromDay].GetStops()[m.Stop].GetId())
+			toDayID, err2 := uuid.Parse(days[m.ToDay].GetId())
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			moves = append(moves, StopMove{
+				StopID: stopID, ToDayID: toDayID, ToIndex: m.ToIndex, Opens: m.On.OpensMinute, Closes: m.On.ClosesMinute,
+			})
+		}
+		h.fixes.OfferMoves(ctx, t, moves)
+	}()
 }
 
 // WithStopChecks attaches the checker. Nil is supported and is the default:
@@ -37,29 +102,7 @@ func (h *Handler) checkStops(ctx context.Context, draft *tripv1.TripDraft) {
 		return
 	}
 	days := draft.GetDays()
-	plan := make([]placecheck.Day, len(days))
-	for i, day := range days {
-		d := placecheck.Day{Stops: make([]placecheck.Stop, len(day.GetStops()))}
-		if day.GetDate() != nil {
-			date := day.GetDate().AsTime().UTC()
-			d.Date = &date
-		}
-		d.Centre, d.HasCentre = dayCentre(day)
-		for j, stop := range day.GetStops() {
-			// The place's own name is what the map is asked for. A stop's
-			// name is the traveller's to change ("Lunch") and may no longer
-			// name the place.
-			name := stop.GetPoi().GetName()
-			if name == "" {
-				name = stop.GetName()
-			}
-			d.Stops[j] = placecheck.Stop{
-				POIID: stop.GetPoiId(), Name: name, Category: stop.GetPoi().GetCategory(),
-				StartMinute: stop.StartMinute, DurationMinutes: stop.DurationMinutes,
-			}
-		}
-		plan[i] = d
-	}
+	plan := checkPlan(days)
 
 	answers := h.checks.Check(ctx, plan)
 	if len(answers) != len(days) {
@@ -86,6 +129,41 @@ func (h *Handler) checkStops(ctx context.Context, draft *tripv1.TripDraft) {
 			}
 		}
 	}
+}
+
+// checkPlan is a trip's days as the checker reads them.
+func checkPlan(days []*tripv1.TripDay) []placecheck.Day {
+	plan := make([]placecheck.Day, len(days))
+	for i, day := range days {
+		d := placecheck.Day{Stops: make([]placecheck.Stop, len(day.GetStops()))}
+		if day.GetDate() != nil {
+			date := day.GetDate().AsTime().UTC()
+			d.Date = &date
+		}
+		d.Centre, d.HasCentre = dayCentre(day)
+		// A day with no city of its own is spent in the trip's, so every
+		// such day compares equal.
+		d.City = day.GetCityId()
+		if d.City == "" {
+			d.City = day.GetCityName()
+		}
+		d.Fixed = day.GetTravelDay() || day.GetCompletedAt() != nil
+		for j, stop := range day.GetStops() {
+			// The place's own name is what the map is asked for. A stop's
+			// name is the traveller's to change ("Lunch") and may no longer
+			// name the place.
+			name := stop.GetPoi().GetName()
+			if name == "" {
+				name = stop.GetName()
+			}
+			d.Stops[j] = placecheck.Stop{
+				POIID: stop.GetPoiId(), Name: name, Category: stop.GetPoi().GetCategory(),
+				StartMinute: stop.StartMinute, DurationMinutes: stop.DurationMinutes,
+			}
+		}
+		plan[i] = d
+	}
+	return plan
 }
 
 // dayCentre is where to search around for a day's places: the day's city when

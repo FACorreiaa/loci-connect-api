@@ -7,6 +7,7 @@ import (
 
 	poiv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/poi"
 	tripv1 "github.com/FACorreiaa/loci-connect-proto/v5/gen/go/loci/trip"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FACorreiaa/loci-connect-api/internal/domain/placecheck"
@@ -15,6 +16,9 @@ import (
 type fakeStopChecker struct {
 	got     []placecheck.Day
 	answers [][]placecheck.Check
+
+	moves      []placecheck.Move
+	movesAsked []placecheck.Day
 }
 
 func (f *fakeStopChecker) Check(_ context.Context, days []placecheck.Day) [][]placecheck.Check {
@@ -22,8 +26,14 @@ func (f *fakeStopChecker) Check(_ context.Context, days []placecheck.Day) [][]pl
 	return f.answers
 }
 
+func (f *fakeStopChecker) Moves(_ context.Context, days []placecheck.Day) []placecheck.Move {
+	f.movesAsked = days
+	return f.moves
+}
+
 func checkF64(v float64) *float64 { return &v }
 func checkI32(v int32) *int32     { return &v }
+func checkStr(v string) *string   { return &v }
 
 func TestCheckStopsFillsStopsAndTheDayVerdict(t *testing.T) {
 	tuesday := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
@@ -151,5 +161,76 @@ func TestHoursToProtoCoversEveryState(t *testing.T) {
 	}
 	if len(seen) != len(tripv1.StopHoursState_name) {
 		t.Errorf("mapped %d states, the proto has %d", len(seen), len(tripv1.StopHoursState_name))
+	}
+}
+
+type fakeStopFixer struct {
+	trip  *Trip
+	moves []StopMove
+	done  chan struct{}
+}
+
+func (f *fakeStopFixer) OfferMoves(_ context.Context, t *Trip, moves []StopMove) {
+	f.trip, f.moves = t, moves
+	close(f.done)
+}
+
+func TestOfferFixesHandsTheFixerTheMovesByStopAndDayID(t *testing.T) {
+	monday := time.Date(2026, 4, 13, 0, 0, 0, 0, time.UTC)
+	stop, tue := uuid.New(), uuid.New()
+	draft := &tripv1.TripDraft{Days: []*tripv1.TripDay{
+		{Id: uuid.NewString(), DayNumber: 1, Date: timestamppb.New(monday), Stops: []*tripv1.TripStop{{Id: stop.String(), PoiId: "a", Name: "Museu"}}},
+		{Id: tue.String(), DayNumber: 2, Date: timestamppb.New(monday.AddDate(0, 0, 1)), CityId: checkStr("porto"), TravelDay: true},
+		{Id: uuid.NewString(), DayNumber: 3, Date: timestamppb.New(monday.AddDate(0, 0, 2)), CompletedAt: timestamppb.New(monday)},
+	}}
+	checker := &fakeStopChecker{moves: []placecheck.Move{
+		{FromDay: 0, Stop: 0, ToDay: 1, ToIndex: 2, On: placecheck.Check{OpensMinute: 600, ClosesMinute: 1080}},
+		{FromDay: 0, Stop: 7, ToDay: 1}, // an index the trip does not have
+	}}
+	fixer := &fakeStopFixer{done: make(chan struct{})}
+	h := (&Handler{}).WithStopChecks(checker).WithStopFixes(fixer)
+	owned := &Trip{ID: uuid.New()}
+
+	h.offerFixes(owned, draft)
+	select {
+	case <-fixer.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the fixer was never told")
+	}
+
+	if fixer.trip != owned {
+		t.Errorf("fixer got trip %v, want the one read", fixer.trip)
+	}
+	want := []StopMove{{StopID: stop, ToDayID: tue, ToIndex: 2, Opens: 600, Closes: 1080}}
+	if len(fixer.moves) != 1 || fixer.moves[0] != want[0] {
+		t.Errorf("moves = %+v, want %+v", fixer.moves, want)
+	}
+	// What the checker was told about the days: which city, and which are
+	// not to be touched.
+	if got := checker.movesAsked; len(got) != 3 || got[1].City != "porto" || !got[1].Fixed || !got[2].Fixed || got[0].Fixed {
+		t.Errorf("days asked = %+v", got)
+	}
+}
+
+func TestOfferFixesTellsTheFixerWhenNoMoveHolds(t *testing.T) {
+	fixer := &fakeStopFixer{done: make(chan struct{})}
+	h := (&Handler{}).WithStopChecks(&fakeStopChecker{}).WithStopFixes(fixer)
+	h.offerFixes(&Trip{}, &tripv1.TripDraft{})
+	select {
+	case <-fixer.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the fixer was never told; a stale offer would stand")
+	}
+	if len(fixer.moves) != 0 {
+		t.Errorf("moves = %+v, want none", fixer.moves)
+	}
+}
+
+func TestOfferFixesDoesNothingWithoutAFixer(t *testing.T) {
+	checker := &fakeStopChecker{}
+	(&Handler{}).WithStopChecks(checker).offerFixes(&Trip{}, &tripv1.TripDraft{})
+	time.Sleep(20 * time.Millisecond)
+	if checker.movesAsked != nil {
+		t.Error("asked for moves with nobody to hand them to")
 	}
 }

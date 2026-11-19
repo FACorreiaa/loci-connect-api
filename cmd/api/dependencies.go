@@ -1211,8 +1211,18 @@ func (d *Dependencies) initHandlers() error {
 			// rather than saving another.
 			chatImpl.SetSessionTrips(trip.NewSessionTrips(d.DB.Pool, d.Logger))
 			store := tripaction.NewStore(d.DB.Pool)
+			// PLACE_CHECK_FIXES (default off): a stop whose place is shut
+			// all day is offered a move to a day it is open, as a card the
+			// owner applies. It rests on the map's hours for a matched
+			// place, so it stays off until the matches have been read on
+			// real plans, and does nothing without PLACE_CHECK_ENABLED.
+			var checkerOffers tripaction.CheckerStore
+			if envFlag("PLACE_CHECK_FIXES", false) {
+				checkerOffers = store
+			}
 			tripActions := tripaction.NewService(tripaction.Deps{
 				LLM:       chatImpl.ActionLLM(),
+				Checker:   checkerOffers,
 				Store:     store,
 				Board:     store,
 				Members:   trip.NewMemberAccess(sharingRepo, membersRepo, socialSvc),
@@ -1234,6 +1244,10 @@ func (d *Dependencies) initHandlers() error {
 				chatImpl.SetHotelCompare(cmp, tripActions)
 			}
 			d.ChatHandler = d.ChatHandler.WithTripActions(tripActions).WithTripProposals(tripActions)
+			if checkerOffers != nil {
+				d.TripHandler = d.TripHandler.WithStopFixes(tripActions)
+				d.Logger.Info("stop checks: offering moves for shut stops")
+			}
 			assistantProposals = tripActions
 			// Telegram gets the same proposals as buttons. The bridge was built
 			// earlier (initMessaging); WithTripPlanner attaches to it in place.

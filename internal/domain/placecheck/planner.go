@@ -25,7 +25,14 @@ type Day struct {
 	// is already held and never looked up: there is nowhere to search.
 	Centre    transit.LatLon
 	HasCentre bool
-	Stops     []Stop
+	// City names the city the day is spent in, in whatever form the caller
+	// has; it is only ever compared with another day's. A stop is never
+	// offered a move between days whose City differs.
+	City string
+	// Fixed marks a day stops are not to be moved onto or off: a travel
+	// day, or one already done.
+	Fixed bool
+	Stops []Stop
 }
 
 // Stop is one stop of a day.
@@ -80,6 +87,25 @@ func NewPlanner(svc *Service, cal Calendar, log *slog.Logger) *Planner {
 // It does not fail. If the store cannot be read every stop is unchecked,
 // which a client shows as no stamp at all.
 func (p *Planner) Check(ctx context.Context, days []Day) [][]Check {
+	out, _ := p.plan(ctx, days, true)
+	return out
+}
+
+// Moves offers, for stops whose place is shut all day, another day of the
+// plan on which it is open. It reads only what is already held and never
+// asks the map, so it is safe to call beside Check for the same plan.
+func (p *Planner) Moves(ctx context.Context, days []Day) []Move {
+	checks, eval := p.plan(ctx, days, false)
+	if eval == nil {
+		return nil
+	}
+	return suggestMoves(days, checks, eval, p.svc.now().UTC())
+}
+
+// plan answers for every stop from what is held and, when lookUp is set,
+// sets off lookups for the places not held. The function it returns answers
+// for a stop as if it were on another day; it is nil when nothing is held.
+func (p *Planner) plan(ctx context.Context, days []Day, lookUp bool) ([][]Check, func(day int, s Stop) Check) {
 	out := make([][]Check, len(days))
 	var ids []string
 	for i, d := range days {
@@ -91,21 +117,23 @@ func (p *Planner) Check(ctx context.Context, days []Day) [][]Check {
 		}
 	}
 	if len(ids) == 0 {
-		return out
+		return out, nil
 	}
 
 	held, err := p.svc.store.Get(ctx, ids)
 	if err != nil {
 		p.log.WarnContext(ctx, "placecheck: reading held checks failed", slog.Any("error", err))
-		return out
+		return out, nil
 	}
 	now := p.svc.now().UTC()
 
+	holidays := make([]string, len(days))
 	for i, d := range days {
 		holiday := ""
 		if d.Date != nil && d.HasCentre && p.cal != nil {
 			holiday = p.cal.Holiday(ctx, d.Centre.Lat, d.Centre.Lon, *d.Date)
 		}
+		holidays[i] = holiday
 		var due []POI
 		for j, s := range d.Stops {
 			if s.POIID == "" {
@@ -125,11 +153,19 @@ func (p *Planner) Check(ctx context.Context, days []Day) [][]Check {
 				Date: d.Date, StartMinute: s.StartMinute, DurationMinutes: s.DurationMinutes, Holiday: holiday,
 			})
 		}
-		if d.HasCentre && len(due) > 0 {
+		if lookUp && d.HasCentre && len(due) > 0 {
 			p.lookUp(d.Centre, due)
 		}
 	}
-	return out
+	return out, func(day int, s Stop) Check {
+		v, ok := held[s.POIID]
+		if !ok || day < 0 || day >= len(days) {
+			return Check{}
+		}
+		return Evaluate(&v, Visit{
+			Date: days[day].Date, StartMinute: s.StartMinute, DurationMinutes: s.DurationMinutes, Holiday: holidays[day],
+		})
+	}
 }
 
 // lookUp asks the map about the places in the background. Places already
