@@ -22,16 +22,16 @@ func (f *fakeStopChecker) Check(_ context.Context, days []placecheck.Day) [][]pl
 	return f.answers
 }
 
-func f64(v float64) *float64 { return &v }
-func i32(v int32) *int32     { return &v }
+func checkF64(v float64) *float64 { return &v }
+func checkI32(v int32) *int32     { return &v }
 
 func TestCheckStopsFillsStopsAndTheDayVerdict(t *testing.T) {
 	tuesday := time.Date(2026, 4, 14, 0, 0, 0, 0, time.UTC)
 	checkedAt := tuesday.Add(-time.Hour)
 	draft := &tripv1.TripDraft{Days: []*tripv1.TripDay{{
-		DayNumber: 1, Date: timestamppb.New(tuesday), CityLat: f64(38.72), CityLon: f64(-9.14),
+		DayNumber: 1, Date: timestamppb.New(tuesday), CityLat: checkF64(38.72), CityLon: checkF64(-9.14),
 		Stops: []*tripv1.TripStop{
-			{PoiId: "a", Name: "Lunch", Poi: &poiv1.POIDetailedInfo{Name: "Museu Nacional do Azulejo", Category: "Museum"}, StartMinute: i32(570), DurationMinutes: i32(90)},
+			{PoiId: "a", Name: "Lunch", Poi: &poiv1.POIDetailedInfo{Name: "Museu Nacional do Azulejo", Category: "Museum"}, StartMinute: checkI32(570), DurationMinutes: checkI32(90)},
 			{PoiId: "b", Name: "Tasca do Chico"},
 			{PoiId: "c", Name: "Still being looked up"},
 			{Name: "A pasted pin"},
@@ -117,10 +117,10 @@ func TestCheckStopsIgnoresAnAnswerOfTheWrongShape(t *testing.T) {
 
 func TestDayCentre(t *testing.T) {
 	stop := func(id string, lat, lon float64) *tripv1.TripStop {
-		return &tripv1.TripStop{PoiId: id, Latitude: f64(lat), Longitude: f64(lon)}
+		return &tripv1.TripStop{PoiId: id, Latitude: checkF64(lat), Longitude: checkF64(lon)}
 	}
 
-	got, ok := dayCentre(&tripv1.TripDay{CityLat: f64(41.15), CityLon: f64(-8.61), Stops: []*tripv1.TripStop{stop("a", 1, 1)}})
+	got, ok := dayCentre(&tripv1.TripDay{CityLat: checkF64(41.15), CityLon: checkF64(-8.61), Stops: []*tripv1.TripStop{stop("a", 1, 1)}})
 	if !ok || got.Lat != 41.15 || got.Lon != -8.61 {
 		t.Errorf("with a city: %+v %v, want the city", got, ok)
 	}
@@ -128,8 +128,8 @@ func TestDayCentre(t *testing.T) {
 	// One stop placed in the wrong country must not drag the centre there.
 	got, ok = dayCentre(&tripv1.TripDay{Stops: []*tripv1.TripStop{
 		stop("a", 38.70, -9.20), stop("b", 38.72, -9.14), stop("c", 48.85, 2.35),
-		{Latitude: f64(10), Longitude: f64(10)}, // a pasted pin: no place behind it
-		stop("d", 0, 0),                         // a place with no stored position
+		{Latitude: checkF64(10), Longitude: checkF64(10)}, // a pasted pin: no place behind it
+		stop("d", 0, 0), // a place with no stored position
 	}})
 	if !ok || got.Lat != 38.72 || got.Lon != -9.14 {
 		t.Errorf("median of stops: %+v %v, want 38.72,-9.14", got, ok)
