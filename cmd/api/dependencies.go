@@ -1692,6 +1692,12 @@ func newMapClient(cache cachestore.Store, dailyBudget int) *transit.Overpass {
 //
 //	PLACE_CHECK_ENABLED       on/off (default off)
 //	PLACE_CHECK_DAILY_BUDGET  map queries per UTC day (default 1500)
+//	PLACE_CHECK_MOVE_PLACES   also move each matched place to the map's
+//	                          position (default off). It overwrites the
+//	                          place's stored position and cannot be undone,
+//	                          so leave it off until the matches logged as
+//	                          "place check: found on the map" have been read
+//	                          on real plans and found right.
 //
 // It asks the same server as stay transport (TRANSIT_OVERPASS_URL) on a
 // budget of its own. A city outside the area that server holds comes back
@@ -1711,9 +1717,14 @@ func (d *Dependencies) newStopChecks() *placecheck.Planner {
 		localcontext.NewBigDataCloudGeocoder(os.Getenv("BIGDATACLOUD_BASE_URL"), client, signals),
 		localcontext.NewHolidaySource(os.Getenv("NAGER_DATE_BASE_URL"), client, signals),
 	)
-	d.Logger.Info("stop checks: on")
+	store := placecheck.NewRepository(d.DB.Pool)
+	movePlaces := envFlag("PLACE_CHECK_MOVE_PLACES", false)
+	if movePlaces {
+		store = store.MovingPlaces()
+	}
+	d.Logger.Info("stop checks: on", slog.Bool("move_places", movePlaces))
 	return placecheck.NewPlanner(
-		placecheck.NewService(m, placecheck.NewRepository(d.DB.Pool)).WithLogger(d.Logger), calendar, d.Logger)
+		placecheck.NewService(m, store).WithLogger(d.Logger), calendar, d.Logger)
 }
 
 // newHotelCompare builds what answers a chat message with hotel listing

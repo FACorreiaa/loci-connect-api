@@ -84,9 +84,11 @@ func NewService(finder Finder, store Store) *Service {
 	return &Service{finder: finder, store: store, now: time.Now}
 }
 
-// WithLogger makes the service say which places it could not find. The names
-// are places, not people, and reading them is how the matching gets better:
-// a miss on a real plan is a case no fixture has.
+// WithLogger makes the service say what the map answered for each place:
+// which it could not find, and for each it did, what it took it to be. The
+// names are places, not people. A wrong match counts as "found" exactly as a
+// right one does, so the counter cannot show one; reading asked name beside
+// matched name is the only way to see it on a real plan.
 func (s *Service) WithLogger(log *slog.Logger) *Service {
 	s.log = log
 	return s
@@ -108,7 +110,7 @@ func kindLabel(v transit.VenueKind) string {
 	}
 }
 
-// record counts how each lookup came out and logs the places not found.
+// record counts how each lookup came out and logs each answer.
 func (s *Service) record(due []POI, asks []transit.PlaceQuery, matches []transit.PlaceMatch) {
 	for i, m := range matches {
 		kind := kindLabel(asks[i].Venue)
@@ -123,6 +125,13 @@ func (s *Service) record(due []POI, asks []transit.PlaceQuery, matches []transit
 			observability.RecordPlaceCheck("found_no_hours", kind)
 		default:
 			observability.RecordPlaceCheck("found_with_hours", kind)
+		}
+		if m.Found && s.log != nil {
+			s.log.Info("place check: found on the map",
+				slog.String("name", due[i].Name), slog.String("category", due[i].Category), slog.String("kind", kind),
+				slog.String("matched_name", m.Place.Name), slog.String("matched_kind", m.Place.Kind),
+				slog.String("osm", fmt.Sprintf("%s/%d", m.Place.OSMType, m.Place.OSMID)),
+				slog.Float64("confidence", m.Place.Confidence), slog.Bool("has_hours", m.Place.OpeningHours != ""))
 		}
 	}
 }

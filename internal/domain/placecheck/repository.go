@@ -11,11 +11,26 @@ import (
 
 // Repository is the Postgres Store.
 type Repository struct {
-	db *pgxpool.Pool
+	db         *pgxpool.Pool
+	movePlaces bool
 }
 
-// NewRepository builds the repository.
+// NewRepository builds the repository. It records what the map said and
+// leaves the places themselves alone; see MovingPlaces.
 func NewRepository(db *pgxpool.Pool) *Repository { return &Repository{db: db} }
+
+// MovingPlaces makes Save also move each matched place to where the map says
+// it is.
+//
+// Off unless asked for, because it cannot be taken back: the position the
+// place had is overwritten, not kept, so a wrong match made under one
+// version of the match rule stays wrong after the rule is fixed. The map's
+// position is in the verification row either way. Switch this on once the
+// matches have been read on real plans and found right.
+func (r *Repository) MovingPlaces() *Repository {
+	r.movePlaces = true
+	return r
+}
 
 const getSQL = `
 SELECT poi_id, status = 'matched', source, external_id, wikidata_id, matched_name, kind,
@@ -67,8 +82,8 @@ UPDATE points_of_interest
 SET location = ST_SetSRID(ST_MakePoint($2, $3), 4326)
 WHERE id = $1`
 
-// Save writes the verifications in one transaction and moves each matched
-// place to its position on the map.
+// Save writes the verifications in one transaction and, when MovingPlaces was
+// asked for, moves each matched place to its position on the map.
 func (r *Repository) Save(ctx context.Context, vs []Verification) error {
 	if len(vs) == 0 {
 		return nil
@@ -89,7 +104,7 @@ func (r *Repository) Save(ctx context.Context, vs []Verification) error {
 		}
 		batch.Queue(saveSQL, v.POIID, status, v.Source, v.ExternalID, v.WikidataID, v.MatchedName, v.Kind,
 			lat, lon, v.HoursRaw, v.Confidence, v.CheckedAt, v.ExpiresAt)
-		if !v.Matched {
+		if !v.Matched || !r.movePlaces {
 			continue
 		}
 		// poi_id is TEXT here and a UUID on the place itself; an id that is

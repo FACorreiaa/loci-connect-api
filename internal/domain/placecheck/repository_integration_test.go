@@ -16,7 +16,7 @@ import (
 func TestRepositorySaveAndGet(t *testing.T) {
 	ctx := context.Background()
 	pool := testsupport.MustPool()
-	repo := NewRepository(pool)
+	repo := NewRepository(pool).MovingPlaces()
 	now := time.Date(2026, 4, 14, 9, 0, 0, 0, time.UTC)
 
 	// A place the model put in the wrong part of town.
@@ -62,4 +62,35 @@ func TestRepositorySaveAndGet(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, empty)
 	require.NoError(t, repo.Save(ctx, nil))
+}
+
+// Unless asked to, saving a match records where the map puts the place and
+// leaves the place where it was: that write cannot be taken back.
+func TestRepositorySaveLeavesPlacesAloneByDefault(t *testing.T) {
+	ctx := context.Background()
+	pool := testsupport.MustPool()
+	now := time.Date(2026, 4, 14, 9, 0, 0, 0, time.UTC)
+
+	var poiID uuid.UUID
+	require.NoError(t, pool.QueryRow(ctx, `
+		INSERT INTO points_of_interest (name, location)
+		VALUES ($1, ST_SetSRID(ST_MakePoint(-9.20, 38.80), 4326)) RETURNING id`,
+		"placecheck-"+uuid.NewString()).Scan(&poiID))
+
+	found := Verification{
+		POIID: poiID.String(), Matched: true, Source: SourceOSM, ExternalID: "way/11",
+		MatchedName: "Museu Nacional do Azulejo", Kind: "museum", Lat: 38.7251, Lon: -9.1137,
+		Confidence: 1, CheckedAt: now, ExpiresAt: now.Add(ttlMatched),
+	}
+	repo := NewRepository(pool)
+	require.NoError(t, repo.Save(ctx, []Verification{found}))
+
+	got, err := repo.Get(ctx, []string{poiID.String()})
+	require.NoError(t, err)
+	require.InDelta(t, 38.7251, got[poiID.String()].Lat, 1e-9)
+
+	var lat, lon float64
+	require.NoError(t, pool.QueryRow(ctx, `SELECT ST_Y(location), ST_X(location) FROM points_of_interest WHERE id = $1`, poiID).Scan(&lat, &lon))
+	require.InDelta(t, 38.80, lat, 1e-9)
+	require.InDelta(t, -9.20, lon, 1e-9)
 }
