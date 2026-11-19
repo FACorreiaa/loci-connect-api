@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
+
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/FACorreiaa/loci-connect-api/pkg/transit"
 )
 
@@ -349,5 +352,42 @@ func TestCheckPOIsAsksForBusinessesAsBusinesses(t *testing.T) {
 	}
 	if !finder.venues["Tasca do Chico"] || finder.venues["Plaza Mayor"] || finder.venues["Somewhere"] {
 		t.Errorf("asked as businesses: %v", finder.venues)
+	}
+}
+
+func TestCheckPOIsCountsHowEachLookupCameOut(t *testing.T) {
+	count := func(outcome, kind string) float64 {
+		var m dto.Metric
+		if err := observability.PlaceChecksTotal.WithLabelValues(outcome, kind).Write(&m); err != nil {
+			t.Fatal(err)
+		}
+		return m.GetCounter().GetValue()
+	}
+	before := map[string]float64{
+		"hours": count("found_with_hours", "sight"), "bare": count("found_no_hours", "food"),
+		"miss": count("not_found", "sight"), "failed": count("lookup_failed", "sight"),
+	}
+
+	finder := &fakeFinder{answers: map[string]transit.PlaceMatch{
+		"Museu":   {Found: true, Place: transit.MapPlace{Name: "Museu", OpeningHours: "Tu-Su 10:00-18:00"}},
+		"Tasca":   {Found: true, Place: transit.MapPlace{Name: "Tasca"}},
+		"Nowhere": {},
+	}}
+	svc := newService(&fakeStore{rows: map[string]Verification{}}, finder)
+	if _, err := svc.CheckPOIs(context.Background(), lisbon, []POI{
+		{ID: "a", Name: "Museu", Category: "Museum"},
+		{ID: "b", Name: "Tasca", Category: "Restaurant"},
+		{ID: "c", Name: "Nowhere", Category: "Park"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if count("found_with_hours", "sight") != before["hours"]+1 || count("found_no_hours", "food") != before["bare"]+1 || count("not_found", "sight") != before["miss"]+1 {
+		t.Errorf("outcomes not counted once each")
+	}
+
+	finder.err = errors.New("map down")
+	_, _ = svc.CheckPOIs(context.Background(), lisbon, []POI{{ID: "d", Name: "Later", Category: "Park"}})
+	if count("lookup_failed", "sight") != before["failed"]+1 {
+		t.Errorf("a failed lookup was not counted")
 	}
 }

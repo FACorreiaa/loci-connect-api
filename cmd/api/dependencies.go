@@ -1713,7 +1713,7 @@ func (d *Dependencies) newStopChecks() *placecheck.Planner {
 	)
 	d.Logger.Info("stop checks: on")
 	return placecheck.NewPlanner(
-		placecheck.NewService(m, placecheck.NewRepository(d.DB.Pool)), calendar, d.Logger)
+		placecheck.NewService(m, placecheck.NewRepository(d.DB.Pool)).WithLogger(d.Logger), calendar, d.Logger)
 }
 
 // newHotelCompare builds what answers a chat message with hotel listing

@@ -3,9 +3,11 @@ package placecheck
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
+	"github.com/FACorreiaa/loci-connect-api/pkg/observability"
 	"github.com/FACorreiaa/loci-connect-api/pkg/placematch"
 	"github.com/FACorreiaa/loci-connect-api/pkg/transit"
 )
@@ -73,12 +75,56 @@ func venueCategory(category string) transit.VenueKind {
 type Service struct {
 	finder Finder
 	store  Store
+	log    *slog.Logger
 	now    func() time.Time
 }
 
 // NewService builds the service.
 func NewService(finder Finder, store Store) *Service {
 	return &Service{finder: finder, store: store, now: time.Now}
+}
+
+// WithLogger makes the service say which places it could not find. The names
+// are places, not people, and reading them is how the matching gets better:
+// a miss on a real plan is a case no fixture has.
+func (s *Service) WithLogger(log *slog.Logger) *Service {
+	s.log = log
+	return s
+}
+
+// kindLabel names the kind of place an ask is for, for metrics and logs.
+func kindLabel(v transit.VenueKind) string {
+	switch v {
+	case 0:
+		return "sight"
+	case transit.VenueFood:
+		return "food"
+	case transit.VenueShop:
+		return "shop"
+	case transit.VenueStay:
+		return "stay"
+	default:
+		return "mixed"
+	}
+}
+
+// record counts how each lookup came out and logs the places not found.
+func (s *Service) record(due []POI, asks []transit.PlaceQuery, matches []transit.PlaceMatch) {
+	for i, m := range matches {
+		kind := kindLabel(asks[i].Venue)
+		switch {
+		case !m.Found:
+			observability.RecordPlaceCheck("not_found", kind)
+			if s.log != nil {
+				s.log.Info("place check: not found on the map",
+					slog.String("name", due[i].Name), slog.String("category", due[i].Category), slog.String("kind", kind))
+			}
+		case m.Place.OpeningHours == "":
+			observability.RecordPlaceCheck("found_no_hours", kind)
+		default:
+			observability.RecordPlaceCheck("found_with_hours", kind)
+		}
+	}
 }
 
 // CheckPOIs returns what is known about each place, looking up on the map
@@ -136,11 +182,16 @@ func (s *Service) CheckPOIs(ctx context.Context, near transit.LatLon, pois []POI
 		// A failed lookup may have answered some names and not others, and
 		// does not say which. Nothing is written: an unanswered name saved
 		// as "not found" would hide a real place for a week.
+		for _, a := range asks {
+			observability.RecordPlaceCheck("lookup_failed", kindLabel(a.Venue))
+		}
 		return held, fmt.Errorf("placecheck: map lookup: %w", err)
 	}
 	if len(matches) != len(due) {
 		return held, fmt.Errorf("placecheck: map lookup answered %d of %d names", len(matches), len(due))
 	}
+
+	s.record(due, asks, matches)
 
 	fresh := make([]Verification, len(due))
 	for i, p := range due {
