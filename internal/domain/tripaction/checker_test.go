@@ -214,3 +214,37 @@ func TestOfferMoves_DoesNothingUnlessSwitchedOn(t *testing.T) {
 	svc.OfferMoves(context.Background(), c.trip, []trip.StopMove{c.toTue})
 	require.Empty(t, c.offers(t))
 }
+
+func TestOfferMoves_RewritesAnOfferWhoseHoursOrPlaceInTheDayChanged(t *testing.T) {
+	c := newChecked(t)
+	ctx := context.Background()
+	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{c.toTue})
+
+	// The map now lists other hours for the Tuesday.
+	later := c.toTue
+	later.Opens, later.Closes = 660, 1020
+	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{later})
+	got := c.offers(t)
+	require.Len(t, got, 1)
+	require.Contains(t, got[0].Summary, "open 11:00–17:00")
+
+	// A stop was added to the Tuesday; the museum now goes after it.
+	moved := later
+	moved.ToIndex = 2
+	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{moved})
+	got = c.offers(t)
+	require.Len(t, got, 1)
+	require.Equal(t, 2, got[0].Action.ToIndex)
+}
+
+func TestOfferMoves_ANoToADayHoldsWhenOnlyTheHoursChange(t *testing.T) {
+	c := newChecked(t)
+	ctx := context.Background()
+	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{c.toTue})
+	require.NoError(t, c.svc.Dismiss(ctx, c.uid, c.offers(t)[0].ID))
+
+	later := c.toTue
+	later.Opens = 660
+	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{later})
+	require.Empty(t, c.offers(t))
+}

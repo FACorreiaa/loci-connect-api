@@ -38,9 +38,28 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 		return
 	}
 
-	want := make(map[string]trip.StopMove, len(moves))
+	// Each move as the card it would be. A move whose stop or day is not on
+	// the trip as loaded, or that cannot be worded, is no card.
+	type card struct {
+		action  Action
+		summary string
+	}
+	want := make(map[string]card, len(moves))
+	var order []string
 	for _, m := range moves {
-		want[m.StopID.String()] = m
+		a := Action{Kind: KindMoveStop, StopID: m.StopID.String(), ToDayID: m.ToDayID.String(), ToIndex: m.ToIndex}
+		// The same vetting a member's suggestion passes.
+		if _, err := checkStopEdit(a, t); err != nil {
+			continue
+		}
+		summary, ok := moveSummary(t, m)
+		if !ok {
+			continue
+		}
+		if _, dup := want[a.StopID]; !dup {
+			order = append(order, a.StopID)
+		}
+		want[a.StopID] = card{action: a, summary: summary}
 	}
 	// settled holds the stops needing no new offer: one stands, or the owner
 	// turned this very move down.
@@ -49,11 +68,12 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 		if p.Source != SourceChecker {
 			continue
 		}
-		m, wanted := want[p.Action.StopID]
-		same := wanted && m.ToDayID.String() == p.Action.ToDayID
+		c, wanted := want[p.Action.StopID]
 		switch p.Status {
 		case StatusPending:
-			if same && now.Before(p.ExpiresAt) {
+			// It stands only while it is the card that would be written
+			// now: same day, same place in the day, same hours in its text.
+			if wanted && p.Action == c.action && p.Summary == c.summary && now.Before(p.ExpiresAt) {
 				settled[p.Action.StopID] = true
 				continue
 			}
@@ -63,7 +83,8 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 				settled[p.Action.StopID] = true
 			}
 		case StatusDismissed:
-			if same {
+			// A no is to a day, not to a position or a wording.
+			if wanted && p.Action.ToDayID == c.action.ToDayID {
 				settled[p.Action.StopID] = true
 			}
 		case StatusApplied:
@@ -71,21 +92,12 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 		}
 	}
 
-	for _, m := range moves {
-		if settled[m.StopID.String()] {
+	for _, stopID := range order {
+		if settled[stopID] {
 			continue
 		}
-		a := Action{Kind: KindMoveStop, StopID: m.StopID.String(), ToDayID: m.ToDayID.String(), ToIndex: m.ToIndex}
-		// The same vetting a member's suggestion passes: the stop and the
-		// day are on the trip as loaded.
-		if _, err := checkStopEdit(a, t); err != nil {
-			continue
-		}
-		summary, ok := moveSummary(t, m)
-		if !ok {
-			continue
-		}
-		p := Proposal{UserID: t.UserID, TripID: t.ID, Action: a, Summary: summary, ExpiresAt: now.Add(checkerOfferTTL)}
+		c := want[stopID]
+		p := Proposal{UserID: t.UserID, TripID: t.ID, Action: c.action, Summary: c.summary, ExpiresAt: now.Add(checkerOfferTTL)}
 		created, err := s.d.Checker.CreateChecker(ctx, &p)
 		if err != nil {
 			s.d.Logger.WarnContext(ctx, "checker offers: storing failed", slog.Any("error", err))

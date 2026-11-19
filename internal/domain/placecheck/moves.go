@@ -31,9 +31,10 @@ type Move struct {
 //     at all on the stop's day
 //   - on the new day it is open for the whole visit (or, for a stop with no
 //     time, opens that day), by the same rule that called it shut
-//   - neither day is fixed or already past, both are in the same city, and
-//     the new day is not a public holiday, when listed hours are least to be
-//     trusted
+//   - neither day is fixed or already past, and the new day is still to
+//     come: today's hours may already be gone by the time the card is read
+//   - both days are in the same city, and the new day is not a public
+//     holiday, when listed hours are least to be trusted
 //   - the visit does not overlap a timed stop already on the new day
 //
 // A stop keeps its times when it moves, so no other stop's answer changes.
@@ -67,7 +68,7 @@ func suggestMoves(days []Day, checks [][]Check, eval func(day int, s Stop) Check
 			if j >= len(checks[i]) || !shutAllDay(checks[i][j]) {
 				continue
 			}
-			to, on, ok := openDay(days, i, s, eval, usable, taken)
+			to, on, ok := openDay(days, i, s, eval, usable, today, taken)
 			if !ok {
 				continue
 			}
@@ -86,7 +87,7 @@ func shutAllDay(c Check) bool {
 }
 
 // openDay is the nearest other day s could move to.
-func openDay(days []Day, from int, s Stop, eval func(int, Stop) Check, usable func(Day) bool, taken [][]span) (int, Check, bool) {
+func openDay(days []Day, from int, s Stop, eval func(int, Stop) Check, usable func(Day) bool, today time.Time, taken [][]span) (int, Check, bool) {
 	order := make([]int, 0, len(days))
 	for k := range days {
 		if k != from {
@@ -103,7 +104,7 @@ func openDay(days []Day, from int, s Stop, eval func(int, Stop) Check, usable fu
 	sp, timed := spanOf(s)
 	for _, k := range order {
 		d := days[k]
-		if !usable(d) || d.City != days[from].City {
+		if !usable(d) || !d.Date.After(today) || d.City != days[from].City {
 			continue
 		}
 		on := eval(k, s)

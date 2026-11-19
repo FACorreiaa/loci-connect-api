@@ -125,6 +125,10 @@ func TestMovesOffersNothingItCannotStandBehind(t *testing.T) {
 		{name: "the other day is a public holiday", hours: museum, cal: holidayOn{"2026-04-16": "Feriado"}, days: func() []Day {
 			return planFrom(wednesday, shutWed, nil)
 		}},
+		{name: "the other day is today, and its hours may already be gone", hours: "Tu 10:00-18:00", days: func() []Day {
+			// Tuesday the 14th is today; the stop is on Wednesday.
+			return planFrom(tuesday, nil, []Stop{visit("museum", 660, 90)})
+		}},
 		{name: "the plan has no dates", hours: museum, days: func() []Day {
 			d := planFrom(wednesday, shutWed, nil)
 			d[0].Date, d[1].Date = nil, nil
