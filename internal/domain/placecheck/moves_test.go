@@ -2,6 +2,7 @@ package placecheck
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -182,13 +183,14 @@ func TestMovesDoesNotPutTwoMovedStopsOnTopOfEachOther(t *testing.T) {
 	require.Equal(t, 2, got[1].ToDay, "Thursday at that hour is now taken")
 }
 
-func TestMovesStopsAtAFew(t *testing.T) {
+func TestMovesIsBoundedOnAVeryLongPlan(t *testing.T) {
 	hours := map[string]string{}
 	var shut []Stop
-	for i, id := range []string{"a", "b", "c", "d", "e"} {
+	for i := range maxMoves + 5 {
+		id := fmt.Sprintf("p%d", i)
 		hours[id] = museum
-		//nolint:gosec // a handful of fixture stops
-		shut = append(shut, visit(id, int32(540+i*60), 30))
+		//nolint:gosec // fixture stops, a few dozen
+		shut = append(shut, visit(id, int32(600+i*16), 15))
 	}
 	days := planFrom(wednesday, shut, nil)
 	require.Len(t, newPlanner(held(hours), &fakeFinder{}, nil).Moves(context.Background(), days), maxMoves)

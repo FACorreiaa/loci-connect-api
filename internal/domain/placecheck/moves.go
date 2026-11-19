@@ -5,9 +5,10 @@ import (
 	"time"
 )
 
-// maxMoves is how many moves one plan is offered at a time. A plan with more
-// shut stops than this has a problem a list of cards will not fix.
-const maxMoves = 3
+// maxMoves bounds the moves worked out for one plan. How many are shown at a
+// time is for whoever offers them to decide; this only stops a very long
+// plan costing a very long answer.
+const maxMoves = 20
 
 // Move offers to take a stop whose place is shut all day to another day of
 // the same plan on which it is open. Indexes are into the days given.

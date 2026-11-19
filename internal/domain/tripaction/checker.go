@@ -14,6 +14,11 @@ import (
 // a trip nobody opens.
 const checkerOfferTTL = 7 * 24 * time.Hour
 
+// maxOpenOffers is how many of the checker's offers stand on a trip at once.
+// A plan with more shut stops than this has a problem a longer list of cards
+// would not fix; the next ones are offered as these are answered.
+const maxOpenOffers = 3
+
 // OfferMoves keeps the stop checker's offers on t in step with moves, which
 // are all the moves that hold for the trip as it is now:
 //
@@ -64,6 +69,7 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 	// settled holds the stops needing no new offer: one stands, or the owner
 	// turned this very move down.
 	settled := map[string]bool{}
+	open := 0
 	for _, p := range all {
 		if p.Source != SourceChecker {
 			continue
@@ -75,12 +81,14 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 			// now: same day, same place in the day, same hours in its text.
 			if wanted && p.Action == c.action && p.Summary == c.summary && now.Before(p.ExpiresAt) {
 				settled[p.Action.StopID] = true
+				open++
 				continue
 			}
 			if err := s.d.Checker.DeleteChecker(ctx, p.ID); err != nil {
 				s.d.Logger.WarnContext(ctx, "checker offers: taking one back failed", slog.Any("error", err))
 				// It still holds the stop's one slot; do not try to add beside it.
 				settled[p.Action.StopID] = true
+				open++
 			}
 		case StatusDismissed:
 			// A no is to a day, not to a position or a wording.
@@ -93,6 +101,9 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 	}
 
 	for _, stopID := range order {
+		if open >= maxOpenOffers {
+			break
+		}
 		if settled[stopID] {
 			continue
 		}
@@ -104,6 +115,7 @@ func (s *Service) OfferMoves(ctx context.Context, t *trip.Trip, moves []trip.Sto
 			continue
 		}
 		if created {
+			open++
 			s.capture(t.UserID, "checker_move_offered", map[string]any{"trip_id": t.ID.String()})
 		}
 	}

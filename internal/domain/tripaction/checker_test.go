@@ -248,3 +248,35 @@ func TestOfferMoves_ANoToADayHoldsWhenOnlyTheHoursChange(t *testing.T) {
 	c.svc.OfferMoves(ctx, c.trip, []trip.StopMove{later})
 	require.Empty(t, c.offers(t))
 }
+
+// Five shut stops, three cards at a time; answering one makes room for the
+// next, and a no does not use up a place.
+func TestOfferMoves_ShowsAFewAtATimeAndANoMakesRoom(t *testing.T) {
+	c := newChecked(t)
+	ctx := context.Background()
+	moves := []trip.StopMove{c.toTue}
+	for range 4 {
+		id := uuid.New()
+		c.trip.Days[0].Stops = append(c.trip.Days[0].Stops, trip.TripStop{ID: id, Name: "Another museum"})
+		moves = append(moves, trip.StopMove{StopID: id, ToDayID: c.tue})
+	}
+
+	c.svc.OfferMoves(ctx, c.trip, moves)
+	first := c.offers(t)
+	require.Len(t, first, maxOpenOffers)
+
+	// Reading again adds nothing while three stand.
+	c.svc.OfferMoves(ctx, c.trip, moves)
+	require.Len(t, c.offers(t), maxOpenOffers)
+
+	// A no to one: the fourth stop is offered, and the one refused is not.
+	require.NoError(t, c.svc.Dismiss(ctx, c.uid, first[0].ID))
+	c.svc.OfferMoves(ctx, c.trip, moves)
+	now := c.offers(t)
+	require.Len(t, now, maxOpenOffers)
+	stops := map[string]bool{}
+	for _, p := range now {
+		stops[p.Action.StopID] = true
+	}
+	require.False(t, stops[first[0].Action.StopID])
+}
