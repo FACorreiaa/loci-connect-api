@@ -133,3 +133,67 @@ func TestBoard_SharedProposalsReactionsAndClosing(t *testing.T) {
 	require.NoError(t, testDB.QueryRow(ctx, `SELECT resolved_at FROM trip_action_proposals WHERE id = $1`, edit.ID).Scan(&resolved))
 	require.Nil(t, resolved, "giving a proposal back reopens it")
 }
+
+// The checker's offers: one open per stop however often it is asked for, and
+// only its own open offers can be taken away.
+func TestStore_CheckerOffers(t *testing.T) {
+	ctx := context.Background()
+	store := NewStore(testDB)
+	uid, tid := newUserAndTrip(t)
+	stop, other := uuid.NewString(), uuid.NewString()
+	offer := func(stopID, toDay string) *Proposal {
+		return &Proposal{
+			UserID: uid, TripID: tid, Summary: "Move it.", ExpiresAt: time.Now().Add(time.Hour),
+			Action: Action{Kind: KindMoveStop, StopID: stopID, ToDayID: toDay},
+		}
+	}
+
+	first := offer(stop, "tue")
+	created, err := store.CreateChecker(ctx, first)
+	require.NoError(t, err)
+	require.True(t, created)
+	require.NotEqual(t, uuid.Nil, first.ID)
+
+	// The same stop again, even for another day: the open one stands.
+	created, err = store.CreateChecker(ctx, offer(stop, "wed"))
+	require.NoError(t, err)
+	require.False(t, created)
+
+	// Another stop of the same trip is its own offer.
+	created, err = store.CreateChecker(ctx, offer(other, "tue"))
+	require.NoError(t, err)
+	require.True(t, created)
+
+	got, err := store.GetByID(ctx, first.ID)
+	require.NoError(t, err)
+	require.Equal(t, SourceChecker, got.Source)
+	require.Equal(t, uuid.Nil, got.SessionID)
+	require.Equal(t, "tue", got.Action.ToDayID)
+
+	// Somebody else's proposal for the same stop is not the checker's to delete.
+	chat := offer(stop, "tue")
+	require.NoError(t, store.Create(ctx, chat))
+	require.NoError(t, store.DeleteChecker(ctx, chat.ID))
+	_, err = store.GetByID(ctx, chat.ID)
+	require.NoError(t, err)
+
+	// Taken away, the stop is free to be offered again.
+	require.NoError(t, store.DeleteChecker(ctx, first.ID))
+	_, err = store.GetByID(ctx, first.ID)
+	require.ErrorIs(t, err, ErrNotFound)
+	again := offer(stop, "wed")
+	created, err = store.CreateChecker(ctx, again)
+	require.NoError(t, err)
+	require.True(t, created)
+
+	// Once the owner has answered, it is kept: no deleting a dismissed offer,
+	// and the stop can be offered a different move.
+	require.NoError(t, store.Transition(ctx, again.ID, StatusPending, StatusDismissed))
+	require.NoError(t, store.DeleteChecker(ctx, again.ID))
+	kept, err := store.GetByID(ctx, again.ID)
+	require.NoError(t, err)
+	require.Equal(t, StatusDismissed, kept.Status)
+	created, err = store.CreateChecker(ctx, offer(stop, "thu"))
+	require.NoError(t, err)
+	require.True(t, created)
+}

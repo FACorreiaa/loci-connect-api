@@ -48,6 +48,10 @@ func ViewToProto(v *View) *chatv1.ActionProposal {
 var sources = map[Source]chatv1.ProposalSource{
 	SourceChat:   chatv1.ProposalSource_PROPOSAL_SOURCE_CHAT,
 	SourceEditor: chatv1.ProposalSource_PROPOSAL_SOURCE_EDITOR,
+	// The wire has no source for the checker yet. Its cards go out as the
+	// planner's, which is how both clients already word anything that is
+	// not a member's suggestion; the summary says the map is the reason.
+	SourceChecker: chatv1.ProposalSource_PROPOSAL_SOURCE_CHAT,
 }
 
 var statuses = map[Status]chatv1.ProposalStatus{

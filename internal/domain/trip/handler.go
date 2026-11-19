@@ -55,6 +55,7 @@ type Handler struct {
 	// Optional, attached via WithStopChecks: fills each stop's `check` and
 	// each day's `verdict` from what a real map says. Nil leaves both absent.
 	checks StopChecker
+	fixes  StopFixer
 
 	// Optional, attached via WithStopImages: fills each stop's `image` from
 	// the POI's first stored picture. Nil leaves stops without one.
@@ -178,6 +179,7 @@ func (h *Handler) GetTrip(ctx context.Context, req *connect.Request[tripv1.GetTr
 	p := h.respond(ctx, t)
 	p.ViewerRole = tripv1.TripRole_TRIP_ROLE_OWNER
 	h.withMembers(ctx, p, t)
+	h.offerFixes(t, p)
 	return connect.NewResponse(p), nil
 }
 

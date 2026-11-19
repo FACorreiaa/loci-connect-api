@@ -47,6 +47,9 @@ type Source string
 const (
 	SourceChat   Source = "chat"
 	SourceEditor Source = "editor"
+	// SourceChecker is the stop checker: a change the map's opening hours
+	// support, offered to the owner. Nobody asked for it.
+	SourceChecker Source = "checker"
 )
 
 // Proposal is an action waiting for the traveller. SessionID is uuid.Nil
@@ -96,6 +99,18 @@ type Store interface {
 	Transition(ctx context.Context, id uuid.UUID, from, to Status) error
 }
 
+// CheckerStore keeps the stop checker's offers. They differ from every other
+// proposal in two ways: nobody asked for one, so at most one stands per stop,
+// and one that stops being true is taken away, not left to be dismissed.
+type CheckerStore interface {
+	// CreateChecker stores p unless an open offer already stands for the
+	// same stop of the same trip; it reports whether it stored it.
+	CreateChecker(ctx context.Context, p *Proposal) (bool, error)
+	// DeleteChecker removes an open offer of the checker's. It does nothing
+	// to an offer already applied or dismissed, or to anyone else's proposal.
+	DeleteChecker(ctx context.Context, id uuid.UUID) error
+}
+
 type pgStore struct{ db *pgxpool.Pool }
 
 // NewStore is the Postgres Store; it is also the Board.
@@ -134,6 +149,39 @@ func (s *pgStore) Create(ctx context.Context, p *Proposal) error {
 		p.UserID, p.TripID, nullable(p.SessionID), action, options, p.Summary, p.Status, p.ExpiresAt, p.Source, base).
 		Scan(&p.ID, &p.CreatedAt); err != nil {
 		return fmt.Errorf("store trip action: %w", err)
+	}
+	return nil
+}
+
+func (s *pgStore) CreateChecker(ctx context.Context, p *Proposal) (bool, error) {
+	action, err := json.Marshal(p.Action)
+	if err != nil {
+		return false, fmt.Errorf("marshal action: %w", err)
+	}
+	p.Status, p.Source = StatusPending, SourceChecker
+	// The partial unique index on (trip, stop) is what makes two reads of a
+	// trip at the same moment offer one card and not two.
+	err = s.db.QueryRow(ctx, `
+		INSERT INTO trip_action_proposals (user_id, trip_id, action, options, summary, status, expires_at, source)
+		VALUES ($1, $2, $3, '[]', $4, $5, $6, $7)
+		ON CONFLICT DO NOTHING
+		RETURNING id, created_at`,
+		p.UserID, p.TripID, action, p.Summary, p.Status, p.ExpiresAt, p.Source).
+		Scan(&p.ID, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("store checker offer: %w", err)
+	}
+	return true, nil
+}
+
+func (s *pgStore) DeleteChecker(ctx context.Context, id uuid.UUID) error {
+	if _, err := s.db.Exec(ctx, `
+		DELETE FROM trip_action_proposals
+		WHERE id = $1 AND source = 'checker' AND status = 'pending'`, id); err != nil {
+		return fmt.Errorf("delete checker offer: %w", err)
 	}
 	return nil
 }
