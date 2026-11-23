@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS answer_evidence (
     -- by recommendation_events and user_visited_pois. No FK: llm_interactions is
     -- a TimescaleDB hypertable (migration 0044) and carrying a foreign key into
     -- it would block chunk maintenance.
+    -- (Correction, migration 0138: the hypertable was never created. 0044's
+    -- create_hypertable failed quietly, and TimescaleDB is now gone.)
     llm_interaction_id TEXT NOT NULL CHECK (llm_interaction_id <> ''),
 
     -- Stable hash over (user, query, city, ordered candidate ids). The same

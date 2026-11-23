@@ -13,8 +13,9 @@
 --   * postgis_tiger_geocoder: PostGIS 3.7, the first release for PostgreSQL 19,
 --     no longer ships it. Migration 0001 created it; nothing calls it.
 --
--- If a hypertable does exist after all, this refuses to run rather than let
--- DROP ... CASCADE take its data: move the rows into a plain table first.
+-- Neither drop uses CASCADE: if anything still depends on either extension,
+-- this fails instead of taking it along. A hypertable gets its own clear
+-- message: move its rows into a plain table first.
 --
 -- The server keeps shared_preload_libraries=timescaledb until this has run in
 -- production. Removing the preload (platform/infra apps/loci/data/postgres.yaml)
@@ -34,15 +35,15 @@ BEGIN
                 'refusing to drop timescaledb: % hypertable(s) exist. Copy their rows into plain tables first.',
                 hypertable_count;
         END IF;
-        DROP EXTENSION timescaledb CASCADE;
+        DROP EXTENSION timescaledb;
     END IF;
 END $$;
 -- +goose StatementEnd
 
 -- Dropping the extension removes tiger_data and every object in tiger, but
--- leaves the tiger schema itself behind, empty. No CASCADE on the schema: if
--- anything else ever landed in it, this fails instead of deleting it.
+-- leaves the tiger schema itself behind, empty. If anything else ever landed
+-- in it, DROP SCHEMA fails instead of deleting it.
 -- fuzzystrmatch, which tiger needed, stays: the infra init script creates it
 -- too, and it is harmless.
-DROP EXTENSION IF EXISTS postgis_tiger_geocoder CASCADE;
+DROP EXTENSION IF EXISTS postgis_tiger_geocoder;
 DROP SCHEMA IF EXISTS tiger;
