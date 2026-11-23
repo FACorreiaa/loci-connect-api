@@ -33,8 +33,8 @@ test: ## Run tests
 test-coverage: test ## Run tests with coverage report
 	go tool cover -html=coverage.out
 
-# Integration & e2e tests spin an ephemeral Postgres (PostGIS + TimescaleDB +
-# pgvector) via testcontainers-go, so they require a running Docker daemon.
+# Integration & e2e tests spin an ephemeral Postgres (PostGIS + pgvector) via
+# testcontainers-go, so they require a running Docker daemon.
 # Override the image with TEST_POSTGRES_IMAGE if needed. Serialized (-p 1) so the
 # per-package containers don't contend.
 test-integration: ## Run integration tests (requires Docker)

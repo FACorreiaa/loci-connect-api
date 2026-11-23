@@ -21,8 +21,8 @@ import (
 )
 
 // Run with: WATCH_TEST_DSN=postgres://... go test -tags=integration ./internal/domain/watch/
-// The database needs the image the migrations expect (PostGIS + TimescaleDB +
-// pgvector, e.g. timescale/timescaledb-ha:pg17); migrations are applied here.
+// The database needs the image the migrations expect (PostGIS + pgvector,
+// e.g. timescale/timescaledb-ha:pg18); migrations are applied here.
 
 var migrateOnce sync.Once
 
