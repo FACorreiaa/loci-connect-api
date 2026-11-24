@@ -147,10 +147,19 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      # Test against the production database image itself (amd64, like the
+      # runner) rather than the multi-arch stand-in testsupport uses locally.
+      - name: Build production Postgres image
+        run: docker build -f postgres.Dockerfile -t loci-postgres:ci .
+
       # ubuntu-latest runners include a running Docker daemon, which
       # testcontainers-go uses to spin the ephemeral Postgres image.
       - name: Run integration tests
+        env:
+          TEST_POSTGRES_IMAGE: loci-postgres:ci
         run: make test-integration
 
       - name: Run end-to-end tests
+        env:
+          TEST_POSTGRES_IMAGE: loci-postgres:ci
         run: make test-e2e

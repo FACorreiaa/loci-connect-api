@@ -1,8 +1,8 @@
 //go:build integration || e2e
 
 // Package testsupport provides shared helpers for integration and e2e tests,
-// notably an ephemeral Postgres container (PostGIS + TimescaleDB + pgvector)
-// with the application's real migrations applied.
+// notably an ephemeral Postgres container (PostGIS + pgvector) with the
+// application's real migrations applied.
 package testsupport
 
 import (
@@ -30,18 +30,20 @@ const (
 	testDBName = "loci_test"
 
 	// defaultImage is a multi-arch (amd64 + arm64) image bundling PostgreSQL,
-	// PostGIS, pgvector and TimescaleDB — the extensions the migrations require.
-	// The production image (postgis/postgis, built via postgres.Dockerfile) is
+	// PostGIS and pgvector, the extensions the migrations require. It also
+	// ships TimescaleDB, which the migrations no longer use (see 0138). The
+	// production image (postgis/postgis, built via postgres.Dockerfile) is
 	// amd64-only, so it cannot build on Apple Silicon; this prebuilt image runs
-	// everywhere and avoids a multi-minute source compile. Override with
-	// TEST_POSTGRES_IMAGE if a different version is needed.
+	// everywhere and avoids a multi-minute source compile. CI sets
+	// TEST_POSTGRES_IMAGE to a build of postgres.Dockerfile, so it tests the
+	// production image itself.
 	//
-	// Pinned by digest (the multi-arch index of pg17 as published 2026-10-27:
-	// PostgreSQL 17.11, PostGIS 3.6.4, TimescaleDB 2.31.0). The floating pg17
-	// tag was republished without postgis_tiger_geocoder, which migration 0001
-	// creates, and every integration test then failed before its first query.
-	// Move the pin on purpose, after checking the new image against 0001.
-	defaultImage = "timescale/timescaledb-ha:pg17@sha256:3f0b3f6bdf4912878444a36e6113a18346309583c4d1a61d81a0c511342a1afd"
+	// Pinned by digest: the multi-arch index of pg18 as published on
+	// 2026-11-23 (PostgreSQL 18.7, PostGIS 3.7.0, pgvector 0.8.7), the same
+	// major production runs. Floating tags here have been republished with a
+	// different extension set before, which broke every test at migration 0001.
+	// Move the pin on purpose, after running the migrations against it.
+	defaultImage = "timescale/timescaledb-ha:pg18@sha256:ff4362ab6890052930ef75a72d94b7072fcc510bc79c84722700c1b2b68f3474"
 )
 
 func image() string {
@@ -62,7 +64,7 @@ var (
 
 // StartPostgres returns a connection pool to a shared, migrated Postgres
 // container. The container is built and started once per test process (the
-// PostGIS/TimescaleDB/pgvector image is expensive to build); subsequent calls
+// PostGIS/pgvector image is expensive to build); subsequent calls
 // reuse it. The container is reaped automatically by Ryuk when the process
 // exits.
 func StartPostgres(t *testing.T) (*pgxpool.Pool, string) {
