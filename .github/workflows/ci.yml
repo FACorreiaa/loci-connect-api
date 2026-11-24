@@ -131,7 +131,24 @@ jobs:
         run: go test -race ./...
 
   integration:
+    # The pg18 leg is production. The pg19 leg builds the same Dockerfile on
+    # postgis/postgis:19-3.7 with pgvector 0.8.7, so a migration or query that
+    # breaks on the next major shows up here first. It may fail without
+    # blocking the PR; the pg18 check keeps its name so it stays the one
+    # branch protection and history refer to.
+    name: integration${{ matrix.pg != '18' && format(' (pg{0}, allowed to fail)', matrix.pg) || '' }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.pg != '18' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pg: "18"
+            postgis: "3.6"
+            pgvector: "0.8.2"
+          - pg: "19"
+            postgis: "3.7"
+            pgvector: "0.8.7"
     needs:
       - proto
       - test
@@ -150,7 +167,12 @@ jobs:
       # Test against the production database image itself (amd64, like the
       # runner) rather than the multi-arch stand-in testsupport uses locally.
       - name: Build production Postgres image
-        run: docker build -f postgres.Dockerfile -t loci-postgres:ci .
+        run: >-
+          docker build -f postgres.Dockerfile -t loci-postgres:ci
+          --build-arg PG_MAJOR=${{ matrix.pg }}
+          --build-arg POSTGIS_VERSION=${{ matrix.postgis }}
+          --build-arg PGVECTOR_VERSION=${{ matrix.pgvector }}
+          .
 
       # ubuntu-latest runners include a running Docker daemon, which
       # testcontainers-go uses to spin the ephemeral Postgres image.

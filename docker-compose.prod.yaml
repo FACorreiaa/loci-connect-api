@@ -1,5 +1,5 @@
 # Production stack for a single VPS: Go API + self-hosted Postgres
-# (PostGIS + TimescaleDB + pgvector). Both images are prebuilt in CI and pulled
+# (PostGIS + pgvector). Both images are prebuilt in CI and pulled
 # here, so the VPS never compiles anything.
 #
 # Usage on the VPS:

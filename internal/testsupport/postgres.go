@@ -31,10 +31,12 @@ const (
 
 	// defaultImage is a multi-arch (amd64 + arm64) image bundling PostgreSQL,
 	// PostGIS and pgvector, the extensions the migrations require. It also
-	// ships TimescaleDB, which the migrations no longer use (see 0138). The
-	// production image (postgis/postgis, built via postgres.Dockerfile) is
-	// amd64-only, so it cannot build on Apple Silicon; this prebuilt image runs
-	// everywhere and avoids a multi-minute source compile. CI sets
+	// ships TimescaleDB, which neither the migrations (see 0138) nor the
+	// production image use any more; nothing creates it, so its presence is
+	// harmless. The production image (postgis/postgis, built via
+	// postgres.Dockerfile) is amd64-only, so it cannot build on Apple Silicon;
+	// this prebuilt image runs everywhere and avoids a multi-minute source
+	// compile. CI sets
 	// TEST_POSTGRES_IMAGE to a build of postgres.Dockerfile, so it tests the
 	// production image itself.
 	//

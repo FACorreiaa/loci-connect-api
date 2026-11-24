@@ -1,19 +1,26 @@
-FROM postgis/postgis:18-3.6
+# Loci's Postgres: PostGIS from the base image, pgvector built from source.
+#
+# PG_MAJOR and POSTGIS_VERSION pick the base and must name a published
+# postgis/postgis tag. The defaults are what production runs; CI also builds
+# 19 / 3.7 / 0.8.7 as an early warning for the next major. pgvector has to be
+# rebuilt for each major, and 0.8.7 is the first release that supports 19.
+#
+# TimescaleDB is gone (migration 0138 drops the extension). Do not deploy this
+# image to a server whose database still has it installed, or whose args still
+# preload it: Postgres refuses to start without the library.
+ARG PG_MAJOR=18
+ARG POSTGIS_VERSION=3.6
+FROM postgis/postgis:${PG_MAJOR}-${POSTGIS_VERSION}
 
-# Install build dependencies
+ARG PG_MAJOR
+ARG PGVECTOR_VERSION=0.8.2
+
 RUN apt-get update && apt-get install -y \
     build-essential \
-    postgresql-server-dev-18 \
-    curl \
-    gnupg \
-    lsb-release
+    postgresql-server-dev-${PG_MAJOR} \
+    curl
 
-# Install TimescaleDB
-RUN curl -s https://packagecloud.io/install/repositories/timescale/timescaledb/script.deb.sh | bash \
-    && apt-get install -y timescaledb-2-postgresql-18
-
-# Download and extract latest pgvector (0.8.2)
-RUN curl -L https://github.com/pgvector/pgvector/archive/refs/tags/v0.8.2.tar.gz | tar xz -C /tmp
+RUN curl -L "https://github.com/pgvector/pgvector/archive/refs/tags/v${PGVECTOR_VERSION}.tar.gz" | tar xz -C /tmp
 
 # Build and install pgvector.
 #
@@ -23,7 +30,7 @@ RUN curl -L https://github.com/pgvector/pgvector/archive/refs/tags/v0.8.2.tar.gz
 # (AVX2, no AVX-512) every `<=>` query killed its backend with SIGILL and
 # took Postgres into recovery. x86-64-v3 is AVX2+FMA: what the node has, and
 # what pgvector's own release packages target.
-RUN cd /tmp/pgvector-0.8.2 && make OPTFLAGS="-march=x86-64-v3" && make install
+RUN cd "/tmp/pgvector-${PGVECTOR_VERSION}" && make OPTFLAGS="-march=x86-64-v3" && make install
 
 # Clean up
-RUN rm -rf /tmp/pgvector-0.8.2 && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /tmp/pgvector-* && rm -rf /var/lib/apt/lists/*
