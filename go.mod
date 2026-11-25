@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
-	buf.build/go/protovalidate v1.4.0
+	buf.build/go/protovalidate v1.4.1
 	connectrpc.com/connect v1.21.1
 	connectrpc.com/cors v0.1.0
 	connectrpc.com/validate v0.9.0
@@ -16,8 +16,8 @@ require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/aws/aws-sdk-go-v2 v1.48.0
-	github.com/aws/aws-sdk-go-v2/credentials v1.21.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.10
+	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.116.0
 	github.com/aws/smithy-go v1.28.9
 	github.com/fogleman/gg v1.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -44,7 +44,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/stripe/stripe-go/v81 v81.4.0
 	github.com/testcontainers/testcontainers-go v0.45.0
-	github.com/twilio/twilio-go v1.33.0
+	github.com/twilio/twilio-go v1.33.1
 	go.opentelemetry.io/contrib/bridges/prometheus v0.72.0
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.47.0
@@ -55,13 +55,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
-	golang.org/x/net v0.62.0
+	golang.org/x/net v0.63.0
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
 	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
-	google.golang.org/api v0.315.0
-	google.golang.org/genai v1.77.0
+	google.golang.org/api v0.316.0
+	google.golang.org/genai v1.79.1
 	google.golang.org/protobuf v1.36.12
 )
 
